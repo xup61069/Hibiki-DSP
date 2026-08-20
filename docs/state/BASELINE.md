@@ -26,6 +26,8 @@
 - MS-PL WaveRT endpoint control-state core with fixed-format validation, Q16.16 dB safety
   ceiling, mute/generation ordering and Strict Direct behavior; the PortCls miniport is not
   yet wired and no `.sys` is built here.
+- Persistent no-allocation linear SRC with phase and boundary-frame carry across output blocks;
+  insufficient output capacity is rejected before partial consumption.
 
 ## 尚未開始
 
@@ -44,7 +46,8 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 ## 最近驗證
 
 初始 foundation evidence 已寫入 `evidence/0000-foundation/initial.json`，目前對應最新
-Windows volume/device、ISO formula、recovery 與 driver control-core baseline commit `828ade7`；
+Windows volume/device、ISO formula、recovery、driver control-core 與 persistent SRC baseline
+commit `5f81320`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
