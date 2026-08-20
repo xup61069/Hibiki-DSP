@@ -52,6 +52,33 @@ bool validate_policy(const EqualLoudnessPolicyV1& policy) noexcept {
     return true;
 }
 
+bool iso226_spl_from_phon(const Iso226FormulaPointV1& point,
+                          const Iso226FormulaReferenceV1& reference,
+                          const double phon,
+                          double& spl_db) noexcept {
+    if (!std::isfinite(point.frequency_hz) || point.frequency_hz < 20.0 ||
+        point.frequency_hz > 12500.0 || !std::isfinite(point.alpha_f) || point.alpha_f <= 0.0 ||
+        !std::isfinite(point.threshold_db) || !std::isfinite(point.transfer_db) ||
+        !std::isfinite(reference.reference_alpha) || reference.reference_alpha <= 0.0 ||
+        !std::isfinite(reference.reference_threshold_db) || !std::isfinite(phon) || phon < 20.0 ||
+        phon > 90.0) {
+        return false;
+    }
+    const double loudness_term =
+        std::pow(10.0, reference.reference_alpha * phon / 10.0) -
+        std::pow(10.0, reference.reference_alpha * reference.reference_threshold_db / 10.0);
+    const double transfer_term = std::pow(
+        4.0e-10, reference.reference_alpha - point.alpha_f) * loudness_term;
+    const double threshold_term =
+        std::pow(10.0, point.alpha_f * (point.threshold_db + point.transfer_db) / 10.0);
+    const double inside = transfer_term + threshold_term;
+    if (!std::isfinite(inside) || inside <= 0.0) {
+        return false;
+    }
+    spl_db = (10.0 / point.alpha_f) * std::log10(inside) - point.transfer_db;
+    return std::isfinite(spl_db);
+}
+
 CompensationResult build_compensation(const std::vector<IsoContourPoint>& current,
                                       const std::vector<IsoContourPoint>& reference,
                                       const EqualLoudnessPolicyV1& policy) noexcept {

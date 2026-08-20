@@ -14,6 +14,18 @@ struct IsoContourPoint {
     double spl_db{0.0};
 };
 
+struct Iso226FormulaPointV1 {
+    double frequency_hz{1000.0};
+    double alpha_f{0.30};
+    double threshold_db{2.4};
+    double transfer_db{0.0};
+};
+
+struct Iso226FormulaReferenceV1 {
+    double reference_alpha{0.30};
+    double reference_threshold_db{2.4};
+};
+
 enum class EqualLoudnessMode : std::uint8_t {
     Calibrated,
     Relative,
@@ -57,6 +69,12 @@ struct EqualLoudnessStatusV1 {
 };
 
 [[nodiscard]] bool validate_policy(const EqualLoudnessPolicyV1& policy) noexcept;
+// ISO 226:2023 formula with caller-supplied, legally obtained parameters. No
+// standard coefficient table is embedded in this repository.
+[[nodiscard]] bool iso226_spl_from_phon(const Iso226FormulaPointV1& point,
+                                        const Iso226FormulaReferenceV1& reference,
+                                        double phon,
+                                        double& spl_db) noexcept;
 
 // The caller supplies legally obtained ISO contour values. This module does
 // not embed the licensed ISO document or a restricted Annex table.

@@ -62,6 +62,15 @@ int main() {
     CHECK(std::abs(result.points[1].gain_db) < 1e-12);
     CHECK(std::abs(result.points[0].gain_db - 6.0) < 1e-12);
     CHECK(result.limited);
+    double one_k_spl = 0.0;
+    CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{1000.0, 0.30, 2.4, 0.0},
+                               Iso226FormulaReferenceV1{0.30, 2.4}, 80.0, one_k_spl));
+    CHECK(std::abs(one_k_spl - 80.0) < 1e-10);
+    CHECK(!iso226_spl_from_phon(Iso226FormulaPointV1{1000.0, 0.30, 2.4, 0.0},
+                                Iso226FormulaReferenceV1{0.30, 2.4}, 10.0, one_k_spl));
+    CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{1000.0, 0.25, 2.4, 0.0},
+                               Iso226FormulaReferenceV1{0.25, 2.4}, 60.0, one_k_spl));
+    CHECK(std::abs(one_k_spl - 60.0) < 1e-10);
 
     EqualLoudnessPolicyV1 calibrated;
     calibrated.mode = EqualLoudnessMode::Calibrated;
