@@ -26,6 +26,7 @@ extern "C" {
 #include "hibiki/scene_presets.hpp"
 #include "hibiki/scene_safety.hpp"
 #include "hibiki/volume_state.hpp"
+#include "hibiki/virtual_mic.hpp"
 #if defined(_WIN32)
 #include <windows.h>
 #include "hibiki/windows_volume_broker.hpp"
@@ -144,6 +145,20 @@ int main() {
     CHECK(sink_model.snapshot().ratio > 1.0 && sink_model.snapshot().source_step < 1.0);
     CHECK(sink_model.process(first_block, 4, resampled, 8, output_frames));
     CHECK(output_frames > 0);
+
+    VirtualMicRouteModel virtual_mic;
+    CHECK(virtual_mic.prepare(VirtualMicConfigV1{1U, 48000U, true}));
+    const float mic_input[2] = {0.25F, -0.5F};
+    float mic_output[2]{};
+    float mic_reference[2]{};
+    CHECK(virtual_mic.process_capture(mic_input, mic_output, 2U));
+    CHECK(mic_output[0] == 0.0F && mic_output[1] == 0.0F);
+    virtual_mic.set_privacy_mute(false);
+    CHECK(virtual_mic.process_capture(mic_input, mic_output, 2U));
+    CHECK(mic_output[0] == mic_input[0] && mic_output[1] == mic_input[1]);
+    CHECK(virtual_mic.process_echo_reference(mic_input, mic_reference, 2U));
+    CHECK(mic_reference[1] == mic_input[1]);
+    CHECK(!virtual_mic.prepare(VirtualMicConfigV1{3U, 48000U, true}));
 
     OutputCrossfade crossfade;
     CHECK(crossfade.begin(2, 48000, 30));

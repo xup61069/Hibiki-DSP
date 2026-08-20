@@ -39,7 +39,8 @@
     {"command": "tab-capture-queue", "status": "pass", "coverage": ["validated packet copy", "fixed four-slot SPSC handoff", "dropped-block bound", "allocation-free pop"]},
     {"command": "wasapi-output-boundary", "status": "pass", "coverage": ["Float32 format gate", "invalid configuration fail-closed", "dedicated COM sink worker source", "bounded SPSC submit", "silence underrun path", "worker-side persistent SRC/clock request"]},
     {"command": "vst3-worker-protocol", "status": "pass", "coverage": ["36-byte little-endian header", "message type validation", "exact ProcessBlock payload", "finite Float32 sample validation"]},
-    {"command": "vst3-worker-pipe", "status": "pass", "coverage": ["named-pipe server boundary", "overlapped connect source", "bounded length prefix", "caller-owned receive buffer", "sandbox launch/stop lifecycle source"]}
+    {"command": "vst3-worker-pipe", "status": "pass", "coverage": ["named-pipe server boundary", "overlapped connect source", "bounded length prefix", "caller-owned receive buffer", "sandbox launch/stop lifecycle source"]},
+    {"command": "virtual-mic-contract", "status": "pass", "coverage": ["format validation", "privacy mute default", "capture passthrough", "echo-reference copy"]}
   ],
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",

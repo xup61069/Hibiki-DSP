@@ -62,6 +62,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   的 `render` 處理 padding、WASAPI buffer copy、ReleaseBuffer。格式不符、裝置不存在或 buffer
   不足都回傳失敗；Hibiki graph RT thread 不得呼叫此 COM API、初始化 COM、配置或重新綁定，
   control plane 只能排程 worker command。
+- `VirtualMicRouteModel` 提供未來 Virtual Mic endpoint 的 user-space capture/reference contract：
+  固定 1/2 聲道與 44.1/48/96/192 kHz、privacy mute 預設開啟、caller-owned passthrough 與
+  render echo-reference copy；它不宣稱 AEC/降噪，driver/IPC/permission indicator 必須另行
+  驗收。
 
 ## 未解問題（阻擋完整 driver 實作）
 

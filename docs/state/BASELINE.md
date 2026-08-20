@@ -55,6 +55,9 @@
 - `vst3_worker_protocol.hpp`/`.cpp` now provide a fixed 36-byte little-endian worker frame codec
   with Hello/Heartbeat/Process/Shutdown/Error types, exact Float32 payload validation and finite
   sample checks. Named-pipe transport and actual SDK dispatch remain pending.
+- `VirtualMicRouteModel` now defines fixed 1/2-channel capture/reference blocks, fail-closed
+  privacy mute and explicit echo-reference enablement; it intentionally does not claim AEC/NS or a
+  loadable virtual capture driver.
 - `Vst3WorkerPipeV1` is now attached to `Vst3SandboxProcess`: optional launch pipe setup passes
   `--hibiki-pipe`, bounded overlapped connect/read/write is exposed only to control/IPC callers,
   and stop closes the pipe with the Job Object. The actual worker executable still remains pending.
@@ -104,7 +107,7 @@ baseline commit `bce4535`；
 working tree 與該 scope 是否一致。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 40 個必要入口與
-9 份 Spec 通過；`source-policy.ps1` 掃描 166 個路徑且無 blocked binary/secret；
+9 份 Spec 通過；`source-policy.ps1` 掃描 168 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1` 與
 `distribution-check.ps1` 與 `driver-source-check.ps1` 通過；16 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
