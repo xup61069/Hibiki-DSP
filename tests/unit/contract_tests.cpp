@@ -5,6 +5,7 @@
 #include "hibiki/asio_bridge.hpp"
 #include "hibiki/calibration.hpp"
 #include "hibiki/plugin_host.hpp"
+#include "hibiki/vst3_sandbox.hpp"
 #include "hibiki/output_sink.hpp"
 #include "hibiki/output_crossfade.hpp"
 #include "hibiki/exporters.hpp"
@@ -311,6 +312,12 @@ int main() {
     CHECK(plugin_output[0] == plugin_input[0] && plugin_output[1] == plugin_input[1]);
     plugin.report_crash();
     CHECK(!plugin.process_passthrough(plugin_input, plugin_output, 2));
+
+    Vst3SandboxProcess sandbox;
+    CHECK(!sandbox.launch(Vst3SandboxLaunchV1{L"", L"", 250}));
+    CHECK(sandbox.state() == Vst3SandboxState::Quarantined);
+    sandbox.stop();
+    CHECK(sandbox.state() == Vst3SandboxState::Stopped);
 
     hibiki_driver_endpoint_state_v1 driver_state{};
     driver_state.header.abi_version = HIBIKI_DRIVER_CONTROL_ABI_V1;

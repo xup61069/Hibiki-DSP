@@ -1,5 +1,6 @@
 add_library(hibiki_vst_host STATIC
   src/plugin_host.cpp
+  src/vst3_sandbox.cpp
 )
 
 target_include_directories(hibiki_vst_host
