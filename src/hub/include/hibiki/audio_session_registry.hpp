@@ -39,6 +39,7 @@ public:
                             std::string output_group);
     [[nodiscard]] bool set_gain_owner(const AudioSessionIdentityV1& identity,
                                       SessionGainOwner owner) noexcept;
+    void mark_endpoint_sessions_inactive(const std::string& endpoint_id) noexcept;
     [[nodiscard]] AudioSessionDescriptorV1* find(
         const AudioSessionIdentityV1& identity) noexcept;
     [[nodiscard]] const AudioSessionDescriptorV1* find(

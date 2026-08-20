@@ -3,7 +3,7 @@
 | 子系統 | 目的 | 目前狀態 | 主要契約 |
 | --- | --- | --- | --- |
 | `driver/` | 固定虛擬端點、KS volume/mute、私有 control IPC | ABI + MS-PL endpoint control core；PortCls 尚未接線 | ADR-0002/SPEC-0003 |
-| `src/` | C++20 RT graph、AudioEngine、session registry、Windows volume/device watcher/recovery、ISO math、IPC、persistent SRC | 可測試 user-space 骨架 | SPEC-0001/0002/0003 |
+| `src/` | C++20 RT graph、AudioEngine、session registry/Windows session adapter、Windows volume/device watcher/recovery、ISO math、IPC、persistent SRC | 可測試 user-space 骨架 | SPEC-0001/0002/0003 |
 | `apps/` | WinUI 3 control plane、Easy/Expert UX | 待建立 | SceneProfile |
 | `asio/` | Hibiki ASIO bridge 與 DAW lane | stream model | SceneProfile |
 | `vst-host/` | Out-of-process VST3 host | trusted/certified watchdog quarantine model | plugin contract |

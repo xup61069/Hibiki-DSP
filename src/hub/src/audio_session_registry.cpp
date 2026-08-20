@@ -88,6 +88,15 @@ bool AudioSessionRegistry::set_gain_owner(const AudioSessionIdentityV1& identity
     return true;
 }
 
+void AudioSessionRegistry::mark_endpoint_sessions_inactive(
+    const std::string& endpoint_id) noexcept {
+    for (auto& session : sessions_) {
+        if (session.identity.endpoint_id == endpoint_id) {
+            session.active = false;
+        }
+    }
+}
+
 AudioSessionDescriptorV1* AudioSessionRegistry::find(
     const AudioSessionIdentityV1& identity) noexcept {
     const auto existing = std::find_if(

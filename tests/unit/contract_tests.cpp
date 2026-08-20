@@ -22,6 +22,7 @@ extern "C" {
 #if defined(_WIN32)
 #include "hibiki/windows_volume_broker.hpp"
 #include "hibiki/windows_device_watcher.hpp"
+#include "hibiki/windows_audio_session_watcher.hpp"
 #endif
 
 #include <cmath>
@@ -373,6 +374,12 @@ int main() {
     CHECK(device_change.kind == WindowsDeviceChangeKind::DefaultChanged &&
           device_change.flow == eRender && device_change.endpoint_id[0] == L'h');
     CHECK(watcher->Release() == 0U);
+    auto* session_watcher = new WindowsAudioSessionWatcher();
+    std::uint64_t session_sequence = 0;
+    CHECK(!session_watcher->poll(session_sequence));
+    CHECK(session_watcher->OnSessionCreated(nullptr) == S_OK);
+    CHECK(session_watcher->poll(session_sequence) && session_sequence == 1U);
+    CHECK(session_watcher->Release() == 0U);
 #endif
 
     return 0;
