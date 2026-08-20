@@ -5,6 +5,7 @@ add_library(hibiki_hub STATIC
   src/control_service.cpp
   src/calibration.cpp
   src/calibration_compiler.cpp
+  src/lane_latency.cpp
   src/audio_session_registry.cpp
   src/audio_engine.cpp
   src/asio_transport_consumer.cpp

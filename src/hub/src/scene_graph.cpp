@@ -19,7 +19,8 @@ bool validate_graph(const GraphConfigV1& graph) noexcept {
             lane.output_group.find('\0') != std::string::npos ||
             (lane.channel_count != 2 && lane.channel_count != 6 && lane.channel_count != 8) ||
             !std::isfinite(lane.makeup_gain_db) || lane.makeup_gain_db < -144.0 ||
-            lane.makeup_gain_db > 12.0) {
+            lane.makeup_gain_db > 12.0 ||
+            lane.reported_latency_samples > kLaneLatencyMaxSamplesV1) {
             return false;
         }
         for (std::size_t prior = 0; prior < lane_index; ++prior) {
@@ -41,7 +42,8 @@ bool validate_graph(const GraphConfigV1& graph) noexcept {
                 }
             }
         }
-        if (graph.strict_direct && std::abs(lane.makeup_gain_db) > 1e-12) {
+        if (graph.strict_direct && (std::abs(lane.makeup_gain_db) > 1e-12 ||
+                                    lane.reported_latency_samples != 0U)) {
             return false;
         }
     }
@@ -61,6 +63,18 @@ bool compile_rt_snapshot(const GraphConfigV1& graph,
     compiled.lane_count = static_cast<std::uint32_t>(graph.lanes.size());
     compiled.revision = revision;
     compiled.strict_direct = graph.strict_direct;
+    std::array<std::uint32_t, kMaxRtLanes> group_max_latency{};
+    for (std::size_t index = 0U; index < graph.lanes.size(); ++index) {
+        const auto& source = graph.lanes[index];
+        if (!source.enabled) continue;
+        for (std::size_t peer = 0U; peer < graph.lanes.size(); ++peer) {
+            const auto& peer_lane = graph.lanes[peer];
+            if (peer_lane.enabled && peer_lane.output_group == source.output_group) {
+                group_max_latency[index] = std::max(group_max_latency[index],
+                                                    peer_lane.reported_latency_samples);
+            }
+        }
+    }
     for (std::size_t index = 0; index < graph.lanes.size(); ++index) {
         const auto& source = graph.lanes[index];
         auto& target = compiled.lanes[index];
@@ -71,6 +85,11 @@ bool compile_rt_snapshot(const GraphConfigV1& graph,
         target.output_group_bytes = static_cast<std::uint8_t>(source.output_group.size());
         std::copy(source.output_group.begin(), source.output_group.end(), target.output_group.begin());
         target.enabled = source.enabled;
+        target.reported_latency_samples = source.enabled ? source.reported_latency_samples : 0U;
+        target.compensation_delay_samples = source.enabled
+                                                 ? group_max_latency[index] -
+                                                       target.reported_latency_samples
+                                                 : 0U;
         target.makeup_gain_linear = static_cast<float>(
             std::pow(10.0, source.makeup_gain_db / 20.0));
     }
@@ -84,7 +103,8 @@ bool process_graph_filtered(const RtGraphSnapshotV1& snapshot,
                             const std::string_view output_group,
                             const std::span<const RtLaneInputV1> inputs,
                             float* const output_interleaved,
-                            const std::size_t frames) noexcept {
+                            const std::size_t frames,
+                            LaneLatencyBankV1* const latency_bank) noexcept {
     if (snapshot.schema_version != 1 || snapshot.lane_count > kMaxRtLanes ||
         snapshot.output_channels == 0 || snapshot.output_channels > 8 ||
         output_interleaved == nullptr || inputs.size() < snapshot.lane_count) {
@@ -108,8 +128,17 @@ bool process_graph_filtered(const RtGraphSnapshotV1& snapshot,
             input.channel_count != lane.input_channels || input.channel_count > 8) {
             continue;
         }
+        const float* lane_interleaved = input.interleaved;
+        if (latency_bank != nullptr) {
+            if (!latency_bank->process_lane(lane_index, input.interleaved,
+                                            input.channel_count, frames)) {
+                return false;
+            }
+            lane_interleaved = latency_bank->output(lane_index);
+            if (lane_interleaved == nullptr) return false;
+        }
         for (std::size_t frame = 0; frame < frames; ++frame) {
-            const auto* input_frame = input.interleaved + frame * input.channel_count;
+            const auto* input_frame = lane_interleaved + frame * input.channel_count;
             auto* output_frame = output_interleaved + frame * snapshot.output_channels;
             for (std::uint32_t source_channel = 0; source_channel < input.channel_count;
                  ++source_channel) {
@@ -138,20 +167,23 @@ bool process_graph_filtered(const RtGraphSnapshotV1& snapshot,
 bool process_graph(const RtGraphSnapshotV1& snapshot,
                    const std::span<const RtLaneInputV1> inputs,
                    float* const output_interleaved,
-                   const std::size_t frames) noexcept {
-    return process_graph_filtered(snapshot, {}, inputs, output_interleaved, frames);
+                   const std::size_t frames,
+                   LaneLatencyBankV1* const latency_bank) noexcept {
+    return process_graph_filtered(snapshot, {}, inputs, output_interleaved, frames, latency_bank);
 }
 
 bool process_graph_for_output_group(const RtGraphSnapshotV1& snapshot,
                                     const std::string_view output_group,
                                     const std::span<const RtLaneInputV1> inputs,
                                     float* const output_interleaved,
-                                    const std::size_t frames) noexcept {
+                                    const std::size_t frames,
+                                    LaneLatencyBankV1* const latency_bank) noexcept {
     if (output_group.empty() || output_group.size() > kMaxOutputGroupBytes ||
         output_group.find('\0') != std::string_view::npos) {
         return false;
     }
-    return process_graph_filtered(snapshot, output_group, inputs, output_interleaved, frames);
+    return process_graph_filtered(snapshot, output_group, inputs, output_interleaved, frames,
+                                  latency_bank);
 }
 
 }  // namespace hibiki

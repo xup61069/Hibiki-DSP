@@ -23,6 +23,7 @@
           "channel_count": {"enum": [2, 6, 8]},
           "makeup_gain_db": {"type": "number", "minimum": -144, "maximum": 12},
           "enabled": {"type": "boolean"},
+          "reported_latency_samples": {"type": "integer", "minimum": 0, "maximum": 16384},
           "channel_map": {"type": "array", "minItems": 8, "maxItems": 8, "items": {"type": "integer", "minimum": -1, "maximum": 7}},
           "matrix_enabled": {"type": "boolean"},
           "channel_matrix": {

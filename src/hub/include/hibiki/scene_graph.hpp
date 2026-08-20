@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <array>
 #include <cstddef>
+#include "hibiki/lane_latency.hpp"
 #include <span>
 #include <string>
 #include <vector>
@@ -18,6 +19,9 @@ struct LaneConfigV1 {
     std::uint32_t channel_count{2};
     double makeup_gain_db{0.0};
     bool enabled{true};
+    // Reported by a bounded plugin worker; compile_rt_snapshot derives the
+    // per-output-group compensation delay from all enabled lanes.
+    std::uint32_t reported_latency_samples{0U};
     // Each input channel maps to one output channel; -1 means intentionally
     // muted. The default is identity for all supported layouts.
     std::array<std::int8_t, 8> channel_map{0, 1, 2, 3, 4, 5, 6, 7};
@@ -47,6 +51,8 @@ struct RtLaneSnapshotV1 {
     std::array<char, kMaxOutputGroupBytes> output_group{};
     float makeup_gain_linear{1.0F};
     bool enabled{true};
+    std::uint32_t reported_latency_samples{0U};
+    std::uint32_t compensation_delay_samples{0U};
 };
 
 struct RtGraphSnapshotV1 {
@@ -72,12 +78,14 @@ struct RtLaneInputV1 {
 [[nodiscard]] bool process_graph(const RtGraphSnapshotV1& snapshot,
                                  std::span<const RtLaneInputV1> inputs,
                                  float* output_interleaved,
-                                 std::size_t frames) noexcept;
+                                 std::size_t frames,
+                                 LaneLatencyBankV1* latency_bank = nullptr) noexcept;
 [[nodiscard]] bool process_graph_for_output_group(
     const RtGraphSnapshotV1& snapshot,
     std::string_view output_group,
     std::span<const RtLaneInputV1> inputs,
     float* output_interleaved,
-    std::size_t frames) noexcept;
+    std::size_t frames,
+    LaneLatencyBankV1* latency_bank = nullptr) noexcept;
 
 }  // namespace hibiki

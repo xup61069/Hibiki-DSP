@@ -6,7 +6,7 @@ authority: architecture
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["vst-host/**", "schemas/latency-graph-commit-v1.schema.json", "tests/**"]
+source_globs: ["vst-host/**", "src/hub/**", "schemas/latency-graph-commit-v1.schema.json", "tests/**"]
 ---
 
 # SPEC-0012：VST3 lane 延遲對齊提交
@@ -39,12 +39,16 @@ source_globs: ["vst-host/**", "schemas/latency-graph-commit-v1.schema.json", "te
    實際 RT 延遲線必須在 commit 前由 caller-owned 固定容量資源完成 prepare，不能在 callback 配置。
 4. worker crash、plugin 回報非法 latency、裝置切換或 revision mismatch 時，使用 rollback 或
    quarantine；不得把未驗證的延遲套入其他 lane。
+5. graph compile 依 output group 分別取 active lane 的最大 latency，將結果寫入
+   `RtLaneSnapshotV1`。`LaneLatencyBankV1` 在 Prepare 時配置所有 scratch/ring，Commit 時與
+   graph snapshot 一起交換；RT mixer 只讀 bank，不在 callback 內配置。
 
 ## 驗收與邊界
 
 - contract test 覆蓋最大延遲計算、inactive lane、重複 token、stale base、rollback 與 revision
   單調性。
-- `FixedDelayLineV1` 是可重用的 RT primitive，但本規格尚未宣稱已把它接到完整 `RtGraphSnapshot`
-  混音路徑；接線時仍須新增跨 block impulse、裝置重綁與 2/6/8 聲道測試。
+- `FixedDelayLineV1` 是 worker-host 可重用的 RT primitive；hub graph 另以
+  `LaneLatencyBankV1` 接入 lane mixer，兩者都以固定上限運作。仍須新增裝置重綁、sink 時鐘
+  及第三方 plugin 回報延遲的端對端測試。
 - 本規格不提供第三方 plugin certification、side-chain/multi-bus、state persistence 或
   signed driver；VST3 SDK 與 plugin 仍只可在隔離 worker 執行。

@@ -14,7 +14,7 @@ source_globs: ["src/**", "schemas/**", "config/distribution-profile.yml"]
 ## 成功條件
 
 任何 App、ASIO client、瀏覽器 tab 或 input 都能以 stable Scene contract 指向
-Lane、output group、channel map、DSP chain、latency mode 與安全策略；裝置替換不會
+Lane、output group、channel map、DSP chain、reported plugin latency、latency mode 與安全策略；裝置替換不會
 重生 endpoint、ASIO 或 IPC identity。
 
 ## 介面

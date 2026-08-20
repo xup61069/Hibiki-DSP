@@ -131,8 +131,9 @@
 - `LatencyAlignmentPlanV1` and `FixedDelayLineV1` provide a fixed 8-channel, 16,384-sample
   bounded delay primitive with active-lane max-latency alignment, impulse and non-finite-input
   tests. `LatencyGraphCommitV1`/`LatencyGraphCommitterV1` now bind that control result to stable
-  lane tokens and graph revisions with stale-base rejection and rollback. The delay primitive is
-  not yet wired into the immutable graph audio mixing path.
+  lane tokens and graph revisions with stale-base rejection and rollback. `LaneLatencyBankV1` is
+  prepared before graph commit and applied cross-block in the RT mixer without allocation; physical
+  sink and third-party plugin end-to-end evidence remain pending.
 - `VirtualMicRouteModel` now defines fixed 1/2-channel capture/reference blocks, fail-closed
   privacy mute and explicit echo-reference enablement. `VirtualMicDspV1` adds an optional bounded
   normalized-LMS echo-reference canceller and slow noise gate with no allocation; it remains a

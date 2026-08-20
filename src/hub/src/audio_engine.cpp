@@ -1,6 +1,8 @@
 #include "hibiki/audio_engine.hpp"
 
+#include <array>
 #include <cmath>
+#include <utility>
 
 namespace hibiki {
 
@@ -12,7 +14,22 @@ bool AudioEngineModel::prepare_graph(const GraphConfigV1& graph,
         has_pending_graph_ = false;
         return false;
     }
+    std::array<LaneLatencyConfigV1, kMaxRtLanes> latency_configs{};
+    for (std::size_t index = 0U; index < candidate.lane_count; ++index) {
+        latency_configs[index] = LaneLatencyConfigV1{
+            candidate.lanes[index].input_channels,
+            candidate.lanes[index].compensation_delay_samples,
+            candidate.lanes[index].enabled};
+    }
+    LaneLatencyBankV1 prepared_latency_bank;
+    if (!prepared_latency_bank.prepare(
+            std::span<const LaneLatencyConfigV1>(latency_configs.data(), candidate.lane_count))) {
+        state_ = EngineTransactionState::Degraded;
+        has_pending_graph_ = false;
+        return false;
+    }
     pending_graph_ = candidate;
+    pending_latency_bank_ = std::move(prepared_latency_bank);
     has_pending_graph_ = true;
     state_ = EngineTransactionState::Prepared;
     return true;
@@ -23,6 +40,7 @@ bool AudioEngineModel::commit_graph() noexcept {
         return false;
     }
     active_graph_ = pending_graph_;
+    active_latency_bank_ = std::move(pending_latency_bank_);
     has_active_graph_ = true;
     has_pending_graph_ = false;
     state_ = EngineTransactionState::Ready;
@@ -52,7 +70,9 @@ VolumeNotificationResult AudioEngineModel::apply_windows_volume(
 bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
                                float* const output_interleaved,
                                const std::size_t frames) const noexcept {
-    if (!has_active_graph_ || !process_graph(active_graph_, inputs, output_interleaved, frames)) {
+    if (!has_active_graph_ ||
+        !process_graph(active_graph_, inputs, output_interleaved, frames,
+                       &active_latency_bank_)) {
         return false;
     }
     const auto volume_word = rt_volume_word_.load(std::memory_order_acquire);
@@ -78,7 +98,7 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
                                             const std::size_t frames) const noexcept {
     if (!has_active_graph_ ||
         !process_graph_for_output_group(active_graph_, output_group, inputs,
-                                        output_interleaved, frames)) {
+                                        output_interleaved, frames, &active_latency_bank_)) {
         return false;
     }
     const auto volume_word = rt_volume_word_.load(std::memory_order_acquire);

@@ -830,6 +830,32 @@ int main() {
     CHECK(!prepare_latency_graph_commit_v1(duplicate_latency_lanes, 0U, 1U,
                                             graph_latency_commit));
 
+    GraphConfigV1 delayed_graph;
+    delayed_graph.lanes.push_back(LaneConfigV1{"fast-plugin", "main", 2, 0.0, true});
+    delayed_graph.lanes.push_back(LaneConfigV1{"slow-plugin", "main", 2, 0.0, true});
+    delayed_graph.lanes[0].reported_latency_samples = 64U;
+    delayed_graph.lanes[1].reported_latency_samples = 256U;
+    RtGraphSnapshotV1 delayed_snapshot{};
+    CHECK(compile_rt_snapshot(delayed_graph, 12U, delayed_snapshot) &&
+          delayed_snapshot.lanes[0].compensation_delay_samples == 192U &&
+          delayed_snapshot.lanes[1].compensation_delay_samples == 0U);
+    const std::array<LaneLatencyConfigV1, 2> delayed_configs{{
+        {2U, delayed_snapshot.lanes[0].compensation_delay_samples, true},
+        {2U, delayed_snapshot.lanes[1].compensation_delay_samples, true}}};
+    LaneLatencyBankV1 delayed_bank;
+    CHECK(delayed_bank.prepare(delayed_configs));
+    std::array<float, 2U * 256U> fast_impulse{};
+    fast_impulse[0] = 1.0F;
+    fast_impulse[1] = -1.0F;
+    std::array<float, 2U * 256U> slow_silence{};
+    const std::array<RtLaneInputV1, 2> delayed_inputs{{
+        {fast_impulse.data(), 2U}, {slow_silence.data(), 2U}}};
+    std::array<float, 2U * 256U> delayed_output{};
+    CHECK(process_graph(delayed_snapshot, delayed_inputs, delayed_output.data(), 256U,
+                        &delayed_bank));
+    CHECK(delayed_output[2U * 191U] == 0.0F && delayed_output[2U * 192U] == 1.0F &&
+          delayed_output[2U * 192U + 1U] == -1.0F);
+
     std::vector<std::uint8_t> tab_packet(16U + 2U * 2U * sizeof(float), 0U);
     tab_packet[0] = 'H'; tab_packet[1] = 'I'; tab_packet[2] = 'B'; tab_packet[3] = 'T';
     tab_packet[4] = 1U;

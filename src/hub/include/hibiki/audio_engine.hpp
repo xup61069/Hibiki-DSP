@@ -65,6 +65,8 @@ public:
 private:
     RtGraphSnapshotV1 active_graph_{};
     RtGraphSnapshotV1 pending_graph_{};
+    mutable LaneLatencyBankV1 active_latency_bank_{};
+    LaneLatencyBankV1 pending_latency_bank_{};
     OutputGroupVolumeStateV1 volume_{};
     // Upper 32 bits: signed Q16.16 effective dB; bit 0: mute.  One atomic
     // word keeps dB and mute coherent for a block boundary.
