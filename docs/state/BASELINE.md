@@ -60,6 +60,8 @@
 - The optional Windows tab bridge now owns a loopback-only WebSocket listener with bounded
   handshake/frame parsing and control-thread callbacks; engine lane routing and denoising model
   provenance remain intentionally outside the receiver.
+- The MS-PL WDK source boundary now has a property-dispatch scaffold for volume/mute that calls
+  the portable Q16.16 endpoint core; it is source-checked but intentionally not a loadable `.sys`.
 
 ## 尚未開始
 

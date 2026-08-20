@@ -22,3 +22,8 @@ property handlers must call this core from the WaveRT miniport and publish the
 result through the Apache ABI. The files are intentionally portable so CI can
 test their invariants without pretending that a `.sys` has been built or
 signed.
+
+`wdk/hibiki_property_adapter.cpp` is the next MS-PL source boundary for a
+WDK/SYSVAD-derived project. Run `pwsh -File tools/driver-source-check.ps1` to
+verify that the scaffold retains its license and does not pull GPL user-space;
+the check deliberately does not claim that a loadable driver exists.

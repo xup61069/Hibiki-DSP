@@ -15,7 +15,8 @@
 8. 修改後執行 `tools/verify.ps1`、`tools/docs-check.ps1` 與
    `tools/source-policy.ps1`；若改動 extension、installer 或 control model，再執行
    `tools/extension-check.ps1`、`tools/installer-check.ps1`、`tools/control-model-check.ps1`。
-   任何 identity/config 變更都必須再執行 `tools/distribution-check.ps1`。
+   任何 identity/config 變更都必須再執行 `tools/distribution-check.ps1`；改動 driver source
+   boundary 時也執行 `tools/driver-source-check.ps1`。
 
 ## 文件權威順序
 

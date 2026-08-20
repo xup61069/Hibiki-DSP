@@ -36,6 +36,7 @@ pwsh -File tools/extension-check.ps1
 pwsh -File tools/installer-check.ps1
 pwsh -File tools/control-model-check.ps1
 pwsh -File tools/distribution-check.ps1
+pwsh -File tools/driver-source-check.ps1
 ```
 
 遇到環境差異先記錄 fingerprint 並更新 handoff，不要自行重生
