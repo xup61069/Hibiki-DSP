@@ -75,6 +75,8 @@
 - `process_tab_capture_lane_v1` can apply that controller to one user-gesture-gated browser tab
   before graph processing, with a sample-rate match check and fail-closed behavior; no automatic
   microphone capture or denoising model is implied.
+- `PeqProcessorV1` compiles up to 16 RBJ peaking filters into fixed per-channel state, and the tab
+  lane can apply PEQ before program-aware level correction with matching sample-rate/channel checks.
 - Worker-side session volume read/write now uses `ISimpleAudioVolume` with dB↔scalar conversion,
   event-context GUIDs and readback; unbound/exclusive/vendor ASIO paths remain explicit bypasses.
 - `OutputSinkModel` now joins clock-drift estimation to persistent SRC per sink, preserving

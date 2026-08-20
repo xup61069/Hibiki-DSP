@@ -11,6 +11,7 @@
 
 #include "hibiki/audio_engine.hpp"
 #include "hibiki/program_loudness.hpp"
+#include "hibiki/peq_dsp.hpp"
 
 namespace hibiki {
 
@@ -47,6 +48,11 @@ struct TabCaptureBlockV1 {
     std::uint32_t frames{0};
     std::uint32_t channels{0};
     std::uint32_t sample_rate{0};
+};
+
+struct TabLaneEffectsV1 {
+    PeqProcessorV1* peq{nullptr};
+    ProgramAwareLevelControllerV1* program_level{nullptr};
 };
 
 // Fixed-capacity SPSC handoff. The WebSocket/control thread may push a
@@ -94,7 +100,7 @@ private:
     float* output_interleaved,
     std::uint32_t output_capacity_frames,
     TabCaptureBlockV1& block,
-    ProgramAwareLevelControllerV1* program_level = nullptr) noexcept;
+    TabLaneEffectsV1* effects = nullptr) noexcept;
 
 void enqueue_tab_capture_packet_v1(const TabCapturePacketViewV1& view, void* context) noexcept;
 

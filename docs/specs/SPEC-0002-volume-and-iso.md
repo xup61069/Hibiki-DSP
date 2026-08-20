@@ -64,6 +64,12 @@ APO、CamillaDSP YAML 與 REW filter list；不內嵌 ISO 授權表格，也不�
 量測結果。同一 exporter 也能把 caller-supplied interleaved impulse samples 寫成 32-bit
 IEEE-float WAV IR；它只負責檔案格式，不替任何未授權量測資料背書。
 
+`PeqProcessorV1` 會把最多 16 個 `PeqFilterV1` 編譯成 RBJ peaking biquad，固定支援 1–8
+聲道；係數在 control side 準備，`process_interleaved` 只使用固定 state，不配置、不等待，
+並對非有限輸入 fail-safe。單分頁 adapter 可選擇在 Graph 前套用這組 PEQ；filter 的 sample
+rate／聲道不符時整個 lane block fail-closed。這是 per-lane EQ，不代表已完成 VST3 或正式
+ISO 係數 fit。
+
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
 `Program-aware` 另有 `ProgramAwareLevelControllerV1` 的慢速內容音量原型：它用無配置的
 RMS 代理、3 秒分析窗、靜音門、增益上限與 dB/s 速率限制，適合由單一 Lane 明確選用。

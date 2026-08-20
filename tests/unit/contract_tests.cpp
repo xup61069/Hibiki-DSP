@@ -34,6 +34,7 @@ extern "C" {
 #include "hibiki/session_route.hpp"
 #include "hibiki/volume_state.hpp"
 #include "hibiki/program_loudness.hpp"
+#include "hibiki/peq_dsp.hpp"
 #include "hibiki/virtual_mic.hpp"
 #include "hibiki/true_peak_limiter.hpp"
 #if defined(_WIN32)
@@ -121,6 +122,14 @@ int main() {
     float silent_program[128]{};
     CHECK(program_loudness.process_interleaved(silent_program, 128U, 1U));
     CHECK(program_loudness.status().silence_gated);
+
+    PeqProcessorV1 peq;
+    const std::array<PeqFilterV1, 1> peq_filters{{PeqFilterV1{1000.0, 6.0, 1.0}}};
+    CHECK(peq.prepare(peq_filters, 48000U, 2U));
+    float peq_block[8] = {0.0F, 0.0F, 1.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F};
+    CHECK(peq.process_interleaved(peq_block, 4U));
+    CHECK(std::isfinite(peq_block[2]) && peq_block[2] > 1.0F);
+    CHECK(!peq.prepare(std::span<const PeqFilterV1>(peq_filters), 48000U, 9U));
 
     OutputGroupVolumeStateV1 state;
     state.requested_db = 3.0;
@@ -807,12 +816,16 @@ int main() {
     ProgramAwareLevelControllerV1 tab_program_level;
     CHECK(tab_program_level.configure(
         ProgramAwareLevelPolicyV1{1, true, -23.0, 6.0, 12.0, 3000.0, 60.0, -70.0}, 48000U));
+    PeqProcessorV1 tab_peq;
+    CHECK(tab_peq.prepare(peq_filters, 48000U, 2U));
+    TabLaneEffectsV1 tab_effects{&tab_peq, &tab_program_level};
     CHECK(process_tab_capture_lane_v1(engine, 0, *tab_queue, tab_lane_input, 2U,
                                       tab_lane_inputs, tab_lane_output, 2U, tab_lane_block,
-                                      &tab_program_level));
+                                      &tab_effects));
     CHECK(tab_lane_block.frames == 2U && tab_lane_block.channels == 2U &&
-          tab_lane_output[0] > 0.12F && tab_lane_output[0] < 0.125F &&
-          tab_lane_output[1] < -0.12F && tab_lane_output[1] > -0.125F);
+          std::isfinite(tab_lane_output[0]) && std::isfinite(tab_lane_output[1]) &&
+          tab_lane_output[0] > 0.125F && tab_lane_output[0] < 0.2F &&
+          tab_lane_output[1] < -0.125F && tab_lane_output[1] > -0.2F);
     VirtualMicRouteModel lane_mic;
     CHECK(lane_mic.prepare(VirtualMicConfigV1{2U, 48000U, true}));
     float lane_mic_input[4] = {0.75F, -0.75F, 0.5F, -0.5F};

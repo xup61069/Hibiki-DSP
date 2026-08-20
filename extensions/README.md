@@ -19,5 +19,7 @@ validation (including finite-sample checks) before the loopback WebSocket
 receiver invokes its control-thread callback. `process_tab_capture_lane_v1` is
 the bounded adapter from that queue into `AudioEngineModel::process_lane_block`;
 it can optionally apply the per-tab, slow RMS-proxy level controller after a
-sample-rate check. Noise-reduction models and their provenance remain separate
-boundaries, and the default path is unchanged when no controller is supplied.
+sample-rate check. A caller can also provide up to 16 fixed-capacity RBJ PEQ
+filters before the level controller; mismatched sample rate/channel settings
+fail closed. Noise-reduction models and their provenance remain separate
+boundaries, and the default path is unchanged when no effects are supplied.

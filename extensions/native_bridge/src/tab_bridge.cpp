@@ -161,7 +161,7 @@ bool process_tab_capture_lane_v1(
     float* const output_interleaved,
     const std::uint32_t output_capacity_frames,
     TabCaptureBlockV1& block,
-    ProgramAwareLevelControllerV1* const program_level) noexcept {
+    TabLaneEffectsV1* const effects) noexcept {
     block = {};
     if (input_interleaved == nullptr || output_interleaved == nullptr ||
         input_capacity_frames == 0U || output_capacity_frames == 0U) {
@@ -172,11 +172,21 @@ bool process_tab_capture_lane_v1(
         block = {};
         return false;
     }
-    if (program_level != nullptr &&
-        (program_level->sample_rate() != block.sample_rate ||
-         !program_level->process_interleaved(input_interleaved, block.frames, block.channels))) {
-        block = {};
-        return false;
+    if (effects != nullptr) {
+        if (effects->peq != nullptr &&
+            (effects->peq->sample_rate() != block.sample_rate ||
+             effects->peq->channels() != block.channels ||
+             !effects->peq->process_interleaved(input_interleaved, block.frames))) {
+            block = {};
+            return false;
+        }
+        if (effects->program_level != nullptr &&
+            (effects->program_level->sample_rate() != block.sample_rate ||
+             !effects->program_level->process_interleaved(input_interleaved, block.frames,
+                                                          block.channels))) {
+            block = {};
+            return false;
+        }
     }
     if (!engine.process_lane_block(lane_index, input_interleaved, block.channels, block.frames,
                                    lane_inputs, output_interleaved)) {
