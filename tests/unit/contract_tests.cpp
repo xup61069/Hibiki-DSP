@@ -688,6 +688,12 @@ int main() {
 
     Vst3SandboxProcess sandbox;
     CHECK(!sandbox.launch(Vst3SandboxLaunchV1{L"", L"", 250}));
+    CHECK(!validate_vst3_sandbox_launch_v1(Vst3SandboxLaunchV1{L"worker.exe", L"plugin.vst3", 250,
+                                                               1U, L"pipe", 1000U, L"uid", 48000.0,
+                                                               4U}));
+    CHECK(validate_vst3_sandbox_launch_v1(Vst3SandboxLaunchV1{L"worker.exe", L"plugin.vst3", 250,
+                                                              1U, L"pipe", 1000U, L"uid", 48000.0,
+                                                              2U}));
     CHECK(sandbox.state() == Vst3SandboxState::Quarantined);
     sandbox.stop();
     CHECK(sandbox.state() == Vst3SandboxState::Stopped);

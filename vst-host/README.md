@@ -23,6 +23,8 @@ scratch buffers, exposes plugin-reported latency and fails closed on invalid
 or non-finite output. The adapter is deliberately not linked into the normal
 engine or RT graph. `hibiki_vst3_sdk_worker` wires that adapter to the existing
 bounded worker pipe and ProcessBlock frame contract; it is built only when the
-local pinned SDK is supplied. Supervisor launch policy, parameter automation,
-latency-compensation policy, crash-dump redaction and real plugin certification
-remain separate release gates.
+local pinned SDK is supplied. `Vst3SandboxLaunchV1` can select the SDK worker
+with an explicit class UID, sample rate and 2/6/8-channel layout; empty class
+UID preserves the existing passthrough worker, and invalid launch fields are
+rejected before process creation. Parameter automation, latency-compensation
+policy, crash-dump redaction and real plugin certification remain separate gates.

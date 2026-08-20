@@ -2,6 +2,8 @@
 
 #include "hibiki/vst3_sandbox.hpp"
 
+#include <cmath>
+
 #if defined(_WIN32)
 
 #define WIN32_LEAN_AND_MEAN
@@ -31,13 +33,26 @@ std::wstring quote_argument(const std::wstring& value) {
 
 }  // namespace
 
+bool validate_vst3_sandbox_launch_v1(const Vst3SandboxLaunchV1& launch_config) noexcept {
+    if (launch_config.worker_executable.empty() || launch_config.plugin_path.empty() ||
+        launch_config.watchdog_timeout_ms == 0U || launch_config.watchdog_timeout_ms > 5000U ||
+        (!launch_config.worker_pipe_name.empty() && launch_config.worker_pipe_timeout_ms == 0U)) {
+        return false;
+    }
+    if (launch_config.vst3_class_id.empty()) return true;
+    if (!std::isfinite(launch_config.vst3_sample_rate) ||
+        launch_config.vst3_sample_rate < 8000.0 || launch_config.vst3_sample_rate > 384000.0) {
+        return false;
+    }
+    return launch_config.vst3_channels == 2U || launch_config.vst3_channels == 6U ||
+           launch_config.vst3_channels == 8U;
+}
+
 Vst3SandboxProcess::~Vst3SandboxProcess() { stop(); }
 
 bool Vst3SandboxProcess::launch(const Vst3SandboxLaunchV1& launch_config) {
     stop();
-    if (launch_config.worker_executable.empty() || launch_config.plugin_path.empty() ||
-        launch_config.watchdog_timeout_ms == 0U || launch_config.watchdog_timeout_ms > 5000U ||
-        (!launch_config.worker_pipe_name.empty() && launch_config.worker_pipe_timeout_ms == 0U)) {
+    if (!validate_vst3_sandbox_launch_v1(launch_config)) {
         state_ = Vst3SandboxState::Quarantined;
         return false;
     }
@@ -57,6 +72,12 @@ bool Vst3SandboxProcess::launch(const Vst3SandboxLaunchV1& launch_config) {
 
     auto command_line = quote_argument(launch_config.worker_executable) + L" --plugin " +
                          quote_argument(launch_config.plugin_path);
+    if (!launch_config.vst3_class_id.empty()) {
+        command_line += L" --vst3-module " + quote_argument(launch_config.plugin_path);
+        command_line += L" --vst3-class " + quote_argument(launch_config.vst3_class_id);
+        command_line += L" --vst3-rate " + std::to_wstring(launch_config.vst3_sample_rate);
+        command_line += L" --vst3-channels " + std::to_wstring(launch_config.vst3_channels);
+    }
     if (!launch_config.worker_pipe_name.empty()) {
         if (!worker_pipe_.create_server(Vst3WorkerPipeConfigV1{
                 launch_config.worker_pipe_name, 1024U * 1024U, launch_config.worker_pipe_timeout_ms})) {
@@ -176,6 +197,21 @@ Vst3SandboxProcess::~Vst3SandboxProcess() = default;
 bool Vst3SandboxProcess::launch(const Vst3SandboxLaunchV1&) {
     state_ = Vst3SandboxState::Quarantined;
     return false;
+}
+
+bool validate_vst3_sandbox_launch_v1(const Vst3SandboxLaunchV1& launch_config) noexcept {
+    if (launch_config.worker_executable.empty() || launch_config.plugin_path.empty() ||
+        launch_config.watchdog_timeout_ms == 0U || launch_config.watchdog_timeout_ms > 5000U ||
+        (!launch_config.worker_pipe_name.empty() && launch_config.worker_pipe_timeout_ms == 0U)) {
+        return false;
+    }
+    if (launch_config.vst3_class_id.empty()) return true;
+    if (!std::isfinite(launch_config.vst3_sample_rate) ||
+        launch_config.vst3_sample_rate < 8000.0 || launch_config.vst3_sample_rate > 384000.0) {
+        return false;
+    }
+    return launch_config.vst3_channels == 2U || launch_config.vst3_channels == 6U ||
+           launch_config.vst3_channels == 8U;
 }
 
 void Vst3SandboxProcess::stop() noexcept {

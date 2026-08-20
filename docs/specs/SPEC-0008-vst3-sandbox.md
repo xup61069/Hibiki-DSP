@@ -25,6 +25,11 @@ VST3 plugin 不得在 Hibiki RT thread 或主 UI process 內直接執行。contr
   `receive_worker_frame` 只在 control/IPC thread 呼叫，pipe 失敗不得由 audio callback 重試。
 - `mark_heartbeat` 與 `poll_watchdog` 只在 control/IPC worker 呼叫，禁止 audio callback
   使用 Win32 handle 或等待。
+- `Vst3SandboxLaunchV1` 的 `vst3_class_id`、`vst3_sample_rate`、`vst3_channels` 是 optional
+  SDK-worker launch fields；空 class UID 維持原有 passthrough worker。非空時必須是有效
+  sample rate 與 2/6/8 channels，supervisor 才會把 module/class/rate/channel 參數傳給
+  `hibiki_vst3_sdk_worker`。共用 `validate_vst3_sandbox_launch_v1` 先拒絕不合法設定，不能
+  由 child process 才發現格式錯誤。
 
 ## Worker IPC frame
 

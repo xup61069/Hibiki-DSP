@@ -34,7 +34,7 @@
     {"command": "optional-native-asio-build", "status": "pass", "target": "hibiki_asio_native", "sdk_commit": "496a0765b8bb9c26f764f22f9a9712a937177db2", "published_artifacts": false},
     {"command": "scene-safety-controller", "status": "pass", "coverage": ["peak attenuation", "rate limit", "manual override", "baseline restore"]},
     {"command": "output-crossfade", "status": "pass", "coverage": ["equal-power handoff", "supported multichannel layouts", "no allocation in process"]},
-    {"command": "vst3-sandbox", "status": "pass", "coverage": ["launch validation", "job containment source", "watchdog/quarantine model"]},
+    {"command": "vst3-sandbox", "status": "pass", "coverage": ["launch validation", "SDK worker class/rate/channel validation", "job containment source", "watchdog/quarantine model"]},
     {"command": "extension-check", "status": "pass", "coverage": ["user gesture", "HIBT packetizer", "bridge fallback"]},
     {"command": "hibiki_tab_bridge_contract", "status": "pass", "coverage": ["header validation", "exact length", "finite samples"]},
     {"command": "tab-bridge-server", "status": "pass", "coverage": ["loopback-only bind source", "WebSocket handshake/frame parser source", "invalid-start contract"]},

@@ -18,7 +18,15 @@ struct Vst3SandboxLaunchV1 {
   std::uint64_t start_time_ms{1};
   std::wstring worker_pipe_name;
   std::uint32_t worker_pipe_timeout_ms{1000};
+  // Optional fields select the SDK-backed worker executable.  Empty class_id
+  // keeps the existing passthrough worker contract unchanged.
+  std::wstring vst3_class_id;
+  double vst3_sample_rate{48000.0};
+  std::uint32_t vst3_channels{0};
 };
+
+[[nodiscard]] bool validate_vst3_sandbox_launch_v1(
+    const Vst3SandboxLaunchV1& launch) noexcept;
 
 enum class Vst3SandboxState : std::uint8_t {
     Stopped,

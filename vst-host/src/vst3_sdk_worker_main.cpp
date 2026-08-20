@@ -58,6 +58,7 @@ bool parse_arguments(int argc, wchar_t** argv, Arguments& arguments) {
     const std::wstring_view key(argv[index]);
     const std::wstring_view value(argv[index + 1]);
     if (key == L"--hibiki-pipe") arguments.pipe.assign(value);
+    else if (key == L"--plugin") arguments.module.assign(value);
     else if (key == L"--vst3-module") arguments.module.assign(value);
     else if (key == L"--vst3-class") arguments.class_id.assign(value);
     else if (key == L"--vst3-channels") {
