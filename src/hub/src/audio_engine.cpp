@@ -87,10 +87,26 @@ bool AudioEngineModel::process_asio_transport(
         block.channels != active_graph_.lanes[lane_index].input_channels) {
         return false;
     }
+    return process_lane_block(lane_index, transport_interleaved, block.channels, block.frames,
+                              lane_inputs, output_interleaved);
+}
+
+bool AudioEngineModel::process_lane_block(const std::size_t lane_index,
+                                          const float* const input_interleaved,
+                                          const std::uint32_t input_channels,
+                                          const std::size_t frames,
+                                          const std::span<RtLaneInputV1> lane_inputs,
+                                          float* const output_interleaved) const noexcept {
+    if (!has_active_graph_ || lane_index >= active_graph_.lane_count ||
+        lane_inputs.size() < active_graph_.lane_count || input_interleaved == nullptr ||
+        output_interleaved == nullptr || frames == 0U ||
+        input_channels != active_graph_.lanes[lane_index].input_channels) {
+        return false;
+    }
     const auto previous = lane_inputs[lane_index];
-    lane_inputs[lane_index] = RtLaneInputV1{transport_interleaved, block.channels};
+    lane_inputs[lane_index] = RtLaneInputV1{input_interleaved, input_channels};
     const bool processed = process(std::span<const RtLaneInputV1>(lane_inputs.data(), lane_inputs.size()),
-                                   output_interleaved, block.frames);
+                                   output_interleaved, frames);
     lane_inputs[lane_index] = previous;
     return processed;
 }

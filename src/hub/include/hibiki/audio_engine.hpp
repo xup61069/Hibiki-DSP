@@ -42,6 +42,12 @@ public:
         float* output_interleaved,
         std::size_t output_capacity_frames,
         AsioTransportBlockV1& block) noexcept;
+    [[nodiscard]] bool process_lane_block(std::size_t lane_index,
+                                          const float* input_interleaved,
+                                          std::uint32_t input_channels,
+                                          std::size_t frames,
+                                          std::span<RtLaneInputV1> lane_inputs,
+                                          float* output_interleaved) const noexcept;
     [[nodiscard]] EngineTransactionState transaction_state() const noexcept { return state_; }
     [[nodiscard]] const RtGraphSnapshotV1& active_graph() const noexcept { return active_graph_; }
     [[nodiscard]] const OutputGroupVolumeStateV1& volume() const noexcept { return volume_; }
