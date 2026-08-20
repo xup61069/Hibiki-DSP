@@ -37,3 +37,10 @@ source_globs: ["src/hub/**output*", "src/hub/include/hibiki/output*", "src/hub/s
   已輸出。
 - 真實 WaveRT endpoint、硬體 clock fixture、DPC/拔插 soak 與 WHCP/HLK 證據不在本機
   contract test 中，必須在 Windows 11 24H2+ test machine 完成。
+
+## Multi-sink fan-out
+
+`OutputFanoutPlanV1` 將同一個 graph block 複製到最多 8 個同聲道 layout 的 sink。所有 enabled
+sink 的 pointer／capacity 在第一次寫入前一次驗證；任何容量不足或 plan 無效都 fail-closed，
+不會只更新部分 sink。每個 sink 後續仍由自己的 ring、clock drift 與 SRC worker 處理；fan-out
+本身不碰 COM、裝置或 physical endpoint。

@@ -20,6 +20,7 @@
 #include "hibiki/output_sink.hpp"
 #include "hibiki/output_crossfade.hpp"
 #include "hibiki/output_handoff.hpp"
+#include "hibiki/output_fanout.hpp"
 #include "hibiki/exporters.hpp"
 #include "hibiki/engine_control.hpp"
 #include "hibiki/audio_engine.hpp"
@@ -337,6 +338,31 @@ int main() {
     handoff.rollback();
     CHECK(handoff.state() == OutputHandoffStateV1::RolledBack &&
           handoff.active_target().endpoint_id == "endpoint-handoff");
+
+    const std::array<OutputFanoutSinkConfigV1, 3> fanout_configs{{
+        {"headphones", 2U, true}, {"speakers", 2U, true}, {"preview", 2U, false}}};
+    OutputFanoutPlanV1 fanout_plan{};
+    CHECK(prepare_output_fanout_plan_v1(fanout_configs, 2U, 7U, fanout_plan) &&
+          validate_output_fanout_plan_v1(fanout_plan));
+    const float fanout_input[] = {0.25F, -0.25F, 0.5F, -0.5F};
+    std::array<float, 4> fanout_a{};
+    std::array<float, 4> fanout_b{};
+    std::array<float, 4> fanout_disabled{};
+    std::array<float*, 3> fanout_outputs{{fanout_a.data(), fanout_b.data(),
+                                          fanout_disabled.data()}};
+    const std::array<std::size_t, 3> fanout_capacities{{2U, 2U, 2U}};
+    const std::array<float, 4> expected_fanout{{0.25F, -0.25F, 0.5F, -0.5F}};
+    const std::array<float, 4> expected_silence{};
+    CHECK(fanout_interleaved_v1(fanout_plan, fanout_input, 2U, fanout_outputs,
+                                fanout_capacities) &&
+          fanout_a == expected_fanout && fanout_b == fanout_a &&
+          fanout_disabled == expected_silence);
+    const std::array<std::size_t, 3> short_capacities{{1U, 2U, 2U}};
+    CHECK(!fanout_interleaved_v1(fanout_plan, fanout_input, 2U, fanout_outputs,
+                                 short_capacities));
+    const std::array<OutputFanoutSinkConfigV1, 2> duplicate_sinks{{
+        {"same", 2U, true}, {"same", 2U, true}}};
+    CHECK(!prepare_output_fanout_plan_v1(duplicate_sinks, 2U, 8U, fanout_plan));
 
     DeviceRecoveryCoordinator recovery;
     CHECK(recovery.observe(DeviceRecoveryEventV1{

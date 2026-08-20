@@ -21,6 +21,7 @@ add_library(hibiki_hub STATIC
   src/noise_suppressor.cpp
   src/output_sink.cpp
   src/output_crossfade.cpp
+  src/output_fanout.cpp
   src/output_handoff.cpp
   src/peq_dsp.cpp
   src/program_loudness.cpp

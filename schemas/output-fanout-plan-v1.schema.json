@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/output-fanout-plan-v1.schema.json",
+  "title": "Hibiki output fan-out plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "revision", "output_channels", "sink_count", "sinks"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "revision": {"type": "integer", "minimum": 1},
+    "output_channels": {"enum": [2, 6, 8]},
+    "sink_count": {"type": "integer", "minimum": 1, "maximum": 8},
+    "sinks": {
+      "type": "array", "minItems": 8, "maxItems": 8,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["sink_id", "channels", "enabled"],
+        "properties": {
+          "sink_id": {"type": "string", "minLength": 1, "maxLength": 64},
+          "channels": {"enum": [2, 6, 8]},
+          "enabled": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}
