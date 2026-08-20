@@ -12,5 +12,6 @@ Expert mode.
 
 `control-model/` is a UI-independent .NET model for Easy/Expert mode, preset
 cards, explicit Controlled/Bypassed/Degraded status, dB presentation and
-transactional device selection. `control-model-check/` runs without WinUI so
+transactional device selection. It now also defines fail-closed One-Tap Enhance
+and scene selection behavior; `control-model-check/` runs without WinUI so
 future WinUI 3 code can reuse the same behavior contract.

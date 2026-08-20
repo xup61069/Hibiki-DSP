@@ -17,4 +17,7 @@ sample rate (all little-endian), followed by interleaved Float32 samples. The
 source-only `hibiki_tab_bridge_contract` library now performs that packet
 validation (including finite-sample checks) before the loopback WebSocket
 receiver invokes its control-thread callback. Lane routing and noise-reduction
-DSP remain separate boundaries.
+DSP remain separate boundaries. `process_tab_capture_lane_v1` is the bounded
+adapter from that queue into `AudioEngineModel::process_lane_block`; it reuses
+the selected lane's immutable graph and Group Master without allocating on the
+audio path.

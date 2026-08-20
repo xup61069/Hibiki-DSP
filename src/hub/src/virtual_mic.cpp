@@ -23,6 +23,29 @@ void VirtualMicRouteModel::reset() noexcept {
   privacy_muted_ = true;
 }
 
+bool process_virtual_mic_lane_v1(
+    AudioEngineModel& engine,
+    const VirtualMicRouteModel& route,
+    const std::size_t lane_index,
+    const float* const input_interleaved,
+    const std::uint32_t input_capacity_frames,
+    float* const capture_interleaved,
+    const std::uint32_t capture_capacity_frames,
+    const std::span<RtLaneInputV1> lane_inputs,
+    float* const output_interleaved,
+    const std::uint32_t output_capacity_frames,
+    const std::uint32_t frames) noexcept {
+  const auto& snapshot = route.snapshot();
+  if (!snapshot.prepared || input_interleaved == nullptr || capture_interleaved == nullptr ||
+      output_interleaved == nullptr || frames == 0U || frames > input_capacity_frames ||
+      frames > capture_capacity_frames || frames > output_capacity_frames) {
+    return false;
+  }
+  if (!route.process_capture(input_interleaved, capture_interleaved, frames)) return false;
+  return engine.process_lane_block(lane_index, capture_interleaved, snapshot.channels, frames,
+                                   lane_inputs, output_interleaved);
+}
+
 bool VirtualMicRouteModel::process_capture(const float* const input,
                                            float* const output,
                                            const std::size_t frames) const noexcept {

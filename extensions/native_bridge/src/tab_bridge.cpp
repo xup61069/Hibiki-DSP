@@ -151,6 +151,34 @@ std::uint32_t TabCaptureQueueV1::dropped_blocks() const noexcept {
     return dropped_blocks_.load(std::memory_order_relaxed);
 }
 
+bool process_tab_capture_lane_v1(
+    AudioEngineModel& engine,
+    const std::size_t lane_index,
+    TabCaptureQueueV1& queue,
+    float* const input_interleaved,
+    const std::uint32_t input_capacity_frames,
+    const std::span<RtLaneInputV1> lane_inputs,
+    float* const output_interleaved,
+    const std::uint32_t output_capacity_frames,
+    TabCaptureBlockV1& block) noexcept {
+    block = {};
+    if (input_interleaved == nullptr || output_interleaved == nullptr ||
+        input_capacity_frames == 0U || output_capacity_frames == 0U) {
+        return false;
+    }
+    if (!queue.pop(input_interleaved, input_capacity_frames, block) ||
+        block.frames == 0U || block.frames > output_capacity_frames) {
+        block = {};
+        return false;
+    }
+    if (!engine.process_lane_block(lane_index, input_interleaved, block.channels, block.frames,
+                                   lane_inputs, output_interleaved)) {
+        block = {};
+        return false;
+    }
+    return true;
+}
+
 void enqueue_tab_capture_packet_v1(const TabCapturePacketViewV1& view, void* const context) noexcept {
     if (context != nullptr) {
         (void)static_cast<TabCaptureQueueV1*>(context)->push(view);

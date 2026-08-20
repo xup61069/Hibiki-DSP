@@ -44,6 +44,44 @@ public sealed record ControlSnapshot(
     public string DisplayVolume => Muted ? "靜音" : $"{EffectiveDb:0.0} dB";
 }
 
+public sealed record EnhanceResult(
+    bool Succeeded,
+    SceneCard? Scene,
+    AudioControlStatus Status,
+    string? Message);
+
+// UI-independent behavior contract for the first-run experience. WinUI may
+// render this model, but it must not silently claim control when no output
+// group is selected.
+public sealed class EasyControlSession
+{
+    public UiMode Mode { get; private set; } = UiMode.Easy;
+    public SceneCard? ActiveScene { get; private set; }
+    public AudioControlStatus Status { get; private set; } = AudioControlStatus.Degraded;
+
+    public void SetMode(UiMode mode) => Mode = mode;
+
+    public EnhanceResult OneTapEnhance(string? outputGroup)
+    {
+        if (string.IsNullOrWhiteSpace(outputGroup))
+        {
+            Status = AudioControlStatus.Degraded;
+            return new(false, null, Status, "尚未選擇輸出裝置");
+        }
+        ActiveScene = ScenePresetCatalog.EasyDefaults[0];
+        Status = AudioControlStatus.Controlled;
+        return new(true, ActiveScene, Status, "已套用遊戲低延遲與音量保護");
+    }
+
+    public bool SelectScene(string sceneId)
+    {
+        var scene = ScenePresetCatalog.EasyDefaults.FirstOrDefault(item => item.Id == sceneId);
+        if (scene is null) return false;
+        ActiveScene = scene;
+        return true;
+    }
+}
+
 public sealed class DeviceSwitchModel
 {
     private string? _active;

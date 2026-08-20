@@ -400,6 +400,7 @@ int main() {
     CHECK(full_tab_queue->push(tab_view));
     CHECK(full_tab_queue->push(tab_view));
     CHECK(!full_tab_queue->push(tab_view) && full_tab_queue->dropped_blocks() == 1U);
+    CHECK(tab_queue->push(tab_view));
     tab_packet.pop_back();
     CHECK(!decode_tab_capture_packet_v1(tab_packet, tab_view, tab_error) &&
           tab_error == TabPacketError::LengthMismatch);
@@ -492,6 +493,29 @@ int main() {
     CHECK(engine.process(std::span<const RtLaneInputV1>(&engine_input_view, 1), engine_output, 1));
     CHECK(std::abs(engine_output[0] - 0.5F) < 1e-5F);
     CHECK(std::abs(engine_output[1] + 0.5F) < 1e-5F);
+    std::vector<RtLaneInputV1> tab_lane_inputs(1);
+    float tab_lane_input[8]{};
+    float tab_lane_output[8]{};
+    TabCaptureBlockV1 tab_lane_block{};
+    CHECK(process_tab_capture_lane_v1(engine, 0, *tab_queue, tab_lane_input, 2U,
+                                      tab_lane_inputs, tab_lane_output, 2U, tab_lane_block));
+    CHECK(tab_lane_block.frames == 2U && tab_lane_block.channels == 2U &&
+          std::abs(tab_lane_output[0] - 0.125F) < 1e-5F &&
+          std::abs(tab_lane_output[1] + 0.125F) < 1e-5F);
+    VirtualMicRouteModel lane_mic;
+    CHECK(lane_mic.prepare(VirtualMicConfigV1{2U, 48000U, true}));
+    float lane_mic_input[4] = {0.75F, -0.75F, 0.5F, -0.5F};
+    float lane_mic_capture[4]{};
+    float lane_mic_output[4]{};
+    std::vector<RtLaneInputV1> mic_lane_inputs(1);
+    CHECK(process_virtual_mic_lane_v1(engine, lane_mic, 0, lane_mic_input, 2U, lane_mic_capture,
+                                      2U, mic_lane_inputs, lane_mic_output, 2U, 2U));
+    CHECK(lane_mic_output[0] == 0.0F && lane_mic_output[1] == 0.0F);
+    lane_mic.set_privacy_mute(false);
+    CHECK(process_virtual_mic_lane_v1(engine, lane_mic, 0, lane_mic_input, 2U, lane_mic_capture,
+                                      2U, mic_lane_inputs, lane_mic_output, 2U, 2U));
+    CHECK(std::abs(lane_mic_output[0] - 0.375F) < 1e-5F &&
+          std::abs(lane_mic_output[1] + 0.375F) < 1e-5F);
 #if defined(_WIN32)
     constexpr wchar_t kContractMapping[] = L"Local\\HibikiDSP_v1_contract_asio";
     CHECK(engine.bind_asio_transport(kContractMapping, 2U, 48000U, 4U));

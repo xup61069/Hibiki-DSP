@@ -9,6 +9,8 @@
 #include <atomic>
 #include <thread>
 
+#include "hibiki/audio_engine.hpp"
+
 namespace hibiki {
 
 enum class TabPacketError : std::uint8_t {
@@ -77,6 +79,20 @@ private:
     std::atomic<std::uint32_t> dropped_blocks_{0U};
     std::array<Slot, kSlotCount> slots_{};
 };
+
+// Bridges one queued browser block into the same immutable engine graph used
+// by ASIO and other external lanes. The adapter owns no audio storage: the
+// caller supplies scratch/input and output buffers.
+[[nodiscard]] bool process_tab_capture_lane_v1(
+    AudioEngineModel& engine,
+    std::size_t lane_index,
+    TabCaptureQueueV1& queue,
+    float* input_interleaved,
+    std::uint32_t input_capacity_frames,
+    std::span<RtLaneInputV1> lane_inputs,
+    float* output_interleaved,
+    std::uint32_t output_capacity_frames,
+    TabCaptureBlockV1& block) noexcept;
 
 void enqueue_tab_capture_packet_v1(const TabCapturePacketViewV1& view, void* context) noexcept;
 

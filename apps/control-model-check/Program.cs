@@ -14,4 +14,14 @@ Check(device.Prepare("endpoint-a") && device.Commit(), "Device A commit failed."
 Check(device.Prepare("endpoint-b"), "Device B prepare failed.");
 device.Rollback();
 Check(device.ActiveDevice == "endpoint-a", "Rollback replaced the active endpoint.");
+var session = new EasyControlSession();
+var blockedEnhance = session.OneTapEnhance(null);
+Check(!blockedEnhance.Succeeded && blockedEnhance.Status == AudioControlStatus.Degraded,
+    "Enhance must fail closed without an output group.");
+var enhanced = session.OneTapEnhance("main");
+Check(enhanced.Succeeded && enhanced.Scene?.Id == "game" &&
+      enhanced.Status == AudioControlStatus.Controlled, "One-tap enhance did not control the scene.");
+session.SetMode(UiMode.Expert);
+Check(session.Mode == UiMode.Expert && session.SelectScene("movie"),
+    "Expert scene selection failed.");
 Console.WriteLine("Control model checks passed.");

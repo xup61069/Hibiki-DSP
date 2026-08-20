@@ -3,8 +3,11 @@
 #ifndef HIBIKI_VIRTUAL_MIC_HPP
 #define HIBIKI_VIRTUAL_MIC_HPP
 
+#include "hibiki/audio_engine.hpp"
+
 #include <cstddef>
 #include <cstdint>
+#include <span>
 
 namespace hibiki {
 
@@ -46,6 +49,22 @@ private:
   VirtualMicSnapshotV1 snapshot_{};
   bool privacy_muted_{true};
 };
+
+// Applies the privacy gate before entering the shared immutable graph. All
+// audio storage remains caller-owned; the helper performs no allocation or
+// blocking and fails closed on capacity/channel mismatches.
+[[nodiscard]] bool process_virtual_mic_lane_v1(
+    AudioEngineModel& engine,
+    const VirtualMicRouteModel& route,
+    std::size_t lane_index,
+    const float* input_interleaved,
+    std::uint32_t input_capacity_frames,
+    float* capture_interleaved,
+    std::uint32_t capture_capacity_frames,
+    std::span<RtLaneInputV1> lane_inputs,
+    float* output_interleaved,
+    std::uint32_t output_capacity_frames,
+    std::uint32_t frames) noexcept;
 
 }  // namespace hibiki
 

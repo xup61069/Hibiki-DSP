@@ -6,6 +6,7 @@ target_include_directories(hibiki_tab_bridge_contract
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+target_link_libraries(hibiki_tab_bridge_contract PUBLIC hibiki_hub)
 target_compile_features(hibiki_tab_bridge_contract PUBLIC cxx_std_20)
 
 if(MSVC)
