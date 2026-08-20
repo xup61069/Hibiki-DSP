@@ -13,6 +13,9 @@
 - Source-only PowerShell installer bootstrapper with manifest/hash dry-run gate.
 - Easy Scene factory、AcousticAnchor phon mapping、PEQ/APO/CamillaDSP/REW exporters 與 WAV IR
   serializer。
+- `EasyControlSession` provides a UI-independent fail-closed One-Tap Enhance contract, explicit
+  Easy/Expert mode, scene selection and active output-group identity for future WinUI rendering;
+  the installer source also rejects manifest path traversal and malformed SHA-256 entries.
 - `AudioEngineModel` facade connecting graph transaction, Windows volume notification and RT
   processing with one Group Master gain.
 - Windows-only `IAudioEndpointVolume` broker with non-blocking callback snapshot, dB/mute
@@ -29,7 +32,9 @@
 - Persistent no-allocation linear SRC with phase and boundary-frame carry across output blocks;
   insufficient output capacity is rejected before partial consumption.
 - VST host control model now requires trusted/certified same-channel descriptors and quarantines
-  a lane on crash or missed bounded heartbeat; actual out-of-process SDK hosting remains pending.
+  a lane on crash or missed bounded heartbeat; the source-only worker now exercises bounded
+  Hello/Heartbeat/ProcessBlock passthrough/Shutdown IPC, while actual VST3 SDK hosting remains
+  pending.
 - `AudioSessionRegistry` keys Windows sessions by endpoint plus session-instance ID, preserves
   user routing on metadata refresh, and supports independent lane/output-group/gain-owner binding;
   Windows `IAudioSessionManager2` worker enumeration now populates it; callbacks remain
@@ -50,20 +55,21 @@
   30 ms default-compatible path for 2/6/8 channels; it is tested independently from the
   still-pending physical endpoint and clock soak fixtures.
 - `Vst3SandboxProcess` now provides a Windows Job Object containment layer with explicit
-  launch validation, heartbeat watchdog and crash quarantine; VST3 SDK worker IPC remains
-  pending and no plugin binary is bundled.
+  launch validation, heartbeat watchdog and crash quarantine; no plugin binary is bundled.
 - `vst3_worker_protocol.hpp`/`.cpp` now provide a fixed 36-byte little-endian worker frame codec
   with Hello/Heartbeat/Process/Shutdown/Error types, exact Float32 payload validation and finite
-  sample checks. Named-pipe transport and actual SDK dispatch remain pending.
+  sample checks. Named-pipe transport plus a source-only worker loop are present; SDK dispatch
+  remains pending.
 - `VirtualMicRouteModel` now defines fixed 1/2-channel capture/reference blocks, fail-closed
   privacy mute and explicit echo-reference enablement; it intentionally does not claim AEC/NS or a
   loadable virtual capture driver.
 - `Vst3WorkerPipeV1` is now attached to `Vst3SandboxProcess`: optional launch pipe setup passes
   `--hibiki-pipe`, bounded overlapped connect/read/write is exposed only to control/IPC callers,
-  and stop closes the pipe with the Job Object. The actual worker executable still remains pending.
+  and stop closes the pipe with the Job Object. `hibiki_vst_worker` provides the bounded
+  worker-side client loop; the actual SDK/plugin executable remains pending.
 - The MV3 tab-capture source now packetizes user-requested audio through an AudioWorklet into
   validated `HIBT` Float32 frames and optionally sends them to localhost; missing bridge leaves
-  browser playback intact, while native receiver/engine lane/noise-reduction remain pending.
+  browser playback intact, while native receiver/noise-reduction remain separate boundaries.
 - `hibiki_tab_bridge_contract` now validates HIBT packet framing, supported LPCM layouts/rates,
   exact payload length and finite samples without owning or allocating audio buffers.
 - The optional Windows tab bridge now owns a loopback-only WebSocket listener with bounded
@@ -71,7 +77,8 @@
   provenance remain intentionally outside the receiver.
 - `TabCaptureQueueV1` now provides a four-slot fixed SPSC handoff for validated HIBT packets;
   `enqueue_tab_capture_packet_v1` is a ready callback adapter, with bounded dropped-block reporting
-  and no allocation/wait on the pop path. The browser queue is not yet wired to a graph lane.
+  and no allocation/wait on the pop path. `process_tab_capture_lane_v1` feeds the selected lane's
+  immutable graph and Group Master without owning audio buffers.
 - The MS-PL WDK source boundary now has a property-dispatch scaffold for volume/mute that calls
   the portable Q16.16 endpoint core; it is source-checked but intentionally not a loadable `.sys`.
 - Apache-2.0 `hibiki_asio_transport_v1` now provides a fixed-layout SPSC shared-memory ring. The
@@ -83,12 +90,14 @@
   Float32 physical render boundary: one dedicated sink-worker apartment owns COM bind/start/stop,
   event waits, bounded SPSC blocks, silence underrun fill, persistent SRC and clock-observation
   updates. The graph RT thread never calls this COM API; real-device/hotplug soak remains pending.
+- `process_virtual_mic_lane_v1` applies the fail-closed privacy gate before sending caller-owned
+  capture blocks through the shared lane graph; it still does not claim AEC/NS or a loadable
+  capture driver.
 
 ## 尚未開始
 
 - 可載入的 WaveRT/SYSVAD-derived driver、ASIO physical sink delivery、out-of-process VST3 SDK
-  host、WinUI 3 UI、native browser engine lane、physical sink clock fixtures 與 signed package
-  delivery。
+  plugin dispatch、WinUI 3 UI、physical sink clock fixtures 與 signed package delivery。
 - ISO 226:2023 合法係數來源與正式 conformance oracle（公式本身已完成，但係數資料仍待
   授權／法務確認）。
 - Microsoft driver signing、Gumroad release artifact 與 production installer。
@@ -99,15 +108,15 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 
 ## 最近驗證
 
-初始 foundation evidence 已寫入 `evidence/0000-foundation/initial.json`，目前對應最新
-Windows volume/device、ISO formula、recovery、driver control-core、persistent SRC、VST watchdog、
-session volume adapter、sink clock pipeline、optional native ASIO transport/ring 與 tab bridge
-baseline commit `bce4535`；
+初始 foundation evidence 已寫入 `evidence/0000-foundation/initial.json`，目前對應
+Windows volume/device、ISO formula、recovery、driver control-core、persistent SRC、VST worker、
+session volume adapter、sink clock pipeline、optional native ASIO transport/ring、tab/Virtual Mic
+lane adapter 與 control-model baseline commit `2cd9d92`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 40 個必要入口與
-9 份 Spec 通過；`source-policy.ps1` 掃描 168 個路徑且無 blocked binary/secret；
+9 份 Spec 通過；`source-policy.ps1` 掃描 169 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1` 與
 `distribution-check.ps1` 與 `driver-source-check.ps1` 通過；16 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
