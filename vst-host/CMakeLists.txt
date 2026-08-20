@@ -5,6 +5,12 @@ add_library(hibiki_vst_host STATIC
   src/vst3_worker_pipe.cpp
 )
 
+add_executable(hibiki_vst_worker
+  src/vst3_worker_main.cpp
+)
+
+target_link_libraries(hibiki_vst_worker PRIVATE hibiki_vst_host)
+
 target_include_directories(hibiki_vst_host
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include

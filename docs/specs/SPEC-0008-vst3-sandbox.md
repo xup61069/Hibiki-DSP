@@ -34,11 +34,14 @@ Heartbeat、ProcessBlock、ProcessBlockResponse、Shutdown、Error。Process fra
 配置、不擁有 payload，適合由 named pipe 或其他 control transport 在 worker 與 supervisor
 間傳遞。真正 VST3 SDK/plugin dispatch 仍必須在 worker process，不能連入 graph RT。
 `Vst3WorkerPipeV1` 提供 Windows overlapped named-pipe server、4-byte bounded length prefix、
-connect/read/write timeout 與 caller-owned receive buffer；它是 control-plane transport，
-不會被 audio callback 呼叫。
+connect/read/write timeout 與 caller-owned receive buffer；worker-side 也可用 bounded
+`connect_client` 連入 supervisor 建立的 pipe。`hibiki_vst_worker` 目前能回應 Hello、
+Heartbeat、受限 ProcessBlock passthrough 與 Shutdown；它是可執行的 transport/可靠性
+fixture，不宣稱已載入 VST3 SDK 或第三方 plugin。
 
 ## 尚未完成的邊界
 
-VST3 SDK 版本鎖定、plugin scan/certification、named-pipe transport、latency compensation、
-crash dump redaction 與實際 worker executable 尚未納入本 commit；目前 supervisor 與 frame codec
-提供可測試的 process containment，不能宣稱已完成 VST3 host。
+VST3 SDK 版本鎖定、plugin scan/certification、SDK parameter/audio dispatch、latency
+compensation、crash dump redaction 與 production worker policy 尚未納入本 commit；目前
+supervisor、named pipe 與 passthrough worker 提供可測試的 process containment，不能宣稱
+已完成 VST3 host。

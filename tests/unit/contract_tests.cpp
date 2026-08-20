@@ -373,6 +373,7 @@ int main() {
           worker_error == Vst3WorkerProtocolErrorV1::NonFiniteSample);
     Vst3WorkerPipeV1 worker_pipe;
     CHECK(!worker_pipe.create_server(Vst3WorkerPipeConfigV1{L"", 1024U, 100U}));
+    CHECK(!worker_pipe.connect_client(L"", 100U));
 
     std::vector<std::uint8_t> tab_packet(16U + 2U * 2U * sizeof(float), 0U);
     tab_packet[0] = 'H'; tab_packet[1] = 'I'; tab_packet[2] = 'B'; tab_packet[3] = 'T';

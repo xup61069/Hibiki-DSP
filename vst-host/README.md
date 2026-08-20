@@ -6,6 +6,8 @@ other lanes or the physical output sinks.
 
 `PluginHostModel` provides the control-plane contract: only trusted, certified,
 same-channel-count descriptors can enter `Running`; a crash or missed heartbeat
-deadline moves the lane to `Quarantined` and blocks further processing. Its
-passthrough is a deterministic test fixture, not a VST3 implementation; the
-actual SDK host remains isolated behind this boundary.
+deadline moves the lane to `Quarantined` and blocks further processing. The
+source-only `hibiki_vst_worker` executable now exercises the bounded worker
+protocol with Hello/Heartbeat/ProcessBlock passthrough/Shutdown. It remains a
+transport fixture: VST3 SDK loading, plugin dispatch, scan and certification
+are intentionally isolated behind this boundary.

@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <string_view>
 
 namespace hibiki {
 
@@ -27,6 +28,8 @@ public:
   Vst3WorkerPipeV1& operator=(const Vst3WorkerPipeV1&) = delete;
 
   [[nodiscard]] bool create_server(const Vst3WorkerPipeConfigV1& config) noexcept;
+  [[nodiscard]] bool connect_client(std::wstring_view pipe_name,
+                                    std::uint32_t io_timeout_ms) noexcept;
   [[nodiscard]] bool wait_for_client(std::uint32_t timeout_ms) noexcept;
   [[nodiscard]] bool send(std::span<const std::uint8_t> frame) noexcept;
   [[nodiscard]] bool receive(std::span<std::uint8_t> destination,

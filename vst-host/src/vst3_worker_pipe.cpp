@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstring>
+#include <string_view>
 
 #if defined(_WIN32)
 
@@ -56,6 +57,39 @@ bool Vst3WorkerPipeV1::create_server(const Vst3WorkerPipeConfigV1& config) noexc
   max_frame_bytes_ = config.max_frame_bytes;
   io_timeout_ms_ = config.io_timeout_ms;
   connected_ = false;
+  return true;
+}
+
+bool Vst3WorkerPipeV1::connect_client(const std::wstring_view pipe_name,
+                                      const std::uint32_t io_timeout_ms) noexcept {
+  close();
+  if (!valid_pipe_name(std::wstring(pipe_name)) || io_timeout_ms == 0U ||
+      io_timeout_ms > 30000U) {
+    return false;
+  }
+  const std::wstring name(pipe_name);
+  const auto deadline = GetTickCount64() + io_timeout_ms;
+  HANDLE pipe = INVALID_HANDLE_VALUE;
+  while (GetTickCount64() <= deadline) {
+    pipe = CreateFileW(name.c_str(), GENERIC_READ | GENERIC_WRITE, 0U, nullptr, OPEN_EXISTING,
+                       FILE_FLAG_OVERLAPPED, nullptr);
+    if (pipe != INVALID_HANDLE_VALUE) break;
+    if (GetLastError() != ERROR_PIPE_BUSY) return false;
+    const auto remaining = deadline - GetTickCount64();
+    if (remaining == 0U || !WaitNamedPipeW(name.c_str(), static_cast<DWORD>(remaining))) {
+      return false;
+    }
+  }
+  if (pipe == INVALID_HANDLE_VALUE) return false;
+  DWORD mode = PIPE_READMODE_BYTE;
+  if (SetNamedPipeHandleState(pipe, &mode, nullptr, nullptr) == FALSE) {
+    CloseHandle(pipe);
+    return false;
+  }
+  handle_ = as_pointer(pipe);
+  max_frame_bytes_ = 4U * 1024U * 1024U;
+  io_timeout_ms_ = io_timeout_ms;
+  connected_ = true;
   return true;
 }
 
@@ -160,6 +194,7 @@ void Vst3WorkerPipeV1::close() noexcept {
 namespace hibiki {
 Vst3WorkerPipeV1::~Vst3WorkerPipeV1() = default;
 bool Vst3WorkerPipeV1::create_server(const Vst3WorkerPipeConfigV1&) noexcept { return false; }
+bool Vst3WorkerPipeV1::connect_client(std::wstring_view, std::uint32_t) noexcept { return false; }
 bool Vst3WorkerPipeV1::wait_for_client(std::uint32_t) noexcept { return false; }
 bool Vst3WorkerPipeV1::send(std::span<const std::uint8_t>) noexcept { return false; }
 bool Vst3WorkerPipeV1::receive(std::span<std::uint8_t>, std::size_t& bytes_read) noexcept {
