@@ -15,6 +15,7 @@ add_library(hibiki_hub STATIC
   src/scene_presets.cpp
   src/scene_safety.cpp
   src/volume_state.cpp
+  src/windows_wasapi_output.cpp
 )
 
 target_include_directories(hibiki_hub

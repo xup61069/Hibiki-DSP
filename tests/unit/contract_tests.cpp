@@ -29,6 +29,7 @@ extern "C" {
 #include "hibiki/windows_volume_broker.hpp"
 #include "hibiki/windows_device_watcher.hpp"
 #include "hibiki/windows_audio_session_watcher.hpp"
+#include "hibiki/windows_wasapi_output.hpp"
 #endif
 
 #include <cmath>
@@ -534,6 +535,9 @@ int main() {
     CHECK(session_watcher->read_session_volume("missing", session_db, session_mute) ==
           E_UNEXPECTED);
     CHECK(session_watcher->Release() == 0U);
+    WindowsWasapiOutputV1 wasapi_output;
+    CHECK(!wasapi_output.bind(WasapiOutputConfigV1{L"", 3U, 48000U, 20U}));
+    CHECK(!wasapi_output.start());
 #endif
 
     return 0;
