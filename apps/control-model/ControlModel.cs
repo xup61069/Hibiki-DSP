@@ -57,6 +57,7 @@ public sealed class EasyControlSession
 {
     public UiMode Mode { get; private set; } = UiMode.Easy;
     public SceneCard? ActiveScene { get; private set; }
+    public string? ActiveOutputGroup { get; private set; }
     public AudioControlStatus Status { get; private set; } = AudioControlStatus.Degraded;
 
     public void SetMode(UiMode mode) => Mode = mode;
@@ -68,6 +69,7 @@ public sealed class EasyControlSession
             Status = AudioControlStatus.Degraded;
             return new(false, null, Status, "尚未選擇輸出裝置");
         }
+        ActiveOutputGroup = outputGroup.Trim();
         ActiveScene = ScenePresetCatalog.EasyDefaults[0];
         Status = AudioControlStatus.Controlled;
         return new(true, ActiveScene, Status, "已套用遊戲低延遲與音量保護");

@@ -20,7 +20,8 @@ Check(!blockedEnhance.Succeeded && blockedEnhance.Status == AudioControlStatus.D
     "Enhance must fail closed without an output group.");
 var enhanced = session.OneTapEnhance("main");
 Check(enhanced.Succeeded && enhanced.Scene?.Id == "game" &&
-      enhanced.Status == AudioControlStatus.Controlled, "One-tap enhance did not control the scene.");
+      enhanced.Status == AudioControlStatus.Controlled &&
+      session.ActiveOutputGroup == "main", "One-tap enhance did not control the scene/output.");
 session.SetMode(UiMode.Expert);
 Check(session.Mode == UiMode.Expert && session.SelectScene("movie"),
     "Expert scene selection failed.");

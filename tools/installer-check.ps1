@@ -9,7 +9,7 @@ $errors = $null
 [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors) | Out-Null
 if ($errors.Count -gt 0) { throw "Installer PowerShell parse errors: $($errors -join '; ')" }
 $text = Get-Content -LiteralPath $path -Raw
-foreach ($required in @('Read-ReleaseManifest', 'Test-ManifestFiles', 'Invoke-HibikiInstall', '-Apply', 'pnputil.exe')) {
+foreach ($required in @('Read-ReleaseManifest', 'Test-ManifestFiles', 'Invoke-HibikiInstall', '-Apply', 'pnputil.exe', 'IsPathRooted', 'sha256')) {
   if (-not $text.Contains($required)) { throw "Installer source missing required boundary: $required" }
 }
 Write-Output 'Installer source checks passed.'

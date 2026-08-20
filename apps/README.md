@@ -14,4 +14,5 @@ Expert mode.
 cards, explicit Controlled/Bypassed/Degraded status, dB presentation and
 transactional device selection. It now also defines fail-closed One-Tap Enhance
 and scene selection behavior; `control-model-check/` runs without WinUI so
-future WinUI 3 code can reuse the same behavior contract.
+future WinUI 3 code can reuse the same behavior contract. A successful enhance
+also records the trimmed active output-group identity for status rendering.

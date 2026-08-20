@@ -27,7 +27,22 @@ function Read-ReleaseManifest([string]$Path) {
 
 function Test-ManifestFiles($Manifest, [string]$Root) {
   foreach ($entry in @($Manifest.unsigned_files)) {
+    if ([string]::IsNullOrWhiteSpace($entry.path) -or
+        [IO.Path]::IsPathRooted($entry.path) -or
+        $entry.path -match '(^|[\\/])\.\.([\\/]|$)' -or
+        $entry.path -match '^[\\/]') {
+      throw "Manifest path must stay relative to PackageRoot: $($entry.path)"
+    }
+    if ([string]::IsNullOrWhiteSpace($entry.sha256) -or
+        $entry.sha256 -notmatch '^[0-9a-fA-F]{64}$') {
+      throw "Manifest sha256 must be a 64-character hexadecimal digest: $($entry.path)"
+    }
     $path = Join-Path $Root $entry.path
+    $resolvedRoot = [IO.Path]::GetFullPath((Resolve-Path -LiteralPath $Root).Path).TrimEnd('\') + '\'
+    $resolvedPath = [IO.Path]::GetFullPath($path)
+    if (-not $resolvedPath.StartsWith($resolvedRoot, [StringComparison]::OrdinalIgnoreCase)) {
+      throw "Manifest path escapes PackageRoot: $($entry.path)"
+    }
     if (-not (Test-Path -LiteralPath $path)) { throw "Manifest file missing: $($entry.path)" }
     $actual = Get-Sha256 $path
     if ($actual -ne $entry.sha256.ToLowerInvariant()) {
