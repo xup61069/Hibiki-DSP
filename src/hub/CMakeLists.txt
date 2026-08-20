@@ -8,6 +8,7 @@ add_library(hibiki_hub STATIC
   src/device_switch.cpp
   src/exporters.cpp
   src/ipc.cpp
+  src/ipc_pipe.cpp
   src/iso226.cpp
   src/output_sink.cpp
   src/output_crossfade.cpp

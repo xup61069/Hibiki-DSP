@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $path = Join-Path $repo 'config/distribution-profile.yml'
 $text = Get-Content -LiteralPath $path -Raw
-foreach ($required in @('hibiki-public-2026', 'Root\\HibikiDSP', 'HibikiVirtualAudio', 'Local\\HibikiDSP\\v1', 'Local\\HibikiDSP_v1_asio')) {
+foreach ($required in @('hibiki-public-2026', 'Root\\HibikiDSP', 'HibikiVirtualAudio', 'Local\\HibikiDSP\\v1', 'HibikiDSP_v1_control', 'Local\\HibikiDSP_v1_asio')) {
   if (-not $text.Contains($required)) { throw "Distribution profile missing stable value: $required" }
 }
 $guidNames = @('endpoint_main_guid', 'endpoint_low_latency_guid', 'endpoint_surround_guid', 'endpoint_virtual_mic_guid', 'asio_clsid')

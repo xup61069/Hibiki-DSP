@@ -2,6 +2,7 @@
 #include "hibiki/device_switch.hpp"
 #include "hibiki/device_recovery.hpp"
 #include "hibiki/ipc.hpp"
+#include "hibiki/ipc_pipe.hpp"
 #include "hibiki/asio_bridge.hpp"
 #include "hibiki/calibration.hpp"
 #include "hibiki/plugin_host.hpp"
@@ -51,6 +52,17 @@ extern "C" {
             return 1;                                                                       \
         }                                                                                   \
     } while (false)
+
+#if defined(_WIN32)
+bool acknowledge_ipc_request(const hibiki::IpcFrameV1& request,
+                             hibiki::IpcFrameV1& response,
+                             void*) noexcept {
+    response.header.type = hibiki::IpcMessageType::Ack;
+    response.header.request_id = request.header.request_id;
+    response.payload.clear();
+    return true;
+}
+#endif
 
 int main() {
     using namespace hibiki;
@@ -280,6 +292,44 @@ int main() {
     malformed[0] = 0;
     CHECK(!decode_ipc_frame(malformed, decode_error).has_value());
     CHECK(decode_error == IpcDecodeError::InvalidMagic);
+    IpcNamedPipeServerV1 ipc_server;
+    CHECK(!ipc_server.start(IpcNamedPipeConfigV1{L"", 1024U, 100U}, nullptr, nullptr));
+#if defined(_WIN32)
+    constexpr wchar_t kControlPipe[] = L"\\\\.\\pipe\\HibikiDSP_contract_control";
+    CHECK(ipc_server.start(IpcNamedPipeConfigV1{kControlPipe, 1024U, 1000U},
+                           acknowledge_ipc_request, nullptr));
+    HANDLE ipc_client = INVALID_HANDLE_VALUE;
+    for (int attempt = 0; attempt < 30 && ipc_client == INVALID_HANDLE_VALUE; ++attempt) {
+        ipc_client = CreateFileW(kControlPipe, GENERIC_READ | GENERIC_WRITE, 0U, nullptr,
+                                 OPEN_EXISTING, 0U, nullptr);
+        if (ipc_client == INVALID_HANDLE_VALUE) {
+            if (GetLastError() == ERROR_PIPE_BUSY) (void)WaitNamedPipeW(kControlPipe, 100U);
+            Sleep(10U);
+        }
+    }
+    CHECK(ipc_client != INVALID_HANDLE_VALUE);
+    const auto request_bytes = encode_ipc_frame(frame);
+    const std::uint32_t request_size = static_cast<std::uint32_t>(request_bytes.size());
+    DWORD transferred = 0U;
+    CHECK(WriteFile(ipc_client, &request_size, sizeof(request_size), &transferred, nullptr) != FALSE &&
+          transferred == sizeof(request_size));
+    CHECK(WriteFile(ipc_client, request_bytes.data(), request_size, &transferred, nullptr) != FALSE &&
+          transferred == request_size);
+    std::uint32_t response_size = 0U;
+    CHECK(ReadFile(ipc_client, &response_size, sizeof(response_size), &transferred, nullptr) != FALSE &&
+          transferred == sizeof(response_size) && response_size <= 1024U);
+    std::vector<std::uint8_t> response_bytes(response_size);
+    CHECK(ReadFile(ipc_client, response_bytes.data(), response_size, &transferred, nullptr) != FALSE &&
+          transferred == response_size);
+    IpcDecodeError pipe_decode_error{IpcDecodeError::None};
+    const auto pipe_response = decode_ipc_frame(response_bytes, pipe_decode_error);
+    CHECK(pipe_response.has_value() && pipe_decode_error == IpcDecodeError::None &&
+          pipe_response->header.type == IpcMessageType::Ack &&
+          pipe_response->header.request_id == frame.header.request_id);
+    CloseHandle(ipc_client);
+    ipc_server.stop();
+    CHECK(!ipc_server.running());
+#endif
 
     AsioBridgeModel asio;
     CHECK(asio.prepare(AsioStreamConfigV1{48000, 2, 128}));

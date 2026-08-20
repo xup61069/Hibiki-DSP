@@ -16,6 +16,9 @@
 - `EasyControlSession` provides a UI-independent fail-closed One-Tap Enhance contract, explicit
   Easy/Expert mode, scene selection and active output-group identity for future WinUI rendering;
   the installer source also rejects manifest path traversal and malformed SHA-256 entries.
+- C# `IpcCodecV1`/`NamedPipeControlClientV1` mirrors the C++ little-endian envelope and bounded
+  4-byte length framing; a cross-language known-byte fixture and malformed-frame checks are part
+  of the control-model gate.
 - `AudioEngineModel` facade connecting graph transaction, Windows volume notification and RT
   processing with one Group Master gain.
 - Windows-only `IAudioEndpointVolume` broker with non-blocking callback snapshot, dB/mute
@@ -90,6 +93,9 @@
   Float32 physical render boundary: one dedicated sink-worker apartment owns COM bind/start/stop,
   event waits, bounded SPSC blocks, silence underrun fill, persistent SRC and clock-observation
   updates. The graph RT thread never calls this COM API; real-device/hotplug soak remains pending.
+- `IpcNamedPipeServerV1` provides the Windows control-plane worker boundary with overlapped,
+  bounded read/write, local-only pipe validation, request decoding and callback response framing;
+  a Windows loopback contract test exercises Ack/request-ID round-trip.
 - `process_virtual_mic_lane_v1` applies the fail-closed privacy gate before sending caller-owned
   capture blocks through the shared lane graph; it still does not claim AEC/NS or a loadable
   capture driver.

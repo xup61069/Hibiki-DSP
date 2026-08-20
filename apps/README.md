@@ -16,3 +16,9 @@ transactional device selection. It now also defines fail-closed One-Tap Enhance
 and scene selection behavior; `control-model-check/` runs without WinUI so
 future WinUI 3 code can reuse the same behavior contract. A successful enhance
 also records the trimmed active output-group identity for status rendering.
+
+`IpcProtocol.cs` mirrors the C++ `IpcFrameV1` little-endian envelope, including
+the 1 MiB bound, explicit decode errors and request-ID correlation. The check
+project includes a cross-language known-byte fixture; transport lifecycle is
+kept separate from the UI model. `NamedPipeControlClientV1` adds an asynchronous
+bounded client for the stable `HibikiDSP_v1_control` logical pipe.
