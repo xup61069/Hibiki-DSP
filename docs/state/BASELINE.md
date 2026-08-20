@@ -70,6 +70,9 @@
   `AsioTransportConsumerV1` creates/owns `Local\\HibikiDSP_v1_asio` for an allocation-free pop;
   `AudioEngineModel::process_asio_transport` now runs that block through the selected graph lane
   and Group Master. Physical sink/WaveRT delivery remains pending.
+- `WindowsWasapiOutputV1` now supplies a Windows shared-mode Float32 physical render boundary:
+  control-side endpoint binding/start/stop and RT-side padding-aware `GetBuffer`/`ReleaseBuffer`.
+  It fails closed on unsupported mix formats and has no real-device soak evidence yet.
 
 ## 尚未開始
 
@@ -89,12 +92,12 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 初始 foundation evidence 已寫入 `evidence/0000-foundation/initial.json`，目前對應最新
 Windows volume/device、ISO formula、recovery、driver control-core、persistent SRC、VST watchdog、
 session volume adapter、sink clock pipeline、optional native ASIO transport/ring 與 tab bridge
-baseline commit `dbad27b`；
+baseline commit `590f020`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 40 個必要入口與
-9 份 Spec 通過；`source-policy.ps1` 掃描 160 個路徑且無 blocked binary/secret；
+9 份 Spec 通過；`source-policy.ps1` 掃描 162 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1` 與
 `distribution-check.ps1` 與 `driver-source-check.ps1` 通過；16 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
