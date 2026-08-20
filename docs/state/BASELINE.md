@@ -62,12 +62,16 @@
   provenance remain intentionally outside the receiver.
 - The MS-PL WDK source boundary now has a property-dispatch scaffold for volume/mute that calls
   the portable Q16.16 endpoint core; it is source-checked but intentionally not a loadable `.sys`.
+- Apache-2.0 `hibiki_asio_transport_v1` now provides a fixed-layout SPSC shared-memory ring. The
+  optional native ASIO DLL writes eight-channel Float32 blocks after callbacks, and
+  `AsioTransportConsumerV1` creates/owns `Local\\HibikiDSP\\v1\\asio` for an allocation-free pop.
+  This is a data boundary only; it is not yet connected to a physical sink or committed graph lane.
 
 ## 尚未開始
 
-- 可載入的 WaveRT/SYSVAD-derived driver、ASIO transport 與 Hibiki engine/physical sink 的
-  真正串接、out-of-process VST3 SDK host、WinUI 3 UI、native browser bridge、physical sink
-  clock fixtures 與 signed package delivery。
+- 可載入的 WaveRT/SYSVAD-derived driver、ASIO ring 與 Hibiki graph/physical sink 的真正串接、
+  out-of-process VST3 SDK host、WinUI 3 UI、native browser engine lane、physical sink clock
+  fixtures 與 signed package delivery。
 - ISO 226:2023 合法係數來源與正式 conformance oracle（公式本身已完成，但係數資料仍待
   授權／法務確認）。
 - Microsoft driver signing、Gumroad release artifact 與 production installer。
@@ -80,13 +84,13 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 
 初始 foundation evidence 已寫入 `evidence/0000-foundation/initial.json`，目前對應最新
 Windows volume/device、ISO formula、recovery、driver control-core、persistent SRC、VST watchdog、
-session volume adapter、sink clock pipeline、optional native ASIO transport 與 tab bridge
-baseline commit `8d36ccb`；
+session volume adapter、sink clock pipeline、optional native ASIO transport/ring 與 tab bridge
+baseline commit `66b027e`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 40 個必要入口與
-9 份 Spec 通過；`source-policy.ps1` 掃描 156 個路徑且無 blocked binary/secret；
+9 份 Spec 通過；`source-policy.ps1` 掃描 160 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1` 與
 `distribution-check.ps1` 與 `driver-source-check.ps1` 通過；16 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
