@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "issue": 0,
-  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-v13",
-  "source_commit": "57f1a53",
+  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-token-v14",
+  "source_commit": "c621d4b",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -62,6 +62,7 @@
     {"command": "scene-automation-timeline-references", "status": "pass", "coverage": ["bounded 16-reference list", "stable ID validation", "SceneProfile schema compatibility"], "compiled_artifacts": false},
     {"command": "graph-rollback-resource-lifecycle", "status": "pass", "coverage": ["pending latency bank release", "rollback preserves degraded state without active graph", "re-prepare after rollback"], "compiled_artifacts": false},
     {"command": "ui-device-switch-state", "status": "pass", "coverage": ["preparing/fading/ready-to-commit states", "commit blocked before crossfade", "rollback preserves active device"], "compiled_artifacts": false},
+    {"command": "vst3-plugin-latency-token", "status": "pass", "coverage": ["non-zero stable lane token", "missing token quarantine", "host latency lane projection"], "compiled_artifacts": false},
     {"command": "installer-source-hardening", "status": "pass", "coverage": ["relative manifest paths", "path traversal rejection", "64-character SHA-256 validation"]},
     {"command": "ir-phase-policy", "status": "pass", "coverage": ["minimum-phase 0 ms", "mixed-phase 80 ms budget", "linear-phase 160 ms budget", "bypass validation", "C++/C# slider parity"]},
     {"command": "audio-engine-volume-snapshot", "status": "pass", "coverage": ["single 64-bit dB/mute atomic", "mute transition", "Group Master applied once", "8 ms gain ramp", "5 ms mute", "15 ms unmute", "-1 dBTP output guard"]},
