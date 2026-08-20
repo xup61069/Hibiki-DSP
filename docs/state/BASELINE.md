@@ -19,6 +19,9 @@
 - C# `IpcCodecV1`/`NamedPipeControlClientV1` mirrors the C++ little-endian envelope and bounded
   4-byte length framing; a cross-language known-byte fixture and malformed-frame checks are part
   of the control-model gate.
+- `EasyControlViewModel` exposes binding-ready Easy/Expert state and emits validated SceneApply
+  and VolumeNotification commands; `handle_control_frame_v1` hands those typed commands to a
+  host-owned sink rather than running DSP on the pipe worker.
 - `handle_control_frame_v1` validates Hello/Volume/Scene/graph lifecycle commands before passing
   them to a host-owned typed sink; malformed or rejected commands receive Error without touching
   the graph.
@@ -99,6 +102,9 @@
 - `IpcNamedPipeServerV1` provides the Windows control-plane worker boundary with overlapped,
   bounded read/write, local-only pipe validation, request decoding and callback response framing;
   a Windows loopback contract test exercises Ack/request-ID round-trip.
+- `driver/inf/HibikiVirtualAudio.inf` is a source-only MS-PL package template with stable Root
+  hardware identity, four endpoint GUIDs and service boundary; it references only the future
+  signed SYS/CAT and remains non-installable from a fresh clone.
 - `process_virtual_mic_lane_v1` applies the fail-closed privacy gate before sending caller-owned
   capture blocks through the shared lane graph; it still does not claim AEC/NS or a loadable
   capture driver.
@@ -118,14 +124,14 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 ## 最近驗證
 
 初始 foundation evidence 已寫入 `evidence/0000-foundation/initial.json`，目前對應
-Windows volume/device、ISO formula、recovery、driver control-core、persistent SRC、VST worker、
-session volume adapter、sink clock pipeline、optional native ASIO transport/ring、tab/Virtual Mic
-lane adapter 與 control-model baseline commit `2cd9d92`；
+Windows volume/device、ISO formula、recovery、driver control-core/INF template、persistent SRC、
+VST worker、control pipe/payloads、session volume adapter、sink clock pipeline、optional native
+ASIO transport/ring、tab/Virtual Mic lane adapter 與 control-model baseline commit `1aa4895`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 40 個必要入口與
-9 份 Spec 通過；`source-policy.ps1` 掃描 169 個路徑且無 blocked binary/secret；
+9 份 Spec 通過；`source-policy.ps1` 掃描 179 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1` 與
 `distribution-check.ps1` 與 `driver-source-check.ps1` 通過；16 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在

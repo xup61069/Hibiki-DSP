@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "issue": 0,
-  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-src-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-v1",
-  "source_commit": "2cd9d92",
+  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-v2",
+  "source_commit": "1aa4895",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -21,7 +21,7 @@
   "results": [
     {"command": "tools/verify.ps1", "status": "pass", "tests": 1},
     {"command": "tools/docs-check.ps1", "status": "pass", "required_paths": 40, "specs": 9},
-    {"command": "tools/source-policy.ps1", "status": "pass", "scanned_paths": 169, "blocked_files": 0},
+    {"command": "tools/source-policy.ps1", "status": "pass", "scanned_paths": 179, "blocked_files": 0},
     {"command": "tools/extension-check.ps1", "status": "pass"},
     {"command": "tools/installer-check.ps1", "status": "pass"},
     {"command": "tools/control-model-check.ps1", "status": "pass"},
@@ -34,7 +34,7 @@
     {"command": "extension-check", "status": "pass", "coverage": ["user gesture", "HIBT packetizer", "bridge fallback"]},
     {"command": "hibiki_tab_bridge_contract", "status": "pass", "coverage": ["header validation", "exact length", "finite samples"]},
     {"command": "tab-bridge-server", "status": "pass", "coverage": ["loopback-only bind source", "WebSocket handshake/frame parser source", "invalid-start contract"]},
-    {"command": "driver-source-check", "status": "pass", "coverage": ["MS-PL scaffold", "volume/mute dispatch", "no GPL linkage"]},
+    {"command": "driver-source-check", "status": "pass", "coverage": ["MS-PL scaffold", "source-only INF", "volume/mute dispatch", "no GPL linkage"]},
     {"command": "asio-transport-contract", "status": "pass", "coverage": ["fixed-layout SPSC ring", "planar-to-interleaved transfer", "metadata and capacity validation", "no allocation in pop", "Windows mapping-to-engine graph and Group Master path"]},
     {"command": "asio-transport-native-build", "status": "pass", "coverage": ["ASIO callback publication", "named mapping attachment", "detached fallback"], "published_artifacts": false},
     {"command": "tab-capture-queue", "status": "pass", "coverage": ["validated packet copy", "fixed four-slot SPSC handoff", "dropped-block bound", "allocation-free pop", "shared graph and Group Master adapter"]},
@@ -42,6 +42,8 @@
     {"command": "vst3-worker-protocol", "status": "pass", "coverage": ["36-byte little-endian header", "message type validation", "exact ProcessBlock payload", "finite Float32 sample validation"]},
     {"command": "vst3-worker-pipe", "status": "pass", "coverage": ["named-pipe server/client boundary", "overlapped connect source", "bounded length prefix", "caller-owned receive buffer", "sandbox launch/stop lifecycle source"]},
     {"command": "vst3-worker-executable", "status": "pass", "coverage": ["Hello/Heartbeat", "bounded ProcessBlock passthrough", "Shutdown", "source-only build"]},
+    {"command": "control-pipe-loopback", "status": "pass", "coverage": ["Windows named pipe server", "4-byte length prefix", "Ack/request-ID round-trip", "safe stop"]},
+    {"command": "control-payloads", "status": "pass", "coverage": ["Q16.16 volume payload", "SceneApply fixed 64-byte payload", "typed command sink", "reserved-byte rejection"]},
     {"command": "virtual-mic-contract", "status": "pass", "coverage": ["format validation", "privacy mute default", "capture passthrough", "echo-reference copy", "privacy gate before shared graph"]},
     {"command": "control-model", "status": "pass", "coverage": ["fail-closed One-Tap Enhance", "Easy/Expert scene selection", "active output-group identity"]},
     {"command": "installer-source-hardening", "status": "pass", "coverage": ["relative manifest paths", "path traversal rejection", "64-character SHA-256 validation"]}
@@ -49,7 +51,7 @@
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",
   "limitations": [
-    "Evidence corresponds to commit 2cd9d92 and the current environment only.",
+    "Evidence corresponds to commit 1aa4895 and the current environment only.",
     "The native ASIO build is an unsigned local developer verification; no DLL or SDK checkout is committed or published.",
     "Current machine is Windows 22631 with VS 17/SDK 10.0.26100.0; it cannot provide driver-target evidence for the locked Windows 26100+/VS 2026/SDK-WDK 10.0.28000.2526 environment."
   ],
