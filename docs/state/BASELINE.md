@@ -34,6 +34,9 @@
   control-plane measured-response to bounded PEQ compiler (16-filter cap, frequency/spacing/Q and
   boost/cut policy validation, explicit `limited` result) that feeds the existing APO/CamillaDSP/
   REW/Hibiki exporters. It is documented as a baseline, not a room optimizer or acoustic oracle.
+- `.github/workflows/verify.yml` now runs the WinUI source gate, MS-PL driver boundary gate and
+  repository JSON parse gate in addition to the existing source/docs/control checks; it still
+  has no artifact upload or package publishing step.
 - `handle_control_frame_v1` validates Hello/Volume/Scene/graph lifecycle commands before passing
   them to a host-owned typed sink; malformed or rejected commands receive Error without touching
   the graph.

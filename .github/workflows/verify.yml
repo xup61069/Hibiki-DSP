@@ -39,6 +39,22 @@ jobs:
         shell: pwsh
         run: ./tools/control-model-check.ps1
 
+      - name: WinUI source shell gate
+        shell: pwsh
+        run: ./tools/winui-shell-check.ps1
+
+      - name: Driver source boundary gate
+        shell: pwsh
+        run: ./tools/driver-source-check.ps1
+
+      - name: JSON contract parse gate
+        shell: pwsh
+        run: |
+          $files = @(Get-ChildItem -LiteralPath . -Recurse -Filter *.json -File |
+            Where-Object { $_.FullName -notmatch '\\(\.git|\.local|obj|bin)\\' })
+          foreach ($file in $files) { Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json | Out-Null }
+          Write-Output "JSON parse gate passed ($($files.Count) files)."
+
       - name: Stable identity gate
         shell: pwsh
         run: ./tools/distribution-check.ps1

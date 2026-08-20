@@ -16,6 +16,9 @@ source_globs: ["installer/**", "tools/**", ".github/**", "schemas/release-manife
 GitHub 只放原始碼、依賴鎖定、建置腳本、測試證據、SBOM 與文字 release manifest。禁止
 release asset、Packages、container、Actions artifact 或任何 EXE／DLL／SYS／MSI／MSIX／
 VST3／PE-COFF 輸出。Public CI 可在 ephemeral runner 編譯與測試，job 結束即刪除輸出。
+公開 `verify.yml` 必須同時執行 CMake/CTest、docs/source policy、WinUI source shell、
+driver source boundary、extension/installer/control-model、stable identity 與 JSON parse
+gates；任何 gate 失敗都不得視為可交付 source tag。
 
 ## 官方建置 custody
 
