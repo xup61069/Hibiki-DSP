@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -52,5 +53,29 @@ private:
                                                std::size_t output_frames,
                                                std::uint32_t channels,
                                                double source_step) noexcept;
+
+// Persistent no-allocation linear SRC. The caller supplies a whole input
+// block and enough output storage for that block; the class carries phase and
+// one boundary frame into the next call so clock-ratio changes do not reset
+// the stream at every block.
+class PersistentLinearResampler final {
+public:
+    [[nodiscard]] bool prepare(std::uint32_t channels, double source_step) noexcept;
+    void reset() noexcept;
+    [[nodiscard]] bool process(const float* input,
+                               std::size_t input_frames,
+                               float* output,
+                               std::size_t output_capacity_frames,
+                               std::size_t& output_frames) noexcept;
+    [[nodiscard]] double phase() const noexcept { return phase_; }
+    [[nodiscard]] double source_step() const noexcept { return source_step_; }
+
+private:
+    std::array<float, 8> previous_{};
+    std::uint32_t channels_{0};
+    double source_step_{1.0};
+    double phase_{0.0};
+    bool has_previous_{false};
+};
 
 }  // namespace hibiki

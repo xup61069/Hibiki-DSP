@@ -91,4 +91,81 @@ bool linear_resample_interleaved(const float* const input,
     return true;
 }
 
+bool PersistentLinearResampler::prepare(const std::uint32_t channels,
+                                        const double source_step) noexcept {
+    if (channels == 0 || channels > previous_.size() || !std::isfinite(source_step) ||
+        source_step < 0.25 || source_step > 4.0) {
+        return false;
+    }
+    channels_ = channels;
+    source_step_ = source_step;
+    reset();
+    return true;
+}
+
+void PersistentLinearResampler::reset() noexcept {
+    previous_.fill(0.0F);
+    phase_ = 0.0;
+    has_previous_ = false;
+}
+
+bool PersistentLinearResampler::process(const float* const input,
+                                        const std::size_t input_frames,
+                                        float* const output,
+                                        const std::size_t output_capacity_frames,
+                                        std::size_t& output_frames) noexcept {
+    output_frames = 0;
+    if (channels_ == 0 || input == nullptr || output == nullptr || input_frames == 0 ||
+        !std::isfinite(phase_) || phase_ < 0.0 || phase_ >= 2.0 ||
+        !std::isfinite(source_step_) || source_step_ <= 0.0) {
+        return false;
+    }
+
+    const std::size_t virtual_frames = input_frames + (has_previous_ ? 1U : 0U);
+    if (virtual_frames < 2U) {
+        std::copy_n(input, channels_, previous_.data());
+        has_previous_ = true;
+        return true;
+    }
+    // Interpolation needs both a left and a right sample, so the last valid
+    // left index is virtual_frames - 2.
+    const auto available = static_cast<double>(virtual_frames - 2U) - phase_;
+    const auto expected = available < 0.0
+                              ? 0U
+                              : static_cast<std::size_t>(std::floor(available / source_step_)) + 1U;
+    if (expected > output_capacity_frames) {
+        return false;
+    }
+
+    const bool previous_at_zero = has_previous_;
+    for (std::size_t frame = 0; frame < expected; ++frame) {
+        const auto left = static_cast<std::size_t>(phase_);
+        const auto right = left + 1U;
+        const float fraction = static_cast<float>(phase_ - static_cast<double>(left));
+        for (std::uint32_t channel = 0; channel < channels_; ++channel) {
+            const auto sample_at = [&](const std::size_t index) noexcept -> float {
+                if (previous_at_zero) {
+                    return index == 0U ? previous_[channel] : input[(index - 1U) * channels_ + channel];
+                }
+                return input[index * channels_ + channel];
+            };
+            const float a = sample_at(left);
+            const float b = sample_at(right);
+            output[frame * channels_ + channel] = a + ((b - a) * fraction);
+        }
+        phase_ += source_step_;
+        ++output_frames;
+    }
+
+    std::copy_n(input + (input_frames - 1U) * channels_, channels_, previous_.data());
+    if (previous_at_zero) {
+        phase_ -= static_cast<double>(input_frames);
+    } else {
+        phase_ -= static_cast<double>(input_frames - 1U);
+    }
+    phase_ = std::clamp(phase_, 0.0, source_step_);
+    has_previous_ = true;
+    return true;
+}
+
 }  // namespace hibiki

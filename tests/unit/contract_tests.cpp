@@ -113,6 +113,17 @@ int main() {
     CHECK(!hibiki_wavert_endpoint_state_init_v1(
         &wavert_state, "bad", 4, 48000, HIBIKI_ACTUATOR_INTERNAL_DSP));
 
+    PersistentLinearResampler persistent_src;
+    CHECK(persistent_src.prepare(1, 1.0));
+    const float first_block[]{0.0F, 1.0F, 2.0F, 3.0F};
+    const float second_block[]{4.0F, 5.0F, 6.0F, 7.0F};
+    float resampled[8]{};
+    std::size_t output_frames = 0;
+    CHECK(persistent_src.process(first_block, 4, resampled, 8, output_frames));
+    CHECK(output_frames == 3 && resampled[0] == 0.0F && resampled[2] == 2.0F);
+    CHECK(persistent_src.process(second_block, 4, resampled, 8, output_frames));
+    CHECK(output_frames == 4 && resampled[0] == 3.0F && resampled[3] == 6.0F);
+
     DeviceRecoveryCoordinator recovery;
     CHECK(recovery.observe(DeviceRecoveryEventV1{
         1, DeviceRecoveryEventKind::EndpointInvalidated, true}));

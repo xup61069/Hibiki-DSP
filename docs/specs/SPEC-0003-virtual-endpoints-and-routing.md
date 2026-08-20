@@ -39,6 +39,9 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
 - `driver/include/hibiki/wavert_endpoint_state_v1.h` 與其 MS-PL C 實作是 WDK adapter 的
   第一個可測試控制核心：格式、Q16.16 dB、safety ceiling、mute、generation 與 actuator
   都在 driver 邊界驗證；它仍不是完整 PortCls miniport 或可載入 `.sys`。
+- `PersistentLinearResampler` 保存跨 block 的 phase 與 boundary frame，要求 caller 提供
+  整個 input block 的 output capacity，並拒絕在不足時部分消耗；它是 clock-drift/SRC 的
+  無配置 baseline，尚未宣稱 production-quality polyphase filter。
 
 ## 未解問題（阻擋完整 driver 實作）
 
