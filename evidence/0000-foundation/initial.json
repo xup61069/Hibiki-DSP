@@ -39,7 +39,7 @@
     {"command": "extension-check", "status": "pass", "coverage": ["user gesture", "HIBT packetizer", "bridge fallback"]},
     {"command": "hibiki_tab_bridge_contract", "status": "pass", "coverage": ["header validation", "exact length", "finite samples"]},
     {"command": "tab-bridge-server", "status": "pass", "coverage": ["loopback-only bind source", "WebSocket handshake/frame parser source", "invalid-start contract"]},
-    {"command": "driver-source-check", "status": "pass", "coverage": ["MS-PL scaffold", "source-only INF", "volume/mute dispatch", "no GPL linkage"]},
+    {"command": "driver-source-check", "status": "pass", "coverage": ["MS-PL scaffold", "source-only INF", "volume/mute dispatch", "fixed topology catalog", "no GPL linkage"]},
     {"command": "asio-transport-contract", "status": "pass", "coverage": ["fixed-layout SPSC ring", "planar-to-interleaved transfer", "metadata and capacity validation", "no allocation in pop", "Windows mapping-to-engine graph and Group Master path"]},
     {"command": "asio-transport-native-build", "status": "pass", "coverage": ["ASIO callback publication", "named mapping attachment", "detached fallback"], "published_artifacts": false},
     {"command": "tab-capture-queue", "status": "pass", "coverage": ["validated packet copy", "fixed four-slot SPSC handoff", "dropped-block bound", "allocation-free pop", "shared graph and Group Master adapter"]},

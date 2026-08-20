@@ -25,6 +25,7 @@ extern "C" {
 #include "hibiki/driver_control_v1.h"
 #include "hibiki/driver_validation_v1.h"
 #include "hibiki/wavert_endpoint_state_v1.h"
+#include "hibiki/endpoint_topology_v1.h"
 }
 #include "hibiki/iso226.hpp"
 #include "hibiki/ir_phase.hpp"
@@ -801,6 +802,24 @@ int main() {
     CHECK(hibiki_driver_validate_endpoint_state_v1(&driver_state, sizeof(driver_state)) == 1);
     driver_state.sample_rate = 12345;
     CHECK(hibiki_driver_validate_endpoint_state_v1(&driver_state, sizeof(driver_state)) == 0);
+
+    CHECK(hibiki_endpoint_topology_count_v1() == HIBIKI_ENDPOINT_TOPOLOGY_COUNT_V1);
+    hibiki_endpoint_topology_v1 topology{};
+    CHECK(hibiki_endpoint_topology_get_v1(0U, &topology) == 1);
+    CHECK(topology.endpoint_kind == HIBIKI_ENDPOINT_MAIN_RENDER_V1 &&
+          topology.direction == HIBIKI_ENDPOINT_DIRECTION_RENDER_V1 &&
+          topology.channel_count == 2U &&
+          topology.channel_mask == HIBIKI_CHANNEL_MASK_STEREO_V1);
+    CHECK(hibiki_endpoint_topology_get_v1(2U, &topology) == 1);
+    CHECK(topology.endpoint_kind == HIBIKI_ENDPOINT_SURROUND_RENDER_V1 &&
+          topology.channel_count == 8U && topology.channel_mask == HIBIKI_CHANNEL_MASK_71_V1);
+    CHECK(hibiki_endpoint_topology_get_v1(3U, &topology) == 1);
+    CHECK(topology.direction == HIBIKI_ENDPOINT_DIRECTION_CAPTURE_V1 &&
+          topology.endpoint_kind == HIBIKI_ENDPOINT_VIRTUAL_MIC_CAPTURE_V1);
+    topology.channel_mask = HIBIKI_CHANNEL_MASK_STEREO_V1;
+    topology.channel_count = 8U;
+    CHECK(hibiki_endpoint_topology_validate_v1(&topology) == 0);
+    CHECK(hibiki_endpoint_topology_get_v1(HIBIKI_ENDPOINT_TOPOLOGY_COUNT_V1, &topology) == 0);
 
     float ring_storage[8]{};
     InterleavedRingBuffer ring(std::span<float>(ring_storage), 2);

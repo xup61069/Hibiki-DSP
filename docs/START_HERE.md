@@ -32,7 +32,8 @@ branch。真實裝置資料與 calibration 留在 `.local/`，只提交 schema �
 
 ## 尚未完成的主要區域
 
-- `driver/`：SYSVAD-derived WaveRT/KS 虛擬端點與 Windows volume nodes。
+- `driver/`：固定四端點的 SYSVAD-derived WaveRT/KS 虛擬端點與 Windows volume nodes；
+  endpoint topology/channel mask catalog 已有 portable MS-PL contract，PortCls wiring 與簽章仍待完成。
 - `src/`：即時 graph、Matrix、ISO fit、scene safety、device switch、ASIO/外部 Lane block API
   與 WASAPI Float32 output boundary；真實端點 soak 仍待目標環境。
 - `apps/`：WinUI 3 易用模式與 Expert matrix/graph UI。

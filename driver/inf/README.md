@@ -12,3 +12,8 @@ topology/property tables, submit the exact CAB to Microsoft, and record the
 returned signature in the release manifest. The SYS must retain the MS-PL
 boundary and communicate with GPL user-space only through the versioned
 Apache ABI/IPC.
+
+The first channel-mask/topology decision is recorded in
+`driver/include/hibiki/endpoint_topology_v1.h`; the eventual INF/KS topology
+must consume those descriptors rather than infer channel ordering from a
+channel count.

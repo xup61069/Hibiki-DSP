@@ -54,6 +54,9 @@
 - MS-PL WaveRT endpoint control-state core with fixed-format validation, Q16.16 dB safety
   ceiling, mute/generation ordering and Strict Direct behavior; the PortCls miniport is not
   yet wired and no `.sys` is built here.
+- MS-PL `endpoint_topology_v1` catalog fixes Main/Low Latency stereo render, Surround 7.1 render
+  with Windows `0x63f` mask and Virtual Mic stereo capture, including permanent GUIDs, direction,
+  default buffer and supported-rate flags; the catalog is portable input to future SYSVAD tables.
 - Persistent no-allocation linear SRC with phase and boundary-frame carry across output blocks;
   insufficient output capacity is rejected before partial consumption.
 - VST host control model now requires trusted/certified same-channel descriptors and quarantines

@@ -5,7 +5,7 @@ owner: hibiki-maintainers
 authority: product-behavior
 last_reviewed: 2026-08-21
 review_after_days: 14
-related_adrs: [ADR-0002]
+related_adrs: [ADR-0002, ADR-0004]
 source_globs: ["driver/**", "apps/**", "asio/**", "extensions/**", "src/**"]
 ---
 
@@ -39,6 +39,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
 - `driver/include/hibiki/wavert_endpoint_state_v1.h` 與其 MS-PL C 實作是 WDK adapter 的
   第一個可測試控制核心：格式、Q16.16 dB、safety ceiling、mute、generation 與 actuator
   都在 driver 邊界驗證；它仍不是完整 PortCls miniport 或可載入 `.sys`。
+- `driver/include/hibiki/endpoint_topology_v1.h` 與 `src/endpoint_topology.c` 固定四個 endpoint
+  的方向、聲道數、Windows channel mask、預設 buffer、取樣率 flags 與 distribution GUID：
+  Main=stereo render、Low Latency=stereo/64-frame render、Surround=7.1 render、Virtual Mic=stereo
+  capture。未來 SYSVAD topology 必須消費此 catalog，不得只由 channel count 推斷排列。
 - `driver/inf/HibikiVirtualAudio.inf` 固定 Root\HibikiDSP hardware ID、四個 endpoint GUID
   與 service/package 邊界；它只引用未提交的 SYS/CAT，`Inf2Cat`、HLK、Microsoft signing
   與真正 PortCls/SYSVAD topology 仍是 release gate。
@@ -95,7 +99,7 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
 
 ## 未解問題（阻擋完整 driver 實作）
 
-1. WaveRT／KS driver 的 endpoint topology、channel mask 與 INF/HLK 測試矩陣。
+1. 已固定 endpoint topology/channel mask；仍需 WaveRT／KS PortCls wiring 與 INF/HLK 測試矩陣。
 2. 多輸出 clock drift、ring buffer 與 adaptive SRC 的上限延遲。
 3. Virtual Mic 的 echo reference、privacy indicator 與卸載行為。
 

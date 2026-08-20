@@ -29,3 +29,12 @@ verify that the scaffold retains its license and does not pull GPL user-space;
 the check deliberately does not claim that a loadable driver exists. The
 source-only INF template is in `inf/HibikiVirtualAudio.inf`; it references the
 future signed SYS/CAT package and is not installable from this repository alone.
+
+`include/hibiki/endpoint_topology_v1.h` and `src/endpoint_topology.c` fix the
+first topology decision independently of WDK: Main is stereo render, Low
+Latency is stereo render with a 64-frame default, Surround is 7.1 render with
+the explicit Windows `0x63f` side/back channel mask, and Virtual Mic is stereo
+capture. Every descriptor carries direction, default rate, supported-rate
+flags, buffer size, channel mask and the permanent distribution GUID. The
+catalog is a portable MS-PL input to the eventual SYSVAD tables; it is not a
+PortCls miniport or a signed driver.
