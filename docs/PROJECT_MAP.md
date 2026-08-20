@@ -3,11 +3,11 @@
 | 子系統 | 目的 | 目前狀態 | 主要契約 |
 | --- | --- | --- | --- |
 | `driver/` | 固定虛擬端點、KS volume/mute、私有 control IPC | ABI + MS-PL endpoint control core；PortCls 尚未接線 | ADR-0002/SPEC-0003 |
-| `src/` | C++20 RT graph、AudioEngine、session registry/Windows session adapter、Windows volume/device watcher/recovery、ISO math、IPC、persistent SRC、scene safety policy、sink crossfade | 可測試 user-space 骨架 | SPEC-0001/0002/0003/0006/0007 |
+| `src/` | C++20 RT graph、AudioEngine、session registry/Windows session adapter、Windows volume/device watcher/recovery、ISO math、IPC、persistent SRC、scene safety policy、sink crossfade、ASIO/外部 Lane block API、WASAPI Float32 output boundary | 可測試 user-space；實體端點尚未 soak | SPEC-0001/0002/0003/0006/0007 |
 | `apps/` | WinUI 3 control plane、Easy/Expert UX | 待建立 | SceneProfile |
 | `asio/` | Hibiki ASIO bridge、可選原生 COM transport 與 DAW lane | stream model + optional unsigned DLL target | SceneProfile / distribution profile |
 | `vst-host/` | Out-of-process VST3 host | trusted/certified model + Windows Job Object supervisor | SPEC-0008 / plugin contract |
-| `extensions/` | Chrome/Edge MV3 tab capture + HIBT AudioWorklet packetizer | user-gesture capture source + optional localhost bridge boundary | SPEC-0009 / browser lane |
+| `extensions/` | Chrome/Edge MV3 tab capture + HIBT AudioWorklet packetizer、loopback WebSocket、TabCaptureQueue SPSC | user-gesture capture source + bounded queue；graph/noise-reduction lane 待接 | SPEC-0009 / browser lane |
 | `installer/` | GPL bootstrapper、driver transaction、rollback | 待建立 | release manifest |
 | `sdk/` | driver／engine 的 Apache-2.0 C ABI 與 schema boundary | v1 header | driver-control-v1 |
 | `schemas/` | IPC、Graph、Scene、volume、PEQ、ISO status、handoff、release JSON schemas | 初始骨架 | versioned v1 |
