@@ -93,7 +93,7 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 初始 foundation evidence 已寫入 `evidence/0000-foundation/initial.json`，目前對應最新
 Windows volume/device、ISO formula、recovery、driver control-core、persistent SRC、VST watchdog、
 session volume adapter、sink clock pipeline、optional native ASIO transport/ring 與 tab bridge
-baseline commit `36eb091`；
+baseline commit `bce4535`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
@@ -102,4 +102,5 @@ working tree 與該 scope 是否一致。
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1` 與
 `distribution-check.ps1` 與 `driver-source-check.ps1` 通過；16 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
-`.local/`，未提交或發布。
+`.local/`，未提交或發布。`doctor.ps1 -CheckOnly` 明確顯示本機低於鎖定的 Windows/VS/WDK
+版本，因此沒有把 driver、HLK、簽章或真實 endpoint 結果誇大為已驗收。
