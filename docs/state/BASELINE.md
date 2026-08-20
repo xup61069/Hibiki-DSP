@@ -60,6 +60,9 @@
 - The optional Windows tab bridge now owns a loopback-only WebSocket listener with bounded
   handshake/frame parsing and control-thread callbacks; engine lane routing and denoising model
   provenance remain intentionally outside the receiver.
+- `TabCaptureQueueV1` now provides a four-slot fixed SPSC handoff for validated HIBT packets;
+  `enqueue_tab_capture_packet_v1` is a ready callback adapter, with bounded dropped-block reporting
+  and no allocation/wait on the pop path. The browser queue is not yet wired to a graph lane.
 - The MS-PL WDK source boundary now has a property-dispatch scaffold for volume/mute that calls
   the portable Q16.16 endpoint core; it is source-checked but intentionally not a loadable `.sys`.
 - Apache-2.0 `hibiki_asio_transport_v1` now provides a fixed-layout SPSC shared-memory ring. The
