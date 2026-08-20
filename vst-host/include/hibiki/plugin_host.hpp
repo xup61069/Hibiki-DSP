@@ -21,6 +21,8 @@ struct PluginDescriptorV1 {
     std::uint32_t output_channels{2};
     std::uint32_t reported_latency_samples{0};
     bool trusted{false};
+    std::uint32_t watchdog_timeout_ms{250};
+    bool certified{true};
 };
 
 class PluginHostModel final {
@@ -28,6 +30,8 @@ public:
     [[nodiscard]] bool start(const PluginDescriptorV1& descriptor);
     void stop() noexcept;
     void report_crash() noexcept;
+    [[nodiscard]] bool heartbeat(std::uint64_t now_ms) noexcept;
+    [[nodiscard]] bool poll_watchdog(std::uint64_t now_ms) noexcept;
     [[nodiscard]] bool can_process() const noexcept;
     [[nodiscard]] bool process_passthrough(const float* input,
                                             float* output,
@@ -40,6 +44,7 @@ public:
 private:
     PluginDescriptorV1 descriptor_{};
     PluginHostState state_{PluginHostState::Disabled};
+    std::uint64_t last_heartbeat_ms_{0};
 };
 
 }  // namespace hibiki

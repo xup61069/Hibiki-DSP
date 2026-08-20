@@ -231,6 +231,11 @@ int main() {
     CHECK(!plugin.start(PluginDescriptorV1{"untrusted", 2, 2, 64, false}));
     CHECK(plugin.state() == PluginHostState::Quarantined);
     CHECK(plugin.start(PluginDescriptorV1{"builtin-test", 2, 2, 64, true}));
+    CHECK(plugin.heartbeat(1000));
+    CHECK(!plugin.poll_watchdog(1200));
+    CHECK(plugin.poll_watchdog(1300));
+    CHECK(plugin.state() == PluginHostState::Quarantined);
+    CHECK(plugin.start(PluginDescriptorV1{"builtin-test", 2, 2, 64, true}));
     const float plugin_input[] = {0.1F, -0.2F};
     float plugin_output[2]{};
     CHECK(plugin.process_passthrough(plugin_input, plugin_output, 2));

@@ -6,11 +6,14 @@ bool PluginHostModel::start(const PluginDescriptorV1& descriptor) {
     if (descriptor.plugin_id.empty() || descriptor.input_channels == 0 ||
         descriptor.input_channels > 8 || descriptor.output_channels == 0 ||
         descriptor.output_channels > 8 || !descriptor.trusted ||
+        !descriptor.certified || descriptor.watchdog_timeout_ms == 0 ||
+        descriptor.watchdog_timeout_ms > 5000 ||
         descriptor.input_channels != descriptor.output_channels) {
         state_ = PluginHostState::Quarantined;
         return false;
     }
     descriptor_ = descriptor;
+    last_heartbeat_ms_ = 0;
     state_ = PluginHostState::Running;
     return true;
 }
@@ -21,6 +24,23 @@ void PluginHostModel::stop() noexcept {
 
 void PluginHostModel::report_crash() noexcept {
     state_ = PluginHostState::Quarantined;
+}
+
+bool PluginHostModel::heartbeat(const std::uint64_t now_ms) noexcept {
+    if (!can_process() || (last_heartbeat_ms_ != 0 && now_ms < last_heartbeat_ms_)) {
+        return false;
+    }
+    last_heartbeat_ms_ = now_ms;
+    return true;
+}
+
+bool PluginHostModel::poll_watchdog(const std::uint64_t now_ms) noexcept {
+    if (!can_process() || last_heartbeat_ms_ == 0 || now_ms < last_heartbeat_ms_ ||
+        now_ms - last_heartbeat_ms_ <= descriptor_.watchdog_timeout_ms) {
+        return false;
+    }
+    state_ = PluginHostState::Quarantined;
+    return true;
 }
 
 bool PluginHostModel::can_process() const noexcept {
