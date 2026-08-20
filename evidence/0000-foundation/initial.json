@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-v4",
-  "source_commit": "eaac483",
+  "source_commit": "c6af965",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -31,7 +31,7 @@
     {"command": "tools/distribution-check.ps1", "status": "pass"},
     {"command": "json-parse", "status": "pass", "files": 20},
     {"command": "optional-vst3-sdk-catalog-build", "status": "pass", "target": "hibiki_vst3_sdk_catalog", "sdk_commit": "3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96", "scope": ["factory catalog", "one-main-bus Float32 processor", "fixed 4096-frame scratch", "latency reporting"], "published_artifacts": false},
-    {"command": "optional-vst3-sdk-worker-build", "status": "pass", "target": "hibiki_vst3_sdk_worker", "sdk_commit": "3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96", "scope": ["named-pipe ProcessBlock bridge", "Hello/Heartbeat", "plugin error fail-closed"], "published_artifacts": false},
+    {"command": "optional-vst3-sdk-worker-build", "status": "pass", "target": "hibiki_vst3_sdk_worker", "sdk_commit": "3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96", "scope": ["named-pipe ProcessBlock bridge", "Hello/Heartbeat", "plugin error fail-closed", "bounded IParameterChanges conversion"], "published_artifacts": false},
     {"command": "optional-native-asio-build", "status": "pass", "target": "hibiki_asio_native", "sdk_commit": "496a0765b8bb9c26f764f22f9a9712a937177db2", "published_artifacts": false},
     {"command": "scene-safety-controller", "status": "pass", "coverage": ["peak attenuation", "rate limit", "manual override", "baseline restore"]},
     {"command": "output-crossfade", "status": "pass", "coverage": ["equal-power handoff", "supported multichannel layouts", "no allocation in process"]},
@@ -69,7 +69,7 @@
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",
   "limitations": [
-    "Evidence corresponds to commit eaac483 and the current environment only.",
+    "Evidence corresponds to commit c6af965 and the current environment only.",
     "The native ASIO build is an unsigned local developer verification; no DLL or SDK checkout is committed or published.",
     "Current machine is Windows 22631 with VS 17/SDK 10.0.26100.0; it cannot provide driver-target evidence for the locked Windows 26100+/VS 2026/SDK-WDK 10.0.28000.2526 environment."
   ],
