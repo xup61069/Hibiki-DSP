@@ -126,8 +126,8 @@
   with Hello/Heartbeat/Process/Shutdown/Error plus bounded `ProcessBlockWithParameters`, exact
   Float32/parameter-point validation and finite sample checks. The optional SDK worker decodes
   those points into the processor's official `IParameterChanges`; named-pipe transport, factory
-  catalog and one-main-bus SDK processing build locally, while supervisor timeline/persistence,
-  latency policy and certification remain pending.
+  catalog and one-main-bus SDK processing build locally, while supervisor UI timeline editing,
+  cross-version plugin state persistence and certification remain pending.
 - `LatencyAlignmentPlanV1` and `FixedDelayLineV1` provide a fixed 8-channel, 16,384-sample
   bounded delay primitive with active-lane max-latency alignment, impulse and non-finite-input
   tests. `LatencyGraphCommitV1`/`LatencyGraphCommitterV1` now bind that control result to stable
