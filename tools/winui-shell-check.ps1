@@ -11,6 +11,7 @@ if ($missing.Count -gt 0) { throw "WinUI shell files missing: $($missing -join '
 $project = Get-Content (Join-Path $shell 'Hibiki.WinUI.csproj') -Raw
 $lock = Get-Content (Join-Path $repo 'build/toolchain-lock.yml') -Raw
 if (-not $project.Contains('<UseWinUI>true</UseWinUI>') -or
+    -not $project.Contains('<WindowsPackageType>None</WindowsPackageType>') -or
     -not $project.Contains('net8.0-windows10.0.26100.0') -or
     -not $project.Contains('<Platforms>x64</Platforms>')) {
   throw 'WinUI project must target WinUI/x64/Windows 11 build 26100.'

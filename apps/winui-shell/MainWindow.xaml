@@ -76,7 +76,7 @@
                             <TextBlock Text="音量保護" FontSize="20" FontWeight="SemiBold" />
                             <ToggleSwitch Grid.Column="1" Header="Expert" IsOn="{Binding IsExpert, Mode=TwoWay}" />
                         </Grid>
-                        <Slider Minimum="-60" Maximum="0" Value="{Binding RequestedVolumeDb, Mode=TwoWay}" />
+                        <Slider Minimum="-60" Maximum="0" Value="{Binding RequestedVolumeDb, Mode=TwoWay}" ValueChanged="OnVolumeChanged" />
                         <TextBlock Text="{Binding RequestedVolumeDb, StringFormat='{}{0:0.0} dB'}" />
                         <ToggleSwitch Header="靜音" IsOn="{Binding Muted, Mode=TwoWay}" />
                         <TextBlock Text="{Binding IrAddedDelayMs, StringFormat='IR 額外延遲：{0:0.0} ms'}" Opacity="0.72" />

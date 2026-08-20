@@ -11,6 +11,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 {
     private readonly EasyControlSession _session = new();
     private readonly ControlCommandFactoryV1 _commands = new();
+    private readonly SemaphoreSlim _commandGate = new(1, 1);
     private readonly string _pipeName;
     private NamedPipeControlClientV1? _controlClient;
     private string? _selectedOutputGroup;
@@ -24,6 +25,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private double _irPhaseStrength;
     private ControlConnectionState _connectionState = ControlConnectionState.Disconnected;
     private bool _isBusy;
+    private CancellationTokenSource? _volumeDebounce;
 
     public EasyControlViewModel(string pipeName = NamedPipeControlClientV1.DefaultPipeName)
     {
@@ -222,8 +224,35 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public async Task<bool> PushVolumeAsync(CancellationToken cancellationToken = default)
     {
-        BuildVolumeCommand();
-        return await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+        return await SendCommandAsync(BuildVolumeCommand, cancellationToken).ConfigureAwait(true);
+    }
+
+    public async Task<bool> QueueVolumeAsync(TimeSpan debounce = default,
+                                              CancellationToken cancellationToken = default)
+    {
+        if (debounce == default) debounce = TimeSpan.FromMilliseconds(40);
+        if (debounce <= TimeSpan.Zero || debounce > TimeSpan.FromSeconds(1))
+            throw new ArgumentOutOfRangeException(nameof(debounce));
+        var replacement = new CancellationTokenSource();
+        var previous = Interlocked.Exchange(ref _volumeDebounce, replacement);
+        previous?.Cancel();
+        try
+        {
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                replacement.Token, cancellationToken);
+            await Task.Delay(debounce, linked.Token).ConfigureAwait(true);
+            if (replacement.IsCancellationRequested) return false;
+            return await PushVolumeAsync(linked.Token).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        finally
+        {
+            Interlocked.CompareExchange(ref _volumeDebounce, null, replacement);
+            replacement.Dispose();
+        }
     }
 
     public bool SelectScene(string sceneId)
@@ -255,11 +284,14 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
-    private async Task<bool> SendLastCommandAsync(CancellationToken cancellationToken)
+    private Task<bool> SendLastCommandAsync(CancellationToken cancellationToken) =>
+        SendCommandAsync(() => LastCommand, cancellationToken);
+
+    private async Task<bool> SendCommandAsync(Func<IpcEnvelopeV1?> commandFactory,
+                                               CancellationToken cancellationToken)
     {
         var client = _controlClient;
-        var command = LastCommand;
-        if (client is null || command is null || !IsConnected)
+        if (client is null || !IsConnected)
         {
             _session.MarkDegraded();
             StatusText = "尚未連接 Hibiki 引擎；命令未送出";
@@ -267,9 +299,21 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             return false;
         }
 
-        SetBusy(true);
+        var gateHeld = false;
         try
         {
+            await _commandGate.WaitAsync(cancellationToken).ConfigureAwait(true);
+            gateHeld = true;
+            if (_controlClient is null || !IsConnected) return false;
+            var command = commandFactory();
+            if (command is null)
+            {
+                _session.MarkDegraded();
+                StatusText = "命令內容無效；未送出";
+                OnPropertyChanged(nameof(Status));
+                return false;
+            }
+            SetBusy(true);
             var reply = await client.RoundTripAsync(command, cancellationToken)
                 .ConfigureAwait(true);
             if (reply.Type != ControlMessageType.Ack)
@@ -295,6 +339,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         finally
         {
             SetBusy(false);
+            if (gateHeld) _commandGate.Release();
         }
     }
 

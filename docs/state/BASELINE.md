@@ -26,9 +26,10 @@
   and VolumeNotification commands; `handle_control_frame_v1` hands those typed commands to a
   host-owned sink rather than running DSP on the pipe worker.
 - `EasyControlViewModel` now exposes the fixed Main/Low Latency/Surround output-group catalog,
-  bounded asynchronous Hello/Scene/volume transport, explicit Connected/Degraded states and
-  disconnect cleanup; `apps/winui-shell/` supplies a source-only WinUI 3 first-run shell that
-  keeps Expert controls behind an explicit switch. The shell is not compiled on this machine.
+  bounded asynchronous Hello/Scene/volume transport, 40 ms latest-value volume debounce,
+  explicit Connected/Degraded states and disconnect cleanup; `apps/winui-shell/` supplies a
+  source-only WinUI 3 first-run shell that keeps Expert controls behind an explicit switch. The
+  shell is not compiled on this machine.
 - `handle_control_frame_v1` validates Hello/Volume/Scene/graph lifecycle commands before passing
   them to a host-owned typed sink; malformed or rejected commands receive Error without touching
   the graph.

@@ -32,7 +32,7 @@ same versioned commands for engine transport.
 `winui-shell/` is now the source-only WinUI 3 presentation shell. It binds the
 control model to a deliberately small first-run surface: engine connection,
 fixed Main/Low Latency/Surround output groups, One-Tap Enhance, scene cards,
-safe volume and the Expert switch. The shell owns no DSP and closes its
-named-pipe client when the window closes. It is not part of the CMake build and
+safe volume (40 ms latest-value debounce) and the Expert switch. The shell owns
+no DSP and closes its named-pipe client when the window closes. It is not part of the CMake build and
 requires the locked Windows App SDK on a Windows 11 24H2+ x64 machine; no
 compiled UI output is committed or published.

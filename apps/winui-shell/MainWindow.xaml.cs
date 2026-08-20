@@ -3,6 +3,7 @@
 using Hibiki.ControlModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 
 namespace Hibiki.WinUI;
 
@@ -31,6 +32,12 @@ public sealed partial class MainWindow : Window
     {
         if (sender is Button { Tag: string sceneId })
             await ViewModel.SelectSceneAsync(sceneId);
+    }
+
+    private async void OnVolumeChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (ViewModel.IsConnected)
+            await ViewModel.QueueVolumeAsync();
     }
 
     private async void OnClosed(object sender, WindowEventArgs e)

@@ -21,7 +21,8 @@ source_globs: ["apps/control-model/**", "apps/winui-shell/**"]
 
 In：WinUI 3 視窗、Easy/Expert 顯示、固定輸出群組卡片、場景卡片、Windows
 音量與 IR 相位滑桿、版本化 named-pipe Hello／SceneApply／VolumeNotification
-命令、連線失敗回復。
+命令、連線失敗回復；音量拖曳使用 40 ms bounded debounce 與 command serialization，
+只送出最新的控制值。
 
 Out：WaveRT/PortCls 驅動、實體裝置枚舉、音訊處理、VST3 UI、校正量測與
 任何編譯後的 EXE／DLL。這些能力仍由各自 Spec 與 worker 負責。
@@ -40,6 +41,8 @@ versioned IPC，Hello 成功後才可送出 SceneApply 或 VolumeNotification。
 - 沒有輸出群組時 One-Tap Enhance fail-closed，不產生 SceneApply。
 - pipe 連線、Hello、命令回覆任何一步失敗，UI 顯示 Degraded，保留上一個
   已提交 graph；不得假裝已控制，也不得重試成無限迴圈。
+- 音量拖曳不可並行寫入 named pipe；上一個尚未送出的值可取消，最終值必須在
+  bounded debounce 後送出，避免 OSD／UI event storm。
 - ViewModel 的 async pipe 工作不在 audio callback 執行；RT thread 不等待 UI、
   COM、named pipe 或檔案系統。
 - 視窗關閉時必須釋放 pipe client。未來若加入自動重連，必須另立 ADR，並採
@@ -54,7 +57,7 @@ bytes。WinUI shell 可在沒有引擎時啟動，並以 Degraded 狀態呈現�
 ## 驗收
 
 1. Fresh clone 的 control-model check 通過，並覆蓋固定輸出群組、連線狀態、
-   One-Tap／Scene／音量命令的 binding surface。
+   One-Tap／Scene／音量命令的 binding surface 與 bounded debounce。
 2. WinUI source-only shell 只引用 control-model；git history、CI artifacts
    與 release 不包含編譯產物。
 3. 沒有 engine pipe 時，按連接會在 bounded timeout 後顯示 Degraded，UI 不崩潰；

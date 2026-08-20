@@ -114,4 +114,16 @@ Check(!connectedToMissingEngine && noEngine.ConnectionState == ControlConnection
     "Missing engine must fail closed with a bounded degraded status.");
 Check(!await noEngine.OneTapEnhanceAsync(),
     "One-Tap command must not be reported as applied while disconnected.");
+Check(!await noEngine.QueueVolumeAsync(TimeSpan.FromMilliseconds(1)),
+    "Disconnected volume debounce must fail closed.");
+var invalidDebounceRejected = false;
+try
+{
+    await noEngine.QueueVolumeAsync(TimeSpan.FromSeconds(2));
+}
+catch (ArgumentOutOfRangeException)
+{
+    invalidDebounceRejected = true;
+}
+Check(invalidDebounceRejected, "Volume debounce must enforce a bounded control interval.");
 Console.WriteLine("Control model checks passed.");
