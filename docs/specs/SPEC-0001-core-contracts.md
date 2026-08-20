@@ -28,6 +28,9 @@ Lane、output group、channel map、DSP chain、latency mode 與安全策略；�
   `IpcFrameV1` little-endian envelope、payload 上限 1 MiB、request ID 與明確 decode errors。
   payload schema 可在後續以 Protobuf 或等價固定編碼替換，但 version、message type 與
   Validate/Prepare/Commit 語意不可破壞。
+- `AudioSessionRegistry` 以 `endpoint_id + session_instance_id` 作為唯一 session key；PID
+  只作顯示／診斷用途。OS metadata refresh 不得覆蓋使用者已選 lane、output group 或 gain
+  owner，避免同一 process 的多個 Chrome tab／session 互相串音。
 
 ## 不變條件
 

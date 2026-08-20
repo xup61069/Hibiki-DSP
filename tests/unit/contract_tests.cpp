@@ -8,6 +8,7 @@
 #include "hibiki/output_sink.hpp"
 #include "hibiki/exporters.hpp"
 #include "hibiki/audio_engine.hpp"
+#include "hibiki/audio_session_registry.hpp"
 
 extern "C" {
 #include "hibiki/driver_control_v1.h"
@@ -226,6 +227,32 @@ int main() {
     asio.apply_group_volume(asio_volume);
     CHECK(asio.process_interleaved(asio_input, asio_output, 2));
     CHECK(asio_output[0] == 0.0F && asio_output[1] == 0.0F);
+
+    AudioSessionRegistry session_registry;
+    const AudioSessionIdentityV1 chrome_tab_a{"hibiki-main", "chrome-instance-a", 1234};
+    const AudioSessionIdentityV1 chrome_tab_b{"hibiki-main", "chrome-instance-b", 1234};
+    CHECK(session_registry.upsert(AudioSessionDescriptorV1{
+        1, chrome_tab_a, "Chrome tab A", "chrome.exe", true,
+        SessionGainOwner::WindowsSession, {}, {}}));
+    CHECK(session_registry.upsert(AudioSessionDescriptorV1{
+        1, chrome_tab_b, "Chrome tab B", "chrome.exe", true,
+        SessionGainOwner::WindowsSession, {}, {}}));
+    CHECK(session_registry.bind(chrome_tab_a, "vlog-noise", "headphones"));
+    CHECK(session_registry.bind(chrome_tab_b, "music", "speakers"));
+    CHECK(session_registry.set_gain_owner(chrome_tab_a, SessionGainOwner::HibikiInternal));
+    CHECK(session_registry.find(chrome_tab_a)->lane_id == "vlog-noise");
+    CHECK(session_registry.find(chrome_tab_a)->output_group == "headphones");
+    CHECK(session_registry.find(chrome_tab_a)->gain_owner == SessionGainOwner::HibikiInternal);
+    CHECK(session_registry.find(chrome_tab_b)->lane_id == "music");
+    CHECK(session_registry.find(chrome_tab_b)->output_group == "speakers");
+    CHECK(session_registry.upsert(AudioSessionDescriptorV1{
+        1, AudioSessionIdentityV1{"hibiki-main", "chrome-instance-a", 5678},
+        "Chrome tab A renamed", "chrome.exe", true,
+        SessionGainOwner::WindowsSession, {}, {}}));
+    CHECK(session_registry.find(chrome_tab_a)->lane_id == "vlog-noise");
+    CHECK(session_registry.find(chrome_tab_a)->identity.process_id == 5678);
+    CHECK(session_registry.remove(chrome_tab_b));
+    CHECK(session_registry.find(chrome_tab_b) == nullptr);
 
     PluginHostModel plugin;
     CHECK(!plugin.start(PluginDescriptorV1{"untrusted", 2, 2, 64, false}));
