@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/ir-phase-policy-v1.schema.json",
+  "title": "Hibiki IR phase policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "mode", "strength"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "mode": {"enum": ["minimum-phase", "mixed-phase", "linear-phase", "bypass"]},
+    "strength": {"type": "number", "minimum": 0, "maximum": 1}
+  }
+}

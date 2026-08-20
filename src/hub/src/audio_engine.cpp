@@ -36,7 +36,17 @@ void AudioEngineModel::rollback_graph() noexcept {
 
 VolumeNotificationResult AudioEngineModel::apply_windows_volume(
     const VolumeNotificationV1& notification) noexcept {
-    return apply_windows_notification(volume_, notification);
+    const auto result = apply_windows_notification(volume_, notification);
+    if (result == VolumeNotificationResult::Accepted) {
+        // Release publishes a complete control-plane update; process() only
+        // consumes these immutable scalar snapshots and never races volume_.
+        const auto effective_q16 = db_to_q16_16(volume_.effective_db);
+        const auto packed = (static_cast<std::uint64_t>(
+                                 static_cast<std::uint32_t>(effective_q16)) << 32U) |
+                            (volume_.mute ? 1ULL : 0ULL);
+        rt_volume_word_.store(packed, std::memory_order_release);
+    }
+    return result;
 }
 
 bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
@@ -46,10 +56,13 @@ bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
         return false;
     }
     const auto samples = frames * static_cast<std::size_t>(active_graph_.output_channels);
-    const float gain = volume_.mute || !std::isfinite(volume_.effective_db) ||
-                               volume_.effective_db <= -144.0
+    const auto volume_word = rt_volume_word_.load(std::memory_order_acquire);
+    const auto effective_q16 = static_cast<std::int32_t>(volume_word >> 32U);
+    const auto effective_db = q16_16_to_db(effective_q16);
+    const float gain = (volume_word & 1ULL) != 0ULL || !std::isfinite(effective_db) ||
+                               effective_db <= -144.0
                            ? 0.0F
-                           : static_cast<float>(std::pow(10.0, volume_.effective_db / 20.0));
+                           : static_cast<float>(std::pow(10.0, effective_db / 20.0));
     for (std::size_t index = 0; index < samples; ++index) {
         output_interleaved[index] *= gain;
     }

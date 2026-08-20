@@ -18,21 +18,25 @@ EasySceneDefaultsV1 make_easy_scene(const EasySceneKind kind,
     switch (kind) {
         case EasySceneKind::Game:
             defaults.scene.latency_mode = LatencyMode::Game;
+            defaults.scene.ir_phase = IrPhasePolicyV1{1, IrPhaseMode::MinimumPhase, 0.0};
             defaults.loudness.strength = 0.30;
             defaults.loudness.max_boost_db = 6.0;
             break;
         case EasySceneKind::Movie:
             defaults.scene.latency_mode = LatencyMode::MovieLinearPhase;
+            defaults.scene.ir_phase = IrPhasePolicyV1{1, IrPhaseMode::LinearPhase, 1.0};
             defaults.loudness.strength = 0.70;
             defaults.loudness.max_boost_db = 6.0;
             break;
         case EasySceneKind::Voice:
             defaults.scene.latency_mode = LatencyMode::Balanced;
+            defaults.scene.ir_phase = IrPhasePolicyV1{1, IrPhaseMode::MixedPhase, 0.5};
             defaults.loudness.strength = 0.15;
             defaults.loudness.max_boost_db = 3.0;
             break;
         case EasySceneKind::Studio:
             defaults.scene.latency_mode = LatencyMode::StrictDirect;
+            defaults.scene.ir_phase = IrPhasePolicyV1{1, IrPhaseMode::Bypass, 0.0};
             defaults.scene.auto_attenuate = false;
             defaults.graph.strict_direct = true;
             defaults.loudness.strength = 0.0;

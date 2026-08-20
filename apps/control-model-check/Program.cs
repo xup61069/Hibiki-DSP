@@ -84,4 +84,12 @@ var viewModelVolume = viewModel.BuildVolumeCommand();
 Check(viewModelVolume.Type == ControlMessageType.VolumeNotification &&
       viewModelVolume.RequestId > 1,
     "ViewModel volume command was not generated.");
+viewModel.IrPhaseMode = IrPhaseMode.LinearPhase;
+viewModel.IrPhaseStrength = 0.5;
+Check(viewModel.IrPhasePolicy.IsValid && viewModel.IrPhasePolicy.UsesFir &&
+      Math.Abs(viewModel.IrAddedDelayMs - 80.0) < 1e-9,
+    "ViewModel IR phase slider did not resolve the linear-phase delay.");
+viewModel.IrPhaseMode = IrPhaseMode.Bypass;
+Check(viewModel.IrPhaseStrength == 0.0 && viewModel.IrAddedDelayMs == 0.0,
+    "IR phase bypass must clear the slider and added delay.");
 Console.WriteLine("Control model checks passed.");

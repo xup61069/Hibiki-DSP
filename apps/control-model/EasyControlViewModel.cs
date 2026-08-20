@@ -18,6 +18,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private double _requestedVolumeDb = -12.0;
     private bool _muted;
     private ulong _generation;
+    private IrPhaseMode _irPhaseMode = IrPhaseMode.MinimumPhase;
+    private double _irPhaseStrength;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -84,6 +86,39 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             OnPropertyChanged();
         }
     }
+
+    public IrPhaseMode IrPhaseMode
+    {
+        get => _irPhaseMode;
+        set
+        {
+            if (!Enum.IsDefined(value) || value == _irPhaseMode) return;
+            _irPhaseMode = value;
+            if (value is IrPhaseMode.MinimumPhase or IrPhaseMode.Bypass)
+                IrPhaseStrength = 0.0;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IrPhasePolicy));
+            OnPropertyChanged(nameof(IrAddedDelayMs));
+        }
+    }
+
+    public double IrPhaseStrength
+    {
+        get => _irPhaseStrength;
+        set
+        {
+            if (!double.IsFinite(value)) return;
+            var clamped = Math.Clamp(value, 0.0, 1.0);
+            if (Math.Abs(clamped - _irPhaseStrength) < 1e-9) return;
+            _irPhaseStrength = clamped;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IrPhasePolicy));
+            OnPropertyChanged(nameof(IrAddedDelayMs));
+        }
+    }
+
+    public IrPhasePolicyV1 IrPhasePolicy => new(IrPhaseMode, IrPhaseStrength);
+    public double IrAddedDelayMs => IrPhasePolicy.AddedDelayMs;
 
     public IpcEnvelopeV1? LastCommand { get; private set; }
 

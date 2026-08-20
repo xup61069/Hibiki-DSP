@@ -13,6 +13,9 @@
 - Source-only PowerShell installer bootstrapper with manifest/hash dry-run gate.
 - Easy Scene factory、AcousticAnchor phon mapping、PEQ/APO/CamillaDSP/REW exporters 與 WAV IR
   serializer。
+- `IrPhasePolicyV1` 與 C# binding-ready slider contract 已加入：Game minimum-phase 0 ms、
+  Balanced mixed-phase 最多 80 ms、Movie linear-phase 最多 160 ms、Strict Direct bypass；
+  目前只解析 latency budget，未宣稱已產生 FIR 係數。
 - `EasyControlSession` provides a UI-independent fail-closed One-Tap Enhance contract, explicit
   Easy/Expert mode, scene selection and active output-group identity for future WinUI rendering;
   the installer source also rejects manifest path traversal and malformed SHA-256 entries.
@@ -27,6 +30,8 @@
   the graph.
 - `AudioEngineModel` facade connecting graph transaction, Windows volume notification and RT
   processing with one Group Master gain.
+- `AudioEngineModel` 的 RT Group Master 已改讀 release/acquire 64-bit Q16.16 dB/mute word；
+  mutable Windows volume state 僅留在 control plane，避免 callback/worker 與 RT 讀寫競態。
 - Windows-only `IAudioEndpointVolume` broker with non-blocking callback snapshot, dB/mute
   read-back and event-context write path; no physical endpoint was exercised on this machine.
 - Windows-only `IMMNotificationClient` watcher with bounded default/add/remove/property event

@@ -12,6 +12,9 @@
     "lanes": {"type": "array", "items": {"type": "string"}},
     "output_group": {"type": "string", "minLength": 1},
     "latency_mode": {"enum": ["game", "balanced", "movie-linear-phase", "strict-direct"]},
+    "ir_phase": {
+      "$ref": "ir-phase-policy-v1.schema.json"
+    },
     "safety": {"type": "object", "additionalProperties": false, "required": ["limiter_dbtp", "auto_attenuate"], "properties": {"limiter_dbtp": {"const": -1}, "auto_attenuate": {"type": "boolean"}}}
   }
 }

@@ -58,6 +58,21 @@ IEEE-float WAV IR；它只負責檔案格式，不替任何未授權量測資料
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
 `Program-aware` 只保留 policy boundary，BS.1770 内容分析尚未加入。
 
+## IR 相位／延遲滑桿
+
+`IrPhasePolicyV1` 是獨立於 ISO magnitude 的 control-plane contract。`strength` 固定為
+0..1，0 代表不增加 buffering；1 代表該模式允許的最高相位校正。模式語意固定如下：
+
+- `minimum-phase`：Game 預設，IIR、0 ms 額外 buffering。
+- `mixed-phase`：Balanced，最多 80 ms 的 mixed-phase FIR。
+- `linear-phase`：Movie 預設，最多 160 ms 的 linear-phase FIR。
+- `bypass`：Strict Direct，完全不掛 IR／校正鏈。
+
+`resolve_ir_phase_policy` 只解析可承諾的最大延遲與是否需要 FIR，不假裝已經生成 FIR
+係數；實際 IR 仍由 caller 提供，graph commit 前必須以量測的實際 latency 取代預估值。
+UI 顯示「0 ms 額外緩衝」「最高 80/160 ms」等可驗證文字，不使用「零延遲完美相位」宣稱。
+Scene 若省略 `ir_phase` 欄位，向後相容地採用 `minimum-phase/strength=0`。
+
 公開 repository 不得包含 ISO 授權文件、掃圖、完整受限表格或未核准 golden data。正式係數加入
 GPL source 前必須由人類 reviewer 完成法務 gate。
 

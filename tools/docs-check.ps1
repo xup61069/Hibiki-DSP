@@ -20,7 +20,7 @@ $required = @(
   'docs/ai/DOC_SCHEMA.json', 'docs/ai/CHANGE_CONTRACT.yml', 'docs/ai/CONFLICT_POLICY.md',
   'schemas/acoustic-anchor-v1.schema.json', 'schemas/equal-loudness-policy-v1.schema.json',
   'schemas/equal-loudness-status-v1.schema.json', 'schemas/ipc-envelope-v1.schema.json',
-  'schemas/driver-control-v1.schema.json',
+  'schemas/driver-control-v1.schema.json', 'schemas/ir-phase-policy-v1.schema.json',
   'schemas/graph-config-v1.schema.json',
   'schemas/peq-filter-v1.schema.json',
   'docs/tasks/active/0.md', 'evidence/0000-foundation/initial.json'

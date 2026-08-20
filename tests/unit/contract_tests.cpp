@@ -25,6 +25,7 @@ extern "C" {
 #include "hibiki/wavert_endpoint_state_v1.h"
 }
 #include "hibiki/iso226.hpp"
+#include "hibiki/ir_phase.hpp"
 #include "hibiki/scene_graph.hpp"
 #include "hibiki/scene_presets.hpp"
 #include "hibiki/scene_safety.hpp"
@@ -81,6 +82,20 @@ int main() {
     scene.name = "Game";
     scene.output_group = "main";
     CHECK(validate_scene(scene));
+
+    const auto game_ir = resolve_ir_phase_policy(
+        IrPhasePolicyV1{1, IrPhaseMode::MinimumPhase, 1.0});
+    CHECK(game_ir.valid && !game_ir.uses_fir && game_ir.added_delay_ms == 0.0);
+    const auto balanced_ir = resolve_ir_phase_policy(
+        IrPhasePolicyV1{1, IrPhaseMode::MixedPhase, 0.5});
+    CHECK(balanced_ir.valid && balanced_ir.uses_fir &&
+          std::abs(balanced_ir.added_delay_ms - 40.0) < 1e-12);
+    const auto movie_ir = resolve_ir_phase_policy(
+        IrPhasePolicyV1{1, IrPhaseMode::LinearPhase, 1.0});
+    CHECK(movie_ir.valid && movie_ir.uses_fir &&
+          std::abs(movie_ir.added_delay_ms - 160.0) < 1e-12);
+    CHECK(!validate_ir_phase_policy(IrPhasePolicyV1{1, IrPhaseMode::Bypass, 0.1}));
+    CHECK(!validate_ir_phase_policy(IrPhasePolicyV1{1, IrPhaseMode::MixedPhase, 1.1}));
 
     OutputGroupVolumeStateV1 state;
     state.requested_db = 3.0;
@@ -221,9 +236,12 @@ int main() {
     CHECK(validate_scene(game_scene.scene));
     CHECK(validate_graph(game_scene.graph));
     CHECK(game_scene.scene.latency_mode == LatencyMode::Game);
+    CHECK(game_scene.scene.ir_phase.mode == IrPhaseMode::MinimumPhase &&
+          resolve_ir_phase_policy(game_scene.scene.ir_phase).added_delay_ms == 0.0);
     const auto studio_scene = make_easy_scene(EasySceneKind::Studio, "main");
     CHECK(validate_scene(studio_scene.scene));
     CHECK(studio_scene.graph.strict_direct);
+    CHECK(studio_scene.scene.ir_phase.mode == IrPhaseMode::Bypass);
     CHECK(validate_graph(studio_scene.graph));
     CHECK(studio_scene.loudness.max_boost_db == 0.0);
 
@@ -589,6 +607,12 @@ int main() {
     CHECK(engine.process(std::span<const RtLaneInputV1>(&engine_input_view, 1), engine_output, 1));
     CHECK(std::abs(engine_output[0] - 0.5F) < 1e-5F);
     CHECK(std::abs(engine_output[1] + 0.5F) < 1e-5F);
+    CHECK(engine.apply_windows_volume(VolumeNotificationV1{-6.0206, true, 2}) ==
+          VolumeNotificationResult::Accepted);
+    CHECK(engine.process(std::span<const RtLaneInputV1>(&engine_input_view, 1), engine_output, 1));
+    CHECK(engine_output[0] == 0.0F && engine_output[1] == 0.0F);
+    CHECK(engine.apply_windows_volume(VolumeNotificationV1{-6.0206, false, 3}) ==
+          VolumeNotificationResult::Accepted);
     std::vector<RtLaneInputV1> tab_lane_inputs(1);
     float tab_lane_input[8]{};
     float tab_lane_output[8]{};

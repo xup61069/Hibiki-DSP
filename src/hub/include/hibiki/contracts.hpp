@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "hibiki/ir_phase.hpp"
+
 namespace hibiki {
 
 enum class LatencyMode : std::uint8_t {
@@ -22,6 +24,7 @@ struct SceneProfileV1 {
     std::vector<std::string> lanes;
     std::string output_group;
     LatencyMode latency_mode{LatencyMode::Game};
+    IrPhasePolicyV1 ir_phase{};
     bool auto_attenuate{true};
     double limiter_dbtp{-1.0};
 };

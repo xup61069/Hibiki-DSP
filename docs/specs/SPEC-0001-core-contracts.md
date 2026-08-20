@@ -20,6 +20,8 @@ Lane、output group、channel map、DSP chain、latency mode 與安全策略；�
 ## 介面
 
 - `SceneProfile v1`：lane routing、DSP、output group、automation、calibration reference。
+- `IrPhasePolicy v1`：minimum/mixed/linear/bypass 模式與 0..1 strength；只描述可驗證的
+  額外延遲預算，不攜帶未授權 IR 或 ISO 係數。
 - `OutputGroupVolumeState v1`：requested/effective/safety dB、mute、generation、origin、actuator。
 - `DistributionProfile v1`：driver hardware ID、endpoint GUID、ASIO CLSID、IPC namespace、schema version。
 - Easy Scene factory：Game／Movie／Voice／Studio 先生成合法的 Scene、Graph 與 loudness
@@ -56,7 +58,10 @@ Lane、output group、channel map、DSP chain、latency mode 與安全策略；�
 - Group Master 只能套用一次；LFE 不重複套用 ISO。
 - Strict Direct 是獨立 bit-perfect Scene，不能偷偷混入 DSP 或 Windows gain。
 - `AudioEngineModel` 的 control plane 只在 pending snapshot 做 Validate → Prepare → Commit；
-  RT `process` 只讀 active immutable snapshot，再對整個 Group Master 套用一次。
+  RT `process` 只讀 active immutable snapshot，再對整個 Group Master 套用一次。Volume
+  control object 不會由 RT 讀取；引擎只透過單一 release/acquire 64-bit word（Q16.16
+  effective-dB + mute bit）聯動 Windows，避免 control worker 與 audio thread 形成 data race
+  或讀到不一致的 dB/mute pair。
 
 ## 相容性與驗收
 

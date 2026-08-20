@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <atomic>
 #include <span>
 
 namespace hibiki {
@@ -50,12 +51,18 @@ public:
                                           float* output_interleaved) const noexcept;
     [[nodiscard]] EngineTransactionState transaction_state() const noexcept { return state_; }
     [[nodiscard]] const RtGraphSnapshotV1& active_graph() const noexcept { return active_graph_; }
-    [[nodiscard]] const OutputGroupVolumeStateV1& volume() const noexcept { return volume_; }
+    // Control-plane snapshot.  The RT process path reads the two atomics
+    // below instead of touching this mutable control-plane object.
+    [[nodiscard]] OutputGroupVolumeStateV1 volume() const noexcept { return volume_; }
 
 private:
     RtGraphSnapshotV1 active_graph_{};
     RtGraphSnapshotV1 pending_graph_{};
     OutputGroupVolumeStateV1 volume_{};
+    // Upper 32 bits: signed Q16.16 effective dB; bit 0: mute.  One atomic
+    // word keeps dB and mute coherent for a block boundary.
+    std::atomic<std::uint64_t> rt_volume_word_{
+        static_cast<std::uint64_t>(static_cast<std::uint32_t>(-60 * 65536)) << 32U};
     EngineTransactionState state_{EngineTransactionState::Ready};
     bool has_active_graph_{false};
     bool has_pending_graph_{false};

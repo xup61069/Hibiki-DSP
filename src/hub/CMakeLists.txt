@@ -9,6 +9,7 @@ add_library(hibiki_hub STATIC
   src/device_recovery.cpp
   src/device_switch.cpp
   src/exporters.cpp
+  src/ir_phase.cpp
   src/ipc.cpp
   src/ipc_pipe.cpp
   src/iso226.cpp
