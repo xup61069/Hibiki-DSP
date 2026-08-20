@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/basic-noise-suppressor-policy-v1.schema.json",
+  "title": "Hibiki BasicNoiseSuppressorPolicy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "enabled", "threshold_dbfs", "floor_db", "attack_ms", "release_ms", "highpass_hz"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "enabled": {"type": "boolean"},
+    "threshold_dbfs": {"type": "number", "minimum": -96, "exclusiveMaximum": 0},
+    "floor_db": {"type": "number", "minimum": -96, "maximum": 0},
+    "attack_ms": {"type": "number", "minimum": 0.1, "maximum": 2000},
+    "release_ms": {"type": "number", "minimum": 1, "maximum": 5000},
+    "highpass_hz": {"type": "number", "minimum": 0, "maximum": 2000}
+  }
+}

@@ -187,6 +187,13 @@ bool process_tab_capture_lane_v1(
             block = {};
             return false;
         }
+        if (effects->noise_suppressor != nullptr &&
+            (effects->noise_suppressor->sample_rate() != block.sample_rate ||
+             effects->noise_suppressor->channels() != block.channels ||
+             !effects->noise_suppressor->process_interleaved(input_interleaved, block.frames))) {
+            block = {};
+            return false;
+        }
         if (effects->program_level != nullptr &&
             (effects->program_level->sample_rate() != block.sample_rate ||
              !effects->program_level->process_interleaved(input_interleaved, block.frames,

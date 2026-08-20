@@ -79,6 +79,8 @@
   lane can apply PEQ before program-aware level correction with matching sample-rate/channel checks.
 - `IrConvolverV1` provides a fixed 4096-tap direct FIR with cross-block history and caller-supplied
   phase metadata; the tab lane can apply IR after PEQ and before program-aware level correction.
+- `BasicNoiseSuppressorV1` provides a fixed high-pass/downward-gate effect with bounded policy and
+  no allocation; tab effects now order PEQ → IR → suppressor → program-aware level correction.
 - `LaneConfigV1` now supports an optional validated 8×8 channel matrix in the immutable RT
   snapshot, while the legacy one-destination `channel_map` remains the default; Strict Direct
   rejects matrix-enabled lanes.
@@ -164,7 +166,7 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 Windows volume/device、ISO formula、recovery、driver control-core/INF template、persistent SRC、
 VST worker、control pipe/payloads、session volume adapter、sink clock pipeline、optional native
 ASIO transport/ring、tab/Virtual Mic lane adapter、session-route/output-handoff 與 control-model
-baseline commit `b7f1f7d`；
+baseline commit `5200d1c`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 

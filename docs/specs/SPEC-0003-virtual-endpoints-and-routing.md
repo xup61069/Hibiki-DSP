@@ -67,6 +67,9 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   `ProgramAwareLevelControllerV1`；它在進 graph 前對該 tab 套用慢速 RMS 代理音量，速率與
   boost/cut 都受 policy 限制。這是可選的內容音量，不是靜默擷取，也不是降噪或 BS.1770
   conformance。
+- 同一個 tab effects contract 可選套用 `BasicNoiseSuppressorV1`：固定高通＋downward gate，
+  只接受 1–8 聲道且要求 sample rate/channel 完全相符。它是可測試的基本抑噪，不宣稱
+  RNNoise、頻譜 AI、AEC 或麥克風權限處理；效果順序為 PEQ → IR → basic suppressor → level。
 - `SessionRouteGraphBuilderV1` 將 `AudioSessionRegistry` 的 active、已 bind session 轉成
   `GraphConfigV1`；`WindowsSession` gain owner 不重複套 lane makeup，`HibikiInternal` 才
   使用 per-session makeup dB。未綁定 session 忽略、重複 lane ID 或 Strict Direct 搭配 gain

@@ -24,4 +24,5 @@ filters before the level controller; mismatched sample rate/channel settings
 fail closed. A caller may also supply a fixed-capacity mono or per-channel IR
 kernel (up to 4096 taps) after PEQ and before level correction; the declared
 phase delay is metadata that still requires measurement. Noise-reduction models and their provenance remain separate
-boundaries, and the default path is unchanged when no effects are supplied.
+boundaries. A separate optional basic suppressor provides a bounded high-pass/downward gate;
+it is not RNNoise, AI denoising or AEC. The default path is unchanged when no effects are supplied.

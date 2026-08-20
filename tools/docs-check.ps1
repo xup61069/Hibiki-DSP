@@ -22,6 +22,7 @@ $required = @(
   'schemas/equal-loudness-status-v1.schema.json', 'schemas/ipc-envelope-v1.schema.json',
   'schemas/driver-control-v1.schema.json', 'schemas/ir-phase-policy-v1.schema.json',
   'schemas/audio-session-descriptor-v1.schema.json', 'schemas/program-aware-level-policy-v1.schema.json',
+  'schemas/basic-noise-suppressor-policy-v1.schema.json',
   'schemas/graph-config-v1.schema.json',
   'schemas/peq-filter-v1.schema.json',
   'docs/tasks/active/0.md', 'evidence/0000-foundation/initial.json'

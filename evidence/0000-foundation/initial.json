@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-v4",
-  "source_commit": "b7f1f7d",
+  "source_commit": "5200d1c",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -57,12 +57,13 @@
     {"command": "peq-runtime", "status": "pass", "coverage": ["RBJ peaking biquad", "16-filter capacity", "1-8 channel state", "nonfinite sample guard", "tab-lane effect ordering", "sample-rate/channel mismatch fail-closed"]},
     {"command": "ir-runtime", "status": "pass", "coverage": ["4096-tap direct FIR", "mono/per-channel kernel", "cross-block history", "phase metadata validation", "nonfinite sample guard", "tab-lane effect ordering"]},
     {"command": "matrix-routing", "status": "pass", "coverage": ["8x8 arbitrary channel matrix", "crossfeed weighted mix", "immutable RT snapshot copy", "legacy channel-map compatibility", "Strict Direct rejection"]},
+    {"command": "basic-noise-suppressor", "status": "pass", "coverage": ["high-pass option", "downward gate", "attack/release smoothing", "bounded policy", "finite sample guard", "tab-lane effect ordering"]},
     {"command": "output-handoff-coordinator", "status": "pass", "coverage": ["transaction plus crossfade", "commit blocked before fade completion", "rollback preserves active endpoint"]}
   ],
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",
   "limitations": [
-    "Evidence corresponds to commit b7f1f7d and the current environment only.",
+    "Evidence corresponds to commit 5200d1c and the current environment only.",
     "The native ASIO build is an unsigned local developer verification; no DLL or SDK checkout is committed or published.",
     "Current machine is Windows 22631 with VS 17/SDK 10.0.26100.0; it cannot provide driver-target evidence for the locked Windows 26100+/VS 2026/SDK-WDK 10.0.28000.2526 environment."
   ],

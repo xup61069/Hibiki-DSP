@@ -36,6 +36,7 @@ extern "C" {
 #include "hibiki/program_loudness.hpp"
 #include "hibiki/peq_dsp.hpp"
 #include "hibiki/ir_convolver.hpp"
+#include "hibiki/noise_suppressor.hpp"
 #include "hibiki/virtual_mic.hpp"
 #include "hibiki/true_peak_limiter.hpp"
 #if defined(_WIN32)
@@ -145,6 +146,20 @@ int main() {
           std::abs(ir_block[3] - 0.5F) < 1e-6F);
     CHECK(!ir.prepare(ir_kernel, 2U, 1U, 2U, 48000U,
                       IrPhaseResolutionV1{1, IrPhaseMode::Bypass, 0.0, 0.0, false, false}));
+
+    BasicNoiseSuppressorV1 noise_suppressor;
+    CHECK(validate_noise_suppressor_policy(BasicNoiseSuppressorPolicyV1{}));
+    CHECK(noise_suppressor.configure(
+        BasicNoiseSuppressorPolicyV1{1, true, -40.0, -30.0, 1.0, 10.0, 0.0}, 48000U, 1U));
+    std::array<float, 480> noise_block{};
+    noise_block.fill(0.01F);
+    CHECK(noise_suppressor.process_interleaved(noise_block.data(), noise_block.size()));
+    CHECK(std::abs(noise_block.back()) < std::abs(noise_block.front()));
+    noise_suppressor.reset();
+    std::array<float, 16> voice_block{};
+    voice_block.fill(0.5F);
+    CHECK(noise_suppressor.process_interleaved(voice_block.data(), voice_block.size()));
+    CHECK(voice_block.back() > 0.4F);
 
     OutputGroupVolumeStateV1 state;
     state.requested_db = 3.0;
@@ -856,7 +871,10 @@ int main() {
     CHECK(tab_peq.prepare(peq_filters, 48000U, 2U));
     IrConvolverV1 tab_ir;
     CHECK(tab_ir.prepare(ir_kernel, 2U, 1U, 2U, 48000U, ir_phase));
-    TabLaneEffectsV1 tab_effects{&tab_peq, &tab_ir, &tab_program_level};
+    BasicNoiseSuppressorV1 tab_noise;
+    CHECK(tab_noise.configure(
+        BasicNoiseSuppressorPolicyV1{1, true, -45.0, -24.0, 8.0, 120.0, 80.0}, 48000U, 2U));
+    TabLaneEffectsV1 tab_effects{&tab_peq, &tab_ir, &tab_noise, &tab_program_level};
     CHECK(process_tab_capture_lane_v1(engine, 0, *tab_queue, tab_lane_input, 2U,
                                       tab_lane_inputs, tab_lane_output, 2U, tab_lane_block,
                                       &tab_effects));
