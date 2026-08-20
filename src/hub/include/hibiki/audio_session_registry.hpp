@@ -40,6 +40,8 @@ public:
                             std::string output_group);
     [[nodiscard]] bool set_gain_owner(const AudioSessionIdentityV1& identity,
                                       SessionGainOwner owner) noexcept;
+    [[nodiscard]] bool set_makeup_gain_db(const AudioSessionIdentityV1& identity,
+                                          double makeup_gain_db) noexcept;
     void mark_endpoint_sessions_inactive(const std::string& endpoint_id) noexcept;
     [[nodiscard]] AudioSessionDescriptorV1* find(
         const AudioSessionIdentityV1& identity) noexcept;

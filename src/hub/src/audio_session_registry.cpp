@@ -92,6 +92,17 @@ bool AudioSessionRegistry::set_gain_owner(const AudioSessionIdentityV1& identity
     return true;
 }
 
+bool AudioSessionRegistry::set_makeup_gain_db(const AudioSessionIdentityV1& identity,
+                                              const double makeup_gain_db) noexcept {
+    if (!std::isfinite(makeup_gain_db) || makeup_gain_db < -144.0 || makeup_gain_db > 12.0) {
+        return false;
+    }
+    auto* session = find(identity);
+    if (session == nullptr) return false;
+    session->makeup_gain_db = makeup_gain_db;
+    return true;
+}
+
 void AudioSessionRegistry::mark_endpoint_sessions_inactive(
     const std::string& endpoint_id) noexcept {
     for (auto& session : sessions_) {

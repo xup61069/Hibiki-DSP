@@ -554,7 +554,8 @@ int main() {
     CHECK(session_registry.bind(chrome_tab_a, "vlog-noise", "headphones"));
     CHECK(session_registry.bind(chrome_tab_b, "music", "speakers"));
     CHECK(session_registry.set_gain_owner(chrome_tab_a, SessionGainOwner::HibikiInternal));
-    session_registry.find(chrome_tab_a)->makeup_gain_db = 6.0205999;
+    CHECK(session_registry.set_makeup_gain_db(chrome_tab_a, 6.0205999));
+    CHECK(!session_registry.set_makeup_gain_db(chrome_tab_a, 13.0));
     CHECK(session_registry.find(chrome_tab_a)->lane_id == "vlog-noise");
     CHECK(session_registry.find(chrome_tab_a)->output_group == "headphones");
     CHECK(session_registry.find(chrome_tab_a)->gain_owner == SessionGainOwner::HibikiInternal);

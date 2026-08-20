@@ -52,7 +52,7 @@
     {"command": "control-command-queue", "status": "pass", "coverage": ["64-slot SPSC", "full-queue dropped counter", "pipe-to-control handoff"]},
     {"command": "engine-control-worker", "status": "pass", "coverage": ["SceneApply to Easy presets", "Validate-Prepare-Commit", "volume through Group Master", "invalid scene preserves revision"]},
     {"command": "output-group-routing", "status": "pass", "coverage": ["fixed-size RT group identity", "four-lane isolation", "missing-group fail-closed", "AudioEngine process_output_group"]},
-    {"command": "session-route-graph-builder", "status": "pass", "coverage": ["active bound session compilation", "WindowsSession/HibikiInternal gain ownership", "two Chrome session groups", "Strict Direct gain rejection"]},
+    {"command": "session-route-graph-builder", "status": "pass", "coverage": ["active bound session compilation", "WindowsSession/HibikiInternal gain ownership", "two Chrome session groups", "Strict Direct gain rejection", "bounded makeup gain mutator"]},
     {"command": "output-handoff-coordinator", "status": "pass", "coverage": ["transaction plus crossfade", "commit blocked before fade completion", "rollback preserves active endpoint"]}
   ],
   "started_at": "2026-08-21T00:00:00Z",

@@ -67,6 +67,8 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   `GraphConfigV1`；`WindowsSession` gain owner 不重複套 lane makeup，`HibikiInternal` 才
   使用 per-session makeup dB。未綁定 session 忽略、重複 lane ID 或 Strict Direct 搭配 gain
   一律 fail-closed。
+- `set_makeup_gain_db` 是 registry 唯一的 per-session gain mutator，限制 −144..+12 dB；
+  metadata `upsert` 不得靜默覆蓋使用者設定。
 - `RtLaneSnapshotV1` 會把每個 lane 的 `output_group` 編譯成固定大小 immutable bytes；
   `process_graph_for_output_group` 與 `AudioEngineModel::process_output_group` 只 render
   指定群組，未命中的群組 fail-closed，避免四個 App／tab 的 samples 互相串音。未指定群組

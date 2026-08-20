@@ -67,6 +67,8 @@
 - `SessionRouteGraphBuilderV1` compiles active bound sessions into graph lanes with explicit
   WindowsSession versus HibikiInternal gain ownership; two Chrome-session fixtures render into
   separate output groups without cross-talk.
+- `AudioSessionRegistry::set_makeup_gain_db` now provides the bounded per-session gain mutator;
+  metadata refresh keeps that value and rejects values outside −144..+12 dB.
 - Worker-side session volume read/write now uses `ISimpleAudioVolume` with dB↔scalar conversion,
   event-context GUIDs and readback; unbound/exclusive/vendor ASIO paths remain explicit bypasses.
 - `OutputSinkModel` now joins clock-drift estimation to persistent SRC per sink, preserving
