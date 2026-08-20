@@ -23,3 +23,36 @@ if(MSVC)
 else()
   target_compile_options(hibiki_vst_host PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 endif()
+
+option(HIBIKI_ENABLE_VST3_SDK "Build optional VST3 SDK module catalog" OFF)
+set(HIBIKI_VST3_SDK_ROOT "" CACHE PATH "Local pinned Steinberg VST3 SDK checkout")
+if(HIBIKI_ENABLE_VST3_SDK)
+  if(NOT EXISTS "${HIBIKI_VST3_SDK_ROOT}/pluginterfaces/vst/ivstcomponent.h")
+    message(FATAL_ERROR "HIBIKI_VST3_SDK_ROOT must point to a populated VST3 SDK checkout")
+  endif()
+  add_library(hibiki_vst3_sdk_catalog STATIC
+    src/vst3_sdk_catalog.cpp
+    "${HIBIKI_VST3_SDK_ROOT}/public.sdk/source/vst/hosting/module.cpp"
+    "${HIBIKI_VST3_SDK_ROOT}/public.sdk/source/vst/hosting/module_win32.cpp"
+    "${HIBIKI_VST3_SDK_ROOT}/public.sdk/source/vst/hosting/hostclasses.cpp"
+    "${HIBIKI_VST3_SDK_ROOT}/public.sdk/source/vst/hosting/pluginterfacesupport.cpp"
+    "${HIBIKI_VST3_SDK_ROOT}/public.sdk/source/vst/utility/stringconvert.cpp"
+    "${HIBIKI_VST3_SDK_ROOT}/pluginterfaces/base/coreiids.cpp"
+    "${HIBIKI_VST3_SDK_ROOT}/pluginterfaces/base/conststringtable.cpp"
+  )
+  target_include_directories(hibiki_vst3_sdk_catalog PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    "${HIBIKI_VST3_SDK_ROOT}"
+    "${HIBIKI_VST3_SDK_ROOT}/base/source"
+    "${HIBIKI_VST3_SDK_ROOT}/pluginterfaces"
+    "${HIBIKI_VST3_SDK_ROOT}/public.sdk/source"
+  )
+  target_compile_features(hibiki_vst3_sdk_catalog PUBLIC cxx_std_20)
+  if(MSVC)
+    target_compile_options(hibiki_vst3_sdk_catalog PRIVATE /W4 /permissive- /EHsc /Zc:char8_t-)
+    target_compile_definitions(hibiki_vst3_sdk_catalog PRIVATE _CRT_SECURE_NO_WARNINGS)
+  endif()
+  if(WIN32)
+    target_link_libraries(hibiki_vst3_sdk_catalog PUBLIC shell32)
+  endif()
+endif()

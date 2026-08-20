@@ -39,9 +39,14 @@ connect/read/write timeout 與 caller-owned receive buffer；worker-side 也可�
 Heartbeat、受限 ProcessBlock passthrough 與 Shutdown；它是可執行的 transport/可靠性
 fixture，不宣稱已載入 VST3 SDK 或第三方 plugin。
 
+`vst3_sdk_catalog.hpp` 提供 optional control-plane bridge，使用 `THIRD_PARTY.yml` 鎖定的
+Steinberg SDK 3.8.1 build 84 與 submodule commits，掃描 module factory class metadata。
+SDK checkout 由開發者在 `.local/` 提供，public monorepo 不 vendor SDK；catalog 不執行 plugin、
+不進 RT thread，也不等同 certification。其 optional target 已在本機以 MSVC 編譯通過。
+
 ## 尚未完成的邊界
 
-VST3 SDK 版本鎖定、plugin scan/certification、SDK parameter/audio dispatch、latency
-compensation、crash dump redaction 與 production worker policy 尚未納入本 commit；目前
-supervisor、named pipe 與 passthrough worker 提供可測試的 process containment，不能宣稱
-已完成 VST3 host。
+plugin scan 的 factory metadata catalog 已有 optional bridge；仍未完成第三方 plugin
+certification、SDK parameter/audio dispatch、latency compensation、crash dump redaction 與
+production worker policy。目前 supervisor、named pipe、passthrough worker 與 catalog 提供
+可測試的 process containment/metadata boundary，不能宣稱已完成 VST3 host。
