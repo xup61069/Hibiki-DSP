@@ -345,6 +345,18 @@ int main() {
     scene_frame.payload.assign(scene_payload.begin(), scene_payload.end());
     CHECK(decode_control_command_v1(scene_frame, decoded_command) &&
           decoded_command.type == IpcMessageType::SceneApply);
+    ControlCommandQueueV1 command_queue;
+    ControlCommandV1 queued_command{};
+    queued_command.type = IpcMessageType::SceneApply;
+    queued_command.request_id = 123U;
+    CHECK(command_queue.try_push(queued_command));
+    CHECK(enqueue_control_command_v1(queued_command, &command_queue));
+    CHECK(command_queue.try_pop(decoded_command) && decoded_command.request_id == 123U);
+    CHECK(command_queue.try_pop(decoded_command) && decoded_command.request_id == 123U);
+    for (std::size_t index = 0; index < ControlCommandQueueV1::kCapacity; ++index) {
+        CHECK(command_queue.try_push(queued_command));
+    }
+    CHECK(!command_queue.try_push(queued_command) && command_queue.dropped() == 1U);
     bool command_accepted = false;
     ControlPlaneHandlerContextV1 service_context{accept_control_command, &command_accepted};
     IpcFrameV1 service_response;

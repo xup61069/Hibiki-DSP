@@ -41,6 +41,9 @@ Lane、output group、channel map、DSP chain、latency mode 與安全策略；�
   以兩段 length-prefixed printable UTF-8（scene ID、output group）及 zero padding 表示。
 - `handle_control_frame_v1` 是 pipe worker 到 host control queue 的唯一 typed adapter；sink
   必須自行 enqueue／排程，不能在 pipe callback 直接跑 RT DSP 或等待 UI/COM。
+- `ControlCommandQueueV1` 是目前的固定 64-slot SPSC handoff；滿載時丟棄新命令並增加
+  dropped counter，consumer 才能呼叫 AudioEngine／graph transaction。這個 queue 不保證
+  multi-producer；若未來有第二個 control producer，必須先建立新的版本化協定。
 - `AudioSessionRegistry` 以 `endpoint_id + session_instance_id` 作為唯一 session key；PID
   只作顯示／診斷用途。OS metadata refresh 不得覆蓋使用者已選 lane、output group 或 gain
   owner，避免同一 process 的多個 Chrome tab／session 互相串音。

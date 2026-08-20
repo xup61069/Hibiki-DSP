@@ -28,6 +28,8 @@
 - `handle_control_frame_v1` validates Hello/Volume/Scene/graph lifecycle commands before passing
   them to a host-owned typed sink; malformed or rejected commands receive Error without touching
   the graph.
+- `ControlCommandQueueV1` provides a fixed 64-slot SPSC pipe-worker to control-worker handoff;
+  overflow is fail-closed with a dropped counter and no allocation/lock/wait.
 - `AudioEngineModel` facade connecting graph transaction, Windows volume notification and RT
   processing with one Group Master gain.
 - `AudioEngineModel` 的 RT Group Master 已改讀 release/acquire 64-bit Q16.16 dB/mute word；
