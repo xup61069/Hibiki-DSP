@@ -75,6 +75,14 @@ Check(ControlPayloadsV1.TryDecodeSceneApply(viewModel.LastCommand!.Payload.Span,
           out var selectedSceneId, out var selectedOutput) &&
       selectedSceneId == "game" && selectedOutput == "main",
     "ViewModel scene command payload was not valid.");
+var encodedSceneCommand = IpcCodecV1.Encode(viewModel.LastCommand);
+Check(IpcCodecV1.TryDecode(encodedSceneCommand, out var decodedSceneCommand, out _) &&
+      decodedSceneCommand?.Type == ControlMessageType.SceneApply,
+    "SceneApply must be accepted by the C# envelope encoder.");
+var invalidUtf8Scene = viewModel.LastCommand.Payload.ToArray();
+invalidUtf8Scene[1] = 0xFF;
+Check(!ControlPayloadsV1.TryDecodeSceneApply(invalidUtf8Scene, out _, out _),
+    "SceneApply decoder must reject invalid UTF-8 rather than substitute characters.");
 viewModel.IsExpert = true;
 Check(viewModel.Mode == UiMode.Expert && viewModel.SelectScene("movie"),
     "ViewModel Expert scene selection failed.");

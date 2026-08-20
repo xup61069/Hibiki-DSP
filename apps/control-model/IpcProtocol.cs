@@ -112,13 +112,16 @@ public static class IpcCodecV1
     public static bool IsValidType(ControlMessageType type) =>
         type is ControlMessageType.Hello or ControlMessageType.VolumeNotification or
         ControlMessageType.GraphPrepare or ControlMessageType.GraphCommit or
-        ControlMessageType.GraphRollback or ControlMessageType.Ack or ControlMessageType.Error;
+        ControlMessageType.GraphRollback or ControlMessageType.Ack or ControlMessageType.Error or
+        ControlMessageType.SceneApply;
 }
 
 public static class ControlPayloadsV1
 {
     public const int VolumeNotificationBytes = 16;
     public const int SceneApplyBytes = 64;
+    private static readonly System.Text.UTF8Encoding StrictUtf8 =
+        new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     public static byte[] EncodeVolumeNotification(double requestedDb,
                                                    bool mute,
@@ -156,8 +159,8 @@ public static class ControlPayloadsV1
 
     public static byte[] EncodeSceneApply(string sceneId, string outputGroup)
     {
-        var scene = System.Text.Encoding.UTF8.GetBytes(sceneId ?? string.Empty);
-        var output = System.Text.Encoding.UTF8.GetBytes(outputGroup ?? string.Empty);
+        var scene = StrictUtf8.GetBytes(sceneId ?? string.Empty);
+        var output = StrictUtf8.GetBytes(outputGroup ?? string.Empty);
         if (scene.Length is < 1 or > 31 || output.Length is < 1 or > 31 ||
             scene.Any(value => value < 0x20) || output.Any(value => value < 0x20))
             throw new ArgumentException("Scene and output-group IDs must be 1..31 printable UTF-8 bytes.");
@@ -186,8 +189,8 @@ public static class ControlPayloadsV1
             if (payload[index] != 0) return false;
         try
         {
-            sceneId = System.Text.Encoding.UTF8.GetString(sceneBytes);
-            outputGroup = System.Text.Encoding.UTF8.GetString(outputBytes);
+            sceneId = StrictUtf8.GetString(sceneBytes);
+            outputGroup = StrictUtf8.GetString(outputBytes);
             return !string.IsNullOrWhiteSpace(sceneId) && !string.IsNullOrWhiteSpace(outputGroup);
         }
         catch (ArgumentException)
