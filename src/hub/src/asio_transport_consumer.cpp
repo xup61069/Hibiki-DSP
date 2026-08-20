@@ -38,6 +38,7 @@ bool AsioTransportConsumerV1::bind(const std::wstring_view mapping_name,
   const auto bytes = hibiki_asio_transport_region_size_v1();
 
 #if defined(_WIN32)
+  SetLastError(ERROR_SUCCESS);
   HANDLE mapping = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0,
                                       static_cast<DWORD>(bytes),
                                       std::wstring(mapping_name).c_str());

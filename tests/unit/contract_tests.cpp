@@ -25,6 +25,7 @@ extern "C" {
 #include "hibiki/scene_safety.hpp"
 #include "hibiki/volume_state.hpp"
 #if defined(_WIN32)
+#include <windows.h>
 #include "hibiki/windows_volume_broker.hpp"
 #include "hibiki/windows_device_watcher.hpp"
 #include "hibiki/windows_audio_session_watcher.hpp"
@@ -427,6 +428,37 @@ int main() {
     CHECK(engine.process(std::span<const RtLaneInputV1>(&engine_input_view, 1), engine_output, 1));
     CHECK(std::abs(engine_output[0] - 0.5F) < 1e-5F);
     CHECK(std::abs(engine_output[1] + 0.5F) < 1e-5F);
+#if defined(_WIN32)
+    constexpr wchar_t kContractMapping[] = L"Local\\HibikiDSP_v1_contract_asio";
+    CHECK(engine.bind_asio_transport(kContractMapping, 2U, 48000U, 4U));
+    CHECK(engine.asio_transport_bound());
+    const auto contract_bytes = hibiki_asio_transport_region_size_v1();
+    HANDLE contract_mapping = OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE, FALSE,
+                                                kContractMapping);
+    CHECK(contract_mapping != nullptr);
+    auto* contract_region = static_cast<hibiki_asio_transport_region_v1*>(
+        MapViewOfFile(contract_mapping, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, contract_bytes));
+    CHECK(contract_region != nullptr);
+    const float contract_left[4] = {1.0F, 2.0F, 3.0F, 4.0F};
+    const float contract_right[4] = {-1.0F, -2.0F, -3.0F, -4.0F};
+    const float* contract_planar[2] = {contract_left, contract_right};
+    CHECK(hibiki_asio_transport_push_planar_v1(contract_region, contract_bytes, contract_planar,
+                                                2U, 4U) == 1);
+    std::vector<RtLaneInputV1> asio_inputs(1);
+    float contract_asio_transport[8]{};
+    float contract_asio_output[8]{};
+    AsioTransportBlockV1 asio_block{};
+    CHECK(engine.process_asio_transport(0, contract_asio_transport, 4U, asio_inputs,
+                                        contract_asio_output, 4U,
+                                        asio_block));
+    CHECK(asio_block.frames == 4U && asio_block.channels == 2U &&
+          std::abs(contract_asio_output[0] - 0.5F) < 1e-5F &&
+          std::abs(contract_asio_output[1] + 0.5F) < 1e-5F);
+    UnmapViewOfFile(contract_region);
+    CloseHandle(contract_mapping);
+    engine.unbind_asio_transport();
+    CHECK(!engine.asio_transport_bound());
+#endif
     AsioTransportBlockV1 detached_block{};
     std::vector<RtLaneInputV1> detached_inputs(1);
     float detached_transport[8]{};

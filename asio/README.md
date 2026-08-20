@@ -25,7 +25,7 @@ shell. It is unsigned developer output and does not yet claim physical sink
 I/O; that boundary remains the Hibiki engine, IPC and the signed virtual
 endpoint.
 
-When the engine has created the stable `Local\\HibikiDSP\\v1\\asio` mapping,
+When the engine has created the stable `Local\\HibikiDSP_v1_asio` mapping,
 `createBuffers` attaches the ASIO output blocks to the Apache-2.0
 `hibiki_asio_transport_v1` SPSC ring. The DLL publishes the block after the
 host callback returns; it never creates the mapping and never blocks the

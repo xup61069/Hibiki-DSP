@@ -39,7 +39,7 @@ constexpr long kPreferredBuffer = 128;
 constexpr long kMinBuffer = 32;
 constexpr long kMaxBuffer = 4096;
 constexpr std::array<double, 4> kSampleRates{44100.0, 48000.0, 96000.0, 192000.0};
-constexpr wchar_t kAsioTransportMappingName[] = L"Local\\HibikiDSP\\v1\\asio";
+constexpr wchar_t kAsioTransportMappingName[] = L"Local\\HibikiDSP_v1_asio";
 
 std::atomic<long> g_object_count{0};
 HINSTANCE g_module_instance = nullptr;
