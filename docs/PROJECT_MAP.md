@@ -10,7 +10,7 @@
 | `extensions/` | Chrome/Edge MV3 tab capture + HIBT AudioWorklet packetizer、loopback WebSocket、TabCaptureQueue SPSC、graph lane adapter | user-gesture capture source + bounded queue + shared graph/Group Master adapter；noise-reduction model 待接 | SPEC-0009 / browser lane |
 | `installer/` | GPL bootstrapper、driver transaction、rollback | PowerShell source bootstrapper with dry-run, hash and traversal-safe manifest gate；signed package pending | release manifest |
 | `sdk/` | driver／engine 的 Apache-2.0 C ABI 與 schema boundary | v1 header | driver-control-v1 |
-| `schemas/` | IPC、Graph、Scene、volume、PEQ、ISO status、handoff、release JSON schemas | 初始骨架 | versioned v1 |
+| `schemas/` | IPC、Graph、Scene、volume、AudioSession、PEQ、ISO status、handoff、release JSON schemas | 初始骨架 | versioned v1 |
 | `build/` | 固定 VS／SDK／WDK 與可重建條件 | 初始鎖定 | toolchain-lock.yml |
 | `tools/` | doctor、probe、verify、docs/source policy gates | 初始骨架 | AGENTS.md |
 

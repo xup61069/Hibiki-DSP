@@ -24,6 +24,8 @@ Lane、output group、channel map、DSP chain、latency mode 與安全策略；�
   群組呼叫指定 render，不得在 audio thread 以 `std::string` 或 map 查路由。
 - `IrPhasePolicy v1`：minimum/mixed/linear/bypass 模式與 0..1 strength；只描述可驗證的
   額外延遲預算，不攜帶未授權 IR 或 ISO 係數。
+- `AudioSessionDescriptor v1`：endpoint/session-instance identity、lane/output group、gain
+  owner 與 per-session makeup dB；JSON schema 是跨語言／跨 AI 的欄位真值。
 - `OutputGroupVolumeState v1`：requested/effective/safety dB、mute、generation、origin、actuator。
 - `DistributionProfile v1`：driver hardware ID、endpoint GUID、ASIO CLSID、IPC namespace、schema version。
 - Easy Scene factory：Game／Movie／Voice／Studio 先生成合法的 Scene、Graph 與 loudness
