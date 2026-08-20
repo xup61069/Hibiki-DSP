@@ -1,6 +1,6 @@
 # Hibiki DSP baseline
 
-## 已完成（未提交 baseline，有 evidence）
+## 已完成（有 commit 與 evidence）
 
 - 公開 monorepo 文件、component license map 與 source-only paid-release policy。
 - AI 接手規則、fresh-clone 流程與 source-only policy。
@@ -29,9 +29,8 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 
 ## 最近驗證
 
-初始 foundation evidence 已寫入 `evidence/0000-foundation/initial.json`。目前 repository
-尚未建立第一個 Git commit，因此 evidence scope 標示為未提交 baseline；新 AI 接手時必須
-先確認 working tree 與該 scope 是否一致。
+初始 foundation evidence 已寫入 `evidence/0000-foundation/initial.json`，對應 foundation
+commit `1d7b704`；新 AI 接手時仍必須確認 working tree 與該 scope 是否一致。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 40 個必要入口與
 5 份 Spec 通過；`source-policy.ps1` 掃描 124 個路徑且無 blocked binary/secret；
