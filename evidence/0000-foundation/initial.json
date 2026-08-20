@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "issue": 0,
-  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-v5",
-  "source_commit": "d7f8ba2",
+  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-v6",
+  "source_commit": "95e8711",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -24,13 +24,13 @@
   ],
   "results": [
     {"command": "tools/verify.ps1", "status": "pass", "tests": 1},
-    {"command": "tools/docs-check.ps1", "status": "pass", "required_paths": 48, "specs": 10},
-    {"command": "tools/source-policy.ps1", "status": "pass", "scanned_paths": 220, "blocked_files": 0},
+    {"command": "tools/docs-check.ps1", "status": "pass", "required_paths": 50, "specs": 11},
+    {"command": "tools/source-policy.ps1", "status": "pass", "scanned_paths": 224, "blocked_files": 0},
     {"command": "tools/extension-check.ps1", "status": "pass"},
     {"command": "tools/installer-check.ps1", "status": "pass"},
     {"command": "tools/control-model-check.ps1", "status": "pass"},
     {"command": "tools/distribution-check.ps1", "status": "pass"},
-    {"command": "json-parse", "status": "pass", "files": 20},
+    {"command": "json-parse", "status": "pass", "files": 22},
     {"command": "optional-vst3-sdk-catalog-build", "status": "pass", "target": "hibiki_vst3_sdk_catalog", "sdk_commit": "3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96", "scope": ["factory catalog", "one-main-bus Float32 processor", "fixed 4096-frame scratch", "latency reporting"], "published_artifacts": false},
     {"command": "optional-vst3-sdk-worker-build", "status": "pass", "target": "hibiki_vst3_sdk_worker", "sdk_commit": "3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96", "scope": ["named-pipe ProcessBlock bridge", "Hello/Heartbeat", "plugin error fail-closed", "bounded ProcessBlockWithParameters frame", "bounded IParameterChanges conversion"], "published_artifacts": false},
     {"command": "optional-native-asio-build", "status": "pass", "target": "hibiki_asio_native", "sdk_commit": "496a0765b8bb9c26f764f22f9a9712a937177db2", "published_artifacts": false},
@@ -54,6 +54,7 @@
     {"command": "virtual-mic-contract", "status": "pass", "coverage": ["format validation", "privacy mute default", "capture passthrough", "echo-reference copy", "bounded normalized-LMS cancellation", "finite-input fail-closed", "privacy gate before shared graph"]},
     {"command": "control-model", "status": "pass", "coverage": ["fail-closed One-Tap Enhance", "Easy/Expert scene selection", "fixed Main/Low Latency/Surround output groups", "bounded Hello/Scene/volume lifecycle", "40 ms latest-value volume debounce", "Connected/Degraded fallback", "active output-group identity", "SceneApply envelope encode", "strict UTF-8 rejection"]},
     {"command": "winui-source-shell", "status": "pass", "coverage": ["Windows App SDK/toolchain lock match", "Easy/Expert binding surface", "source-only audio boundary", "window disconnect cleanup"], "compiled_artifacts": false},
+    {"command": "calibration-compiler", "status": "pass", "coverage": ["strictly increasing response validation", "16-filter bounded selection", "boost/cut/Q/spacing policy", "explicit limited diagnostic", "exporter-compatible PeqFilterV1"], "compiled_artifacts": false},
     {"command": "installer-source-hardening", "status": "pass", "coverage": ["relative manifest paths", "path traversal rejection", "64-character SHA-256 validation"]},
     {"command": "ir-phase-policy", "status": "pass", "coverage": ["minimum-phase 0 ms", "mixed-phase 80 ms budget", "linear-phase 160 ms budget", "bypass validation", "C++/C# slider parity"]},
     {"command": "audio-engine-volume-snapshot", "status": "pass", "coverage": ["single 64-bit dB/mute atomic", "mute transition", "Group Master applied once", "8 ms gain ramp", "5 ms mute", "15 ms unmute", "-1 dBTP output guard"]},
@@ -71,7 +72,7 @@
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",
   "limitations": [
-    "Evidence corresponds to commit d7f8ba2 and the current environment only.",
+    "Evidence corresponds to commit 95e8711 and the current environment only.",
     "The native ASIO build is an unsigned local developer verification; no DLL or SDK checkout is committed or published.",
     "Current machine is Windows 22631 with VS 17/SDK 10.0.26100.0; it cannot provide driver-target evidence for the locked Windows 26100+/VS 2026/SDK-WDK 10.0.28000.2526 environment."
   ],
