@@ -56,4 +56,43 @@ bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
     return true;
 }
 
+bool AudioEngineModel::bind_asio_transport(const std::wstring_view mapping_name,
+                                           const std::uint32_t channels,
+                                           const std::uint32_t sample_rate,
+                                           const std::uint32_t frames_per_buffer) noexcept {
+    return asio_transport_.bind(mapping_name, channels, sample_rate, frames_per_buffer);
+}
+
+void AudioEngineModel::unbind_asio_transport() noexcept { asio_transport_.unbind(); }
+
+bool AudioEngineModel::asio_transport_bound() const noexcept { return asio_transport_.bound(); }
+
+bool AudioEngineModel::process_asio_transport(
+    const std::size_t lane_index,
+    float* const transport_interleaved,
+    const std::uint32_t transport_capacity_frames,
+    const std::span<RtLaneInputV1> lane_inputs,
+    float* const output_interleaved,
+    const std::size_t output_capacity_frames,
+    AsioTransportBlockV1& block) noexcept {
+    block = {};
+    if (!has_active_graph_ || lane_index >= active_graph_.lane_count ||
+        lane_inputs.size() < active_graph_.lane_count || transport_interleaved == nullptr ||
+        output_interleaved == nullptr ||
+        active_graph_.lanes[lane_index].input_channels == 0U) {
+        return false;
+    }
+    if (!asio_transport_.pop(transport_interleaved, transport_capacity_frames, block) ||
+        block.frames == 0U || block.frames > output_capacity_frames ||
+        block.channels != active_graph_.lanes[lane_index].input_channels) {
+        return false;
+    }
+    const auto previous = lane_inputs[lane_index];
+    lane_inputs[lane_index] = RtLaneInputV1{transport_interleaved, block.channels};
+    const bool processed = process(std::span<const RtLaneInputV1>(lane_inputs.data(), lane_inputs.size()),
+                                   output_interleaved, block.frames);
+    lane_inputs[lane_index] = previous;
+    return processed;
+}
+
 }  // namespace hibiki

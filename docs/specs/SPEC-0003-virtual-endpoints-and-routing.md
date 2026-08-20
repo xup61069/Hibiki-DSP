@@ -50,6 +50,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   完成後把八聲道 Float32 block 寫入 SPSC ring。Engine 端 `AsioTransportConsumerV1` 在 RT lane
   以 caller-owned buffer pop，禁止配置與等待。mapping 不存在、格式不符或 ring 滿載時，ASIO
   仍可運作但 UI 必須顯示 detached／dropped blocks，不能宣稱已套用 Hibiki graph。
+- `AudioEngineModel::process_asio_transport` 將一個已 pop 的 ASIO block 暫時置入指定 Lane，
+  走現有 immutable graph 與唯一 Group Master，再寫入 caller-owned output；完成後還原 caller
+  的 Lane view。它只證明 user-space graph data path，不代表已連接實體 sink、WaveRT endpoint
+  或 vendor ASIO。
 
 ## 未解問題（阻擋完整 driver 實作）
 

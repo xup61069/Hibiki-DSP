@@ -427,6 +427,13 @@ int main() {
     CHECK(engine.process(std::span<const RtLaneInputV1>(&engine_input_view, 1), engine_output, 1));
     CHECK(std::abs(engine_output[0] - 0.5F) < 1e-5F);
     CHECK(std::abs(engine_output[1] + 0.5F) < 1e-5F);
+    AsioTransportBlockV1 detached_block{};
+    std::vector<RtLaneInputV1> detached_inputs(1);
+    float detached_transport[8]{};
+    float detached_output[8]{};
+    CHECK(!engine.asio_transport_bound());
+    CHECK(!engine.process_asio_transport(0, detached_transport, 4U, detached_inputs,
+                                         detached_output, 4U, detached_block));
     GraphConfigV1 invalid_graph;
     CHECK(!engine.prepare_graph(invalid_graph, 12));
     CHECK(engine.transaction_state() == EngineTransactionState::Degraded);
