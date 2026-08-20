@@ -4,6 +4,10 @@
   "description": "Routes the active browser tab to a Hibiki lane after a user gesture.",
   "version": "0.1.0",
   "permissions": ["activeTab", "tabCapture", "offscreen"],
+  "host_permissions": ["http://127.0.0.1/*"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src ws://127.0.0.1:17842"
+  },
   "background": {"service_worker": "service-worker.js", "type": "module"},
   "action": {"default_popup": "popup.html", "default_title": "Capture this tab"}
 }

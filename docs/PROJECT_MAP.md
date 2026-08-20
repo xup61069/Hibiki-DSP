@@ -7,7 +7,7 @@
 | `apps/` | WinUI 3 control plane、Easy/Expert UX | 待建立 | SceneProfile |
 | `asio/` | Hibiki ASIO bridge、可選原生 COM transport 與 DAW lane | stream model + optional unsigned DLL target | SceneProfile / distribution profile |
 | `vst-host/` | Out-of-process VST3 host | trusted/certified model + Windows Job Object supervisor | SPEC-0008 / plugin contract |
-| `extensions/` | Chrome/Edge MV3 tab capture | MV3 source prototype | browser lane |
+| `extensions/` | Chrome/Edge MV3 tab capture + HIBT AudioWorklet packetizer | user-gesture capture source + optional localhost bridge boundary | SPEC-0009 / browser lane |
 | `installer/` | GPL bootstrapper、driver transaction、rollback | 待建立 | release manifest |
 | `sdk/` | driver／engine 的 Apache-2.0 C ABI 與 schema boundary | v1 header | driver-control-v1 |
 | `schemas/` | IPC、Graph、Scene、volume、PEQ、ISO status、handoff、release JSON schemas | 初始骨架 | versioned v1 |
