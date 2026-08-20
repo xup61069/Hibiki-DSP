@@ -153,8 +153,8 @@
 
 ## 尚未開始
 
-- 可載入的 WaveRT/SYSVAD-derived driver、ASIO physical sink delivery、out-of-process VST3 SDK
-  plugin dispatch、WinUI 3 UI、physical sink clock fixtures 與 signed package delivery。
+- 可載入的 WaveRT/SYSVAD-derived driver、ASIO physical sink delivery、完整 out-of-process
+  VST3 SDK plugin dispatch、WinUI 3 UI、physical sink clock fixtures 與 signed package delivery。
 - ISO 226:2023 合法係數來源與正式 conformance oracle（公式本身已完成，但係數資料仍待
   授權／法務確認）。
 - Microsoft driver signing、Gumroad release artifact 與 production installer。
@@ -169,14 +169,16 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 Windows volume/device、ISO formula、recovery、driver control-core/INF template、persistent SRC、
 VST worker、control pipe/payloads、session volume adapter、sink clock pipeline、optional native
 ASIO transport/ring、tab/Virtual Mic lane adapter、session-route/output-handoff 與 control-model
-baseline commit `54c6795`；
+baseline commit `54edd17`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 44 個必要入口與
-9 份 Spec 通過；`source-policy.ps1` 掃描 205 個路徑且無 blocked binary/secret；
+9 份 Spec 通過；`source-policy.ps1` 掃描 207 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1` 與
 `distribution-check.ps1` 與 `driver-source-check.ps1` 通過；20 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
-`.local/`，未提交或發布。`doctor.ps1 -CheckOnly` 明確顯示本機低於鎖定的 Windows/VS/WDK
-版本，因此沒有把 driver、HLK、簽章或真實 endpoint 結果誇大為已驗收。
+`.local/`，未提交或發布。以本機 pinned VST3 SDK 另行執行的 optional target
+`hibiki_vst3_sdk_catalog`（含 bounded one-main-bus processor）unsigned build 亦通過；輸出同樣
+只在 `.local/`。`doctor.ps1 -CheckOnly` 明確顯示本機低於鎖定的 Windows/VS/WDK 版本，因此
+沒有把 driver、HLK、簽章、真實 endpoint 或第三方 plugin certification 結果誇大為已驗收。
