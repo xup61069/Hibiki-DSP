@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-src-vst-session-volume-sink-clock-native-asio-v1",
-  "source_commit": "fa525be",
+  "source_commit": "93712f5",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -31,12 +31,13 @@
     {"command": "output-crossfade", "status": "pass", "coverage": ["equal-power handoff", "supported multichannel layouts", "no allocation in process"]},
     {"command": "vst3-sandbox", "status": "pass", "coverage": ["launch validation", "job containment source", "watchdog/quarantine model"]},
     {"command": "extension-check", "status": "pass", "coverage": ["user gesture", "HIBT packetizer", "bridge fallback"]},
-    {"command": "hibiki_tab_bridge_contract", "status": "pass", "coverage": ["header validation", "exact length", "finite samples"]}
+    {"command": "hibiki_tab_bridge_contract", "status": "pass", "coverage": ["header validation", "exact length", "finite samples"]},
+    {"command": "tab-bridge-server", "status": "pass", "coverage": ["loopback-only bind source", "WebSocket handshake/frame parser source", "invalid-start contract"]}
   ],
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",
   "limitations": [
-    "Evidence corresponds to commit fa525be and the current environment only.",
+    "Evidence corresponds to commit 93712f5 and the current environment only.",
     "The native ASIO build is an unsigned local developer verification; no DLL or SDK checkout is committed or published.",
     "Current machine is Windows 22631 with VS 17/SDK 10.0.26100.0; it cannot provide driver-target evidence for the locked Windows 26100+/VS 2026/SDK-WDK 10.0.28000.2526 environment."
   ],
