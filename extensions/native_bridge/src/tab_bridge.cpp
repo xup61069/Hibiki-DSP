@@ -180,6 +180,13 @@ bool process_tab_capture_lane_v1(
             block = {};
             return false;
         }
+        if (effects->ir != nullptr &&
+            (effects->ir->sample_rate() != block.sample_rate ||
+             effects->ir->channels() != block.channels ||
+             !effects->ir->process_interleaved(input_interleaved, block.frames, block.channels))) {
+            block = {};
+            return false;
+        }
         if (effects->program_level != nullptr &&
             (effects->program_level->sample_rate() != block.sample_rate ||
              !effects->program_level->process_interleaved(input_interleaved, block.frames,

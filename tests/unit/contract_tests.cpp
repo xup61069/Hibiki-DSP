@@ -35,6 +35,7 @@ extern "C" {
 #include "hibiki/volume_state.hpp"
 #include "hibiki/program_loudness.hpp"
 #include "hibiki/peq_dsp.hpp"
+#include "hibiki/ir_convolver.hpp"
 #include "hibiki/virtual_mic.hpp"
 #include "hibiki/true_peak_limiter.hpp"
 #if defined(_WIN32)
@@ -130,6 +131,20 @@ int main() {
     CHECK(peq.process_interleaved(peq_block, 4U));
     CHECK(std::isfinite(peq_block[2]) && peq_block[2] > 1.0F);
     CHECK(!peq.prepare(std::span<const PeqFilterV1>(peq_filters), 48000U, 9U));
+
+    IrConvolverV1 ir;
+    const std::array<float, 2> ir_kernel{{1.0F, 0.5F}};
+    const auto ir_phase = resolve_ir_phase_policy(
+        IrPhasePolicyV1{1, IrPhaseMode::MixedPhase, 0.5});
+    CHECK(ir.prepare(ir_kernel, 2U, 1U, 2U, 48000U, ir_phase));
+    float ir_block[4] = {1.0F, 1.0F, 0.0F, 0.0F};
+    CHECK(ir.process_interleaved(ir_block, 2U, 2U));
+    CHECK(std::abs(ir_block[0] - 1.0F) < 1e-6F &&
+          std::abs(ir_block[1] - 1.0F) < 1e-6F &&
+          std::abs(ir_block[2] - 0.5F) < 1e-6F &&
+          std::abs(ir_block[3] - 0.5F) < 1e-6F);
+    CHECK(!ir.prepare(ir_kernel, 2U, 1U, 2U, 48000U,
+                      IrPhaseResolutionV1{1, IrPhaseMode::Bypass, 0.0, 0.0, false, false}));
 
     OutputGroupVolumeStateV1 state;
     state.requested_db = 3.0;
@@ -818,7 +833,9 @@ int main() {
         ProgramAwareLevelPolicyV1{1, true, -23.0, 6.0, 12.0, 3000.0, 60.0, -70.0}, 48000U));
     PeqProcessorV1 tab_peq;
     CHECK(tab_peq.prepare(peq_filters, 48000U, 2U));
-    TabLaneEffectsV1 tab_effects{&tab_peq, &tab_program_level};
+    IrConvolverV1 tab_ir;
+    CHECK(tab_ir.prepare(ir_kernel, 2U, 1U, 2U, 48000U, ir_phase));
+    TabLaneEffectsV1 tab_effects{&tab_peq, &tab_ir, &tab_program_level};
     CHECK(process_tab_capture_lane_v1(engine, 0, *tab_queue, tab_lane_input, 2U,
                                       tab_lane_inputs, tab_lane_output, 2U, tab_lane_block,
                                       &tab_effects));

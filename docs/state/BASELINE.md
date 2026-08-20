@@ -77,6 +77,8 @@
   microphone capture or denoising model is implied.
 - `PeqProcessorV1` compiles up to 16 RBJ peaking filters into fixed per-channel state, and the tab
   lane can apply PEQ before program-aware level correction with matching sample-rate/channel checks.
+- `IrConvolverV1` provides a fixed 4096-tap direct FIR with cross-block history and caller-supplied
+  phase metadata; the tab lane can apply IR after PEQ and before program-aware level correction.
 - Worker-side session volume read/write now uses `ISimpleAudioVolume` with dB↔scalar conversion,
   event-context GUIDs and readback; unbound/exclusive/vendor ASIO paths remain explicit bypasses.
 - `OutputSinkModel` now joins clock-drift estimation to persistent SRC per sink, preserving

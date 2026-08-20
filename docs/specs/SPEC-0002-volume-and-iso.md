@@ -70,6 +70,11 @@ IEEE-float WAV IR；它只負責檔案格式，不替任何未授權量測資料
 rate／聲道不符時整個 lane block fail-closed。這是 per-lane EQ，不代表已完成 VST3 或正式
 ISO 係數 fit。
 
+`IrConvolverV1` 提供最多 4096 taps、mono 或逐聲道 kernel 的固定容量 direct FIR；它保存
+跨 block history，會檢查 `IrPhaseResolutionV1` 已經 valid、sample rate／聲道一致與所有
+係數 finite。它只執行 caller 提供的 IR，不自行推導 minimum/mixed/linear-phase kernel；
+宣告的 delay 仍須由實際量測驗證。
+
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
 `Program-aware` 另有 `ProgramAwareLevelControllerV1` 的慢速內容音量原型：它用無配置的
 RMS 代理、3 秒分析窗、靜音門、增益上限與 dB/s 速率限制，適合由單一 Lane 明確選用。

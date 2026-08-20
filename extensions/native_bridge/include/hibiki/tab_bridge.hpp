@@ -12,6 +12,7 @@
 #include "hibiki/audio_engine.hpp"
 #include "hibiki/program_loudness.hpp"
 #include "hibiki/peq_dsp.hpp"
+#include "hibiki/ir_convolver.hpp"
 
 namespace hibiki {
 
@@ -52,6 +53,7 @@ struct TabCaptureBlockV1 {
 
 struct TabLaneEffectsV1 {
     PeqProcessorV1* peq{nullptr};
+    IrConvolverV1* ir{nullptr};
     ProgramAwareLevelControllerV1* program_level{nullptr};
 };
 
