@@ -1,4 +1,6 @@
 #include "hibiki/contracts.hpp"
+#include "hibiki/control_payloads.hpp"
+#include "hibiki/control_service.hpp"
 #include "hibiki/device_switch.hpp"
 #include "hibiki/device_recovery.hpp"
 #include "hibiki/ipc.hpp"
@@ -63,6 +65,13 @@ bool acknowledge_ipc_request(const hibiki::IpcFrameV1& request,
     return true;
 }
 #endif
+
+bool accept_control_command(const hibiki::ControlCommandV1& command, void* context) noexcept {
+    if (context == nullptr) return false;
+    auto* accepted = static_cast<bool*>(context);
+    *accepted = command.type == hibiki::IpcMessageType::SceneApply;
+    return *accepted;
+}
 
 int main() {
     using namespace hibiki;
@@ -288,6 +297,42 @@ int main() {
     const auto decoded = decode_ipc_frame(encoded, decode_error);
     CHECK(decoded.has_value() && decode_error == IpcDecodeError::None);
     CHECK(decoded->header.request_id == 42 && decoded->payload == frame.payload);
+    const VolumeNotificationV1 payload_volume{-6.0205999, true, 7U};
+    const auto volume_payload = encode_volume_notification_payload_v1(payload_volume);
+    VolumeNotificationV1 decoded_volume{};
+    CHECK(decode_volume_notification_payload_v1(volume_payload, decoded_volume));
+    CHECK(std::abs(decoded_volume.requested_db + 6.020599365234375) < 1e-5 &&
+          decoded_volume.mute && decoded_volume.generation == 7U);
+    auto invalid_volume_payload = volume_payload;
+    invalid_volume_payload[4] = 2U;
+    CHECK(!decode_volume_notification_payload_v1(invalid_volume_payload, decoded_volume));
+    ControlCommandV1 decoded_command{};
+    IpcFrameV1 volume_command_frame;
+    volume_command_frame.header.type = IpcMessageType::VolumeNotification;
+    volume_command_frame.header.request_id = 99U;
+    volume_command_frame.payload.assign(volume_payload.begin(), volume_payload.end());
+    CHECK(decode_control_command_v1(volume_command_frame, decoded_command) &&
+          decoded_command.type == IpcMessageType::VolumeNotification &&
+          decoded_command.request_id == 99U && decoded_command.volume.mute);
+    CHECK(make_ack_frame_v1(volume_command_frame).header.request_id == 99U &&
+          make_error_frame_v1(volume_command_frame).header.type == IpcMessageType::Error);
+    std::array<std::uint8_t, kSceneApplyPayloadBytesV1> scene_payload{};
+    CHECK(encode_scene_apply_payload_v1("game", "main", scene_payload));
+    SceneApplyPayloadV1 decoded_scene{};
+    CHECK(decode_scene_apply_payload_v1(scene_payload, decoded_scene) &&
+          decoded_scene.scene_id_bytes == 4U && decoded_scene.output_group_bytes == 4U &&
+          decoded_scene.scene_id[0] == 'g' && decoded_scene.output_group[0] == 'm');
+    IpcFrameV1 scene_frame;
+    scene_frame.header.type = IpcMessageType::SceneApply;
+    scene_frame.payload.assign(scene_payload.begin(), scene_payload.end());
+    CHECK(decode_control_command_v1(scene_frame, decoded_command) &&
+          decoded_command.type == IpcMessageType::SceneApply);
+    bool command_accepted = false;
+    ControlPlaneHandlerContextV1 service_context{accept_control_command, &command_accepted};
+    IpcFrameV1 service_response;
+    CHECK(handle_control_frame_v1(scene_frame, service_response, &service_context) &&
+          command_accepted && service_response.header.type == IpcMessageType::Ack &&
+          service_response.header.request_id == scene_frame.header.request_id);
     auto malformed = encoded;
     malformed[0] = 0;
     CHECK(!decode_ipc_frame(malformed, decode_error).has_value());

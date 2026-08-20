@@ -16,7 +16,8 @@ public enum ControlMessageType : ushort
     GraphCommit = 4,
     GraphRollback = 5,
     Ack = 6,
-    Error = 7
+    Error = 7,
+    SceneApply = 8
 }
 
 public enum IpcDecodeError
@@ -114,6 +115,88 @@ public static class IpcCodecV1
         ControlMessageType.GraphRollback or ControlMessageType.Ack or ControlMessageType.Error;
 }
 
+public static class ControlPayloadsV1
+{
+    public const int VolumeNotificationBytes = 16;
+    public const int SceneApplyBytes = 64;
+
+    public static byte[] EncodeVolumeNotification(double requestedDb,
+                                                   bool mute,
+                                                   ulong generation)
+    {
+        if (!double.IsFinite(requestedDb) || requestedDb < -144.0 || requestedDb > 12.0)
+            throw new ArgumentOutOfRangeException(nameof(requestedDb));
+        var payload = new byte[VolumeNotificationBytes];
+        var q16 = checked((int)Math.Round(Math.Clamp(requestedDb, -144.0, 12.0) * 65536.0,
+                                          MidpointRounding.AwayFromZero));
+        BinaryPrimitives.WriteInt32LittleEndian(payload, q16);
+        payload[4] = mute ? (byte)1 : (byte)0;
+        BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(8), generation);
+        return payload;
+    }
+
+    public static bool TryDecodeVolumeNotification(ReadOnlySpan<byte> payload,
+                                                   out double requestedDb,
+                                                   out bool mute,
+                                                   out ulong generation)
+    {
+        requestedDb = 0.0;
+        mute = false;
+        generation = 0UL;
+        if (payload.Length != VolumeNotificationBytes || (payload[4] != 0 && payload[4] != 1) ||
+            payload[5] != 0 || payload[6] != 0 || payload[7] != 0)
+            return false;
+        var q16 = BinaryPrimitives.ReadInt32LittleEndian(payload);
+        if (q16 < -144 * 65536 || q16 > 12 * 65536) return false;
+        requestedDb = q16 / 65536.0;
+        mute = payload[4] != 0;
+        generation = BinaryPrimitives.ReadUInt64LittleEndian(payload[8..]);
+        return true;
+    }
+
+    public static byte[] EncodeSceneApply(string sceneId, string outputGroup)
+    {
+        var scene = System.Text.Encoding.UTF8.GetBytes(sceneId ?? string.Empty);
+        var output = System.Text.Encoding.UTF8.GetBytes(outputGroup ?? string.Empty);
+        if (scene.Length is < 1 or > 31 || output.Length is < 1 or > 31 ||
+            scene.Any(value => value < 0x20) || output.Any(value => value < 0x20))
+            throw new ArgumentException("Scene and output-group IDs must be 1..31 printable UTF-8 bytes.");
+        var payload = new byte[SceneApplyBytes];
+        payload[0] = (byte)scene.Length;
+        scene.CopyTo(payload.AsSpan(1));
+        payload[32] = (byte)output.Length;
+        output.CopyTo(payload.AsSpan(33));
+        return payload;
+    }
+
+    public static bool TryDecodeSceneApply(ReadOnlySpan<byte> payload,
+                                           out string sceneId,
+                                           out string outputGroup)
+    {
+        sceneId = string.Empty;
+        outputGroup = string.Empty;
+        if (payload.Length != SceneApplyBytes || payload[0] is < 1 or > 31 ||
+            payload[32] is < 1 or > 31)
+            return false;
+        var sceneBytes = payload.Slice(1, payload[0]);
+        var outputBytes = payload.Slice(33, payload[32]);
+        for (var index = 1 + payload[0]; index < 32; index++)
+            if (payload[index] != 0) return false;
+        for (var index = 33 + payload[32]; index < 64; index++)
+            if (payload[index] != 0) return false;
+        try
+        {
+            sceneId = System.Text.Encoding.UTF8.GetString(sceneBytes);
+            outputGroup = System.Text.Encoding.UTF8.GetString(outputBytes);
+            return !string.IsNullOrWhiteSpace(sceneId) && !string.IsNullOrWhiteSpace(outputGroup);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+}
+
 // The UI/control plane owns request IDs; the audio thread never creates or
 // waits for one. This small session object makes request/reply correlation
 // explicit before a transport (named pipe or test stream) is attached.
@@ -130,6 +213,25 @@ public sealed class IpcRequestSession
     public static bool IsReplyTo(IpcEnvelopeV1 request, IpcEnvelopeV1 reply) =>
         request.RequestId != 0 && request.RequestId == reply.RequestId &&
         reply.Type is ControlMessageType.Ack or ControlMessageType.Error;
+}
+
+public sealed class ControlCommandFactoryV1
+{
+    private readonly IpcRequestSession _requests = new();
+
+    public IpcEnvelopeV1 Hello() => _requests.Create(ControlMessageType.Hello);
+
+    public IpcEnvelopeV1 SetVolume(double requestedDb, bool mute, ulong generation) =>
+        _requests.Create(ControlMessageType.VolumeNotification,
+            ControlPayloadsV1.EncodeVolumeNotification(requestedDb, mute, generation));
+
+    public IpcEnvelopeV1 CommitGraph() => _requests.Create(ControlMessageType.GraphCommit);
+
+    public IpcEnvelopeV1 RollbackGraph() => _requests.Create(ControlMessageType.GraphRollback);
+
+    public IpcEnvelopeV1 ApplyScene(string sceneId, string outputGroup) =>
+        _requests.Create(ControlMessageType.SceneApply,
+            ControlPayloadsV1.EncodeSceneApply(sceneId, outputGroup));
 }
 
 // Thin asynchronous client for the control worker. It owns no UI state and

@@ -56,4 +56,32 @@ catch (ArgumentException)
     pipeNameRejected = true;
 }
 Check(pipeNameRejected, "Control pipe client must reject path-like names.");
+var commandFactory = new ControlCommandFactoryV1();
+var volumeCommand = commandFactory.SetVolume(-6.0205999, true, 9UL);
+Check(volumeCommand.Type == ControlMessageType.VolumeNotification &&
+      ControlPayloadsV1.TryDecodeVolumeNotification(volumeCommand.Payload.Span,
+          out var commandDb, out var commandMute, out var commandGeneration) &&
+      Math.Abs(commandDb + 6.020599365234375) < 1e-6 && commandMute && commandGeneration == 9UL,
+    "Control volume payload did not round-trip with the v1 contract.");
+Check(IpcRequestSession.IsReplyTo(volumeCommand,
+        new IpcEnvelopeV1(ControlMessageType.Ack, volumeCommand.RequestId, ReadOnlyMemory<byte>.Empty)),
+    "Control command request correlation failed.");
+var viewModel = new EasyControlViewModel { SelectedOutputGroup = " main " };
+Check(viewModel.OneTapEnhance() && viewModel.SelectedScene?.Id == "game" &&
+      viewModel.Status == AudioControlStatus.Controlled &&
+      viewModel.SelectedOutputGroup == "main" && viewModel.LastCommand?.Type == ControlMessageType.SceneApply,
+    "ViewModel One-Tap Enhance should control the selected output.");
+Check(ControlPayloadsV1.TryDecodeSceneApply(viewModel.LastCommand!.Payload.Span,
+          out var selectedSceneId, out var selectedOutput) &&
+      selectedSceneId == "game" && selectedOutput == "main",
+    "ViewModel scene command payload was not valid.");
+viewModel.IsExpert = true;
+Check(viewModel.Mode == UiMode.Expert && viewModel.SelectScene("movie"),
+    "ViewModel Expert scene selection failed.");
+viewModel.RequestedVolumeDb = -6.0205999;
+viewModel.Muted = true;
+var viewModelVolume = viewModel.BuildVolumeCommand();
+Check(viewModelVolume.Type == ControlMessageType.VolumeNotification &&
+      viewModelVolume.RequestId > 1,
+    "ViewModel volume command was not generated.");
 Console.WriteLine("Control model checks passed.");

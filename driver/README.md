@@ -26,4 +26,6 @@ signed.
 `wdk/hibiki_property_adapter.cpp` is the next MS-PL source boundary for a
 WDK/SYSVAD-derived project. Run `pwsh -File tools/driver-source-check.ps1` to
 verify that the scaffold retains its license and does not pull GPL user-space;
-the check deliberately does not claim that a loadable driver exists.
+the check deliberately does not claim that a loadable driver exists. The
+source-only INF template is in `inf/HibikiVirtualAudio.inf`; it references the
+future signed SYS/CAT package and is not installable from this repository alone.

@@ -22,3 +22,9 @@ the 1 MiB bound, explicit decode errors and request-ID correlation. The check
 project includes a cross-language known-byte fixture; transport lifecycle is
 kept separate from the UI model. `NamedPipeControlClientV1` adds an asynchronous
 bounded client for the stable `HibikiDSP_v1_control` logical pipe.
+`ControlCommandFactoryV1` emits Hello, VolumeNotification, SceneApply,
+GraphCommit and GraphRollback envelopes so the UI does not handcraft control
+payloads.
+`EasyControlViewModel` is the binding-ready surface for a future WinUI 3 shell:
+it keeps Easy mode fail-closed, exposes Expert mode explicitly, and emits the
+same versioned commands for engine transport.

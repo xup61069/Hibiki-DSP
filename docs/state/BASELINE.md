@@ -19,6 +19,9 @@
 - C# `IpcCodecV1`/`NamedPipeControlClientV1` mirrors the C++ little-endian envelope and bounded
   4-byte length framing; a cross-language known-byte fixture and malformed-frame checks are part
   of the control-model gate.
+- `handle_control_frame_v1` validates Hello/Volume/Scene/graph lifecycle commands before passing
+  them to a host-owned typed sink; malformed or rejected commands receive Error without touching
+  the graph.
 - `AudioEngineModel` facade connecting graph transaction, Windows volume notification and RT
   processing with one Group Master gain.
 - Windows-only `IAudioEndpointVolume` broker with non-blocking callback snapshot, dB/mute

@@ -22,6 +22,7 @@ enum class IpcMessageType : std::uint16_t {
     GraphRollback = 5,
     Ack = 6,
     Error = 7,
+    SceneApply = 8,
 };
 
 struct IpcHeaderV1 {

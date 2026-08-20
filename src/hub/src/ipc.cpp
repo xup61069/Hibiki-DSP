@@ -56,6 +56,7 @@ bool is_valid_message_type(const IpcMessageType type) noexcept {
         case IpcMessageType::GraphRollback:
         case IpcMessageType::Ack:
         case IpcMessageType::Error:
+        case IpcMessageType::SceneApply:
             return true;
     }
     return false;

@@ -39,6 +39,9 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
 - `driver/include/hibiki/wavert_endpoint_state_v1.h` 與其 MS-PL C 實作是 WDK adapter 的
   第一個可測試控制核心：格式、Q16.16 dB、safety ceiling、mute、generation 與 actuator
   都在 driver 邊界驗證；它仍不是完整 PortCls miniport 或可載入 `.sys`。
+- `driver/inf/HibikiVirtualAudio.inf` 固定 Root\HibikiDSP hardware ID、四個 endpoint GUID
+  與 service/package 邊界；它只引用未提交的 SYS/CAT，`Inf2Cat`、HLK、Microsoft signing
+  與真正 PortCls/SYSVAD topology 仍是 release gate。
 - `PersistentLinearResampler` 保存跨 block 的 phase 與 boundary frame，要求 caller 提供
   整個 input block 的 output capacity，並拒絕在不足時部分消耗；它是 clock-drift/SRC 的
   無配置 baseline，尚未宣稱 production-quality polyphase filter。

@@ -1,0 +1,60 @@
+; SPDX-License-Identifier: MS-PL
+; Source-only INF scaffold. The referenced SYS/CAT are produced and signed by
+; the private WDK release pipeline; neither is stored in this repository.
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=MEDIA
+ClassGuid={4D36E96C-E325-11CE-BFC1-08002BE10318}
+Provider=%HibikiProvider%
+CatalogFile=HibikiVirtualAudio.cat
+DriverVer=08/21/2026,0.1.0.0
+PnpLockdown=1
+
+[Manufacturer]
+%HibikiProvider%=Hibiki,NTamd64
+
+[Hibiki.NTamd64]
+%HibikiMain.DeviceDesc%=HibikiMain_Install,Root\HibikiDSP
+
+[HibikiMain_Install]
+Include=ks.inf,wdmaudio.inf
+Needs=KS.Registration,WDMAUDIO.Registration
+CopyFiles=HibikiDriver.CopyFiles
+AddReg=HibikiMain.AddReg
+
+[HibikiMain_Install.Services]
+AddService=HibikiVirtualAudio,0x00000002,HibikiVirtualAudio.Service
+
+[HibikiDriver.CopyFiles]
+HibikiVirtualAudio.sys
+
+[HibikiMain.AddReg]
+; Stable endpoint identities are consumed by the eventual SYSVAD-derived
+; topology. The values are documented in distribution-profile.yml.
+HKR,,EndpointMainGuid,0x00000000,"8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10"
+HKR,,EndpointLowLatencyGuid,0x00000000,"6d5706a4-b661-4bf6-9c2d-9c31b8f7df21"
+HKR,,EndpointSurroundGuid,0x00000000,"d4a21e0f-83e5-4a6e-92dc-44d13f9e6c93"
+HKR,,EndpointVirtualMicGuid,0x00000000,"5e90de25-0e88-4892-8b0e-a1d521cb3f40"
+
+[HibikiVirtualAudio.Service]
+DisplayName=%HibikiServiceDesc%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%12%\HibikiVirtualAudio.sys
+
+[SourceDisksFiles]
+HibikiVirtualAudio.sys=1
+
+[SourceDisksNames]
+1=%DiskName%,,
+
+[DestinationDirs]
+HibikiDriver.CopyFiles=12
+
+[Strings]
+HibikiProvider="Hibiki DSP"
+HibikiMain.DeviceDesc="Hibiki Virtual Audio (source-only package)"
+HibikiServiceDesc="Hibiki Virtual Audio"
+DiskName="Hibiki Virtual Audio Driver"

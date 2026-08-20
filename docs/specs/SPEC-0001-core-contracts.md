@@ -30,6 +30,15 @@ Lane、output group、channel map、DSP chain、latency mode 與安全策略；�
   單一 control callback 與 local-only pipe 實作 transport；C# `NamedPipeControlClientV1`
   使用同一 logical pipe name 與 request correlation。payload schema 可在後續以 Protobuf
   或等價固定編碼替換，但 version、message type 與 Validate/Prepare/Commit 語意不可破壞。
+- `VolumeNotification` v1 payload 固定為 16 bytes：Q16.16 dB、mute、三個 reserved bytes
+  與 uint64 generation；C++ `control_payloads.hpp` 與 C# `ControlPayloadsV1` 必須保持相同
+  little-endian bytes，超出 -144..12 dB 或 reserved 非零一律拒絕。
+- C++ `decode_control_command_v1` 只接受 Hello、VolumeNotification、GraphCommit 與
+  GraphRollback、SceneApply request；Ack/Error 只能作 response，未知或 GraphPrepare 未定義
+  payload 一律回 Error，避免 UI 任意注入未驗證 graph。SceneApply payload 固定 64 bytes，
+  以兩段 length-prefixed printable UTF-8（scene ID、output group）及 zero padding 表示。
+- `handle_control_frame_v1` 是 pipe worker 到 host control queue 的唯一 typed adapter；sink
+  必須自行 enqueue／排程，不能在 pipe callback 直接跑 RT DSP 或等待 UI/COM。
 - `AudioSessionRegistry` 以 `endpoint_id + session_instance_id` 作為唯一 session key；PID
   只作顯示／診斷用途。OS metadata refresh 不得覆蓋使用者已選 lane、output group 或 gain
   owner，避免同一 process 的多個 Chrome tab／session 互相串音。
