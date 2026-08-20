@@ -195,12 +195,12 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 Windows volume/device、ISO formula、recovery、driver control-core/INF template、persistent SRC、
 VST worker、control pipe/payloads、session volume adapter、sink clock pipeline、optional native
 ASIO transport/ring、tab/Virtual Mic lane adapter、session-route/output-handoff、control-model
-與 VST3 latency graph commit／RT lane latency bank／parameter timeline／Scene automation refs／rollback lifecycle／UI device fade／plugin lane token baseline `c621d4b`；
+與 VST3 latency graph commit／RT lane latency bank／parameter timeline／Scene automation refs／rollback lifecycle／UI device fade／plugin lane token／multi-sink fan-out baseline `aa93b21`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
-目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 54 個必要入口與
-12 份 Spec 通過；`source-policy.ps1` 掃描 236 個路徑且無 blocked binary/secret；
+目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 55 個必要入口與
+12 份 Spec 通過；`source-policy.ps1` 掃描 239 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1` 與 `driver-source-check.ps1` 通過；25 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
