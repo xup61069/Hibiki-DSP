@@ -58,9 +58,9 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   Virtual Mic 或其他已驗證來源共用 Lane／Group Master 行為；平台 bridge 不得在 RT path
   配置、等待或直接操作 Windows COM。
 - `WindowsWasapiOutputV1` 提供 user-space physical sink boundary：control thread 以 endpoint ID
-  綁定 shared-mode Float32 2/6/8 聲道與固定 sample rate，RT `render` 只處理 padding、WASAPI
-  buffer copy、ReleaseBuffer。格式不符、裝置不存在或 buffer 不足都回傳失敗；不得在 RT
-  thread 做 COM 初始化、配置或重新綁定。
+  綁定 shared-mode Float32 2/6/8 聲道與固定 sample rate；獨立 sink worker 的 `render` 只處理
+  padding、WASAPI buffer copy、ReleaseBuffer。格式不符、裝置不存在或 buffer 不足都回傳失敗；
+  Hibiki graph RT thread 不得呼叫此 COM API、初始化 COM、配置或重新綁定。
 
 ## 未解問題（阻擋完整 driver 實作）
 

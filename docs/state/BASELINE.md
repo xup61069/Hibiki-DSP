@@ -71,8 +71,9 @@
   `AudioEngineModel::process_asio_transport` now runs that block through the selected graph lane
   and Group Master. Physical sink/WaveRT delivery remains pending.
 - `WindowsWasapiOutputV1` now supplies a Windows shared-mode Float32 physical render boundary:
-  control-side endpoint binding/start/stop and RT-side padding-aware `GetBuffer`/`ReleaseBuffer`.
-  It fails closed on unsupported mix formats and has no real-device soak evidence yet.
+  control-side endpoint binding/start/stop and dedicated sink-worker padding-aware `GetBuffer`/
+  `ReleaseBuffer` (the graph RT thread never calls this COM API). It fails closed on unsupported
+  mix formats and has no real-device soak evidence yet.
 
 ## 尚未開始
 
