@@ -65,6 +65,8 @@ Lane、output group、channel map、DSP chain、latency mode 與安全策略；�
 
 - RT thread 不 allocation、lock、wait 或呼叫 UI/COM/filesystem。
 - graph change 必須 Validate → Prepare → Commit；失敗回復 last-known-good。
+- output device change 必須與 30 ms equal-power handoff 同一交易；crossfade 尚未完成時
+  禁止 commit，新 sink 失敗時保留舊 sink。
 - Group Master 只能套用一次；LFE 不重複套用 ISO。
 - Strict Direct 是獨立 bit-perfect Scene，不能偷偷混入 DSP 或 Windows gain。
 - `AudioEngineModel` 的 control plane 只在 pending snapshot 做 Validate → Prepare → Commit；

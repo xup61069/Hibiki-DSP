@@ -15,6 +15,7 @@
 #include "hibiki/asio_transport_v1.h"
 #include "hibiki/output_sink.hpp"
 #include "hibiki/output_crossfade.hpp"
+#include "hibiki/output_handoff.hpp"
 #include "hibiki/exporters.hpp"
 #include "hibiki/engine_control.hpp"
 #include "hibiki/audio_engine.hpp"
@@ -238,6 +239,20 @@ int main() {
     CHECK(crossfade.snapshot().processed_frames == crossfade.snapshot().total_frames);
     CHECK(!crossfade.snapshot().active);
     CHECK(mixed.front() > 0.0F && mixed.back() < 0.01F);
+
+    OutputHandoffCoordinatorV1 handoff;
+    CHECK(handoff.begin(DeviceTargetV1{"endpoint-handoff", 2U, 48000U, 128U}, 30U));
+    CHECK(handoff.prepare() && handoff.state() == OutputHandoffStateV1::Fading);
+    CHECK(!handoff.commit());
+    CHECK(handoff.process(old_sink.data(), new_sink.data(), mixed.data(), old_sink.size() / 2U));
+    CHECK(handoff.crossfade().active == false && handoff.commit() &&
+          handoff.state() == OutputHandoffStateV1::Committed &&
+          handoff.active_target().endpoint_id == "endpoint-handoff");
+    CHECK(handoff.begin(DeviceTargetV1{"endpoint-rollback", 2U, 48000U, 128U}));
+    CHECK(handoff.prepare());
+    handoff.rollback();
+    CHECK(handoff.state() == OutputHandoffStateV1::RolledBack &&
+          handoff.active_target().endpoint_id == "endpoint-handoff");
 
     DeviceRecoveryCoordinator recovery;
     CHECK(recovery.observe(DeviceRecoveryEventV1{

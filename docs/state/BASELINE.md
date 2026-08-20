@@ -82,6 +82,8 @@
 - `OutputCrossfade` now provides a no-allocation equal-power sink handoff primitive with a
   30 ms default-compatible path for 2/6/8 channels; it is tested independently from the
   still-pending physical endpoint and clock soak fixtures.
+- `OutputHandoffCoordinatorV1` now gates DeviceSwitch commit on a completed 30 ms crossfade and
+  preserves the previous active target on rollback.
 - `Vst3SandboxProcess` now provides a Windows Job Object containment layer with explicit
   launch validation, heartbeat watchdog and crash quarantine; no plugin binary is bundled.
 - `vst3_worker_protocol.hpp`/`.cpp` now provide a fixed 36-byte little-endian worker frame codec
@@ -150,7 +152,7 @@ ASIO transport/ring、tab/Virtual Mic lane adapter 與 control-model baseline co
 working tree 與該 scope 是否一致。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 41 個必要入口與
-9 份 Spec 通過；`source-policy.ps1` 掃描 188 個路徑且無 blocked binary/secret；
+9 份 Spec 通過；`source-policy.ps1` 掃描 190 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1` 與
 `distribution-check.ps1` 與 `driver-source-check.ps1` 通過；16 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在

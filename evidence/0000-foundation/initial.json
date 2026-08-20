@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-v4",
-  "source_commit": "4fb16e2",
+  "source_commit": "0fd1c7c",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -21,7 +21,7 @@
   "results": [
     {"command": "tools/verify.ps1", "status": "pass", "tests": 1},
     {"command": "tools/docs-check.ps1", "status": "pass", "required_paths": 41, "specs": 9},
-    {"command": "tools/source-policy.ps1", "status": "pass", "scanned_paths": 188, "blocked_files": 0},
+    {"command": "tools/source-policy.ps1", "status": "pass", "scanned_paths": 190, "blocked_files": 0},
     {"command": "tools/extension-check.ps1", "status": "pass"},
     {"command": "tools/installer-check.ps1", "status": "pass"},
     {"command": "tools/control-model-check.ps1", "status": "pass"},
@@ -52,12 +52,13 @@
     {"command": "control-command-queue", "status": "pass", "coverage": ["64-slot SPSC", "full-queue dropped counter", "pipe-to-control handoff"]},
     {"command": "engine-control-worker", "status": "pass", "coverage": ["SceneApply to Easy presets", "Validate-Prepare-Commit", "volume through Group Master", "invalid scene preserves revision"]},
     {"command": "output-group-routing", "status": "pass", "coverage": ["fixed-size RT group identity", "four-lane isolation", "missing-group fail-closed", "AudioEngine process_output_group"]},
-    {"command": "session-route-graph-builder", "status": "pass", "coverage": ["active bound session compilation", "WindowsSession/HibikiInternal gain ownership", "two Chrome session groups", "Strict Direct gain rejection"]}
+    {"command": "session-route-graph-builder", "status": "pass", "coverage": ["active bound session compilation", "WindowsSession/HibikiInternal gain ownership", "two Chrome session groups", "Strict Direct gain rejection"]},
+    {"command": "output-handoff-coordinator", "status": "pass", "coverage": ["transaction plus crossfade", "commit blocked before fade completion", "rollback preserves active endpoint"]}
   ],
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",
   "limitations": [
-    "Evidence corresponds to commit 4fb16e2 and the current environment only.",
+    "Evidence corresponds to commit 0fd1c7c and the current environment only.",
     "The native ASIO build is an unsigned local developer verification; no DLL or SDK checkout is committed or published.",
     "Current machine is Windows 22631 with VS 17/SDK 10.0.26100.0; it cannot provide driver-target evidence for the locked Windows 26100+/VS 2026/SDK-WDK 10.0.28000.2526 environment."
   ],
