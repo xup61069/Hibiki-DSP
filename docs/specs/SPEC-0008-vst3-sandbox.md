@@ -20,6 +20,9 @@ VST3 plugin 不得在 Hibiki RT thread 或主 UI process 內直接執行。contr
   1–5000 ms watchdog；失敗狀態為 `Quarantined`。
 - Windows target 使用 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`，worker crash、建立失敗
   或 heartbeat 超時都 quarantine；不自動把同一 plugin 無限重啟。
+- `Vst3SandboxLaunchV1.worker_pipe_name` 若提供，supervisor 在建立 process 前建立 named
+  pipe server，command line 傳入 `--hibiki-pipe`；`wait_for_worker`、`send_worker_frame`、
+  `receive_worker_frame` 只在 control/IPC thread 呼叫，pipe 失敗不得由 audio callback 重試。
 - `mark_heartbeat` 與 `poll_watchdog` 只在 control/IPC worker 呼叫，禁止 audio callback
   使用 Win32 handle 或等待。
 

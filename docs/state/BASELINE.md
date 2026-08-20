@@ -55,6 +55,9 @@
 - `vst3_worker_protocol.hpp`/`.cpp` now provide a fixed 36-byte little-endian worker frame codec
   with Hello/Heartbeat/Process/Shutdown/Error types, exact Float32 payload validation and finite
   sample checks. Named-pipe transport and actual SDK dispatch remain pending.
+- `Vst3WorkerPipeV1` is now attached to `Vst3SandboxProcess`: optional launch pipe setup passes
+  `--hibiki-pipe`, bounded overlapped connect/read/write is exposed only to control/IPC callers,
+  and stop closes the pipe with the Job Object. The actual worker executable still remains pending.
 - The MV3 tab-capture source now packetizes user-requested audio through an AudioWorklet into
   validated `HIBT` Float32 frames and optionally sends them to localhost; missing bridge leaves
   browser playback intact, while native receiver/engine lane/noise-reduction remain pending.

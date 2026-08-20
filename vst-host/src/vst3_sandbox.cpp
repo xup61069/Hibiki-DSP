@@ -36,7 +36,8 @@ Vst3SandboxProcess::~Vst3SandboxProcess() { stop(); }
 bool Vst3SandboxProcess::launch(const Vst3SandboxLaunchV1& launch_config) {
     stop();
     if (launch_config.worker_executable.empty() || launch_config.plugin_path.empty() ||
-        launch_config.watchdog_timeout_ms == 0U || launch_config.watchdog_timeout_ms > 5000U) {
+        launch_config.watchdog_timeout_ms == 0U || launch_config.watchdog_timeout_ms > 5000U ||
+        (!launch_config.worker_pipe_name.empty() && launch_config.worker_pipe_timeout_ms == 0U)) {
         state_ = Vst3SandboxState::Quarantined;
         return false;
     }
@@ -56,6 +57,15 @@ bool Vst3SandboxProcess::launch(const Vst3SandboxLaunchV1& launch_config) {
 
     auto command_line = quote_argument(launch_config.worker_executable) + L" --plugin " +
                          quote_argument(launch_config.plugin_path);
+    if (!launch_config.worker_pipe_name.empty()) {
+        if (!worker_pipe_.create_server(Vst3WorkerPipeConfigV1{
+                launch_config.worker_pipe_name, 1024U * 1024U, launch_config.worker_pipe_timeout_ms})) {
+            CloseHandle(job);
+            state_ = Vst3SandboxState::Quarantined;
+            return false;
+        }
+        command_line += L" --hibiki-pipe " + quote_argument(launch_config.worker_pipe_name);
+    }
     std::vector<wchar_t> mutable_command(command_line.begin(), command_line.end());
     mutable_command.push_back(L'\0');
     STARTUPINFOW startup{};
@@ -70,6 +80,7 @@ bool Vst3SandboxProcess::launch(const Vst3SandboxLaunchV1& launch_config) {
             CloseHandle(process_info.hProcess);
         }
         CloseHandle(job);
+        worker_pipe_.close();
         state_ = Vst3SandboxState::Quarantined;
         return false;
     }
@@ -99,6 +110,7 @@ void Vst3SandboxProcess::stop() noexcept {
         if (process_handle_ != nullptr) WaitForSingleObject(as_handle(process_handle_), 1000U);
     }
     close_handles();
+    worker_pipe_.close();
     state_ = Vst3SandboxState::Stopped;
     last_heartbeat_ms_ = 0;
 }
@@ -131,6 +143,28 @@ bool Vst3SandboxProcess::poll_watchdog(const std::uint64_t now_ms) noexcept {
     return true;
 }
 
+bool Vst3SandboxProcess::wait_for_worker(const std::uint32_t timeout_ms) noexcept {
+    if (state_ != Vst3SandboxState::Running || !worker_pipe_.server_ready()) return false;
+    return worker_pipe_.wait_for_client(timeout_ms);
+}
+
+bool Vst3SandboxProcess::send_worker_frame(const std::span<const std::uint8_t> frame) noexcept {
+    if (state_ != Vst3SandboxState::Running || !worker_pipe_.connected() ||
+        !worker_pipe_.send(frame)) {
+        return false;
+    }
+    return true;
+}
+
+bool Vst3SandboxProcess::receive_worker_frame(const std::span<std::uint8_t> destination,
+                                              std::size_t& bytes_read) noexcept {
+    if (state_ != Vst3SandboxState::Running || !worker_pipe_.connected()) {
+        bytes_read = 0U;
+        return false;
+    }
+    return worker_pipe_.receive(destination, bytes_read);
+}
+
 }  // namespace hibiki
 
 #else
@@ -152,6 +186,13 @@ void Vst3SandboxProcess::stop() noexcept {
 bool Vst3SandboxProcess::mark_heartbeat(const std::uint64_t) noexcept { return false; }
 
 bool Vst3SandboxProcess::poll_watchdog(const std::uint64_t) noexcept { return false; }
+
+bool Vst3SandboxProcess::wait_for_worker(std::uint32_t) noexcept { return false; }
+bool Vst3SandboxProcess::send_worker_frame(std::span<const std::uint8_t>) noexcept { return false; }
+bool Vst3SandboxProcess::receive_worker_frame(std::span<std::uint8_t>, std::size_t& bytes_read) noexcept {
+    bytes_read = 0U;
+    return false;
+}
 
 void Vst3SandboxProcess::quarantine() noexcept { state_ = Vst3SandboxState::Quarantined; }
 void Vst3SandboxProcess::close_handles() noexcept {}
