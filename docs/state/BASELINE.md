@@ -23,6 +23,9 @@
 - Parameterized ISO 226:2023 SPL-from-phon formula using caller-supplied legal parameters;
   the 1 kHz invariant and phon bounds are covered by CTest without embedding the licensed
   29-point coefficient table.
+- MS-PL WaveRT endpoint control-state core with fixed-format validation, Q16.16 dB safety
+  ceiling, mute/generation ordering and Strict Direct behavior; the PortCls miniport is not
+  yet wired and no `.sys` is built here.
 
 ## 尚未開始
 
@@ -41,10 +44,11 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 ## 最近驗證
 
 初始 foundation evidence 已寫入 `evidence/0000-foundation/initial.json`，目前對應最新
-Windows volume/device、ISO formula 與 recovery baseline commit `ca276d3`；新 AI 接手時仍必須確認
+Windows volume/device、ISO formula、recovery 與 driver control-core baseline commit `828ade7`；
+新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 40 個必要入口與
-5 份 Spec 通過；`source-policy.ps1` 掃描 131 個路徑且無 blocked binary/secret；
+5 份 Spec 通過；`source-policy.ps1` 掃描 133 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1` 與
 `distribution-check.ps1` 通過；16 個 JSON 檔案均可解析。
