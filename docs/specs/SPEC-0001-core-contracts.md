@@ -34,6 +34,9 @@ Lane、output group、channel map、DSP chain、latency mode 與安全策略；�
 - Windows `IAudioSessionManager2` adapter 的 `OnSessionCreated` callback 只遞增 sequence；
   worker 才呼叫 enumerator、讀取 instance/session ID、PID、display name 與 active state，
   再 upsert registry。這個邊界禁止在 OS callback 裡 QueryInterface、分配或改寫 graph。
+- Session volume 的 canonical control 以 dB 表示，worker 呼叫 `ISimpleAudioVolume` 時才轉
+  成 0–1 scalar，所有寫入帶 event-context GUID 並 read-back；session API 只適用 shared-mode，
+  exclusive／vendor ASIO 仍標示 bypass。
 
 ## 不變條件
 

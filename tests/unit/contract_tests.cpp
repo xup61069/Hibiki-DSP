@@ -379,6 +379,13 @@ int main() {
     CHECK(!session_watcher->poll(session_sequence));
     CHECK(session_watcher->OnSessionCreated(nullptr) == S_OK);
     CHECK(session_watcher->poll(session_sequence) && session_sequence == 1U);
+    GUID session_context{};
+    CHECK(session_watcher->write_session_volume("missing", -12.0, false, session_context) ==
+          E_UNEXPECTED);
+    double session_db = 0.0;
+    bool session_mute = false;
+    CHECK(session_watcher->read_session_volume("missing", session_db, session_mute) ==
+          E_UNEXPECTED);
     CHECK(session_watcher->Release() == 0U);
 #endif
 

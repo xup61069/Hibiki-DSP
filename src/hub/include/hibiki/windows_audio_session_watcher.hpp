@@ -7,11 +7,13 @@
 #include "hibiki/audio_session_registry.hpp"
 
 #include <audiopolicy.h>
+#include <audioclient.h>
 #include <mmdeviceapi.h>
 
 #include <atomic>
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 namespace hibiki {
 
@@ -33,6 +35,13 @@ public:
     [[nodiscard]] HRESULT bind(IMMDevice* device);
     void unbind() noexcept;
     [[nodiscard]] HRESULT enumerate(AudioSessionRegistry& registry);
+    [[nodiscard]] HRESULT write_session_volume(std::string_view session_instance_id,
+                                                double requested_db,
+                                                bool mute,
+                                                const GUID& event_context);
+    [[nodiscard]] HRESULT read_session_volume(std::string_view session_instance_id,
+                                               double& requested_db,
+                                               bool& mute);
     [[nodiscard]] bool poll(std::uint64_t& sequence) noexcept;
     [[nodiscard]] const std::string& endpoint_id() const noexcept { return endpoint_id_; }
 
