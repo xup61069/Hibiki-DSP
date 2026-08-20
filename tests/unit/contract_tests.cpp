@@ -16,6 +16,10 @@ extern "C" {
 #include "hibiki/scene_graph.hpp"
 #include "hibiki/scene_presets.hpp"
 #include "hibiki/volume_state.hpp"
+#if defined(_WIN32)
+#include "hibiki/windows_volume_broker.hpp"
+#include "hibiki/windows_device_watcher.hpp"
+#endif
 
 #include <cmath>
 #include <cstdio>
@@ -242,6 +246,43 @@ int main() {
     CHECK(engine.transaction_state() == EngineTransactionState::Degraded);
     engine.rollback_graph();
     CHECK(engine.transaction_state() == EngineTransactionState::Ready);
+
+#if defined(_WIN32)
+    WindowsVolumeBroker volume_broker;
+    CHECK(!volume_broker.is_bound());
+    WindowsVolumeNotificationSnapshotV1 no_notification;
+    CHECK(!volume_broker.poll(no_notification));
+    struct NotificationWithEightChannels {
+        GUID guidEventContext;
+        BOOL bMuted;
+        float fMasterVolume;
+        UINT nChannels;
+        float afChannelVolumes[8];
+    } notification{};
+    notification.guidEventContext.Data1 = 0x12345678U;
+    notification.bMuted = FALSE;
+    notification.fMasterVolume = -12.0F;
+    notification.nChannels = 2U;
+    notification.afChannelVolumes[0] = 0.5F;
+    notification.afChannelVolumes[1] = 0.25F;
+    auto* callback = new WindowsVolumeCallback();
+    CHECK(callback->OnNotify(reinterpret_cast<AUDIO_VOLUME_NOTIFICATION_DATA*>(&notification)) ==
+          S_OK);
+    WindowsVolumeNotificationSnapshotV1 callback_snapshot;
+    CHECK(callback->read(callback_snapshot));
+    CHECK(std::abs(callback_snapshot.requested_db + 12.0) < 1e-6 &&
+          callback_snapshot.channel_count == 2U &&
+          callback_snapshot.channel_scalars[1] == 0.25F &&
+          callback_snapshot.event_context.Data1 == 0x12345678U);
+    CHECK(callback->Release() == 0U);
+    auto* watcher = new WindowsDeviceWatcher();
+    CHECK(watcher->OnDefaultDeviceChanged(eRender, eConsole, L"hibiki-endpoint") == S_OK);
+    WindowsDeviceChangeSnapshotV1 device_change;
+    CHECK(watcher->poll(device_change));
+    CHECK(device_change.kind == WindowsDeviceChangeKind::DefaultChanged &&
+          device_change.flow == eRender && device_change.endpoint_id[0] == L'h');
+    CHECK(watcher->Release() == 0U);
+#endif
 
     return 0;
 }

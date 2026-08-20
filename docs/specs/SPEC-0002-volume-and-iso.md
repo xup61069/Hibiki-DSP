@@ -20,6 +20,12 @@ fade、device crossfade 與 safety clamp 必須保留 last-known-safe gain。
 目前 user-space contract 已提供 `apply_windows_notification`：只接受有限 dB 範圍與不倒退
 的 generation，接受後將 origin 設為 Windows 並重新套用 safety。真正的
 `IAudioEndpointVolume`／driver callback 仍待 SPEC-0003 的 Windows driver work。
+Windows build 現在提供 `WindowsVolumeBroker`：control thread 可 bind/unbind
+`IAudioEndpointVolume`、write canonical dB/mute with caller GUID、read-back 實際量化值，
+並以 lock-free atomic snapshot 接收 callback；callback 本身不配置、不等待、不呼叫 COM。
+`WindowsDeviceWatcher` 同樣只把 `IMMNotificationClient` 的 default/add/remove/state/property
+事件複製到 bounded snapshot；實際 rebind 必須由 worker 讀取 snapshot 後執行，避免在 OS
+callback 裡 unregister、release 或建立 COM 物件。
 Driver ABI 另外使用 Q16.16 dB；`db_to_q16_16`／`q16_16_to_db` 將量化集中在 boundary，
 避免 scalar 0–1 與 engine dB 互相漂移。
 每個 driver notification 同時攜帶 endpoint 與 event-context GUID；VolumeBroker 可用固定

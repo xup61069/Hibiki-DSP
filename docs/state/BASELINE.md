@@ -15,6 +15,10 @@
   serializer。
 - `AudioEngineModel` facade connecting graph transaction, Windows volume notification and RT
   processing with one Group Master gain.
+- Windows-only `IAudioEndpointVolume` broker with non-blocking callback snapshot, dB/mute
+  read-back and event-context write path; no physical endpoint was exercised on this machine.
+- Windows-only `IMMNotificationClient` watcher with bounded default/add/remove/property event
+  snapshots; worker-side rebind and Audio Service recovery are still pending.
 
 ## 尚未開始
 

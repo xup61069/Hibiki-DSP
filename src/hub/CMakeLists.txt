@@ -29,3 +29,9 @@ set_target_properties(hibiki_hub PROPERTIES
   OUTPUT_NAME hibiki_hub
   POSITION_INDEPENDENT_CODE ON
 )
+
+if(WIN32)
+  target_sources(hibiki_hub PRIVATE src/windows_volume_broker.cpp)
+  target_sources(hibiki_hub PRIVATE src/windows_device_watcher.cpp)
+  target_link_libraries(hibiki_hub PUBLIC ole32 uuid)
+endif()
