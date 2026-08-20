@@ -13,3 +13,12 @@ The public ABI header is in `sdk/include/hibiki/driver_control_v1.h`. The driver
 must include only this Apache-2.0 boundary plus its MS-PL implementation; it
 must not link the GPL engine. Endpoint IDs and service names come from the
 canonical distribution profile.
+
+`include/hibiki/wavert_endpoint_state_v1.h` and
+`src/wavert_endpoint_state.c` are the first WDK-facing control-state core. They
+validate the supported LPCM formats, hold Q16.16 dB/mute/generation state and
+apply the safety ceiling without allocation or COM. The future PortCls/KS
+property handlers must call this core from the WaveRT miniport and publish the
+result through the Apache ABI. The files are intentionally portable so CI can
+test their invariants without pretending that a `.sys` has been built or
+signed.

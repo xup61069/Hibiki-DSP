@@ -1,5 +1,6 @@
 add_library(hibiki_driver_contract STATIC
   src/control_validation.c
+  src/wavert_endpoint_state.c
 )
 
 target_include_directories(hibiki_driver_contract

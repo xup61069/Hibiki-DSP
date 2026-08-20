@@ -12,6 +12,7 @@
 extern "C" {
 #include "hibiki/driver_control_v1.h"
 #include "hibiki/driver_validation_v1.h"
+#include "hibiki/wavert_endpoint_state_v1.h"
 }
 #include "hibiki/iso226.hpp"
 #include "hibiki/scene_graph.hpp"
@@ -92,6 +93,25 @@ int main() {
           VolumeNotificationResult::StaleGeneration);
     const auto q16 = db_to_q16_16(-6.0206);
     CHECK(std::abs(q16_16_to_db(q16) + 6.0206) < 0.00002);
+
+    hibiki_wavert_endpoint_state_v1 wavert_state{};
+    CHECK(hibiki_wavert_endpoint_state_init_v1(
+        &wavert_state, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 8, 48000,
+        HIBIKI_ACTUATOR_INTERNAL_DSP));
+    CHECK(hibiki_wavert_endpoint_state_apply_volume_v1(
+        &wavert_state, -6 * 65536, -12 * 65536, 0, 2,
+        "volume-windows"));
+    CHECK(wavert_state.effective_db_q16_16 == -12 * 65536);
+    CHECK(!hibiki_wavert_endpoint_state_apply_volume_v1(
+        &wavert_state, 0, 0, 0, 1, "stale"));
+    CHECK(hibiki_wavert_endpoint_state_init_v1(
+        &wavert_state, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 2, 48000,
+        HIBIKI_ACTUATOR_STRICT_DIRECT));
+    CHECK(hibiki_wavert_endpoint_state_apply_volume_v1(
+        &wavert_state, 0, 0, 0, 2, "direct"));
+    CHECK(wavert_state.effective_db_q16_16 == 0);
+    CHECK(!hibiki_wavert_endpoint_state_init_v1(
+        &wavert_state, "bad", 4, 48000, HIBIKI_ACTUATOR_INTERNAL_DSP));
 
     DeviceRecoveryCoordinator recovery;
     CHECK(recovery.observe(DeviceRecoveryEventV1{
