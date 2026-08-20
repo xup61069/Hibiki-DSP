@@ -13,3 +13,7 @@ if(MSVC)
 else()
   target_compile_options(hibiki_tab_bridge_contract PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 endif()
+
+if(WIN32)
+  target_link_libraries(hibiki_tab_bridge_contract PUBLIC ws2_32 bcrypt)
+endif()

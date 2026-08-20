@@ -15,6 +15,6 @@ the extension never silently captures a tab or microphone.
 Packet header: magic `HIBT`, version `1`, channel count, frame count and
 sample rate (all little-endian), followed by interleaved Float32 samples. The
 source-only `hibiki_tab_bridge_contract` library now performs that packet
-validation (including finite-sample checks) before a future WebSocket receiver
-hands data to a lane. The receiver, lane routing and noise-reduction DSP remain
-separate boundaries.
+validation (including finite-sample checks) before the loopback WebSocket
+receiver invokes its control-thread callback. Lane routing and noise-reduction
+DSP remain separate boundaries.

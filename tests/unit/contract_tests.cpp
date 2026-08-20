@@ -337,6 +337,9 @@ int main() {
     tab_packet.pop_back();
     CHECK(!decode_tab_capture_packet_v1(tab_packet, tab_view, tab_error) &&
           tab_error == TabPacketError::LengthMismatch);
+    TabBridgeServer tab_server;
+    CHECK(!tab_server.start(TabBridgeServerConfigV1{17842U, 256U * 1024U}, nullptr, nullptr));
+    CHECK(!tab_server.running());
 
     hibiki_driver_endpoint_state_v1 driver_state{};
     driver_state.header.abi_version = HIBIKI_DRIVER_CONTROL_ABI_V1;

@@ -57,6 +57,9 @@
   browser playback intact, while native receiver/engine lane/noise-reduction remain pending.
 - `hibiki_tab_bridge_contract` now validates HIBT packet framing, supported LPCM layouts/rates,
   exact payload length and finite samples without owning or allocating audio buffers.
+- The optional Windows tab bridge now owns a loopback-only WebSocket listener with bounded
+  handshake/frame parsing and control-thread callbacks; engine lane routing and denoising model
+  provenance remain intentionally outside the receiver.
 
 ## 尚未開始
 
