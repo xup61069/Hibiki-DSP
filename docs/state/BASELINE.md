@@ -125,6 +125,9 @@
   those points into the processor's official `IParameterChanges`; named-pipe transport, factory
   catalog and one-main-bus SDK processing build locally, while supervisor timeline/persistence,
   latency policy and certification remain pending.
+- `LatencyAlignmentPlanV1` and `FixedDelayLineV1` now provide a fixed 8-channel, 16,384-sample
+  bounded delay primitive with active-lane max-latency alignment, impulse and non-finite-input
+  tests. It is not yet committed into the immutable graph lane snapshot or supervisor policy.
 - `VirtualMicRouteModel` now defines fixed 1/2-channel capture/reference blocks, fail-closed
   privacy mute and explicit echo-reference enablement. `VirtualMicDspV1` adds an optional bounded
   normalized-LMS echo-reference canceller and slow noise gate with no allocation; it remains a

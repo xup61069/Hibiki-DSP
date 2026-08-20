@@ -12,6 +12,7 @@
 #include "hibiki/vst3_sandbox.hpp"
 #include "hibiki/vst3_worker_protocol.hpp"
 #include "hibiki/vst3_worker_pipe.hpp"
+#include "hibiki/latency_compensation.hpp"
 #include "hibiki/tab_bridge.hpp"
 #include "hibiki/asio_transport_v1.h"
 #include "hibiki/output_sink.hpp"
@@ -778,6 +779,27 @@ int main() {
     Vst3WorkerPipeV1 worker_pipe;
     CHECK(!worker_pipe.create_server(Vst3WorkerPipeConfigV1{L"", 1024U, 100U}));
     CHECK(!worker_pipe.connect_client(L"", 100U));
+
+    const std::array<LatencyLaneInputV1, 3> latency_lanes{{
+        {true, 64U}, {true, 256U}, {false, 0U}}};
+    LatencyAlignmentPlanV1 latency_plan{};
+    CHECK(build_latency_alignment_plan_v1(latency_lanes, latency_plan) &&
+          latency_plan.maximum_latency_samples == 256U &&
+          latency_plan.delay_samples[0] == 192U && latency_plan.delay_samples[1] == 0U &&
+          latency_plan.delay_samples[2] == 0U &&
+          validate_latency_alignment_plan_v1(latency_plan));
+    auto delay_line = std::make_unique<FixedDelayLineV1>();
+    CHECK(delay_line->prepare(2U, 2U));
+    const float delay_input[] = {1.0F, -1.0F, 0.5F, -0.5F, 0.25F, -0.25F};
+    float delay_output[6]{};
+    CHECK(delay_line->process(delay_input, delay_output, 3U) &&
+          delay_output[0] == 0.0F && delay_output[1] == 0.0F &&
+          delay_output[2] == 0.0F && delay_output[3] == 0.0F &&
+          std::abs(delay_output[4] - 1.0F) < 1e-6F &&
+          std::abs(delay_output[5] + 1.0F) < 1e-6F);
+    const float delay_nan[] = {std::numeric_limits<float>::quiet_NaN(), 0.0F};
+    CHECK(!delay_line->process(delay_nan, delay_output, 1U) && delay_output[0] == 0.0F &&
+          delay_output[1] == 0.0F);
 
     std::vector<std::uint8_t> tab_packet(16U + 2U * 2U * sizeof(float), 0U);
     tab_packet[0] = 'H'; tab_packet[1] = 'I'; tab_packet[2] = 'B'; tab_packet[3] = 'T';

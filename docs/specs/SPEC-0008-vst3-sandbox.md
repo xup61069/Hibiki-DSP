@@ -66,6 +66,13 @@ points，將 normalized `[0,1]` 值轉成官方 `IParameterChanges`；非法 off
 worker 解碼並交給 adapter；supervisor 的 UI／timeline producer、參數持久化與自動化排程仍
 未接入，因此不能宣稱完整 host automation。
 
+`LatencyAlignmentPlanV1` 會在 control plane 取所有 active lane 的 reported latency，將每個
+lane 的補償量設為 `maximum_latency - lane_latency`，上限 16,384 samples。
+`FixedDelayLineV1` 使用固定 8 聲道 ring、最多 4,096 frames/block，RT `process` 不配置、不鎖、
+不等待，遇到非有限輸入會清零並 reset。這個 primitive 已通過 impulse／NaN contract test；
+目前尚未把它接進完整 graph lane snapshot，也未替代 plugin-reported latency 的 supervisor
+policy。
+
 當本機提供 pinned SDK 時，`hibiki_vst3_sdk_worker` 會把該 adapter 接到既有 named-pipe
 worker frame：啟動參數固定包含 pipe、module、class UID、sample rate 與 2/6/8 channels；
 Hello/Heartbeat 沿用既有 frame，ProcessBlock 以 caller-owned packet 驗證後交給 SDK，成功
@@ -75,8 +82,9 @@ public source-only checkout 自動生成，且仍不提供第三方 plugin binar
 ## 尚未完成的邊界
 
 plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter、bounded parameter
-frame 與 optional worker executable 已有 bridge；仍未完成第三方 plugin certification、supervisor
-launch integration、parameter timeline/persistence、side-chain/multi-bus、latency compensation、crash dump redaction 與 production
+frame、latency alignment primitive 與 optional worker executable 已有 bridge；仍未完成第三方
+plugin certification、supervisor launch integration、parameter timeline/persistence、graph lane
+latency commit、side-chain/multi-bus、crash dump redaction 與 production
 worker policy。目前 supervisor、named pipe、passthrough worker、catalog 與 bounded SDK
 processor 提供可測試的 process containment/metadata/processing boundary，不能宣稱已完成
 VST3 host。

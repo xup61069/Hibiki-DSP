@@ -3,6 +3,7 @@ add_library(hibiki_vst_host STATIC
   src/vst3_sandbox.cpp
   src/vst3_worker_protocol.cpp
   src/vst3_worker_pipe.cpp
+  src/latency_compensation.cpp
 )
 
 add_executable(hibiki_vst_worker

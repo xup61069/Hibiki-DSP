@@ -29,8 +29,13 @@ UID preserves the existing passthrough worker, and invalid launch fields are
 rejected before process creation. Parameter automation, latency-compensation
 policy, crash-dump redaction and real plugin certification remain separate gates.
 
-The processor API also accepts up to 16 parameter IDs, five sample-accurate
-points per ID and normalized values in `[0,1]`; it converts them to the SDK's
-`IParameterChanges` before `process`. The existing v1 worker frame does not
-carry parameter points yet, so this control/worker API is intentionally not
-described as end-to-end automation.
+The processor API and optional SDK worker accept up to 16 parameter IDs, five
+sample-accurate points per ID and normalized values in `[0,1]`; the bounded
+`ProcessBlockWithParameters` frame converts them to the SDK's
+`IParameterChanges` before `process`. Supervisor timeline persistence and full
+end-to-end automation remain intentionally outside this baseline.
+
+`LatencyAlignmentPlanV1` and `FixedDelayLineV1` provide a bounded 16,384-sample
+alignment plan and fixed 8-channel delay primitive. They are tested separately
+from supervisor and graph lane commit, so plugin certification and full latency
+policy are still pending.
