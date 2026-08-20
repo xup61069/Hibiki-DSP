@@ -47,6 +47,8 @@ extern "C" {
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
 #define CHECK(condition)                                                                    \
@@ -296,6 +298,32 @@ int main() {
     CHECK(std::abs(rendered[10] - 2.0F) < 1e-5F);
     CHECK(std::abs(rendered[11] - 0.5F) < 1e-5F);
 
+    GraphConfigV1 multi_group_graph;
+    multi_group_graph.output_channels = 2;
+    for (std::uint32_t lane_index = 0U; lane_index < 4U; ++lane_index) {
+        LaneConfigV1 lane{"lane" + std::to_string(lane_index),
+                          "group" + std::to_string(lane_index), 2, 0.0, true};
+        multi_group_graph.lanes.push_back(std::move(lane));
+    }
+    RtGraphSnapshotV1 multi_group_snapshot;
+    CHECK(compile_rt_snapshot(multi_group_graph, 8U, multi_group_snapshot));
+    const float group_inputs[] = {1.0F, -1.0F, 2.0F, -2.0F, 3.0F, -3.0F, 4.0F, -4.0F};
+    std::array<RtLaneInputV1, 4> group_views{};
+    for (std::size_t lane_index = 0U; lane_index < group_views.size(); ++lane_index) {
+        group_views[lane_index] = RtLaneInputV1{group_inputs + lane_index * 2U, 2U};
+    }
+    float group_rendered[2]{};
+    CHECK(process_graph_for_output_group(multi_group_snapshot, "group2", group_views,
+                                         group_rendered, 1U));
+    CHECK(group_rendered[0] == 3.0F && group_rendered[1] == -3.0F);
+    CHECK(process_graph_for_output_group(multi_group_snapshot, "group0", group_views,
+                                         group_rendered, 1U));
+    CHECK(group_rendered[0] == 1.0F && group_rendered[1] == -1.0F);
+    CHECK(!process_graph_for_output_group(multi_group_snapshot, "missing", group_views,
+                                          group_rendered, 1U));
+    multi_group_graph.lanes[0].output_group.assign(kMaxOutputGroupBytes + 1U, 'x');
+    CHECK(!validate_graph(multi_group_graph));
+
     DeviceSwitchTransaction transaction;
     CHECK(transaction.begin(DeviceTargetV1{"endpoint-a", 2, 48000, 128}));
     CHECK(transaction.prepare_complete());
@@ -392,6 +420,13 @@ int main() {
     CHECK(control_worker.drain(control_queue) == 1U);
     CHECK(control_engine.process(std::span<const RtLaneInputV1>(&control_view, 1), control_output, 1));
     CHECK(std::abs(control_output[0] - 0.5F) < 1e-5F);
+    CHECK(control_engine.process_output_group("main",
+                                             std::span<const RtLaneInputV1>(&control_view, 1),
+                                             control_output, 1));
+    CHECK(std::abs(control_output[0] - 0.5F) < 1e-5F);
+    CHECK(!control_engine.process_output_group("missing",
+                                              std::span<const RtLaneInputV1>(&control_view, 1),
+                                              control_output, 1));
     scene_command.scene.scene_id_bytes = 7U;
     std::copy_n("unknown", 7U, scene_command.scene.scene_id.data());
     CHECK(control_queue.try_push(scene_command));

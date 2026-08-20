@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <algorithm>
+#include <string_view>
 
 namespace hibiki {
 
@@ -14,6 +15,8 @@ bool validate_graph(const GraphConfigV1& graph) noexcept {
     for (std::size_t lane_index = 0; lane_index < graph.lanes.size(); ++lane_index) {
         const auto& lane = graph.lanes[lane_index];
         if (lane.id.empty() || lane.output_group.empty() ||
+            lane.output_group.size() > kMaxOutputGroupBytes ||
+            lane.output_group.find('\0') != std::string::npos ||
             (lane.channel_count != 2 && lane.channel_count != 6 && lane.channel_count != 8) ||
             !std::isfinite(lane.makeup_gain_db) || lane.makeup_gain_db < -144.0 ||
             lane.makeup_gain_db > 12.0) {
@@ -54,6 +57,8 @@ bool compile_rt_snapshot(const GraphConfigV1& graph,
         auto& target = compiled.lanes[index];
         target.input_channels = source.channel_count;
         target.channel_map = source.channel_map;
+        target.output_group_bytes = static_cast<std::uint8_t>(source.output_group.size());
+        std::copy(source.output_group.begin(), source.output_group.end(), target.output_group.begin());
         target.enabled = source.enabled;
         target.makeup_gain_linear = static_cast<float>(
             std::pow(10.0, source.makeup_gain_db / 20.0));
@@ -62,10 +67,13 @@ bool compile_rt_snapshot(const GraphConfigV1& graph,
     return true;
 }
 
-bool process_graph(const RtGraphSnapshotV1& snapshot,
-                   const std::span<const RtLaneInputV1> inputs,
-                   float* const output_interleaved,
-                   const std::size_t frames) noexcept {
+namespace {
+
+bool process_graph_filtered(const RtGraphSnapshotV1& snapshot,
+                            const std::string_view output_group,
+                            const std::span<const RtLaneInputV1> inputs,
+                            float* const output_interleaved,
+                            const std::size_t frames) noexcept {
     if (snapshot.schema_version != 1 || snapshot.lane_count > kMaxRtLanes ||
         snapshot.output_channels == 0 || snapshot.output_channels > 8 ||
         output_interleaved == nullptr || inputs.size() < snapshot.lane_count) {
@@ -74,9 +82,16 @@ bool process_graph(const RtGraphSnapshotV1& snapshot,
 
     const auto output_samples = frames * static_cast<std::size_t>(snapshot.output_channels);
     std::fill_n(output_interleaved, output_samples, 0.0F);
+    bool matched_output_group = output_group.empty();
 
     for (std::size_t lane_index = 0; lane_index < snapshot.lane_count; ++lane_index) {
         const auto& lane = snapshot.lanes[lane_index];
+        if (!output_group.empty() &&
+            (lane.output_group_bytes != output_group.size() ||
+             !std::equal(output_group.begin(), output_group.end(), lane.output_group.begin()))) {
+            continue;
+        }
+        matched_output_group = true;
         const auto& input = inputs[lane_index];
         if (!lane.enabled || input.interleaved == nullptr ||
             input.channel_count != lane.input_channels || input.channel_count > 8) {
@@ -95,7 +110,28 @@ bool process_graph(const RtGraphSnapshotV1& snapshot,
             }
         }
     }
-    return true;
+    return matched_output_group;
+}
+
+}  // namespace
+
+bool process_graph(const RtGraphSnapshotV1& snapshot,
+                   const std::span<const RtLaneInputV1> inputs,
+                   float* const output_interleaved,
+                   const std::size_t frames) noexcept {
+    return process_graph_filtered(snapshot, {}, inputs, output_interleaved, frames);
+}
+
+bool process_graph_for_output_group(const RtGraphSnapshotV1& snapshot,
+                                    const std::string_view output_group,
+                                    const std::span<const RtLaneInputV1> inputs,
+                                    float* const output_interleaved,
+                                    const std::size_t frames) noexcept {
+    if (output_group.empty() || output_group.size() > kMaxOutputGroupBytes ||
+        output_group.find('\0') != std::string_view::npos) {
+        return false;
+    }
+    return process_graph_filtered(snapshot, output_group, inputs, output_interleaved, frames);
 }
 
 }  // namespace hibiki

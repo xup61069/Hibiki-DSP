@@ -20,6 +20,8 @@ Lane、output group、channel map、DSP chain、latency mode 與安全策略；�
 ## 介面
 
 - `SceneProfile v1`：lane routing、DSP、output group、automation、calibration reference。
+- `output_group` 在 graph compile 時進入 fixed-size RT snapshot；physical sink worker 可按
+  群組呼叫指定 render，不得在 audio thread 以 `std::string` 或 map 查路由。
 - `IrPhasePolicy v1`：minimum/mixed/linear/bypass 模式與 0..1 strength；只描述可驗證的
   額外延遲預算，不攜帶未授權 IR 或 ISO 係數。
 - `OutputGroupVolumeState v1`：requested/effective/safety dB、mute、generation、origin、actuator。

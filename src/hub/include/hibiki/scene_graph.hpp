@@ -8,6 +8,7 @@
 #include <span>
 #include <string>
 #include <vector>
+#include <string_view>
 
 namespace hibiki {
 
@@ -30,10 +31,13 @@ struct GraphConfigV1 {
 };
 
 constexpr std::size_t kMaxRtLanes = 32;
+constexpr std::size_t kMaxOutputGroupBytes = 64;
 
 struct RtLaneSnapshotV1 {
     std::uint32_t input_channels{2};
     std::array<std::int8_t, 8> channel_map{0, 1, 2, 3, 4, 5, 6, 7};
+    std::uint8_t output_group_bytes{0U};
+    std::array<char, kMaxOutputGroupBytes> output_group{};
     float makeup_gain_linear{1.0F};
     bool enabled{true};
 };
@@ -61,5 +65,11 @@ struct RtLaneInputV1 {
                                  std::span<const RtLaneInputV1> inputs,
                                  float* output_interleaved,
                                  std::size_t frames) noexcept;
+[[nodiscard]] bool process_graph_for_output_group(
+    const RtGraphSnapshotV1& snapshot,
+    std::string_view output_group,
+    std::span<const RtLaneInputV1> inputs,
+    float* output_interleaved,
+    std::size_t frames) noexcept;
 
 }  // namespace hibiki

@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <atomic>
 #include <span>
+#include <string_view>
 
 namespace hibiki {
 
@@ -29,6 +30,10 @@ public:
     [[nodiscard]] bool process(std::span<const RtLaneInputV1> inputs,
                                float* output_interleaved,
                                std::size_t frames) const noexcept;
+    [[nodiscard]] bool process_output_group(std::string_view output_group,
+                                             std::span<const RtLaneInputV1> inputs,
+                                             float* output_interleaved,
+                                             std::size_t frames) const noexcept;
     [[nodiscard]] bool bind_asio_transport(std::wstring_view mapping_name,
                                             std::uint32_t channels,
                                             std::uint32_t sample_rate,

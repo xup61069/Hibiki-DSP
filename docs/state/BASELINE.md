@@ -33,6 +33,8 @@
 - `EngineControlWorkerV1` consumes that queue and applies the four Easy Scene presets through
   AudioEngine Validate → Prepare → Commit; invalid scene IDs leave the last committed graph
   and revision unchanged, while volume commands share the same Group Master path.
+- `RtLaneSnapshotV1` now carries fixed-size output-group bytes and exposes a group-filtered render
+  path; four-lane fixtures verify that selecting one group does not mix the other three.
 - `AudioEngineModel` facade connecting graph transaction, Windows volume notification and RT
   processing with one Group Master gain.
 - `AudioEngineModel` 的 RT Group Master 已改讀 release/acquire 64-bit Q16.16 dB/mute word；

@@ -51,6 +51,7 @@
     {"command": "audio-engine-volume-snapshot", "status": "pass", "coverage": ["single 64-bit dB/mute atomic", "mute transition", "Group Master applied once"]},
     {"command": "control-command-queue", "status": "pass", "coverage": ["64-slot SPSC", "full-queue dropped counter", "pipe-to-control handoff"]},
     {"command": "engine-control-worker", "status": "pass", "coverage": ["SceneApply to Easy presets", "Validate-Prepare-Commit", "volume through Group Master", "invalid scene preserves revision"]}
+    ,{"command": "output-group-routing", "status": "pass", "coverage": ["fixed-size RT group identity", "four-lane isolation", "missing-group fail-closed", "AudioEngine process_output_group"]}
   ],
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",

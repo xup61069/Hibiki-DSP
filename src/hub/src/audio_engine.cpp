@@ -69,6 +69,29 @@ bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
     return true;
 }
 
+bool AudioEngineModel::process_output_group(const std::string_view output_group,
+                                            const std::span<const RtLaneInputV1> inputs,
+                                            float* const output_interleaved,
+                                            const std::size_t frames) const noexcept {
+    if (!has_active_graph_ ||
+        !process_graph_for_output_group(active_graph_, output_group, inputs,
+                                        output_interleaved, frames)) {
+        return false;
+    }
+    const auto samples = frames * static_cast<std::size_t>(active_graph_.output_channels);
+    const auto volume_word = rt_volume_word_.load(std::memory_order_acquire);
+    const auto effective_q16 = static_cast<std::int32_t>(volume_word >> 32U);
+    const auto effective_db = q16_16_to_db(effective_q16);
+    const float gain = (volume_word & 1ULL) != 0ULL || !std::isfinite(effective_db) ||
+                               effective_db <= -144.0
+                           ? 0.0F
+                           : static_cast<float>(std::pow(10.0, effective_db / 20.0));
+    for (std::size_t index = 0; index < samples; ++index) {
+        output_interleaved[index] *= gain;
+    }
+    return true;
+}
+
 bool AudioEngineModel::bind_asio_transport(const std::wstring_view mapping_name,
                                            const std::uint32_t channels,
                                            const std::uint32_t sample_rate,
