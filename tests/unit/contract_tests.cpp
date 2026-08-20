@@ -6,6 +6,7 @@
 #include "hibiki/plugin_host.hpp"
 #include "hibiki/output_sink.hpp"
 #include "hibiki/exporters.hpp"
+#include "hibiki/audio_engine.hpp"
 
 extern "C" {
 #include "hibiki/driver_control_v1.h"
@@ -220,6 +221,27 @@ int main() {
     const auto wav = export_wav_f32_ir(ir_samples, 48000, 2);
     CHECK(wav.size() == 60 && wav[0] == 'R' && wav[1] == 'I' && wav[2] == 'F' &&
           wav[3] == 'F' && wav[8] == 'W' && wav[9] == 'A' && wav[10] == 'V' && wav[11] == 'E');
+
+    AudioEngineModel engine;
+    GraphConfigV1 engine_graph;
+    engine_graph.lanes.push_back(LaneConfigV1{"game", "main", 2, 0.0, true});
+    CHECK(engine.prepare_graph(engine_graph, 11));
+    CHECK(engine.transaction_state() == EngineTransactionState::Prepared);
+    CHECK(engine.commit_graph());
+    CHECK(engine.transaction_state() == EngineTransactionState::Ready);
+    CHECK(engine.apply_windows_volume(VolumeNotificationV1{-6.0206, false, 1}) ==
+          VolumeNotificationResult::Accepted);
+    const float engine_input[] = {1.0F, -1.0F};
+    const RtLaneInputV1 engine_input_view{engine_input, 2};
+    float engine_output[2]{};
+    CHECK(engine.process(std::span<const RtLaneInputV1>(&engine_input_view, 1), engine_output, 1));
+    CHECK(std::abs(engine_output[0] - 0.5F) < 1e-5F);
+    CHECK(std::abs(engine_output[1] + 0.5F) < 1e-5F);
+    GraphConfigV1 invalid_graph;
+    CHECK(!engine.prepare_graph(invalid_graph, 12));
+    CHECK(engine.transaction_state() == EngineTransactionState::Degraded);
+    engine.rollback_graph();
+    CHECK(engine.transaction_state() == EngineTransactionState::Ready);
 
     return 0;
 }

@@ -3,7 +3,7 @@
 | 子系統 | 目的 | 目前狀態 | 主要契約 |
 | --- | --- | --- | --- |
 | `driver/` | 固定虛擬端點、KS volume/mute、私有 control IPC | ABI boundary | ADR-0002/SPEC-0003 |
-| `src/` | C++20 RT graph、volume state、ISO math、IPC framing | 可測試 user-space 骨架 | SPEC-0001/0002 |
+| `src/` | C++20 RT graph、AudioEngine、volume state、ISO math、IPC framing | 可測試 user-space 骨架 | SPEC-0001/0002 |
 | `apps/` | WinUI 3 control plane、Easy/Expert UX | 待建立 | SceneProfile |
 | `asio/` | Hibiki ASIO bridge 與 DAW lane | stream model | SceneProfile |
 | `vst-host/` | Out-of-process VST3 host | quarantine model | plugin contract |

@@ -13,6 +13,8 @@
 - Source-only PowerShell installer bootstrapper with manifest/hash dry-run gate.
 - Easy Scene factory、AcousticAnchor phon mapping、PEQ/APO/CamillaDSP/REW exporters 與 WAV IR
   serializer。
+- `AudioEngineModel` facade connecting graph transaction, Windows volume notification and RT
+  processing with one Group Master gain.
 
 ## 尚未開始
 

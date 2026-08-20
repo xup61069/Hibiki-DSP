@@ -1,6 +1,7 @@
 add_library(hibiki_hub STATIC
   src/contracts.cpp
   src/calibration.cpp
+  src/audio_engine.cpp
   src/device_switch.cpp
   src/exporters.cpp
   src/ipc.cpp

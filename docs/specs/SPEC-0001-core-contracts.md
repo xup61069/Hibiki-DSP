@@ -35,6 +35,8 @@ Lane、output group、channel map、DSP chain、latency mode 與安全策略；�
 - graph change 必須 Validate → Prepare → Commit；失敗回復 last-known-good。
 - Group Master 只能套用一次；LFE 不重複套用 ISO。
 - Strict Direct 是獨立 bit-perfect Scene，不能偷偷混入 DSP 或 Windows gain。
+- `AudioEngineModel` 的 control plane 只在 pending snapshot 做 Validate → Prepare → Commit；
+  RT `process` 只讀 active immutable snapshot，再對整個 Group Master 套用一次。
 
 ## 相容性與驗收
 
