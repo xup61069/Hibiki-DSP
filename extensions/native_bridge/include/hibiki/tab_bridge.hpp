@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <array>
 #include <atomic>
 #include <thread>
 
@@ -38,6 +39,46 @@ struct TabCapturePacketViewV1 {
     TabPacketError& error) noexcept;
 
 using TabCapturePacketCallbackV1 = void (*)(const TabCapturePacketViewV1& view, void* context);
+
+struct TabCaptureBlockV1 {
+    std::uint32_t frames{0};
+    std::uint32_t channels{0};
+    std::uint32_t sample_rate{0};
+};
+
+// Fixed-capacity SPSC handoff. The WebSocket/control thread may push a
+// validated packet; an engine lane may pop into a caller-owned buffer without
+// allocation or waiting. Four blocks bound memory and expose overruns.
+class TabCaptureQueueV1 final {
+public:
+    TabCaptureQueueV1() noexcept = default;
+    TabCaptureQueueV1(const TabCaptureQueueV1&) = delete;
+    TabCaptureQueueV1& operator=(const TabCaptureQueueV1&) = delete;
+
+    [[nodiscard]] bool push(const TabCapturePacketViewV1& view) noexcept;
+    [[nodiscard]] bool pop(float* interleaved,
+                           std::uint32_t output_capacity_frames,
+                           TabCaptureBlockV1& block) noexcept;
+    [[nodiscard]] std::uint32_t dropped_blocks() const noexcept;
+
+private:
+    static constexpr std::uint32_t kSlotCount = 4U;
+    static constexpr std::uint32_t kMaxSamples = 8U * 4096U;
+    struct Slot {
+        std::atomic<std::uint32_t> ready_sequence{0U};
+        std::uint32_t frames{0U};
+        std::uint32_t channels{0U};
+        std::uint32_t sample_rate{0U};
+        std::array<float, kMaxSamples> samples{};
+    };
+
+    std::atomic<std::uint32_t> producer_sequence_{0U};
+    std::atomic<std::uint32_t> consumer_sequence_{0U};
+    std::atomic<std::uint32_t> dropped_blocks_{0U};
+    std::array<Slot, kSlotCount> slots_{};
+};
+
+void enqueue_tab_capture_packet_v1(const TabCapturePacketViewV1& view, void* context) noexcept;
 
 struct TabBridgeServerConfigV1 {
     std::uint16_t port{17842};

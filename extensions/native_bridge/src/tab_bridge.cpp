@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <algorithm>
 
 namespace hibiki {
 namespace {
@@ -94,6 +95,66 @@ bool decode_tab_capture_packet_v1(const std::span<const std::uint8_t> packet,
     view.samples_bytes = samples;
     view.sample_count = sample_count;
     return true;
+}
+
+bool TabCaptureQueueV1::push(const TabCapturePacketViewV1& view) noexcept {
+    if (!supported_channels(view.channels) || !supported_rate(view.sample_rate) ||
+        view.frames == 0U || view.frames > 4096U ||
+        view.sample_rate == 0U || view.samples_bytes == nullptr ||
+        view.sample_count != static_cast<std::size_t>(view.channels) * view.frames) {
+        return false;
+    }
+    const auto producer = producer_sequence_.load(std::memory_order_relaxed);
+    const auto consumer = consumer_sequence_.load(std::memory_order_acquire);
+    if (producer - consumer >= kSlotCount) {
+        dropped_blocks_.fetch_add(1U, std::memory_order_relaxed);
+        return false;
+    }
+    auto& slot = slots_[producer % kSlotCount];
+    for (std::size_t index = 0U; index < view.sample_count; ++index) {
+        const auto value = view.sample(index);
+        if (!std::isfinite(value)) return false;
+        slot.samples[index] = value;
+    }
+    slot.frames = view.frames;
+    slot.channels = view.channels;
+    slot.sample_rate = view.sample_rate;
+    slot.ready_sequence.store(producer + 1U, std::memory_order_release);
+    producer_sequence_.store(producer + 1U, std::memory_order_release);
+    return true;
+}
+
+bool TabCaptureQueueV1::pop(float* const interleaved,
+                            const std::uint32_t output_capacity_frames,
+                            TabCaptureBlockV1& block) noexcept {
+    block = {};
+    if (interleaved == nullptr) return false;
+    const auto consumer = consumer_sequence_.load(std::memory_order_relaxed);
+    const auto producer = producer_sequence_.load(std::memory_order_acquire);
+    if (consumer == producer) return false;
+    auto& slot = slots_[consumer % kSlotCount];
+    if (slot.ready_sequence.load(std::memory_order_acquire) != consumer + 1U ||
+        slot.frames == 0U || slot.frames > output_capacity_frames || slot.channels == 0U ||
+        slot.channels > 8U) {
+        return false;
+    }
+    const auto sample_count = static_cast<std::size_t>(slot.frames) * slot.channels;
+    std::copy_n(slot.samples.data(), sample_count, interleaved);
+    block.frames = slot.frames;
+    block.channels = slot.channels;
+    block.sample_rate = slot.sample_rate;
+    consumer_sequence_.store(consumer + 1U, std::memory_order_release);
+    return true;
+}
+
+std::uint32_t TabCaptureQueueV1::dropped_blocks() const noexcept {
+    return dropped_blocks_.load(std::memory_order_relaxed);
+}
+
+void enqueue_tab_capture_packet_v1(const TabCapturePacketViewV1& view, void* const context) noexcept {
+    if (context != nullptr) {
+        (void)static_cast<TabCaptureQueueV1*>(context)->push(view);
+    }
 }
 
 }  // namespace hibiki

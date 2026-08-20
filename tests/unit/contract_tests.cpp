@@ -34,6 +34,7 @@ extern "C" {
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <vector>
 
 #define CHECK(condition)                                                                    \
@@ -336,6 +337,19 @@ int main() {
     CHECK(decode_tab_capture_packet_v1(tab_packet, tab_view, tab_error));
     CHECK(tab_view.channels == 2U && tab_view.frames == 2U && tab_view.sample_rate == 48000U);
     CHECK(std::abs(tab_view.sample(2U) - 0.5F) < 1e-6F);
+    auto tab_queue = std::make_unique<TabCaptureQueueV1>();
+    enqueue_tab_capture_packet_v1(tab_view, tab_queue.get());
+    float tab_output[8]{};
+    TabCaptureBlockV1 tab_block{};
+    CHECK(tab_queue->pop(tab_output, 2U, tab_block));
+    CHECK(tab_block.frames == 2U && tab_block.channels == 2U &&
+          std::abs(tab_output[2] - 0.5F) < 1e-6F);
+    auto full_tab_queue = std::make_unique<TabCaptureQueueV1>();
+    CHECK(full_tab_queue->push(tab_view));
+    CHECK(full_tab_queue->push(tab_view));
+    CHECK(full_tab_queue->push(tab_view));
+    CHECK(full_tab_queue->push(tab_view));
+    CHECK(!full_tab_queue->push(tab_view) && full_tab_queue->dropped_blocks() == 1U);
     tab_packet.pop_back();
     CHECK(!decode_tab_capture_packet_v1(tab_packet, tab_view, tab_error) &&
           tab_error == TabPacketError::LengthMismatch);
