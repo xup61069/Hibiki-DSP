@@ -17,6 +17,7 @@
     "cmake --build .local/asio-build --config RelWithDebInfo --target hibiki_asio_native",
     "cmake -S . -B .local/vst3-build -DHIBIKI_ENABLE_VST3_SDK=ON -DHIBIKI_VST3_SDK_ROOT=.local/vst3sdk",
     "cmake --build .local/vst3-build --config RelWithDebInfo --target hibiki_vst3_sdk_catalog",
+    "cmake --build .local/vst3-build --config RelWithDebInfo --target hibiki_vst3_sdk_worker",
     "scene-safety-controller coverage in hibiki_contract_tests",
     "output-crossfade coverage in hibiki_contract_tests"
   ],
