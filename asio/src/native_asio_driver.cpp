@@ -224,6 +224,8 @@ public:
       for (long channel = 0; channel < kOutputChannels; ++channel) {
         first[static_cast<std::size_t>(channel)] = std::make_unique<float[]>(buffer_size);
         second[static_cast<std::size_t>(channel)] = std::make_unique<float[]>(buffer_size);
+        std::fill_n(first[static_cast<std::size_t>(channel)].get(), buffer_size, 0.0F);
+        std::fill_n(second[static_cast<std::size_t>(channel)].get(), buffer_size, 0.0F);
         infos[channel].buffers[0] = first[static_cast<std::size_t>(channel)].get();
         infos[channel].buffers[1] = second[static_cast<std::size_t>(channel)].get();
       }
