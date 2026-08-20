@@ -34,10 +34,13 @@ VST3 plugin 不得在 Hibiki RT thread 或主 UI process 內直接執行。contr
 ## Worker IPC frame
 
 `vst3_worker_protocol.hpp` 定義固定 36-byte little-endian frame header：Hello、HelloAck、
-Heartbeat、ProcessBlock、ProcessBlockResponse、Shutdown、Error。Process frame 僅接受
-2/6/8 聲道、1–4096 frames、exact interleaved Float32 payload，並拒絕 NaN/Inf；codec 不
-配置、不擁有 payload，適合由 named pipe 或其他 control transport 在 worker 與 supervisor
-間傳遞。真正 VST3 SDK/plugin dispatch 仍必須在 worker process，不能連入 graph RT。
+Heartbeat、ProcessBlock、ProcessBlockResponse、Shutdown、Error，以及不破壞既有 bytes 的
+`ProcessBlockWithParameters`。一般 Process frame 僅接受 2/6/8 聲道、1–4096 frames、exact
+interleaved Float32 payload；參數 frame 使用 `[u32 count][u32 reserved][最多 64 個 16-byte
+point][Float32]`，每個 parameter 最多 5 點、最多 16 個 parameter，並拒絕 NaN/Inf、非法
+offset／normalized 值。codec 不配置、不擁有 payload，適合由 named pipe 或其他 control
+transport 在 worker 與 supervisor 間傳遞。真正 VST3 SDK/plugin dispatch 仍必須在 worker
+process，不能連入 graph RT。
 `Vst3WorkerPipeV1` 提供 Windows overlapped named-pipe server、4-byte bounded length prefix、
 connect/read/write timeout 與 caller-owned receive buffer；worker-side 也可用 bounded
 `connect_client` 連入 supervisor 建立的 pipe。`hibiki_vst_worker` 目前能回應 Hello、
@@ -59,8 +62,9 @@ VST3 sandbox worker，不能直接掛進 Hibiki RT graph。此 adapter 沒有參
 
 SDK adapter 的 control API 另接受最多 16 個 parameter IDs、每個 ID 最多 5 個 sample-accurate
 points，將 normalized `[0,1]` 值轉成官方 `IParameterChanges`；非法 offset、值域或超限事件
-會在交給 plugin 前拒絕。既有 v1 worker frame 尚未攜帶 parameter points，因此這個能力目前
-是 worker-side API boundary，不宣稱 supervisor 到 plugin 的 end-to-end automation。
+會在交給 plugin 前拒絕。`ProcessBlockWithParameters` 已由 frame codec 與 optional SDK
+worker 解碼並交給 adapter；supervisor 的 UI／timeline producer、參數持久化與自動化排程仍
+未接入，因此不能宣稱完整 host automation。
 
 當本機提供 pinned SDK 時，`hibiki_vst3_sdk_worker` 會把該 adapter 接到既有 named-pipe
 worker frame：啟動參數固定包含 pipe、module、class UID、sample rate 與 2/6/8 channels；
@@ -70,9 +74,9 @@ public source-only checkout 自動生成，且仍不提供第三方 plugin binar
 
 ## 尚未完成的邊界
 
-plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter 與 optional worker
-executable 已有 bridge；仍未完成第三方 plugin certification、supervisor launch integration、parameter
-automation、side-chain/multi-bus、latency compensation、crash dump redaction 與 production
+plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter、bounded parameter
+frame 與 optional worker executable 已有 bridge；仍未完成第三方 plugin certification、supervisor
+launch integration、parameter timeline/persistence、side-chain/multi-bus、latency compensation、crash dump redaction 與 production
 worker policy。目前 supervisor、named pipe、passthrough worker、catalog 與 bounded SDK
 processor 提供可測試的 process containment/metadata/processing boundary，不能宣稱已完成
 VST3 host。

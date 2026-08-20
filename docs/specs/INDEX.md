@@ -11,6 +11,7 @@
 | SPEC-0007 | accepted | Output sink handoff、crossfade 與 clock/SRC boundary |
 | SPEC-0008 | accepted | VST3 sandbox、watchdog 與 quarantine |
 | SPEC-0009 | accepted | Chrome/Edge 單分頁 HIBT bridge 與 bounded queue |
+| SPEC-0010 | accepted | WinUI 3 Easy/Expert 控制殼與 named-pipe 命令邊界 |
 
 Draft spec 有 blocking open question 時不得直接實作；公開行為變更必須在同一 PR
 更新 spec 與測試。

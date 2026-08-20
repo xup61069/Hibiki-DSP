@@ -10,6 +10,7 @@ $required = @(
   'extensions/manifest.json', 'tools/extension-check.ps1',
   'installer/HibikiSetup.ps1', 'tools/installer-check.ps1',
   'apps/control-model/Hibiki.ControlModel.csproj', 'tools/control-model-check.ps1',
+  'apps/winui-shell/Hibiki.WinUI.csproj', 'tools/winui-shell-check.ps1',
   'tools/distribution-check.ps1',
   'docs/START_HERE.md', 'docs/PROJECT_MAP.md', 'docs/state/BASELINE.md',
   'docs/specs/INDEX.md', 'docs/specs/SPEC-0001-core-contracts.md',
@@ -26,6 +27,7 @@ $required = @(
   'schemas/virtual-mic-policy-v1.schema.json',
   'schemas/graph-config-v1.schema.json',
   'schemas/peq-filter-v1.schema.json',
+  'docs/specs/SPEC-0010-winui-shell.md',
   'docs/tasks/active/0.md', 'evidence/0000-foundation/initial.json'
 )
 

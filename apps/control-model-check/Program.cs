@@ -7,6 +7,10 @@ static void Check(bool condition, string message)
 
 Check(ScenePresetCatalog.EasyDefaults.Count == 4, "Expected four Easy defaults.");
 Check(ScenePresetCatalog.EasyDefaults[0].Id == "game", "Game preset missing.");
+Check(OutputGroupCatalog.Fixed.Count == 3 &&
+      OutputGroupCatalog.Fixed.Select(group => group.Id).SequenceEqual(
+          ["main", "low-latency", "surround"]),
+    "Fixed output-group catalog changed unexpectedly.");
 var snapshot = new ControlSnapshot(UiMode.Easy, AudioControlStatus.Controlled, "main", -8.5, -8.5, false, null, null);
 Check(snapshot.DisplayVolume == "-8.5 dB", "dB display must use the effective value.");
 var device = new DeviceSwitchModel();
@@ -67,6 +71,9 @@ Check(IpcRequestSession.IsReplyTo(volumeCommand,
         new IpcEnvelopeV1(ControlMessageType.Ack, volumeCommand.RequestId, ReadOnlyMemory<byte>.Empty)),
     "Control command request correlation failed.");
 var viewModel = new EasyControlViewModel { SelectedOutputGroup = " main " };
+Check(viewModel.ConnectionState == ControlConnectionState.Disconnected &&
+      !viewModel.IsConnected && !viewModel.IsBusy,
+    "ViewModel must start disconnected and idle.");
 Check(viewModel.OneTapEnhance() && viewModel.SelectedScene?.Id == "game" &&
       viewModel.Status == AudioControlStatus.Controlled &&
       viewModel.SelectedOutputGroup == "main" && viewModel.LastCommand?.Type == ControlMessageType.SceneApply,
@@ -100,4 +107,11 @@ Check(viewModel.IrPhasePolicy.IsValid && viewModel.IrPhasePolicy.UsesFir &&
 viewModel.IrPhaseMode = IrPhaseMode.Bypass;
 Check(viewModel.IrPhaseStrength == 0.0 && viewModel.IrAddedDelayMs == 0.0,
     "IR phase bypass must clear the slider and added delay.");
+var noEngine = new EasyControlViewModel("HibikiDSP_v1_control_model_check_missing");
+var connectedToMissingEngine = await noEngine.ConnectAsync(TimeSpan.FromMilliseconds(50));
+Check(!connectedToMissingEngine && noEngine.ConnectionState == ControlConnectionState.Degraded &&
+      noEngine.StatusText.Contains("找不到 Hibiki"),
+    "Missing engine must fail closed with a bounded degraded status.");
+Check(!await noEngine.OneTapEnhanceAsync(),
+    "One-Tap command must not be reported as applied while disconnected.");
 Console.WriteLine("Control model checks passed.");

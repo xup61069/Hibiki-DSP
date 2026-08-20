@@ -14,7 +14,8 @@
 7. 先執行 handoff 的 baseline smoke test；結果不一致時先標記 stale/conflict。
 8. 修改後執行 `tools/verify.ps1`、`tools/docs-check.ps1` 與
    `tools/source-policy.ps1`；若改動 extension、installer 或 control model，再執行
-   `tools/extension-check.ps1`、`tools/installer-check.ps1`、`tools/control-model-check.ps1`。
+   `tools/extension-check.ps1`、`tools/installer-check.ps1`、`tools/control-model-check.ps1`、
+   `tools/winui-shell-check.ps1`。
    任何 identity/config 變更都必須再執行 `tools/distribution-check.ps1`；改動 driver source
    boundary 時也執行 `tools/driver-source-check.ps1`。
 
@@ -36,7 +37,8 @@ branch。真實裝置資料與 calibration 留在 `.local/`，只提交 schema �
   endpoint topology/channel mask catalog 已有 portable MS-PL contract，PortCls wiring 與簽章仍待完成。
 - `src/`：即時 graph、Matrix、ISO fit、scene safety、device switch、ASIO/外部 Lane block API
   與 WASAPI Float32 output boundary；真實端點 soak 仍待目標環境。
-- `apps/`：WinUI 3 易用模式與 Expert matrix/graph UI。
+- `apps/`：已有 UI-independent control model 與 source-only WinUI 3 Easy/Expert shell；
+  仍需在鎖定 Windows App SDK 的目標環境編譯、做視覺／無障礙驗證，再接上實體端點狀態。
 - `asio/`：預設為 stream model；需要本機 pinned ASIO SDK 時可開啟 optional native COM
   transport（不進 public CI，也不提交 DLL）。`vst-host/` 已有 supervisor、frame codec、
   named-pipe boundary、source-only passthrough worker、可選的 pinned VST3 SDK factory catalog

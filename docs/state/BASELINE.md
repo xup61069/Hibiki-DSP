@@ -25,6 +25,10 @@
 - `EasyControlViewModel` exposes binding-ready Easy/Expert state and emits validated SceneApply
   and VolumeNotification commands; `handle_control_frame_v1` hands those typed commands to a
   host-owned sink rather than running DSP on the pipe worker.
+- `EasyControlViewModel` now exposes the fixed Main/Low Latency/Surround output-group catalog,
+  bounded asynchronous Hello/Scene/volume transport, explicit Connected/Degraded states and
+  disconnect cleanup; `apps/winui-shell/` supplies a source-only WinUI 3 first-run shell that
+  keeps Expert controls behind an explicit switch. The shell is not compiled on this machine.
 - `handle_control_frame_v1` validates Hello/Volume/Scene/graph lifecycle commands before passing
   them to a host-owned typed sink; malformed or rejected commands receive Error without touching
   the graph.
@@ -111,10 +115,11 @@
 - `Vst3SandboxProcess` now provides a Windows Job Object containment layer with explicit
   launch validation, heartbeat watchdog and crash quarantine; no plugin binary is bundled.
 - `vst3_worker_protocol.hpp`/`.cpp` now provide a fixed 36-byte little-endian worker frame codec
-  with Hello/Heartbeat/Process/Shutdown/Error types, exact Float32 payload validation and finite
-  sample checks. Named-pipe transport plus a source-only worker loop are present; an optional
-  pinned-SDK factory catalog, bounded one-main-bus SDK processor and optional SDK worker build
-  locally, while supervisor/plugin parameter wiring and certification remain pending.
+  with Hello/Heartbeat/Process/Shutdown/Error plus bounded `ProcessBlockWithParameters`, exact
+  Float32/parameter-point validation and finite sample checks. The optional SDK worker decodes
+  those points into the processor's official `IParameterChanges`; named-pipe transport, factory
+  catalog and one-main-bus SDK processing build locally, while supervisor timeline/persistence,
+  latency policy and certification remain pending.
 - `VirtualMicRouteModel` now defines fixed 1/2-channel capture/reference blocks, fail-closed
   privacy mute and explicit echo-reference enablement. `VirtualMicDspV1` adds an optional bounded
   normalized-LMS echo-reference canceller and slow noise gate with no allocation; it remains a
@@ -160,7 +165,8 @@
 ## 尚未開始
 
 - 可載入的 WaveRT/SYSVAD-derived driver、ASIO physical sink delivery、完整 out-of-process
-  VST3 SDK plugin dispatch、WinUI 3 UI、physical sink clock fixtures 與 signed package delivery。
+  VST3 SDK plugin dispatch、WinUI 3 SDK/build and accessibility validation、physical sink clock
+  fixtures 與 signed package delivery。
 - ISO 226:2023 合法係數來源與正式 conformance oracle（公式本身已完成，但係數資料仍待
   授權／法務確認）。
 - Microsoft driver signing、Gumroad release artifact 與 production installer。
@@ -181,7 +187,7 @@ working tree 與該 scope 是否一致。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 45 個必要入口與
 9 份 Spec 通過；`source-policy.ps1` 掃描 212 個路徑且無 blocked binary/secret；
-`extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1` 與
+`extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1` 與 `driver-source-check.ps1` 通過；20 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
 `.local/`，未提交或發布。以本機 pinned VST3 SDK 另行執行的 optional target

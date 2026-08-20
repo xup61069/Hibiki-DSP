@@ -11,6 +11,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 {
     private readonly EasyControlSession _session = new();
     private readonly ControlCommandFactoryV1 _commands = new();
+    private readonly string _pipeName;
+    private NamedPipeControlClientV1? _controlClient;
     private string? _selectedOutputGroup;
     private SceneCard? _selectedScene;
     private string _statusText = "尚未連接 Hibiki 音訊引擎";
@@ -20,12 +22,32 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private ulong _generation;
     private IrPhaseMode _irPhaseMode = IrPhaseMode.MinimumPhase;
     private double _irPhaseStrength;
+    private ControlConnectionState _connectionState = ControlConnectionState.Disconnected;
+    private bool _isBusy;
+
+    public EasyControlViewModel(string pipeName = NamedPipeControlClientV1.DefaultPipeName)
+    {
+        if (string.IsNullOrWhiteSpace(pipeName) || pipeName.IndexOfAny(['\\', '/']) >= 0)
+            throw new ArgumentException("Pipe name must be a stable logical name.", nameof(pipeName));
+        _pipeName = pipeName;
+    }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public IReadOnlyList<SceneCard> Scenes => ScenePresetCatalog.EasyDefaults;
+    public IReadOnlyList<OutputGroupCard> OutputGroups => OutputGroupCatalog.Fixed;
     public UiMode Mode => _isExpert ? UiMode.Expert : UiMode.Easy;
     public AudioControlStatus Status => _session.Status;
+    public ControlConnectionState ConnectionState => _connectionState;
+    public bool IsConnected => _connectionState == ControlConnectionState.Connected;
+    public bool IsBusy => _isBusy;
+    public string ConnectionStatusText => _connectionState switch
+    {
+        ControlConnectionState.Connecting => "正在連接 Hibiki 音訊引擎…",
+        ControlConnectionState.Connected => "Hibiki 已連線",
+        ControlConnectionState.Degraded => "引擎未可用（音訊保持安全狀態）",
+        _ => "尚未連接 Hibiki 音訊引擎"
+    };
     public SceneCard? SelectedScene => _selectedScene;
     public string? SelectedOutputGroup
     {
@@ -135,6 +157,75 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         return true;
     }
 
+    public async Task<bool> ConnectAsync(TimeSpan timeout,
+                                          CancellationToken cancellationToken = default)
+    {
+        if (_connectionState == ControlConnectionState.Connecting) return false;
+        await DisconnectAsync().ConfigureAwait(true);
+        SetConnectionState(ControlConnectionState.Connecting);
+        SetBusy(true);
+        var client = new NamedPipeControlClientV1(_pipeName);
+        try
+        {
+            await client.ConnectAsync(timeout, cancellationToken).ConfigureAwait(true);
+            var reply = await client.RoundTripAsync(_commands.Hello(), cancellationToken)
+                .ConfigureAwait(true);
+            if (reply.Type != ControlMessageType.Ack)
+                throw new InvalidDataException("Hibiki engine rejected the Hello request.");
+            _controlClient = client;
+            SetConnectionState(ControlConnectionState.Connected);
+            StatusText = "引擎已連線；選擇輸出裝置後即可一鍵改善";
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            await client.DisposeAsync().ConfigureAwait(true);
+            SetConnectionState(ControlConnectionState.Degraded);
+            StatusText = "連線已取消；音訊保持原狀";
+            return false;
+        }
+        catch (Exception)
+        {
+            await client.DisposeAsync().ConfigureAwait(true);
+            SetConnectionState(ControlConnectionState.Degraded);
+            StatusText = "找不到 Hibiki 引擎；請確認服務已啟動";
+            return false;
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    public async Task DisconnectAsync()
+    {
+        if (_controlClient is not null)
+        {
+            await _controlClient.DisposeAsync().ConfigureAwait(true);
+            _controlClient = null;
+        }
+        SetConnectionState(ControlConnectionState.Disconnected);
+    }
+
+    public async Task<bool> OneTapEnhanceAsync(CancellationToken cancellationToken = default)
+    {
+        if (!OneTapEnhance()) return false;
+        return await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    public async Task<bool> SelectSceneAsync(string sceneId,
+                                              CancellationToken cancellationToken = default)
+    {
+        if (!SelectScene(sceneId)) return false;
+        return await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    public async Task<bool> PushVolumeAsync(CancellationToken cancellationToken = default)
+    {
+        BuildVolumeCommand();
+        return await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+    }
+
     public bool SelectScene(string sceneId)
     {
         if (!_session.SelectScene(sceneId))
@@ -163,4 +254,63 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+    private async Task<bool> SendLastCommandAsync(CancellationToken cancellationToken)
+    {
+        var client = _controlClient;
+        var command = LastCommand;
+        if (client is null || command is null || !IsConnected)
+        {
+            _session.MarkDegraded();
+            StatusText = "尚未連接 Hibiki 引擎；命令未送出";
+            OnPropertyChanged(nameof(Status));
+            return false;
+        }
+
+        SetBusy(true);
+        try
+        {
+            var reply = await client.RoundTripAsync(command, cancellationToken)
+                .ConfigureAwait(true);
+            if (reply.Type != ControlMessageType.Ack)
+                throw new InvalidDataException("Hibiki engine rejected the command.");
+            StatusText = _selectedScene is null
+                ? "命令已套用"
+                : $"已套用 {_selectedScene.Name} 到 {_selectedOutputGroup}";
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "命令已取消；保留上一個安全狀態";
+            return false;
+        }
+        catch (Exception)
+        {
+            _session.MarkDegraded();
+            SetConnectionState(ControlConnectionState.Degraded);
+            StatusText = "引擎連線中斷；已回到安全狀態";
+            OnPropertyChanged(nameof(Status));
+            return false;
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    private void SetConnectionState(ControlConnectionState state)
+    {
+        if (_connectionState == state) return;
+        _connectionState = state;
+        OnPropertyChanged(nameof(ConnectionState));
+        OnPropertyChanged(nameof(IsConnected));
+        OnPropertyChanged(nameof(ConnectionStatusText));
+    }
+
+    private void SetBusy(bool value)
+    {
+        if (_isBusy == value) return;
+        _isBusy = value;
+        OnPropertyChanged(nameof(IsBusy));
+    }
 }

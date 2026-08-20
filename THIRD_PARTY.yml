@@ -7,6 +7,12 @@ dependencies:
     license: Microsoft-redistributable-tooling
     purpose: Windows driver and SDK build prerequisite
     redistribution: Do not vendor into the public repository
+  - name: Microsoft Windows App SDK
+    source: https://www.nuget.org/packages/Microsoft.WindowsAppSDK
+    version: 1.7.250401001
+    license: MIT (package notices apply)
+    purpose: WinUI 3 source-only control shell
+    redistribution: Restore from NuGet; preserve package notices; do not vendor binaries
   - name: Microsoft Windows-driver-samples SYSVAD
     source: https://github.com/microsoft/Windows-driver-samples/tree/main/audio/sysvad
     version: pinned-at-driver-bootstrap

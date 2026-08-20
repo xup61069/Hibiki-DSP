@@ -726,6 +726,36 @@ int main() {
     CHECK(!validate_vst3_worker_audio_frame_v1(worker_packet, decoded_worker, decoded_samples,
                                                 worker_error) &&
           worker_error == Vst3WorkerProtocolErrorV1::NonFiniteSample);
+    const Vst3WorkerParameterPointV1 worker_parameters[] = {
+        {7U, 0, 0.25}, {7U, 1, 0.75}, {9U, 0, 0.5}};
+    const auto parameter_payload_bytes = kVst3WorkerParameterPrefixBytesV1 +
+        3U * kVst3WorkerParameterPointBytesV1 + sizeof(worker_samples);
+    std::vector<std::uint8_t> parameter_packet(kVst3WorkerHeaderBytesV1 +
+                                                parameter_payload_bytes);
+    const Vst3WorkerFrameV1 parameter_frame{
+        Vst3WorkerMessageTypeV1::ProcessBlockWithParameters, 18U, 2U, 2U,
+        static_cast<std::uint32_t>(parameter_payload_bytes), 0U};
+    std::size_t parameter_bytes_written = 0U;
+    CHECK(encode_vst3_worker_parameter_frame_v1(
+        parameter_frame, worker_parameters, std::span<const float>(worker_samples),
+        std::span<std::uint8_t>(parameter_packet), parameter_bytes_written) &&
+          parameter_bytes_written == parameter_packet.size());
+    std::array<Vst3WorkerParameterPointV1, kVst3WorkerMaxParameterPointsV1>
+        decoded_parameters{};
+    std::size_t decoded_parameter_count = 0U;
+    std::span<const float> decoded_parameter_samples;
+    CHECK(validate_vst3_worker_parameter_frame_v1(
+        parameter_packet, decoded_worker, std::span<Vst3WorkerParameterPointV1>(decoded_parameters),
+        decoded_parameter_count, decoded_parameter_samples, worker_error) &&
+          decoded_parameter_count == 3U && decoded_parameters[1].parameter_id == 7U &&
+          decoded_parameters[1].sample_offset == 1 &&
+          std::abs(decoded_parameters[1].normalized_value - 0.75) < 1e-12 &&
+          decoded_parameter_samples.size() == 4U);
+    parameter_packet[kVst3WorkerHeaderBytesV1 + 4U] = 1U;
+    CHECK(!validate_vst3_worker_parameter_frame_v1(
+        parameter_packet, decoded_worker, std::span<Vst3WorkerParameterPointV1>(decoded_parameters),
+        decoded_parameter_count, decoded_parameter_samples, worker_error) &&
+          worker_error == Vst3WorkerProtocolErrorV1::InvalidFormat);
     Vst3WorkerPipeV1 worker_pipe;
     CHECK(!worker_pipe.create_server(Vst3WorkerPipeConfigV1{L"", 1024U, 100U}));
     CHECK(!worker_pipe.connect_client(L"", 100U));

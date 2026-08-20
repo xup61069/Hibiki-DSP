@@ -1,0 +1,20 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.26100.0</TargetPlatformMinVersion>
+    <UseWinUI>true</UseWinUI>
+    <EnableDefaultApplicationDefinition>true</EnableDefaultApplicationDefinition>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+    <Platforms>x64</Platforms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <WindowsAppSDKVersion Condition="'$(WindowsAppSDKVersion)' == ''">1.7.250401001</WindowsAppSDKVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\control-model\Hibiki.ControlModel.csproj" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="$(WindowsAppSDKVersion)" />
+  </ItemGroup>
+</Project>

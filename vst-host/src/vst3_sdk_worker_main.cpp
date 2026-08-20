@@ -19,8 +19,7 @@
 namespace {
 
 constexpr std::size_t kMaxPayload =
-    static_cast<std::size_t>(hibiki::kVst3WorkerMaxChannelsV1) *
-    hibiki::kVst3WorkerMaxFramesV1 * sizeof(float);
+    hibiki::kVst3WorkerMaxPayloadBytesV1;
 constexpr std::size_t kMaxPacket = hibiki::kVst3WorkerHeaderBytesV1 + kMaxPayload;
 
 struct Arguments {
@@ -139,6 +138,10 @@ int wmain(int argc, wchar_t** argv) {
   std::vector<std::uint8_t> response;
   std::array<float, hibiki::kVst3WorkerMaxChannelsV1 * hibiki::kVst3WorkerMaxFramesV1> input{};
   std::array<float, hibiki::kVst3WorkerMaxChannelsV1 * hibiki::kVst3WorkerMaxFramesV1> output{};
+  std::array<hibiki::Vst3WorkerParameterPointV1,
+             hibiki::kVst3WorkerMaxParameterPointsV1> worker_parameters{};
+  std::array<hibiki::Vst3SdkParameterPointV1,
+             hibiki::kVst3WorkerMaxParameterPointsV1> sdk_parameters{};
   for (;;) {
     std::size_t bytes_read = 0U;
     if (!pipe.receive(request, bytes_read)) return 5;
@@ -157,19 +160,38 @@ int wmain(int argc, wchar_t** argv) {
       }
       continue;
     }
-    if (frame.type != hibiki::Vst3WorkerMessageTypeV1::ProcessBlock) {
+    if (frame.type != hibiki::Vst3WorkerMessageTypeV1::ProcessBlock &&
+        frame.type != hibiki::Vst3WorkerMessageTypeV1::ProcessBlockWithParameters) {
       if (!make_error(frame.request_id, response) || !pipe.send(response)) return 8;
       continue;
     }
     std::span<const float> samples;
-    if (!hibiki::validate_vst3_worker_audio_frame_v1(packet, frame, samples, protocol_error) ||
-        frame.channels != arguments.channels) {
+    std::size_t parameter_count = 0U;
+    bool valid_frame = false;
+    if (frame.type == hibiki::Vst3WorkerMessageTypeV1::ProcessBlockWithParameters) {
+      valid_frame = hibiki::validate_vst3_worker_parameter_frame_v1(
+          packet, frame, std::span<hibiki::Vst3WorkerParameterPointV1>(worker_parameters),
+          parameter_count, samples, protocol_error);
+      if (valid_frame) {
+        for (std::size_t index = 0U; index < parameter_count; ++index) {
+          sdk_parameters[index].parameter_id = worker_parameters[index].parameter_id;
+          sdk_parameters[index].sample_offset = worker_parameters[index].sample_offset;
+          sdk_parameters[index].normalized_value = worker_parameters[index].normalized_value;
+        }
+      }
+    } else {
+      valid_frame = hibiki::validate_vst3_worker_audio_frame_v1(packet, frame, samples,
+                                                                 protocol_error);
+    }
+    if (!valid_frame || frame.channels != arguments.channels) {
       if (!make_error(frame.request_id, response) || !pipe.send(response)) return 9;
       continue;
     }
     const std::size_t sample_count = static_cast<std::size_t>(frame.channels) * frame.frames;
     std::copy_n(samples.data(), sample_count, input.data());
-    const auto process_result = processor.process(input.data(), output.data(), frame.frames);
+    const auto process_result = processor.process(
+        input.data(), output.data(), frame.frames,
+        std::span<const hibiki::Vst3SdkParameterPointV1>(sdk_parameters.data(), parameter_count));
     if (process_result != hibiki::Vst3SdkProcessResultV1::ok) {
       if (!make_error(frame.request_id, response) || !pipe.send(response)) return 10;
       continue;
@@ -177,6 +199,7 @@ int wmain(int argc, wchar_t** argv) {
     response.assign(hibiki::kVst3WorkerHeaderBytesV1 + sample_count * sizeof(float), 0U);
     hibiki::Vst3WorkerFrameV1 response_frame = frame;
     response_frame.type = hibiki::Vst3WorkerMessageTypeV1::ProcessBlockResponse;
+    response_frame.payload_bytes = static_cast<std::uint32_t>(sample_count * sizeof(float));
     std::size_t written = 0U;
     if (!hibiki::encode_vst3_worker_frame_v1(response_frame,
                                              std::span<std::uint8_t>(response.data(),

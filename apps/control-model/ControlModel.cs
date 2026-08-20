@@ -13,6 +13,30 @@ public enum AudioControlStatus
     Degraded
 }
 
+public enum ControlConnectionState
+{
+    Disconnected,
+    Connecting,
+    Connected,
+    Degraded
+}
+
+public sealed record OutputGroupCard(
+    string Id,
+    string Name,
+    int Channels,
+    bool IsAvailable = true);
+
+public static class OutputGroupCatalog
+{
+    public static IReadOnlyList<OutputGroupCard> Fixed { get; } =
+    [
+        new("main", "Main", 2),
+        new("low-latency", "Low Latency", 2),
+        new("surround", "Surround 7.1", 8)
+    ];
+}
+
 public sealed record SceneCard(
     string Id,
     string Name,
@@ -82,6 +106,8 @@ public sealed class EasyControlSession
         ActiveScene = scene;
         return true;
     }
+
+    public void MarkDegraded() => Status = AudioControlStatus.Degraded;
 }
 
 public sealed class DeviceSwitchModel

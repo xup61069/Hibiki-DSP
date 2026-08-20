@@ -1,0 +1,23 @@
+schema_version: 1
+toolchain_id: windows11-x64-hibiki-2026
+target:
+  os: Windows 11
+  minimum_build: 26100
+  architecture: x64
+compiler:
+  family: MSVC
+  visual_studio: "2026"
+  generator: "Visual Studio 18 2026"
+windows:
+  sdk: "10.0.28000.2526"
+  wdk: "10.0.28000.2526"
+  app_sdk: "1.7.250401001"
+build:
+  language_standard: c++20
+  configuration: RelWithDebInfo
+  source_date_epoch: required-for-release
+  locale: en-US
+notes:
+  - "Public CI may use a matching ephemeral toolchain but must not publish binaries."
+  - "A local machine with another toolchain may run contract tests, but its result is not driver-target evidence."
+  - "Changing any locked version requires a new accepted ADR and refreshed evidence."

@@ -35,6 +35,7 @@ pwsh -File tools/source-policy.ps1
 pwsh -File tools/extension-check.ps1
 pwsh -File tools/installer-check.ps1
 pwsh -File tools/control-model-check.ps1
+pwsh -File tools/winui-shell-check.ps1
 pwsh -File tools/distribution-check.ps1
 pwsh -File tools/driver-source-check.ps1
 ```
