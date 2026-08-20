@@ -49,7 +49,8 @@
     {"command": "installer-source-hardening", "status": "pass", "coverage": ["relative manifest paths", "path traversal rejection", "64-character SHA-256 validation"]},
     {"command": "ir-phase-policy", "status": "pass", "coverage": ["minimum-phase 0 ms", "mixed-phase 80 ms budget", "linear-phase 160 ms budget", "bypass validation", "C++/C# slider parity"]},
     {"command": "audio-engine-volume-snapshot", "status": "pass", "coverage": ["single 64-bit dB/mute atomic", "mute transition", "Group Master applied once"]},
-    {"command": "control-command-queue", "status": "pass", "coverage": ["64-slot SPSC", "full-queue dropped counter", "pipe-to-control handoff"]}
+    {"command": "control-command-queue", "status": "pass", "coverage": ["64-slot SPSC", "full-queue dropped counter", "pipe-to-control handoff"]},
+    {"command": "engine-control-worker", "status": "pass", "coverage": ["SceneApply to Easy presets", "Validate-Prepare-Commit", "volume through Group Master", "invalid scene preserves revision"]}
   ],
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",

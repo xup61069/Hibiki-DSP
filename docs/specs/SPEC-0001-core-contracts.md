@@ -44,6 +44,9 @@ Lane、output group、channel map、DSP chain、latency mode 與安全策略；�
 - `ControlCommandQueueV1` 是目前的固定 64-slot SPSC handoff；滿載時丟棄新命令並增加
   dropped counter，consumer 才能呼叫 AudioEngine／graph transaction。這個 queue 不保證
   multi-producer；若未來有第二個 control producer，必須先建立新的版本化協定。
+- `EngineControlWorkerV1` 是目前的單一 consumer：它將 `SceneApply` 解析為四個受控 Easy
+  preset，執行 `prepare_graph` → `commit_graph`，失敗則 rollback；`VolumeNotification`
+  同樣在 control worker 套用，pipe callback 只負責 validate、enqueue、回 ACK。
 - `AudioSessionRegistry` 以 `endpoint_id + session_instance_id` 作為唯一 session key；PID
   只作顯示／診斷用途。OS metadata refresh 不得覆蓋使用者已選 lane、output group 或 gain
   owner，避免同一 process 的多個 Chrome tab／session 互相串音。

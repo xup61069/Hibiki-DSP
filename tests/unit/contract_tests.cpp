@@ -16,6 +16,7 @@
 #include "hibiki/output_sink.hpp"
 #include "hibiki/output_crossfade.hpp"
 #include "hibiki/exporters.hpp"
+#include "hibiki/engine_control.hpp"
 #include "hibiki/audio_engine.hpp"
 #include "hibiki/audio_session_registry.hpp"
 
@@ -40,6 +41,7 @@ extern "C" {
 #endif
 
 #include <cmath>
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <cstring>
@@ -365,6 +367,35 @@ int main() {
     CHECK(handle_control_frame_v1(scene_frame, service_response, &service_context) &&
           command_accepted && service_response.header.type == IpcMessageType::Ack &&
           service_response.header.request_id == scene_frame.header.request_id);
+    AudioEngineModel control_engine;
+    EngineControlWorkerV1 control_worker(control_engine);
+    ControlCommandQueueV1 control_queue;
+    ControlCommandV1 scene_command{};
+    scene_command.type = IpcMessageType::SceneApply;
+    scene_command.scene = decoded_scene;
+    CHECK(control_queue.try_push(scene_command));
+    CHECK(control_worker.drain(control_queue) == 1U && control_worker.has_active_scene() &&
+          control_worker.active_scene().output_group == "main" && control_worker.revision() == 1U);
+    ControlCommandV1 control_volume{};
+    control_volume.type = IpcMessageType::VolumeNotification;
+    control_volume.volume = VolumeNotificationV1{0.0, false, 1U};
+    CHECK(control_queue.try_push(control_volume));
+    CHECK(control_worker.drain(control_queue) == 1U);
+    const float control_input[] = {1.0F, -1.0F};
+    const RtLaneInputV1 control_view{control_input, 2};
+    float control_output[2]{};
+    CHECK(control_engine.process(std::span<const RtLaneInputV1>(&control_view, 1), control_output, 1));
+    CHECK(std::abs(control_output[0] - 1.0F) < 1e-5F &&
+          std::abs(control_output[1] + 1.0F) < 1e-5F);
+    control_volume.volume = VolumeNotificationV1{-6.0206, false, 2U};
+    CHECK(control_queue.try_push(control_volume));
+    CHECK(control_worker.drain(control_queue) == 1U);
+    CHECK(control_engine.process(std::span<const RtLaneInputV1>(&control_view, 1), control_output, 1));
+    CHECK(std::abs(control_output[0] - 0.5F) < 1e-5F);
+    scene_command.scene.scene_id_bytes = 7U;
+    std::copy_n("unknown", 7U, scene_command.scene.scene_id.data());
+    CHECK(control_queue.try_push(scene_command));
+    CHECK(control_worker.drain(control_queue) == 1U && control_worker.revision() == 1U);
     auto malformed = encoded;
     malformed[0] = 0;
     CHECK(!decode_ipc_frame(malformed, decode_error).has_value());

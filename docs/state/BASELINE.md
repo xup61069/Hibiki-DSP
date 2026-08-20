@@ -30,6 +30,9 @@
   the graph.
 - `ControlCommandQueueV1` provides a fixed 64-slot SPSC pipe-worker to control-worker handoff;
   overflow is fail-closed with a dropped counter and no allocation/lock/wait.
+- `EngineControlWorkerV1` consumes that queue and applies the four Easy Scene presets through
+  AudioEngine Validate → Prepare → Commit; invalid scene IDs leave the last committed graph
+  and revision unchanged, while volume commands share the same Group Master path.
 - `AudioEngineModel` facade connecting graph transaction, Windows volume notification and RT
   processing with one Group Master gain.
 - `AudioEngineModel` 的 RT Group Master 已改讀 release/acquire 64-bit Q16.16 dB/mute word；
