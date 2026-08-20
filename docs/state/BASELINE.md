@@ -39,12 +39,17 @@
 - `OutputSinkModel` now joins clock-drift estimation to persistent SRC per sink, preserving
   phase while applying bounded `base_step / sink_source_ratio` correction; physical clock fixtures
   are still pending.
+- Optional source-only native ASIO COM transport now builds when a local pinned ASIO SDK is
+  supplied: stable CLSID, eight Float32 output channels, 32--4096 frame buffers, supported
+  sample rates, callbacks, sample position and ASIO registry routines. It remains disabled in
+  normal CI and does not yet connect buffers to a physical sink or the signed virtual endpoint.
 
 ## 尚未開始
 
 - 可載入的 WaveRT/SYSVAD-derived driver。
-- 真正的 WaveRT-backed RT engine、Steinberg ASIO DLL、out-of-process VST3 SDK host、WinUI 3 UI、
-  native browser bridge、physical sink clock integration 與 signed package delivery。
+- 可載入的 WaveRT/SYSVAD-derived driver、ASIO transport 與 Hibiki engine/physical sink 的
+  真正串接、out-of-process VST3 SDK host、WinUI 3 UI、native browser bridge、physical sink
+  clock fixtures 與 signed package delivery。
 - ISO 226:2023 合法係數來源與正式 conformance oracle（公式本身已完成，但係數資料仍待
   授權／法務確認）。
 - Microsoft driver signing、Gumroad release artifact 與 production installer。
@@ -57,11 +62,14 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 
 初始 foundation evidence 已寫入 `evidence/0000-foundation/initial.json`，目前對應最新
 Windows volume/device、ISO formula、recovery、driver control-core、persistent SRC、VST watchdog、
-session volume adapter 與 sink clock pipeline baseline commit `16d2fae`；
+session volume adapter、sink clock pipeline 與 optional native ASIO transport baseline commit
+`c470c23`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 40 個必要入口與
 5 份 Spec 通過；`source-policy.ps1` 掃描 137 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1` 與
-`distribution-check.ps1` 通過；16 個 JSON 檔案均可解析。
+`distribution-check.ps1` 通過；16 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
+另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
+`.local/`，未提交或發布。

@@ -34,4 +34,6 @@ branch。真實裝置資料與 calibration 留在 `.local/`，只提交 schema �
 - `driver/`：SYSVAD-derived WaveRT/KS 虛擬端點與 Windows volume nodes。
 - `src/`：即時 graph、Matrix、ISO fit、safety、device switch 與 output sinks。
 - `apps/`：WinUI 3 易用模式與 Expert matrix/graph UI。
-- `asio/`、`vst-host/`、`extensions/`、`installer/`：各自依 Spec 漸進加入。
+- `asio/`：預設為 stream model；需要本機 pinned ASIO SDK 時可開啟 optional native COM
+  transport（不進 public CI，也不提交 DLL）。`vst-host/`、`extensions/`、`installer/` 仍依
+  Spec 漸進加入。
