@@ -19,6 +19,9 @@
   read-back and event-context write path; no physical endpoint was exercised on this machine.
 - Windows-only `IMMNotificationClient` watcher with bounded default/add/remove/property event
   snapshots; worker-side rebind and Audio Service recovery are still pending.
+- Parameterized ISO 226:2023 SPL-from-phon formula using caller-supplied legal parameters;
+  the 1 kHz invariant and phon bounds are covered by CTest without embedding the licensed
+  29-point coefficient table.
 
 ## 尚未開始
 
@@ -26,7 +29,8 @@
 - 真正的 WaveRT-backed RT engine、Steinberg ASIO DLL、out-of-process VST3 SDK host、WinUI 3 UI、
   native browser bridge、persistent SRC state、physical sink clock integration 與 signed package
   delivery。
-- ISO 226:2023 合法係數來源與正式 conformance oracle。
+- ISO 226:2023 合法係數來源與正式 conformance oracle（公式本身已完成，但係數資料仍待
+  授權／法務確認）。
 - Microsoft driver signing、Gumroad release artifact 與 production installer。
 
 目前開發機是 Windows build 22631、VS 17／SDK 10.0.26100.0，低於鎖定的 driver 目標
@@ -36,8 +40,8 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 ## 最近驗證
 
 初始 foundation evidence 已寫入 `evidence/0000-foundation/initial.json`，目前對應最新
-Windows volume/device baseline commit `1b7de12`；新 AI 接手時仍必須確認 working tree 與該
-scope 是否一致。
+Windows volume/device 與 ISO formula baseline commit `85cbce9`；新 AI 接手時仍必須確認
+working tree 與該 scope 是否一致。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 40 個必要入口與
 5 份 Spec 通過；`source-policy.ps1` 掃描 129 個路徑且無 blocked binary/secret；
