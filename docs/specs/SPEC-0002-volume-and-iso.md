@@ -61,7 +61,10 @@ minimum/mixed/linear implementation choice。
 
 Exporter 只接受 caller-supplied `PeqFilterV1`，目前可輸出 Hibiki JSON profile、Equalizer
 APO、CamillaDSP YAML 與 REW filter list；不內嵌 ISO 授權表格，也不把估算耳機資料標成正式
-量測結果。同一 exporter 也能把 caller-supplied interleaved impulse samples 寫成 32-bit
+量測結果。`compile_bounded_peq_correction_v1` 可把 caller-supplied 的 measured/target
+頻響點編成最多 16 段 bounded PEQ，並保留 clipped/unrepresented `limited` 狀態；這是
+校正檔 compiler baseline，不是房間聲學 optimizer。編譯後可交給同一組 exporter。
+同一 exporter 也能把 caller-supplied interleaved impulse samples 寫成 32-bit
 IEEE-float WAV IR；它只負責檔案格式，不替任何未授權量測資料背書。
 
 `PeqProcessorV1` 會把最多 16 個 `PeqFilterV1` 編譯成 RBJ peaking biquad，固定支援 1–8

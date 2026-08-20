@@ -30,6 +30,10 @@
   explicit Connected/Degraded states and disconnect cleanup; `apps/winui-shell/` supplies a
   source-only WinUI 3 first-run shell that keeps Expert controls behind an explicit switch. The
   shell is not compiled on this machine.
+- `CalibrationResponsePointV1` and `compile_bounded_peq_correction_v1` now provide a deterministic
+  control-plane measured-response to bounded PEQ compiler (16-filter cap, frequency/spacing/Q and
+  boost/cut policy validation, explicit `limited` result) that feeds the existing APO/CamillaDSP/
+  REW/Hibiki exporters. It is documented as a baseline, not a room optimizer or acoustic oracle.
 - `handle_control_frame_v1` validates Hello/Volume/Scene/graph lifecycle commands before passing
   them to a host-owned typed sink; malformed or rejected commands receive Error without touching
   the graph.

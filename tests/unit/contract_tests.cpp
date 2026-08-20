@@ -7,6 +7,7 @@
 #include "hibiki/ipc_pipe.hpp"
 #include "hibiki/asio_bridge.hpp"
 #include "hibiki/calibration.hpp"
+#include "hibiki/calibration_compiler.hpp"
 #include "hibiki/plugin_host.hpp"
 #include "hibiki/vst3_sandbox.hpp"
 #include "hibiki/vst3_worker_protocol.hpp"
@@ -221,6 +222,24 @@ int main() {
     EqualLoudnessPolicyV1 calibrated;
     calibrated.mode = EqualLoudnessMode::Calibrated;
     CHECK(!validate_policy(calibrated));
+
+    const std::array<CalibrationResponsePointV1, 4> calibration_response{{
+        {100.0, -10.0, 0.0}, {250.0, -2.0, 0.0}, {1000.0, 0.0, 0.0},
+        {10000.0, 6.0, 0.0}}};
+    CalibrationCompilePolicyV1 calibration_policy;
+    calibration_policy.max_filters = 2U;
+    calibration_policy.max_boost_db = 4.0;
+    calibration_policy.max_cut_db = 3.0;
+    const auto calibration_result = compile_bounded_peq_correction_v1(
+        calibration_response, calibration_policy);
+    CHECK(calibration_result.filters.size() == 2U && calibration_result.limited &&
+          calibration_result.filters[0].frequency_hz == 100.0 &&
+          std::abs(calibration_result.filters[0].gain_db - 4.0) < 1e-12 &&
+          calibration_result.maximum_requested_correction_db == 10.0);
+    CHECK(validate_calibration_response_v1(calibration_response, calibration_policy));
+    auto unsorted_response = calibration_response;
+    std::swap(unsorted_response[0], unsorted_response[1]);
+    CHECK(!validate_calibration_response_v1(unsorted_response, calibration_policy));
     calibrated.anchor_id = "speaker-anchor";
     CHECK(!validate_policy(calibrated));
     calibrated.standard = "iso-226-2023-calibrated";

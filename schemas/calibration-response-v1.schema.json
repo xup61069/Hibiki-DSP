@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/calibration-response-v1.schema.json",
+  "title": "Hibiki calibration response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "sample_rate", "channels", "points"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "sample_rate": {"type": "number", "minimum": 8000, "maximum": 384000},
+    "channels": {"type": "integer", "enum": [1, 2, 6, 8]},
+    "device_id": {"type": "string", "minLength": 1},
+    "points": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["frequency_hz", "measured_db", "target_db"],
+        "properties": {
+          "frequency_hz": {"type": "number", "exclusiveMinimum": 0, "maximum": 24000},
+          "measured_db": {"type": "number"},
+          "target_db": {"type": "number"}
+        }
+      }
+    }
+  }
+}

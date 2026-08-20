@@ -36,7 +36,8 @@ branch。真實裝置資料與 calibration 留在 `.local/`，只提交 schema �
 - `driver/`：固定四端點的 SYSVAD-derived WaveRT/KS 虛擬端點與 Windows volume nodes；
   endpoint topology/channel mask catalog 已有 portable MS-PL contract，PortCls wiring 與簽章仍待完成。
 - `src/`：即時 graph、Matrix、ISO fit、scene safety、device switch、ASIO/外部 Lane block API
-  與 WASAPI Float32 output boundary；真實端點 soak 仍待目標環境。
+  與 WASAPI Float32 output boundary；bounded calibration PEQ compiler 已加入，真實端點 soak
+  仍待目標環境。
 - `apps/`：已有 UI-independent control model 與 source-only WinUI 3 Easy/Expert shell；
   仍需在鎖定 Windows App SDK 的目標環境編譯、做視覺／無障礙驗證，再接上實體端點狀態。
 - `asio/`：預設為 stream model；需要本機 pinned ASIO SDK 時可開啟 optional native COM
