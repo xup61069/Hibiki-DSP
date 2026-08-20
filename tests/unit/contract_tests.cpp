@@ -14,6 +14,7 @@
 #include "hibiki/vst3_worker_pipe.hpp"
 #include "hibiki/latency_compensation.hpp"
 #include "hibiki/latency_graph_commit.hpp"
+#include "hibiki/vst3_parameter_timeline.hpp"
 #include "hibiki/tab_bridge.hpp"
 #include "hibiki/asio_transport_v1.h"
 #include "hibiki/output_sink.hpp"
@@ -777,6 +778,33 @@ int main() {
         parameter_packet, decoded_worker, std::span<Vst3WorkerParameterPointV1>(decoded_parameters),
         decoded_parameter_count, decoded_parameter_samples, worker_error) &&
           worker_error == Vst3WorkerProtocolErrorV1::InvalidFormat);
+    Vst3ParameterTimelineV1 parameter_timeline;
+    CHECK(parameter_timeline.append(Vst3ParameterTimelineEventV1{7U, 48003U, 0.75}) &&
+          parameter_timeline.append(Vst3ParameterTimelineEventV1{3U, 48000U, 0.25}) &&
+          parameter_timeline.append(Vst3ParameterTimelineEventV1{7U, 48000U, 0.5}) &&
+          validate_vst3_parameter_timeline_v1(parameter_timeline.snapshot()) &&
+          parameter_timeline.snapshot().events[0].parameter_id == 3U &&
+          parameter_timeline.snapshot().events[1].parameter_id == 7U);
+    std::array<Vst3WorkerParameterPointV1, kVst3WorkerMaxParameterPointsV1> timeline_points{};
+    std::size_t timeline_point_count = 0U;
+    CHECK(parameter_timeline.collect_block(48000U, 8U, timeline_points, timeline_point_count) &&
+          timeline_point_count == 3U && timeline_points[0].sample_offset == 0 &&
+          timeline_points[0].parameter_id == 3U && timeline_points[1].parameter_id == 7U &&
+          timeline_points[2].sample_offset == 3);
+    CHECK(parameter_timeline.erase(1U) && parameter_timeline.snapshot().event_count == 2U &&
+          parameter_timeline.collect_block(48000U, 2U, timeline_points, timeline_point_count) &&
+          timeline_point_count == 1U);
+    CHECK(!parameter_timeline.append(Vst3ParameterTimelineEventV1{99U, 0U, 1.1}) &&
+          !parameter_timeline.collect_block(0U, 0U, timeline_points, timeline_point_count));
+    Vst3ParameterTimelineV1 too_many_parameters;
+    bool timeline_parameter_capacity = true;
+    for (std::uint32_t parameter_id = 0U; parameter_id < 17U; ++parameter_id) {
+        timeline_parameter_capacity =
+            too_many_parameters.append(Vst3ParameterTimelineEventV1{parameter_id, parameter_id,
+                                                                     0.5}) &&
+            timeline_parameter_capacity;
+    }
+    CHECK(!timeline_parameter_capacity && too_many_parameters.snapshot().event_count == 16U);
     Vst3WorkerPipeV1 worker_pipe;
     CHECK(!worker_pipe.create_server(Vst3WorkerPipeConfigV1{L"", 1024U, 100U}));
     CHECK(!worker_pipe.connect_client(L"", 100U));

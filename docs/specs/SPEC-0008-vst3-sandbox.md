@@ -63,8 +63,10 @@ VST3 sandbox worker，不能直接掛進 Hibiki RT graph。此 adapter 沒有參
 SDK adapter 的 control API 另接受最多 16 個 parameter IDs、每個 ID 最多 5 個 sample-accurate
 points，將 normalized `[0,1]` 值轉成官方 `IParameterChanges`；非法 offset、值域或超限事件
 會在交給 plugin 前拒絕。`ProcessBlockWithParameters` 已由 frame codec 與 optional SDK
-worker 解碼並交給 adapter；supervisor 的 UI／timeline producer、參數持久化與自動化排程仍
-未接入，因此不能宣稱完整 host automation。
+worker 解碼並交給 adapter。`Vst3ParameterTimelineV1` 現在提供最多 256 個已排序事件的
+control-plane snapshot、穩定 sample-position block extraction 與 worker point conversion；
+它可持久化為 `vst3-parameter-timeline-v1.schema.json`，但 supervisor 的 UI 編輯器、跨版本
+plugin state persistence 與完整自動化排程仍未接入，因此不能宣稱完整 host automation。
 
 `LatencyAlignmentPlanV1` 會在 control plane 取所有 active lane 的 reported latency，將每個
 lane 的補償量設為 `maximum_latency - lane_latency`，上限 16,384 samples。

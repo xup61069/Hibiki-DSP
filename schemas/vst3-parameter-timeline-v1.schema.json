@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/vst3-parameter-timeline-v1.schema.json",
+  "title": "Hibiki VST3 parameter timeline v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_count", "events"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "event_count": {"type": "integer", "minimum": 0, "maximum": 256},
+    "events": {
+      "type": "array", "minItems": 256, "maxItems": 256,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["parameter_id", "sample_position", "normalized_value"],
+        "properties": {
+          "parameter_id": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+          "sample_position": {"type": "integer", "minimum": 0},
+          "normalized_value": {"type": "number", "minimum": 0, "maximum": 1}
+        }
+      }
+    }
+  }
+}
