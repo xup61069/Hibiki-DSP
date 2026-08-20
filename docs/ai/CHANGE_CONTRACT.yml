@@ -1,0 +1,12 @@
+schema_version: 1
+rules:
+  public_behavior:
+    required: [spec_update, contract_tests, evidence]
+  architecture_or_dependency:
+    required: [adr_or_superseding_adr, project_map_update, third_party_update]
+  build_or_toolchain:
+    required: [agents_update, readme_update, ci_update]
+  task_handoff:
+    required: [issue, active_handoff, base_commit, next_safe_action]
+  release:
+    required: [signed_source_tag, unsigned_reproducibility, release_manifest, source_policy]

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/equal-loudness-policy-v1.schema.json",
+  "title": "Hibiki EqualLoudnessPolicy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "standard", "mode", "reference_phon", "strength", "max_boost_db"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "standard": {"enum": ["iso-226-2023-derived", "iso-226-2023-calibrated"]},
+    "mode": {"enum": ["calibrated", "relative", "program-aware"]},
+    "reference_phon": {"type": "number", "minimum": 20, "maximum": 90},
+    "strength": {"type": "number", "minimum": 0, "maximum": 1},
+    "max_boost_db": {"type": "number", "minimum": 0, "maximum": 12},
+    "measured_f3_hz": {"type": "number", "minimum": 0},
+    "anchor_id": {"type": ["string", "null"]}
+  }
+}

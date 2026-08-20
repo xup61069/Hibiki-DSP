@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "uncommitted-initial-foundation",
+  "environment_fingerprint": "local-only-run-tools-probe",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/extension-check.ps1",
+    "pwsh -File tools/installer-check.ps1",
+    "pwsh -File tools/control-model-check.ps1",
+    "pwsh -File tools/distribution-check.ps1"
+  ],
+  "results": [
+    {"command": "tools/verify.ps1", "status": "pass", "tests": 1},
+    {"command": "tools/docs-check.ps1", "status": "pass", "required_paths": 40, "specs": 5},
+    {"command": "tools/source-policy.ps1", "status": "pass", "scanned_paths": 124, "blocked_files": 0},
+    {"command": "tools/extension-check.ps1", "status": "pass"},
+    {"command": "tools/installer-check.ps1", "status": "pass"},
+    {"command": "tools/control-model-check.ps1", "status": "pass"},
+    {"command": "tools/distribution-check.ps1", "status": "pass"},
+    {"command": "json-parse", "status": "pass", "files": 16}
+  ],
+  "started_at": "2026-08-21T00:00:00Z",
+  "finished_at": "2026-08-21T00:00:00Z",
+  "limitations": [
+    "Evidence is for the uncommitted foundation and current environment only.",
+    "Current machine is Windows 22631 with VS 17/SDK 10.0.26100.0; it cannot provide driver-target evidence for the locked Windows 26100+/VS 2026/SDK-WDK 10.0.28000.2526 environment."
+  ],
+  "logs": [],
+  "tool_versions": {"cmake": "local doctor output", "compiler": "local CMake generator"}
+}

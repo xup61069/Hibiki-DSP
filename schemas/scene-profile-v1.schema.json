@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/scene-profile-v1.schema.json",
+  "title": "Hibiki SceneProfile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "name", "lanes", "output_group", "latency_mode", "safety"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"},
+    "name": {"type": "string", "minLength": 1, "maxLength": 120},
+    "lanes": {"type": "array", "items": {"type": "string"}},
+    "output_group": {"type": "string", "minLength": 1},
+    "latency_mode": {"enum": ["game", "balanced", "movie-linear-phase", "strict-direct"]},
+    "safety": {"type": "object", "additionalProperties": false, "required": ["limiter_dbtp", "auto_attenuate"], "properties": {"limiter_dbtp": {"const": -1}, "auto_attenuate": {"type": "boolean"}}}
+  }
+}

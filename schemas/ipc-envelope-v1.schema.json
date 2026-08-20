@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/ipc-envelope-v1.schema.json",
+  "title": "Hibiki IPC Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "type", "request_id", "payload_bytes"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "type": {"enum": ["hello", "volume-notification", "graph-prepare", "graph-commit", "graph-rollback", "ack", "error"]},
+    "request_id": {"type": "integer", "minimum": 0},
+    "payload_bytes": {"type": "integer", "minimum": 0, "maximum": 1048576}
+  }
+}

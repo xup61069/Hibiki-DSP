@@ -1,0 +1,5 @@
+Hibiki DSP is a multi-license repository. Each source file and component has
+an SPDX identifier; see LICENSES/README.md and THIRD_PARTY.yml.
+
+The default user-space license is GPL-3.0-only. Its complete text is in
+LICENSES/GPL-3.0-only.txt. Other component license texts are kept beside it.

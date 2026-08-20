@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/equal-loudness-status-v1.schema.json",
+  "title": "Hibiki EqualLoudnessStatus v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "mode", "calibrated", "limited", "maximum_fit_error_db", "realized_peak_db", "diagnostic"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "mode": {"enum": ["calibrated", "relative", "program-aware"]},
+    "calibrated": {"type": "boolean"},
+    "limited": {"type": "boolean"},
+    "maximum_fit_error_db": {"type": "number", "minimum": 0},
+    "realized_peak_db": {"type": "number"},
+    "diagnostic": {"type": "string"}
+  }
+}

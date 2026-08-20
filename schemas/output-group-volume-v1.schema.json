@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/output-group-volume-v1.schema.json",
+  "title": "Hibiki OutputGroupVolumeState v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "requested_db", "safety_ceiling_db", "effective_db", "mute", "generation", "origin", "actuator"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "requested_db": {"type": "number", "minimum": -144, "maximum": 12},
+    "safety_ceiling_db": {"type": "number", "minimum": -144, "maximum": 12},
+    "effective_db": {"type": "number", "minimum": -144, "maximum": 12},
+    "mute": {"type": "boolean"},
+    "generation": {"type": "integer", "minimum": 0},
+    "origin": {"enum": ["windows", "hibiki-ui", "safety", "scene", "session"]},
+    "actuator": {"enum": ["internal-dsp", "device-hardware", "strict-direct"]}
+  }
+}

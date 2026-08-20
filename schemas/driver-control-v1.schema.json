@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/driver-control-v1.schema.json",
+  "title": "Hibiki driver control ABI v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "message_type", "request_id", "channel_count", "sample_rate", "frames_per_buffer", "generation"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "message_type": {"enum": ["hello", "volume-notification", "endpoint-state", "ack", "error"]},
+    "request_id": {"type": "integer", "minimum": 0},
+    "endpoint_guid": {"type": "string", "maxLength": 39},
+    "event_context_guid": {"type": "string", "maxLength": 39},
+    "channel_count": {"enum": [2, 6, 8]},
+    "sample_rate": {"enum": [44100, 48000, 96000, 192000]},
+    "frames_per_buffer": {"type": "integer", "minimum": 1, "maximum": 4096},
+    "requested_db_q16_16": {"type": "integer"},
+    "safety_ceiling_db_q16_16": {"type": "integer"},
+    "effective_db_q16_16": {"type": "integer"},
+    "mute": {"type": "boolean"},
+    "generation": {"type": "integer", "minimum": 0},
+    "actuator": {"enum": ["internal-dsp", "device-hardware", "strict-direct"]}
+  }
+}

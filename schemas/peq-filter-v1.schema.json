@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/peq-filter-v1.schema.json",
+  "title": "Hibiki PEQ filter v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "filters"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "filters": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "frequency_hz", "gain_db", "q"],
+        "properties": {
+          "type": {"const": "peaking"},
+          "frequency_hz": {"type": "number", "minimum": 10, "maximum": 48000},
+          "gain_db": {"type": "number", "minimum": -44, "maximum": 24},
+          "q": {"type": "number", "minimum": 0.1, "maximum": 100}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "windows-dev",
+      "displayName": "Hibiki Windows development",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/.local/build",
+      "cacheVariables": {
+        "HIBIKI_BUILD_TESTS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-dev",
+      "configurePreset": "windows-dev",
+      "configuration": "RelWithDebInfo"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-dev",
+      "configurePreset": "windows-dev",
+      "configuration": "RelWithDebInfo",
+      "output": {"outputOnFailure": true}
+    }
+  ]
+}

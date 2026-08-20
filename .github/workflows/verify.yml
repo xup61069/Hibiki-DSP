@@ -1,0 +1,44 @@
+name: verify
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-2025
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Configure and test unsigned source
+        shell: pwsh
+        run: ./tools/verify.ps1
+
+      - name: Documentation gate
+        shell: pwsh
+        run: ./tools/docs-check.ps1
+
+      - name: Source-only and secret gate
+        shell: pwsh
+        run: ./tools/source-policy.ps1
+
+      - name: Browser extension source gate
+        shell: pwsh
+        run: ./tools/extension-check.ps1
+
+      - name: Installer source gate
+        shell: pwsh
+        run: ./tools/installer-check.ps1
+
+      - name: Control model gate
+        shell: pwsh
+        run: ./tools/control-model-check.ps1
+
+      - name: Stable identity gate
+        shell: pwsh
+        run: ./tools/distribution-check.ps1

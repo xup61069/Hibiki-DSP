@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/docs/ai/doc-schema-v1.json",
+  "type": "object",
+  "required": ["id", "path", "authority", "owner", "last_reviewed", "review_after_days", "source_globs"],
+  "properties": {
+    "id": {"type": "string"},
+    "path": {"type": "string"},
+    "authority": {"enum": ["workflow", "product-behavior", "architecture", "current-state", "task", "evidence"]},
+    "owner": {"type": "string"},
+    "last_reviewed": {"type": "string", "format": "date"},
+    "review_after_days": {"type": "integer", "minimum": 1},
+    "source_globs": {"type": "array", "items": {"type": "string"}}
+  }
+}

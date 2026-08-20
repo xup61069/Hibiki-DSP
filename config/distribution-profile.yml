@@ -1,0 +1,16 @@
+schema_version: 1
+distribution_id: hibiki-public-2026
+platform:
+  os_min_build: 26100
+  architecture: x64
+  target: windows-11
+identities:
+  driver_hardware_id: Root\\HibikiDSP
+  driver_service: HibikiVirtualAudio
+  endpoint_main_guid: 8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10
+  endpoint_low_latency_guid: 6d5706a4-b661-4bf6-9c2d-9c31b8f7df21
+  endpoint_surround_guid: d4a21e0f-83e5-4a6e-92dc-44d13f9e6c93
+  endpoint_virtual_mic_guid: 5e90de25-0e88-4892-8b0e-a1d521cb3f40
+  asio_clsid: 2c0e8d4f-7d9f-4aa7-a03d-690dcf5d5f8c
+  ipc_namespace: Local\\HibikiDSP\\v1
+  schema_version: 1

@@ -1,0 +1,11 @@
+---
+description: Hibiki DSP canonical project rules
+alwaysApply: true
+---
+
+<!-- GENERATED_FROM: AGENTS.md -->
+
+Read `AGENTS.md` and `docs/START_HERE.md` before editing. Never invent stable
+IDs, private device data, licenses or binary release artifacts. Follow the
+Issue handoff and update the relevant Spec/ADR/evidence with every public
+contract change.

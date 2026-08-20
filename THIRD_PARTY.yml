@@ -1,0 +1,39 @@
+schema_version: 1
+policy: Every dependency is pinned by source URL, commit/version, hash, SPDX license and purpose.
+dependencies:
+  - name: Microsoft Windows SDK/WDK
+    source: https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk
+    version: 10.0.28000.2526
+    license: Microsoft-redistributable-tooling
+    purpose: Windows driver and SDK build prerequisite
+    redistribution: Do not vendor into the public repository
+  - name: Microsoft Windows-driver-samples SYSVAD
+    source: https://github.com/microsoft/Windows-driver-samples/tree/main/audio/sysvad
+    version: pinned-at-driver-bootstrap
+    license: MS-PL
+    purpose: Driver reference and permitted derivative boundary
+    redistribution: Preserve MS-PL notices
+  - name: Steinberg VST3 SDK
+    source: https://github.com/steinbergmedia/vst3sdk
+    version: pinned-at-vst-bootstrap
+    license: MIT
+    purpose: VST3 host compatibility
+    redistribution: Preserve license and notices
+  - name: libebur128
+    source: https://github.com/jiixyj/libebur128
+    version: pending
+    license: MIT
+    purpose: Optional slow content loudness meter
+    redistribution: Pin before use
+  - name: libsamplerate
+    source: https://github.com/libsndfile/libsamplerate
+    version: pending
+    license: BSD-2-Clause
+    purpose: Adaptive SRC reference or implementation
+    redistribution: Pin before use
+  - name: rnnoise-or-deepfilternet
+    source: pending
+    version: pending
+    license: pending
+    purpose: Optional browser voice/noise reduction
+    redistribution: Blocked until model and data provenance is verified

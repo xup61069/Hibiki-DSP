@@ -1,0 +1,42 @@
+# Hibiki DSP AI 工作規則
+
+## 先讀什麼
+
+每次開始工作先讀本檔與 `docs/START_HERE.md`，再讀 GitHub Issue 指定的
+handoff、Spec、ADR、source 與 tests。聊天紀錄、AI memory、個人 IDE 規則
+都不是專案真值。
+
+## 專案硬限制
+
+- 目標：Windows 11 24H2+ x64；C++20 即時核心、C# WinUI 3 UI。
+- RT audio thread 不配置、不取得 mutex、不等待、不呼叫 COM/UI/檔案系統。
+- driver 與 GPL user-space 只能透過版本化 IPC；不得把 MS-PL driver 靜態或動態連入 GPL engine。
+- 廠商 ASIO、WASAPI Exclusive、RAW 路徑不可宣稱受 Hibiki 控制。
+- 不提交 EXE、DLL、SYS、MSI、MSIX、VST3、PE/COFF、簽章憑證或私密金鑰。
+- 真實裝置 ID、校正檔、序號、私人路徑放 `.local/`，不得進 Git。
+- 不反編譯或繞過閉源軟體保護；只用開源程式、官方文件與合法 black-box 觀察。
+- ISO 226 授權文件、掃描、完整表格與受限資料不可放入 repo、Issue、prompt 或 RAG。
+
+## 真值與文件契約
+
+- 產品行為看 accepted Spec；架構取捨看 accepted ADR；已完成能力看 source、tests、evidence 與 `docs/state/BASELINE.md`。
+- 修改 public API、schema、DSP 順序、安全規則或建置方式時，同一 PR 必須更新對應文件與 evidence。
+- Accepted ADR 不可改寫；新決策建立新 ADR 並標示 supersedes。
+- 每個 Issue 使用一份 `docs/tasks/active/<issue>.md` handoff；換 AI 或電腦前建立 WIP commit、push branch、更新下一個安全動作。
+
+## 必跑命令
+
+```powershell
+pwsh -File tools/doctor.ps1 -CheckOnly
+pwsh -File tools/probe-environment.ps1
+pwsh -File tools/verify.ps1
+pwsh -File tools/docs-check.ps1
+pwsh -File tools/source-policy.ps1
+pwsh -File tools/extension-check.ps1
+pwsh -File tools/installer-check.ps1
+pwsh -File tools/control-model-check.ps1
+pwsh -File tools/distribution-check.ps1
+```
+
+遇到環境差異先記錄 fingerprint 並更新 handoff，不要自行重生
+`config/distribution-profile.yml` 裡的 endpoint、ASIO、IPC GUID。
