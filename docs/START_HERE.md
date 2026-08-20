@@ -39,6 +39,6 @@ branch。真實裝置資料與 calibration 留在 `.local/`，只提交 schema �
 - `asio/`：預設為 stream model；需要本機 pinned ASIO SDK 時可開啟 optional native COM
   transport（不進 public CI，也不提交 DLL）。`vst-host/` 已有 supervisor、frame codec、
   named-pipe boundary、source-only passthrough worker、可選的 pinned VST3 SDK factory catalog
-  與單一主 bus worker-side SDK processor；supervisor IPC wiring、參數自動化與 latency policy
+  與單一主 bus worker-side SDK processor/optional worker executable；supervisor launch policy、參數自動化與 latency policy
   仍待接入。`extensions/` 已有 HIBT decoder、loopback bridge、bounded capture queue 與
   graph-lane adapter；denoise model provenance 仍待完成。

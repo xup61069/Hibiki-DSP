@@ -138,8 +138,7 @@ bool Vst3SdkProcessorV1::open(const std::string& module_path,
                                                 Steinberg::Vst::kInput, 0, input_info)) ||
         !result_ok(impl->component->getBusInfo(Steinberg::Vst::kAudio,
                                                 Steinberg::Vst::kOutput, 0, output_info)) ||
-        input_info.channelCount != static_cast<Steinberg::int32>(channels) ||
-        output_info.channelCount != static_cast<Steinberg::int32>(channels)) {
+        input_info.channelCount <= 0 || output_info.channelCount <= 0) {
         set_error(error, "VST3 main bus channel count does not match the requested layout");
         impl->component->terminate();
         return false;
@@ -158,6 +157,17 @@ bool Vst3SdkProcessorV1::open(const std::string& module_path,
     if (!result_ok(impl->processor->setBusArrangements(&input_arrangement, 1,
                                                         &output_arrangement, 1))) {
         set_error(error, "VST3 speaker arrangement rejected");
+        impl->component->terminate();
+        return false;
+    }
+    SpeakerArrangement actual_input = 0;
+    SpeakerArrangement actual_output = 0;
+    if (!result_ok(impl->processor->getBusArrangement(Steinberg::Vst::kInput, 0,
+                                                       actual_input)) ||
+        !result_ok(impl->processor->getBusArrangement(Steinberg::Vst::kOutput, 0,
+                                                       actual_output)) ||
+        actual_input != arrangement || actual_output != arrangement) {
+        set_error(error, "VST3 plugin did not retain the requested speaker arrangement");
         impl->component->terminate();
         return false;
     }

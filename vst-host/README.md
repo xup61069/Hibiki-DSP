@@ -21,6 +21,8 @@ optional worker-side adapter for one main input/output bus: it initializes a
 selected class, accepts 1/2/5.1/7.1 layouts, uses fixed 4096-frame planar
 scratch buffers, exposes plugin-reported latency and fails closed on invalid
 or non-finite output. The adapter is deliberately not linked into the normal
-engine or RT graph. Supervisor IPC integration, parameter automation,
-latency-compensation policy, crash-dump redaction and real plugin
-certification remain separate release gates.
+engine or RT graph. `hibiki_vst3_sdk_worker` wires that adapter to the existing
+bounded worker pipe and ProcessBlock frame contract; it is built only when the
+local pinned SDK is supplied. Supervisor launch policy, parameter automation,
+latency-compensation policy, crash-dump redaction and real plugin certification
+remain separate release gates.

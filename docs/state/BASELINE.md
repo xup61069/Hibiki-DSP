@@ -60,8 +60,8 @@
   a lane on crash or missed bounded heartbeat; the source-only worker now exercises bounded
   Hello/Heartbeat/ProcessBlock passthrough/Shutdown IPC. An optional pinned-SDK catalog and
   worker-side one-main-bus processor now cover module/class discovery, 1/2/5.1/7.1 Float32
-  dispatch, fixed scratch bounds and plugin latency reporting; supervisor wiring and production
-  certification remain pending.
+  dispatch, fixed scratch bounds and plugin latency reporting; the optional worker also bridges
+  ProcessBlock frames, while supervisor launch policy and production certification remain pending.
 - `AudioSessionRegistry` keys Windows sessions by endpoint plus session-instance ID, preserves
   user routing on metadata refresh, and supports independent lane/output-group/gain-owner binding;
   Windows `IAudioSessionManager2` worker enumeration now populates it; callbacks remain
@@ -108,8 +108,8 @@
 - `vst3_worker_protocol.hpp`/`.cpp` now provide a fixed 36-byte little-endian worker frame codec
   with Hello/Heartbeat/Process/Shutdown/Error types, exact Float32 payload validation and finite
   sample checks. Named-pipe transport plus a source-only worker loop are present; an optional
-  pinned-SDK factory catalog and bounded one-main-bus SDK processor build locally, while
-  supervisor/plugin parameter wiring and certification remain pending.
+  pinned-SDK factory catalog, bounded one-main-bus SDK processor and optional SDK worker build
+  locally, while supervisor/plugin parameter wiring and certification remain pending.
 - `VirtualMicRouteModel` now defines fixed 1/2-channel capture/reference blocks, fail-closed
   privacy mute and explicit echo-reference enablement; it intentionally does not claim AEC/NS or a
   loadable virtual capture driver.

@@ -52,10 +52,16 @@ NaN/Inf、格式不符或 plugin error 會清零輸出；但 plugin 本身仍是
 VST3 sandbox worker，不能直接掛進 Hibiki RT graph。此 adapter 沒有參數自動化、side-chain、
 多 bus、state persistence 或 latency compensation policy。
 
+當本機提供 pinned SDK 時，`hibiki_vst3_sdk_worker` 會把該 adapter 接到既有 named-pipe
+worker frame：啟動參數固定包含 pipe、module、class UID、sample rate 與 2/6/8 channels；
+Hello/Heartbeat 沿用既有 frame，ProcessBlock 以 caller-owned packet 驗證後交給 SDK，成功
+回傳 ProcessBlockResponse，plugin 或格式錯誤回傳 Error。這個 target 不會在一般 CI 或
+public source-only checkout 自動生成，且仍不提供第三方 plugin binary。
+
 ## 尚未完成的邊界
 
-plugin scan 的 factory metadata catalog 與單一主 bus SDK dispatch adapter 已有 optional
-bridge；仍未完成第三方 plugin certification、supervisor-to-SDK worker wiring、parameter
+plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter 與 optional worker
+executable 已有 bridge；仍未完成第三方 plugin certification、supervisor launch integration、parameter
 automation、side-chain/multi-bus、latency compensation、crash dump redaction 與 production
 worker policy。目前 supervisor、named pipe、passthrough worker、catalog 與 bounded SDK
 processor 提供可測試的 process containment/metadata/processing boundary，不能宣稱已完成
