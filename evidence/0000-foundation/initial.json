@@ -43,7 +43,7 @@
     {"command": "vst3-worker-pipe", "status": "pass", "coverage": ["named-pipe server/client boundary", "overlapped connect source", "bounded length prefix", "caller-owned receive buffer", "sandbox launch/stop lifecycle source"]},
     {"command": "vst3-worker-executable", "status": "pass", "coverage": ["Hello/Heartbeat", "bounded ProcessBlock passthrough", "Shutdown", "source-only build"]},
     {"command": "control-pipe-loopback", "status": "pass", "coverage": ["Windows named pipe server", "4-byte length prefix", "Ack/request-ID round-trip", "safe stop"]},
-    {"command": "control-payloads", "status": "pass", "coverage": ["Q16.16 volume payload", "SceneApply fixed 64-byte payload", "typed command sink", "reserved-byte rejection"]},
+    {"command": "control-payloads", "status": "pass", "coverage": ["Q16.16 volume payload", "SceneApply fixed 64-byte payload", "typed command sink", "reserved-byte rejection", "strict UTF-8 validation"]},
     {"command": "virtual-mic-contract", "status": "pass", "coverage": ["format validation", "privacy mute default", "capture passthrough", "echo-reference copy", "privacy gate before shared graph"]},
     {"command": "control-model", "status": "pass", "coverage": ["fail-closed One-Tap Enhance", "Easy/Expert scene selection", "active output-group identity", "SceneApply envelope encode", "strict UTF-8 rejection"]},
     {"command": "installer-source-hardening", "status": "pass", "coverage": ["relative manifest paths", "path traversal rejection", "64-character SHA-256 validation"]},

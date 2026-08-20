@@ -36,6 +36,61 @@ std::uint64_t read_u64(const std::uint8_t* bytes) noexcept {
     return value;
 }
 
+bool is_continuation(const unsigned char value) noexcept {
+    return (value & 0xC0U) == 0x80U;
+}
+
+bool is_printable_utf8(const std::string_view value) noexcept {
+    for (std::size_t index = 0U; index < value.size();) {
+        const auto first = static_cast<unsigned char>(value[index]);
+        std::uint32_t codepoint = 0U;
+        std::size_t width = 0U;
+        if (first <= 0x7FU) {
+            if (first < 0x20U) return false;
+            codepoint = first;
+            width = 1U;
+        } else if (first >= 0xC2U && first <= 0xDFU) {
+            if (index + 1U >= value.size() ||
+                !is_continuation(static_cast<unsigned char>(value[index + 1U]))) {
+                return false;
+            }
+            codepoint = ((first & 0x1FU) << 6U) |
+                        (static_cast<unsigned char>(value[index + 1U]) & 0x3FU);
+            width = 2U;
+        } else if (first >= 0xE0U && first <= 0xEFU) {
+            if (index + 2U >= value.size()) return false;
+            const auto second = static_cast<unsigned char>(value[index + 1U]);
+            const auto third = static_cast<unsigned char>(value[index + 2U]);
+            const bool second_valid = first == 0xE0U ? second >= 0xA0U && second <= 0xBFU
+                                                    : first == 0xEDU ? second <= 0x9FU
+                                                                      : second >= 0x80U && second <= 0xBFU;
+            if (!second_valid || !is_continuation(third)) return false;
+            codepoint = ((first & 0x0FU) << 12U) | ((second & 0x3FU) << 6U) |
+                        (third & 0x3FU);
+            width = 3U;
+        } else if (first >= 0xF0U && first <= 0xF4U) {
+            if (index + 3U >= value.size()) return false;
+            const auto second = static_cast<unsigned char>(value[index + 1U]);
+            const auto third = static_cast<unsigned char>(value[index + 2U]);
+            const auto fourth = static_cast<unsigned char>(value[index + 3U]);
+            const bool second_valid = first == 0xF0U ? second >= 0x90U && second <= 0xBFU
+                                                    : first == 0xF4U ? second <= 0x8FU
+                                                                      : second >= 0x80U && second <= 0xBFU;
+            if (!second_valid || !is_continuation(third) || !is_continuation(fourth)) {
+                return false;
+            }
+            codepoint = ((first & 0x07U) << 18U) | ((second & 0x3FU) << 12U) |
+                        ((third & 0x3FU) << 6U) | (fourth & 0x3FU);
+            width = 4U;
+        } else {
+            return false;
+        }
+        if (codepoint < 0x20U || (codepoint >= 0x7FU && codepoint <= 0x9FU)) return false;
+        index += width;
+    }
+    return true;
+}
+
 }  // namespace
 
 std::array<std::uint8_t, kVolumeNotificationPayloadBytesV1>
@@ -72,13 +127,8 @@ bool encode_scene_apply_payload_v1(
     std::array<std::uint8_t, kSceneApplyPayloadBytesV1>& payload) noexcept {
     payload.fill(0U);
     if (scene_id.empty() || scene_id.size() > 31U || output_group.empty() ||
-        output_group.size() > 31U ||
-        std::any_of(scene_id.begin(), scene_id.end(), [](const char value) {
-            return value == '\0' || static_cast<unsigned char>(value) < 0x20U;
-        }) ||
-        std::any_of(output_group.begin(), output_group.end(), [](const char value) {
-            return value == '\0' || static_cast<unsigned char>(value) < 0x20U;
-        })) {
+        output_group.size() > 31U || !is_printable_utf8(scene_id) ||
+        !is_printable_utf8(output_group)) {
         return false;
     }
     payload[0] = static_cast<std::uint8_t>(scene_id.size());
@@ -105,7 +155,10 @@ bool decode_scene_apply_payload_v1(const std::span<const std::uint8_t> payload,
     for (std::size_t index = command.output_group_bytes; index < command.output_group.size(); ++index) {
         if (payload[33U + index] != 0U) return false;
     }
-    return true;
+    return is_printable_utf8(
+               std::string_view(command.scene_id.data(), command.scene_id_bytes)) &&
+           is_printable_utf8(
+               std::string_view(command.output_group.data(), command.output_group_bytes));
 }
 
 bool decode_control_command_v1(const IpcFrameV1& frame,

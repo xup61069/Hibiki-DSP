@@ -336,6 +336,8 @@ int main() {
           make_error_frame_v1(volume_command_frame).header.type == IpcMessageType::Error);
     std::array<std::uint8_t, kSceneApplyPayloadBytesV1> scene_payload{};
     CHECK(encode_scene_apply_payload_v1("game", "main", scene_payload));
+    CHECK(!encode_scene_apply_payload_v1(std::string_view("\xFF", 1), "main", scene_payload));
+    CHECK(encode_scene_apply_payload_v1("game", "main", scene_payload));
     SceneApplyPayloadV1 decoded_scene{};
     CHECK(decode_scene_apply_payload_v1(scene_payload, decoded_scene) &&
           decoded_scene.scene_id_bytes == 4U && decoded_scene.output_group_bytes == 4U &&
