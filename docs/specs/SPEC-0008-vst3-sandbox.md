@@ -23,8 +23,16 @@ VST3 plugin 不得在 Hibiki RT thread 或主 UI process 內直接執行。contr
 - `mark_heartbeat` 與 `poll_watchdog` 只在 control/IPC worker 呼叫，禁止 audio callback
   使用 Win32 handle 或等待。
 
+## Worker IPC frame
+
+`vst3_worker_protocol.hpp` 定義固定 36-byte little-endian frame header：Hello、HelloAck、
+Heartbeat、ProcessBlock、ProcessBlockResponse、Shutdown、Error。Process frame 僅接受
+2/6/8 聲道、1–4096 frames、exact interleaved Float32 payload，並拒絕 NaN/Inf；codec 不
+配置、不擁有 payload，適合由 named pipe 或其他 control transport 在 worker 與 supervisor
+間傳遞。真正 VST3 SDK/plugin dispatch 仍必須在 worker process，不能連入 graph RT。
+
 ## 尚未完成的邊界
 
-VST3 SDK 版本鎖定、plugin scan/certification、音訊 buffer IPC、latency compensation、
-crash dump redaction 與實際 worker executable 尚未納入本 commit；目前 supervisor
+VST3 SDK 版本鎖定、plugin scan/certification、named-pipe transport、latency compensation、
+crash dump redaction 與實際 worker executable 尚未納入本 commit；目前 supervisor 與 frame codec
 提供可測試的 process containment，不能宣稱已完成 VST3 host。

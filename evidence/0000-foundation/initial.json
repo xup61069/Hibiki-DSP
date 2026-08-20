@@ -20,7 +20,7 @@
   "results": [
     {"command": "tools/verify.ps1", "status": "pass", "tests": 1},
     {"command": "tools/docs-check.ps1", "status": "pass", "required_paths": 40, "specs": 9},
-    {"command": "tools/source-policy.ps1", "status": "pass", "scanned_paths": 160, "blocked_files": 0},
+    {"command": "tools/source-policy.ps1", "status": "pass", "scanned_paths": 164, "blocked_files": 0},
     {"command": "tools/extension-check.ps1", "status": "pass"},
     {"command": "tools/installer-check.ps1", "status": "pass"},
     {"command": "tools/control-model-check.ps1", "status": "pass"},
@@ -37,7 +37,8 @@
     {"command": "asio-transport-contract", "status": "pass", "coverage": ["fixed-layout SPSC ring", "planar-to-interleaved transfer", "metadata and capacity validation", "no allocation in pop", "Windows mapping-to-engine graph and Group Master path"]},
     {"command": "asio-transport-native-build", "status": "pass", "coverage": ["ASIO callback publication", "named mapping attachment", "detached fallback"], "published_artifacts": false},
     {"command": "tab-capture-queue", "status": "pass", "coverage": ["validated packet copy", "fixed four-slot SPSC handoff", "dropped-block bound", "allocation-free pop"]},
-    {"command": "wasapi-output-boundary", "status": "pass", "coverage": ["Float32 format gate", "invalid configuration fail-closed", "dedicated COM sink worker source", "bounded SPSC submit", "silence underrun path", "worker-side persistent SRC/clock request"]}
+    {"command": "wasapi-output-boundary", "status": "pass", "coverage": ["Float32 format gate", "invalid configuration fail-closed", "dedicated COM sink worker source", "bounded SPSC submit", "silence underrun path", "worker-side persistent SRC/clock request"]},
+    {"command": "vst3-worker-protocol", "status": "pass", "coverage": ["36-byte little-endian header", "message type validation", "exact ProcessBlock payload", "finite Float32 sample validation"]}
   ],
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",

@@ -6,6 +6,7 @@
 #include "hibiki/calibration.hpp"
 #include "hibiki/plugin_host.hpp"
 #include "hibiki/vst3_sandbox.hpp"
+#include "hibiki/vst3_worker_protocol.hpp"
 #include "hibiki/tab_bridge.hpp"
 #include "hibiki/asio_transport_v1.h"
 #include "hibiki/output_sink.hpp"
@@ -33,8 +34,10 @@ extern "C" {
 #endif
 
 #include <cmath>
+#include <array>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -324,6 +327,34 @@ int main() {
     CHECK(sandbox.state() == Vst3SandboxState::Quarantined);
     sandbox.stop();
     CHECK(sandbox.state() == Vst3SandboxState::Stopped);
+
+    std::array<std::uint8_t, kVst3WorkerHeaderBytesV1 + 4U * sizeof(float)> worker_packet{};
+    const Vst3WorkerFrameV1 worker_frame{Vst3WorkerMessageTypeV1::ProcessBlock, 17U, 2U, 2U,
+                                         4U * sizeof(float), 0U};
+    std::size_t worker_header_bytes = 0U;
+    CHECK(encode_vst3_worker_frame_v1(worker_frame,
+                                      std::span<std::uint8_t>(worker_packet).subspan(
+                                          0U, kVst3WorkerHeaderBytesV1),
+                                      worker_header_bytes));
+    const float worker_samples[4] = {0.25F, -0.25F, 0.5F, -0.5F};
+    std::memcpy(worker_packet.data() + kVst3WorkerHeaderBytesV1, worker_samples,
+                sizeof(worker_samples));
+    Vst3WorkerFrameV1 decoded_worker{};
+    Vst3WorkerProtocolErrorV1 worker_error{Vst3WorkerProtocolErrorV1::None};
+    std::span<const float> decoded_samples;
+    CHECK(validate_vst3_worker_audio_frame_v1(worker_packet, decoded_worker, decoded_samples,
+                                               worker_error));
+    CHECK(decoded_worker.request_id == 17U && decoded_samples.size() == 4U &&
+          std::abs(decoded_samples[2] - 0.5F) < 1e-6F);
+    worker_packet[0] = 0U;
+    CHECK(!decode_vst3_worker_frame_v1(worker_packet, decoded_worker, worker_error) &&
+          worker_error == Vst3WorkerProtocolErrorV1::InvalidMagic);
+    worker_packet[0] = 'H';
+    float worker_nan = std::numeric_limits<float>::quiet_NaN();
+    std::memcpy(worker_packet.data() + kVst3WorkerHeaderBytesV1, &worker_nan, sizeof(worker_nan));
+    CHECK(!validate_vst3_worker_audio_frame_v1(worker_packet, decoded_worker, decoded_samples,
+                                                worker_error) &&
+          worker_error == Vst3WorkerProtocolErrorV1::NonFiniteSample);
 
     std::vector<std::uint8_t> tab_packet(16U + 2U * 2U * sizeof(float), 0U);
     tab_packet[0] = 'H'; tab_packet[1] = 'I'; tab_packet[2] = 'B'; tab_packet[3] = 'T';
