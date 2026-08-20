@@ -73,9 +73,9 @@
 
 ## 尚未開始
 
-- 可載入的 WaveRT/SYSVAD-derived driver、ASIO ring 與 Hibiki graph/physical sink 的真正串接、
-  out-of-process VST3 SDK host、WinUI 3 UI、native browser engine lane、physical sink clock
-  fixtures 與 signed package delivery。
+- 可載入的 WaveRT/SYSVAD-derived driver、ASIO physical sink delivery、out-of-process VST3 SDK
+  host、WinUI 3 UI、native browser engine lane、physical sink clock fixtures 與 signed package
+  delivery。
 - ISO 226:2023 合法係數來源與正式 conformance oracle（公式本身已完成，但係數資料仍待
   授權／法務確認）。
 - Microsoft driver signing、Gumroad release artifact 與 production installer。
