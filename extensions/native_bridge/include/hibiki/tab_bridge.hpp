@@ -10,6 +10,7 @@
 #include <thread>
 
 #include "hibiki/audio_engine.hpp"
+#include "hibiki/program_loudness.hpp"
 
 namespace hibiki {
 
@@ -92,7 +93,8 @@ private:
     std::span<RtLaneInputV1> lane_inputs,
     float* output_interleaved,
     std::uint32_t output_capacity_frames,
-    TabCaptureBlockV1& block) noexcept;
+    TabCaptureBlockV1& block,
+    ProgramAwareLevelControllerV1* program_level = nullptr) noexcept;
 
 void enqueue_tab_capture_packet_v1(const TabCapturePacketViewV1& view, void* context) noexcept;
 

@@ -160,7 +160,8 @@ bool process_tab_capture_lane_v1(
     const std::span<RtLaneInputV1> lane_inputs,
     float* const output_interleaved,
     const std::uint32_t output_capacity_frames,
-    TabCaptureBlockV1& block) noexcept {
+    TabCaptureBlockV1& block,
+    ProgramAwareLevelControllerV1* const program_level) noexcept {
     block = {};
     if (input_interleaved == nullptr || output_interleaved == nullptr ||
         input_capacity_frames == 0U || output_capacity_frames == 0U) {
@@ -168,6 +169,12 @@ bool process_tab_capture_lane_v1(
     }
     if (!queue.pop(input_interleaved, input_capacity_frames, block) ||
         block.frames == 0U || block.frames > output_capacity_frames) {
+        block = {};
+        return false;
+    }
+    if (program_level != nullptr &&
+        (program_level->sample_rate() != block.sample_rate ||
+         !program_level->process_interleaved(input_interleaved, block.frames, block.channels))) {
         block = {};
         return false;
     }

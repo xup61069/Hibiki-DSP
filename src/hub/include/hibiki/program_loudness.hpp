@@ -47,6 +47,7 @@ public:
     [[nodiscard]] const ProgramAwareLevelStatusV1& status() const noexcept {
         return status_;
     }
+    [[nodiscard]] std::uint32_t sample_rate() const noexcept { return sample_rate_; }
 
 private:
     ProgramAwareLevelPolicyV1 policy_{};

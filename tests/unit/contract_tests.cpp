@@ -804,11 +804,15 @@ int main() {
     float tab_lane_input[8]{};
     float tab_lane_output[8]{};
     TabCaptureBlockV1 tab_lane_block{};
+    ProgramAwareLevelControllerV1 tab_program_level;
+    CHECK(tab_program_level.configure(
+        ProgramAwareLevelPolicyV1{1, true, -23.0, 6.0, 12.0, 3000.0, 60.0, -70.0}, 48000U));
     CHECK(process_tab_capture_lane_v1(engine, 0, *tab_queue, tab_lane_input, 2U,
-                                      tab_lane_inputs, tab_lane_output, 2U, tab_lane_block));
+                                      tab_lane_inputs, tab_lane_output, 2U, tab_lane_block,
+                                      &tab_program_level));
     CHECK(tab_lane_block.frames == 2U && tab_lane_block.channels == 2U &&
-          std::abs(tab_lane_output[0] - 0.125F) < 1e-5F &&
-          std::abs(tab_lane_output[1] + 0.125F) < 1e-5F);
+          tab_lane_output[0] > 0.12F && tab_lane_output[0] < 0.125F &&
+          tab_lane_output[1] < -0.12F && tab_lane_output[1] > -0.125F);
     VirtualMicRouteModel lane_mic;
     CHECK(lane_mic.prepare(VirtualMicConfigV1{2U, 48000U, true}));
     float lane_mic_input[4] = {0.75F, -0.75F, 0.5F, -0.5F};

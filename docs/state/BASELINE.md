@@ -72,6 +72,9 @@
 - `ProgramAwareLevelControllerV1` provides an allocation-free, slow RMS-proxy content level
   controller with silence gate, bounded boost/cut and dB-per-second rate limiting; it is not a
   BS.1770/K-weighted conformance implementation.
+- `process_tab_capture_lane_v1` can apply that controller to one user-gesture-gated browser tab
+  before graph processing, with a sample-rate match check and fail-closed behavior; no automatic
+  microphone capture or denoising model is implied.
 - Worker-side session volume read/write now uses `ISimpleAudioVolume` with dB↔scalar conversion,
   event-context GUIDs and readback; unbound/exclusive/vendor ASIO paths remain explicit bypasses.
 - `OutputSinkModel` now joins clock-drift estimation to persistent SRC per sink, preserving
@@ -113,7 +116,8 @@
 - `TabCaptureQueueV1` now provides a four-slot fixed SPSC handoff for validated HIBT packets;
   `enqueue_tab_capture_packet_v1` is a ready callback adapter, with bounded dropped-block reporting
   and no allocation/wait on the pop path. `process_tab_capture_lane_v1` feeds the selected lane's
-  immutable graph and Group Master without owning audio buffers.
+  immutable graph and Group Master without owning audio buffers and can apply the optional
+  program-aware level controller before the graph.
 - The MS-PL WDK source boundary now has a property-dispatch scaffold for volume/mute that calls
   the portable Q16.16 endpoint core; it is source-checked but intentionally not a loadable `.sys`.
 - Apache-2.0 `hibiki_asio_transport_v1` now provides a fixed-layout SPSC shared-memory ring. The
