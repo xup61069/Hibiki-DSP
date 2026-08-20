@@ -34,6 +34,8 @@
   user routing on metadata refresh, and supports independent lane/output-group/gain-owner binding;
   Windows `IAudioSessionManager2` worker enumeration now populates it; callbacks remain
   non-blocking and only publish a sequence.
+- Worker-side session volume read/write now uses `ISimpleAudioVolume` with dB↔scalar conversion,
+  event-context GUIDs and readback; unbound/exclusive/vendor ASIO paths remain explicit bypasses.
 
 ## 尚未開始
 
@@ -52,7 +54,7 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 
 初始 foundation evidence 已寫入 `evidence/0000-foundation/initial.json`，目前對應最新
 Windows volume/device、ISO formula、recovery、driver control-core、persistent SRC、VST watchdog
-與 session registry/session-adapter baseline commit `1a861c2`；
+與 session registry/session volume adapter baseline commit `d1a0526`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
