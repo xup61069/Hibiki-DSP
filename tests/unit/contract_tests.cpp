@@ -1,5 +1,6 @@
 #include "hibiki/contracts.hpp"
 #include "hibiki/device_switch.hpp"
+#include "hibiki/device_recovery.hpp"
 #include "hibiki/ipc.hpp"
 #include "hibiki/asio_bridge.hpp"
 #include "hibiki/calibration.hpp"
@@ -91,6 +92,24 @@ int main() {
           VolumeNotificationResult::StaleGeneration);
     const auto q16 = db_to_q16_16(-6.0206);
     CHECK(std::abs(q16_16_to_db(q16) + 6.0206) < 0.00002);
+
+    DeviceRecoveryCoordinator recovery;
+    CHECK(recovery.observe(DeviceRecoveryEventV1{
+        1, DeviceRecoveryEventKind::EndpointInvalidated, true}));
+    CHECK(recovery.state() == DeviceRecoveryState::RebindPending);
+    CHECK(!recovery.observe(DeviceRecoveryEventV1{
+        1, DeviceRecoveryEventKind::EndpointAdded, false}));
+    CHECK(recovery.begin_rebind(DeviceTargetV1{"hibiki-main", 2, 48000, 128}));
+    CHECK(recovery.prepare());
+    CHECK(recovery.commit());
+    CHECK(recovery.state() == DeviceRecoveryState::Stable);
+    OutputGroupVolumeStateV1 restart_volume;
+    restart_volume.requested_db = 0.0;
+    restart_volume.safety_ceiling_db = 0.0;
+    const auto safe_restart = recovery.safe_restart_state(restart_volume, -48.0);
+    CHECK(safe_restart.mute);
+    CHECK(std::abs(safe_restart.requested_db + 48.0) < 1e-12);
+    CHECK(safe_restart.effective_db <= -48.0);
 
     GraphConfigV1 graph;
     graph.output_channels = 8;

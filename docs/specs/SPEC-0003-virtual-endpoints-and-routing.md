@@ -32,6 +32,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
 - `sdk/include/hibiki/driver_control_v1.h` 定義 Apache-2.0 C ABI；`driver/` 的 validator
   保持 MS-PL，檢查固定 header、Q16.16 dB、格式與 endpoint GUID 邊界。這不是可載入的
   WaveRT driver，不能替代 WDK／HLK／簽章驗收。
+- `DeviceRecoveryCoordinator` 是 worker-side 的 platform-neutral recovery state machine：
+  `IMMNotificationClient` snapshot 只能透過單調 sequence 投遞，失效、拔除、format change
+  或 Audio Service restart 進入 `RebindPending`，再以 `begin → prepare → commit/rollback`
+  交易換端點。恢復前使用 safe-start dB 並保持 mute，不能回到 0 dB／100%。
 
 ## 未解問題（阻擋完整 driver 實作）
 
