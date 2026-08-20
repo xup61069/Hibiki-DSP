@@ -65,7 +65,10 @@ APO、CamillaDSP YAML 與 REW filter list；不內嵌 ISO 授權表格，也不�
 IEEE-float WAV IR；它只負責檔案格式，不替任何未授權量測資料背書。
 
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
-`Program-aware` 只保留 policy boundary，BS.1770 内容分析尚未加入。
+`Program-aware` 另有 `ProgramAwareLevelControllerV1` 的慢速內容音量原型：它用無配置的
+RMS 代理、3 秒分析窗、靜音門、增益上限與 dB/s 速率限制，適合由單一 Lane 明確選用。
+它不宣稱 BS.1770/K-weighted conformance，也不會在 `Relative`／`Calibrated` ISO 曲線中
+偷偷改變音色；正式 BS.1770 analyzer 與 oracle 仍是 release gate。
 
 ## IR 相位／延遲滑桿
 

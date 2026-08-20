@@ -69,6 +69,9 @@
   separate output groups without cross-talk.
 - `AudioSessionRegistry::set_makeup_gain_db` now provides the bounded per-session gain mutator;
   metadata refresh keeps that value and rejects values outside −144..+12 dB.
+- `ProgramAwareLevelControllerV1` provides an allocation-free, slow RMS-proxy content level
+  controller with silence gate, bounded boost/cut and dB-per-second rate limiting; it is not a
+  BS.1770/K-weighted conformance implementation.
 - Worker-side session volume read/write now uses `ISimpleAudioVolume` with dB↔scalar conversion,
   event-context GUIDs and readback; unbound/exclusive/vendor ASIO paths remain explicit bypasses.
 - `OutputSinkModel` now joins clock-drift estimation to persistent SRC per sink, preserving

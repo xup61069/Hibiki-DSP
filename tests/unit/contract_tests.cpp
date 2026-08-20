@@ -33,6 +33,7 @@ extern "C" {
 #include "hibiki/scene_safety.hpp"
 #include "hibiki/session_route.hpp"
 #include "hibiki/volume_state.hpp"
+#include "hibiki/program_loudness.hpp"
 #include "hibiki/virtual_mic.hpp"
 #include "hibiki/true_peak_limiter.hpp"
 #if defined(_WIN32)
@@ -103,6 +104,23 @@ int main() {
           std::abs(movie_ir.added_delay_ms - 160.0) < 1e-12);
     CHECK(!validate_ir_phase_policy(IrPhasePolicyV1{1, IrPhaseMode::Bypass, 0.1}));
     CHECK(!validate_ir_phase_policy(IrPhasePolicyV1{1, IrPhaseMode::MixedPhase, 1.1}));
+
+    ProgramAwareLevelControllerV1 program_loudness;
+    CHECK(validate_program_aware_policy(ProgramAwareLevelPolicyV1{}));
+    CHECK(!validate_program_aware_policy(
+        ProgramAwareLevelPolicyV1{1, true, -23.0, 6.0, 12.0, 3000.0, 0.0, -70.0}));
+    CHECK(program_loudness.configure(ProgramAwareLevelPolicyV1{1, true, -23.0, 6.0, 12.0,
+                                                                3000.0, 6.0, -70.0},
+                                     48000U));
+    float loud_program[4800];
+    std::fill(std::begin(loud_program), std::end(loud_program), 0.5F);
+    CHECK(program_loudness.process_interleaved(loud_program, 4800U, 1U));
+    CHECK(program_loudness.status().valid && program_loudness.status().applied_gain_db < 0.0);
+    CHECK(std::isfinite(loud_program[0]));
+    program_loudness.reset();
+    float silent_program[128]{};
+    CHECK(program_loudness.process_interleaved(silent_program, 128U, 1U));
+    CHECK(program_loudness.status().silence_gated);
 
     OutputGroupVolumeStateV1 state;
     state.requested_db = 3.0;
