@@ -32,6 +32,7 @@ extern "C" {
 #include "hibiki/scene_safety.hpp"
 #include "hibiki/volume_state.hpp"
 #include "hibiki/virtual_mic.hpp"
+#include "hibiki/true_peak_limiter.hpp"
 #if defined(_WIN32)
 #include <windows.h>
 #include "hibiki/windows_volume_broker.hpp"
@@ -127,6 +128,16 @@ int main() {
     ramp.observe_target(db_to_q16_16(-6.0206), false, 8000U);
     for (std::size_t frame = 0U; frame < 120U; ++frame) (void)ramp.next_gain();
     CHECK(std::abs(ramp.next_gain() - 0.5F) < 1e-5F);
+
+    TruePeakLimiterV1 limiter;
+    float limiter_samples[] = {1.2F, -1.1F, 0.8F, -0.8F};
+    const auto limiter_gain = limiter.limit_in_place(limiter_samples, 2U, 2U, -1.0);
+    CHECK(limiter_gain < 1.0F && std::abs(limiter_samples[0]) <= 0.891251F + 1e-5F &&
+          std::abs(limiter_samples[1]) <= 0.891251F + 1e-5F);
+    limiter.reset();
+    float finite_guard[] = {std::numeric_limits<float>::quiet_NaN(), 0.25F};
+    CHECK(limiter.limit_in_place(finite_guard, 1U, 2U, -1.0) == 1.0F &&
+          finite_guard[0] == 0.0F);
 
     std::vector<IsoContourPoint> current{{100.0, 60.0}, {1000.0, 40.0}};
     std::vector<IsoContourPoint> reference{{100.0, 50.0}, {1000.0, 40.0}};
@@ -436,11 +447,13 @@ int main() {
     const RtLaneInputV1 control_view{control_input.data(), 2};
     CHECK(control_engine.process(std::span<const RtLaneInputV1>(&control_view, 1),
                                  control_output.data(), 128U));
-    CHECK(std::abs(control_output[254] - 1.0F) < 1e-5F &&
-          std::abs(control_output[255] + 1.0F) < 1e-5F);
+    CHECK(std::abs(control_output[254] - 0.8912509F) < 1e-5F &&
+          std::abs(control_output[255] + 0.8912509F) < 1e-5F);
     control_volume.volume = VolumeNotificationV1{-6.0206, false, 2U};
     CHECK(control_queue.try_push(control_volume));
     CHECK(control_worker.drain(control_queue) == 1U);
+    CHECK(control_engine.process(std::span<const RtLaneInputV1>(&control_view, 1),
+                                 control_output.data(), 128U));
     CHECK(control_engine.process(std::span<const RtLaneInputV1>(&control_view, 1),
                                  control_output.data(), 128U));
     CHECK(std::abs(control_output[254] - 0.5F) < 1e-5F);
@@ -776,8 +789,8 @@ int main() {
                                         contract_asio_output, 4U,
                                         asio_block));
     CHECK(asio_block.frames == 4U && asio_block.channels == 2U &&
-          std::abs(contract_asio_output[0] - 0.5F) < 1e-5F &&
-          std::abs(contract_asio_output[1] + 0.5F) < 1e-5F);
+          std::abs(contract_asio_output[0] - (0.5F * 0.8912509F / 2.0F)) < 1e-5F &&
+          std::abs(contract_asio_output[1] + (0.5F * 0.8912509F / 2.0F)) < 1e-5F);
     UnmapViewOfFile(contract_region);
     CloseHandle(contract_mapping);
     engine.unbind_asio_transport();

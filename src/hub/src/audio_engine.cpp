@@ -65,6 +65,10 @@ bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
             output_interleaved[frame * active_graph_.output_channels + channel] *= gain;
         }
     }
+    if (!active_graph_.strict_direct) {
+        (void)rt_true_peak_limiter_.limit_in_place(
+            output_interleaved, frames, active_graph_.output_channels, -1.0);
+    }
     return true;
 }
 
@@ -86,6 +90,10 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
         for (std::uint32_t channel = 0U; channel < active_graph_.output_channels; ++channel) {
             output_interleaved[frame * active_graph_.output_channels + channel] *= gain;
         }
+    }
+    if (!active_graph_.strict_direct) {
+        (void)rt_true_peak_limiter_.limit_in_place(
+            output_interleaved, frames, active_graph_.output_channels, -1.0);
     }
     return true;
 }

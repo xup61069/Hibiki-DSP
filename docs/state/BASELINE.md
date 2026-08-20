@@ -41,6 +41,8 @@
   mutable Windows volume state 僅留在 control plane，避免 callback/worker 與 RT 讀寫競態。
 - `VolumeRampProcessorV1` 已接入 AudioEngine：8 ms 一般音量、5 ms mute、15 ms unmute，
   並以 8/48 kHz fixture 驗證單調 ramp 與完成後的精確 gain。
+- `TruePeakLimiterV1` 已接在非 Strict Direct render 尾端：固定 8-channel、非有限值歸零、
+  −1 dBTP bounded inter-sample guard；目前仍不宣稱正式 ITU/BS.1770 conformance。
 - Windows-only `IAudioEndpointVolume` broker with non-blocking callback snapshot, dB/mute
   read-back and event-context write path; no physical endpoint was exercised on this machine.
 - Windows-only `IMMNotificationClient` watcher with bounded default/add/remove/property event

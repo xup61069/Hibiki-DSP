@@ -22,6 +22,10 @@ fade、device crossfade 與 safety clamp 必須保留 last-known-safe gain。
 因此不會在音量鍵或 Scene 結束時產生 block-level hard step。實體 device crossfade 仍由
 `OutputCrossfade` 的 30 ms sink handoff 負責。
 
+Group render 完成後，非 Strict Direct Scene 會經過 `TruePeakLimiterV1` 的 −1 dBTP
+bounded guard；它以三個線性 inter-sample probes 作保守估算並採 block-coherent gain，
+目前不宣稱 ITU/BS.1770 conformance，正式 meter oracle 仍是 release gate。
+
 目前 user-space contract 已提供 `apply_windows_notification`：只接受有限 dB 範圍與不倒退
 的 generation，接受後將 origin 設為 Windows 並重新套用 safety。真正的
 `IAudioEndpointVolume`／driver callback 仍待 SPEC-0003 的 Windows driver work。

@@ -5,6 +5,7 @@
 #include "hibiki/scene_graph.hpp"
 #include "hibiki/asio_transport_consumer.hpp"
 #include "hibiki/volume_state.hpp"
+#include "hibiki/true_peak_limiter.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -71,6 +72,7 @@ private:
         static_cast<std::uint64_t>(static_cast<std::uint32_t>(-60 * 65536)) << 32U};
     std::atomic<std::uint32_t> sample_rate_{48000U};
     mutable VolumeRampProcessorV1 rt_volume_ramp_{};
+    mutable TruePeakLimiterV1 rt_true_peak_limiter_{};
     EngineTransactionState state_{EngineTransactionState::Ready};
     bool has_active_graph_{false};
     bool has_pending_graph_{false};

@@ -47,6 +47,7 @@ struct RtGraphSnapshotV1 {
     std::uint32_t output_channels{2};
     std::uint32_t lane_count{0};
     std::uint64_t revision{0};
+    bool strict_direct{false};
     std::array<RtLaneSnapshotV1, kMaxRtLanes> lanes{};
 };
 

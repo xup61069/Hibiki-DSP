@@ -73,6 +73,8 @@ Lane、output group、channel map、DSP chain、latency mode 與安全策略；�
 - Group Master 的 RT ramp 以 dB-domain 執行：一般 target 8 ms、mute 5 ms、unmute 15 ms；
   sample rate 由 control plane 設定（預設 48 kHz），ramp state 由唯一 audio thread 擁有，
   不配置、不鎖、不等待。
+- 最後一級以固定 8-channel bounded inter-sample peak guard 對非 Strict Direct graph 套用
+  −1 dBTP ceiling；非有限 sample 先 fail-safe 變成 0，Strict Direct 不套 limiter。
 
 ## 相容性與驗收
 

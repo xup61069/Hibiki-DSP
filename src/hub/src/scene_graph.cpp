@@ -52,6 +52,7 @@ bool compile_rt_snapshot(const GraphConfigV1& graph,
     compiled.output_channels = graph.output_channels;
     compiled.lane_count = static_cast<std::uint32_t>(graph.lanes.size());
     compiled.revision = revision;
+    compiled.strict_direct = graph.strict_direct;
     for (std::size_t index = 0; index < graph.lanes.size(); ++index) {
         const auto& source = graph.lanes[index];
         auto& target = compiled.lanes[index];
