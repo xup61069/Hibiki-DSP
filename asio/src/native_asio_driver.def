@@ -1,7 +1,7 @@
 ; SPDX-License-Identifier: GPL-3.0-only
 LIBRARY HibikiDSPASIO
 EXPORTS
-  DllCanUnloadNow
-  DllGetClassObject
-  DllRegisterServer
-  DllUnregisterServer
+  DllCanUnloadNow PRIVATE
+  DllGetClassObject PRIVATE
+  DllRegisterServer PRIVATE
+  DllUnregisterServer PRIVATE
