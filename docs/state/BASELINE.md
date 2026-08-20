@@ -70,10 +70,10 @@
   `AsioTransportConsumerV1` creates/owns `Local\\HibikiDSP_v1_asio` for an allocation-free pop;
   `AudioEngineModel::process_asio_transport` now runs that block through the selected graph lane
   and Group Master. Physical sink/WaveRT delivery remains pending.
-- `WindowsWasapiOutputV1` now supplies a Windows shared-mode Float32 physical render boundary:
-  one dedicated sink-worker apartment owns COM bind/start/stop and padding-aware `GetBuffer`/
-  `ReleaseBuffer` (the graph RT thread never calls this COM API). It fails closed on unsupported
-  mix formats and has no real-device soak evidence yet.
+- `WindowsWasapiOutputV1` plus `WindowsWasapiSinkWorkerV1` now supply a Windows shared-mode
+  Float32 physical render boundary: one dedicated sink-worker apartment owns COM bind/start/stop,
+  event waits, bounded SPSC blocks, silence underrun fill, persistent SRC and clock-observation
+  updates. The graph RT thread never calls this COM API; real-device/hotplug soak remains pending.
 
 ## 尚未開始
 

@@ -6,7 +6,7 @@ authority: architecture
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["src/hub/output*", "src/hub/include/hibiki/output*", "src/hub/src/output*"]
+source_globs: ["src/hub/**output*", "src/hub/include/hibiki/output*", "src/hub/src/output*"]
 ---
 
 # SPEC-0007：多輸出 sink 交接與時鐘連續性
@@ -27,5 +27,13 @@ source_globs: ["src/hub/output*", "src/hub/include/hibiki/output*", "src/hub/src
   plane 更新 ratio，audio thread 讀 immutable snapshot。
 - USB/HDMI/Bluetooth 拔插或 Audio Service invalidation 由 `DeviceRecoveryCoordinator`
   進入 safe-start；不得回到 0 dB、100% 或未驗證的舊 endpoint。
+- `WindowsWasapiSinkWorkerV1` 將 COM/WASAPI 完整限制在單一 dedicated sink worker apartment：
+  graph/ASIO/TabCapture producer 只呼叫 bounded SPSC `submit`，worker 在 endpoint event 後
+  pop block，空 queue 補 silence，並透過 `OutputSinkModel` 的 persistent SRC 處理已排程的
+  clock observation。`observe_clock` 只寫入 atomic latest-request，實際 SRC 更新在 worker
+  套用；graph RT 不呼叫 COM、等待或配置。
+- worker snapshot 必須可觀察 `endpoint_ready`、`degraded`、dropped/submitted/rendered blocks、
+  `source_step` 與 `drift_ppm`，讓 UI 在實體 endpoint 未綁定時顯示 detached，而不是靜默宣稱
+  已輸出。
 - 真實 WaveRT endpoint、硬體 clock fixture、DPC/拔插 soak 與 WHCP/HLK 證據不在本機
   contract test 中，必須在 Windows 11 24H2+ test machine 完成。

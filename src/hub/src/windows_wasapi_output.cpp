@@ -2,6 +2,8 @@
 
 #include "hibiki/windows_wasapi_output.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstring>
 
@@ -153,6 +155,195 @@ bool WindowsWasapiOutputV1::render(const float* const interleaved,
   return SUCCEEDED(as_render(render_client_)->ReleaseBuffer(frames, 0U));
 }
 
+bool WindowsWasapiOutputV1::wait_for_buffer(const std::uint32_t timeout_ms) noexcept {
+  if (!started_ || event_ == nullptr) return false;
+  return WaitForSingleObject(as_event(event_), timeout_ms) == WAIT_OBJECT_0;
+}
+
+WindowsWasapiSinkWorkerV1::~WindowsWasapiSinkWorkerV1() { stop(); }
+
+bool WindowsWasapiSinkWorkerV1::start(const WasapiOutputConfigV1& config,
+                                      const std::uint32_t block_frames) noexcept {
+  stop();
+  if (!valid_layout(config.channels) || !valid_rate(config.sample_rate) || block_frames == 0U ||
+      block_frames > kMaxFrames) {
+    return false;
+  }
+  channels_ = config.channels;
+  sample_rate_ = config.sample_rate;
+  block_frames_ = block_frames;
+  producer_sequence_.store(0U, std::memory_order_release);
+  consumer_sequence_.store(0U, std::memory_order_release);
+  dropped_blocks_.store(0U, std::memory_order_release);
+  submitted_blocks_.store(0U, std::memory_order_release);
+  rendered_blocks_.store(0U, std::memory_order_release);
+  clock_request_sequence_.store(0U, std::memory_order_release);
+  clock_source_frames_.store(0.0, std::memory_order_release);
+  clock_sink_frames_.store(0.0, std::memory_order_release);
+  clock_elapsed_seconds_.store(0.0, std::memory_order_release);
+  source_step_.store(1.0, std::memory_order_release);
+  drift_ppm_.store(0.0, std::memory_order_release);
+  endpoint_ready_.store(false, std::memory_order_release);
+  degraded_.store(false, std::memory_order_release);
+  stop_requested_.store(false, std::memory_order_release);
+  running_.store(true, std::memory_order_release);
+  try {
+    worker_ = std::thread([this, config, block_frames] { run(config, block_frames); });
+  } catch (...) {
+    running_.store(false, std::memory_order_release);
+    stop_requested_.store(true, std::memory_order_release);
+    return false;
+  }
+  return true;
+}
+
+void WindowsWasapiSinkWorkerV1::stop() noexcept {
+  stop_requested_.store(true, std::memory_order_release);
+  if (worker_.joinable()) worker_.join();
+  running_.store(false, std::memory_order_release);
+  endpoint_ready_.store(false, std::memory_order_release);
+}
+
+void WindowsWasapiSinkWorkerV1::observe_clock(const double source_frames,
+                                              const double sink_frames,
+                                              const double elapsed_seconds) noexcept {
+  if (!std::isfinite(source_frames) || !std::isfinite(sink_frames) ||
+      !std::isfinite(elapsed_seconds) || source_frames <= 0.0 || sink_frames <= 0.0 ||
+      elapsed_seconds <= 0.0) {
+    return;
+  }
+  clock_source_frames_.store(source_frames, std::memory_order_relaxed);
+  clock_sink_frames_.store(sink_frames, std::memory_order_relaxed);
+  clock_elapsed_seconds_.store(elapsed_seconds, std::memory_order_relaxed);
+  clock_request_sequence_.fetch_add(1U, std::memory_order_release);
+}
+
+bool WindowsWasapiSinkWorkerV1::submit(const float* const interleaved,
+                                       const std::uint32_t frames,
+                                       const std::uint32_t channels) noexcept {
+  if (!running_.load(std::memory_order_acquire) || interleaved == nullptr || frames == 0U ||
+      frames > kMaxFrames || channels != channels_) {
+    return false;
+  }
+  const auto producer = producer_sequence_.load(std::memory_order_relaxed);
+  const auto consumer = consumer_sequence_.load(std::memory_order_acquire);
+  if (producer - consumer >= kSlotCount) {
+    dropped_blocks_.fetch_add(1U, std::memory_order_relaxed);
+    return false;
+  }
+  auto& slot = slots_[producer % kSlotCount];
+  const auto samples = static_cast<std::size_t>(frames) * channels;
+  std::copy_n(interleaved, samples, slot.samples.data());
+  slot.frames = frames;
+  slot.channels = channels;
+  slot.ready_sequence.store(producer + 1U, std::memory_order_release);
+  producer_sequence_.store(producer + 1U, std::memory_order_release);
+  submitted_blocks_.fetch_add(1U, std::memory_order_relaxed);
+  return true;
+}
+
+bool WindowsWasapiSinkWorkerV1::pop(float* const interleaved,
+                                    const std::uint32_t output_capacity_frames,
+                                    std::uint32_t& frames,
+                                    std::uint32_t& channels) noexcept {
+  frames = 0U;
+  channels = 0U;
+  if (interleaved == nullptr) return false;
+  const auto consumer = consumer_sequence_.load(std::memory_order_relaxed);
+  const auto producer = producer_sequence_.load(std::memory_order_acquire);
+  if (consumer == producer) return false;
+  auto& slot = slots_[consumer % kSlotCount];
+  if (slot.ready_sequence.load(std::memory_order_acquire) != consumer + 1U ||
+      slot.frames == 0U || slot.frames > output_capacity_frames || slot.channels != channels_) {
+    return false;
+  }
+  const auto samples = static_cast<std::size_t>(slot.frames) * slot.channels;
+  std::copy_n(slot.samples.data(), samples, interleaved);
+  frames = slot.frames;
+  channels = slot.channels;
+  consumer_sequence_.store(consumer + 1U, std::memory_order_release);
+  return true;
+}
+
+void WindowsWasapiSinkWorkerV1::run(WasapiOutputConfigV1 config,
+                                    const std::uint32_t block_frames) noexcept {
+  HRESULT com_result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+  const bool com_initialized = SUCCEEDED(com_result);
+  if (!com_initialized && com_result != RPC_E_CHANGED_MODE) {
+    degraded_.store(true, std::memory_order_release);
+    running_.store(false, std::memory_order_release);
+    return;
+  }
+  WindowsWasapiOutputV1 output;
+  if (!output.bind(config) || !output.start()) {
+    degraded_.store(true, std::memory_order_release);
+    running_.store(false, std::memory_order_release);
+    if (com_initialized) CoUninitialize();
+    return;
+  }
+  endpoint_ready_.store(true, std::memory_order_release);
+  std::array<float, kMaxChannels * kMaxFrames> block{};
+  std::array<float, kMaxChannels * kMaxFrames> rendered{};
+  if (!sink_model_.prepare(config.channels, 1.0)) {
+    degraded_.store(true, std::memory_order_release);
+    output.stop();
+    endpoint_ready_.store(false, std::memory_order_release);
+    running_.store(false, std::memory_order_release);
+    if (com_initialized) CoUninitialize();
+    return;
+  }
+  std::uint64_t applied_clock_sequence = 0U;
+  while (!stop_requested_.load(std::memory_order_acquire)) {
+    const auto requested_clock_sequence =
+        clock_request_sequence_.load(std::memory_order_acquire);
+    if (requested_clock_sequence != applied_clock_sequence) {
+      sink_model_.observe_clock(clock_source_frames_.load(std::memory_order_relaxed),
+                                clock_sink_frames_.load(std::memory_order_relaxed),
+                                clock_elapsed_seconds_.load(std::memory_order_relaxed));
+      applied_clock_sequence = requested_clock_sequence;
+      source_step_.store(sink_model_.snapshot().source_step, std::memory_order_release);
+      drift_ppm_.store(sink_model_.snapshot().drift_ppm, std::memory_order_release);
+    }
+    if (!output.wait_for_buffer(10U)) continue;
+    std::uint32_t frames = 0U;
+    std::uint32_t channels = 0U;
+    if (!pop(block.data(), kMaxFrames, frames, channels)) {
+      frames = block_frames;
+      channels = channels_;
+      std::fill_n(block.data(), static_cast<std::size_t>(frames) * channels, 0.0F);
+    }
+    std::size_t rendered_frames = 0U;
+    if (!sink_model_.process(block.data(), frames, rendered.data(), kMaxFrames, rendered_frames)) {
+      degraded_.store(true, std::memory_order_release);
+      continue;
+    }
+    if (rendered_frames > 0U && output.render(rendered.data(), static_cast<std::uint32_t>(rendered_frames))) {
+      rendered_blocks_.fetch_add(1U, std::memory_order_relaxed);
+    } else {
+      degraded_.store(true, std::memory_order_release);
+    }
+  }
+  output.stop();
+  endpoint_ready_.store(false, std::memory_order_release);
+  running_.store(false, std::memory_order_release);
+  if (com_initialized) CoUninitialize();
+}
+
+WasapiSinkWorkerSnapshotV1 WindowsWasapiSinkWorkerV1::snapshot() const noexcept {
+  return WasapiSinkWorkerSnapshotV1{
+      running_.load(std::memory_order_acquire),
+      endpoint_ready_.load(std::memory_order_acquire),
+      degraded_.load(std::memory_order_acquire),
+      channels_,
+      sample_rate_,
+      block_frames_,
+      dropped_blocks_.load(std::memory_order_acquire),
+      submitted_blocks_.load(std::memory_order_acquire),
+      rendered_blocks_.load(std::memory_order_acquire),
+      source_step_.load(std::memory_order_acquire),
+      drift_ppm_.load(std::memory_order_acquire)};
+}
+
 }  // namespace hibiki
 
 #else
@@ -172,7 +363,24 @@ void WindowsWasapiOutputV1::unbind() noexcept {
   buffer_frames_ = 0;
 }
 bool WindowsWasapiOutputV1::render(const float*, std::uint32_t) noexcept { return false; }
+bool WindowsWasapiOutputV1::wait_for_buffer(std::uint32_t) noexcept { return false; }
 void WindowsWasapiOutputV1::release_resources() noexcept { unbind(); }
+
+WindowsWasapiSinkWorkerV1::~WindowsWasapiSinkWorkerV1() { stop(); }
+bool WindowsWasapiSinkWorkerV1::start(const WasapiOutputConfigV1&, std::uint32_t) noexcept {
+  stop();
+  return false;
+}
+void WindowsWasapiSinkWorkerV1::stop() noexcept {
+  stop_requested_.store(true, std::memory_order_release);
+  if (worker_.joinable()) worker_.join();
+  running_.store(false, std::memory_order_release);
+}
+bool WindowsWasapiSinkWorkerV1::submit(const float*, std::uint32_t, std::uint32_t) noexcept {
+  return false;
+}
+void WindowsWasapiSinkWorkerV1::observe_clock(double, double, double) noexcept {}
+WasapiSinkWorkerSnapshotV1 WindowsWasapiSinkWorkerV1::snapshot() const noexcept { return {}; }
 
 }  // namespace hibiki
 

@@ -37,7 +37,7 @@
     {"command": "asio-transport-contract", "status": "pass", "coverage": ["fixed-layout SPSC ring", "planar-to-interleaved transfer", "metadata and capacity validation", "no allocation in pop", "Windows mapping-to-engine graph and Group Master path"]},
     {"command": "asio-transport-native-build", "status": "pass", "coverage": ["ASIO callback publication", "named mapping attachment", "detached fallback"], "published_artifacts": false},
     {"command": "tab-capture-queue", "status": "pass", "coverage": ["validated packet copy", "fixed four-slot SPSC handoff", "dropped-block bound", "allocation-free pop"]},
-    {"command": "wasapi-output-boundary", "status": "pass", "coverage": ["Float32 format gate", "invalid configuration fail-closed", "shared-mode render source", "padding-aware RT copy"]}
+    {"command": "wasapi-output-boundary", "status": "pass", "coverage": ["Float32 format gate", "invalid configuration fail-closed", "dedicated COM sink worker source", "bounded SPSC submit", "silence underrun path", "worker-side persistent SRC/clock request"]}
   ],
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",

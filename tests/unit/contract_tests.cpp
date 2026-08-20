@@ -538,6 +538,9 @@ int main() {
     WindowsWasapiOutputV1 wasapi_output;
     CHECK(!wasapi_output.bind(WasapiOutputConfigV1{L"", 3U, 48000U, 20U}));
     CHECK(!wasapi_output.start());
+    auto wasapi_worker = std::make_unique<WindowsWasapiSinkWorkerV1>();
+    CHECK(!wasapi_worker->start(WasapiOutputConfigV1{L"", 3U, 48000U, 20U}, 128U));
+    CHECK(!wasapi_worker->submit(nullptr, 128U, 2U));
 #endif
 
     return 0;
