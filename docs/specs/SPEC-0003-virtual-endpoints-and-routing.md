@@ -45,6 +45,11 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
 - `OutputSinkModel` 將 `ClockDriftEstimator` 的 `sink/source` ratio 接到每個 persistent SRC
   的 effective source step（`base_step / ratio`）；clock observation 在 control side，音訊
   process 只讀已設定的 immutable pipeline state，後續仍需真實 USB/HDMI/Bluetooth clock fixture。
+- 原生 ASIO transport 使用 Apache-2.0 固定 layout `hibiki_asio_transport_v1`，由 Engine
+  control plane 建立 `Local\\HibikiDSP\\v1\\asio` named mapping；ASIO DLL 只在 host callback
+  完成後把八聲道 Float32 block 寫入 SPSC ring。Engine 端 `AsioTransportConsumerV1` 在 RT lane
+  以 caller-owned buffer pop，禁止配置與等待。mapping 不存在、格式不符或 ring 滿載時，ASIO
+  仍可運作但 UI 必須顯示 detached／dropped blocks，不能宣稱已套用 Hibiki graph。
 
 ## 未解問題（阻擋完整 driver 實作）
 

@@ -23,9 +23,12 @@
 #include <memory>
 #include <mutex>
 #include <new>
+#include <cstddef>
 #include <thread>
 
 #include <iasiodrv.h>
+
+#include "hibiki/asio_transport_v1.h"
 
 namespace {
 
@@ -36,6 +39,7 @@ constexpr long kPreferredBuffer = 128;
 constexpr long kMinBuffer = 32;
 constexpr long kMaxBuffer = 4096;
 constexpr std::array<double, 4> kSampleRates{44100.0, 48000.0, 96000.0, 192000.0};
+constexpr wchar_t kAsioTransportMappingName[] = L"Local\\HibikiDSP\\v1\\asio";
 
 std::atomic<long> g_object_count{0};
 HINSTANCE g_module_instance = nullptr;
@@ -166,6 +170,7 @@ public:
       sample_rate_ = rate;
       callbacks_copy = callbacks_;
     }
+    refresh_transport_attachment();
     if (callbacks_copy.sampleRateDidChange != nullptr) callbacks_copy.sampleRateDidChange(rate);
     return ASE_OK;
   }
@@ -240,6 +245,7 @@ public:
     } catch (...) {
       return ASE_NoMemory;
     }
+    refresh_transport_attachment();
     return ASE_OK;
   }
 
@@ -251,6 +257,7 @@ public:
       channel[1].reset();
     }
     buffers_ready_ = false;
+    detach_transport();
     return ASE_OK;
   }
 
@@ -270,6 +277,69 @@ public:
 
 private:
   using BufferPair = std::array<std::unique_ptr<float[]>, 2>;
+
+  void detach_transport() noexcept {
+    if (transport_region_ != nullptr) UnmapViewOfFile(transport_region_);
+    if (transport_mapping_ != nullptr) CloseHandle(transport_mapping_);
+    transport_region_ = nullptr;
+    transport_mapping_ = nullptr;
+    transport_region_bytes_ = 0;
+  }
+
+  void refresh_transport_attachment() noexcept {
+    detach_transport();
+    long buffer_size = 0;
+    ASIOSampleRate sample_rate = 0.0;
+    bool ready = false;
+    {
+      std::scoped_lock lock(mutex_);
+      buffer_size = buffer_size_;
+      sample_rate = sample_rate_;
+      ready = buffers_ready_;
+    }
+    if (!ready) return;
+    const auto region_bytes = hibiki_asio_transport_region_size_v1();
+    HANDLE mapping = OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE, FALSE,
+                                      kAsioTransportMappingName);
+    if (mapping == nullptr) return;
+    auto* region = static_cast<hibiki_asio_transport_region_v1*>(
+        MapViewOfFile(mapping, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, region_bytes));
+    if (region == nullptr) {
+      CloseHandle(mapping);
+      return;
+    }
+    const bool format_matches =
+        region->magic == HIBIKI_ASIO_TRANSPORT_MAGIC_V1 &&
+        region->abi_version == HIBIKI_ASIO_TRANSPORT_ABI_V1 &&
+        region->size_bytes == region_bytes && region->channels == kOutputChannels &&
+        region->sample_rate == static_cast<std::uint32_t>(sample_rate + 0.5) &&
+        region->frames_per_buffer == static_cast<std::uint32_t>(buffer_size);
+    if (!format_matches) {
+      UnmapViewOfFile(region);
+      CloseHandle(mapping);
+      return;
+    }
+    transport_mapping_ = mapping;
+    transport_region_ = region;
+    transport_region_bytes_ = region_bytes;
+  }
+
+  void publish_buffer(const long buffer_index) noexcept {
+    // ASIO guarantees that buffer management is complete before start(); the
+    // control thread therefore cannot unmap or replace this view while the
+    // callback worker is running. Keep this path lock-free and allocation-free.
+    auto* const region = transport_region_;
+    const auto region_bytes = transport_region_bytes_;
+    const auto frames = static_cast<std::uint32_t>(buffer_size_);
+    std::array<const float*, kOutputChannels> channel_buffers{};
+    if (region == nullptr || buffer_index < 0 || buffer_index > 1) return;
+    for (long channel = 0; channel < kOutputChannels; ++channel) {
+      channel_buffers[static_cast<std::size_t>(channel)] =
+          buffers_[static_cast<std::size_t>(channel)][static_cast<std::size_t>(buffer_index)].get();
+    }
+    (void)hibiki_asio_transport_push_planar_v1(
+        region, region_bytes, channel_buffers.data(), static_cast<std::uint32_t>(kOutputChannels), frames);
+  }
 
   void run_callbacks() noexcept {
     long buffer_index = 0;
@@ -295,6 +365,7 @@ private:
       } else if (callbacks_copy.bufferSwitch != nullptr) {
         callbacks_copy.bufferSwitch(buffer_index, ASIOFalse);
       }
+      publish_buffer(buffer_index);
       sample_position_.fetch_add(static_cast<std::uint64_t>(buffer_size_), std::memory_order_relaxed);
       buffer_index = 1 - buffer_index;
       std::this_thread::sleep_for(block_duration);
@@ -312,6 +383,9 @@ private:
   std::atomic<std::uint64_t> sample_position_{0};
   char last_error_[64]{""};
   std::thread worker_;
+  HANDLE transport_mapping_{nullptr};
+  hibiki_asio_transport_region_v1* transport_region_{nullptr};
+  std::size_t transport_region_bytes_{0};
 };
 
 class HibikiAsioClassFactory final : public IClassFactory {

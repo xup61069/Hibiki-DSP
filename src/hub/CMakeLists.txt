@@ -3,6 +3,7 @@ add_library(hibiki_hub STATIC
   src/calibration.cpp
   src/audio_session_registry.cpp
   src/audio_engine.cpp
+  src/asio_transport_consumer.cpp
   src/device_recovery.cpp
   src/device_switch.cpp
   src/exporters.cpp
@@ -19,7 +20,10 @@ add_library(hibiki_hub STATIC
 target_include_directories(hibiki_hub
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/sdk/include
 )
+
+target_link_libraries(hibiki_hub PUBLIC hibiki_sdk)
 
 target_compile_features(hibiki_hub PUBLIC cxx_std_20)
 

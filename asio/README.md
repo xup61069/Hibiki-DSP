@@ -24,3 +24,12 @@ ASIO SDK registry contract under `HKLM\\SOFTWARE\\ASIO` and
 shell. It is unsigned developer output and does not yet claim physical sink
 I/O; that boundary remains the Hibiki engine, IPC and the signed virtual
 endpoint.
+
+When the engine has created the stable `Local\\HibikiDSP\\v1\\asio` mapping,
+`createBuffers` attaches the ASIO output blocks to the Apache-2.0
+`hibiki_asio_transport_v1` SPSC ring. The DLL publishes the block after the
+host callback returns; it never creates the mapping and never blocks the
+callback on a missing engine. If the mapping is absent or its format does not
+match, ASIO remains usable but is explicitly detached from Hibiki processing.
+The engine-side `AsioTransportConsumerV1` owns mapping creation and performs
+the allocation-free pop on its audio lane.

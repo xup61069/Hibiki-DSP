@@ -7,6 +7,7 @@
 #include "hibiki/plugin_host.hpp"
 #include "hibiki/vst3_sandbox.hpp"
 #include "hibiki/tab_bridge.hpp"
+#include "hibiki/asio_transport_v1.h"
 #include "hibiki/output_sink.hpp"
 #include "hibiki/output_crossfade.hpp"
 #include "hibiki/exporters.hpp"
@@ -340,6 +341,29 @@ int main() {
     TabBridgeServer tab_server;
     CHECK(!tab_server.start(TabBridgeServerConfigV1{17842U, 256U * 1024U}, nullptr, nullptr));
     CHECK(!tab_server.running());
+
+    const auto transport_bytes = hibiki_asio_transport_region_size_v1();
+    std::vector<std::uint64_t> transport_words(
+        (transport_bytes + sizeof(std::uint64_t) - 1U) / sizeof(std::uint64_t));
+    auto* transport = reinterpret_cast<hibiki_asio_transport_region_v1*>(transport_words.data());
+    CHECK(hibiki_asio_transport_init_v1(transport,
+                                        transport_words.size() * sizeof(std::uint64_t),
+                                        2U, 48000U, 4U) == 1);
+    const float left[4] = {1.0F, 2.0F, 3.0F, 4.0F};
+    const float right[4] = {-1.0F, -2.0F, -3.0F, -4.0F};
+    const float* planar[2] = {left, right};
+    CHECK(hibiki_asio_transport_push_planar_v1(
+              transport, transport_words.size() * sizeof(std::uint64_t), planar, 2U, 4U) == 1);
+    float transport_output[8]{};
+    uint32_t transport_frames = 0U;
+    uint32_t transport_channels = 0U;
+    uint32_t transport_rate = 0U;
+    CHECK(hibiki_asio_transport_pop_interleaved_v1(
+              transport, transport_words.size() * sizeof(std::uint64_t), transport_output, 4U,
+              &transport_frames, &transport_channels, &transport_rate) == 1);
+    CHECK(transport_frames == 4U && transport_channels == 2U && transport_rate == 48000U);
+    CHECK(transport_output[0] == 1.0F && transport_output[1] == -1.0F &&
+          transport_output[6] == 4.0F && transport_output[7] == -4.0F);
 
     hibiki_driver_endpoint_state_v1 driver_state{};
     driver_state.header.abi_version = HIBIKI_DRIVER_CONTROL_ABI_V1;

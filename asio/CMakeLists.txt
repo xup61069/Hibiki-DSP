@@ -36,13 +36,14 @@ if(HIBIKI_ENABLE_NATIVE_ASIO)
   )
   target_include_directories(hibiki_asio_native PRIVATE
     "${HIBIKI_ASIO_SDK_ROOT}/common"
+    "${PROJECT_SOURCE_DIR}/sdk/include"
   )
   target_compile_definitions(hibiki_asio_native PRIVATE
     HIBIKI_ENABLE_NATIVE_ASIO=1
     $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>
   )
   target_compile_features(hibiki_asio_native PRIVATE cxx_std_20)
-  target_link_libraries(hibiki_asio_native PRIVATE ole32 advapi32)
+  target_link_libraries(hibiki_asio_native PRIVATE hibiki_sdk ole32 advapi32)
   set_target_properties(hibiki_asio_native PROPERTIES
     OUTPUT_NAME "HibikiDSPASIO"
     PREFIX ""

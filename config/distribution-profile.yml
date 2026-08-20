@@ -13,4 +13,5 @@ identities:
   endpoint_virtual_mic_guid: 5e90de25-0e88-4892-8b0e-a1d521cb3f40
   asio_clsid: 2c0e8d4f-7d9f-4aa7-a03d-690dcf5d5f8c
   ipc_namespace: Local\\HibikiDSP\\v1
+  asio_transport_shared_memory: Local\\HibikiDSP\\v1\\asio
   schema_version: 1
