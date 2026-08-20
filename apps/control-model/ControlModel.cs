@@ -112,25 +112,61 @@ public sealed class EasyControlSession
 
 public sealed class DeviceSwitchModel
 {
+    public enum SwitchState
+    {
+        Unbound,
+        Preparing,
+        Fading,
+        ReadyToCommit,
+        Synced,
+        RolledBack,
+        Degraded
+    }
+
     private string? _active;
     private string? _prepared;
 
     public string? ActiveDevice => _active;
+    public string? PreparedDevice => _prepared;
+    public SwitchState State { get; private set; } = SwitchState.Unbound;
+    public bool CanCommit => State == SwitchState.ReadyToCommit && _prepared is not null;
 
     public bool Prepare(string deviceId)
     {
-        if (string.IsNullOrWhiteSpace(deviceId)) return false;
+        if (string.IsNullOrWhiteSpace(deviceId) ||
+            State is SwitchState.Preparing or SwitchState.Fading or SwitchState.ReadyToCommit)
+            return false;
         _prepared = deviceId;
+        State = SwitchState.Preparing;
+        return true;
+    }
+
+    public bool MarkPrepared()
+    {
+        if (State != SwitchState.Preparing || _prepared is null) return false;
+        State = SwitchState.Fading;
+        return true;
+    }
+
+    public bool MarkCrossfadeComplete()
+    {
+        if (State != SwitchState.Fading || _prepared is null) return false;
+        State = SwitchState.ReadyToCommit;
         return true;
     }
 
     public bool Commit()
     {
-        if (_prepared is null) return false;
+        if (!CanCommit) return false;
         _active = _prepared;
         _prepared = null;
+        State = SwitchState.Synced;
         return true;
     }
 
-    public void Rollback() => _prepared = null;
+    public void Rollback()
+    {
+        _prepared = null;
+        State = _active is null ? SwitchState.Unbound : SwitchState.RolledBack;
+    }
 }

@@ -14,10 +14,18 @@ Check(OutputGroupCatalog.Fixed.Count == 3 &&
 var snapshot = new ControlSnapshot(UiMode.Easy, AudioControlStatus.Controlled, "main", -8.5, -8.5, false, null, null);
 Check(snapshot.DisplayVolume == "-8.5 dB", "dB display must use the effective value.");
 var device = new DeviceSwitchModel();
-Check(device.Prepare("endpoint-a") && device.Commit(), "Device A commit failed.");
+Check(device.Prepare("endpoint-a") && device.State == DeviceSwitchModel.SwitchState.Preparing,
+    "Device A prepare state failed.");
+Check(device.MarkPrepared() && device.State == DeviceSwitchModel.SwitchState.Fading,
+    "Device A warm-up state failed.");
+Check(device.MarkCrossfadeComplete() && device.CanCommit && device.Commit(),
+    "Device A crossfade commit failed.");
 Check(device.Prepare("endpoint-b"), "Device B prepare failed.");
+Check(!device.Commit(), "Device B must not commit before crossfade.");
 device.Rollback();
-Check(device.ActiveDevice == "endpoint-a", "Rollback replaced the active endpoint.");
+Check(device.ActiveDevice == "endpoint-a" &&
+      device.State == DeviceSwitchModel.SwitchState.RolledBack,
+    "Rollback replaced the active endpoint.");
 var session = new EasyControlSession();
 var blockedEnhance = session.OneTapEnhance(null);
 Check(!blockedEnhance.Succeeded && blockedEnhance.Status == AudioControlStatus.Degraded,

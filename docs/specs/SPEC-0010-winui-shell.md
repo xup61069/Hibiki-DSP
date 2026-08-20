@@ -36,6 +36,10 @@ versioned IPC，Hello 成功後才可送出 SceneApply 或 VolumeNotification。
 固定輸出群組 ID 為 `main`、`low-latency`、`surround`；它們是 UI 選擇值，
 不是實體 Endpoint ID。場景 ID 延用 `game`、`movie`、`voice`、`studio`。
 
+`DeviceSwitchModel` 的控制面狀態固定為 `Preparing → Fading → ReadyToCommit → Synced`；
+未完成暖機或 crossfade 時 `Commit` 必須失敗，Rollback 保留上一個 active device。實際
+endpoint bind、30 ms equal-power crossfade 與回復仍由 C++ sink worker 負責。
+
 ## 失敗與安全
 
 - 沒有輸出群組時 One-Tap Enhance fail-closed，不產生 SceneApply。
