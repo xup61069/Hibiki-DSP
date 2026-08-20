@@ -6,6 +6,7 @@
 #include "hibiki/calibration.hpp"
 #include "hibiki/plugin_host.hpp"
 #include "hibiki/vst3_sandbox.hpp"
+#include "hibiki/tab_bridge.hpp"
 #include "hibiki/output_sink.hpp"
 #include "hibiki/output_crossfade.hpp"
 #include "hibiki/exporters.hpp"
@@ -30,6 +31,7 @@ extern "C" {
 
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 #define CHECK(condition)                                                                    \
@@ -318,6 +320,23 @@ int main() {
     CHECK(sandbox.state() == Vst3SandboxState::Quarantined);
     sandbox.stop();
     CHECK(sandbox.state() == Vst3SandboxState::Stopped);
+
+    std::vector<std::uint8_t> tab_packet(16U + 2U * 2U * sizeof(float), 0U);
+    tab_packet[0] = 'H'; tab_packet[1] = 'I'; tab_packet[2] = 'B'; tab_packet[3] = 'T';
+    tab_packet[4] = 1U;
+    tab_packet[6] = 2U;
+    tab_packet[8] = 2U;
+    tab_packet[12] = 0x80U; tab_packet[13] = 0xBBU; tab_packet[14] = 0U; tab_packet[15] = 0U;
+    const float tab_samples[4] = {0.25F, -0.25F, 0.5F, -0.5F};
+    std::memcpy(tab_packet.data() + 16U, tab_samples, sizeof(tab_samples));
+    TabCapturePacketViewV1 tab_view{};
+    TabPacketError tab_error{TabPacketError::None};
+    CHECK(decode_tab_capture_packet_v1(tab_packet, tab_view, tab_error));
+    CHECK(tab_view.channels == 2U && tab_view.frames == 2U && tab_view.sample_rate == 48000U);
+    CHECK(std::abs(tab_view.sample(2U) - 0.5F) < 1e-6F);
+    tab_packet.pop_back();
+    CHECK(!decode_tab_capture_packet_v1(tab_packet, tab_view, tab_error) &&
+          tab_error == TabPacketError::LengthMismatch);
 
     hibiki_driver_endpoint_state_v1 driver_state{};
     driver_state.header.abi_version = HIBIKI_DRIVER_CONTROL_ABI_V1;

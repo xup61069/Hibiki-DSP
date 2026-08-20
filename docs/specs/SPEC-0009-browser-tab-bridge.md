@@ -24,6 +24,10 @@ stream，AudioWorklet 將音訊轉成 `HIBT` packet；Windows process routing �
 
 ## Native bridge boundary
 
+The repository now includes `hibiki_tab_bridge_contract`, a portable decoder
+that validates all fields and rejects non-finite samples before exposing a
+non-owning packet view.
+
 目前 extension 只連 `ws://127.0.0.1:17842/v1/tab` 的 optional receiver；bridge 未啟動
 時丟棄送出 packet。native receiver、命名 pipe/engine lane、降噪模型 provenance、
 權限提示與斷線重連 policy 必須在獨立 source component 完成後才可宣稱「單分頁掛降噪」。
