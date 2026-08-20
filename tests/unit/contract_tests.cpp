@@ -125,6 +125,12 @@ int main() {
     CHECK(output_frames == 3 && resampled[0] == 0.0F && resampled[2] == 2.0F);
     CHECK(persistent_src.process(second_block, 4, resampled, 8, output_frames));
     CHECK(output_frames == 4 && resampled[0] == 3.0F && resampled[3] == 6.0F);
+    OutputSinkModel sink_model;
+    CHECK(sink_model.prepare(1, 1.0));
+    sink_model.observe_clock(48000.0, 48012.0, 1.0);
+    CHECK(sink_model.snapshot().ratio > 1.0 && sink_model.snapshot().source_step < 1.0);
+    CHECK(sink_model.process(first_block, 4, resampled, 8, output_frames));
+    CHECK(output_frames > 0);
 
     DeviceRecoveryCoordinator recovery;
     CHECK(recovery.observe(DeviceRecoveryEventV1{

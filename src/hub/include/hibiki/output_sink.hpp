@@ -61,6 +61,7 @@ private:
 class PersistentLinearResampler final {
 public:
     [[nodiscard]] bool prepare(std::uint32_t channels, double source_step) noexcept;
+    [[nodiscard]] bool set_source_step(double source_step) noexcept;
     void reset() noexcept;
     [[nodiscard]] bool process(const float* input,
                                std::size_t input_frames,
@@ -76,6 +77,38 @@ private:
     double source_step_{1.0};
     double phase_{0.0};
     bool has_previous_{false};
+};
+
+struct OutputSinkClockSnapshotV1 {
+    double ratio{1.0};
+    double drift_ppm{0.0};
+    double source_step{1.0};
+    bool prepared{false};
+};
+
+// Per-sink clock/SRC pipeline. Clock observations are control-plane input;
+// process() is the no-allocation audio-side operation.
+class OutputSinkModel final {
+public:
+    [[nodiscard]] bool prepare(std::uint32_t channels, double source_step) noexcept;
+    void reset() noexcept;
+    void observe_clock(double source_frames,
+                      double sink_frames,
+                      double elapsed_seconds) noexcept;
+    [[nodiscard]] bool process(const float* input,
+                               std::size_t input_frames,
+                               float* output,
+                               std::size_t output_capacity_frames,
+                               std::size_t& output_frames) noexcept;
+    [[nodiscard]] const OutputSinkClockSnapshotV1& snapshot() const noexcept {
+        return snapshot_;
+    }
+
+private:
+    ClockDriftEstimator drift_{};
+    PersistentLinearResampler resampler_{};
+    double base_source_step_{1.0};
+    OutputSinkClockSnapshotV1 snapshot_{};
 };
 
 }  // namespace hibiki

@@ -103,6 +103,14 @@ bool PersistentLinearResampler::prepare(const std::uint32_t channels,
     return true;
 }
 
+bool PersistentLinearResampler::set_source_step(const double source_step) noexcept {
+    if (!std::isfinite(source_step) || source_step < 0.25 || source_step > 4.0) {
+        return false;
+    }
+    source_step_ = source_step;
+    return true;
+}
+
 void PersistentLinearResampler::reset() noexcept {
     previous_.fill(0.0F);
     phase_ = 0.0;
@@ -166,6 +174,51 @@ bool PersistentLinearResampler::process(const float* const input,
     phase_ = std::clamp(phase_, 0.0, source_step_);
     has_previous_ = true;
     return true;
+}
+
+bool OutputSinkModel::prepare(const std::uint32_t channels,
+                              const double source_step) noexcept {
+    if (!std::isfinite(source_step) || source_step < 0.25 || source_step > 4.0 ||
+        !resampler_.prepare(channels, source_step)) {
+        return false;
+    }
+    base_source_step_ = source_step;
+    drift_.reset();
+    snapshot_ = OutputSinkClockSnapshotV1{1.0, 0.0, source_step, true};
+    return true;
+}
+
+void OutputSinkModel::reset() noexcept {
+    drift_.reset();
+    resampler_.reset();
+    snapshot_.ratio = 1.0;
+    snapshot_.drift_ppm = 0.0;
+    snapshot_.source_step = base_source_step_;
+}
+
+void OutputSinkModel::observe_clock(const double source_frames,
+                                    const double sink_frames,
+                                    const double elapsed_seconds) noexcept {
+    if (!snapshot_.prepared) {
+        return;
+    }
+    drift_.observe(source_frames, sink_frames, elapsed_seconds);
+    const double ratio = drift_.ratio();
+    const double effective_step = base_source_step_ / ratio;
+    if (resampler_.set_source_step(effective_step)) {
+        snapshot_.ratio = ratio;
+        snapshot_.drift_ppm = drift_.drift_ppm();
+        snapshot_.source_step = effective_step;
+    }
+}
+
+bool OutputSinkModel::process(const float* const input,
+                              const std::size_t input_frames,
+                              float* const output,
+                              const std::size_t output_capacity_frames,
+                              std::size_t& output_frames) noexcept {
+    return snapshot_.prepared && resampler_.process(
+                                     input, input_frames, output, output_capacity_frames, output_frames);
 }
 
 }  // namespace hibiki
