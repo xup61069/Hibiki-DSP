@@ -12,6 +12,7 @@ bool AudioEngineModel::prepare_graph(const GraphConfigV1& graph,
     if (!compile_rt_snapshot(graph, revision, candidate)) {
         state_ = EngineTransactionState::Degraded;
         has_pending_graph_ = false;
+        pending_latency_bank_ = LaneLatencyBankV1{};
         return false;
     }
     std::array<LaneLatencyConfigV1, kMaxRtLanes> latency_configs{};
@@ -26,6 +27,7 @@ bool AudioEngineModel::prepare_graph(const GraphConfigV1& graph,
             std::span<const LaneLatencyConfigV1>(latency_configs.data(), candidate.lane_count))) {
         state_ = EngineTransactionState::Degraded;
         has_pending_graph_ = false;
+        pending_latency_bank_ = LaneLatencyBankV1{};
         return false;
     }
     pending_graph_ = candidate;
@@ -49,6 +51,7 @@ bool AudioEngineModel::commit_graph() noexcept {
 
 void AudioEngineModel::rollback_graph() noexcept {
     has_pending_graph_ = false;
+    pending_latency_bank_ = LaneLatencyBankV1{};
     state_ = has_active_graph_ ? EngineTransactionState::Ready : EngineTransactionState::Degraded;
 }
 

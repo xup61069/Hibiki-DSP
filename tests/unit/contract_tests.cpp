@@ -1036,6 +1036,9 @@ int main() {
     engine_graph.lanes.push_back(LaneConfigV1{"game", "main", 2, 0.0, true});
     CHECK(engine.prepare_graph(engine_graph, 11));
     CHECK(engine.transaction_state() == EngineTransactionState::Prepared);
+    engine.rollback_graph();
+    CHECK(engine.transaction_state() == EngineTransactionState::Degraded);
+    CHECK(engine.prepare_graph(engine_graph, 11));
     CHECK(engine.commit_graph());
     CHECK(engine.transaction_state() == EngineTransactionState::Ready);
     engine.set_sample_rate(8000U);
