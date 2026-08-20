@@ -46,6 +46,9 @@
 - `SceneSafetyController` now provides a tested control-plane policy for smart scene attenuation:
   it rate-limits true-peak overage actions, detects manual Windows volume overrides and restores
   the remembered scene baseline only when it is safe to do so.
+- `OutputCrossfade` now provides a no-allocation equal-power sink handoff primitive with a
+  30 ms default-compatible path for 2/6/8 channels; it is tested independently from the
+  still-pending physical endpoint and clock soak fixtures.
 
 ## 尚未開始
 
@@ -71,7 +74,7 @@ session volume adapter、sink clock pipeline 與 optional native ASIO transport 
 working tree 與該 scope 是否一致。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 40 個必要入口與
-6 份 Spec 通過；`source-policy.ps1` 掃描 142 個路徑且無 blocked binary/secret；
+7 份 Spec 通過；`source-policy.ps1` 掃描 142 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1` 與
 `distribution-check.ps1` 通過；16 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在

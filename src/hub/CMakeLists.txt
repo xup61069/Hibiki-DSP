@@ -9,6 +9,7 @@ add_library(hibiki_hub STATIC
   src/ipc.cpp
   src/iso226.cpp
   src/output_sink.cpp
+  src/output_crossfade.cpp
   src/scene_graph.cpp
   src/scene_presets.cpp
   src/scene_safety.cpp

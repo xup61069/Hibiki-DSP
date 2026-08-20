@@ -6,6 +6,7 @@
 #include "hibiki/calibration.hpp"
 #include "hibiki/plugin_host.hpp"
 #include "hibiki/output_sink.hpp"
+#include "hibiki/output_crossfade.hpp"
 #include "hibiki/exporters.hpp"
 #include "hibiki/audio_engine.hpp"
 #include "hibiki/audio_session_registry.hpp"
@@ -132,6 +133,16 @@ int main() {
     CHECK(sink_model.snapshot().ratio > 1.0 && sink_model.snapshot().source_step < 1.0);
     CHECK(sink_model.process(first_block, 4, resampled, 8, output_frames));
     CHECK(output_frames > 0);
+
+    OutputCrossfade crossfade;
+    CHECK(crossfade.begin(2, 48000, 30));
+    std::vector<float> old_sink(48000U * 30U / 1000U * 2U, 1.0F);
+    std::vector<float> new_sink(old_sink.size(), 0.0F);
+    std::vector<float> mixed(old_sink.size(), 0.0F);
+    CHECK(crossfade.process(old_sink.data(), new_sink.data(), mixed.data(), old_sink.size() / 2U));
+    CHECK(crossfade.snapshot().processed_frames == crossfade.snapshot().total_frames);
+    CHECK(!crossfade.snapshot().active);
+    CHECK(mixed.front() > 0.0F && mixed.back() < 0.01F);
 
     DeviceRecoveryCoordinator recovery;
     CHECK(recovery.observe(DeviceRecoveryEventV1{
