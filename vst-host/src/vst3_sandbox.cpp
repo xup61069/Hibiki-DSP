@@ -77,7 +77,7 @@ bool Vst3SandboxProcess::launch(const Vst3SandboxLaunchV1& launch_config) {
     process_handle_ = as_pointer(process_info.hProcess);
     job_handle_ = as_pointer(job);
     watchdog_timeout_ms_ = launch_config.watchdog_timeout_ms;
-    last_heartbeat_ms_ = 0;
+    last_heartbeat_ms_ = launch_config.start_time_ms == 0U ? 1U : launch_config.start_time_ms;
     state_ = Vst3SandboxState::Running;
     return true;
 }

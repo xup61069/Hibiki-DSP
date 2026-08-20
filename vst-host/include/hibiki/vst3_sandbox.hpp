@@ -11,6 +11,7 @@ struct Vst3SandboxLaunchV1 {
     std::wstring worker_executable;
     std::wstring plugin_path;
     std::uint32_t watchdog_timeout_ms{250};
+    std::uint64_t start_time_ms{1};
 };
 
 enum class Vst3SandboxState : std::uint8_t {
