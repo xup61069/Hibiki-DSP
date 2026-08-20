@@ -19,6 +19,14 @@ dependencies:
     license: MIT
     purpose: VST3 host compatibility
     redistribution: Preserve license and notices
+  - name: Steinberg ASIO SDK (open-source repository)
+    source: https://github.com/audiosdk/asio
+    version: 2.3.4
+    commit: 496a0765b8bb9c26f764f22f9a9712a937177db2
+    hash: source commit pin; local checkout only
+    license: GPL-3.0-only (SDK repository terms)
+    purpose: Optional native ASIO COM transport
+    redistribution: Do not vendor; obtain locally and preserve SDK notices
   - name: libebur128
     source: https://github.com/jiixyj/libebur128
     version: pending
