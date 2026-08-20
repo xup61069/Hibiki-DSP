@@ -15,10 +15,10 @@ struct WasapiOutputConfigV1 {
   std::uint32_t buffer_duration_ms{20};
 };
 
-// Control-plane WASAPI shared-mode endpoint with an allocation-free render
-// call for a dedicated sink worker (not the Hibiki graph RT thread). The
-// caller must initialize COM on the binding thread. Only Float32 mix formats
-// are accepted so the sink worker never performs format conversion.
+// WASAPI shared-mode endpoint owned by one dedicated sink worker (not the
+// Hibiki graph RT thread). That worker must initialize COM and perform bind,
+// start, render and unbind on the same apartment; the control plane schedules
+// commands to it. Only Float32 mix formats are accepted.
 class WindowsWasapiOutputV1 final {
 public:
   WindowsWasapiOutputV1() noexcept = default;
