@@ -21,6 +21,11 @@ struct LaneConfigV1 {
     // Each input channel maps to one output channel; -1 means intentionally
     // muted. The default is identity for all supported layouts.
     std::array<std::int8_t, 8> channel_map{0, 1, 2, 3, 4, 5, 6, 7};
+    // Optional arbitrary input-to-output matrix. Rows are input channels and
+    // columns are output channels; disabled by default for compatibility with
+    // the compact channel_map representation.
+    bool matrix_enabled{false};
+    std::array<std::array<float, 8>, 8> channel_matrix{};
 };
 
 struct GraphConfigV1 {
@@ -36,6 +41,8 @@ constexpr std::size_t kMaxOutputGroupBytes = 64;
 struct RtLaneSnapshotV1 {
     std::uint32_t input_channels{2};
     std::array<std::int8_t, 8> channel_map{0, 1, 2, 3, 4, 5, 6, 7};
+    bool matrix_enabled{false};
+    std::array<std::array<float, 8>, 8> channel_matrix{};
     std::uint8_t output_group_bytes{0U};
     std::array<char, kMaxOutputGroupBytes> output_group{};
     float makeup_gain_linear{1.0F};

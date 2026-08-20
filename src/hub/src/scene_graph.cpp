@@ -33,6 +33,14 @@ bool validate_graph(const GraphConfigV1& graph) noexcept {
                 return false;
             }
         }
+        if (lane.matrix_enabled) {
+            if (graph.strict_direct) return false;
+            for (const auto& row : lane.channel_matrix) {
+                for (const auto gain : row) {
+                    if (!std::isfinite(gain) || std::abs(gain) > 8.0F) return false;
+                }
+            }
+        }
         if (graph.strict_direct && std::abs(lane.makeup_gain_db) > 1e-12) {
             return false;
         }
@@ -58,6 +66,8 @@ bool compile_rt_snapshot(const GraphConfigV1& graph,
         auto& target = compiled.lanes[index];
         target.input_channels = source.channel_count;
         target.channel_map = source.channel_map;
+        target.matrix_enabled = source.matrix_enabled;
+        target.channel_matrix = source.channel_matrix;
         target.output_group_bytes = static_cast<std::uint8_t>(source.output_group.size());
         std::copy(source.output_group.begin(), source.output_group.end(), target.output_group.begin());
         target.enabled = source.enabled;
@@ -103,10 +113,19 @@ bool process_graph_filtered(const RtGraphSnapshotV1& snapshot,
             auto* output_frame = output_interleaved + frame * snapshot.output_channels;
             for (std::uint32_t source_channel = 0; source_channel < input.channel_count;
                  ++source_channel) {
-                const auto destination = lane.channel_map[source_channel];
-                if (destination >= 0) {
-                    output_frame[static_cast<std::size_t>(destination)] +=
-                        input_frame[source_channel] * lane.makeup_gain_linear;
+                if (lane.matrix_enabled) {
+                    for (std::uint32_t destination = 0U; destination < snapshot.output_channels;
+                         ++destination) {
+                        output_frame[destination] += input_frame[source_channel] *
+                                                     lane.channel_matrix[source_channel][destination] *
+                                                     lane.makeup_gain_linear;
+                    }
+                } else {
+                    const auto destination = lane.channel_map[source_channel];
+                    if (destination >= 0) {
+                        output_frame[static_cast<std::size_t>(destination)] +=
+                            input_frame[source_channel] * lane.makeup_gain_linear;
+                    }
                 }
             }
         }

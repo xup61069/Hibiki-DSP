@@ -79,6 +79,9 @@
   lane can apply PEQ before program-aware level correction with matching sample-rate/channel checks.
 - `IrConvolverV1` provides a fixed 4096-tap direct FIR with cross-block history and caller-supplied
   phase metadata; the tab lane can apply IR after PEQ and before program-aware level correction.
+- `LaneConfigV1` now supports an optional validated 8×8 channel matrix in the immutable RT
+  snapshot, while the legacy one-destination `channel_map` remains the default; Strict Direct
+  rejects matrix-enabled lanes.
 - Worker-side session volume read/write now uses `ISimpleAudioVolume` with dB↔scalar conversion,
   event-context GUIDs and readback; unbound/exclusive/vendor ASIO paths remain explicit bypasses.
 - `OutputSinkModel` now joins clock-drift estimation to persistent SRC per sink, preserving

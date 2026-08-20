@@ -384,6 +384,27 @@ int main() {
     CHECK(std::abs(rendered[10] - 2.0F) < 1e-5F);
     CHECK(std::abs(rendered[11] - 0.5F) < 1e-5F);
 
+    GraphConfigV1 matrix_graph;
+    matrix_graph.output_channels = 2U;
+    matrix_graph.lanes.push_back(LaneConfigV1{"matrix", "main", 2U, 0.0, true});
+    matrix_graph.lanes[0].matrix_enabled = true;
+    matrix_graph.lanes[0].channel_matrix[0] = {0.5F, 0.25F, 0.0F, 0.0F,
+                                               0.0F, 0.0F, 0.0F, 0.0F};
+    matrix_graph.lanes[0].channel_matrix[1] = {0.25F, 0.5F, 0.0F, 0.0F,
+                                               0.0F, 0.0F, 0.0F, 0.0F};
+    CHECK(validate_graph(matrix_graph));
+    RtGraphSnapshotV1 matrix_snapshot;
+    CHECK(compile_rt_snapshot(matrix_graph, 9U, matrix_snapshot));
+    const float matrix_input[] = {1.0F, -1.0F};
+    const RtLaneInputV1 matrix_view{matrix_input, 2U};
+    float matrix_output[2]{};
+    CHECK(process_graph(matrix_snapshot, std::span<const RtLaneInputV1>(&matrix_view, 1),
+                        matrix_output, 1U));
+    CHECK(std::abs(matrix_output[0] - 0.25F) < 1e-6F &&
+          std::abs(matrix_output[1] + 0.25F) < 1e-6F);
+    matrix_graph.strict_direct = true;
+    CHECK(!validate_graph(matrix_graph));
+
     GraphConfigV1 multi_group_graph;
     multi_group_graph.output_channels = 2;
     for (std::uint32_t lane_index = 0U; lane_index < 4U; ++lane_index) {

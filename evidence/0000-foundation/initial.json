@@ -56,6 +56,7 @@
     {"command": "program-aware-level-controller", "status": "pass", "coverage": ["bounded RMS proxy", "3 second analysis window", "silence gate", "boost/cut caps", "dB-per-second rate limit", "nonfinite sample guard", "optional tab-lane integration", "sample-rate mismatch fail-closed"]},
     {"command": "peq-runtime", "status": "pass", "coverage": ["RBJ peaking biquad", "16-filter capacity", "1-8 channel state", "nonfinite sample guard", "tab-lane effect ordering", "sample-rate/channel mismatch fail-closed"]},
     {"command": "ir-runtime", "status": "pass", "coverage": ["4096-tap direct FIR", "mono/per-channel kernel", "cross-block history", "phase metadata validation", "nonfinite sample guard", "tab-lane effect ordering"]},
+    {"command": "matrix-routing", "status": "pass", "coverage": ["8x8 arbitrary channel matrix", "crossfeed weighted mix", "immutable RT snapshot copy", "legacy channel-map compatibility", "Strict Direct rejection"]},
     {"command": "output-handoff-coordinator", "status": "pass", "coverage": ["transaction plus crossfade", "commit blocked before fade completion", "rollback preserves active endpoint"]}
   ],
   "started_at": "2026-08-21T00:00:00Z",

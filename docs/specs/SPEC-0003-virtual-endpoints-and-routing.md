@@ -71,6 +71,9 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   `GraphConfigV1`；`WindowsSession` gain owner 不重複套 lane makeup，`HibikiInternal` 才
   使用 per-session makeup dB。未綁定 session 忽略、重複 lane ID 或 Strict Direct 搭配 gain
   一律 fail-closed。
+- `LaneConfigV1` 保留原本的 `channel_map`，並可選啟用 8×8 `channel_matrix` 來表達 VB
+  Matrix 類的 crossfeed、分流與加權混音；矩陣係數在 control side 驗證並複製到 immutable
+  RT snapshot。Strict Direct 禁止 matrix_enabled，避免把 DSP 路徑誤標成 bit-perfect。
 - `set_makeup_gain_db` 是 registry 唯一的 per-session gain mutator，限制 −144..+12 dB；
   metadata `upsert` 不得靜默覆蓋使用者設定。
 - `RtLaneSnapshotV1` 會把每個 lane 的 `output_group` 編譯成固定大小 immutable bytes；
