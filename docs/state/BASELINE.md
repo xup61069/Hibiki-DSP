@@ -35,8 +35,7 @@
 
 - 可載入的 WaveRT/SYSVAD-derived driver。
 - 真正的 WaveRT-backed RT engine、Steinberg ASIO DLL、out-of-process VST3 SDK host、WinUI 3 UI、
-  native browser bridge、persistent SRC state、physical sink clock integration 與 signed package
-  delivery。
+  native browser bridge、physical sink clock integration 與 signed package delivery。
 - ISO 226:2023 合法係數來源與正式 conformance oracle（公式本身已完成，但係數資料仍待
   授權／法務確認）。
 - Microsoft driver signing、Gumroad release artifact 與 production installer。
