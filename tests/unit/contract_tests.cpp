@@ -30,6 +30,7 @@ extern "C" {
 #include "hibiki/scene_graph.hpp"
 #include "hibiki/scene_presets.hpp"
 #include "hibiki/scene_safety.hpp"
+#include "hibiki/session_route.hpp"
 #include "hibiki/volume_state.hpp"
 #include "hibiki/virtual_mic.hpp"
 #include "hibiki/true_peak_limiter.hpp"
@@ -538,11 +539,34 @@ int main() {
     CHECK(session_registry.bind(chrome_tab_a, "vlog-noise", "headphones"));
     CHECK(session_registry.bind(chrome_tab_b, "music", "speakers"));
     CHECK(session_registry.set_gain_owner(chrome_tab_a, SessionGainOwner::HibikiInternal));
+    session_registry.find(chrome_tab_a)->makeup_gain_db = 6.0205999;
     CHECK(session_registry.find(chrome_tab_a)->lane_id == "vlog-noise");
     CHECK(session_registry.find(chrome_tab_a)->output_group == "headphones");
     CHECK(session_registry.find(chrome_tab_a)->gain_owner == SessionGainOwner::HibikiInternal);
     CHECK(session_registry.find(chrome_tab_b)->lane_id == "music");
     CHECK(session_registry.find(chrome_tab_b)->output_group == "speakers");
+    GraphConfigV1 session_graph;
+    CHECK(build_session_route_graph(session_registry, SessionRouteGraphPolicyV1{1, 2U, false},
+                                    session_graph));
+    CHECK(session_graph.lanes.size() == 2U &&
+          std::abs(session_graph.lanes[0].makeup_gain_db - 6.0205999) < 1e-6 &&
+          session_graph.lanes[0].output_group == "headphones");
+    RtGraphSnapshotV1 session_snapshot;
+    CHECK(compile_rt_snapshot(session_graph, 4U, session_snapshot));
+    const float session_samples[] = {1.0F, -1.0F, 0.25F, -0.25F};
+    const std::array<RtLaneInputV1, 2> session_inputs{
+        RtLaneInputV1{session_samples, 2U}, RtLaneInputV1{session_samples + 2U, 2U}};
+    float session_output[2]{};
+    CHECK(process_graph_for_output_group(session_snapshot, "headphones", session_inputs,
+                                         session_output, 1U));
+    CHECK(std::abs(session_output[0] - 2.0F) < 1e-5F &&
+          std::abs(session_output[1] + 2.0F) < 1e-5F);
+    CHECK(process_graph_for_output_group(session_snapshot, "speakers", session_inputs,
+                                         session_output, 1U));
+    CHECK(std::abs(session_output[0] - 0.25F) < 1e-5F &&
+          std::abs(session_output[1] + 0.25F) < 1e-5F);
+    CHECK(!build_session_route_graph(session_registry,
+                                     SessionRouteGraphPolicyV1{1, 2U, true}, session_graph));
     CHECK(session_registry.upsert(AudioSessionDescriptorV1{
         1, AudioSessionIdentityV1{"hibiki-main", "chrome-instance-a", 5678},
         "Chrome tab A renamed", "chrome.exe", true,

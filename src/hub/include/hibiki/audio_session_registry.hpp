@@ -28,6 +28,7 @@ struct AudioSessionDescriptorV1 {
     SessionGainOwner gain_owner{SessionGainOwner::WindowsSession};
     std::string lane_id;
     std::string output_group;
+    double makeup_gain_db{0.0};
 };
 
 class AudioSessionRegistry final {

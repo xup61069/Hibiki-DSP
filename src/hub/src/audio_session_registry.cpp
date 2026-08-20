@@ -1,6 +1,7 @@
 #include "hibiki/audio_session_registry.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace hibiki {
@@ -25,7 +26,9 @@ bool AudioSessionRegistry::valid(const AudioSessionDescriptorV1& descriptor) noe
            descriptor.identity.session_instance_id.size() <= kMaxIdentityLength &&
            descriptor.display_name.size() <= kMaxLabelLength &&
            descriptor.app_id.size() <= kMaxLabelLength && descriptor.lane_id.size() <= kMaxLabelLength &&
-           descriptor.output_group.size() <= kMaxLabelLength;
+           descriptor.output_group.size() <= kMaxLabelLength &&
+           std::isfinite(descriptor.makeup_gain_db) && descriptor.makeup_gain_db >= -144.0 &&
+           descriptor.makeup_gain_db <= 12.0;
 }
 
 bool AudioSessionRegistry::upsert(AudioSessionDescriptorV1 descriptor) {
@@ -40,6 +43,7 @@ bool AudioSessionRegistry::upsert(AudioSessionDescriptorV1 descriptor) {
         descriptor.lane_id = existing->lane_id;
         descriptor.output_group = existing->output_group;
         descriptor.gain_owner = existing->gain_owner;
+        descriptor.makeup_gain_db = existing->makeup_gain_db;
         *existing = std::move(descriptor);
         return true;
     }

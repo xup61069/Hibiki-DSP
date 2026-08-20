@@ -52,6 +52,8 @@ Lane、output group、channel map、DSP chain、latency mode 與安全策略；�
 - `AudioSessionRegistry` 以 `endpoint_id + session_instance_id` 作為唯一 session key；PID
   只作顯示／診斷用途。OS metadata refresh 不得覆蓋使用者已選 lane、output group 或 gain
   owner，避免同一 process 的多個 Chrome tab／session 互相串音。
+- `SessionRouteGraphBuilderV1` 是 registry 到 immutable graph 的唯一控制面轉換點；每個
+  active bound session 生成一個 lane，並在 Validate → Prepare → Commit 後才可進 RT。
 - Windows `IAudioSessionManager2` adapter 的 `OnSessionCreated` callback 只遞增 sequence；
   worker 才呼叫 enumerator、讀取 instance/session ID、PID、display name 與 active state，
   再 upsert registry。這個邊界禁止在 OS callback 裡 QueryInterface、分配或改寫 graph。

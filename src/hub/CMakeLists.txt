@@ -20,6 +20,7 @@ add_library(hibiki_hub STATIC
   src/scene_graph.cpp
   src/scene_presets.cpp
   src/scene_safety.cpp
+  src/session_route.cpp
   src/true_peak_limiter.cpp
   src/volume_state.cpp
   src/virtual_mic.cpp
