@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <string>
 
+#include "hibiki/latency_graph_commit.hpp"
+
 namespace hibiki {
 
 enum class PluginHostState : std::uint8_t {
@@ -23,6 +25,7 @@ struct PluginDescriptorV1 {
     bool trusted{false};
     std::uint32_t watchdog_timeout_ms{250};
     bool certified{true};
+    std::uint64_t lane_token{0U};
 };
 
 class PluginHostModel final {
@@ -39,6 +42,11 @@ public:
     [[nodiscard]] PluginHostState state() const noexcept { return state_; }
     [[nodiscard]] std::uint32_t latency_samples() const noexcept {
         return descriptor_.reported_latency_samples;
+    }
+    [[nodiscard]] LatencyGraphLaneInputV1 latency_lane_input() const noexcept {
+        return LatencyGraphLaneInputV1{descriptor_.lane_token, can_process(),
+                                       descriptor_.output_channels,
+                                       descriptor_.reported_latency_samples};
     }
 
 private:

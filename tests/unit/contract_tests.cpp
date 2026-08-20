@@ -698,14 +698,19 @@ int main() {
     CHECK(session_registry.find(chrome_tab_b) == nullptr);
 
     PluginHostModel plugin;
-    CHECK(!plugin.start(PluginDescriptorV1{"untrusted", 2, 2, 64, false}));
+    CHECK(!plugin.start(PluginDescriptorV1{"untrusted", 2, 2, 64, false, 250, true, 41U}));
     CHECK(plugin.state() == PluginHostState::Quarantined);
-    CHECK(plugin.start(PluginDescriptorV1{"builtin-test", 2, 2, 64, true}));
+    CHECK(!plugin.start(PluginDescriptorV1{"missing-token", 2, 2, 64, true, 250, true, 0U}));
+    CHECK(plugin.state() == PluginHostState::Quarantined);
+    CHECK(plugin.start(PluginDescriptorV1{"builtin-test", 2, 2, 64, true, 250, true, 42U}));
+    CHECK(plugin.latency_lane_input().lane_token == 42U &&
+          plugin.latency_lane_input().active &&
+          plugin.latency_lane_input().reported_latency_samples == 64U);
     CHECK(plugin.heartbeat(1000));
     CHECK(!plugin.poll_watchdog(1200));
     CHECK(plugin.poll_watchdog(1300));
     CHECK(plugin.state() == PluginHostState::Quarantined);
-    CHECK(plugin.start(PluginDescriptorV1{"builtin-test", 2, 2, 64, true}));
+    CHECK(plugin.start(PluginDescriptorV1{"builtin-test", 2, 2, 64, true, 250, true, 42U}));
     const float plugin_input[] = {0.1F, -0.2F};
     float plugin_output[2]{};
     CHECK(plugin.process_passthrough(plugin_input, plugin_output, 2));

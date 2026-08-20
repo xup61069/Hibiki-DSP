@@ -8,7 +8,7 @@ bool PluginHostModel::start(const PluginDescriptorV1& descriptor) {
         descriptor.output_channels > 8 || !descriptor.trusted ||
         !descriptor.certified || descriptor.watchdog_timeout_ms == 0 ||
         descriptor.watchdog_timeout_ms > 5000 ||
-        descriptor.input_channels != descriptor.output_channels) {
+        descriptor.input_channels != descriptor.output_channels || descriptor.lane_token == 0U) {
         state_ = PluginHostState::Quarantined;
         return false;
     }

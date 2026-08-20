@@ -30,6 +30,9 @@ VST3 plugin 不得在 Hibiki RT thread 或主 UI process 內直接執行。contr
   sample rate 與 2/6/8 channels，supervisor 才會把 module/class/rate/channel 參數傳給
   `hibiki_vst3_sdk_worker`。共用 `validate_vst3_sandbox_launch_v1` 先拒絕不合法設定，不能
   由 child process 才發現格式錯誤。
+- `PluginDescriptorV1.lane_token` 是 control plane 配發的 stable non-zero identity；缺少 token
+  時 host 直接 quarantine。`PluginHostModel::latency_lane_input()` 只在 plugin 可處理時輸出
+  active lane，供 SPEC-0012 的 latency graph commit 使用，避免 PID 或暫時 index 對錯延遲。
 
 ## Worker IPC frame
 
