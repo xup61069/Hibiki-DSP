@@ -22,6 +22,9 @@ struct SceneProfileV1 {
     std::string id;
     std::string name;
     std::vector<std::string> lanes;
+    // Stable IDs for bounded VST3 automation timeline snapshots. The scene
+    // stores references only; the worker owns timeline execution.
+    std::vector<std::string> automation_timeline_ids;
     std::string output_group;
     LatencyMode latency_mode{LatencyMode::Game};
     IrPhasePolicyV1 ir_phase{};

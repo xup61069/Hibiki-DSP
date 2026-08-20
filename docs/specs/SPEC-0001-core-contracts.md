@@ -19,7 +19,9 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
 
 ## 介面
 
-- `SceneProfile v1`：lane routing、DSP、output group、automation、calibration reference。
+- `SceneProfile v1`：lane routing、DSP、output group、automation、calibration reference；
+  `automation_timeline_ids` 只保存 bounded VST3 timeline snapshot 的穩定引用，實際 worker
+  執行與 plugin state 不內嵌於 Scene JSON。
 - `output_group` 在 graph compile 時進入 fixed-size RT snapshot；physical sink worker 可按
   群組呼叫指定 render，不得在 audio thread 以 `std::string` 或 map 查路由。
 - `IrPhasePolicy v1`：minimum/mixed/linear/bypass 模式與 0..1 strength；只描述可驗證的

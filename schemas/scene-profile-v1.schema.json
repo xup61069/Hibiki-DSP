@@ -10,6 +10,10 @@
     "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"},
     "name": {"type": "string", "minLength": 1, "maxLength": 120},
     "lanes": {"type": "array", "items": {"type": "string"}},
+    "automation_timeline_ids": {
+      "type": "array", "maxItems": 16,
+      "items": {"type": "string", "minLength": 1, "maxLength": 64}
+    },
     "output_group": {"type": "string", "minLength": 1},
     "latency_mode": {"enum": ["game", "balanced", "movie-linear-phase", "strict-direct"]},
     "ir_phase": {

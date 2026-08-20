@@ -97,7 +97,11 @@ int main() {
     scene.id = "game";
     scene.name = "Game";
     scene.output_group = "main";
+    scene.automation_timeline_ids.push_back("game-vst3-default");
     CHECK(validate_scene(scene));
+    scene.automation_timeline_ids.push_back(std::string(65, 'x'));
+    CHECK(!validate_scene(scene));
+    scene.automation_timeline_ids.pop_back();
 
     const auto game_ir = resolve_ir_phase_policy(
         IrPhasePolicyV1{1, IrPhaseMode::MinimumPhase, 1.0});
