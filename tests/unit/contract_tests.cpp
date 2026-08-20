@@ -13,6 +13,7 @@
 #include "hibiki/vst3_worker_protocol.hpp"
 #include "hibiki/vst3_worker_pipe.hpp"
 #include "hibiki/latency_compensation.hpp"
+#include "hibiki/latency_graph_commit.hpp"
 #include "hibiki/tab_bridge.hpp"
 #include "hibiki/asio_transport_v1.h"
 #include "hibiki/output_sink.hpp"
@@ -800,6 +801,34 @@ int main() {
     const float delay_nan[] = {std::numeric_limits<float>::quiet_NaN(), 0.0F};
     CHECK(!delay_line->process(delay_nan, delay_output, 1U) && delay_output[0] == 0.0F &&
           delay_output[1] == 0.0F);
+
+    const std::array<LatencyGraphLaneInputV1, 3> graph_latency_lanes{{
+        {101U, true, 2U, 64U}, {202U, true, 6U, 256U}, {303U, false, 2U, 128U}}};
+    LatencyGraphCommitV1 graph_latency_commit{};
+    CHECK(prepare_latency_graph_commit_v1(graph_latency_lanes, 10U, 11U,
+                                          graph_latency_commit) &&
+          graph_latency_commit.maximum_latency_samples == 256U &&
+          graph_latency_commit.lanes[0].compensation_delay_samples == 192U &&
+          graph_latency_commit.lanes[1].compensation_delay_samples == 0U &&
+          graph_latency_commit.lanes[2].reported_latency_samples == 0U &&
+          graph_latency_commit.lanes[2].compensation_delay_samples == 256U &&
+          validate_latency_graph_commit_v1(graph_latency_commit));
+    auto graph_latency_committer = std::make_unique<LatencyGraphCommitterV1>();
+    CHECK(graph_latency_committer->prepare(graph_latency_lanes, 1U) &&
+          graph_latency_committer->state() == LatencyGraphTransactionStateV1::Prepared &&
+          graph_latency_committer->commit() &&
+          graph_latency_committer->active_graph_revision() == 1U);
+    CHECK(graph_latency_committer->prepare(graph_latency_lanes, 3U) &&
+          graph_latency_committer->pending().base_graph_revision == 1U);
+    graph_latency_committer->rollback();
+    CHECK(graph_latency_committer->active_graph_revision() == 1U &&
+          graph_latency_committer->state() == LatencyGraphTransactionStateV1::Ready);
+    CHECK(!graph_latency_committer->prepare(graph_latency_lanes, 1U) &&
+          graph_latency_committer->state() == LatencyGraphTransactionStateV1::Degraded);
+    const std::array<LatencyGraphLaneInputV1, 2> duplicate_latency_lanes{{
+        {7U, true, 2U, 1U}, {7U, true, 2U, 2U}}};
+    CHECK(!prepare_latency_graph_commit_v1(duplicate_latency_lanes, 0U, 1U,
+                                            graph_latency_commit));
 
     std::vector<std::uint8_t> tab_packet(16U + 2U * 2U * sizeof(float), 0U);
     tab_packet[0] = 'H'; tab_packet[1] = 'I'; tab_packet[2] = 'B'; tab_packet[3] = 'T';

@@ -128,9 +128,11 @@
   those points into the processor's official `IParameterChanges`; named-pipe transport, factory
   catalog and one-main-bus SDK processing build locally, while supervisor timeline/persistence,
   latency policy and certification remain pending.
-- `LatencyAlignmentPlanV1` and `FixedDelayLineV1` now provide a fixed 8-channel, 16,384-sample
+- `LatencyAlignmentPlanV1` and `FixedDelayLineV1` provide a fixed 8-channel, 16,384-sample
   bounded delay primitive with active-lane max-latency alignment, impulse and non-finite-input
-  tests. It is not yet committed into the immutable graph lane snapshot or supervisor policy.
+  tests. `LatencyGraphCommitV1`/`LatencyGraphCommitterV1` now bind that control result to stable
+  lane tokens and graph revisions with stale-base rejection and rollback. The delay primitive is
+  not yet wired into the immutable graph audio mixing path.
 - `VirtualMicRouteModel` now defines fixed 1/2-channel capture/reference blocks, fail-closed
   privacy mute and explicit echo-reference enablement. `VirtualMicDspV1` adds an optional bounded
   normalized-LMS echo-reference canceller and slow noise gate with no allocation; it remains a
@@ -191,15 +193,15 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 初始 foundation evidence 已寫入 `evidence/0000-foundation/initial.json`，目前對應
 Windows volume/device、ISO formula、recovery、driver control-core/INF template、persistent SRC、
 VST worker、control pipe/payloads、session volume adapter、sink clock pipeline、optional native
-ASIO transport/ring、tab/Virtual Mic lane adapter、session-route/output-handoff 與 control-model
-baseline commit `a3e7946`；
+ASIO transport/ring、tab/Virtual Mic lane adapter、session-route/output-handoff、control-model
+與 VST3 latency graph commit baseline；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
-目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 51 個必要入口與
-11 份 Spec 通過；`source-policy.ps1` 掃描 227 個路徑且無 blocked binary/secret；
+目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 53 個必要入口與
+12 份 Spec 通過；`source-policy.ps1` 掃描 227 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
-`distribution-check.ps1` 與 `driver-source-check.ps1` 通過；23 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
+`distribution-check.ps1` 與 `driver-source-check.ps1` 通過；24 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
 `.local/`，未提交或發布。以本機 pinned VST3 SDK 另行執行的 optional target
 `hibiki_vst3_sdk_catalog` 與 `hibiki_vst3_sdk_worker`（含 bounded one-main-bus processor、

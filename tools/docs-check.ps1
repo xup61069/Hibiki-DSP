@@ -29,8 +29,10 @@ $required = @(
   'schemas/peq-filter-v1.schema.json',
   'schemas/calibration-response-v1.schema.json',
   'schemas/vst3-latency-alignment-v1.schema.json',
+  'schemas/latency-graph-commit-v1.schema.json',
   'docs/specs/SPEC-0010-winui-shell.md',
   'docs/specs/SPEC-0011-calibration-compiler.md',
+  'docs/specs/SPEC-0012-vst3-latency-graph-commit.md',
   'docs/tasks/active/0.md', 'evidence/0000-foundation/initial.json'
 )
 

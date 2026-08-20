@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "issue": 0,
-  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-v7",
+  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-v8",
   "source_commit": "a3e7946",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
@@ -24,13 +24,13 @@
   ],
   "results": [
     {"command": "tools/verify.ps1", "status": "pass", "tests": 1},
-    {"command": "tools/docs-check.ps1", "status": "pass", "required_paths": 51, "specs": 11},
+    {"command": "tools/docs-check.ps1", "status": "pass", "required_paths": 53, "specs": 12},
     {"command": "tools/source-policy.ps1", "status": "pass", "scanned_paths": 227, "blocked_files": 0},
     {"command": "tools/extension-check.ps1", "status": "pass"},
     {"command": "tools/installer-check.ps1", "status": "pass"},
     {"command": "tools/control-model-check.ps1", "status": "pass"},
     {"command": "tools/distribution-check.ps1", "status": "pass"},
-    {"command": "json-parse", "status": "pass", "files": 23},
+    {"command": "json-parse", "status": "pass", "files": 24},
     {"command": "optional-vst3-sdk-catalog-build", "status": "pass", "target": "hibiki_vst3_sdk_catalog", "sdk_commit": "3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96", "scope": ["factory catalog", "one-main-bus Float32 processor", "fixed 4096-frame scratch", "latency reporting"], "published_artifacts": false},
     {"command": "optional-vst3-sdk-worker-build", "status": "pass", "target": "hibiki_vst3_sdk_worker", "sdk_commit": "3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96", "scope": ["named-pipe ProcessBlock bridge", "Hello/Heartbeat", "plugin error fail-closed", "bounded ProcessBlockWithParameters frame", "bounded IParameterChanges conversion"], "published_artifacts": false},
     {"command": "optional-native-asio-build", "status": "pass", "target": "hibiki_asio_native", "sdk_commit": "496a0765b8bb9c26f764f22f9a9712a937177db2", "published_artifacts": false},
@@ -56,6 +56,7 @@
     {"command": "winui-source-shell", "status": "pass", "coverage": ["Windows App SDK/toolchain lock match", "Easy/Expert binding surface", "source-only audio boundary", "window disconnect cleanup"], "compiled_artifacts": false},
     {"command": "calibration-compiler", "status": "pass", "coverage": ["strictly increasing response validation", "16-filter bounded selection", "boost/cut/Q/spacing policy", "explicit limited diagnostic", "exporter-compatible PeqFilterV1"], "compiled_artifacts": false},
     {"command": "vst3-latency-alignment", "status": "pass", "coverage": ["active-lane maximum-latency plan", "16,384-sample bound", "fixed 8-channel delay", "impulse delay", "non-finite reset"], "compiled_artifacts": false},
+    {"command": "vst3-latency-graph-commit", "status": "pass", "coverage": ["stable lane tokens", "revision-bound prepare/commit", "stale-base rejection", "rollback preservation", "inactive-lane normalization"], "compiled_artifacts": false},
     {"command": "installer-source-hardening", "status": "pass", "coverage": ["relative manifest paths", "path traversal rejection", "64-character SHA-256 validation"]},
     {"command": "ir-phase-policy", "status": "pass", "coverage": ["minimum-phase 0 ms", "mixed-phase 80 ms budget", "linear-phase 160 ms budget", "bypass validation", "C++/C# slider parity"]},
     {"command": "audio-engine-volume-snapshot", "status": "pass", "coverage": ["single 64-bit dB/mute atomic", "mute transition", "Group Master applied once", "8 ms gain ramp", "5 ms mute", "15 ms unmute", "-1 dBTP output guard"]},
