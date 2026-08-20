@@ -17,6 +17,11 @@ source_globs: ["src/**", "schemas/output-group-volume-v1.schema.json"]
 作為 canonical value，透過 origin GUID 與 generation 防止 feedback loop。volume ramp、mute
 fade、device crossfade 與 safety clamp 必須保留 last-known-safe gain。
 
+`AudioEngineModel` 的 RT Group Master 已實際使用 dB-domain ramp：一般變更 8 ms、mute
+5 ms、unmute 15 ms；control worker 只發布 Q16.16 target，audio thread 自己推進固定狀態，
+因此不會在音量鍵或 Scene 結束時產生 block-level hard step。實體 device crossfade 仍由
+`OutputCrossfade` 的 30 ms sink handoff 負責。
+
 目前 user-space contract 已提供 `apply_windows_notification`：只接受有限 dB 範圍與不倒退
 的 generation，接受後將 origin 設為 Windows 並重新套用 safety。真正的
 `IAudioEndpointVolume`／driver callback 仍待 SPEC-0003 的 Windows driver work。

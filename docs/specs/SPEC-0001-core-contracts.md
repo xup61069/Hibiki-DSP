@@ -70,6 +70,9 @@ Lane、output group、channel map、DSP chain、latency mode 與安全策略；�
   control object 不會由 RT 讀取；引擎只透過單一 release/acquire 64-bit word（Q16.16
   effective-dB + mute bit）聯動 Windows，避免 control worker 與 audio thread 形成 data race
   或讀到不一致的 dB/mute pair。
+- Group Master 的 RT ramp 以 dB-domain 執行：一般 target 8 ms、mute 5 ms、unmute 15 ms；
+  sample rate 由 control plane 設定（預設 48 kHz），ramp state 由唯一 audio thread 擁有，
+  不配置、不鎖、不等待。
 
 ## 相容性與驗收
 

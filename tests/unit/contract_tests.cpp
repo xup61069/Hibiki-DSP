@@ -111,6 +111,23 @@ int main() {
     state = reconcile(state);
     CHECK(std::abs(state.effective_db) < 1e-12);
 
+    VolumeRampProcessorV1 ramp;
+    ramp.reset(-60.0, false);
+    ramp.observe_target(db_to_q16_16(0.0), false, 8000U);
+    float previous_gain = 0.0F;
+    for (std::size_t frame = 0U; frame < 64U; ++frame) {
+        const auto gain = ramp.next_gain();
+        CHECK(gain >= previous_gain);
+        previous_gain = gain;
+    }
+    CHECK(std::abs(previous_gain - 1.0F) < 1e-6F && ramp.remaining_frames() == 0U);
+    ramp.observe_target(db_to_q16_16(-6.0206), true, 8000U);
+    for (std::size_t frame = 0U; frame < 40U; ++frame) (void)ramp.next_gain();
+    CHECK(ramp.next_gain() == 0.0F);
+    ramp.observe_target(db_to_q16_16(-6.0206), false, 8000U);
+    for (std::size_t frame = 0U; frame < 120U; ++frame) (void)ramp.next_gain();
+    CHECK(std::abs(ramp.next_gain() - 0.5F) < 1e-5F);
+
     std::vector<IsoContourPoint> current{{100.0, 60.0}, {1000.0, 40.0}};
     std::vector<IsoContourPoint> reference{{100.0, 50.0}, {1000.0, 40.0}};
     EqualLoudnessPolicyV1 policy;
@@ -404,29 +421,36 @@ int main() {
     CHECK(control_queue.try_push(scene_command));
     CHECK(control_worker.drain(control_queue) == 1U && control_worker.has_active_scene() &&
           control_worker.active_scene().output_group == "main" && control_worker.revision() == 1U);
+    control_engine.set_sample_rate(8000U);
     ControlCommandV1 control_volume{};
     control_volume.type = IpcMessageType::VolumeNotification;
     control_volume.volume = VolumeNotificationV1{0.0, false, 1U};
     CHECK(control_queue.try_push(control_volume));
     CHECK(control_worker.drain(control_queue) == 1U);
-    const float control_input[] = {1.0F, -1.0F};
-    const RtLaneInputV1 control_view{control_input, 2};
-    float control_output[2]{};
-    CHECK(control_engine.process(std::span<const RtLaneInputV1>(&control_view, 1), control_output, 1));
-    CHECK(std::abs(control_output[0] - 1.0F) < 1e-5F &&
-          std::abs(control_output[1] + 1.0F) < 1e-5F);
+    std::array<float, 256> control_input{};
+    std::array<float, 256> control_output{};
+    for (std::size_t index = 0U; index < control_input.size(); index += 2U) {
+        control_input[index] = 1.0F;
+        control_input[index + 1U] = -1.0F;
+    }
+    const RtLaneInputV1 control_view{control_input.data(), 2};
+    CHECK(control_engine.process(std::span<const RtLaneInputV1>(&control_view, 1),
+                                 control_output.data(), 128U));
+    CHECK(std::abs(control_output[254] - 1.0F) < 1e-5F &&
+          std::abs(control_output[255] + 1.0F) < 1e-5F);
     control_volume.volume = VolumeNotificationV1{-6.0206, false, 2U};
     CHECK(control_queue.try_push(control_volume));
     CHECK(control_worker.drain(control_queue) == 1U);
-    CHECK(control_engine.process(std::span<const RtLaneInputV1>(&control_view, 1), control_output, 1));
-    CHECK(std::abs(control_output[0] - 0.5F) < 1e-5F);
+    CHECK(control_engine.process(std::span<const RtLaneInputV1>(&control_view, 1),
+                                 control_output.data(), 128U));
+    CHECK(std::abs(control_output[254] - 0.5F) < 1e-5F);
     CHECK(control_engine.process_output_group("main",
                                              std::span<const RtLaneInputV1>(&control_view, 1),
-                                             control_output, 1));
-    CHECK(std::abs(control_output[0] - 0.5F) < 1e-5F);
+                                             control_output.data(), 128U));
+    CHECK(std::abs(control_output[254] - 0.5F) < 1e-5F);
     CHECK(!control_engine.process_output_group("missing",
                                               std::span<const RtLaneInputV1>(&control_view, 1),
-                                              control_output, 1));
+                                              control_output.data(), 128U));
     scene_command.scene.scene_id_bytes = 7U;
     std::copy_n("unknown", 7U, scene_command.scene.scene_id.data());
     CHECK(control_queue.try_push(scene_command));
@@ -679,18 +703,30 @@ int main() {
     CHECK(engine.transaction_state() == EngineTransactionState::Prepared);
     CHECK(engine.commit_graph());
     CHECK(engine.transaction_state() == EngineTransactionState::Ready);
+    engine.set_sample_rate(8000U);
     CHECK(engine.apply_windows_volume(VolumeNotificationV1{-6.0206, false, 1}) ==
           VolumeNotificationResult::Accepted);
-    const float engine_input[] = {1.0F, -1.0F};
-    const RtLaneInputV1 engine_input_view{engine_input, 2};
-    float engine_output[2]{};
-    CHECK(engine.process(std::span<const RtLaneInputV1>(&engine_input_view, 1), engine_output, 1));
-    CHECK(std::abs(engine_output[0] - 0.5F) < 1e-5F);
-    CHECK(std::abs(engine_output[1] + 0.5F) < 1e-5F);
+    std::array<float, 256> engine_input{};
+    std::array<float, 256> engine_output{};
+    for (std::size_t index = 0U; index < engine_input.size(); index += 2U) {
+        engine_input[index] = 1.0F;
+        engine_input[index + 1U] = -1.0F;
+    }
+    const RtLaneInputV1 engine_input_view{engine_input.data(), 2};
+    CHECK(engine.process(std::span<const RtLaneInputV1>(&engine_input_view, 1),
+                         engine_output.data(), 128U));
+    CHECK(std::abs(engine_output[254] - 0.5F) < 1e-5F);
+    CHECK(std::abs(engine_output[255] + 0.5F) < 1e-5F);
     CHECK(engine.apply_windows_volume(VolumeNotificationV1{-6.0206, true, 2}) ==
           VolumeNotificationResult::Accepted);
-    CHECK(engine.process(std::span<const RtLaneInputV1>(&engine_input_view, 1), engine_output, 1));
-    CHECK(engine_output[0] == 0.0F && engine_output[1] == 0.0F);
+    CHECK(engine.process(std::span<const RtLaneInputV1>(&engine_input_view, 1),
+                         engine_output.data(), 128U));
+    CHECK(engine_output[254] == 0.0F && engine_output[255] == 0.0F);
+    CHECK(engine.apply_windows_volume(VolumeNotificationV1{-6.0206, false, 3}) ==
+          VolumeNotificationResult::Accepted);
+    CHECK(engine.process(std::span<const RtLaneInputV1>(&engine_input_view, 1),
+                         engine_output.data(), 128U));
+    CHECK(std::abs(engine_output[254] - 0.5F) < 1e-5F);
     CHECK(engine.apply_windows_volume(VolumeNotificationV1{-6.0206, false, 3}) ==
           VolumeNotificationResult::Accepted);
     std::vector<RtLaneInputV1> tab_lane_inputs(1);

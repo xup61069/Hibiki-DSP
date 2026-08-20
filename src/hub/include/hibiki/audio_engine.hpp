@@ -34,6 +34,7 @@ public:
                                              std::span<const RtLaneInputV1> inputs,
                                              float* output_interleaved,
                                              std::size_t frames) const noexcept;
+    void set_sample_rate(std::uint32_t sample_rate) noexcept;
     [[nodiscard]] bool bind_asio_transport(std::wstring_view mapping_name,
                                             std::uint32_t channels,
                                             std::uint32_t sample_rate,
@@ -68,6 +69,8 @@ private:
     // word keeps dB and mute coherent for a block boundary.
     std::atomic<std::uint64_t> rt_volume_word_{
         static_cast<std::uint64_t>(static_cast<std::uint32_t>(-60 * 65536)) << 32U};
+    std::atomic<std::uint32_t> sample_rate_{48000U};
+    mutable VolumeRampProcessorV1 rt_volume_ramp_{};
     EngineTransactionState state_{EngineTransactionState::Ready};
     bool has_active_graph_{false};
     bool has_pending_graph_{false};
