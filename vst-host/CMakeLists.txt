@@ -32,6 +32,7 @@ if(HIBIKI_ENABLE_VST3_SDK)
   endif()
   add_library(hibiki_vst3_sdk_catalog STATIC
     src/vst3_sdk_catalog.cpp
+    src/vst3_sdk_processor.cpp
     "${HIBIKI_VST3_SDK_ROOT}/public.sdk/source/vst/hosting/module.cpp"
     "${HIBIKI_VST3_SDK_ROOT}/public.sdk/source/vst/hosting/module_win32.cpp"
     "${HIBIKI_VST3_SDK_ROOT}/public.sdk/source/vst/hosting/hostclasses.cpp"

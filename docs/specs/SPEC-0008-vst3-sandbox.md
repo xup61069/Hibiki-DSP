@@ -44,9 +44,19 @@ Steinberg SDK 3.8.1 build 84 與 submodule commits，掃描 module factory class
 SDK checkout 由開發者在 `.local/` 提供，public monorepo 不 vendor SDK；catalog 不執行 plugin、
 不進 RT thread，也不等同 certification。其 optional target 已在本機以 MSVC 編譯通過。
 
+`vst3_sdk_processor.hpp` 提供同一 optional target 的 worker-side processing adapter。它只
+接受 catalog 回傳的 class UID，初始化一個主 input/output audio bus，支援 1/2/5.1/7.1
+speaker arrangement，將 caller-owned interleaved block 轉成固定 4096-frame planar scratch，
+再交給 `IAudioProcessor::process`，並回報 plugin latency。`process` 不配置、不等待，遇到
+NaN/Inf、格式不符或 plugin error 會清零輸出；但 plugin 本身仍是不受信任程式，必須留在
+VST3 sandbox worker，不能直接掛進 Hibiki RT graph。此 adapter 沒有參數自動化、side-chain、
+多 bus、state persistence 或 latency compensation policy。
+
 ## 尚未完成的邊界
 
-plugin scan 的 factory metadata catalog 已有 optional bridge；仍未完成第三方 plugin
-certification、SDK parameter/audio dispatch、latency compensation、crash dump redaction 與
-production worker policy。目前 supervisor、named pipe、passthrough worker 與 catalog 提供
-可測試的 process containment/metadata boundary，不能宣稱已完成 VST3 host。
+plugin scan 的 factory metadata catalog 與單一主 bus SDK dispatch adapter 已有 optional
+bridge；仍未完成第三方 plugin certification、supervisor-to-SDK worker wiring、parameter
+automation、side-chain/multi-bus、latency compensation、crash dump redaction 與 production
+worker policy。目前 supervisor、named pipe、passthrough worker、catalog 與 bounded SDK
+processor 提供可測試的 process containment/metadata/processing boundary，不能宣稱已完成
+VST3 host。
