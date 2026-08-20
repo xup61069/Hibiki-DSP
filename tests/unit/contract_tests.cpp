@@ -18,6 +18,7 @@ extern "C" {
 #include "hibiki/iso226.hpp"
 #include "hibiki/scene_graph.hpp"
 #include "hibiki/scene_presets.hpp"
+#include "hibiki/scene_safety.hpp"
 #include "hibiki/volume_state.hpp"
 #if defined(_WIN32)
 #include "hibiki/windows_volume_broker.hpp"
@@ -167,6 +168,29 @@ int main() {
     CHECK(studio_scene.graph.strict_direct);
     CHECK(validate_graph(studio_scene.graph));
     CHECK(studio_scene.loudness.max_boost_db == 0.0);
+
+    OutputGroupVolumeStateV1 safety_volume{};
+    safety_volume.requested_db = -12.0;
+    safety_volume.safety_ceiling_db = -3.0;
+    SceneSafetyController safety_controller;
+    CHECK(safety_controller.begin(make_easy_scene(EasySceneKind::Movie, "movie").scene,
+                                   safety_volume));
+    CHECK(safety_controller.active() && safety_controller.baseline_db() == -12.0);
+    const auto no_action = safety_controller.observe_peak(-1.6, 50, safety_volume);
+    CHECK(no_action.kind == SceneSafetyActionKind::None);
+    const auto attenuation = safety_controller.observe_peak(-0.2, 100, safety_volume);
+    CHECK(attenuation.kind == SceneSafetyActionKind::Attenuate);
+    CHECK(std::abs(attenuation.requested_db + 12.8) < 1e-12);
+    safety_volume.requested_db = attenuation.requested_db;
+    const auto restore = safety_controller.end(safety_volume);
+    CHECK(restore.kind == SceneSafetyActionKind::Restore && restore.requested_db == -12.0);
+
+    CHECK(safety_controller.begin(make_easy_scene(EasySceneKind::Movie, "movie").scene,
+                                  safety_volume));
+    safety_volume.requested_db = -6.0;
+    const auto manual_end = safety_controller.end(safety_volume);
+    CHECK(manual_end.kind == SceneSafetyActionKind::None &&
+          safety_controller.user_override_detected());
 
     AcousticAnchorV1 anchor;
     anchor.test_signal_dbfs = -20.0;

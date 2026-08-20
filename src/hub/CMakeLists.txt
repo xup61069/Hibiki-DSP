@@ -11,6 +11,7 @@ add_library(hibiki_hub STATIC
   src/output_sink.cpp
   src/scene_graph.cpp
   src/scene_presets.cpp
+  src/scene_safety.cpp
   src/volume_state.cpp
 )
 
