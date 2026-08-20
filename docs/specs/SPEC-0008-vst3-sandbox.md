@@ -30,6 +30,9 @@ Heartbeat、ProcessBlock、ProcessBlockResponse、Shutdown、Error。Process fra
 2/6/8 聲道、1–4096 frames、exact interleaved Float32 payload，並拒絕 NaN/Inf；codec 不
 配置、不擁有 payload，適合由 named pipe 或其他 control transport 在 worker 與 supervisor
 間傳遞。真正 VST3 SDK/plugin dispatch 仍必須在 worker process，不能連入 graph RT。
+`Vst3WorkerPipeV1` 提供 Windows overlapped named-pipe server、4-byte bounded length prefix、
+connect/read/write timeout 與 caller-owned receive buffer；它是 control-plane transport，
+不會被 audio callback 呼叫。
 
 ## 尚未完成的邊界
 

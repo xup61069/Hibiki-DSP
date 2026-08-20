@@ -7,6 +7,7 @@
 #include "hibiki/plugin_host.hpp"
 #include "hibiki/vst3_sandbox.hpp"
 #include "hibiki/vst3_worker_protocol.hpp"
+#include "hibiki/vst3_worker_pipe.hpp"
 #include "hibiki/tab_bridge.hpp"
 #include "hibiki/asio_transport_v1.h"
 #include "hibiki/output_sink.hpp"
@@ -355,6 +356,8 @@ int main() {
     CHECK(!validate_vst3_worker_audio_frame_v1(worker_packet, decoded_worker, decoded_samples,
                                                 worker_error) &&
           worker_error == Vst3WorkerProtocolErrorV1::NonFiniteSample);
+    Vst3WorkerPipeV1 worker_pipe;
+    CHECK(!worker_pipe.create_server(Vst3WorkerPipeConfigV1{L"", 1024U, 100U}));
 
     std::vector<std::uint8_t> tab_packet(16U + 2U * 2U * sizeof(float), 0U);
     tab_packet[0] = 'H'; tab_packet[1] = 'I'; tab_packet[2] = 'B'; tab_packet[3] = 'T';
