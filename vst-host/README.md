@@ -28,3 +28,9 @@ with an explicit class UID, sample rate and 2/6/8-channel layout; empty class
 UID preserves the existing passthrough worker, and invalid launch fields are
 rejected before process creation. Parameter automation, latency-compensation
 policy, crash-dump redaction and real plugin certification remain separate gates.
+
+The processor API also accepts up to 16 parameter IDs, five sample-accurate
+points per ID and normalized values in `[0,1]`; it converts them to the SDK's
+`IParameterChanges` before `process`. The existing v1 worker frame does not
+carry parameter points yet, so this control/worker API is intentionally not
+described as end-to-end automation.

@@ -36,6 +36,7 @@ if(HIBIKI_ENABLE_VST3_SDK)
     "${HIBIKI_VST3_SDK_ROOT}/public.sdk/source/vst/hosting/module.cpp"
     "${HIBIKI_VST3_SDK_ROOT}/public.sdk/source/vst/hosting/module_win32.cpp"
     "${HIBIKI_VST3_SDK_ROOT}/public.sdk/source/vst/hosting/hostclasses.cpp"
+    "${HIBIKI_VST3_SDK_ROOT}/public.sdk/source/vst/hosting/parameterchanges.cpp"
     "${HIBIKI_VST3_SDK_ROOT}/public.sdk/source/vst/hosting/pluginterfacesupport.cpp"
     "${HIBIKI_VST3_SDK_ROOT}/public.sdk/source/vst/utility/stringconvert.cpp"
     "${HIBIKI_VST3_SDK_ROOT}/public.sdk/source/common/commonstringconvert.cpp"

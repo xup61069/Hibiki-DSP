@@ -63,7 +63,8 @@
   a lane on crash or missed bounded heartbeat; the source-only worker now exercises bounded
   Hello/Heartbeat/ProcessBlock passthrough/Shutdown IPC. An optional pinned-SDK catalog and
   worker-side one-main-bus processor now cover module/class discovery, 1/2/5.1/7.1 Float32
-  dispatch, fixed scratch bounds and plugin latency reporting; the optional worker also bridges
+  dispatch, fixed scratch bounds, plugin latency reporting and bounded parameter point conversion;
+  the optional worker also bridges
   ProcessBlock frames, while supervisor launch validation now passes explicit class/rate/channel
   fields and production certification remain pending.
 - `AudioSessionRegistry` keys Windows sessions by endpoint plus session-instance ID, preserves

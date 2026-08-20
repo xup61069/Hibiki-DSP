@@ -6,6 +6,7 @@
 #include "pluginterfaces/vst/vstspeaker.h"
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "public.sdk/source/vst/hosting/module.h"
+#include "public.sdk/source/vst/hosting/parameterchanges.h"
 
 #include <algorithm>
 #include <cmath>
@@ -66,11 +67,52 @@ struct Vst3SdkProcessorV1::Impl {
     Steinberg::Vst::AudioBusBuffers output_bus{};
     Steinberg::Vst::ProcessData process_data{};
     Steinberg::Vst::ProcessSetup setup{};
+    Steinberg::Vst::ParameterChanges parameter_changes{16};
 };
 
 Vst3SdkProcessorV1::~Vst3SdkProcessorV1()
 {
     close();
+}
+
+bool validate_vst3_sdk_parameter_points_v1(
+    const std::span<const Vst3SdkParameterPointV1> points,
+    const std::uint32_t frames) noexcept {
+    if (frames == 0U || frames > Vst3SdkProcessorV1::kMaxFrames || points.size() > 64U) {
+        return false;
+    }
+    for (std::size_t index = 0U; index < points.size(); ++index) {
+        const auto& point = points[index];
+        if (point.sample_offset < 0 || static_cast<std::uint32_t>(point.sample_offset) >= frames ||
+            !std::isfinite(point.normalized_value) || point.normalized_value < 0.0 ||
+            point.normalized_value > 1.0) {
+            return false;
+        }
+        std::size_t same_parameter = 0U;
+        bool first_parameter_point = true;
+        for (std::size_t prior = 0U; prior <= index; ++prior) {
+            if (points[prior].parameter_id == point.parameter_id) {
+                ++same_parameter;
+                if (prior < index) first_parameter_point = false;
+            }
+        }
+        if (same_parameter > 5U) return false;
+        if (first_parameter_point) {
+            std::size_t unique_count = 0U;
+            for (std::size_t candidate = 0U; candidate <= index; ++candidate) {
+                bool seen = false;
+                for (std::size_t prior = 0U; prior < candidate; ++prior) {
+                    if (points[prior].parameter_id == points[candidate].parameter_id) {
+                        seen = true;
+                        break;
+                    }
+                }
+                if (!seen) ++unique_count;
+            }
+            if (unique_count > 16U) return false;
+        }
+    }
+    return true;
 }
 
 bool Vst3SdkProcessorV1::open(const std::string& module_path,
@@ -229,7 +271,8 @@ void Vst3SdkProcessorV1::close() noexcept
 
 Vst3SdkProcessResultV1 Vst3SdkProcessorV1::process(const float* input,
                                                    float* output,
-                                                   std::uint32_t frames) noexcept
+                                                   const std::uint32_t frames,
+                                                   const std::span<const Vst3SdkParameterPointV1> parameters) noexcept
 {
     if (!processing_ || impl_ == nullptr) {
         return Vst3SdkProcessResultV1::not_open;
@@ -239,6 +282,9 @@ Vst3SdkProcessResultV1 Vst3SdkProcessorV1::process(const float* input,
     }
     if (frames == 0 || frames > max_frames_ || frames > kMaxFrames) {
         return Vst3SdkProcessResultV1::unsupported_block;
+    }
+    if (!validate_vst3_sdk_parameter_points_v1(parameters, frames)) {
+        return Vst3SdkProcessResultV1::invalid_parameter;
     }
 
     for (std::uint32_t channel = 0; channel < channels_; ++channel) {
@@ -255,6 +301,23 @@ Vst3SdkProcessResultV1 Vst3SdkProcessorV1::process(const float* input,
         }
     }
     impl_->process_data.numSamples = static_cast<Steinberg::int32>(frames);
+    impl_->parameter_changes.clearQueue();
+    for (const auto& point : parameters) {
+        Steinberg::int32 queue_index = 0;
+        auto* queue = impl_->parameter_changes.addParameterData(
+            static_cast<Steinberg::Vst::ParamID>(point.parameter_id), queue_index);
+        if (queue == nullptr) {
+            std::fill(output, output + frames * channels_, 0.0F);
+            return Vst3SdkProcessResultV1::invalid_parameter;
+        }
+        Steinberg::int32 point_index = 0;
+        if (queue->addPoint(point.sample_offset, point.normalized_value, point_index) !=
+            Steinberg::kResultOk) {
+            std::fill(output, output + frames * channels_, 0.0F);
+            return Vst3SdkProcessResultV1::invalid_parameter;
+        }
+    }
+    impl_->process_data.inputParameterChanges = parameters.empty() ? nullptr : &impl_->parameter_changes;
     const auto result = impl_->processor->process(impl_->process_data);
     if (!result_ok(result)) {
         std::fill(output, output + frames * channels_, 0.0F);

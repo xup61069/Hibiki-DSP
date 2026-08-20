@@ -57,6 +57,11 @@ NaN/Inf、格式不符或 plugin error 會清零輸出；但 plugin 本身仍是
 VST3 sandbox worker，不能直接掛進 Hibiki RT graph。此 adapter 沒有參數自動化、side-chain、
 多 bus、state persistence 或 latency compensation policy。
 
+SDK adapter 的 control API 另接受最多 16 個 parameter IDs、每個 ID 最多 5 個 sample-accurate
+points，將 normalized `[0,1]` 值轉成官方 `IParameterChanges`；非法 offset、值域或超限事件
+會在交給 plugin 前拒絕。既有 v1 worker frame 尚未攜帶 parameter points，因此這個能力目前
+是 worker-side API boundary，不宣稱 supervisor 到 plugin 的 end-to-end automation。
+
 當本機提供 pinned SDK 時，`hibiki_vst3_sdk_worker` 會把該 adapter 接到既有 named-pipe
 worker frame：啟動參數固定包含 pipe、module、class UID、sample rate 與 2/6/8 channels；
 Hello/Heartbeat 沿用既有 frame，ProcessBlock 以 caller-owned packet 驗證後交給 SDK，成功

@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <span>
 #include <string>
 
 namespace hibiki {
@@ -32,7 +33,18 @@ enum class Vst3SdkProcessResultV1 : std::uint8_t {
     unsupported_block,
     plugin_error,
     non_finite_output,
+    invalid_parameter,
 };
+
+struct Vst3SdkParameterPointV1 {
+    std::uint32_t parameter_id{0};
+    std::int32_t sample_offset{0};
+    double normalized_value{0.0};
+};
+
+[[nodiscard]] bool validate_vst3_sdk_parameter_points_v1(
+    std::span<const Vst3SdkParameterPointV1> points,
+    std::uint32_t frames) noexcept;
 
 class Vst3SdkProcessorV1 final {
 public:
@@ -63,7 +75,8 @@ public:
     // must run in the sandbox worker, never in Hibiki's RT graph.
     Vst3SdkProcessResultV1 process(const float* input,
                                    float* output,
-                                   std::uint32_t frames) noexcept;
+                                   std::uint32_t frames,
+                                   std::span<const Vst3SdkParameterPointV1> parameters = {}) noexcept;
 
 private:
     struct Impl;
