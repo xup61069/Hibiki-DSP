@@ -115,8 +115,9 @@
   pinned-SDK factory catalog, bounded one-main-bus SDK processor and optional SDK worker build
   locally, while supervisor/plugin parameter wiring and certification remain pending.
 - `VirtualMicRouteModel` now defines fixed 1/2-channel capture/reference blocks, fail-closed
-  privacy mute and explicit echo-reference enablement; it intentionally does not claim AEC/NS or a
-  loadable virtual capture driver.
+  privacy mute and explicit echo-reference enablement. `VirtualMicDspV1` adds an optional bounded
+  normalized-LMS echo-reference canceller and slow noise gate with no allocation; it remains a
+  baseline, not acoustic AEC/NS conformance or a loadable virtual capture driver.
 - `Vst3WorkerPipeV1` is now attached to `Vst3SandboxProcess`: optional launch pipe setup passes
   `--hibiki-pipe`, bounded overlapped connect/read/write is exposed only to control/IPC callers,
   and stop closes the pipe with the Job Object. `hibiki_vst_worker` provides the bounded
@@ -152,8 +153,8 @@
   hardware identity, four endpoint GUIDs and service boundary; it references only the future
   signed SYS/CAT and remains non-installable from a fresh clone.
 - `process_virtual_mic_lane_v1` applies the fail-closed privacy gate before sending caller-owned
-  capture blocks through the shared lane graph; it still does not claim AEC/NS or a loadable
-  capture driver.
+  capture blocks through the shared lane graph, with optional bounded VirtualMicDsp cancellation/
+  gate; it still does not claim acoustic AEC/NS conformance or a loadable capture driver.
 
 ## 尚未開始
 
@@ -177,8 +178,8 @@ baseline commit `716c734`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
-目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 44 個必要入口與
-9 份 Spec 通過；`source-policy.ps1` 掃描 211 個路徑且無 blocked binary/secret；
+目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 45 個必要入口與
+9 份 Spec 通過；`source-policy.ps1` 掃描 212 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1` 與
 `distribution-check.ps1` 與 `driver-source-check.ps1` 通過；20 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在

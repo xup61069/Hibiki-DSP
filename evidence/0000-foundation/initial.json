@@ -23,7 +23,7 @@
   ],
   "results": [
     {"command": "tools/verify.ps1", "status": "pass", "tests": 1},
-    {"command": "tools/docs-check.ps1", "status": "pass", "required_paths": 44, "specs": 9},
+    {"command": "tools/docs-check.ps1", "status": "pass", "required_paths": 45, "specs": 9},
     {"command": "tools/source-policy.ps1", "status": "pass", "scanned_paths": 211, "blocked_files": 0},
     {"command": "tools/extension-check.ps1", "status": "pass"},
     {"command": "tools/installer-check.ps1", "status": "pass"},
@@ -50,7 +50,7 @@
     {"command": "vst3-worker-executable", "status": "pass", "coverage": ["Hello/Heartbeat", "bounded ProcessBlock passthrough", "Shutdown", "source-only build"]},
     {"command": "control-pipe-loopback", "status": "pass", "coverage": ["Windows named pipe server", "4-byte length prefix", "Ack/request-ID round-trip", "safe stop"]},
     {"command": "control-payloads", "status": "pass", "coverage": ["Q16.16 volume payload", "SceneApply fixed 64-byte payload", "typed command sink", "reserved-byte rejection", "strict UTF-8 validation"]},
-    {"command": "virtual-mic-contract", "status": "pass", "coverage": ["format validation", "privacy mute default", "capture passthrough", "echo-reference copy", "privacy gate before shared graph"]},
+    {"command": "virtual-mic-contract", "status": "pass", "coverage": ["format validation", "privacy mute default", "capture passthrough", "echo-reference copy", "bounded normalized-LMS cancellation", "finite-input fail-closed", "privacy gate before shared graph"]},
     {"command": "control-model", "status": "pass", "coverage": ["fail-closed One-Tap Enhance", "Easy/Expert scene selection", "active output-group identity", "SceneApply envelope encode", "strict UTF-8 rejection"]},
     {"command": "installer-source-hardening", "status": "pass", "coverage": ["relative manifest paths", "path traversal rejection", "64-character SHA-256 validation"]},
     {"command": "ir-phase-policy", "status": "pass", "coverage": ["minimum-phase 0 ms", "mixed-phase 80 ms budget", "linear-phase 160 ms budget", "bypass validation", "C++/C# slider parity"]},

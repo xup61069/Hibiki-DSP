@@ -42,4 +42,5 @@ branch。真實裝置資料與 calibration 留在 `.local/`，只提交 schema �
   named-pipe boundary、source-only passthrough worker、可選的 pinned VST3 SDK factory catalog
   與單一主 bus worker-side SDK processor/optional worker executable；supervisor launch policy、參數自動化與 latency policy
   仍待接入。`extensions/` 已有 HIBT decoder、loopback bridge、bounded capture queue 與
-  graph-lane adapter；denoise model provenance 仍待完成。
+  graph-lane adapter；Virtual Mic 有 bounded normalized-LMS/gate baseline，但正式 AEC/NS model
+  provenance 與 signed capture driver 仍待完成。

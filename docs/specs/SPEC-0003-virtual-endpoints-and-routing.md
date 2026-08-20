@@ -93,9 +93,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   不足都回傳失敗；Hibiki graph RT thread 不得呼叫此 COM API、初始化 COM、配置或重新綁定，
   control plane 只能排程 worker command。
 - `VirtualMicRouteModel` 提供未來 Virtual Mic endpoint 的 user-space capture/reference contract：
-  固定 1/2 聲道與 44.1/48/96/192 kHz、privacy mute 預設開啟、caller-owned passthrough 與
-  render echo-reference copy；它不宣稱 AEC/降噪，driver/IPC/permission indicator 必須另行
-  驗收。
+  固定 1/2 聲道與 44.1/48/96/192 kHz、privacy mute 預設開啟、caller-owned capture 與
+  render echo-reference copy。可選 `VirtualMicDspV1` 以固定 128-tap 上限做 normalized-LMS
+  reference cancellation 與慢速 noise gate；這是 bounded baseline，不宣稱 acoustic AEC、
+  RNNoise 或 conformance，driver/IPC/permission indicator 仍需另行驗收。
 
 ## 未解問題（阻擋完整 driver 實作）
 

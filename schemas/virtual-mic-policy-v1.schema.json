@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/virtual-mic-policy-v1.schema.json",
+  "title": "Hibiki Virtual Mic DSP Policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "echo_cancellation_enabled", "noise_gate_enabled", "filter_length", "adaptation_rate", "noise_gate_threshold_dbfs", "noise_gate_floor", "attack_ms", "release_ms"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "echo_cancellation_enabled": {"type": "boolean"},
+    "noise_gate_enabled": {"type": "boolean"},
+    "filter_length": {"type": "integer", "minimum": 1, "maximum": 128},
+    "adaptation_rate": {"type": "number", "minimum": 0, "maximum": 1},
+    "noise_gate_threshold_dbfs": {"type": "number", "minimum": -144, "maximum": 0},
+    "noise_gate_floor": {"type": "number", "minimum": 0, "maximum": 1},
+    "attack_ms": {"type": "number", "exclusiveMinimum": 0},
+    "release_ms": {"type": "number", "exclusiveMinimum": 0}
+  }
+}

@@ -7,14 +7,58 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <array>
 #include <span>
 
 namespace hibiki {
+
+struct VirtualMicDspPolicyV1 {
+  bool echo_cancellation_enabled{false};
+  bool noise_gate_enabled{false};
+  std::uint32_t filter_length{32};
+  float adaptation_rate{0.15F};
+  float noise_gate_threshold_dbfs{-50.0F};
+  float noise_gate_floor{0.08F};
+  float attack_ms{5.0F};
+  float release_ms{80.0F};
+};
+
+// Bounded worker/RT-safe reference canceller. It is intentionally a small
+// normalized-LMS baseline, not a claim of acoustic/ITU AEC conformance.
+class VirtualMicDspV1 final {
+public:
+  static constexpr std::uint32_t kMaxChannels = 2U;
+  static constexpr std::uint32_t kMaxTaps = 128U;
+
+  [[nodiscard]] bool prepare(const VirtualMicDspPolicyV1& policy,
+                             std::uint32_t channels,
+                             std::uint32_t sample_rate) noexcept;
+  void reset() noexcept;
+  [[nodiscard]] bool process(const float* capture,
+                             const float* reference,
+                             float* output,
+                             std::size_t frames) noexcept;
+  [[nodiscard]] bool prepared() const noexcept { return prepared_; }
+
+private:
+  VirtualMicDspPolicyV1 policy_{};
+  std::array<std::array<float, kMaxTaps>, kMaxChannels> coefficients_{};
+  std::array<std::array<float, kMaxTaps>, kMaxChannels> history_{};
+  std::array<float, kMaxChannels> envelope_{};
+  std::array<float, kMaxChannels> gate_gain_{};
+  std::uint32_t channels_{0};
+  std::uint32_t filter_length_{0};
+  float threshold_linear_{0.0F};
+  float attack_alpha_{0.0F};
+  float release_alpha_{0.0F};
+  bool prepared_{false};
+};
 
 struct VirtualMicConfigV1 {
   std::uint32_t channels{1};
   std::uint32_t sample_rate{48000};
   bool echo_reference_enabled{true};
+  VirtualMicDspPolicyV1 dsp_policy{};
 };
 
 struct VirtualMicSnapshotV1 {
@@ -26,8 +70,8 @@ struct VirtualMicSnapshotV1 {
 };
 
 // User-space privacy/reference contract for the future virtual capture
-// endpoint. It performs no AEC/NS claim: capture and render-reference blocks
-// are copied through caller-owned buffers, while privacy mute is fail-closed.
+// endpoint. Optional bounded DSP is a normalized-LMS/gate baseline, not AEC/NS
+// conformance; privacy mute remains fail-closed.
 class VirtualMicRouteModel final {
 public:
   [[nodiscard]] bool prepare(const VirtualMicConfigV1& config) noexcept;
@@ -40,6 +84,10 @@ public:
   [[nodiscard]] bool process_capture(const float* input,
                                      float* output,
                                      std::size_t frames) const noexcept;
+  [[nodiscard]] bool process_capture_with_reference(const float* input,
+                                                    const float* reference,
+                                                    float* output,
+                                                    std::size_t frames) const noexcept;
   [[nodiscard]] bool process_echo_reference(const float* render,
                                             float* reference,
                                             std::size_t frames) const noexcept;
@@ -48,6 +96,7 @@ public:
 private:
   VirtualMicSnapshotV1 snapshot_{};
   bool privacy_muted_{true};
+  mutable VirtualMicDspV1 dsp_{};
 };
 
 // Applies the privacy gate before entering the shared immutable graph. All
@@ -64,7 +113,9 @@ private:
     std::span<RtLaneInputV1> lane_inputs,
     float* output_interleaved,
     std::uint32_t output_capacity_frames,
-    std::uint32_t frames) noexcept;
+    std::uint32_t frames,
+    const float* echo_reference_interleaved = nullptr,
+    std::uint32_t echo_reference_capacity_frames = 0U) noexcept;
 
 }  // namespace hibiki
 

@@ -838,6 +838,27 @@ int main() {
     CHECK(linear_resample_interleaved(resample_input, 4, resample_output, 3, 1, 1.5));
     CHECK(std::abs(resample_output[1] - 1.5F) < 1e-5F);
 
+    VirtualMicDspPolicyV1 mic_dsp_policy{};
+    mic_dsp_policy.echo_cancellation_enabled = true;
+    mic_dsp_policy.filter_length = 8U;
+    mic_dsp_policy.adaptation_rate = 0.5F;
+    VirtualMicDspV1 mic_dsp;
+    CHECK(mic_dsp.prepare(mic_dsp_policy, 1U, 48000U));
+    std::array<float, 64> aec_capture{};
+    std::array<float, 64> aec_reference{};
+    std::array<float, 64> aec_clean{};
+    for (std::size_t aec_frame = 0U; aec_frame < aec_capture.size(); ++aec_frame) {
+        aec_reference[aec_frame] = 0.5F;
+        aec_capture[aec_frame] = 0.25F;
+    }
+    CHECK(mic_dsp.process(aec_capture.data(), aec_reference.data(), aec_clean.data(),
+                          aec_capture.size()));
+    CHECK(std::abs(aec_clean.back()) < 0.01F);
+    aec_capture[3] = std::numeric_limits<float>::quiet_NaN();
+    CHECK(!mic_dsp.process(aec_capture.data(), aec_reference.data(), aec_clean.data(),
+                           aec_capture.size()));
+    CHECK(aec_clean[0] == 0.0F && aec_clean.back() == 0.0F);
+
     const std::vector<PeqFilterV1> filters{{1000.0, 3.0, 1.0}, {100.0, -2.0, 0.7}};
     const auto apo = export_equalizer_apo(filters);
     const auto camilla = export_camilladsp_yaml(filters);
