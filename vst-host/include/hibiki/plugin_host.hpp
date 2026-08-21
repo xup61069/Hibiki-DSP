@@ -6,8 +6,10 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <string_view>
 
 #include "hibiki/latency_graph_commit.hpp"
+#include "hibiki/vst3_plugin_state.hpp"
 #include "hibiki/vst3_worker_lane.hpp"
 
 namespace hibiki {
@@ -59,6 +61,20 @@ public:
     [[nodiscard]] LatencyGraphLaneInputV1 worker_latency_lane_input() const noexcept {
         return worker_lane_.latency_lane_input();
     }
+    [[nodiscard]] Vst3PluginStateResultV1 capture_plugin_state(
+        std::string_view state_id,
+        const Vst3PluginStateIdentityV1& identity,
+        std::uint32_t state_version,
+        std::span<const std::uint8_t> bytes);
+    [[nodiscard]] Vst3PluginStateResultV1 restore_plugin_state(
+        std::string_view state_id,
+        const Vst3PluginStateIdentityV1& expected_identity,
+        std::uint32_t expected_state_version,
+        std::span<std::uint8_t> destination,
+        std::size_t& bytes_written) const noexcept;
+    [[nodiscard]] std::size_t plugin_state_count() const noexcept {
+        return plugin_state_.size();
+    }
     [[nodiscard]] PluginHostState state() const noexcept { return state_; }
     [[nodiscard]] std::uint32_t latency_samples() const noexcept {
         return descriptor_.reported_latency_samples;
@@ -74,6 +90,7 @@ private:
     PluginHostState state_{PluginHostState::Disabled};
     std::uint64_t last_heartbeat_ms_{0};
     Vst3WorkerLaneSessionV1 worker_lane_{};
+    Vst3PluginStateStoreV1 plugin_state_{};
 };
 
 }  // namespace hibiki

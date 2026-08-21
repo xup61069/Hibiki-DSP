@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/vst3-plugin-state-v1.schema.json",
+  "title": "Hibiki private VST3 plugin state metadata v1",
+  "description": "Metadata only. The opaque state bytes are caller-owned private storage and must not be committed to the public repository.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "state_id", "plugin_id", "class_id", "module_sha256", "state_version", "byte_count", "storage"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "state_id": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[^\\u0000]+$"},
+    "plugin_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000]+$"},
+    "class_id": {"type": "string", "pattern": "^[0-9A-Fa-f]{32}$"},
+    "module_sha256": {"type": "string", "pattern": "^[0-9A-Fa-f]{64}$"},
+    "state_version": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+    "byte_count": {"type": "integer", "minimum": 0, "maximum": 1048576},
+    "storage": {"const": "private-caller-owned"}
+  }
+}

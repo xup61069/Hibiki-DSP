@@ -94,4 +94,23 @@ Vst3WorkerExchangeResultV1 PluginHostModel::process_worker_block(
     return result;
 }
 
+Vst3PluginStateResultV1 PluginHostModel::capture_plugin_state(
+    const std::string_view state_id,
+    const Vst3PluginStateIdentityV1& identity,
+    const std::uint32_t state_version,
+    const std::span<const std::uint8_t> bytes) {
+    if (state_ != PluginHostState::Running) return Vst3PluginStateResultV1::invalid_argument;
+    return plugin_state_.capture(state_id, identity, state_version, bytes);
+}
+
+Vst3PluginStateResultV1 PluginHostModel::restore_plugin_state(
+    const std::string_view state_id,
+    const Vst3PluginStateIdentityV1& expected_identity,
+    const std::uint32_t expected_state_version,
+    const std::span<std::uint8_t> destination,
+    std::size_t& bytes_written) const noexcept {
+    return plugin_state_.restore(state_id, expected_identity, expected_state_version,
+                                 destination, bytes_written);
+}
+
 }  // namespace hibiki

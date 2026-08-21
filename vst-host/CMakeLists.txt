@@ -8,6 +8,7 @@ add_library(hibiki_vst_host STATIC
   src/vst3_parameter_timeline.cpp
   src/vst3_worker_lane.cpp
   src/vst3_scene_automation.cpp
+  src/vst3_plugin_state.cpp
 )
 
 add_executable(hibiki_vst_worker

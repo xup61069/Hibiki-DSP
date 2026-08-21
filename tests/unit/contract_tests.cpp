@@ -841,6 +841,30 @@ int main() {
     float plugin_output[2]{};
     CHECK(plugin.process_passthrough(plugin_input, plugin_output, 2));
     CHECK(plugin_output[0] == plugin_input[0] && plugin_output[1] == plugin_input[1]);
+    Vst3PluginStateIdentityV1 plugin_identity{};
+    plugin_identity.plugin_id = "builtin-test";
+    plugin_identity.class_id = "0123456789abcdef0123456789abcdef";
+    plugin_identity.module_sha256[0] = 1U;
+    const std::array<std::uint8_t, 3> plugin_state_bytes{{1U, 2U, 3U}};
+    CHECK(plugin.capture_plugin_state("movie-state", plugin_identity, 1U, plugin_state_bytes) ==
+              Vst3PluginStateResultV1::ok &&
+          plugin.plugin_state_count() == 1U);
+    std::array<std::uint8_t, 2> small_state_output{};
+    std::size_t state_bytes_written = 0U;
+    CHECK(plugin.restore_plugin_state("movie-state", plugin_identity, 1U, small_state_output,
+                                      state_bytes_written) ==
+          Vst3PluginStateResultV1::output_too_small);
+    std::array<std::uint8_t, 3> restored_state{};
+    CHECK(plugin.restore_plugin_state("movie-state", plugin_identity, 1U, restored_state,
+                                      state_bytes_written) == Vst3PluginStateResultV1::ok &&
+          state_bytes_written == 3U && restored_state == plugin_state_bytes);
+    auto wrong_identity = plugin_identity;
+    wrong_identity.module_sha256[0] = 2U;
+    CHECK(plugin.restore_plugin_state("movie-state", wrong_identity, 1U, restored_state,
+                                      state_bytes_written) ==
+          Vst3PluginStateResultV1::identity_mismatch);
+    CHECK(plugin.restore_plugin_state("movie-state", plugin_identity, 2U, restored_state,
+                                      state_bytes_written) == Vst3PluginStateResultV1::version_mismatch);
     plugin.report_crash();
     CHECK(!plugin.process_passthrough(plugin_input, plugin_output, 2));
 
