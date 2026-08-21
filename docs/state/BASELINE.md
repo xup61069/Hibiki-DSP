@@ -433,7 +433,7 @@ store、handler 與 atomic ViewModel apply；本機 status probe 通過，但仍
 per-App delivery 或 browser tab capture 已完成。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 75 個必要入口與
-18 份 Spec 通過；`source-policy.ps1` 掃描數量以最新 gate 輸出為準且無 blocked
+19 份 Spec 通過；`source-policy.ps1` 掃描 315 個 tracked paths 且無 blocked
 binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
@@ -452,6 +452,7 @@ parameter frame 與 `IParameterChanges` bridge）unsigned build 亦通過；輸�
 與 C# grouped-volume payload round-trip、legacy payload compatibility、selected group resolver
 及 custom Scene card mirror 的 JSON save/load、atomic replace、malformed rollback 亦已通過本機
 contract/control-model checks。
+本次 ephemeral App session catalog additions 的 source commit 是 `68cf466`；
 本次 control-status-snapshot additions 的 source commit 是 `e97fb90`；
 session-route health 接入與避免同端點重綁的最新 source commit 是 `5f8dbcb`；
 volume broker unchanged-endpoint result 修正的最新 source commit 是 `ca8ea40`；
