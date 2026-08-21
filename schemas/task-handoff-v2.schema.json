@@ -36,10 +36,11 @@
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$"
     },
     "base_commit": {"type": "string", "pattern": "^[0-9a-fA-F]{7,40}$"},
-    "status": {"enum": ["planned", "in_progress", "blocked", "ready_for_review"]},
+    "status": {"enum": ["planned", "in_progress", "blocked", "ready_for_review", "completed"]},
     "role": {"enum": ["worker", "integrator"]},
     "owner": {"type": "string", "minLength": 1, "maxLength": 80},
     "updated_at": {"type": "string", "format": "date-time"},
+    "merge_commit": {"type": "string", "pattern": "^[0-9a-fA-F]{7,40}$"},
     "environment_fingerprint": {"type": "string"},
     "scope_globs": {
       "type": "array",
