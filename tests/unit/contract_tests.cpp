@@ -1407,6 +1407,12 @@ int main() {
     CHECK(!wasapi_fanout.prepare(invalid_fanout, 128U));
     CHECK(wasapi_fanout.snapshot().degraded);
     wasapi_fanout.stop();
+    AudioEngineModel fanout_engine;
+    CHECK(!fanout_engine.prepare_wasapi_fanout(invalid_fanout, 128U));
+    CHECK(fanout_engine.wasapi_fanout_snapshot().degraded);
+    CHECK(!fanout_engine.process_output_group_to_wasapi_fanout(
+        "main", {}, wasapi_graph_buffer.data(), 2U));
+    fanout_engine.stop_wasapi_fanout();
 #endif
 
     return 0;

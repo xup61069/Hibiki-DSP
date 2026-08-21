@@ -9,6 +9,7 @@
 #include "hibiki/volume_state.hpp"
 #include "hibiki/true_peak_limiter.hpp"
 #include "hibiki/windows_wasapi_handoff.hpp"
+#include "hibiki/windows_wasapi_fanout.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -109,6 +110,16 @@ public:
         std::span<const RtLaneInputV1> inputs,
         float* graph_output_interleaved,
         std::size_t frames) noexcept;
+    [[nodiscard]] bool prepare_wasapi_fanout(
+        std::span<const WasapiFanoutSinkConfigV1> configs,
+        std::uint32_t block_frames = 128U) noexcept;
+    [[nodiscard]] bool process_output_group_to_wasapi_fanout(
+        std::string_view output_group,
+        std::span<const RtLaneInputV1> inputs,
+        float* graph_output_interleaved,
+        std::size_t frames) noexcept;
+    [[nodiscard]] WasapiFanoutSnapshotV1 wasapi_fanout_snapshot() const noexcept;
+    void stop_wasapi_fanout() noexcept;
     [[nodiscard]] bool process_lane_block(std::size_t lane_index,
                                           const float* input_interleaved,
                                           std::uint32_t input_channels,
@@ -146,6 +157,7 @@ private:
     AsioTransportConsumerV1 asio_transport_{};
     mutable OutputFanoutRuntimeV1 output_fanout_{};
     WindowsWasapiSinkHandoffV1 wasapi_handoff_{};
+    WindowsWasapiFanoutV1 wasapi_fanout_{};
 };
 
 }  // namespace hibiki

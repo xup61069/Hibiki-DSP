@@ -319,6 +319,35 @@ bool AudioEngineModel::process_output_group_to_wasapi(
                                    active_graph_.output_channels);
 }
 
+bool AudioEngineModel::prepare_wasapi_fanout(
+    const std::span<const WasapiFanoutSinkConfigV1> configs,
+    const std::uint32_t block_frames) noexcept {
+    return wasapi_fanout_.prepare(configs, block_frames);
+}
+
+bool AudioEngineModel::process_output_group_to_wasapi_fanout(
+    const std::string_view output_group,
+    const std::span<const RtLaneInputV1> inputs,
+    float* const graph_output_interleaved,
+    const std::size_t frames) noexcept {
+    if (frames == 0U ||
+        frames > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()) ||
+        graph_output_interleaved == nullptr || active_graph_.output_channels == 0U ||
+        active_graph_.output_channels > 8U ||
+        !process_output_group(output_group, inputs, graph_output_interleaved, frames)) {
+        return false;
+    }
+    return wasapi_fanout_.process(graph_output_interleaved,
+                                  static_cast<std::uint32_t>(frames),
+                                  active_graph_.output_channels);
+}
+
+WasapiFanoutSnapshotV1 AudioEngineModel::wasapi_fanout_snapshot() const noexcept {
+    return wasapi_fanout_.snapshot();
+}
+
+void AudioEngineModel::stop_wasapi_fanout() noexcept { wasapi_fanout_.stop(); }
+
 bool AudioEngineModel::process_lane_block(const std::size_t lane_index,
                                           const float* const input_interleaved,
                                           const std::uint32_t input_channels,
