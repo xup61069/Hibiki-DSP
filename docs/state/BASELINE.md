@@ -72,6 +72,9 @@
 - MS-PL WaveRT endpoint control-state core with fixed-format validation, Q16.16 dB safety
   ceiling, mute/generation ordering and Strict Direct behavior; the PortCls miniport is not
   yet wired and no `.sys` is built here.
+- The MS-PL WDK property adapter now checks KS instance/value buffers and rejects ambiguous
+  access verbs before touching endpoint state; this is source hardening, not a loadable-driver
+  result.
 - MS-PL `endpoint_topology_v1` catalog fixes Main/Low Latency stereo render, Surround 7.1 render
   with Windows `0x63f` mask and Virtual Mic stereo capture, including permanent GUIDs, direction,
   default buffer and supported-rate flags; the catalog is portable input to future SYSVAD tables.
@@ -243,7 +246,7 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 Windows volume/device、ISO formula、recovery、driver control-core/INF template、persistent SRC、
 VST worker、control pipe/payloads、session volume adapter、sink clock pipeline、optional native
 ASIO transport/ring、tab/Virtual Mic lane adapter、session-route/output-handoff、control-model
-與 VST3 latency graph commit／RT lane latency bank／parameter timeline／Scene automation refs／rollback lifecycle／UI device fade／plugin lane token／VST3 supervisor handshake/process exchange／VST3 worker lane timeline bridge／PluginHostModel worker-lane wiring／ISO formula compensation builder／source-only CI publication gate／multi-sink fan-out、per-sink clock/SRC runtime、AudioEngine fan-out boundary、精確容量 preflight、高倍率 SRC phase guard、portable WaveRT stream ring、WDK pin adapter、driver→engine stream packet bridge、endpoint identity、graph lane binding、WASAPI IAudioClock drift path、雙 worker WASAPI handoff、graph-to-WASAPI adapter、ASIO-to-WASAPI path、driver-to-WASAPI path、tab-to-WASAPI path、virtual-mic-to-WASAPI path、Windows WASAPI fan-out graph adapter 及 WinUI Expert readonly surface 的 fail-closed safety baseline `b00da46`；
+與 VST3 latency graph commit／RT lane latency bank／parameter timeline／Scene automation refs／rollback lifecycle／UI device fade／plugin lane token／VST3 supervisor handshake/process exchange／VST3 worker lane timeline bridge／PluginHostModel worker-lane wiring／ISO formula compensation builder／source-only CI publication gate／WDK property request hardening／multi-sink fan-out、per-sink clock/SRC runtime、AudioEngine fan-out boundary、精確容量 preflight、高倍率 SRC phase guard、portable WaveRT stream ring、WDK pin adapter、driver→engine stream packet bridge、endpoint identity、graph lane binding、WASAPI IAudioClock drift path、雙 worker WASAPI handoff、graph-to-WASAPI adapter、ASIO-to-WASAPI path、driver-to-WASAPI path、tab-to-WASAPI path、virtual-mic-to-WASAPI path、Windows WASAPI fan-out graph adapter 及 WinUI Expert readonly surface 的 fail-closed safety baseline `179a581`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
