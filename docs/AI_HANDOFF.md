@@ -29,6 +29,9 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   release evidence；連線後每秒輪詢一次 bounded ControlStatusSnapshot，命令忙碌時會合併輪詢。
 - WinUI 與 Desktop Preview 都有 IR phase policy controls（Game/Balanced/Movie/Bypass）與明確的
   0/80/160 ms delay semantics；這是 UI contract，尚未送出 FIR coefficients。
+- C++ control-plane 已有 bounded RIFF/WAVE IR importer，支援 Float32/PCM16/24/32、finite/tap/file
+  bounds 與 channel-major convolver prepare；它仍不做 FIR phase kernel derivation、graph commit 或
+  physical sink playback，見 `evidence/0000-foundation/ir-wav-decoder-v1.json`。
 - C++ Engine Preview 已可由 `tools/build-engine-preview.ps1` 建置；`tools/engine-preview-smoke.ps1`
   會啟動它並驗證 v1 named-pipe Hello/Ack request correlation 與 ControlStatusSnapshot 回覆。
   `tools/control-model-engine-smoke.ps1` 另外以 C# `EasyControlViewModel` 驗證 −18 dB 音量

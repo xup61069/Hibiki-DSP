@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "ir-wav-decoder-v1",
+  "source_commit": "8ffefb6",
+  "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "C++ bounded RIFF/WAVE parser",
+        "IEEE Float32 and signed PCM16 decode",
+        "channel-major IrConvolverV1 prepare",
+        "malformed RIFF, unsupported bits and non-finite sample rejection",
+        "contract test build and CTest"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "spec and baseline references",
+        "AI handoff references",
+        "required documentation paths"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "tracked source paths contain no compiled artifacts",
+        "public workflow contains no binary upload policy violation"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The importer is control-plane only and performs no file I/O or allocation on the RT thread.",
+    "The decoder does not derive minimum/mixed/linear-phase kernels; phase UI remains policy-only.",
+    "No graph commit, physical sink, virtual driver or audible playback evidence is claimed.",
+    "ISO 226 restricted tables and coefficient data remain outside the repository."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00+08:00",
+  "finished_at": "2026-08-21T00:00:00+08:00"
+}
