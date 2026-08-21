@@ -57,6 +57,8 @@ WaveRT endpoint 的 WDK build/signability 工作。不要先做 Microsoft signin
 預覽，使用 `pwsh -File tools/run-preview.ps1 -Build`；它會先啟動 user-space Engine Preview，再
 開啟自帶 .NET runtime 的桌面 UI，關閉 UI 後引擎會一併停止。不要直接執行需要 Windows App
 Runtime 的 `WinUICompat` 輸出。
+Windows 使用者也可雙擊 repository 根目錄的 `Start-HibikiPreview.cmd`；這只是上述命令的來源入口，
+不會把任何編譯物加入 Git。
 
 ## 必讀順序
 

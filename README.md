@@ -92,6 +92,9 @@ Windows App Runtime；但不含 XAML 正式 UI、driver、系統攔截或 access
 pwsh -File tools/run-preview.ps1 -Build
 ```
 
+Windows 使用者也可以直接雙擊 repository 根目錄的 `Start-HibikiPreview.cmd`；它會執行同一個
+流程，先建置必要的 unsigned preview，再啟動 Engine Preview 與自帶 .NET runtime 的桌面 UI。
+
 視窗開啟後會自動嘗試連接本機引擎；若沒有連線，仍會安全顯示「尚未連接」，不會改動 Windows
 音量或任何實體裝置。直接雙擊 `.local/preview/DesktopCompat/Hibiki.DesktopPreview.exe` 也可以，
 但那只會開 UI，不會自動啟動引擎。
