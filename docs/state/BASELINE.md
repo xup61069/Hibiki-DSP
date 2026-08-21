@@ -85,6 +85,11 @@
   padding validation, catalog-sequence propagation and an explicit EngineControl handler gate.
   The WinUI shell mirrors selectable render cards and rolls back its UI transaction when the
   command send fails; it does not claim a physical switch before an engine Ack.
+- `DeviceCatalogSnapshot` v1 now publishes a bounded 16-byte header plus 416-byte entries over
+  the versioned control envelope. C++ and C# validate reserved bytes, strict UTF-8, formats,
+  duplicate/default invariants and sequence ordering; the ViewModel atomically preserves its
+  previous catalog on stale or malformed snapshots. The pipe client has an unsolicited-frame
+  reader for a future engine metadata worker; COM enumeration is still external.
 - Parameterized ISO 226:2023 SPL-from-phon formula using caller-supplied legal parameters;
   the 1 kHz invariant and phon bounds are covered by CTest without embedding the licensed
   29-point coefficient table.
@@ -299,14 +304,16 @@ ASIO transport/ring、tab/Virtual Mic lane adapter、session-route/output-handof
 working tree 與該 scope 是否一致。
 
 目前 catalog-gated recovery rebind 的 source commit 是 `bc66229`；DeviceSwitch control-plane
-與 WinUI picker 的 source commit 是 `a97e9f8`；其餘較早 scope 仍以
+與 WinUI picker 的 source commit 是 `a97e9f8`；DeviceCatalogSnapshot 的 source commit 是
+`9dc903a`；其餘較早 scope 仍以
 下方 evidence manifest 的各自 commit 與限制為準。
 
-目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 66 個必要入口與
-15 份 Spec 通過；`source-policy.ps1` 掃描 281 個路徑且無 blocked binary/secret；
+目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 67 個必要入口與
+15 份 Spec 通過；`source-policy.ps1` 掃描 282 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
-`distribution-check.ps1` 與 `driver-source-check.ps1` 通過；33 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
-288-byte payload、catalog sequence、handler fail-closed 與 WinUI send-failure rollback 亦通過。以本機 pinned ASIO SDK
+`distribution-check.ps1` 與 `driver-source-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
+288-byte payload、catalog sequence、handler fail-closed、WinUI send-failure rollback 與 DeviceCatalogSnapshot
+wire/atomic replace 亦通過。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
 `.local/`，未提交或發布。以本機 pinned VST3 SDK 另行執行的 optional target
 `hibiki_vst3_sdk_catalog` 與 `hibiki_vst3_sdk_worker`（含 bounded one-main-bus processor、
