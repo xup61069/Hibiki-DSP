@@ -23,6 +23,7 @@ add_library(hibiki_hub STATIC
   src/ipc.cpp
   src/ipc_pipe.cpp
   src/ir_convolver.cpp
+  src/wav_ir.cpp
   src/iso226.cpp
   src/noise_suppressor.cpp
   src/output_sink.cpp

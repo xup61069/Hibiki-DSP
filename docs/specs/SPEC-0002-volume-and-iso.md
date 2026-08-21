@@ -106,6 +106,13 @@ ISO 係數 fit。
 係數 finite。它只執行 caller 提供的 IR，不自行推導 minimum/mixed/linear-phase kernel；
 宣告的 delay 仍須由實際量測驗證。
 
+`decode_ir_wav_v1` 是 control-plane 的 bounded RIFF/WAVE importer：接受 IEEE Float32 與 signed
+PCM16/24/32、最多 8 聲道與 4096 frames，檢查 RIFF container/chunk 邊界、block alignment、
+sample-rate、finite samples 與記憶體上限；它不讀檔、不配置在 RT thread。`prepare_ir_convolver_from_wav_v1`
+會把 interleaved file samples 轉成 convolver 的 channel-major kernel，並在 graph commit 前
+套用已解析的 phase policy。這仍不代表已推導 minimum/mixed/linear kernel，或已在實體 sink
+上套用校正。
+
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
 `Program-aware` 另有 `ProgramAwareLevelControllerV1` 的慢速內容音量控制：預設保留無配置的
 RMS 代理；`KWeightedProxy` 會在固定容量狀態內串接高通與高頻 shelf 兩段 K-weighting，並

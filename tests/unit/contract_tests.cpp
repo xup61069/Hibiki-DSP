@@ -45,6 +45,7 @@ extern "C" {
 }
 #include "hibiki/iso226.hpp"
 #include "hibiki/ir_phase.hpp"
+#include "hibiki/wav_ir.hpp"
 #include "hibiki/scene_graph.hpp"
 #include "hibiki/scene_catalog.hpp"
 #include "hibiki/vst3_bus_layout.hpp"
@@ -2228,6 +2229,59 @@ int main() {
     const auto wav = export_wav_f32_ir(ir_samples, 48000, 2);
     CHECK(wav.size() == 60 && wav[0] == 'R' && wav[1] == 'I' && wav[2] == 'F' &&
           wav[3] == 'F' && wav[8] == 'W' && wav[9] == 'A' && wav[10] == 'V' && wav[11] == 'E');
+    const auto decoded_ir = decode_ir_wav_v1(wav);
+    CHECK(decoded_ir.valid && decoded_ir.data.sample_rate == 48000U &&
+          decoded_ir.data.channels == 2U && decoded_ir.data.frames() == 2U &&
+          std::abs(decoded_ir.data.interleaved_samples[2] + 0.25F) < 1e-6F);
+    const auto ir_phase_resolution = resolve_ir_phase_policy(
+        IrPhasePolicyV1{1U, IrPhaseMode::LinearPhase, 0.5});
+    IrConvolverV1 decoded_convolver;
+    CHECK(prepare_ir_convolver_from_wav_v1(decoded_convolver, decoded_ir.data,
+                                           ir_phase_resolution) &&
+          decoded_convolver.status().valid && decoded_convolver.status().taps == 2U &&
+          decoded_convolver.status().uses_fir &&
+          std::abs(decoded_convolver.status().declared_delay_ms - 80.0) < 1e-9);
+    std::array<float, 4> decoded_block{1.0F, 1.0F, 0.0F, 0.0F};
+    CHECK(decoded_convolver.process_interleaved(decoded_block.data(), 2U, 2U));
+    auto pcm16_wav = wav;
+    pcm16_wav.resize(52U);
+    const auto write_test_u16 = [&pcm16_wav](const std::size_t offset, const std::uint16_t value) {
+        pcm16_wav[offset] = static_cast<std::uint8_t>(value & 0xffU);
+        pcm16_wav[offset + 1U] = static_cast<std::uint8_t>((value >> 8U) & 0xffU);
+    };
+    const auto write_test_u32 = [&pcm16_wav](const std::size_t offset, const std::uint32_t value) {
+        for (std::size_t shift = 0U; shift < 32U; shift += 8U)
+            pcm16_wav[offset + (shift / 8U)] = static_cast<std::uint8_t>(value >> shift);
+    };
+    write_test_u32(4U, 44U);
+    write_test_u16(20U, 1U); // signed PCM
+    write_test_u32(28U, 192000U);
+    write_test_u16(32U, 4U);
+    write_test_u16(34U, 16U);
+    write_test_u32(40U, 8U);
+    write_test_u16(44U, 32767U);
+    write_test_u16(46U, static_cast<std::uint16_t>(-32768));
+    write_test_u16(48U, 0U);
+    write_test_u16(50U, 16384U);
+    const auto decoded_pcm16 = decode_ir_wav_v1(pcm16_wav);
+    CHECK(decoded_pcm16.valid && decoded_pcm16.data.frames() == 2U &&
+          std::abs(decoded_pcm16.data.interleaved_samples[0] - (32767.0F / 32768.0F)) < 1e-5F &&
+          std::abs(decoded_pcm16.data.interleaved_samples[1] + 1.0F) < 1e-6F);
+    auto nonfinite_wav = wav;
+    nonfinite_wav[44U] = 0x00U;
+    nonfinite_wav[45U] = 0x00U;
+    nonfinite_wav[46U] = 0xc0U;
+    nonfinite_wav[47U] = 0x7fU;
+    CHECK(!decode_ir_wav_v1(nonfinite_wav).valid);
+    auto malformed_container = wav;
+    malformed_container[4U] = 0xffU;
+    malformed_container[5U] = 0xffU;
+    malformed_container[6U] = 0xffU;
+    malformed_container[7U] = 0x7fU;
+    CHECK(!decode_ir_wav_v1(malformed_container).valid);
+    auto malformed_wav = wav;
+    malformed_wav[34U] = 16U;
+    CHECK(!decode_ir_wav_v1(malformed_wav).valid);
 
     AudioEngineModel engine;
     GraphConfigV1 engine_graph;
