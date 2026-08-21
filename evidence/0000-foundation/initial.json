@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "issue": 0,
-  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-token-output-fanout-runtime-engine-boundary-exact-capacity-high-ratio-wavert-stream-wdk-adapter-driver-stream-bridge-endpoint-identity-graph-lane-wasapi-clock-v26",
-  "source_commit": "bfd5035",
+  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-token-output-fanout-runtime-engine-boundary-exact-capacity-high-ratio-wavert-stream-wdk-adapter-driver-stream-bridge-endpoint-identity-graph-lane-wasapi-clock-handoff-v27",
+  "source_commit": "e557d72",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -14,6 +14,7 @@
     "pwsh -File tools/winui-shell-check.ps1",
     "pwsh -File tools/distribution-check.ps1",
     "pwsh -File tools/driver-source-check.ps1",
+    "wasapi-worker-handoff coverage in hibiki_contract_tests",
     "cmake -S . -B .local/asio-build -DHIBIKI_ENABLE_NATIVE_ASIO=ON -DHIBIKI_ASIO_SDK_ROOT=.local/asio-sdk",
     "cmake --build .local/asio-build --config RelWithDebInfo --target hibiki_asio_native",
     "cmake -S . -B .local/vst3-build -DHIBIKI_ENABLE_VST3_SDK=ON -DHIBIKI_VST3_SDK_ROOT=.local/vst3sdk",
@@ -25,7 +26,7 @@
   "results": [
     {"command": "tools/verify.ps1", "status": "pass", "tests": 1},
     {"command": "tools/docs-check.ps1", "status": "pass", "required_paths": 55, "specs": 12},
-    {"command": "tools/source-policy.ps1", "status": "pass", "scanned_paths": 246, "blocked_files": 0},
+    {"command": "tools/source-policy.ps1", "status": "pass", "scanned_paths": 248, "blocked_files": 0},
     {"command": "tools/extension-check.ps1", "status": "pass"},
     {"command": "tools/installer-check.ps1", "status": "pass"},
     {"command": "tools/control-model-check.ps1", "status": "pass"},
@@ -44,6 +45,7 @@
     {"command": "driver-stream-packet-bridge", "status": "pass", "coverage": ["80-byte header ABI", "fixed render/capture packet framing", "exact packet length validation", "allocation-free C encode/payload view", "finite Float32 user-space decode", "caller-owned lane storage"], "compiled_artifacts": false},
     {"command": "driver-stream-graph-binding", "status": "pass", "coverage": ["render-only gate", "endpoint GUID match", "sample-rate match", "active-lane channel match", "lane graph/Group Master path", "non-finite rejection"], "compiled_artifacts": false},
     {"command": "wasapi-device-clock-boundary", "status": "pass", "coverage": ["IAudioClock acquisition source", "device position/QPC sampling", "worker-side SRC observation", "2/5.1/7.1 channel-mask validation", "non-Windows safe stub"], "compiled_artifacts": false},
+    {"command": "wasapi-worker-handoff", "status": "pass", "coverage": ["dual worker ownership", "same-layout and sample-rate gate", "prepare/fade/ready-to-commit state boundary", "equal-power scaled submit", "candidate failure rollback", "active failure degraded", "off-stack bounded ring storage", "unbound fail-closed contract"], "compiled_artifacts": false},
     {"command": "endpoint-topology-contract", "status": "pass", "coverage": ["four stable endpoint GUIDs", "direction and channel count", "Windows stereo/7.1 masks", "supported-rate flags", "buffer defaults"]},
     {"command": "asio-transport-contract", "status": "pass", "coverage": ["fixed-layout SPSC ring", "planar-to-interleaved transfer", "metadata and capacity validation", "no allocation in pop", "Windows mapping-to-engine graph and Group Master path"]},
     {"command": "asio-transport-native-build", "status": "pass", "coverage": ["ASIO callback publication", "named mapping attachment", "detached fallback"], "published_artifacts": false},
@@ -84,7 +86,7 @@
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",
   "limitations": [
-    "Evidence corresponds to commit bfd5035 and the current environment only.",
+    "Evidence corresponds to commit e557d72 and the current environment only; no real endpoint handoff was exercised.",
     "The native ASIO build is an unsigned local developer verification; no DLL or SDK checkout is committed or published.",
     "Current machine is Windows 22631 with VS 17/SDK 10.0.26100.0; it cannot provide driver-target evidence for the locked Windows 26100+/VS 2026/SDK-WDK 10.0.28000.2526 environment."
   ],

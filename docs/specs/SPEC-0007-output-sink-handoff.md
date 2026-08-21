@@ -6,7 +6,7 @@ authority: architecture
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["src/hub/**output*", "src/hub/include/hibiki/output*", "src/hub/src/output*"]
+source_globs: ["src/hub/**output*", "src/hub/**wasapi*", "src/hub/include/hibiki/output*", "src/hub/src/output*"]
 ---
 
 # SPEC-0007：多輸出 sink 交接與時鐘連續性
@@ -41,6 +41,21 @@ source_globs: ["src/hub/**output*", "src/hub/include/hibiki/output*", "src/hub/s
   已輸出。
 - 真實 WaveRT endpoint、硬體 clock fixture、DPC/拔插 soak 與 WHCP/HLK 證據不在本機
   contract test 中，必須在 Windows 11 24H2+ test machine 完成。
+
+## WASAPI endpoint handoff
+
+`WindowsWasapiSinkHandoffV1` 以兩個 dedicated `WindowsWasapiSinkWorkerV1` 實例實作
+prepare → fade → commit／rollback。候選 endpoint 會先獨立 bind、暖機並通過
+`endpoint_ready`；只有同聲道 layout、與目前 graph 相同的 sample rate、以及 1–200 ms
+fade 設定才可開始，避免在尚未建立明確 SRC 邊界時把不同速率的 block 直接交給 sink。
+交叉淡化期間 graph block 只提交一次，worker 邊界套用 bounded equal-power sin/cos gain；
+audio graph 不重啟、不直接呼叫 COM。候選 submit、endpoint bind 或舊 sink render 失敗時，
+候選立即停止並回到舊 sink；舊 sink 不可用則進入 `Degraded`，不得假裝已同步。
+
+`ReadyToCommit` 是唯一允許交換 active slot 的狀態；`commit` 停止舊 worker 後才翻轉
+active slot，`rollback` 保留仍在執行的舊 worker。這個 user-space handoff 只證明狀態機、
+bounded queue 與 source-level fallback；實體 endpoint 的暖機時間、音量連續性、拔插與
+Audio Service restart 仍需 Windows 11 24H2+ 實機／HLK evidence。
 
 ## Multi-sink fan-out
 
