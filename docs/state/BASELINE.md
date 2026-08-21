@@ -396,9 +396,13 @@ gate 對應 commit 是 `6154a5c`，本機 probe 僅證明 session enumeration，
 Windows session→immutable route-graph coordinator 的 source commit 是 `2822461`；它已接上
 watcher、rule store 與 graph candidate 的 fail-closed control-plane boundary，但沒有宣稱
 實際 per-App audio capture、physical routing 或 DSP delivery。
+Windows process-loopback source boundary 的 source commit 是 `3cd4620`；它使用官方
+`ActivateAudioInterfaceAsync` 建立 process-tree shared-mode Float32 capture，包含固定容量
+讀取、overflow drop 與明確 Degraded 狀態，但尚未在目標機注入含音訊程序、Audio Service
+restart 或完成實體 per-App 重送。
 
-目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 73 個必要入口與
-15 份 Spec 通過；`source-policy.ps1` 掃描 293 個路徑且無 blocked binary/secret；
+目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 74 個必要入口與
+16 份 Spec 通過；`source-policy.ps1` 掃描 300 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
 288-byte payload、catalog sequence、handler fail-closed、WinUI send-failure rollback、DeviceCatalogSnapshot
