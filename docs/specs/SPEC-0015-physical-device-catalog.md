@@ -6,7 +6,7 @@ authority: platform-boundary
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0002, ADR-0004]
-source_globs: ["src/hub/**", "tests/unit/**", "docs/specs/SPEC-0015-physical-device-catalog.md"]
+source_globs: ["src/hub/**", "tests/unit/**", "schemas/physical-device-catalog-v1.schema.json", "docs/specs/SPEC-0015-physical-device-catalog.md"]
 ---
 
 # SPEC-0015：實體裝置目錄與切換前資料契約
