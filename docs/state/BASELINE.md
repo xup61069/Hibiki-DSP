@@ -20,6 +20,10 @@
   command/Ack/status-refresh based. While connected it polls the bounded ControlStatusSnapshot once
   per second (coalesced while a command is busy) so external engine/Windows-volume changes can be
   reflected without touching the audio thread.
+- Both the formal WinUI source shell and Desktop Compatibility Preview now expose the bounded IR
+  phase policy: Game minimum-phase/0 ms, Balanced mixed-phase/80 ms maximum, Movie linear-phase/
+  160 ms maximum and Bypass. The controls explicitly remain policy-only until an engine FIR command
+  exists; no preview claim says that a filter was audibly applied.
 - 公開 monorepo 文件、component license map 與 source-only paid-release policy。
 - AI 接手規則、fresh-clone 流程與 source-only policy。
 - `OutputGroupVolumeState` 與 ISO compensation public C++ boundary 的初始骨架。

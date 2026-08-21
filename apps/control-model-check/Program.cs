@@ -500,6 +500,10 @@ Check(viewModel.IrPhasePolicy.IsValid && viewModel.IrPhasePolicy.UsesFir &&
 viewModel.IrPhaseMode = IrPhaseMode.Bypass;
 Check(viewModel.IrPhaseStrength == 0.0 && viewModel.IrAddedDelayMs == 0.0,
     "IR phase bypass must clear the slider and added delay.");
+Check(viewModel.IrPhaseModeOptions.Count == 4 &&
+      viewModel.IrPhaseModeOptions.Any(option => option.Mode == IrPhaseMode.LinearPhase &&
+                                                 option.Label.Contains("Movie")),
+    "IR phase UI options must expose the bounded Game/Balanced/Movie/Bypass contract.");
 var noEngine = new EasyControlViewModel("HibikiDSP_v1_control_model_check_missing");
 var connectedToMissingEngine = await noEngine.ConnectAsync(TimeSpan.FromMilliseconds(50));
 Check(!connectedToMissingEngine && noEngine.ConnectionState == ControlConnectionState.Degraded &&

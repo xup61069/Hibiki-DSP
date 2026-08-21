@@ -81,6 +81,8 @@ pwsh -File tools/build-preview.ps1 -Target DesktopCompat
 它以同一個 `EasyControlViewModel` 展示連線、場景選擇、一鍵改善、輸出群組、路由健康與安全音量的控制面，不需要
 Windows App Runtime；但不含 XAML 正式 UI、driver、系統攔截或 accessibility evidence。所有輸出都在
 `.local/preview/`，不可加入 Git。
+預覽也會顯示 IR 相位 policy 的 Game／Balanced／Movie／Bypass 與預估延遲；這只是可驗證的控制
+契約，不會假裝已經產生或套用 FIR 濾波器。
 加入 `-SmokeTest` 可同時做 3 秒的無視窗啟動檢查；它不會連接音訊引擎。只想重跑控制面可用
 `-Target ControlModel`。
 

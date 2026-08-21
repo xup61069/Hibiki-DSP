@@ -54,6 +54,14 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public ExpertSurfaceModel Expert { get; } = new();
 
+    public IReadOnlyList<IrPhaseModeOption> IrPhaseModeOptions { get; } =
+    [
+        new(IrPhaseMode.MinimumPhase, "Game／Minimum Phase", "0 ms 額外緩衝；最低延遲"),
+        new(IrPhaseMode.MixedPhase, "Balanced／Mixed Phase", "最多 80 ms；延遲與相位折衷"),
+        new(IrPhaseMode.LinearPhase, "Movie／Linear Phase", "最多 160 ms；影音同步需補償"),
+        new(IrPhaseMode.Bypass, "Bypass／不套用 IR", "不套用 IR 相位處理")
+    ];
+
     public EasyControlViewModel(string pipeName = NamedPipeControlClientV1.DefaultPipeName)
     {
         if (string.IsNullOrWhiteSpace(pipeName) || pipeName.IndexOfAny(['\\', '/']) >= 0)
@@ -330,6 +338,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(IrPhasePolicy));
             OnPropertyChanged(nameof(IrAddedDelayMs));
+            OnPropertyChanged(nameof(IrPhaseUsesFir));
+            OnPropertyChanged(nameof(IrPhaseModeText));
         }
     }
 
@@ -345,11 +355,21 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(IrPhasePolicy));
             OnPropertyChanged(nameof(IrAddedDelayMs));
+            OnPropertyChanged(nameof(IrPhaseUsesFir));
         }
     }
 
     public IrPhasePolicyV1 IrPhasePolicy => new(IrPhaseMode, IrPhaseStrength);
     public double IrAddedDelayMs => IrPhasePolicy.AddedDelayMs;
+    public bool IrPhaseUsesFir => IrPhasePolicy.UsesFir;
+    public string IrPhaseModeText => IrPhaseMode switch
+    {
+        IrPhaseMode.MinimumPhase => "Minimum-phase／0 ms 額外緩衝",
+        IrPhaseMode.MixedPhase => "Mixed-phase／最多 80 ms",
+        IrPhaseMode.LinearPhase => "Linear-phase／最多 160 ms",
+        IrPhaseMode.Bypass => "Bypass／不套用 IR",
+        _ => "未知相位模式"
+    };
 
     public IpcEnvelopeV1? LastCommand { get; private set; }
 

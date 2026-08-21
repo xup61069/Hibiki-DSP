@@ -26,6 +26,9 @@ internal sealed class PreviewForm : Form
     private readonly Label _routes = new() { AutoSize = false, Width = 550, Height = 58 };
     private readonly Label _effective = new() { AutoSize = true };
     private readonly ComboBox _scenes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox _irModes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly TrackBar _irStrength = new() { Minimum = 0, Maximum = 100, TickFrequency = 10, Width = 460 };
+    private readonly Label _irStatus = new() { AutoSize = false, Width = 550, Height = 42 };
     private readonly TrackBar _volume = new() { Minimum = -60, Maximum = 0, TickFrequency = 5, Width = 460 };
     private readonly Button _enhance = new() { Text = "一鍵改善", AutoSize = true, Margin = new Padding(3, 12, 3, 3) };
     private readonly System.Windows.Forms.Timer _statusTimer = new() { Interval = 1000 };
@@ -64,6 +67,24 @@ internal sealed class PreviewForm : Form
             RefreshView();
         };
         panel.Controls.Add(_scenes);
+        panel.Controls.Add(new Label { Text = "IR 相位（只編輯 policy contract）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        _irModes.DataSource = _viewModel.IrPhaseModeOptions.ToList();
+        _irModes.DisplayMember = "Label";
+        _irModes.ValueMember = "Mode";
+        _irModes.SelectedValueChanged += (_, _) =>
+        {
+            if (_irModes.SelectedValue is IrPhaseMode mode)
+                _viewModel.IrPhaseMode = mode;
+            RefreshView();
+        };
+        _irStrength.ValueChanged += (_, _) =>
+        {
+            _viewModel.IrPhaseStrength = _irStrength.Value / 100.0;
+            RefreshView();
+        };
+        panel.Controls.Add(_irModes);
+        panel.Controls.Add(_irStrength);
+        panel.Controls.Add(_irStatus);
         _enhance.Click += async (_, _) => { await _viewModel.OneTapEnhanceAsync(); RefreshView(); };
         panel.Controls.Add(_enhance);
         panel.Controls.Add(new Label { Text = "系統音量（dB）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
@@ -118,14 +139,21 @@ internal sealed class PreviewForm : Form
         _enhance.Enabled = _viewModel.IsConnected;
         _scenes.Enabled = _viewModel.IsConnected;
         _volume.Enabled = _viewModel.IsConnected;
+        _irStrength.Enabled = _viewModel.IrPhaseMode is IrPhaseMode.MixedPhase or IrPhaseMode.LinearPhase;
         _effective.Text = $"實際有效音量：{_viewModel.EffectiveVolumeDb:0.0} dB；{_viewModel.VolumeOriginText}；{_viewModel.VolumeActuatorText}";
         _routes.Text = _viewModel.Expert.RouteHealth.Count == 0
             ? "路由狀態：尚未收到引擎快照"
             : "路由狀態：" + string.Join("／", _viewModel.Expert.RouteHealth.Select(route =>
                 $"{route.Name} {route.StateLabel}"));
         _status.Text = _viewModel.StatusText;
+        _irStatus.Text = $"{_viewModel.IrPhaseModeText}；實測延遲 {_viewModel.IrAddedDelayMs:0.0} ms。尚未送出 FIR 係數。";
         var requested = Math.Clamp((int)Math.Round(_viewModel.RequestedVolumeDb), _volume.Minimum, _volume.Maximum);
         if (_volume.Value != requested) _volume.Value = requested;
+        if (_irModes.SelectedValue is not IrPhaseMode currentMode || currentMode != _viewModel.IrPhaseMode)
+            _irModes.SelectedValue = _viewModel.IrPhaseMode;
+        var strength = Math.Clamp((int)Math.Round(_viewModel.IrPhaseStrength * 100.0),
+                                  _irStrength.Minimum, _irStrength.Maximum);
+        if (_irStrength.Value != strength) _irStrength.Value = strength;
         var selectedScene = _viewModel.SelectedScene?.Id;
         if (selectedScene is not null && !string.Equals(_scenes.SelectedValue as string, selectedScene,
                                                          StringComparison.Ordinal))

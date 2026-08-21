@@ -10,6 +10,8 @@ public enum IrPhaseMode
     Bypass
 }
 
+public sealed record IrPhaseModeOption(IrPhaseMode Mode, string Label, string Detail);
+
 public readonly record struct IrPhasePolicyV1(IrPhaseMode Mode, double Strength)
 {
     public const uint SchemaVersion = 1;
