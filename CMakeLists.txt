@@ -8,6 +8,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Repository documentation and source comments are UTF-8, including the
+# Traditional Chinese canonical specs. Keep MSVC's source decoding explicit so
+# a locale/code-page change cannot silently alter literals or warnings.
+add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+
 add_subdirectory(sdk)
 add_subdirectory(src/hub)
 add_subdirectory(driver)

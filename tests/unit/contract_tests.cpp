@@ -16,6 +16,7 @@
 #include "hibiki/latency_graph_commit.hpp"
 #include "hibiki/vst3_parameter_timeline.hpp"
 #include "hibiki/vst3_worker_lane.hpp"
+#include "hibiki/vst3_scene_automation.hpp"
 #include "hibiki/tab_bridge.hpp"
 #include "hibiki/asio_transport_v1.h"
 #include "hibiki/output_sink.hpp"
@@ -959,6 +960,30 @@ int main() {
     CHECK(!worker_lane.append_parameter_event(Vst3ParameterTimelineEventV1{8U, 8U, 0.25}));
     worker_lane.detach();
     CHECK(worker_lane.state() == Vst3WorkerLaneStateV1::Detached);
+    CHECK(worker_lane.prepare(sandbox, Vst3WorkerLaneConfigV1{99U, 2U, 48000.0, 64U, 128U}));
+    auto automation_scheduler = std::make_unique<Vst3SceneAutomationSchedulerV1>();
+    const std::array<Vst3WorkerLaneSessionV1*, 1> automation_lanes{{&worker_lane}};
+    Vst3ParameterTimelineSnapshotV1 automation_timeline{};
+    automation_timeline.event_count = 1U;
+    automation_timeline.events[0] = Vst3ParameterTimelineEventV1{7U, 4U, 0.5};
+    CHECK(automation_scheduler->prepare(automation_lanes) &&
+          automation_scheduler->upsert_timeline("djmax-default", automation_timeline) &&
+          automation_scheduler->bind_scene("DJMAX", 99U, "djmax-default") &&
+          automation_scheduler->activate_scene("DJMAX") == Vst3SceneAutomationResultV1::ok &&
+          automation_scheduler->active_scene() == "DJMAX" &&
+          automation_scheduler->timeline_count() == 1U &&
+          automation_scheduler->binding_count() == 1U &&
+          worker_lane.parameter_timeline().event_count == 1U);
+    const std::array<float, 4> automation_input{0.1F, -0.1F, 0.2F, -0.2F};
+    std::array<float, 4> automation_output{};
+    CHECK(automation_scheduler->process_lane_block(
+              "DJMAX", 99U, 2U, 0U, 2U, automation_input, automation_output) ==
+          Vst3SceneAutomationResultV1::lane_not_ready);
+    CHECK(automation_scheduler->activate_scene("missing") ==
+          Vst3SceneAutomationResultV1::not_bound &&
+          !automation_scheduler->remove_timeline("djmax-default"));
+    automation_scheduler->clear();
+    CHECK(automation_scheduler->active_scene().empty() && automation_scheduler->lane_count() == 0U);
     Vst3ParameterTimelineV1 too_many_parameters;
     bool timeline_parameter_capacity = true;
     for (std::uint32_t parameter_id = 0U; parameter_id < 17U; ++parameter_id) {
