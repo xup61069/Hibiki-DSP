@@ -41,5 +41,9 @@ pwsh -File tools/distribution-check.ps1
 pwsh -File tools/driver-source-check.ps1
 ```
 
+Windows endpoint enumeration 是額外的 opt-in live check：
+`pwsh -File tools/live-device-catalog-check.ps1`。它只產生 `.local/` 暫存輸出；不得把
+真實 endpoint ID、friendly name、簽章檔或任何編譯產物提交到 Git。
+
 遇到環境差異先記錄 fingerprint 並更新 handoff，不要自行重生
 `config/distribution-profile.yml` 裡的 endpoint、ASIO、IPC GUID。
