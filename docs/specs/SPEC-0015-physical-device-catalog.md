@@ -34,6 +34,8 @@ Out：COM 枚舉、PortCls／WaveRT driver、WASAPI worker 啟動、實體硬體
 44.1／48／96／192 kHz，buffer 介於 16–4096 frames。`PhysicalDeviceCatalogV1::upsert`
 以 endpoint ID 做 replace；新 default 會清除同一 flow 的舊 default。Windows watcher 的
 sequence 以單調規則更新；較舊的 descriptor／狀態事件直接拒絕，防止通知亂序回退狀態。
+跨程序／跨 AI 的 JSON 交換使用 `schemas/physical-device-catalog-v1.schema.json`；schema
+不允許把私人裝置資料或未定義欄位靜默帶入正式 handoff。
 
 只有 `Active` endpoint 才能 `selectable` 或 `mark_default`。進入 Disabled／Unplugged／
 Unknown 時，catalog 清除 default；切換 worker 必須回到上一個已同步 endpoint，或使用

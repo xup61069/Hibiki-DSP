@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/physical-device-catalog-v1.schema.json",
+  "title": "Hibiki Physical Device Catalog v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "devices"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "devices": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {"$ref": "#/$defs/device"}
+    }
+  },
+  "$defs": {
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "endpoint_id", "display_name", "flow", "availability",
+        "channels", "sample_rate", "buffer_frames", "is_default", "last_sequence"
+      ],
+      "properties": {
+        "schema_version": {"const": 1},
+        "endpoint_id": {"type": "string", "minLength": 1, "maxLength": 260},
+        "display_name": {"type": "string", "minLength": 1, "maxLength": 128},
+        "flow": {"enum": ["render", "capture"]},
+        "availability": {"enum": ["active", "disabled", "unplugged", "unknown"]},
+        "channels": {"enum": [1, 2, 6, 8]},
+        "sample_rate": {"enum": [44100, 48000, 96000, 192000]},
+        "buffer_frames": {"type": "integer", "minimum": 16, "maximum": 4096},
+        "is_default": {"type": "boolean"},
+        "last_sequence": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}
