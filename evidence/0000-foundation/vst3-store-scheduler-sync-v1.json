@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "issue": 72,
+  "scope_digest": "vst3-store-scheduler-sync-v1",
+  "source_commit": "9cca03d",
+  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-msvc-19.44-dotnet-10.0.301-pwsh-7.6.5; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 72",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "sync_timeline_store_to_scheduler_v1 loads every stored timeline into the scheduler in deterministic sorted order via upsert_timeline",
+        "closed store returns invalid_argument with a zeroed result",
+        "empty store reports zero loaded and zero skipped without touching the scheduler",
+        "two valid stored timelines both publish (timeline_snapshot readback)",
+        "a corrupt entry is counted skipped, never aborts the run, and leaves the scheduler's other entries unchanged",
+        "a full scheduler counts every entry skipped while its catalog remains unchanged",
+        "C++ build and CTest contract suite (1/1 passed)"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 72 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope exclusivity and Git ancestry checks"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 / tools/source-policy.ps1 / tools/source-only-ci-check.ps1 / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "documentation gates with refreshed BASELINE counters, source-only policy and whitespace cleanliness"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Skipped entries are counted without per-entry reasons; callers replay through the store API for details.",
+    "Single-writer control-plane adapter; no new locking or threading model.",
+    "User-space source-contract evidence only; this proves nothing about physical audio, per-App delivery, drivers, HLK or Microsoft signing."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSVC 19.44 (VS 2022 BuildTools 17.14)",
+    "cmake": "4.4.0",
+    "dotnet": "10.0.301",
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}

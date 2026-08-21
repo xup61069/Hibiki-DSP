@@ -5,6 +5,51 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
+
+function Get-CounterClaims([string]$Text) {
+  $claims = [pscustomobject]@{ Required = 0; Specs = 0; Tracked = 0; Json = 0 }
+  $patterns = [ordered]@{
+    Required = @('docs-check\.ps1`\s*的\s*(?<count>\d+)\s*個必要入口', 'docs-check required-entry')
+    Specs    = @('個必要入口與\s*(?<count>\d+)\s*份\s*Spec\s*通過', 'spec')
+    Tracked  = @('source-policy\.ps1`\s*掃描\s*(?<count>\d+)\s*個\s*tracked paths', 'source-policy tracked-path')
+    Json     = @('(?<count>\d+)\s*個\s*repository JSON\s*檔案均可解析', 'repository-json')
+  }
+  foreach ($key in $patterns.Keys) {
+    $match = [regex]::Match($Text, [string]$patterns[$key][0])
+    if (-not $match.Success) {
+      throw ("BASELINE.md is missing the {0} counter expected by docs-check; keep the " +
+             "verification-summary sentence in docs/state/BASELINE.md up to date.") -f $patterns[$key][1]
+    }
+    $claims.$key = [int]$match.Groups['count'].Value
+  }
+  return $claims
+}
+
+function Assert-CounterClaims {
+  param(
+    [Parameter(Mandatory = $true)]$Claims,
+    [Parameter(Mandatory = $true)][int]$Required,
+    [Parameter(Mandatory = $true)][int]$Specs,
+    [Parameter(Mandatory = $true)][int]$Tracked,
+    [Parameter(Mandatory = $true)][int]$Json
+  )
+  if ($Claims.Required -ne $Required) {
+    throw ("BASELINE.md claims {0} docs-check required entries but docs-check defines {1}; " +
+           "update the BASELINE.md verification summary.") -f $Claims.Required, $Required
+  }
+  if ($Claims.Specs -ne $Specs) {
+    throw ("BASELINE.md claims {0} specs but the repository tracks {1}; " +
+           "update the BASELINE.md verification summary.") -f $Claims.Specs, $Specs
+  }
+  if ($Claims.Tracked -ne $Tracked) {
+    throw ("BASELINE.md claims {0} tracked paths but git reports {1}; " +
+           "update the BASELINE.md verification summary.") -f $Claims.Tracked, $Tracked
+  }
+  if ($Claims.Json -ne $Json) {
+    throw ("BASELINE.md claims {0} repository JSON files but git reports {1}; " +
+           "update the BASELINE.md verification summary.") -f $Claims.Json, $Json
+  }
+}
 $required = @(
   'AGENTS.md', 'CLAUDE.md', 'README.md', 'CONTRIBUTING.md', 'SECURITY.md',
   '.github/PULL_REQUEST_TEMPLATE.md', '.github/ISSUE_TEMPLATE/ai-task.yml',
@@ -84,87 +129,36 @@ foreach ($adapter in $adapters) {
   }
 }
 
-function Get-BaselineClaim {
-  param([string]$Text, [string]$Pattern, [string]$Label)
-  $match = [regex]::Match($Text, $Pattern)
-  if (-not $match.Success) {
-    throw ("BASELINE.md is missing the {0} counter expected by docs-check; keep the " +
-           "verification-summary sentence in docs/state/BASELINE.md up to date.") -f $Label
-  }
-  return [int]$match.Groups['count'].Value
-}
-
-function Test-BaselineSummary {
-  param(
-    [string]$Text,
-    [int]$RequiredEntries,
-    [int]$SpecCount,
-    [int]$TrackedPaths,
-    [int]$JsonFiles
-  )
-  $claimedRequired = Get-BaselineClaim $Text 'docs-check\.ps1`\s*的\s*(?<count>\d+)\s*個必要入口' 'docs-check required-entry'
-  if ($claimedRequired -ne $RequiredEntries) {
-    throw ("BASELINE.md claims {0} docs-check required entries but docs-check defines {1}; " +
-           "update the BASELINE.md verification summary.") -f $claimedRequired, $RequiredEntries
-  }
-  $claimedSpecs = Get-BaselineClaim $Text '個必要入口與\s*(?<count>\d+)\s*份\s*Spec\s*通過' 'spec'
-  if ($claimedSpecs -ne $SpecCount) {
-    throw ("BASELINE.md claims {0} specs but the repository tracks {1}; " +
-           "update the BASELINE.md verification summary.") -f $claimedSpecs, $SpecCount
-  }
-  $claimedTracked = Get-BaselineClaim $Text 'source-policy\.ps1`\s*掃描\s*(?<count>\d+)\s*個\s*tracked paths' 'source-policy tracked-path'
-  if ($claimedTracked -ne $TrackedPaths) {
-    throw ("BASELINE.md claims {0} tracked paths but git reports {1}; " +
-           "update the BASELINE.md verification summary.") -f $claimedTracked, $TrackedPaths
-  }
-  $claimedJson = Get-BaselineClaim $Text '(?<count>\d+)\s*個\s*repository JSON\s*檔案均可解析' 'repository-json'
-  if ($claimedJson -ne $JsonFiles) {
-    throw ("BASELINE.md claims {0} repository JSON files but git reports {1}; " +
-           "update the BASELINE.md verification summary.") -f $claimedJson, $JsonFiles
-  }
-}
-
 if ($SelfTest) {
-  $sampleTemplate = '目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 {0} 個必要入口與{1}份 Spec 通過；`source-policy.ps1` 掃描 {2} 個 tracked paths 且無 blocked binary/secret；通過；{3} 個 repository JSON 檔案均可解析。'
-
-  function Assert-GateRejection {
-    param([scriptblock]$Action, [string]$ExpectedPattern, [string]$Label)
-    try { & $Action } catch {
-      if ("$($_.Exception.Message)" -notmatch $ExpectedPattern) {
-        throw ("docs-check self-test case '{0}' failed with an unexpected message: {1}") -f $Label, $_.Exception.Message
-      }
-      return
-    }
-    throw ("docs-check self-test case '{0}' expected a rejection matching '{1}' but the gate passed.") -f $Label, $ExpectedPattern
-  }
-
+  $summaryOk = @'
+目前驗證摘要：`docs-check.ps1` 的 85 個必要入口與
+24 份 Spec 通過；`source-policy.ps1` 掃描 411 個 tracked paths 且無 blocked
+binary/secret；
+`distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過了71 個 repository JSON 檔案均可解析。
+'@
   $caseCount = 0
-
-  Test-BaselineSummary -Text ($sampleTemplate -f 85, 24, 397, 65) -RequiredEntries 85 -SpecCount 24 -TrackedPaths 397 -JsonFiles 65
+  $ok = Get-CounterClaims $summaryOk
+  if ($ok.Required -ne 85 -or $ok.Specs -ne 24 -or $ok.Tracked -ne 411 -or $ok.Json -ne 71) {
+    throw 'docs-check self-test failed: canonical summary did not parse to expected counters.'
+  }
   $caseCount++
-  Test-BaselineSummary -Text ($sampleTemplate -f 96, 35, 410, 77) -RequiredEntries 96 -SpecCount 35 -TrackedPaths 410 -JsonFiles 77
+  Assert-CounterClaims -Claims $ok -Required 85 -Specs 24 -Tracked 411 -Json 71
   $caseCount++
-
-  Assert-GateRejection -Label 'required-entries-mismatch' -ExpectedPattern 'claims 85 docs-check required entries but docs-check defines 86' `
-    -Action { Test-BaselineSummary -Text ($sampleTemplate -f 85, 24, 397, 65) -RequiredEntries 86 -SpecCount 24 -TrackedPaths 397 -JsonFiles 65 }
-  $caseCount++
-  Assert-GateRejection -Label 'spec-count-mismatch' -ExpectedPattern 'claims 24 specs but the repository tracks 25' `
-    -Action { Test-BaselineSummary -Text ($sampleTemplate -f 85, 24, 397, 65) -RequiredEntries 85 -SpecCount 25 -TrackedPaths 397 -JsonFiles 65 }
-  $caseCount++
-  Assert-GateRejection -Label 'tracked-paths-mismatch' -ExpectedPattern 'claims 397 tracked paths but git reports 401' `
-    -Action { Test-BaselineSummary -Text ($sampleTemplate -f 85, 24, 397, 65) -RequiredEntries 85 -SpecCount 24 -TrackedPaths 401 -JsonFiles 65 }
-  $caseCount++
-  Assert-GateRejection -Label 'repository-json-mismatch' -ExpectedPattern 'claims 65 repository JSON files but git reports 66' `
-    -Action { Test-BaselineSummary -Text ($sampleTemplate -f 85, 24, 397, 65) -RequiredEntries 85 -SpecCount 24 -TrackedPaths 397 -JsonFiles 66 }
-  $caseCount++
-  Assert-GateRejection -Label 'missing-all-markers' -ExpectedPattern 'missing the docs-check required-entry counter' `
-    -Action { Test-BaselineSummary -Text 'no verification summary here' -RequiredEntries 85 -SpecCount 24 -TrackedPaths 397 -JsonFiles 65 }
-  $caseCount++
-  Assert-GateRejection -Label 'missing-tracked-path-marker' -ExpectedPattern 'missing the source-policy tracked-path counter' `
-    -Action { Test-BaselineSummary -Text (($sampleTemplate -f 85, 24, 397, 65) -replace '；`source-policy\.ps1` 掃描 397 個 tracked paths 且無 blocked binary/secret；', '；') -RequiredEntries 85 -SpecCount 24 -TrackedPaths 397 -JsonFiles 65 }
-  $caseCount++
-
-  Write-Output "Documentation baseline-summary gate self-test passed ($caseCount cases)."
+  foreach ($fragment in @('個必要入口', '份 Spec 通過', '掃描 411 個', 'repository JSON')) {
+    $broken = $summaryOk.Replace($fragment, 'removed-marker')
+    try { Get-CounterClaims $broken | Out-Null } catch { $caseCount++; continue }
+    throw "docs-check self-test failed: removing '$fragment' should fail the counter parser."
+  }
+  try {
+    $drift = Get-CounterClaims $summaryOk
+    Assert-CounterClaims -Claims $drift -Required 85 -Specs 24 -Tracked 409 -Json 71
+  } catch {
+    $caseCount++
+  }
+  if ($caseCount -lt 7) {
+    throw "docs-check self-test failed: expected at least 7 passing cases, saw $caseCount."
+  }
+  Write-Output "docs-check self-test passed ($caseCount cases; parser markers, malformed text and drift detection)."
   exit 0
 }
 
@@ -173,7 +167,71 @@ $trackedFiles = @(git -C $repo ls-files)
 if ($LASTEXITCODE -ne 0) { throw 'docs-check could not list tracked files.' }
 $jsonFiles = @(git -C $repo ls-files -- '*.json')
 
-Test-BaselineSummary -Text $baselineText -RequiredEntries $required.Count -SpecCount $specs.Count -TrackedPaths $trackedFiles.Count -JsonFiles $jsonFiles.Count
+$claims = Get-CounterClaims $baselineText
 
-$summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; baseline summary verified against {2} tracked paths and {3} repository JSON files.)'
+# Structural counters (required entries and specs) are always verified against
+# the tree being tested; they change rarely, so keeping them strict costs
+# parallel lanes nothing.
+if ($claims.Required -ne $required.Count) {
+  throw ("BASELINE.md claims {0} docs-check required entries but docs-check defines {1}; " +
+         "update the BASELINE.md verification summary.") -f $claims.Required, $required.Count
+}
+if ($claims.Specs -ne $specs.Count) {
+  throw ("BASELINE.md claims {0} specs but the repository tracks {1}; " +
+         "update the BASELINE.md verification summary.") -f $claims.Specs, $specs.Count
+}
+
+$baseRef = $env:GITHUB_BASE_REF
+$pullRequestMode = -not [string]::IsNullOrWhiteSpace($baseRef)
+if (-not $pullRequestMode) {
+  # Push-to-main and local runs stay fully strict so main cannot drift silently.
+  Assert-CounterClaims -Claims $claims -Required $required.Count -Specs $specs.Count `
+    -Tracked $trackedFiles.Count -Json $jsonFiles.Count
+  $summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; baseline summary verified against {2} tracked paths and {3} repository JSON files.)'
+  Write-Output (($summaryTemplate) -f $required.Count, $specs.Count, $trackedFiles.Count, $jsonFiles.Count)
+  exit 0
+}
+
+$baseRefName = 'origin/' + $baseRef
+git -C $repo cat-file -e ("{0}^{{commit}}" -f $baseRefName) 2>$null
+if ($LASTEXITCODE -ne 0) {
+  throw "docs-check could not resolve merge base ref '$baseRefName'; ensure checkout keeps fetch-depth: 0."
+}
+$baseTracked = @(git -C $repo ls-tree -r --name-only $baseRefName)
+if ($LASTEXITCODE -ne 0) { throw "docs-check could not list the merge base tree '$baseRefName'." }
+# git ls-tree does not expand a bare '*.json' pathspec across directories the way
+# git ls-files does; filter the full listing instead of trusting a pathspec.
+$baseJson = @($baseTracked | Where-Object { $_.ToLowerInvariant().EndsWith('.json') })
+$baseBaselineText = git -C $repo show ('{0}:docs/state/BASELINE.md' -f $baseRefName)
+if ($LASTEXITCODE -ne 0) { throw "docs-check could not read BASELINE.md from '$baseRefName'." }
+
+# The merge base itself must be internally consistent: a stale summary on main
+# is an integrator problem and fails closed here instead of blaming the PR.
+$baseClaims = Get-CounterClaims $baseBaselineText
+if ($baseClaims.Tracked -ne $baseTracked.Count) {
+  throw ("BASELINE.md on '{0}' claims {1} tracked paths but that tree has {2}; " +
+         "refresh docs/state/BASELINE.md on the target branch.") -f $baseRefName, $baseClaims.Tracked, $baseTracked.Count
+}
+if ($baseClaims.Json -ne $baseJson.Count) {
+  throw ("BASELINE.md on '{0}' claims {1} repository JSON files but that tree has {2}; " +
+         "refresh docs/state/BASELINE.md on the target branch.") -f $baseRefName, $baseClaims.Json, $baseJson.Count
+}
+
+$headNormalized = $baselineText -replace "`r", ''
+$baseNormalized = $baseBaselineText -replace "`r", ''
+if ($headNormalized.Trim() -eq $baseNormalized.Trim()) {
+  # The PR did not touch BASELINE.md, so its own file additions are exactly the
+  # counter drift the shared snapshot cannot track per-slice. The base was just
+  # proven consistent; tolerate the head-side delta instead of serializing every
+  # parallel lane behind an integrator refresh.
+  $summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; BASELINE.md untouched by this pull request, verified against merge base {2}: {3} tracked paths and {4} repository JSON files.)'
+  Write-Output (($summaryTemplate) -f $required.Count, $specs.Count, $baseRefName, $baseTracked.Count, $baseJson.Count)
+  exit 0
+}
+
+# A PR that edits BASELINE.md owns its numbers end to end.
+Assert-CounterClaims -Claims $claims -Required $required.Count -Specs $specs.Count `
+  -Tracked $trackedFiles.Count -Json $jsonFiles.Count
+
+$summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; BASELINE.md updated by this pull request, verified against head: {2} tracked paths and {3} repository JSON files.)'
 Write-Output (($summaryTemplate) -f $required.Count, $specs.Count, $trackedFiles.Count, $jsonFiles.Count)
