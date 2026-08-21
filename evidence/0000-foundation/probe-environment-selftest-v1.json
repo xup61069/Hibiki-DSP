@@ -90,7 +90,14 @@
     "The normal probe writes only ignored .local/context.json; actual endpoint identity, calibration data and private paths remain excluded from Git.",
     "No live endpoint enumeration or audio delivery was performed by this self-test."
   ],
-  "logs": [],
+  "logs": [
+    {
+      "event": "latest-origin-main-sync",
+      "origin_main": "81da555b3d1430fdb119664bfbd31f540ca0754a",
+      "merge_commit": "89f59f7",
+      "scope": "own Issue 76 branch only"
+    }
+  ],
   "tool_versions": {
     "compiler": "MSVC 19.44 (VS 2022 BuildTools 17.14)",
     "cmake": "4.4.0",
