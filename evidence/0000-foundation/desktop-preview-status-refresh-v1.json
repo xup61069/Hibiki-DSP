@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "desktop-preview-status-refresh-v1",
+  "source_commit": "07aa1fa",
+  "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/build-preview.ps1 -SmokeTest",
+    "pwsh -File tools/control-model-engine-smoke.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/build-preview.ps1 -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "self-contained Desktop Compatibility Preview launch",
+        "status refresh timer compiles and does not require Windows App Runtime",
+        "three-second liveness"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/control-model-engine-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "command-triggered status refresh remains compatible with the C# model",
+        "volume/generation and SceneApply readback remain green"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Timer polling is UI/control-plane work; it does not poll COM or execute DSP on the RT thread.",
+    "The preview still has no physical sink, virtual driver, Windows volume node or audible audio path.",
+    "The formal WinUI/XAML and accessibility gates remain target-toolchain work."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00+08:00",
+  "finished_at": "2026-08-21T00:00:00+08:00"
+}
