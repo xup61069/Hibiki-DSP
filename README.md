@@ -106,6 +106,16 @@ Windows 使用者也可以直接雙擊 repository 根目錄的 `Start-HibikiPrev
 音量或任何實體裝置。直接雙擊 `.local/preview/DesktopCompat/Hibiki.DesktopPreview.exe` 也可以，
 但那只會開 UI，不會自動啟動引擎。
 
+若要明確測試 Windows 系統音量聯動，才使用：
+
+```powershell
+pwsh -File tools/run-preview.ps1 -Build -EnableSystemVolume
+```
+
+這個選項會讀取目前 Windows render endpoint 音量、監聽外部音量鍵，並把 Preview 的音量調整
+寫回同一 endpoint；預設預覽不會寫入系統音量。只想驗證 endpoint volume broker 是否可用而不送出
+音量命令，可執行 `pwsh -File tools/engine-preview-smoke.ps1 -EnableSystemVolume -StatusOnly`。
+
 不要開啟 `.local/preview/WinUICompat/Hibiki.WinUI.exe` 來當一般預覽：那是需要 Windows App
 Runtime 1.7 的實驗性 WinUI fallback，缺少 runtime 時會出現「Required components of the
 Windows App Runtime are missing」。這個錯誤不代表 Desktop Compatibility Preview 損壞。

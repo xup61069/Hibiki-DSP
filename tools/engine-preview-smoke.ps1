@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param()
+param(
+  [switch]$EnableSystemVolume,
+  [switch]$StatusOnly
+)
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
@@ -78,7 +81,10 @@ function Write-TestIrWav([string]$Path) {
   }
 }
 
-$engineProcess = Start-Process -FilePath $engine -WorkingDirectory (Split-Path $engine) -WindowStyle Hidden -PassThru
+$engineArguments = @()
+if ($EnableSystemVolume) { $engineArguments += '--enable-system-volume' }
+$engineProcess = Start-Process -FilePath $engine -ArgumentList $engineArguments `
+  -WorkingDirectory (Split-Path $engine) -WindowStyle Hidden -PassThru
 $irPath = Join-Path $repo '.local/engine-preview-smoke-ir.wav'
 $irDirectory = Split-Path $irPath
 New-Item -ItemType Directory -Force -Path $irDirectory | Out-Null
@@ -112,6 +118,28 @@ try {
   if ($reply[0] -ne 0x48 -or $reply[1] -ne 0x49 -or $reply[2] -ne 0x4B -or $reply[3] -ne 0x31 -or
       $reply[6] -ne 6 -or [BitConverter]::ToUInt64($reply, 12) -ne 42) {
     throw 'Engine Preview Hello did not receive the v1 correlated Ack.'
+  }
+
+  if ($StatusOnly) {
+    $statusFrame = New-IpcFrame 13 43 @()
+    Send-IpcFrame $client $statusFrame
+    $statusReply = Receive-IpcFrame $client
+    if ($statusReply[6] -ne 12 -or [BitConverter]::ToUInt64($statusReply, 12) -ne 43) {
+      throw 'Engine Preview status-only probe did not receive a correlated snapshot.'
+    }
+    $statusPayloadBytes = [BitConverter]::ToUInt32($statusReply, 8)
+    $statusRouteOffset = 20 + 40 + (2 * 224)
+    if ($statusPayloadBytes -ne ($statusReply.Length - 20) -or
+        $statusPayloadBytes -lt (40 + (3 * 224)) -or
+        $statusReply[$statusRouteOffset + 1] -ne 0) {
+      $state = if ($statusPayloadBytes -ge ($statusRouteOffset + 2)) {
+        $statusReply[$statusRouteOffset + 1]
+      } else { 255 }
+      throw "Windows volume route was not Ready (state=$state, payload=$statusPayloadBytes)."
+    }
+    $mode = if ($EnableSystemVolume) { 'explicit write-through enabled' } else { 'write-through disabled' }
+    Write-Output "Engine Preview status-only smoke passed (Windows volume route Ready; $mode)."
+    return
   }
 
   # The physical catalog is metadata only: inspect bounded wire fields without

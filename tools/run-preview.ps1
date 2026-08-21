@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-  [switch]$Build
+  [switch]$Build,
+  [switch]$EnableSystemVolume
 )
 
 $ErrorActionPreference = 'Stop'
@@ -20,8 +21,10 @@ if (@(Get-Process -Name hibiki_engine_preview -ErrorAction SilentlyContinue).Cou
   throw 'Another Engine Preview process is already running; close it before starting the combined preview.'
 }
 
-$engineProcess = Start-Process -FilePath $engine -WorkingDirectory (Split-Path $engine) `
-  -WindowStyle Hidden -PassThru
+$engineArguments = @()
+if ($EnableSystemVolume) { $engineArguments += '--enable-system-volume' }
+$engineProcess = Start-Process -FilePath $engine -ArgumentList $engineArguments `
+  -WorkingDirectory (Split-Path $engine) -WindowStyle Hidden -PassThru
 try {
   # The desktop preview auto-connects once the local control pipe is ready.
   $desktopProcess = Start-Process -FilePath $desktop -WorkingDirectory (Split-Path $desktop) -PassThru

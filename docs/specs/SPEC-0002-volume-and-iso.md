@@ -58,6 +58,11 @@ Hibiki UI/Scene/Safety 寫入所使用的 event-context GUID；匹配自家 GUID
 `config/distribution-profile.yml`，`WindowsVolumeLinkV1` 建構時自動註冊；換電腦或換 AI
 不得重生這些 GUID。其他整合來源只能透過明確的 `add_ignored_context` 加入，並須在
 handoff/evidence 中記錄用途。
+Engine Preview 的系統音量聯動必須是明確 opt-in（`--enable-system-volume`）。未帶 flag 的
+Preview 不 bind、讀取或寫入 Windows endpoint volume；帶 flag 時才可在同一個 COM control
+thread bind default render endpoint、poll callback、以 `WindowsVolumeLinkV1` 套用外部通知，
+並以 UI context 將經 safety reconciliation 的 UI 音量寫回。Status route 必須把 broker
+是否已 bind 與 write-through 是否啟用分開呈現；status-only smoke 不得送出 volume command。
 `WindowsDeviceWatcher` 同樣只把 `IMMNotificationClient` 的 default/add/remove/state/property
 事件複製到 bounded snapshot；實際 rebind 必須由 worker 讀取 snapshot 後執行，避免在 OS
 callback 裡 unregister、release 或建立 COM 物件。

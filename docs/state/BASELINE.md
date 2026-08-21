@@ -174,6 +174,10 @@
   an `AudioEngineModel` output-group master, with self event-context filtering and stale/invalid
   generation handling covered by the Windows contract test. UI/Safety/Scene/Session event
   contexts are stable values from `distribution-profile.yml` and are registered by default.
+- Engine Preview now has an explicit `--enable-system-volume` opt-in: it binds the current default
+  render endpoint's `IAudioEndpointVolume`, mirrors external dB/mute notifications into Main Group
+  Master, and writes UI volume requests back with the UI event-context GUID. The default Preview
+  remains non-mutating; status-only broker smoke coverage does not send a volume command.
 - Windows-only `IMMNotificationClient` watcher with bounded default/add/remove/property event
   snapshots, consumed by a worker-side transactional recovery coordinator with safe-start mute
   after endpoint invalidation or Audio Service restart.

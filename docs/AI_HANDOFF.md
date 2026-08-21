@@ -48,7 +48,9 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   bounded snapshot 與 watcher poll；不啟用 physical WASAPI sink，也不改 Windows 音量。
   `tools/run-preview.ps1 -Build` 會把 Engine Preview 與不依賴 Windows App Runtime 的 Desktop
   Compatibility UI 一起啟動；它只提供 user-space control host，不代表 WaveRT、實體輸出或
-  Windows session routing 已完成。
+  Windows session routing 已完成。若要明確驗證 Windows endpoint 音量聯動，使用
+  `tools/run-preview.ps1 -Build -EnableSystemVolume`；預設不會寫入系統音量，且
+  `tools/engine-preview-smoke.ps1 -EnableSystemVolume -StatusOnly` 只檢查 broker Ready、不送音量命令。
 - ISO 226 只保留合法 formula/derived boundary；禁止把受限標準文件、完整表格、掃圖或其內容
   放進 source、Issue、prompt、RAG、fixture 或 evidence。
 

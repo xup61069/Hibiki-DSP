@@ -48,3 +48,9 @@ changes without touching a physical sink. The Desktop Compatibility Preview can
 therefore show the current local render/capture counts and default-render metadata. This is
 metadata only; no endpoint is opened, no Windows system volume is changed, and no
 device switch is claimed until a future physical sink transaction is implemented.
+
+The combined launcher accepts `-EnableSystemVolume` only as an explicit opt-in. In
+that mode Engine Preview binds the current render endpoint's `IAudioEndpointVolume`,
+mirrors external dB/mute notifications into the canonical Main Group Master, and
+writes UI volume requests back with the documented event-context GUID. The default
+launcher remains read/write-safe and does not touch Windows volume.
