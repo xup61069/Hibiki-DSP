@@ -107,6 +107,20 @@
       "status": "failure",
       "failed_gate": "Documentation gate",
       "message": "BASELINE.md claims 417 tracked paths but git reports 419; later gates were skipped."
+    },
+    {
+      "run_id": 32533778359,
+      "event": "push",
+      "status": "failure",
+      "failed_gate": "Documentation gate",
+      "message": "BASELINE.md claims 417 tracked paths but git reports 419; later gates were skipped."
+    },
+    {
+      "run_id": 32533786951,
+      "event": "pull_request",
+      "status": "failure",
+      "failed_gate": "Documentation gate",
+      "message": "BASELINE.md claims 417 tracked paths but git reports 419; later gates were skipped."
     }
   ],
   "tool_versions": {
