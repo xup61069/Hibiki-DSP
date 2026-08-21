@@ -18,7 +18,7 @@ enum class SessionCommandKindV1 : std::uint8_t {
     RouteRule = 3U,
 };
 
-// This is an in-process handoff record, not an IPC layout. The two payloads
+// This is an in-process handoff record, not an IPC layout. The payloads
 // intentionally remain fixed-size so enqueue/dequeue never allocates and can
 // be used by the control worker without entering the COM boundary. The queue
 // owns one heap-backed slot array created with the runtime object.
