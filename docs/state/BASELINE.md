@@ -416,7 +416,7 @@ route-health cards 接到 Easy／Expert control-model；它只顯示保守的 se
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 74 個必要入口與
 16 份 Spec 通過；`docs-check.ps1` 最新已擴充為 75 個必要入口；`source-policy.ps1` 掃描
-306 個路徑且無 blocked binary/secret；
+307 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
 288-byte payload、catalog sequence、handler fail-closed、WinUI send-failure rollback、DeviceCatalogSnapshot
@@ -434,4 +434,5 @@ parameter frame 與 `IParameterChanges` bridge）unsigned build 亦通過；輸�
 及 custom Scene card mirror 的 JSON save/load、atomic replace、malformed rollback 亦已通過本機
 contract/control-model checks。
 本次 control-model route-health／volume-safety additions 的 source commit 是 `7d43e67`，
-對應 handoff/evidence 更新 commit 是 `e13cfd8`。
+對應 handoff/evidence 更新 commit 是 `e13cfd8`；最後一次 live session evidence 更新是
+`2ba5299`。
