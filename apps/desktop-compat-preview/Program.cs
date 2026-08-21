@@ -28,7 +28,9 @@ internal sealed class PreviewForm : Form
     private readonly ComboBox _scenes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly TrackBar _volume = new() { Minimum = -60, Maximum = 0, TickFrequency = 5, Width = 460 };
     private readonly Button _enhance = new() { Text = "一鍵改善", AutoSize = true, Margin = new Padding(3, 12, 3, 3) };
+    private readonly System.Windows.Forms.Timer _statusTimer = new() { Interval = 1000 };
     private bool _updatingScene;
+    private bool _statusRefreshActive;
 
     internal PreviewForm(EasyControlViewModel viewModel)
     {
@@ -41,7 +43,7 @@ internal sealed class PreviewForm : Form
         var panel = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24), FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
         panel.Controls.Add(new Label { Text = "Hibiki DSP", AutoSize = true, Font = new Font("Segoe UI", 24, FontStyle.Bold) });
         panel.Controls.Add(new Label { Text = "本機 Compatibility Preview：自帶 .NET runtime，不需要 Windows App Runtime；不含 driver、系統攔截或正式音訊處理。", AutoSize = false, Width = 550, Height = 42 });
-        panel.Controls.Add(new Label { Text = "離線預覽模式：先啟動真正的 Hibiki 引擎，才能套用場景或改變音量。", AutoSize = true, ForeColor = Color.DimGray });
+        panel.Controls.Add(new Label { Text = "離線預覽模式：先啟動 user-space Engine Preview，才能測試場景或音量命令。", AutoSize = true, ForeColor = Color.DimGray });
         panel.Controls.Add(new Label { Text = "輸出群組", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
         var groups = new ComboBox { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, DataSource = _viewModel.OutputGroups.ToList(), DisplayMember = "Name", ValueMember = "Id" };
         groups.SelectedIndexChanged += (_, _) => { if (groups.SelectedValue is string id) _viewModel.SelectedOutputGroup = id; };
@@ -73,7 +75,27 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(_status);
         Controls.Add(panel);
         _viewModel.PropertyChanged += OnViewModelChanged;
-        FormClosed += async (_, _) => await _viewModel.DisconnectAsync();
+        _statusTimer.Tick += async (_, _) =>
+        {
+            if (!_viewModel.IsConnected || _viewModel.IsBusy || _statusRefreshActive) return;
+            _statusRefreshActive = true;
+            try
+            {
+                await _viewModel.RefreshControlStatusAsync();
+                RefreshView();
+            }
+            finally
+            {
+                _statusRefreshActive = false;
+            }
+        };
+        _statusTimer.Start();
+        FormClosed += async (_, _) =>
+        {
+            _statusTimer.Stop();
+            _statusTimer.Dispose();
+            await _viewModel.DisconnectAsync();
+        };
         Shown += async (_, _) =>
         {
             // The compatibility preview is deliberately useful as a single

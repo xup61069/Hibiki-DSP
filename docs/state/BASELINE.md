@@ -17,7 +17,9 @@
   Evidence is recorded in `evidence/0000-foundation/control-model-engine-v1.json`.
 - Desktop Compatibility Preview now exposes a scene selector, route-health summary and volume
   origin/actuator text; scene selection is disabled until the engine is connected and remains
-  command/Ack/status-refresh based.
+  command/Ack/status-refresh based. While connected it polls the bounded ControlStatusSnapshot once
+  per second (coalesced while a command is busy) so external engine/Windows-volume changes can be
+  reflected without touching the audio thread.
 - 公開 monorepo 文件、component license map 與 source-only paid-release policy。
 - AI 接手規則、fresh-clone 流程與 source-only policy。
 - `OutputGroupVolumeState` 與 ISO compensation public C++ boundary 的初始骨架。
