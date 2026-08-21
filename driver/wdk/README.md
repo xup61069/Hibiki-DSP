@@ -4,6 +4,8 @@
 SYSVAD-derived topology. It dispatches `KSPROPERTY_AUDIO_VOLUMELEVEL` and
 `KSPROPERTY_AUDIO_MUTE` into the portable `wavert_endpoint_state_v1` core,
 preserving the Q16.16 dB safety ceiling, mute and monotonic generation rules.
+The request boundary rejects missing instance/value buffers and verbs that are
+neither a single GET nor SET before dereferencing the KS property request.
 
 It is deliberately not part of the default CMake target: this machine does
 not have the locked WDK 10.0.28000.2526 and no `.sys` is produced. A future WDK

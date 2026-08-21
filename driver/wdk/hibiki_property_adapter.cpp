@@ -26,7 +26,8 @@ static NTSTATUS hibiki_validate_request(
     _In_ PPCPROPERTY_REQUEST request,
     _In_ ULONG value_bytes,
     _In_ ULONG instance_bytes) {
-    if (request == nullptr || request->PropertyItem == nullptr || request->Value == nullptr) {
+    if (request == nullptr || request->PropertyItem == nullptr || request->Value == nullptr ||
+        (instance_bytes != 0U && request->Instance == nullptr)) {
         return STATUS_INVALID_PARAMETER;
     }
     if (request->ValueSize < value_bytes || request->InstanceSize < instance_bytes) {
@@ -36,12 +37,23 @@ static NTSTATUS hibiki_validate_request(
     return STATUS_SUCCESS;
 }
 
+static NTSTATUS hibiki_validate_verb(_In_ PPCPROPERTY_REQUEST request) {
+    if (request == nullptr) return STATUS_INVALID_PARAMETER;
+    if ((request->Verb & KSPROPERTY_TYPE_BASICSUPPORT) != 0U) return STATUS_SUCCESS;
+    const auto access = request->Verb & (KSPROPERTY_TYPE_GET | KSPROPERTY_TYPE_SET);
+    return access == KSPROPERTY_TYPE_GET || access == KSPROPERTY_TYPE_SET
+               ? STATUS_SUCCESS
+               : STATUS_INVALID_DEVICE_REQUEST;
+}
+
 extern "C" NTSTATUS HibikiPropertyHandlerVolumeV1(
     _In_ PPCPROPERTY_REQUEST request,
     _Inout_ hibiki_wdk_endpoint_context_v1* context) {
     if (context == nullptr) return STATUS_INVALID_PARAMETER;
     const auto validation = hibiki_validate_request(request, sizeof(LONG), sizeof(ULONG));
     if (!NT_SUCCESS(validation)) return validation;
+    const auto verb_validation = hibiki_validate_verb(request);
+    if (!NT_SUCCESS(verb_validation)) return verb_validation;
 
     const auto channel = *static_cast<const ULONG*>(request->Instance);
     if (channel >= context->state.channel_count && channel != HIBIKI_ALL_CHANNELS_ID_V1) {
@@ -83,6 +95,8 @@ extern "C" NTSTATUS HibikiPropertyHandlerMuteV1(
     if (context == nullptr) return STATUS_INVALID_PARAMETER;
     const auto validation = hibiki_validate_request(request, sizeof(BOOL), sizeof(ULONG));
     if (!NT_SUCCESS(validation)) return validation;
+    const auto verb_validation = hibiki_validate_verb(request);
+    if (!NT_SUCCESS(verb_validation)) return verb_validation;
     const auto channel = *static_cast<const ULONG*>(request->Instance);
     if (channel >= context->state.channel_count && channel != HIBIKI_ALL_CHANNELS_ID_V1) {
         return STATUS_INVALID_PARAMETER;
