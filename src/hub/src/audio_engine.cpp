@@ -200,11 +200,14 @@ bool AudioEngineModel::process_asio_transport(
 
 bool AudioEngineModel::process_driver_stream_packet(
     const std::size_t lane_index,
+    const std::string_view expected_endpoint_guid,
     const std::span<const std::uint8_t> packet,
     const std::span<float> packet_sample_storage,
     const std::span<RtLaneInputV1> lane_inputs,
     float* const output_interleaved) const noexcept {
-    if (!has_active_graph_ || lane_index >= active_graph_.lane_count ||
+    if (!has_active_graph_ || expected_endpoint_guid.empty() || expected_endpoint_guid.size() >=
+                                      HIBIKI_DRIVER_STREAM_ENDPOINT_GUID_CAPACITY_V1 ||
+        lane_index >= active_graph_.lane_count ||
         lane_inputs.size() < active_graph_.lane_count || output_interleaved == nullptr ||
         active_graph_.lanes[lane_index].input_channels == 0U) {
         return false;
@@ -212,6 +215,7 @@ bool AudioEngineModel::process_driver_stream_packet(
     DriverStreamLaneBlockV1 block{};
     if (!decode_driver_stream_packet_v1(packet, packet_sample_storage, block) ||
         block.packet_type != HIBIKI_DRIVER_STREAM_RENDER_V1 ||
+        std::string_view(block.endpoint_guid.data()) != expected_endpoint_guid ||
         block.sample_rate != sample_rate_.load(std::memory_order_acquire) ||
         block.channels != active_graph_.lanes[lane_index].input_channels ||
         block.interleaved == nullptr) {

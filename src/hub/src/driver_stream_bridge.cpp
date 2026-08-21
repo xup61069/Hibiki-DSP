@@ -36,6 +36,7 @@ bool decode_driver_stream_packet_v1(
         }
     }
     block.interleaved = sample_storage.data();
+    std::copy_n(header.endpoint_guid, block.endpoint_guid.size(), block.endpoint_guid.data());
     block.channels = header.channels;
     block.sample_rate = header.sample_rate;
     block.frames = header.frames;

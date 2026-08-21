@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <array>
 #include <span>
 
 #include "hibiki/driver_stream_transport_v1.h"
@@ -12,6 +13,7 @@ namespace hibiki {
 
 struct DriverStreamLaneBlockV1 {
     const float* interleaved{nullptr};
+    std::array<char, HIBIKI_DRIVER_STREAM_ENDPOINT_GUID_CAPACITY_V1> endpoint_guid{};
     std::uint32_t channels{0U};
     std::uint32_t sample_rate{0U};
     std::uint32_t frames{0U};

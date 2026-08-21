@@ -1184,16 +1184,17 @@ int main() {
     std::array<float, 4> engine_driver_storage{};
     std::array<RtLaneInputV1, 1> engine_driver_inputs{};
     std::array<float, 4> engine_driver_output{};
-    CHECK(engine.process_driver_stream_packet(0U, engine_driver_packet, engine_driver_storage,
-                                              engine_driver_inputs, engine_driver_output.data()));
+    CHECK(engine.process_driver_stream_packet(
+        0U, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", engine_driver_packet,
+        engine_driver_storage, engine_driver_inputs, engine_driver_output.data()));
     const float engine_driver_nan = std::numeric_limits<float>::quiet_NaN();
     std::memcpy(driver_packet.data() + HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1,
                 &engine_driver_nan, sizeof(engine_driver_nan));
     const auto bad_engine_driver_packet =
         std::span<const std::uint8_t>(driver_packet.data(), driver_packet_bytes);
-    CHECK(!engine.process_driver_stream_packet(0U, bad_engine_driver_packet,
-                                               engine_driver_storage, engine_driver_inputs,
-                                               engine_driver_output.data()));
+    CHECK(!engine.process_driver_stream_packet(
+        0U, "6d5706a4-b661-4bf6-9c2d-9c31b8f7df21", bad_engine_driver_packet,
+        engine_driver_storage, engine_driver_inputs, engine_driver_output.data()));
     engine.set_sample_rate(8000U);
     CHECK(engine.prepare_output_fanout(fanout_plan, 1.0));
     std::array<float, 16> engine_fanout_a{};

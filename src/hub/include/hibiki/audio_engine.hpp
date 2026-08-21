@@ -69,6 +69,7 @@ public:
         AsioTransportBlockV1& block) noexcept;
     [[nodiscard]] bool process_driver_stream_packet(
         std::size_t lane_index,
+        std::string_view expected_endpoint_guid,
         std::span<const std::uint8_t> packet,
         std::span<float> packet_sample_storage,
         std::span<RtLaneInputV1> lane_inputs,
