@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "issue": 28,
+  "scope_digest": "winui-a11y-source-gate-v1",
+  "source_commit": "437dd66",
+  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-git-2.55.0-pwsh-7.6.5; target-vs2026-sdk-wdk-missing",
+  "commands": [
+    "pwsh -File tools/winui-shell-check.ps1 -SelfTest",
+    "pwsh -File tools/winui-shell-check.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 28",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/winui-shell-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "bounded interactive XAML opening element parser",
+        "valid non-empty AutomationProperties.Name acceptance",
+        "missing and empty AutomationProperties.Name fail-closed rejection",
+        "non-interactive element exclusion"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/winui-shell-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "all 32 interactive controls in MainWindow.xaml declare non-empty AutomationProperties.Name",
+        "Windows App SDK 1.7.250401001 package lock verification"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 28 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 28"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "85 required documentation paths",
+        "24 specs including updated SPEC-0010 interactive accessibility section"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "tracked paths, no blocked binary or secret"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "no compiled artifact or binary upload policy violation"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Source-only static accessibility name scanning only; does not prove compiled XAML UI Automation, keyboard focus, high contrast or screen reader runtime behavior.",
+    "Does not claim audio, driver, HLK, Microsoft signing or physical endpoint behavior.",
+    "Local machine is below the locked target toolchain (Windows 26200, VS BuildTools 17.14, no WDK/Windows App SDK)."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSVC 19.44 (VS 2022 BuildTools 17.14)",
+    "cmake": "4.4.0",
+    "dotnet": "10.0.301",
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T04:20:00+08:00",
+  "finished_at": "2026-08-22T04:25:00+08:00"
+}

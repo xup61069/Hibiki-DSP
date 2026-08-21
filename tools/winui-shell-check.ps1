@@ -1,7 +1,81 @@
 [CmdletBinding()]
-param()
+param(
+  [switch]$SelfTest
+)
 
 $ErrorActionPreference = 'Stop'
+
+$interactiveControlPattern = '(?ms)<(?<type>Button|ComboBox|Slider|ToggleSwitch|CheckBox|TextBox|NumberBox)\b(?<attributes>[^>]*?)(?:/?>)'
+
+function Get-InteractiveControlOpenings([string]$xaml) {
+  foreach ($match in [regex]::Matches($xaml, $script:interactiveControlPattern)) {
+    $line = 1 + @($xaml.Substring(0, $match.Index) -split "`n").Count - 1
+    [pscustomobject]@{
+      Type = $match.Groups['type'].Value
+      Attributes = $match.Groups['attributes'].Value
+      Line = $line
+    }
+  }
+}
+
+function Assert-InteractiveControlNames([string]$xaml, [string]$sourceName) {
+  $controls = @(Get-InteractiveControlOpenings $xaml)
+  $missing = @($controls | Where-Object {
+      $doubleQuoted = [regex]::Match($_.Attributes, 'AutomationProperties\.Name\s*=\s*"(?<value>[^"]*)"')
+      $singleQuoted = [regex]::Match($_.Attributes, "AutomationProperties\.Name\s*=\s*'(?<value>[^']*)'")
+      (!$doubleQuoted.Success -and !$singleQuoted.Success) -or
+        (($doubleQuoted.Success -and [string]::IsNullOrWhiteSpace($doubleQuoted.Groups['value'].Value)) -or
+        ($singleQuoted.Success -and [string]::IsNullOrWhiteSpace($singleQuoted.Groups['value'].Value)))
+    })
+  if ($missing.Count -gt 0) {
+    $details = @($missing | ForEach-Object { "$($_.Type) at $($sourceName):$($_.Line)" }) -join ', '
+    throw "Interactive WinUI controls must declare a non-empty AutomationProperties.Name: $details"
+  }
+  return $controls.Count
+}
+
+if ($SelfTest) {
+  $valid = @'
+<StackPanel>
+  <TextBlock Text="Not interactive" />
+  <Button AutomationProperties.Name="Connect" />
+  <ComboBox
+      Header="Output"
+      AutomationProperties.Name="Output" />
+</StackPanel>
+'@
+  if ((Assert-InteractiveControlNames $valid 'selftest-valid.xaml') -ne 2) {
+    throw 'WinUI accessibility self-test expected two interactive controls.'
+  }
+
+  $missing = '<Slider Minimum="0" Maximum="1" />'
+  $missingCaught = $false
+  try {
+    [void](Assert-InteractiveControlNames $missing 'selftest-missing.xaml')
+  } catch {
+    $missingCaught = $true
+    if ($_.Exception.Message -notmatch 'Slider at selftest-missing\.xaml:1') { throw }
+  }
+  if (-not $missingCaught) { throw 'WinUI accessibility self-test expected a missing-name failure.' }
+
+  $empty = '<TextBox AutomationProperties.Name="" />'
+  $emptyCaught = $false
+  try {
+    [void](Assert-InteractiveControlNames $empty 'selftest-empty.xaml')
+  } catch {
+    $emptyCaught = $true
+    if ($_.Exception.Message -notmatch 'TextBox at selftest-empty\.xaml:1') { throw }
+  }
+  if (-not $emptyCaught) { throw 'WinUI accessibility self-test expected an empty-name failure.' }
+
+  $unrelated = '<StackPanel><TextBlock Text="No automation name required" /></StackPanel>'
+  if ((Assert-InteractiveControlNames $unrelated 'selftest-unrelated.xaml') -ne 0) {
+    throw 'WinUI accessibility self-test counted a non-interactive element.'
+  }
+  Write-Output 'WinUI interactive-control accessibility self-test passed (4 cases).'
+  exit 0
+}
+
 $repo = Split-Path -Parent $PSScriptRoot
 $shell = Join-Path $repo 'apps/winui-shell'
 $required = @('Hibiki.WinUI.csproj', 'App.xaml', 'App.xaml.cs', 'MainWindow.xaml', 'MainWindow.xaml.cs')
@@ -24,6 +98,7 @@ if ([string]::IsNullOrWhiteSpace($projectVersion) -or $projectVersion -ne $lockV
 
 $xaml = Get-Content (Join-Path $shell 'MainWindow.xaml') -Raw
 $codeBehind = Get-Content (Join-Path $shell 'MainWindow.xaml.cs') -Raw
+Write-Output "WinUI interactive-control accessibility scan: $(Assert-InteractiveControlNames $xaml 'apps/winui-shell/MainWindow.xaml') controls."
 foreach ($requiredText in @('x:Name="RootGrid"', 'ItemsSource="{Binding Scenes}"',
     'ItemsSource="{Binding OutputGroups}"', 'SelectedOutputGroup', 'IsExpert',
     'ItemsSource="{Binding PhysicalDevices}"', 'SelectedPhysicalDeviceId',
