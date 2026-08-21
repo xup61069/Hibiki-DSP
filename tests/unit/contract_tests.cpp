@@ -41,6 +41,7 @@ extern "C" {
 #include "hibiki/iso226.hpp"
 #include "hibiki/ir_phase.hpp"
 #include "hibiki/scene_graph.hpp"
+#include "hibiki/scene_catalog.hpp"
 #include "hibiki/scene_presets.hpp"
 #include "hibiki/scene_safety.hpp"
 #include "hibiki/session_route.hpp"
@@ -748,6 +749,56 @@ int main() {
     CHECK(handle_control_frame_v1(scene_frame, service_response, &service_context) &&
           command_accepted && service_response.header.type == IpcMessageType::Ack &&
           service_response.header.request_id == scene_frame.header.request_id);
+
+    auto scene_catalog = std::make_unique<SceneCatalogV1>();
+    auto custom_defaults = make_easy_scene(EasySceneKind::Movie, "custom-output");
+    custom_defaults.scene.id = "quiet-game";
+    custom_defaults.scene.name = "Quiet Game";
+    SceneDefinitionV1 custom_definition;
+    custom_definition.scene = std::move(custom_defaults.scene);
+    custom_definition.graph = std::move(custom_defaults.graph);
+    custom_definition.loudness = std::move(custom_defaults.loudness);
+    CHECK(validate_scene_definition_v1(custom_definition) &&
+          scene_catalog->upsert(custom_definition) == SceneCatalogResultV1::Applied &&
+          scene_catalog->size() == 1U && scene_catalog->find("quiet-game") != nullptr);
+    auto invalid_definition = custom_definition;
+    invalid_definition.graph.strict_direct = !invalid_definition.graph.strict_direct;
+    CHECK(!validate_scene_definition_v1(invalid_definition) &&
+          scene_catalog->upsert(invalid_definition) == SceneCatalogResultV1::Invalid);
+    auto invalid_scene_id_definition = custom_definition;
+    invalid_scene_id_definition.scene.id = "Bad Scene";
+    CHECK(!validate_scene_definition_v1(invalid_scene_id_definition));
+    auto capacity_catalog = std::make_unique<SceneCatalogV1>();
+    for (std::size_t scene_index = 0U; scene_index < kMaxCustomScenesV1; ++scene_index) {
+        auto capacity_definition = custom_definition;
+        capacity_definition.scene.id = "scene-" + std::to_string(scene_index);
+        CHECK(capacity_catalog->upsert(capacity_definition) == SceneCatalogResultV1::Applied);
+    }
+    auto over_capacity_definition = custom_definition;
+    over_capacity_definition.scene.id = "scene-over-capacity";
+    CHECK(capacity_catalog->upsert(over_capacity_definition) ==
+          SceneCatalogResultV1::CapacityExhausted && capacity_catalog->size() == kMaxCustomScenesV1);
+    CHECK(capacity_catalog->remove("scene-0") == SceneCatalogResultV1::Applied &&
+          capacity_catalog->size() == kMaxCustomScenesV1 - 1U &&
+          capacity_catalog->upsert(over_capacity_definition) == SceneCatalogResultV1::Applied &&
+          capacity_catalog->size() == kMaxCustomScenesV1);
+    capacity_catalog->clear();
+    CHECK(capacity_catalog->size() == 0U && capacity_catalog->find("scene-1") == nullptr);
+    auto custom_scene_engine = std::make_unique<AudioEngineModel>();
+    EngineControlWorkerV1 custom_scene_worker(*custom_scene_engine);
+    custom_scene_worker.set_scene_catalog(scene_catalog.get());
+    ControlCommandV1 custom_scene_command{};
+    custom_scene_command.type = IpcMessageType::SceneApply;
+    CHECK(encode_scene_apply_payload_v1("quiet-game", "custom-output", scene_payload));
+    CHECK(decode_scene_apply_payload_v1(scene_payload, custom_scene_command.scene));
+    CHECK(custom_scene_worker.consume(custom_scene_command) == EngineControlResultV1::Applied &&
+          custom_scene_worker.active_scene().id == "quiet-game" &&
+          custom_scene_worker.active_scene().output_group == "custom-output" &&
+          custom_scene_worker.revision() == 1U);
+    CHECK(encode_scene_apply_payload_v1("quiet-game", "main", scene_payload));
+    CHECK(decode_scene_apply_payload_v1(scene_payload, custom_scene_command.scene));
+    CHECK(custom_scene_worker.consume(custom_scene_command) == EngineControlResultV1::Invalid);
+
     AudioEngineModel control_engine;
     EngineControlWorkerV1 control_worker(control_engine);
     ControlCommandQueueV1 control_queue;

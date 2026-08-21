@@ -1,6 +1,7 @@
 #include "hibiki/engine_control.hpp"
 
 #include <string_view>
+#include <utility>
 
 namespace hibiki {
 namespace {
@@ -32,27 +33,50 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
     const std::string_view scene_id(payload.scene_id.data(), payload.scene_id_bytes);
     const std::string_view output_group(payload.output_group.data(), payload.output_group_bytes);
     EasySceneKind kind{};
-    if (output_group.empty() || !scene_kind_from_id(scene_id, kind)) {
+    if (output_group.empty()) {
         return EngineControlResultV1::Invalid;
     }
 
-    const auto candidate = make_easy_scene(kind, std::string(output_group));
-    if (scene_preflight_ != nullptr && !scene_preflight_(candidate.scene, scene_preflight_context_)) {
-        return EngineControlResultV1::Failed;
-    }
-    const auto next_revision = revision_ + 1U;
-    if (!engine_.prepare_graph(candidate.graph, next_revision)) {
+    try {
+        SceneProfileV1 candidate_scene{};
+        GraphConfigV1 candidate_graph{};
+        if (scene_kind_from_id(scene_id, kind)) {
+            auto candidate = make_easy_scene(kind, std::string(output_group));
+            candidate_scene = std::move(candidate.scene);
+            candidate_graph = std::move(candidate.graph);
+        } else {
+            if (scene_catalog_ == nullptr) return EngineControlResultV1::Invalid;
+            const auto* const definition = scene_catalog_->find(scene_id);
+            if (definition == nullptr || definition->scene.output_group != output_group) {
+                return EngineControlResultV1::Invalid;
+            }
+            candidate_scene = definition->scene;
+            candidate_graph = definition->graph;
+        }
+        if (scene_preflight_ != nullptr &&
+            !scene_preflight_(candidate_scene, scene_preflight_context_)) {
+            return EngineControlResultV1::Failed;
+        }
+        const auto next_revision = revision_ + 1U;
+        if (!engine_.prepare_graph(candidate_graph, next_revision)) {
+            engine_.rollback_graph();
+            return EngineControlResultV1::Failed;
+        }
+        // Swapping vectors/strings is noexcept, so a failed commit can restore
+        // the prior active Scene without a second allocation.
+        std::swap(active_scene_, candidate_scene);
+        if (!engine_.commit_graph()) {
+            std::swap(active_scene_, candidate_scene);
+            engine_.rollback_graph();
+            return EngineControlResultV1::Failed;
+        }
+        revision_ = next_revision;
+        has_active_scene_ = true;
+        return EngineControlResultV1::Applied;
+    } catch (...) {
         engine_.rollback_graph();
         return EngineControlResultV1::Failed;
     }
-    if (!engine_.commit_graph()) {
-        engine_.rollback_graph();
-        return EngineControlResultV1::Failed;
-    }
-    active_scene_ = candidate.scene;
-    revision_ = next_revision;
-    has_active_scene_ = true;
-    return EngineControlResultV1::Applied;
 }
 
 EngineControlResultV1 EngineControlWorkerV1::consume(

@@ -27,6 +27,7 @@ add_library(hibiki_hub STATIC
   src/peq_dsp.cpp
   src/program_loudness.cpp
   src/scene_graph.cpp
+  src/scene_catalog.cpp
   src/scene_presets.cpp
   src/scene_safety.cpp
   src/session_route.cpp

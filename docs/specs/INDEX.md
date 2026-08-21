@@ -14,6 +14,8 @@
 | SPEC-0010 | accepted | WinUI 3 Easy/Expert 控制殼與 named-pipe 命令邊界 |
 | SPEC-0011 | accepted | 量測頻響到 bounded PEQ 校正編譯器 |
 | SPEC-0012 | accepted | VST3 lane 延遲對齊與 graph commit transaction |
+| SPEC-0013 | accepted | Per-App session route rules、priority/ambiguity/capacity fail-closed |
+| SPEC-0014 | accepted | 自定義 Scene catalog、bounded resolver 與 SceneApply transaction |
 
 Draft spec 有 blocking open question 時不得直接實作；公開行為變更必須在同一 PR
 更新 spec 與測試。

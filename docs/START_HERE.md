@@ -41,7 +41,8 @@ branch。真實裝置資料與 calibration 留在 `.local/`，只提交 schema �
 - `src/`：即時 graph、Matrix、per-output-group plugin latency compensation、跨 block lane delay
   bank、bounded multi-sink fan-out、ISO fit、program-aware RMS/K-weighted proxy、scene safety、
   device switch、ASIO/外部 Lane block API、WASAPI Float32 output boundary 與 bounded per-App
-  session route rules；bounded calibration PEQ compiler 已加入，真實端點 soak 仍待目標環境。
+  session route rules、per-output-group volume bank 與 bounded custom Scene catalog；bounded
+  calibration PEQ compiler 已加入，真實端點 soak 仍待目標環境。
 - `apps/`：已有 UI-independent control model 與 source-only WinUI 3 Easy/Expert shell；
   仍需在鎖定 Windows App SDK 的目標環境編譯、做視覺／無障礙驗證，再接上實體端點狀態。
 - `asio/`：預設為 stream model；需要本機 pinned ASIO SDK 時可開啟 optional native COM

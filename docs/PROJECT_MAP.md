@@ -14,5 +14,9 @@
 | `build/` | 固定 VS／SDK／WDK 與可重建條件 | 初始鎖定 | toolchain-lock.yml |
 | `tools/` | doctor、probe、verify、docs/source-only CI、license、driver 與 release policy gates | source-only workflow publication gate 會拒絕 artifact/package/release upload、signing permission 與 tracked binary | AGENTS.md |
 
+`SceneCatalogV1` 位於 `src/hub/` 的 control plane，保存最多 32 個自定義 Scene definition，
+並由 `EngineControlWorkerV1` 以 output-group exact-match resolver 接入既有
+Validate → Prepare → Commit；RT graph 只接收 immutable snapshot。
+
 即時執行緒只能讀 immutable snapshots；control plane 以 Validate → Prepare →
 Commit/Rollback 修改 graph。跨子系統不得硬編碼個人裝置名稱、Endpoint ID 或磁碟機路徑。

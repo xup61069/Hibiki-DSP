@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/scene-definition-v1.schema.json",
+  "title": "Hibiki SceneDefinition v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "scene", "graph", "loudness"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "scene": {"$ref": "scene-profile-v1.schema.json"},
+    "graph": {"$ref": "graph-config-v1.schema.json"},
+    "loudness": {"$ref": "equal-loudness-policy-v1.schema.json"}
+  }
+}

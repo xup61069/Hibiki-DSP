@@ -25,7 +25,7 @@ $required = @(
   'schemas/audio-session-descriptor-v1.schema.json', 'schemas/program-aware-level-policy-v1.schema.json',
   'schemas/basic-noise-suppressor-policy-v1.schema.json',
   'schemas/virtual-mic-policy-v1.schema.json',
-  'schemas/graph-config-v1.schema.json',
+  'schemas/graph-config-v1.schema.json', 'schemas/scene-definition-v1.schema.json',
   'schemas/peq-filter-v1.schema.json',
   'schemas/calibration-response-v1.schema.json',
   'schemas/vst3-latency-alignment-v1.schema.json',
@@ -37,7 +37,7 @@ $required = @(
   'docs/specs/SPEC-0010-winui-shell.md',
   'docs/specs/SPEC-0011-calibration-compiler.md',
   'docs/specs/SPEC-0012-vst3-latency-graph-commit.md',
-  'docs/specs/SPEC-0013-session-route-rules.md',
+  'docs/specs/SPEC-0013-session-route-rules.md', 'docs/specs/SPEC-0014-custom-scene-catalog.md',
   'docs/VST3_STATE_COMPATIBILITY_REVIEW.md',
   'docs/tasks/active/0.md', 'evidence/0000-foundation/initial.json'
 )

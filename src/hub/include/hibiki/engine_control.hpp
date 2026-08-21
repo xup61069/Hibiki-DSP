@@ -5,6 +5,7 @@
 #include "hibiki/audio_engine.hpp"
 #include "hibiki/control_service.hpp"
 #include "hibiki/scene_presets.hpp"
+#include "hibiki/scene_catalog.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -38,6 +39,13 @@ public:
         scene_preflight_context_ = context;
     }
 
+    // Non-owning catalog configured by the control worker. Built-in Easy IDs
+    // keep their existing behavior; any other ID is resolved from this catalog
+    // and must match the payload's output group exactly.
+    void set_scene_catalog(const SceneCatalogV1* catalog) noexcept {
+        scene_catalog_ = catalog;
+    }
+
     [[nodiscard]] EngineControlResultV1 consume(const ControlCommandV1& command) noexcept;
     [[nodiscard]] std::size_t drain(ControlCommandQueueV1& queue,
                                      std::size_t max_commands = ControlCommandQueueV1::kCapacity) noexcept;
@@ -55,6 +63,7 @@ private:
     bool has_active_scene_{false};
     ScenePreflightFnV1 scene_preflight_{nullptr};
     void* scene_preflight_context_{nullptr};
+    const SceneCatalogV1* scene_catalog_{nullptr};
 };
 
 }  // namespace hibiki
