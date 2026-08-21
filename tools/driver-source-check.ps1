@@ -8,10 +8,11 @@ $topologyHeader = Join-Path $repo 'driver/include/hibiki/endpoint_topology_v1.h'
 $topologySource = Join-Path $repo 'driver/src/endpoint_topology.c'
 $streamHeader = Join-Path $repo 'driver/include/hibiki/wavert_stream_v1.h'
 $streamSource = Join-Path $repo 'driver/src/wavert_stream.c'
+$streamAdapter = Join-Path $repo 'driver/wdk/hibiki_stream_adapter.cpp'
 $readme = Join-Path $repo 'driver/wdk/README.md'
 $inf = Join-Path $repo 'driver/inf/HibikiVirtualAudio.inf'
 $infReadme = Join-Path $repo 'driver/inf/README.md'
-foreach ($path in @($adapter, $topologyHeader, $topologySource, $streamHeader, $streamSource, $readme, $inf, $infReadme)) {
+foreach ($path in @($adapter, $topologyHeader, $topologySource, $streamHeader, $streamSource, $streamAdapter, $readme, $inf, $infReadme)) {
     if (-not (Test-Path -LiteralPath $path)) { throw "Missing WDK source boundary: $path" }
 }
 $source = Get-Content -LiteralPath $adapter -Raw
@@ -36,6 +37,14 @@ foreach ($required in @('HIBIKI_WAVERT_STREAM_ABI_V1', 'hibiki_wavert_stream_pus
 }
 if ($stream -match '(?i)malloc|calloc|realloc|free|CreateThread|KeWaitFor') {
     throw 'WaveRT stream core must remain allocation-free and non-blocking.'
+}
+$adapterSource = Get-Content -LiteralPath $streamAdapter -Raw
+foreach ($required in @('KeAcquireSpinLock', 'KeReleaseSpinLock', 'HibikiWaveRtPinSubmitRenderV1',
+    'HibikiWaveRtPinReadRenderV1', 'hibiki_wavert_stream_pop_or_silence_v1')) {
+    if (-not $adapterSource.Contains($required)) { throw "WDK stream adapter missing required boundary: $required" }
+}
+if ($adapterSource -match '(?i)malloc|calloc|realloc|free|CreateThread|audio_engine|scene_graph|asio_bridge') {
+    throw 'WDK stream adapter must remain non-allocating and independent from GPL user-space.'
 }
 $infSource = Get-Content -LiteralPath $inf -Raw
 foreach ($required in @('Root\HibikiDSP', 'HibikiVirtualAudio.sys', 'EndpointMainGuid', 'EndpointVirtualMicGuid', 'PnpLockdown=1')) {

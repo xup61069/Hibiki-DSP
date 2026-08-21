@@ -12,7 +12,10 @@ SYSVAD property/automation tables, expose the fixed LPCM pin formats and use
 the Apache driver-control ABI over IPC. It must not include or link GPL
 user-space code. The portable `wavert_stream_v1` core is the intended ring/
 underrun boundary for those pin callbacks; WDK code must add the required
-interlocked producer/consumer publication around it.
+interlocked producer/consumer publication around it. The companion
+`hibiki_stream_adapter.cpp` demonstrates that WDK boundary with a spin lock,
+render submit, underrun-safe render read and reset; it is source-only until
+compiled inside a SYSVAD/PortCls project.
 
 Before enabling a driver build, the maintainer must compile this source in a
 clean WDK project, run Driver Verifier/HLK and record signability evidence for
