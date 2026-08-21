@@ -48,6 +48,10 @@ public:
     [[nodiscard]] HRESULT bind(IMMDevice* device);
     void unbind() noexcept;
     [[nodiscard]] bool set_rules(const SessionRouteRuleStoreV1& rules) noexcept;
+    // Transactional rule replacement: enumerate/apply/build the candidate
+    // graph first, then swap the rule store and registry together.
+    [[nodiscard]] WindowsAudioSessionRouteRefreshResultV1 set_rules_and_refresh(
+        const SessionRouteRuleStoreV1& rules) noexcept;
     // Control-plane per-session volume access. The instance ID is an
     // ephemeral Windows session key; it is never persisted as profile identity.
     [[nodiscard]] HRESULT write_session_volume(std::string_view session_instance_id,

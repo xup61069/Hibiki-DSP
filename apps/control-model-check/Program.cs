@@ -219,6 +219,36 @@ malformedSessionRoute[18] = 1;
 Check(!ControlPayloadsV1.TryDecodeSessionRouteCommand(malformedSessionRoute,
                                                        out _, out _, out _, out _),
     "Session route decoder must reject reserved bytes.");
+var ruleCommand = new SessionRouteRuleCommandV1(
+    1U, 20, 3.5, SessionRouteRuleOperationV1.Upsert, true,
+    SessionRouteRuleGainOwnerV1.WindowsSession, 12UL, "quiet-game", "game.exe",
+    "DJMAX", "game", "surround");
+var ruleBytes = ControlPayloadsV1.EncodeSessionRouteRuleCommand(ruleCommand);
+Check(ruleBytes.Length == ControlPayloadsV1.SessionRouteRuleCommandBytes &&
+      ControlPayloadsV1.TryDecodeSessionRouteRuleCommand(ruleBytes, out var decodedRule) &&
+      decodedRule is not null && decodedRule.RuleId == "quiet-game" &&
+      decodedRule.AppId == "game.exe" && decodedRule.DisplayName == "DJMAX" &&
+      decodedRule.LaneId == "game" && decodedRule.OutputGroup == "surround" &&
+      decodedRule.Priority == 20 && Math.Abs(decodedRule.MakeupGainDb - 3.5) < 1e-6,
+    "Session route rule command did not round-trip.");
+var malformedRule = ruleBytes.ToArray();
+malformedRule[29] = 1;
+Check(!ControlPayloadsV1.TryDecodeSessionRouteRuleCommand(malformedRule, out _),
+    "Session route rule decoder must reject reserved bytes.");
+var removeRule = commandFactory.RemoveSessionRouteRule(13UL, "quiet-game");
+Check(removeRule.Type == ControlMessageType.SessionRouteRuleCommand &&
+      ControlPayloadsV1.TryDecodeSessionRouteRuleCommand(removeRule.Payload.Span,
+          out var removedRule) && removedRule?.Operation == SessionRouteRuleOperationV1.Remove &&
+      removedRule.RuleId == "quiet-game",
+    "Session route rule remove command did not round-trip.");
+var clearRules = commandFactory.ClearSessionRouteRules(14UL);
+Check(clearRules.Type == ControlMessageType.SessionRouteRuleCommand &&
+      ControlPayloadsV1.TryDecodeSessionRouteRuleCommand(clearRules.Payload.Span,
+          out var clearedRules) && clearedRules?.Operation == SessionRouteRuleOperationV1.Clear &&
+      IpcRequestSession.IsReplyTo(clearRules,
+          new IpcEnvelopeV1(ControlMessageType.Ack, clearRules.RequestId,
+                            ReadOnlyMemory<byte>.Empty)),
+    "Session route rule clear command did not round-trip.");
 var sessionVolumeRequest = commandFactory.SetSessionVolume(
     sessionEntries[0].Handle, -9.5, true, 12UL);
 Check(sessionVolumeRequest.Type == ControlMessageType.SessionVolumeCommand &&

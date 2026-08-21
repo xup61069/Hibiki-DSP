@@ -31,6 +31,9 @@ namespace hibiki {
 [[nodiscard]] bool apply_session_route_command_v1(
     const SessionRouteCommandV1& request,
     void* context) noexcept;
+[[nodiscard]] bool apply_session_route_rule_command_v1(
+    const SessionRouteRuleCommandV1& request,
+    void* context) noexcept;
 
 // Worker-owned COM boundary for endpoint metadata. All methods must run on
 // the same COM-initialized worker thread that owns the enumerator; notification
@@ -182,6 +185,8 @@ public:
         const SessionVolumeCommandV1& request) noexcept;
     [[nodiscard]] bool enqueue_session_route_command(
         const SessionRouteCommandV1& request) noexcept;
+    [[nodiscard]] bool enqueue_session_route_rule_command(
+        const SessionRouteRuleCommandV1& request) noexcept;
     // Drains the queue on the COM-owning worker. Each item is validated again
     // against the current catalog before it can touch Windows or the graph.
     [[nodiscard]] std::size_t drain_session_commands() noexcept;
@@ -230,6 +235,7 @@ private:
     ControlStatusSnapshotV1 status_snapshot_{};
     SessionCatalogSnapshotStoreV1 session_catalog_store_{};
     SessionCommandQueueV1 session_command_queue_{};
+    SessionRouteRuleStoreV1 session_route_rules_{};
     WindowsAudioSessionRouteCoordinatorV1 session_routes_{};
 
     [[nodiscard]] bool publish_status_volume(

@@ -67,6 +67,10 @@
 - Expert source UI now allows selecting an App catalog entry and entering lane/output labels;
   it also mirrors available per-App dB/mute into bounded controls and sends a separate session
   volume command; disconnected, unavailable or stale submission remains visibly fail-closed.
+- `SessionRouteRuleCommand` v1 now provides fixed 480-byte Upsert/Remove/Clear operations with
+  bounded printable UTF-8 matchers, priority, makeup gain and gain-owner semantics. C++/C# codec,
+  EngineControl callback, COM-worker queue handoff and candidate rule-store/route-graph transaction
+  are contract-tested; physical active-session delivery remains unverified.
 - `CalibrationResponsePointV1` and `compile_bounded_peq_correction_v1` now provide a deterministic
   control-plane measured-response to bounded PEQ compiler (16-filter cap, frequency/spacing/Q and
   boost/cut policy validation, explicit `limited` result) that feeds the existing APO/CamillaDSP/

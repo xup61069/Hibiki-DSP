@@ -82,6 +82,7 @@ extern "C" {
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <new>
 #include <span>
 #include <string>
 #include <utility>
@@ -190,6 +191,15 @@ bool accept_session_route(const hibiki::SessionRouteCommandV1& request,
                 std::string_view(request.lane.data(), request.lane_bytes) == "game" &&
                 std::string_view(request.output_group.data(), request.output_group_bytes) ==
                     "surround";
+    return *accepted;
+}
+
+bool accept_session_route_rule(const hibiki::SessionRouteRuleCommandV1& request,
+                               void* context) noexcept {
+    if (context == nullptr) return false;
+    auto* accepted = static_cast<bool*>(context);
+    *accepted = request.operation == hibiki::SessionRouteRuleOperationV1::Upsert &&
+                request.catalog_sequence == 12U && request.rule_id_bytes == 10U;
     return *accepted;
 }
 
@@ -1072,7 +1082,11 @@ int main() {
           status_response.payload.size() == status_bytes);
     CHECK(!status_store.publish(status_snapshot) && status_store.sequence() == 3U &&
           control_status_snapshot_reply_v1(status_response, &status_store));
-    SessionCatalogSnapshotV1 session_catalog_snapshot{};
+    // Keep the 8 KiB snapshot off the test harness stack; this main function
+    // intentionally retains many fixed wire fixtures until its final checks.
+    auto session_catalog_snapshot_storage = std::unique_ptr<SessionCatalogSnapshotV1>(
+        new (std::nothrow) SessionCatalogSnapshotV1());
+    auto& session_catalog_snapshot = *session_catalog_snapshot_storage;
     session_catalog_snapshot.sequence = 12U;
     session_catalog_snapshot.generation = 2U;
     session_catalog_snapshot.entry_count = 2U;
@@ -1085,10 +1099,10 @@ int main() {
     session_catalog_snapshot.entries[0].app_bytes = 8U;
     session_catalog_snapshot.entries[0].lane_bytes = 4U;
     session_catalog_snapshot.entries[0].output_bytes = 4U;
-    std::copy("DJMAX", "DJMAX" + 5, session_catalog_snapshot.entries[0].name.begin());
-    std::copy("game.exe", "game.exe" + 8, session_catalog_snapshot.entries[0].app.begin());
-    std::copy("game", "game" + 4, session_catalog_snapshot.entries[0].lane.begin());
-    std::copy("main", "main" + 4, session_catalog_snapshot.entries[0].output.begin());
+    std::memcpy(session_catalog_snapshot.entries[0].name.data(), "DJMAX", 5U);
+    std::memcpy(session_catalog_snapshot.entries[0].app.data(), "game.exe", 8U);
+    std::memcpy(session_catalog_snapshot.entries[0].lane.data(), "game", 4U);
+    std::memcpy(session_catalog_snapshot.entries[0].output.data(), "main", 4U);
     session_catalog_snapshot.entries[1].handle = (2ULL << 32U) | 2ULL;
     session_catalog_snapshot.entries[1].route_state = SessionCatalogRouteStateV1::Unavailable;
     session_catalog_snapshot.entries[1].mute = 1U;
@@ -1096,10 +1110,10 @@ int main() {
     session_catalog_snapshot.entries[1].app_bytes = 10U;
     session_catalog_snapshot.entries[1].lane_bytes = 11U;
     session_catalog_snapshot.entries[1].output_bytes = 4U;
-    std::copy("Chrome tab", "Chrome tab" + 10, session_catalog_snapshot.entries[1].name.begin());
-    std::copy("chrome.exe", "chrome.exe" + 10, session_catalog_snapshot.entries[1].app.begin());
-    std::copy("browser-tab", "browser-tab" + 11, session_catalog_snapshot.entries[1].lane.begin());
-    std::copy("main", "main" + 4, session_catalog_snapshot.entries[1].output.begin());
+    std::memcpy(session_catalog_snapshot.entries[1].name.data(), "Chrome tab", 10U);
+    std::memcpy(session_catalog_snapshot.entries[1].app.data(), "chrome.exe", 10U);
+    std::memcpy(session_catalog_snapshot.entries[1].lane.data(), "browser-tab", 11U);
+    std::memcpy(session_catalog_snapshot.entries[1].output.data(), "main", 4U);
     std::array<std::uint8_t, kSessionCatalogSnapshotPayloadBytesV1> session_payload{};
     std::size_t session_bytes = 0U;
     CHECK(is_valid_message_type(IpcMessageType::SessionCatalogRequest) &&
@@ -1159,6 +1173,54 @@ int main() {
     auto malformed_session_route = session_route_payload;
     malformed_session_route[18U] = 1U;
     CHECK(!decode_session_route_command_v1(malformed_session_route, decoded_session_route));
+    SessionRouteRuleCommandV1 session_route_rule_command{};
+    session_route_rule_command.priority = 20;
+    session_route_rule_command.makeup_gain_q16_16 = db_to_q16_16(3.5);
+    session_route_rule_command.catalog_sequence = 12U;
+    session_route_rule_command.rule_id_bytes = 10U;
+    session_route_rule_command.app_id_bytes = 8U;
+    session_route_rule_command.display_name_bytes = 5U;
+    session_route_rule_command.lane_bytes = 4U;
+    session_route_rule_command.output_group_bytes = 8U;
+    std::memcpy(session_route_rule_command.rule_id.data(), "quiet-game", 10U);
+    std::memcpy(session_route_rule_command.app_id.data(), "game.exe", 8U);
+    std::memcpy(session_route_rule_command.display_name.data(), "DJMAX", 5U);
+    std::memcpy(session_route_rule_command.lane.data(), "game", 4U);
+    std::memcpy(session_route_rule_command.output_group.data(), "surround", 8U);
+    const auto session_route_rule_payload =
+        encode_session_route_rule_command_v1(session_route_rule_command);
+    SessionRouteRuleCommandV1 decoded_session_route_rule{};
+    CHECK(decode_session_route_rule_command_v1(session_route_rule_payload,
+                                               decoded_session_route_rule) &&
+          decoded_session_route_rule.priority == 20 &&
+          std::abs(q16_16_to_db(decoded_session_route_rule.makeup_gain_q16_16) - 3.5) < 0.00002 &&
+          std::string_view(decoded_session_route_rule.rule_id.data(),
+                           decoded_session_route_rule.rule_id_bytes) == "quiet-game" &&
+          std::string_view(decoded_session_route_rule.output_group.data(),
+                           decoded_session_route_rule.output_group_bytes) == "surround");
+    const auto decoded_upsert_session_route_rule = decoded_session_route_rule;
+    auto malformed_session_route_rule = session_route_rule_payload;
+    malformed_session_route_rule[29U] = 1U;
+    CHECK(!decode_session_route_rule_command_v1(malformed_session_route_rule,
+                                                decoded_session_route_rule));
+    session_route_rule_command.operation = SessionRouteRuleOperationV1::Remove;
+    session_route_rule_command.app_id_bytes = 0U;
+    session_route_rule_command.display_name_bytes = 0U;
+    session_route_rule_command.lane_bytes = 0U;
+    session_route_rule_command.output_group_bytes = 0U;
+    const auto remove_route_rule_payload =
+        encode_session_route_rule_command_v1(session_route_rule_command);
+    CHECK(decode_session_route_rule_command_v1(remove_route_rule_payload,
+                                               decoded_session_route_rule) &&
+          decoded_session_route_rule.operation == SessionRouteRuleOperationV1::Remove);
+    session_route_rule_command.operation = SessionRouteRuleOperationV1::Clear;
+    session_route_rule_command.rule_id_bytes = 0U;
+    const auto clear_route_rule_payload =
+        encode_session_route_rule_command_v1(session_route_rule_command);
+    CHECK(decode_session_route_rule_command_v1(clear_route_rule_payload,
+                                               decoded_session_route_rule) &&
+          decoded_session_route_rule.operation == SessionRouteRuleOperationV1::Clear &&
+          is_valid_message_type(IpcMessageType::SessionRouteRuleCommand));
     IpcFrameV1 session_volume_frame;
     session_volume_frame.header.type = IpcMessageType::SessionVolumeCommand;
     session_volume_frame.header.request_id = 780U;
@@ -1174,6 +1236,14 @@ int main() {
     CHECK(decode_control_command_v1(session_route_frame, decoded_command) &&
           decoded_command.type == IpcMessageType::SessionRouteCommand &&
           decoded_command.session_route.output_group_bytes == 8U);
+    IpcFrameV1 session_route_rule_frame;
+    session_route_rule_frame.header.type = IpcMessageType::SessionRouteRuleCommand;
+    session_route_rule_frame.header.request_id = 782U;
+    session_route_rule_frame.payload.assign(session_route_rule_payload.begin(),
+                                            session_route_rule_payload.end());
+    CHECK(decode_control_command_v1(session_route_rule_frame, decoded_command) &&
+          decoded_command.type == IpcMessageType::SessionRouteRuleCommand &&
+          decoded_command.session_route_rule.rule_id_bytes == 10U);
     ControlCommandQueueV1 command_queue;
     ControlCommandV1 queued_command{};
     queued_command.type = IpcMessageType::SceneApply;
@@ -1197,6 +1267,11 @@ int main() {
           session_work_item.kind == SessionCommandKindV1::Route &&
           session_work_item.route.output_group_bytes ==
               session_route_command.output_group_bytes);
+    CHECK(session_command_queue.try_push_route_rule(session_route_rule_command));
+    CHECK(session_command_queue.try_pop(session_work_item) &&
+          session_work_item.kind == SessionCommandKindV1::RouteRule &&
+          session_work_item.route_rule.rule_id_bytes ==
+              session_route_rule_command.rule_id_bytes);
     SessionCommandWorkItemV1 filled_session_item{};
     filled_session_item.kind = SessionCommandKindV1::Volume;
     for (std::size_t index = 0U; index < SessionCommandQueueV1::kCapacity; ++index) {
@@ -1355,6 +1430,16 @@ int main() {
           session_route_accepted);
     session_route_control.session_route.catalog_sequence = 13U;
     CHECK(control_worker.consume(session_route_control) == EngineControlResultV1::Failed);
+    bool session_route_rule_accepted = false;
+    control_worker.set_session_route_rule_handler(accept_session_route_rule,
+                                                   &session_route_rule_accepted);
+    ControlCommandV1 session_route_rule_control{};
+    session_route_rule_control.type = IpcMessageType::SessionRouteRuleCommand;
+    session_route_rule_control.session_route_rule = decoded_upsert_session_route_rule;
+    CHECK(control_worker.consume(session_route_rule_control) == EngineControlResultV1::Applied &&
+          session_route_rule_accepted);
+    session_route_rule_control.session_route_rule.catalog_sequence = 13U;
+    CHECK(control_worker.consume(session_route_rule_control) == EngineControlResultV1::Failed);
     control_engine.set_sample_rate(8000U);
     ControlCommandV1 control_volume{};
     control_volume.type = IpcMessageType::VolumeNotification;
@@ -2458,7 +2543,8 @@ int main() {
                                                      unbound_session_db,
                                                      unbound_session_mute) == E_UNEXPECTED &&
           control_runtime.bind_session_route_handle(0x0000000200000001ULL, 1U, "game",
-                                                    "surround") == E_UNEXPECTED);
+                                                    "surround") == E_UNEXPECTED &&
+          !control_runtime.enqueue_session_route_rule_command(session_route_rule_command));
     auto* session_watcher = new WindowsAudioSessionWatcher();
     std::uint64_t session_sequence = 0;
     CHECK(!session_watcher->poll(session_sequence));

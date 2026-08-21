@@ -6,6 +6,11 @@ target_link_libraries(hibiki_contract_tests PRIVATE hibiki_hub hibiki_asio_bridg
 
 if(MSVC)
   target_compile_options(hibiki_contract_tests PRIVATE /W4 /permissive- /EHsc)
+  # contract_tests intentionally exercises every fixed-size wire fixture in one
+  # process; keep the test harness from exhausting the Windows default stack
+  # as new versioned payloads are added. Runtime/RT code has no dependency on
+  # this linker setting.
+  target_link_options(hibiki_contract_tests PRIVATE /STACK:8388608)
 else()
   target_compile_options(hibiki_contract_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 endif()

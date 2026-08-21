@@ -12,6 +12,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 
 namespace hibiki {
 
@@ -37,10 +38,16 @@ struct ControlPlaneHandlerContextV1 {
 
 // Single-producer (pipe worker), single-consumer (control worker) queue. The
 // command is copied into a fixed slot; no heap allocation, mutex or wait is
-// permitted on either side. The consumer owns all AudioEngine mutations.
+// permitted on either side (the slot array is allocated once at construction).
+// The consumer owns all AudioEngine mutations.
 class ControlCommandQueueV1 final {
 public:
     static constexpr std::size_t kCapacity = 64U;
+
+    ControlCommandQueueV1() noexcept;
+    ~ControlCommandQueueV1() = default;
+    ControlCommandQueueV1(const ControlCommandQueueV1&) = delete;
+    ControlCommandQueueV1& operator=(const ControlCommandQueueV1&) = delete;
 
     [[nodiscard]] bool try_push(const ControlCommandV1& command) noexcept;
     [[nodiscard]] bool try_pop(ControlCommandV1& command) noexcept;
@@ -49,7 +56,7 @@ public:
     }
 
 private:
-    std::array<ControlCommandV1, kCapacity> slots_{};
+    std::unique_ptr<std::array<ControlCommandV1, kCapacity>> slots_{};
     std::atomic<std::uint64_t> head_{0U};
     std::atomic<std::uint64_t> tail_{0U};
     std::atomic<std::uint64_t> dropped_{0U};

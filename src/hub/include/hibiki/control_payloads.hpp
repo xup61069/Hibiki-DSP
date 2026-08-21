@@ -8,6 +8,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <span>
 #include <string_view>
 
@@ -33,6 +34,10 @@ constexpr std::size_t kSessionVolumeCommandPayloadBytesV1 = 24U;
 constexpr std::size_t kSessionRouteCommandPayloadBytesV1 = 128U;
 constexpr std::size_t kSessionRouteCommandLaneMaxBytesV1 = 48U;
 constexpr std::size_t kSessionRouteCommandOutputMaxBytesV1 = 48U;
+constexpr std::size_t kSessionRouteRuleIdMaxBytesV1 = 64U;
+constexpr std::size_t kSessionRouteRuleMatchMaxBytesV1 = 128U;
+constexpr std::size_t kSessionRouteRuleRouteMaxBytesV1 = 64U;
+constexpr std::size_t kSessionRouteRuleCommandPayloadBytesV1 = 480U;
 
 struct SessionVolumeCommandV1 {
     std::uint64_t handle{0U};
@@ -61,6 +66,47 @@ encode_session_route_command_v1(const SessionRouteCommandV1& command) noexcept;
 [[nodiscard]] bool decode_session_route_command_v1(
     std::span<const std::uint8_t> payload,
     SessionRouteCommandV1& command) noexcept;
+
+enum class SessionRouteRuleOperationV1 : std::uint8_t {
+    Upsert = 1U,
+    Remove = 2U,
+    Clear = 3U,
+};
+
+enum class SessionRouteRuleGainOwnerV1 : std::uint8_t {
+    WindowsSession = 0U,
+    HibikiInternal = 1U,
+};
+
+// Fixed control-plane rule command. The wire caps are intentionally narrower
+// than the in-process rule store so a malformed/oversized profile cannot turn
+// a pipe request into an unbounded allocation.
+struct SessionRouteRuleCommandV1 {
+    std::uint32_t schema_version{1U};
+    std::int32_t priority{0};
+    std::int32_t makeup_gain_q16_16{0};
+    SessionRouteRuleOperationV1 operation{SessionRouteRuleOperationV1::Upsert};
+    std::uint8_t enabled{1U};
+    SessionRouteRuleGainOwnerV1 gain_owner{SessionRouteRuleGainOwnerV1::WindowsSession};
+    std::uint64_t catalog_sequence{0U};
+    std::uint16_t rule_id_bytes{0U};
+    std::uint16_t app_id_bytes{0U};
+    std::uint16_t display_name_bytes{0U};
+    std::uint16_t lane_bytes{0U};
+    std::uint16_t output_group_bytes{0U};
+    std::array<char, kSessionRouteRuleIdMaxBytesV1> rule_id{};
+    std::array<char, kSessionRouteRuleMatchMaxBytesV1> app_id{};
+    std::array<char, kSessionRouteRuleMatchMaxBytesV1> display_name{};
+    std::array<char, kSessionRouteRuleRouteMaxBytesV1> lane{};
+    std::array<char, kSessionRouteRuleRouteMaxBytesV1> output_group{};
+};
+
+[[nodiscard]] std::array<std::uint8_t, kSessionRouteRuleCommandPayloadBytesV1>
+encode_session_route_rule_command_v1(
+    const SessionRouteRuleCommandV1& command) noexcept;
+[[nodiscard]] bool decode_session_route_rule_command_v1(
+    std::span<const std::uint8_t> payload,
+    SessionRouteRuleCommandV1& command) noexcept;
 
 // Fixed little-endian control payload shared with apps/control-model. The
 // legacy 16-byte form stores dB Q16.16 at offset 0, mute at offset 4, reserved
@@ -157,13 +203,29 @@ struct DeviceCatalogSnapshotV1 {
 struct ControlCommandV1 {
     IpcMessageType type{IpcMessageType::Error};
     std::uint64_t request_id{0U};
+    // Grouped volume commands intentionally carry both the dB/mute value and
+    // the output-group selector, so these two fields cannot alias.
     VolumeNotificationV1 volume{};
     GroupedVolumeNotificationPayloadV1 volume_target{};
+    union {
+        SceneApplyPayloadV1 scene;
+        DeviceSwitchPayloadV1 device_switch;
+        SessionVolumeCommandV1 session_volume;
+        SessionRouteCommandV1 session_route;
+        SessionRouteRuleCommandV1 session_route_rule;
+    };
     bool has_volume_target{false};
-    SceneApplyPayloadV1 scene{};
-    DeviceSwitchPayloadV1 device_switch{};
-    SessionVolumeCommandV1 session_volume{};
-    SessionRouteCommandV1 session_route{};
+
+    ControlCommandV1() noexcept : volume{} {}
+    ControlCommandV1(const ControlCommandV1& other) noexcept {
+        std::memcpy(this, &other, sizeof(*this));
+    }
+    ControlCommandV1& operator=(const ControlCommandV1& other) noexcept {
+        if (this != &other) {
+            std::memcpy(this, &other, sizeof(*this));
+        }
+        return *this;
+    }
 };
 
 [[nodiscard]] bool decode_control_command_v1(const IpcFrameV1& frame,

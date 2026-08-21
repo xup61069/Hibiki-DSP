@@ -26,7 +26,8 @@ public enum ControlMessageType : ushort
     SessionCatalogSnapshot = 14,
     SessionCatalogRequest = 15,
     SessionVolumeCommand = 16,
-    SessionRouteCommand = 17
+    SessionRouteCommand = 17,
+    SessionRouteRuleCommand = 18
 }
 
 public enum IpcDecodeError
@@ -47,6 +48,33 @@ public sealed record IpcEnvelopeV1(
 {
     public uint PayloadBytes => checked((uint)Payload.Length);
 }
+
+public enum SessionRouteRuleOperationV1 : byte
+{
+    Upsert = 1,
+    Remove = 2,
+    Clear = 3
+}
+
+public enum SessionRouteRuleGainOwnerV1 : byte
+{
+    WindowsSession = 0,
+    HibikiInternal = 1
+}
+
+public sealed record SessionRouteRuleCommandV1(
+    uint SchemaVersion,
+    int Priority,
+    double MakeupGainDb,
+    SessionRouteRuleOperationV1 Operation,
+    bool Enabled,
+    SessionRouteRuleGainOwnerV1 GainOwner,
+    ulong CatalogSequence,
+    string RuleId,
+    string AppId,
+    string DisplayName,
+    string LaneId,
+    string OutputGroup);
 
 public static class IpcCodecV1
 {
@@ -126,7 +154,8 @@ public static class IpcCodecV1
         ControlMessageType.DeviceCatalogSnapshot or ControlMessageType.DeviceCatalogRequest or
         ControlMessageType.ControlStatusSnapshot or ControlMessageType.ControlStatusRequest or
         ControlMessageType.SessionCatalogSnapshot or ControlMessageType.SessionCatalogRequest or
-        ControlMessageType.SessionVolumeCommand or ControlMessageType.SessionRouteCommand;
+        ControlMessageType.SessionVolumeCommand or ControlMessageType.SessionRouteCommand or
+        ControlMessageType.SessionRouteRuleCommand;
 }
 
 public static class ControlPayloadsV1
@@ -158,6 +187,10 @@ public static class ControlPayloadsV1
     public const int SessionRouteCommandBytes = 128;
     public const int SessionRouteCommandLaneMaxBytes = 48;
     public const int SessionRouteCommandOutputMaxBytes = 48;
+    public const int SessionRouteRuleIdMaxBytes = 64;
+    public const int SessionRouteRuleMatchMaxBytes = 128;
+    public const int SessionRouteRuleRouteMaxBytes = 64;
+    public const int SessionRouteRuleCommandBytes = 480;
     private static readonly System.Text.UTF8Encoding StrictUtf8 =
         new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
@@ -289,6 +322,129 @@ public static class ControlPayloadsV1
         {
             return false;
         }
+    }
+
+    public static byte[] EncodeSessionRouteRuleCommand(SessionRouteRuleCommandV1 command)
+    {
+        if (command is null || command.SchemaVersion != 1U || command.CatalogSequence == 0UL ||
+            !Enum.IsDefined(command.Operation) || !Enum.IsDefined(command.GainOwner) ||
+            !double.IsFinite(command.MakeupGainDb) || command.MakeupGainDb is < -144.0 or > 12.0)
+            throw new ArgumentException("Session route rule is outside the v1 contract.", nameof(command));
+        var ruleId = StrictUtf8.GetBytes(command.RuleId ?? string.Empty);
+        var appId = StrictUtf8.GetBytes(command.AppId ?? string.Empty);
+        var displayName = StrictUtf8.GetBytes(command.DisplayName ?? string.Empty);
+        var lane = StrictUtf8.GetBytes(command.LaneId ?? string.Empty);
+        var output = StrictUtf8.GetBytes(command.OutputGroup ?? string.Empty);
+        static bool Valid(ReadOnlySpan<byte> value, int capacity)
+        {
+            if (value.Length is < 1 || value.Length > capacity) return false;
+            try
+            {
+                var text = StrictUtf8.GetString(value);
+                return !text.Any(char.IsControl);
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+        }
+        if (ruleId.Length > SessionRouteRuleIdMaxBytes || appId.Length > SessionRouteRuleMatchMaxBytes ||
+            displayName.Length > SessionRouteRuleMatchMaxBytes || lane.Length > SessionRouteRuleRouteMaxBytes ||
+            output.Length > SessionRouteRuleRouteMaxBytes ||
+            (command.Operation == SessionRouteRuleOperationV1.Upsert &&
+             (!Valid(ruleId, SessionRouteRuleIdMaxBytes) ||
+              (!Valid(appId, SessionRouteRuleMatchMaxBytes) &&
+               !Valid(displayName, SessionRouteRuleMatchMaxBytes)) ||
+              !Valid(lane, SessionRouteRuleRouteMaxBytes) ||
+              !Valid(output, SessionRouteRuleRouteMaxBytes))) ||
+            (command.Operation == SessionRouteRuleOperationV1.Remove &&
+             (!Valid(ruleId, SessionRouteRuleIdMaxBytes) || appId.Length != 0 ||
+              displayName.Length != 0 || lane.Length != 0 || output.Length != 0)) ||
+            (command.Operation == SessionRouteRuleOperationV1.Clear &&
+             (ruleId.Length != 0 || appId.Length != 0 || displayName.Length != 0 ||
+              lane.Length != 0 || output.Length != 0)))
+            throw new ArgumentException("Session route rule text is outside the v1 limit.", nameof(command));
+        var payload = new byte[SessionRouteRuleCommandBytes];
+        BinaryPrimitives.WriteUInt32LittleEndian(payload, command.SchemaVersion);
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(4), command.Priority);
+        WriteDbQ16(payload.AsSpan(8), command.MakeupGainDb);
+        payload[12] = (byte)command.Operation;
+        payload[13] = command.Enabled ? (byte)1 : (byte)0;
+        payload[14] = (byte)command.GainOwner;
+        BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(16), command.CatalogSequence);
+        payload[24] = (byte)ruleId.Length;
+        payload[25] = (byte)appId.Length;
+        payload[26] = (byte)displayName.Length;
+        payload[27] = (byte)lane.Length;
+        payload[28] = (byte)output.Length;
+        ruleId.CopyTo(payload.AsSpan(32));
+        appId.CopyTo(payload.AsSpan(96));
+        displayName.CopyTo(payload.AsSpan(224));
+        lane.CopyTo(payload.AsSpan(352));
+        output.CopyTo(payload.AsSpan(416));
+        return payload;
+    }
+
+    public static bool TryDecodeSessionRouteRuleCommand(
+        ReadOnlySpan<byte> payload, out SessionRouteRuleCommandV1? command)
+    {
+        command = null;
+        if (payload.Length != SessionRouteRuleCommandBytes || payload[15] != 0 ||
+            payload[29] != 0 || payload[30] != 0 || payload[31] != 0 ||
+            BinaryPrimitives.ReadUInt32LittleEndian(payload) != 1U || payload[13] > 1 ||
+            !Enum.IsDefined(typeof(SessionRouteRuleOperationV1), payload[12]) ||
+            !Enum.IsDefined(typeof(SessionRouteRuleGainOwnerV1), payload[14]) ||
+            BinaryPrimitives.ReadUInt64LittleEndian(payload[16..]) == 0UL)
+            return false;
+        var q16 = BinaryPrimitives.ReadInt32LittleEndian(payload[8..]);
+        if (q16 < -144 * 65536 || q16 > 12 * 65536) return false;
+        var ruleBytes = payload[24];
+        var appBytes = payload[25];
+        var displayBytes = payload[26];
+        var laneBytes = payload[27];
+        var outputBytes = payload[28];
+        if (ruleBytes > SessionRouteRuleIdMaxBytes || appBytes > SessionRouteRuleMatchMaxBytes ||
+            displayBytes > SessionRouteRuleMatchMaxBytes || laneBytes > SessionRouteRuleRouteMaxBytes ||
+            outputBytes > SessionRouteRuleRouteMaxBytes)
+            return false;
+        static bool TryText(ReadOnlySpan<byte> bytes, int used, out string value)
+        {
+            value = string.Empty;
+            if (!IsZero(bytes, used, bytes.Length)) return false;
+            try
+            {
+                value = StrictUtf8.GetString(bytes[..used]);
+                return !value.Any(char.IsControl);
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+        }
+        if (!TryText(payload.Slice(32, SessionRouteRuleIdMaxBytes), ruleBytes, out var ruleId) ||
+            !TryText(payload.Slice(96, SessionRouteRuleMatchMaxBytes), appBytes, out var appId) ||
+            !TryText(payload.Slice(224, SessionRouteRuleMatchMaxBytes), displayBytes, out var display) ||
+            !TryText(payload.Slice(352, SessionRouteRuleRouteMaxBytes), laneBytes, out var lane) ||
+            !TryText(payload.Slice(416, SessionRouteRuleRouteMaxBytes), outputBytes, out var output))
+            return false;
+        var operation = (SessionRouteRuleOperationV1)payload[12];
+        if ((operation == SessionRouteRuleOperationV1.Upsert &&
+             (ruleBytes == 0 || (appBytes == 0 && displayBytes == 0) || laneBytes == 0 || outputBytes == 0)) ||
+            (operation == SessionRouteRuleOperationV1.Remove &&
+             (ruleBytes == 0 || appBytes != 0 || displayBytes != 0 || laneBytes != 0 || outputBytes != 0)) ||
+            (operation == SessionRouteRuleOperationV1.Clear &&
+             (ruleBytes != 0 || appBytes != 0 || displayBytes != 0 || laneBytes != 0 || outputBytes != 0)))
+            return false;
+        command = new SessionRouteRuleCommandV1(
+            1U,
+            BinaryPrimitives.ReadInt32LittleEndian(payload[4..]),
+            q16 / 65536.0,
+            operation,
+            payload[13] != 0,
+            (SessionRouteRuleGainOwnerV1)payload[14],
+            BinaryPrimitives.ReadUInt64LittleEndian(payload[16..]),
+            ruleId, appId, display, lane, output);
+        return true;
     }
 
     public static byte[] EncodeGroupedVolumeNotification(string outputGroup,
@@ -879,6 +1035,36 @@ public sealed class ControlCommandFactoryV1
         _requests.Create(ControlMessageType.SessionRouteCommand,
             ControlPayloadsV1.EncodeSessionRouteCommand(handle, catalogSequence, laneId,
                                                         outputGroup));
+
+    public IpcEnvelopeV1 UpsertSessionRouteRule(ulong catalogSequence,
+                                                string ruleId,
+                                                string appId,
+                                                string displayName,
+                                                string laneId,
+                                                string outputGroup,
+                                                int priority = 0,
+                                                double makeupGainDb = 0.0,
+                                                bool enabled = true,
+                                                SessionRouteRuleGainOwnerV1 gainOwner =
+                                                    SessionRouteRuleGainOwnerV1.WindowsSession) =>
+        _requests.Create(ControlMessageType.SessionRouteRuleCommand,
+            ControlPayloadsV1.EncodeSessionRouteRuleCommand(new SessionRouteRuleCommandV1(
+                1U, priority, makeupGainDb, SessionRouteRuleOperationV1.Upsert, enabled,
+                gainOwner, catalogSequence, ruleId, appId, displayName, laneId, outputGroup)));
+
+    public IpcEnvelopeV1 RemoveSessionRouteRule(ulong catalogSequence, string ruleId) =>
+        _requests.Create(ControlMessageType.SessionRouteRuleCommand,
+            ControlPayloadsV1.EncodeSessionRouteRuleCommand(new SessionRouteRuleCommandV1(
+                1U, 0, 0.0, SessionRouteRuleOperationV1.Remove, true,
+                SessionRouteRuleGainOwnerV1.WindowsSession, catalogSequence, ruleId,
+                string.Empty, string.Empty, string.Empty, string.Empty)));
+
+    public IpcEnvelopeV1 ClearSessionRouteRules(ulong catalogSequence) =>
+        _requests.Create(ControlMessageType.SessionRouteRuleCommand,
+            ControlPayloadsV1.EncodeSessionRouteRuleCommand(new SessionRouteRuleCommandV1(
+                1U, 0, 0.0, SessionRouteRuleOperationV1.Clear, true,
+                SessionRouteRuleGainOwnerV1.WindowsSession, catalogSequence,
+                string.Empty, string.Empty, string.Empty, string.Empty, string.Empty)));
 
     public IpcEnvelopeV1 RequestControlStatus() =>
         _requests.Create(ControlMessageType.ControlStatusRequest);

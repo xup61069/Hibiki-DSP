@@ -42,6 +42,54 @@ bool WindowsAudioSessionRouteCoordinatorV1::set_rules(
     return true;
 }
 
+WindowsAudioSessionRouteRefreshResultV1
+WindowsAudioSessionRouteCoordinatorV1::set_rules_and_refresh(
+    const SessionRouteRuleStoreV1& rules) noexcept {
+    if (!bound_) return WindowsAudioSessionRouteRefreshResultV1::Unbound;
+    try {
+        SessionRouteRuleStoreV1 candidate_rules = rules;
+        AudioSessionRegistry candidate_registry;
+        watcher_.set_route_rules(&candidate_rules);
+        if (FAILED(watcher_.enumerate(candidate_registry))) {
+            watcher_.set_route_rules(&rules_);
+            degraded_ = true;
+            return WindowsAudioSessionRouteRefreshResultV1::Degraded;
+        }
+        std::size_t routed_count = 0U;
+        for (const auto& session : candidate_registry.sessions()) {
+            if (session.active && !session.lane_id.empty() && !session.output_group.empty()) {
+                ++routed_count;
+            }
+        }
+        GraphConfigV1 candidate_graph{};
+        const bool graph_ready = routed_count > 0U &&
+                                 build_session_route_graph(
+                                     candidate_registry, SessionRouteGraphPolicyV1{}, candidate_graph);
+        if (routed_count > 0U && !graph_ready) {
+            watcher_.set_route_rules(&rules_);
+            degraded_ = true;
+            return WindowsAudioSessionRouteRefreshResultV1::Degraded;
+        }
+        rules_ = std::move(candidate_rules);
+        registry_ = std::move(candidate_registry);
+        graph_ = std::move(candidate_graph);
+        watcher_.set_route_rules(&rules_);
+        has_graph_ = graph_ready;
+        degraded_ = false;
+        ++generation_;
+        return has_graph_ ? WindowsAudioSessionRouteRefreshResultV1::Applied
+                          : WindowsAudioSessionRouteRefreshResultV1::NoRoutes;
+    } catch (const std::bad_alloc&) {
+        watcher_.set_route_rules(&rules_);
+        degraded_ = true;
+        return WindowsAudioSessionRouteRefreshResultV1::Degraded;
+    } catch (...) {
+        watcher_.set_route_rules(&rules_);
+        degraded_ = true;
+        return WindowsAudioSessionRouteRefreshResultV1::Degraded;
+    }
+}
+
 namespace {
 
 constexpr std::size_t kMaxSessionControlIdentityBytesV1 = 260U;

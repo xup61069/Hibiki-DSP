@@ -8,22 +8,40 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <memory>
 
 namespace hibiki {
 
 enum class SessionCommandKindV1 : std::uint8_t {
     Volume = 1U,
     Route = 2U,
+    RouteRule = 3U,
 };
 
 // This is an in-process handoff record, not an IPC layout. The two payloads
 // intentionally remain fixed-size so enqueue/dequeue never allocates and can
-// be used by the control worker without entering the COM boundary.
+// be used by the control worker without entering the COM boundary. The queue
+// owns one heap-backed slot array created with the runtime object.
 struct SessionCommandWorkItemV1 {
     SessionCommandKindV1 kind{SessionCommandKindV1::Volume};
     std::uint8_t reserved[7U]{};
-    SessionVolumeCommandV1 volume{};
-    SessionRouteCommandV1 route{};
+    union {
+        SessionVolumeCommandV1 volume;
+        SessionRouteCommandV1 route;
+        SessionRouteRuleCommandV1 route_rule;
+    };
+
+    SessionCommandWorkItemV1() noexcept : volume{} {}
+    SessionCommandWorkItemV1(const SessionCommandWorkItemV1& other) noexcept {
+        std::memcpy(this, &other, sizeof(*this));
+    }
+    SessionCommandWorkItemV1& operator=(const SessionCommandWorkItemV1& other) noexcept {
+        if (this != &other) {
+            std::memcpy(this, &other, sizeof(*this));
+        }
+        return *this;
+    }
 };
 
 // Single-producer (EngineControl worker), single-consumer (Windows COM
@@ -34,9 +52,15 @@ class SessionCommandQueueV1 final {
 public:
     static constexpr std::size_t kCapacity = 64U;
 
+    SessionCommandQueueV1() noexcept;
+    ~SessionCommandQueueV1() = default;
+    SessionCommandQueueV1(const SessionCommandQueueV1&) = delete;
+    SessionCommandQueueV1& operator=(const SessionCommandQueueV1&) = delete;
+
     [[nodiscard]] bool try_push(const SessionCommandWorkItemV1& item) noexcept;
     [[nodiscard]] bool try_push_volume(const SessionVolumeCommandV1& command) noexcept;
     [[nodiscard]] bool try_push_route(const SessionRouteCommandV1& command) noexcept;
+    [[nodiscard]] bool try_push_route_rule(const SessionRouteRuleCommandV1& command) noexcept;
     [[nodiscard]] bool try_pop(SessionCommandWorkItemV1& item) noexcept;
     [[nodiscard]] std::uint64_t dropped() const noexcept {
         return dropped_.load(std::memory_order_relaxed);
@@ -48,7 +72,10 @@ public:
     void reset() noexcept;
 
 private:
-    std::array<SessionCommandWorkItemV1, kCapacity> slots_{};
+    // Allocated once when the control-plane object is constructed. The
+    // producer/consumer methods never allocate; heap ownership keeps the
+    // large fixed queue out of callers' thread stacks.
+    std::unique_ptr<std::array<SessionCommandWorkItemV1, kCapacity>> slots_{};
     std::atomic<std::uint64_t> head_{0U};
     std::atomic<std::uint64_t> tail_{0U};
     std::atomic<std::uint64_t> dropped_{0U};

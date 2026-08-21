@@ -13,8 +13,8 @@ source_globs: ["src/hub/include/hibiki/session_command_queue.hpp", "src/hub/src/
 
 ## 成功條件
 
-EngineControl／pipe 控制執行緒可以安全接受 `SessionVolumeCommand` 與
-`SessionRouteCommand`，而不直接呼叫 `IAudioSessionControl`、`ISimpleAudioVolume` 或
+EngineControl／pipe 控制執行緒可以安全接受 `SessionVolumeCommand`、`SessionRouteCommand` 與
+`SessionRouteRuleCommand`，而不直接呼叫 `IAudioSessionControl`、`ISimpleAudioVolume` 或
 Windows endpoint COM。命令只會進入固定容量的 in-process SPSC queue；擁有
 `WindowsAudioSessionWatcher` 的 COM worker 在 `refresh_now`／`poll_and_refresh` 後取出命令，
 重新驗證目前 catalog，再執行 volume 或 route graph transaction。
@@ -23,8 +23,10 @@ Windows endpoint COM。命令只會進入固定容量的 in-process SPSC queue�
 
 - `SessionCommandQueueV1` 固定 64 slots，producer 是 EngineControl worker，consumer 是
   Windows COM worker。
-- 每個 slot 是固定大小的 `SessionCommandWorkItemV1`，不含 heap、mutex、condition variable、
+- 每個 slot 是固定大小的 `SessionCommandWorkItemV1`，不含 mutex、condition variable、
   COM pointer 或 raw session ID。
+- queue storage 在 runtime 建立時一次配置到 heap；producer／consumer 路徑不配置、不釋放，
+  因此新增較大的 route-rule payload 不會把 64 slots 壓到呼叫者 stack。
 - `try_push` 在滿載時回傳 false 並遞增 `dropped`；不阻塞、不覆蓋尚未消費的命令。
 - runtime stop 先停止 pipe producer，再 reset queue；新的 runtime 不會繼承前一個 endpoint
   binding 的 pending command。
@@ -51,7 +53,7 @@ restart 與五來源同步播放另列為硬體／平台驗收。
 
 ## 驗收
 
-1. CTest 覆蓋 volume/route work item FIFO、64-slot capacity、drop counter、reset 與 empty
+1. CTest 覆蓋 volume/route/route-rule work item FIFO、64-slot capacity、drop counter、reset 與 empty
    queue。
 2. EngineControl handler 從非 COM 執行緒只入列，不回傳 `RPC_E_WRONG_THREAD`，且不發生
    COM call；Windows worker drain 再執行實際 coordinator 方法。

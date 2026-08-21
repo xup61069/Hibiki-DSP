@@ -666,6 +666,17 @@ bool WindowsControlRuntimeV1::enqueue_session_route_command(
     return session_command_queue_.try_push_route(request);
 }
 
+bool WindowsControlRuntimeV1::enqueue_session_route_rule_command(
+    const SessionRouteRuleCommandV1& request) noexcept {
+    if (!running() || request.catalog_sequence == 0U ||
+        request.catalog_sequence != session_catalog_store_.sequence()) {
+        return false;
+    }
+    const auto encoded = encode_session_route_rule_command_v1(request);
+    if (encoded[0U] == 0U) return false;
+    return session_command_queue_.try_push_route_rule(request);
+}
+
 std::size_t WindowsControlRuntimeV1::drain_session_commands() noexcept {
     if (!running() || !on_worker_thread()) return 0U;
     std::size_t processed = 0U;
@@ -696,6 +707,60 @@ std::size_t WindowsControlRuntimeV1::drain_session_commands() noexcept {
                 (void)publish_session_route_status();
                 catalog_dirty = true;
                 if (expected_sequence != UINT64_MAX) ++expected_sequence;
+            }
+        } else if (item.kind == SessionCommandKindV1::RouteRule) {
+            if (item.route_rule.catalog_sequence != expected_sequence) {
+                ++processed;
+                continue;
+            }
+            try {
+                auto candidate_rules = session_route_rules_;
+                const auto operation = item.route_rule.operation;
+                SessionRouteRuleResultV1 rule_result = SessionRouteRuleResultV1::invalid_argument;
+                if (operation == SessionRouteRuleOperationV1::Upsert) {
+                    SessionRouteRuleV1 rule{};
+                    rule.schema_version = item.route_rule.schema_version;
+                    rule.rule_id.assign(item.route_rule.rule_id.data(), item.route_rule.rule_id_bytes);
+                    rule.priority = item.route_rule.priority;
+                    rule.enabled = item.route_rule.enabled != 0U;
+                    rule.app_id.assign(item.route_rule.app_id.data(), item.route_rule.app_id_bytes);
+                    rule.display_name_contains.assign(item.route_rule.display_name.data(),
+                                                       item.route_rule.display_name_bytes);
+                    rule.lane_id.assign(item.route_rule.lane.data(), item.route_rule.lane_bytes);
+                    rule.output_group.assign(item.route_rule.output_group.data(),
+                                             item.route_rule.output_group_bytes);
+                    rule.gain_owner = item.route_rule.gain_owner ==
+                                              SessionRouteRuleGainOwnerV1::HibikiInternal
+                                          ? SessionGainOwner::HibikiInternal
+                                          : SessionGainOwner::WindowsSession;
+                    rule.makeup_gain_db = q16_16_to_db(item.route_rule.makeup_gain_q16_16);
+                    rule_result = candidate_rules.upsert(rule);
+                } else if (operation == SessionRouteRuleOperationV1::Remove) {
+                    rule_result = candidate_rules.remove(
+                                      std::string_view(item.route_rule.rule_id.data(),
+                                                       item.route_rule.rule_id_bytes))
+                                      ? SessionRouteRuleResultV1::applied
+                                      : SessionRouteRuleResultV1::no_match;
+                } else if (operation == SessionRouteRuleOperationV1::Clear) {
+                    candidate_rules.clear();
+                    rule_result = SessionRouteRuleResultV1::applied;
+                }
+                if (rule_result == SessionRouteRuleResultV1::applied) {
+                    const auto refresh_result = session_routes_.set_rules_and_refresh(candidate_rules);
+                    const bool applied = refresh_result ==
+                                             WindowsAudioSessionRouteRefreshResultV1::Applied ||
+                                         refresh_result ==
+                                             WindowsAudioSessionRouteRefreshResultV1::NoRoutes;
+                    if (applied) {
+                        session_route_rules_ = std::move(candidate_rules);
+                        (void)publish_session_route_status();
+                        catalog_dirty = true;
+                        if (expected_sequence != UINT64_MAX) ++expected_sequence;
+                    }
+                }
+            } catch (...) {
+                // Rule/profile commands are control-plane only. Allocation or
+                // enumeration failure leaves the previous rules and graph.
             }
         }
         ++processed;
@@ -783,6 +848,13 @@ bool apply_session_route_command_v1(const SessionRouteCommandV1& request,
     if (context == nullptr) return false;
     auto* runtime = static_cast<WindowsControlRuntimeV1*>(context);
     return runtime->enqueue_session_route_command(request);
+}
+
+bool apply_session_route_rule_command_v1(const SessionRouteRuleCommandV1& request,
+                                         void* const context) noexcept {
+    if (context == nullptr) return false;
+    auto* runtime = static_cast<WindowsControlRuntimeV1*>(context);
+    return runtime->enqueue_session_route_rule_command(request);
 }
 
 }  // namespace hibiki

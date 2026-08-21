@@ -230,6 +230,143 @@ bool decode_session_route_command_v1(
     return true;
 }
 
+std::array<std::uint8_t, kSessionRouteRuleCommandPayloadBytesV1>
+encode_session_route_rule_command_v1(
+    const SessionRouteRuleCommandV1& command) noexcept {
+    std::array<std::uint8_t, kSessionRouteRuleCommandPayloadBytesV1> payload{};
+    const auto valid_operation =
+        command.operation == SessionRouteRuleOperationV1::Upsert ||
+        command.operation == SessionRouteRuleOperationV1::Remove ||
+        command.operation == SessionRouteRuleOperationV1::Clear;
+    const auto valid_owner = command.gain_owner == SessionRouteRuleGainOwnerV1::WindowsSession ||
+                             command.gain_owner == SessionRouteRuleGainOwnerV1::HibikiInternal;
+    const auto valid_text = [](const auto& text, const std::uint16_t bytes) noexcept {
+        return bytes > 0U && bytes <= text.size() &&
+               is_printable_utf8(std::string_view(text.data(), bytes));
+    };
+    if (command.schema_version != 1U || command.catalog_sequence == 0U ||
+        !valid_operation || command.enabled > 1U || !valid_owner ||
+        command.makeup_gain_q16_16 < (-144 * 65536) ||
+        command.makeup_gain_q16_16 > (12 * 65536) ||
+        command.rule_id_bytes > command.rule_id.size() ||
+        command.app_id_bytes > command.app_id.size() ||
+        command.display_name_bytes > command.display_name.size() ||
+        command.lane_bytes > command.lane.size() ||
+        command.output_group_bytes > command.output_group.size()) {
+        return payload;
+    }
+    if (command.operation == SessionRouteRuleOperationV1::Upsert) {
+        if (!valid_text(command.rule_id, command.rule_id_bytes) ||
+            (!valid_text(command.app_id, command.app_id_bytes) &&
+             !valid_text(command.display_name, command.display_name_bytes)) ||
+            !valid_text(command.lane, command.lane_bytes) ||
+            !valid_text(command.output_group, command.output_group_bytes)) {
+            return payload;
+        }
+    } else if (command.operation == SessionRouteRuleOperationV1::Remove) {
+        if (!valid_text(command.rule_id, command.rule_id_bytes) || command.app_id_bytes != 0U ||
+            command.display_name_bytes != 0U || command.lane_bytes != 0U ||
+            command.output_group_bytes != 0U) {
+            return payload;
+        }
+    } else if (command.rule_id_bytes != 0U || command.app_id_bytes != 0U ||
+               command.display_name_bytes != 0U || command.lane_bytes != 0U ||
+               command.output_group_bytes != 0U) {
+        return payload;
+    }
+    write_u32(payload.data(), command.schema_version);
+    write_u32(payload.data() + 4U, static_cast<std::uint32_t>(command.priority));
+    write_u32(payload.data() + 8U, static_cast<std::uint32_t>(command.makeup_gain_q16_16));
+    payload[12U] = static_cast<std::uint8_t>(command.operation);
+    payload[13U] = command.enabled;
+    payload[14U] = static_cast<std::uint8_t>(command.gain_owner);
+    write_u64(payload.data() + 16U, command.catalog_sequence);
+    payload[24U] = static_cast<std::uint8_t>(command.rule_id_bytes);
+    payload[25U] = static_cast<std::uint8_t>(command.app_id_bytes);
+    payload[26U] = static_cast<std::uint8_t>(command.display_name_bytes);
+    payload[27U] = static_cast<std::uint8_t>(command.lane_bytes);
+    payload[28U] = static_cast<std::uint8_t>(command.output_group_bytes);
+    std::copy_n(command.rule_id.data(), command.rule_id_bytes, payload.data() + 32U);
+    std::copy_n(command.app_id.data(), command.app_id_bytes, payload.data() + 96U);
+    std::copy_n(command.display_name.data(), command.display_name_bytes, payload.data() + 224U);
+    std::copy_n(command.lane.data(), command.lane_bytes, payload.data() + 352U);
+    std::copy_n(command.output_group.data(), command.output_group_bytes, payload.data() + 416U);
+    return payload;
+}
+
+bool decode_session_route_rule_command_v1(
+    const std::span<const std::uint8_t> payload,
+    SessionRouteRuleCommandV1& command) noexcept {
+    command = {};
+    if (payload.size() != kSessionRouteRuleCommandPayloadBytesV1 ||
+        payload[15U] != 0U || payload[29U] != 0U || payload[30U] != 0U ||
+        payload[31U] != 0U) {
+        return false;
+    }
+    const auto operation = static_cast<SessionRouteRuleOperationV1>(payload[12U]);
+    const auto owner = static_cast<SessionRouteRuleGainOwnerV1>(payload[14U]);
+    if (read_u32(payload.data()) != 1U ||
+        (operation != SessionRouteRuleOperationV1::Upsert &&
+         operation != SessionRouteRuleOperationV1::Remove &&
+         operation != SessionRouteRuleOperationV1::Clear) ||
+        payload[13U] > 1U ||
+        (owner != SessionRouteRuleGainOwnerV1::WindowsSession &&
+         owner != SessionRouteRuleGainOwnerV1::HibikiInternal) ||
+        read_u64(payload.data() + 16U) == 0U || payload[24U] > kSessionRouteRuleIdMaxBytesV1 ||
+        payload[25U] > kSessionRouteRuleMatchMaxBytesV1 ||
+        payload[26U] > kSessionRouteRuleMatchMaxBytesV1 ||
+        payload[27U] > kSessionRouteRuleRouteMaxBytesV1 ||
+        payload[28U] > kSessionRouteRuleRouteMaxBytesV1) {
+        return false;
+    }
+    const auto copy_text = [](const std::uint8_t* bytes, const std::size_t length,
+                              auto& target) noexcept {
+        for (std::size_t index = length; index < target.size(); ++index) {
+            if (bytes[index] != 0U) return false;
+        }
+        const std::string_view text(reinterpret_cast<const char*>(bytes), length);
+        if (length != 0U && !is_printable_utf8(text)) return false;
+        std::copy_n(text.data(), text.size(), target.data());
+        return true;
+    };
+    if (!copy_text(payload.data() + 32U, payload[24U], command.rule_id) ||
+        !copy_text(payload.data() + 96U, payload[25U], command.app_id) ||
+        !copy_text(payload.data() + 224U, payload[26U], command.display_name) ||
+        !copy_text(payload.data() + 352U, payload[27U], command.lane) ||
+        !copy_text(payload.data() + 416U, payload[28U], command.output_group)) {
+        return false;
+    }
+    command.schema_version = 1U;
+    command.priority = static_cast<std::int32_t>(read_u32(payload.data() + 4U));
+    command.makeup_gain_q16_16 = static_cast<std::int32_t>(read_u32(payload.data() + 8U));
+    if (command.makeup_gain_q16_16 < (-144 * 65536) ||
+        command.makeup_gain_q16_16 > (12 * 65536)) {
+        return false;
+    }
+    command.operation = operation;
+    command.enabled = payload[13U];
+    command.gain_owner = owner;
+    command.catalog_sequence = read_u64(payload.data() + 16U);
+    command.rule_id_bytes = payload[24U];
+    command.app_id_bytes = payload[25U];
+    command.display_name_bytes = payload[26U];
+    command.lane_bytes = payload[27U];
+    command.output_group_bytes = payload[28U];
+    if (operation == SessionRouteRuleOperationV1::Upsert) {
+        return command.rule_id_bytes != 0U &&
+               (command.app_id_bytes != 0U || command.display_name_bytes != 0U) &&
+               command.lane_bytes != 0U && command.output_group_bytes != 0U;
+    }
+    if (operation == SessionRouteRuleOperationV1::Remove) {
+        return command.rule_id_bytes != 0U && command.app_id_bytes == 0U &&
+               command.display_name_bytes == 0U && command.lane_bytes == 0U &&
+               command.output_group_bytes == 0U;
+    }
+    return command.rule_id_bytes == 0U && command.app_id_bytes == 0U &&
+           command.display_name_bytes == 0U && command.lane_bytes == 0U &&
+           command.output_group_bytes == 0U;
+}
+
 std::array<std::uint8_t, kGroupedVolumeNotificationPayloadBytesV1>
 encode_grouped_volume_notification_payload_v1(
     const std::string_view output_group,
@@ -527,6 +664,8 @@ bool decode_control_command_v1(const IpcFrameV1& frame,
             return decode_session_volume_command_v1(frame.payload, command.session_volume);
         case IpcMessageType::SessionRouteCommand:
             return decode_session_route_command_v1(frame.payload, command.session_route);
+        case IpcMessageType::SessionRouteRuleCommand:
+            return decode_session_route_rule_command_v1(frame.payload, command.session_route_rule);
         case IpcMessageType::SceneApply:
             return decode_scene_apply_payload_v1(frame.payload, command.scene);
         case IpcMessageType::DeviceSwitch:
