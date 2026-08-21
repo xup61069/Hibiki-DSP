@@ -11,6 +11,10 @@ identities:
   endpoint_low_latency_guid: 6d5706a4-b661-4bf6-9c2d-9c31b8f7df21
   endpoint_surround_guid: d4a21e0f-83e5-4a6e-92dc-44d13f9e6c93
   endpoint_virtual_mic_guid: 5e90de25-0e88-4892-8b0e-a1d521cb3f40
+  volume_ui_context_guid: 5b1fbad1-8e7c-4e8a-910d-2a654f937c11
+  volume_safety_context_guid: 7c3c2e54-1a5f-4c2a-a834-5d76812b4e90
+  volume_scene_context_guid: 8f3d9b66-2c11-4fd0-b742-1e63559ac428
+  volume_session_context_guid: a4e2c779-3d88-421b-9c0a-724d18ef6b35
   asio_clsid: 2c0e8d4f-7d9f-4aa7-a03d-690dcf5d5f8c
   ipc_namespace: Local\\HibikiDSP\\v1
   ipc_control_pipe: HibikiDSP_v1_control

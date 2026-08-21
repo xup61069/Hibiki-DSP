@@ -6,6 +6,31 @@
 
 namespace hibiki {
 
+namespace {
+
+constexpr GUID kUiContext{0x5b1fbad1U, 0x8e7cU, 0x4e8aU,
+                          {0x91U, 0x0dU, 0x2aU, 0x65U, 0x4fU, 0x93U, 0x7cU, 0x11U}};
+constexpr GUID kSafetyContext{0x7c3c2e54U, 0x1a5fU, 0x4c2aU,
+                              {0xa8U, 0x34U, 0x5dU, 0x76U, 0x81U, 0x2bU, 0x4eU, 0x90U}};
+constexpr GUID kSceneContext{0x8f3d9b66U, 0x2c11U, 0x4fd0U,
+                             {0xb7U, 0x42U, 0x1eU, 0x63U, 0x55U, 0x9aU, 0xc4U, 0x28U}};
+constexpr GUID kSessionContext{0xa4e2c779U, 0x3d88U, 0x421bU,
+                               {0x9cU, 0x0aU, 0x72U, 0x4dU, 0x18U, 0xefU, 0x6bU, 0x35U}};
+
+}  // namespace
+
+const GUID& WindowsVolumeEventContextsV1::ui() noexcept { return kUiContext; }
+const GUID& WindowsVolumeEventContextsV1::safety() noexcept { return kSafetyContext; }
+const GUID& WindowsVolumeEventContextsV1::scene() noexcept { return kSceneContext; }
+const GUID& WindowsVolumeEventContextsV1::session() noexcept { return kSessionContext; }
+
+WindowsVolumeLinkV1::WindowsVolumeLinkV1() noexcept {
+    (void)add_ignored_context(WindowsVolumeEventContextsV1::ui());
+    (void)add_ignored_context(WindowsVolumeEventContextsV1::safety());
+    (void)add_ignored_context(WindowsVolumeEventContextsV1::scene());
+    (void)add_ignored_context(WindowsVolumeEventContextsV1::session());
+}
+
 bool WindowsVolumeLinkV1::add_ignored_context(const GUID& context) noexcept {
     if (is_ignored(context)) return true;
     if (ignored_context_count_ >= ignored_contexts_.size()) return false;

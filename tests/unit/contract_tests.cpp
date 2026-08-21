@@ -2079,11 +2079,15 @@ int main() {
           WindowsVolumeSyncResultV1::Applied);
     CHECK(std::abs(linked_engine.volume().requested_db + 18.0) < 1e-9 &&
           linked_engine.volume().generation == 1U);
-    external_snapshot.event_context = hibiki_write_context;
+    external_snapshot.event_context = WindowsVolumeEventContextsV1::ui();
     external_snapshot.generation = 2U;
     CHECK(volume_link.apply(linked_engine, "main", external_snapshot) ==
           WindowsVolumeSyncResultV1::IgnoredSelf &&
           linked_engine.volume().generation == 1U);
+    external_snapshot.event_context = hibiki_write_context;
+    CHECK(volume_link.add_ignored_context(hibiki_write_context));
+    CHECK(volume_link.apply(linked_engine, "main", external_snapshot) ==
+          WindowsVolumeSyncResultV1::IgnoredSelf);
     volume_link.clear_ignored_contexts();
     external_snapshot.event_context = GUID{};
     external_snapshot.generation = 3U;

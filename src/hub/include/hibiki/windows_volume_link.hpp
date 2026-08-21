@@ -14,6 +14,13 @@
 
 namespace hibiki {
 
+struct WindowsVolumeEventContextsV1 final {
+    [[nodiscard]] static const GUID& ui() noexcept;
+    [[nodiscard]] static const GUID& safety() noexcept;
+    [[nodiscard]] static const GUID& scene() noexcept;
+    [[nodiscard]] static const GUID& session() noexcept;
+};
+
 enum class WindowsVolumeSyncResultV1 : std::uint8_t {
     NoUpdate,
     IgnoredSelf,
@@ -31,7 +38,7 @@ class WindowsVolumeLinkV1 final {
 public:
     static constexpr std::size_t kMaxIgnoredContexts = 8U;
 
-    WindowsVolumeLinkV1() noexcept = default;
+    WindowsVolumeLinkV1() noexcept;
 
     [[nodiscard]] bool add_ignored_context(const GUID& context) noexcept;
     void clear_ignored_contexts() noexcept;
