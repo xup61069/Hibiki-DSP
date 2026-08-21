@@ -101,7 +101,14 @@ Issue 0 是 foundation integration handoff，只由 integrator 更新，不是�
   identity and remains user-space control-plane evidence; physical per-App capture/re-send and DSP
   delivery are still unverified. `-DirectCoordinator` is a diagnostic-only bypass. The same probe
   then sends a bounded `SessionRouteCommand` and requires the route catalog to read back `Ready`;
-  this verifies candidate graph commit in the worker, not physical audio rerouting.
+  then sends a bounded `SessionRouteRuleCommand` upsert/remove and verifies candidate rule readback (`Ready → Pending`).
+  This verifies candidate graph commit and rule transaction in the worker, not physical audio rerouting.
+- C++ VST host supervisor now includes `Vst3TimelineEditorV1` (`vst-host/include/hibiki/vst3_timeline_editor.hpp`),
+  providing fail-closed parameter point upsert, bounded remove/set-value, and validated commit against
+  `validate_vst3_parameter_timeline_v1`.
+- C# control model now includes `CalibrationModel.cs` (`apps/control-model/`), providing strongly-typed
+  calibration response data contracts, deterministic bounded PEQ correction compiler matching SPEC-0011,
+  atomic JSON persistence, and Equalizer APO/CamillaDSP/REW/Hibiki profile exporters.
 - The next driver-facing source milestone is now the Apache `driver_control_transport_v1` fixed
   136-byte little-endian endpoint-state/volume-notification packet plus the GPL
   `DriverVolumeLinkV1` adapter. It is contract-tested and ready for a future WDK/SYSVAD project
