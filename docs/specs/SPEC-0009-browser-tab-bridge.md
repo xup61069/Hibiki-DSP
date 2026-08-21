@@ -39,3 +39,12 @@ buffer。`process_tab_capture_lane_to_wasapi_v1` 使用相同 effects 與 lane v
 graph／Group Master／limiter 後只提交一次到 WASAPI handoff；sink 未綁定時回傳失敗且不
 宣稱已播放。降噪模型 provenance、權限提示與斷線重連 policy 仍必須在獨立 source component
 完成後，才能宣稱「單分頁掛降噪」。
+
+## Extension security and CSP policy
+
+MV3 extension source gate (`tools/extension-check.ps1`) 強制驗證最小權限與 CSP 不漂移：
+1. 權限僅限 `activeTab`、`tabCapture` 與 `offscreen`，拒絕任何額外或廣域權限。
+2. Host 權限僅限 `http://127.0.0.1/*`，拒絕 wildcard remote hosts 與 `<all_urls>`。
+3. `extension_pages` CSP 必須為 `script-src 'self'; object-src 'self'; connect-src ws://127.0.0.1:17842`，
+   嚴格禁止 `unsafe-eval`、`unsafe-inline`、外部 script 或 non-loopback connect-src。
+
