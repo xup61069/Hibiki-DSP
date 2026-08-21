@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "ai-handoff-and-preview-readiness-v1",
+  "source_commit": "d069a26",
+  "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/control-model-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "pwsh -File tools/extension-check.ps1",
+    "pwsh -File tools/installer-check.ps1",
+    "pwsh -File tools/winui-shell-check.ps1",
+    "pwsh -File tools/distribution-check.ps1",
+    "pwsh -File tools/driver-source-check.ps1",
+    "pwsh -File tools/driver-signability-check.ps1",
+    "pwsh -File tools/build-preview.ps1 -Target ControlModel",
+    "pwsh -File tools/build-preview.ps1 -Target WinUI"
+  ],
+  "results": [
+    {
+      "command": "handoff/documentation/source-only gates",
+      "status": "pass",
+      "coverage": [
+        "canonical AI entry links",
+        "active handoff front matter and base-commit ancestry",
+        "context-pack entry",
+        "source-only and no-artifact policy"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1 and control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "unsigned C++ user-space contract baseline",
+        "C# control model and Expert per-App route preset boundary"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target ControlModel",
+      "status": "pass",
+      "coverage": [
+        "local control-plane preview baseline"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target WinUI",
+      "status": "blocked_environment",
+      "coverage": [
+        "NuGet restore completed",
+        "Windows App SDK XamlCompiler exited 1 on local Windows 22631"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Local Windows build 22631, Visual Studio 17 and SDK 10.0.26100.0 do not meet the locked Windows 11 24H2, Visual Studio 2026 and SDK/WDK 10.0.28000.2526 target.",
+    "No installable preview, virtual audio driver, Microsoft signature, Gumroad artifact or physical audio delivery is claimed.",
+    "All local build outputs remain under ignored .local paths and are not repository or GitHub release artifacts."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00+08:00",
+  "finished_at": "2026-08-21T00:00:00+08:00"
+}
