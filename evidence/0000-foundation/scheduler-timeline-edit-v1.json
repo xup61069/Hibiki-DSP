@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 22,
   "scope_digest": "scheduler-timeline-edit-v1",
-  "source_commit": "pending",
+  "source_commit": "8a041a2",
   "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-msvc-buildtools-17.14-msvc-19.44-dotnet-10.0.301-pwsh-7.6.5; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/verify.ps1",
