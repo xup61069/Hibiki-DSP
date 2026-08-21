@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "ir-phase-policy-ui-v1",
+  "source_commit": "92c3c77",
+  "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/control-model-check.ps1",
+    "pwsh -File tools/build-preview.ps1 -SmokeTest",
+    "pwsh -File tools/winui-shell-check.ps1",
+    "pwsh -File tools/control-model-engine-smoke.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "four bounded IR options",
+        "Game/Balanced/Movie/Bypass labels",
+        "linear-phase delay contract and Bypass reset"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/build-preview.ps1 -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "Desktop Compatibility Preview IR selector and strength slider compile",
+        "three-second launch liveness"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/winui-shell-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "source-only WinUI IR mode/strength bindings",
+        "explicit policy-only FIR wording"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/control-model-engine-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "IR UI additions do not regress command/status round-trip"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The controls select a versioned IR policy only; no FIR coefficient generation or engine command exists yet.",
+    "No ISO standard table or restricted coefficient data is embedded.",
+    "Formal WinUI XAML compilation and accessibility evidence remain blocked on the local non-target toolchain."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00+08:00",
+  "finished_at": "2026-08-21T00:00:00+08:00"
+}
