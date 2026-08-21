@@ -20,7 +20,7 @@ source_globs: ["apps/control-model/**", "apps/winui-shell/**"]
 ## In / Out
 
 In：WinUI 3 視窗、Easy/Expert 顯示、固定輸出群組卡片、場景卡片、Windows
-音量與 IR 相位滑桿、版本化 named-pipe Hello／SceneApply／VolumeNotification
+音量與 IR 相位滑桿、Expert 的 Matrix／DSP Graph／VST3 隔離／校正唯讀摘要、版本化 named-pipe Hello／SceneApply／VolumeNotification
 命令、連線失敗回復；音量拖曳使用 40 ms bounded debounce 與 command serialization，
 只送出最新的控制值。
 
@@ -29,7 +29,8 @@ Out：WaveRT/PortCls 驅動、實體裝置枚舉、音訊處理、VST3 UI、校�
 
 ## 介面與資料流
 
-`EasyControlViewModel` 是唯一 binding surface。WinUI 只讀寫其公開屬性與
+`EasyControlViewModel` 是唯一 binding surface；`ExpertSurfaceModel` 提供固定、唯讀且
+明確標示未認證／未校準的詳細摘要。WinUI 只讀寫其公開屬性與
 非同步命令；ViewModel 透過 `NamedPipeControlClientV1` 建立 local-only
 versioned IPC，Hello 成功後才可送出 SceneApply 或 VolumeNotification。
 
@@ -51,6 +52,8 @@ endpoint bind、30 ms equal-power crossfade 與回復仍由 C++ sink worker 負�
   COM、named pipe 或檔案系統。
 - 視窗關閉時必須釋放 pipe client。未來若加入自動重連，必須另立 ADR，並採
   bounded backoff 與明確使用者狀態提示。
+- Expert 摘要不可宣稱 Matrix/VST3/ISO 校正已提交；沒有對應版本化 IPC command 時，
+  UI 必須維持唯讀並顯示「未認證／未校準」狀態。
 
 ## 相容性
 
@@ -61,7 +64,7 @@ bytes。WinUI shell 可在沒有引擎時啟動，並以 Degraded 狀態呈現�
 ## 驗收
 
 1. Fresh clone 的 control-model check 通過，並覆蓋固定輸出群組、連線狀態、
-   One-Tap／Scene／音量命令的 binding surface 與 bounded debounce。
+   One-Tap／Scene／音量命令、Expert Matrix/DSP/VST3/校正摘要與 bounded debounce。
 2. WinUI source-only shell 只引用 control-model；git history、CI artifacts
    與 release 不包含編譯產物。
 3. 沒有 engine pipe 時，按連接會在 bounded timeout 後顯示 Degraded，UI 不崩潰；
