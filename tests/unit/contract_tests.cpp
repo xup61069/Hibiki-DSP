@@ -331,6 +331,7 @@ int main() {
                                          decoded_driver_block) &&
           decoded_driver_block.interleaved == decoded_driver_samples.data() &&
           decoded_driver_block.channels == 2U && decoded_driver_block.sample_rate == 48000U &&
+          decoded_driver_block.frames == 2U &&
           decoded_driver_block.sequence == 42U && decoded_driver_block.generation == 9U &&
           decoded_driver_block.flags == HIBIKI_DRIVER_STREAM_FLAG_DISCONTINUITY_V1 &&
           decoded_driver_samples[3] == driver_samples[3]);
@@ -1173,6 +1174,27 @@ int main() {
                          engine_output.data(), 128U));
     CHECK(std::abs(engine_output[254] - 0.5F) < 1e-5F);
     CHECK(std::abs(engine_output[255] + 0.5F) < 1e-5F);
+    engine.set_sample_rate(48000U);
+    CHECK(hibiki_driver_stream_packet_encode_v1(
+              driver_packet.data(), driver_packet.size(), HIBIKI_DRIVER_STREAM_RENDER_V1,
+              43U, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 2U, 48000U, 2U, 0U, 10U,
+              driver_samples, &driver_packet_bytes) == 1);
+    const auto engine_driver_packet =
+        std::span<const std::uint8_t>(driver_packet.data(), driver_packet_bytes);
+    std::array<float, 4> engine_driver_storage{};
+    std::array<RtLaneInputV1, 1> engine_driver_inputs{};
+    std::array<float, 4> engine_driver_output{};
+    CHECK(engine.process_driver_stream_packet(0U, engine_driver_packet, engine_driver_storage,
+                                              engine_driver_inputs, engine_driver_output.data()));
+    const float engine_driver_nan = std::numeric_limits<float>::quiet_NaN();
+    std::memcpy(driver_packet.data() + HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1,
+                &engine_driver_nan, sizeof(engine_driver_nan));
+    const auto bad_engine_driver_packet =
+        std::span<const std::uint8_t>(driver_packet.data(), driver_packet_bytes);
+    CHECK(!engine.process_driver_stream_packet(0U, bad_engine_driver_packet,
+                                               engine_driver_storage, engine_driver_inputs,
+                                               engine_driver_output.data()));
+    engine.set_sample_rate(8000U);
     CHECK(engine.prepare_output_fanout(fanout_plan, 1.0));
     std::array<float, 16> engine_fanout_a{};
     std::array<float, 16> engine_fanout_b{};

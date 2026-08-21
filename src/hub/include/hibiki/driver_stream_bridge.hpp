@@ -14,6 +14,7 @@ struct DriverStreamLaneBlockV1 {
     const float* interleaved{nullptr};
     std::uint32_t channels{0U};
     std::uint32_t sample_rate{0U};
+    std::uint32_t frames{0U};
     std::uint64_t sequence{0U};
     std::uint64_t generation{0U};
     std::uint32_t flags{0U};

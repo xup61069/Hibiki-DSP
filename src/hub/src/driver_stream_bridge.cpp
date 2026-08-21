@@ -38,6 +38,7 @@ bool decode_driver_stream_packet_v1(
     block.interleaved = sample_storage.data();
     block.channels = header.channels;
     block.sample_rate = header.sample_rate;
+    block.frames = header.frames;
     block.sequence = header.sequence;
     block.generation = header.generation;
     block.flags = header.flags;

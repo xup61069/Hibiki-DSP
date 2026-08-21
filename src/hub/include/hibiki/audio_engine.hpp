@@ -4,6 +4,7 @@
 
 #include "hibiki/scene_graph.hpp"
 #include "hibiki/asio_transport_consumer.hpp"
+#include "hibiki/driver_stream_bridge.hpp"
 #include "hibiki/output_fanout.hpp"
 #include "hibiki/volume_state.hpp"
 #include "hibiki/true_peak_limiter.hpp"
@@ -66,6 +67,12 @@ public:
         float* output_interleaved,
         std::size_t output_capacity_frames,
         AsioTransportBlockV1& block) noexcept;
+    [[nodiscard]] bool process_driver_stream_packet(
+        std::size_t lane_index,
+        std::span<const std::uint8_t> packet,
+        std::span<float> packet_sample_storage,
+        std::span<RtLaneInputV1> lane_inputs,
+        float* output_interleaved) const noexcept;
     [[nodiscard]] bool process_lane_block(std::size_t lane_index,
                                           const float* input_interleaved,
                                           std::uint32_t input_channels,
