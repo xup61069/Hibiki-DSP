@@ -106,6 +106,21 @@ private:
     TabCaptureBlockV1& block,
     TabLaneEffectsV1* effects = nullptr) noexcept;
 
+// Same tab effects and lane validation, followed by one bounded submit to the
+// engine's active WASAPI handoff. Browser capture remains user-gesture gated;
+// a missing sink leaves playback/queue state fail-closed.
+[[nodiscard]] bool process_tab_capture_lane_to_wasapi_v1(
+    AudioEngineModel& engine,
+    std::size_t lane_index,
+    TabCaptureQueueV1& queue,
+    float* input_interleaved,
+    std::uint32_t input_capacity_frames,
+    std::span<RtLaneInputV1> lane_inputs,
+    float* output_interleaved,
+    std::uint32_t output_capacity_frames,
+    TabCaptureBlockV1& block,
+    TabLaneEffectsV1* effects = nullptr) noexcept;
+
 void enqueue_tab_capture_packet_v1(const TabCapturePacketViewV1& view, void* context) noexcept;
 
 struct TabBridgeServerConfigV1 {

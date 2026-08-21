@@ -1247,6 +1247,15 @@ int main() {
           std::isfinite(tab_lane_output[0]) && std::isfinite(tab_lane_output[1]) &&
           tab_lane_output[0] > 0.125F && tab_lane_output[0] < 0.2F &&
           tab_lane_output[1] < -0.125F && tab_lane_output[1] > -0.2F);
+    auto tab_wasapi_queue = std::make_unique<TabCaptureQueueV1>();
+    const TabCapturePacketViewV1 tab_wasapi_view{
+        2U, 2U, 48000U, reinterpret_cast<const std::uint8_t*>(tab_samples), 4U};
+    CHECK(tab_wasapi_queue->push(tab_wasapi_view));
+    TabCaptureBlockV1 tab_wasapi_block{};
+    CHECK(!process_tab_capture_lane_to_wasapi_v1(
+        engine, 0U, *tab_wasapi_queue, tab_lane_input, 2U, tab_lane_inputs, tab_lane_output, 2U,
+        tab_wasapi_block, &tab_effects));
+    CHECK(tab_wasapi_block.frames == 0U && tab_wasapi_block.channels == 0U);
     VirtualMicRouteModel lane_mic;
     CHECK(lane_mic.prepare(VirtualMicConfigV1{2U, 48000U, true}));
     float lane_mic_input[4] = {0.75F, -0.75F, 0.5F, -0.5F};

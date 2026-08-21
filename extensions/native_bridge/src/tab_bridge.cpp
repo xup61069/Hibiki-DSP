@@ -151,7 +151,7 @@ std::uint32_t TabCaptureQueueV1::dropped_blocks() const noexcept {
     return dropped_blocks_.load(std::memory_order_relaxed);
 }
 
-bool process_tab_capture_lane_v1(
+static bool process_tab_capture_lane_impl(
     AudioEngineModel& engine,
     const std::size_t lane_index,
     TabCaptureQueueV1& queue,
@@ -161,7 +161,8 @@ bool process_tab_capture_lane_v1(
     float* const output_interleaved,
     const std::uint32_t output_capacity_frames,
     TabCaptureBlockV1& block,
-    TabLaneEffectsV1* const effects) noexcept {
+    TabLaneEffectsV1* const effects,
+    const bool to_wasapi) noexcept {
     block = {};
     if (input_interleaved == nullptr || output_interleaved == nullptr ||
         input_capacity_frames == 0U || output_capacity_frames == 0U) {
@@ -202,12 +203,50 @@ bool process_tab_capture_lane_v1(
             return false;
         }
     }
-    if (!engine.process_lane_block(lane_index, input_interleaved, block.channels, block.frames,
-                                   lane_inputs, output_interleaved)) {
+    const bool processed = to_wasapi
+                               ? engine.process_lane_block_to_wasapi(
+                                     lane_index, input_interleaved, block.channels, block.frames,
+                                     lane_inputs, output_interleaved)
+                               : engine.process_lane_block(lane_index, input_interleaved,
+                                                           block.channels, block.frames,
+                                                           lane_inputs, output_interleaved);
+    if (!processed) {
         block = {};
         return false;
     }
     return true;
+}
+
+bool process_tab_capture_lane_v1(
+    AudioEngineModel& engine,
+    const std::size_t lane_index,
+    TabCaptureQueueV1& queue,
+    float* const input_interleaved,
+    const std::uint32_t input_capacity_frames,
+    const std::span<RtLaneInputV1> lane_inputs,
+    float* const output_interleaved,
+    const std::uint32_t output_capacity_frames,
+    TabCaptureBlockV1& block,
+    TabLaneEffectsV1* const effects) noexcept {
+    return process_tab_capture_lane_impl(engine, lane_index, queue, input_interleaved,
+                                         input_capacity_frames, lane_inputs, output_interleaved,
+                                         output_capacity_frames, block, effects, false);
+}
+
+bool process_tab_capture_lane_to_wasapi_v1(
+    AudioEngineModel& engine,
+    const std::size_t lane_index,
+    TabCaptureQueueV1& queue,
+    float* const input_interleaved,
+    const std::uint32_t input_capacity_frames,
+    const std::span<RtLaneInputV1> lane_inputs,
+    float* const output_interleaved,
+    const std::uint32_t output_capacity_frames,
+    TabCaptureBlockV1& block,
+    TabLaneEffectsV1* const effects) noexcept {
+    return process_tab_capture_lane_impl(engine, lane_index, queue, input_interleaved,
+                                         input_capacity_frames, lane_inputs, output_interleaved,
+                                         output_capacity_frames, block, effects, true);
 }
 
 void enqueue_tab_capture_packet_v1(const TabCapturePacketViewV1& view, void* const context) noexcept {
