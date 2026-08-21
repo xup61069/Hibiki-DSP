@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/session-route-rule-v1.schema.json",
+  "title": "Hibiki per-application session route rule v1",
+  "description": "Control-plane metadata for deterministic app routing; process IDs are never persisted as profile identity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "rule_id", "priority", "enabled", "match", "lane_id", "output_group", "gain_owner", "makeup_gain_db"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "rule_id": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[^\\u0000]+$"},
+    "priority": {"type": "integer", "minimum": -2147483648, "maximum": 2147483647},
+    "enabled": {"type": "boolean"},
+    "match": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "app_id": {"type": "string", "maxLength": 256},
+        "display_name_contains": {"type": "string", "maxLength": 256}
+      }
+    },
+    "lane_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "output_group": {"type": "string", "minLength": 1, "maxLength": 256},
+    "gain_owner": {"enum": ["windows-session", "hibiki-internal"]},
+    "makeup_gain_db": {"type": "number", "minimum": -144, "maximum": 12}
+  }
+}

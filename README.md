@@ -25,7 +25,7 @@ the application itself has no activation or runtime license check.
 
 The repository now includes testable user-space graph/routing, volume/ISO formula
 compensation, IPC, ASIO stream, VST supervisor exchange/lane quarantine, bounded
-Scene state binding/preflight, output sink and browser-capture prototypes. Public
+Scene state binding/preflight, per-application routing rules, output sink and browser-capture prototypes. Public
 CI also enforces the source-only publication rule and refuses tracked binaries or
 release/package upload steps. The WaveRT-backed driver, physical endpoint soak,
 third-party VST3 certification, calibrated ISO data, WinUI SDK validation and

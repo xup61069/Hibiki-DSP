@@ -44,6 +44,7 @@ extern "C" {
 #include "hibiki/scene_presets.hpp"
 #include "hibiki/scene_safety.hpp"
 #include "hibiki/session_route.hpp"
+#include "hibiki/session_route_rules.hpp"
 #include "hibiki/volume_state.hpp"
 #include "hibiki/program_loudness.hpp"
 #include "hibiki/peq_dsp.hpp"
@@ -848,6 +849,44 @@ int main() {
     CHECK(session_registry.upsert(AudioSessionDescriptorV1{
         1, chrome_tab_b, "Chrome tab B", "chrome.exe", true,
         SessionGainOwner::WindowsSession, {}, {}}));
+    auto route_rules = std::make_unique<SessionRouteRuleStoreV1>();
+    SessionRouteRuleV1 chrome_rule;
+    chrome_rule.rule_id = "chrome-vlog";
+    chrome_rule.priority = 100;
+    chrome_rule.app_id = "Chrome.EXE";
+    chrome_rule.lane_id = "vlog-noise";
+    chrome_rule.output_group = "headphones";
+    chrome_rule.gain_owner = SessionGainOwner::HibikiInternal;
+    chrome_rule.makeup_gain_db = 3.0;
+    CHECK(route_rules->upsert(chrome_rule) == SessionRouteRuleResultV1::applied);
+    auto rule_target = *session_registry.find(chrome_tab_b);
+    rule_target.identity.process_id = 9876U;
+    CHECK(route_rules->apply(rule_target) == SessionRouteRuleResultV1::applied &&
+          rule_target.lane_id == "vlog-noise" &&
+          rule_target.output_group == "headphones" &&
+          rule_target.gain_owner == SessionGainOwner::HibikiInternal &&
+          std::abs(rule_target.makeup_gain_db - 3.0) < 1e-12);
+    SessionRouteRuleV1 display_rule;
+    display_rule.rule_id = "chrome-display-fallback";
+    display_rule.priority = 10;
+    display_rule.display_name_contains = "TAB B";
+    display_rule.lane_id = "fallback";
+    display_rule.output_group = "main";
+    CHECK(route_rules->upsert(display_rule) == SessionRouteRuleResultV1::applied);
+    CHECK(route_rules->apply(rule_target) == SessionRouteRuleResultV1::applied &&
+          rule_target.lane_id == "vlog-noise");
+    SessionRouteRuleV1 tie_rule = chrome_rule;
+    tie_rule.rule_id = "chrome-tie";
+    tie_rule.output_group = "surround";
+    CHECK(route_rules->upsert(tie_rule) == SessionRouteRuleResultV1::applied);
+    CHECK(route_rules->apply(rule_target) == SessionRouteRuleResultV1::ambiguous &&
+          rule_target.output_group == "headphones");
+    SessionRouteRuleV1 invalid_rule;
+    invalid_rule.rule_id = "missing-match";
+    invalid_rule.lane_id = "lane";
+    invalid_rule.output_group = "main";
+    CHECK(route_rules->upsert(invalid_rule) == SessionRouteRuleResultV1::invalid_argument);
+    CHECK(route_rules->remove("chrome-tie") && route_rules->size() == 2U);
     CHECK(session_registry.bind(chrome_tab_a, "vlog-noise", "headphones"));
     CHECK(session_registry.bind(chrome_tab_b, "music", "speakers"));
     CHECK(session_registry.set_gain_owner(chrome_tab_a, SessionGainOwner::HibikiInternal));
