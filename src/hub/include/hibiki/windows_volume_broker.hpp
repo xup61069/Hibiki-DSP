@@ -14,6 +14,7 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <string>
 
 namespace hibiki {
 
@@ -65,6 +66,9 @@ public:
     WindowsVolumeBroker& operator=(const WindowsVolumeBroker&) = delete;
 
     [[nodiscard]] HRESULT bind(IMMDevice* device) noexcept;
+    // Keeps the current COM callback registration when the default endpoint
+    // identity is unchanged. A changed identity falls back to bind().
+    [[nodiscard]] HRESULT bind_if_changed(IMMDevice* device) noexcept;
     void unbind() noexcept;
     [[nodiscard]] bool is_bound() const noexcept { return endpoint_ != nullptr; }
     [[nodiscard]] HRESULT write(const OutputGroupVolumeStateV1& state,
@@ -75,6 +79,7 @@ public:
 private:
     IAudioEndpointVolume* endpoint_{nullptr};
     WindowsVolumeCallback* callback_{nullptr};
+    std::wstring endpoint_id_{};
     std::uint64_t last_callback_sequence_{0};
     std::uint64_t generation_{0};
 };

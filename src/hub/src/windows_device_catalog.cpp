@@ -399,6 +399,17 @@ HRESULT WindowsControlRuntimeV1::refresh_default_volume(
     return bind_result;
 }
 
+HRESULT WindowsControlRuntimeV1::refresh_default_volume_if_changed(
+    IMMDeviceEnumerator* const enumerator) noexcept {
+    if (!running() || enumerator == nullptr) return E_INVALIDARG;
+    IMMDevice* device = nullptr;
+    const auto result = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
+    if (FAILED(result) || device == nullptr) return FAILED(result) ? result : E_FAIL;
+    const auto bind_result = volume_broker_.bind_if_changed(device);
+    device->Release();
+    return bind_result;
+}
+
 HRESULT WindowsControlRuntimeV1::read_volume(OutputGroupVolumeStateV1& state) noexcept {
     if (!running()) return E_UNEXPECTED;
     return volume_broker_.read_state(state);

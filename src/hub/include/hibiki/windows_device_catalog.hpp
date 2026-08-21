@@ -136,6 +136,8 @@ public:
     [[nodiscard]] HRESULT refresh_now() noexcept;
     [[nodiscard]] HRESULT poll_and_refresh() noexcept;
     [[nodiscard]] HRESULT refresh_default_volume(IMMDeviceEnumerator* enumerator) noexcept;
+    [[nodiscard]] HRESULT refresh_default_volume_if_changed(
+        IMMDeviceEnumerator* enumerator) noexcept;
     [[nodiscard]] HRESULT read_volume(OutputGroupVolumeStateV1& state) noexcept;
     [[nodiscard]] HRESULT write_volume(const OutputGroupVolumeStateV1& state,
                                        const GUID& event_context) noexcept;

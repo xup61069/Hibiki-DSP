@@ -107,6 +107,12 @@ HRESULT WindowsVolumeBroker::bind(IMMDevice* const device) noexcept {
         return E_INVALIDARG;
     }
     unbind();
+    LPWSTR endpoint_id = nullptr;
+    const auto id_result = device->GetId(&endpoint_id);
+    if (SUCCEEDED(id_result) && endpoint_id != nullptr) {
+        endpoint_id_ = endpoint_id;
+        CoTaskMemFree(endpoint_id);
+    }
     HRESULT result = device->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_ALL, nullptr,
                                      reinterpret_cast<void**>(&endpoint_));
     if (FAILED(result)) {
@@ -122,12 +128,24 @@ HRESULT WindowsVolumeBroker::bind(IMMDevice* const device) noexcept {
     return result;
 }
 
+HRESULT WindowsVolumeBroker::bind_if_changed(IMMDevice* const device) noexcept {
+    if (device == nullptr || callback_ == nullptr) return E_INVALIDARG;
+    LPWSTR endpoint_id = nullptr;
+    const auto id_result = device->GetId(&endpoint_id);
+    const bool same = endpoint_ != nullptr && SUCCEEDED(id_result) && endpoint_id != nullptr &&
+                      endpoint_id_ == endpoint_id;
+    if (endpoint_id != nullptr) CoTaskMemFree(endpoint_id);
+    if (same) return S_OK;
+    return bind(device);
+}
+
 void WindowsVolumeBroker::unbind() noexcept {
     if (endpoint_ != nullptr) {
         endpoint_->UnregisterControlChangeNotify(callback_);
         endpoint_->Release();
         endpoint_ = nullptr;
     }
+    endpoint_id_.clear();
     last_callback_sequence_ = 0;
 }
 
