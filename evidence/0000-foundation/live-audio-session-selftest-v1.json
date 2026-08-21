@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "issue": 102,
+  "scope_digest": "live-audio-session-selftest-v1",
+  "source_commit": "e7cdebd",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-msvc-14.51.36231-sdk-10.0.28000.0-cmake-path-missing-dotnet-10.0.400-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/probe-environment.ps1",
+    "pwsh -NoProfile -File tools/live-audio-session-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/live-audio-session-check.ps1 (with VS2026 CMake directory prepended process-locally)",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/doctor.ps1 -CheckOnly",
+      "status": "pass_with_limitations",
+      "coverage": [
+        "Windows 11 build 26200, AMD64, Git, PowerShell 7.6.4, Visual Studio 2026 and .NET 10.0.400 detected",
+        "CMake is not on PATH and the locked SDK/WDK prerequisite is reported missing"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/probe-environment.ps1",
+      "status": "pass",
+      "coverage": [
+        "local environment fingerprint written under ignored .local/context.json"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/live-audio-session-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "Windows-only guard rejection",
+        "exact CMake definitions, build root, target, executable and anonymous probe path",
+        "target mismatch, unsafe build-root, and CMake argument rejection",
+        "no CMake, build, process, Audio Service, session or audio activity"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/live-audio-session-check.ps1 (with VS2026 CMake directory prepended process-locally)",
+      "status": "pass",
+      "coverage": [
+        "unsigned live audio-session probe configured and built",
+        "anonymous output: sessions=pass count=1 active=0 route_identity=endpoint+session_instance"
+      ],
+      "compiled_artifacts": true
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors in the source diff"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The live probe output is anonymous session enumeration only; it does not prove per-App route rules, capture/re-send, DSP delivery, physical audio, driver, WaveRT, HLK, or signing.",
+    "No PID, session ID, endpoint ID, friendly name, or private identity was recorded.",
+    "CMake/SDK/WDK availability is recorded from doctor; compiled outputs remain under ignored .local and are not release artifacts.",
+    "The shared docs/state/BASELINE.md counter remains integrator-owned and was not modified."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.400",
+    "msvc": "14.51.36231",
+    "powershell": "7.6.4",
+    "cmake": "VS2026 bundled CMake used process-locally"
+  },
+  "started_at": "2026-08-22T11:00:00+08:00",
+  "finished_at": "2026-08-22T11:40:00+08:00"
+}
