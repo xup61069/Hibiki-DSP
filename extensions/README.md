@@ -26,3 +26,5 @@ kernel (up to 4096 taps) after PEQ and before level correction; the declared
 phase delay is metadata that still requires measurement. Noise-reduction models and their provenance remain separate
 boundaries. A separate optional basic suppressor provides a bounded high-pass/downward gate;
 it is not RNNoise, AI denoising or AEC. The default path is unchanged when no effects are supplied.
+`process_tab_capture_lane_to_wasapi_v1` reuses those effects and submits the processed block once
+to the same dual-worker WASAPI handoff used by ASIO and driver lanes; an unbound sink fails closed.

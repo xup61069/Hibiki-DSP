@@ -35,5 +35,7 @@ non-owning packet view.
 buffer pop；滿載會回報 dropped blocks，不阻塞 WebSocket。`process_tab_capture_lane_v1`
 會把一個 queue block 送入 `AudioEngineModel::process_lane_block`，因此沿用同一份
 immutable graph、lane mapping 與 Group Master；adapter 不配置、不等待，也不擁有音訊
-buffer。降噪模型 provenance、權限提示與斷線重連 policy 仍必須在獨立 source component
+buffer。`process_tab_capture_lane_to_wasapi_v1` 使用相同 effects 與 lane validation，完成
+graph／Group Master／limiter 後只提交一次到 WASAPI handoff；sink 未綁定時回傳失敗且不
+宣稱已播放。降噪模型 provenance、權限提示與斷線重連 policy 仍必須在獨立 source component
 完成後，才能宣稱「單分頁掛降噪」。
