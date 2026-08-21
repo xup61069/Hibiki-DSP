@@ -28,8 +28,9 @@
   creates an inaudible shared-mode test session, discovers it through the bounded catalog, sends a
   generation-scoped session handle through IPC/control queue/COM worker, verifies approximately −3 dB
   readback, and restores the original dB/mute state. This closes the target-session COM readback
-  boundary but remains user-space control evidence; physical per-App capture/re-send and DSP delivery
-  are still unverified.
+  boundary; it also sends a bounded `SessionRouteCommand` and requires route catalog `Ready`. It
+  remains user-space control evidence; physical per-App capture/re-send and DSP delivery are still
+  unverified.
 - The control-model Engine Preview smoke now exercises the full IR prepare → Scene IR clear
   round-trip and retries temporary fixture cleanup for bounded transient Windows file-indexer
   locks. Three consecutive session-routing runs are recorded in
@@ -128,7 +129,8 @@
   availability; expired/inactive/unreadable sessions remain visible with volume unavailable.
 - `SessionRouteCommand` v1 now carries only handle/sequence/lane/output labels. The coordinator
   builds and validates a candidate registry/graph before commit, increments generation on success,
-  and republishes status/catalog; physical process-loopback delivery remains unverified.
+  and republishes status/catalog. The live Engine Preview probe now verifies the queued command and
+  `Ready` catalog readback; physical process-loopback delivery remains unverified.
 - Session volume/route runtime adapters now validate and enqueue from the EngineControl thread;
   a fixed 64-slot SPSC `SessionCommandQueueV1` is drained only by the COM worker after refresh.
   Direct synchronous read/write APIs still fail closed with `RPC_E_WRONG_THREAD`, while normal UI
