@@ -419,7 +419,9 @@ Lane graph／WASAPI handoff。兩者尚未在目標機注入含音訊程序、Au
 `aac9274` 再拒絕不同 PID 共用同一 Lane 的 `DuplicateLane`，與 graph duplicate invariant 對齊。
 `7d43e67` 將 requested/effective/safety dB、origin、actuator、generation 與 bounded
 route-health cards 接到 Easy／Expert control-model；它只顯示保守的 session、process loopback、
-瀏覽器單分頁與 direct bypass 邊界，不宣稱尚未接上的 engine status IPC。
+瀏覽器單分頁與 direct bypass 邊界。`e97fb90` 接上 ControlStatusSnapshot 的 C++/C# wire、
+store、handler 與 atomic ViewModel apply；本機 status probe 通過，但仍不宣稱 physical
+per-App delivery 或 browser tab capture 已完成。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 75 個必要入口與
 17 份 Spec 通過；`source-policy.ps1` 掃描數量以最新 gate 輸出為準且無 blocked
