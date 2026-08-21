@@ -77,6 +77,27 @@
                 </Border>
 
                 <Border Padding="20" CornerRadius="12" Background="#1D2028">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="自訂預設" FontSize="20" FontWeight="SemiBold" />
+                        <TextBlock Text="建立最多 32 個自訂卡片；完整 DSP graph 由引擎端 Scene catalog 驗證。"
+                                   TextWrapping="Wrap" Opacity="0.72" />
+                        <TextBox Header="Scene ID（英文小寫）"
+                                 Text="{Binding CustomSceneId, Mode=TwoWay}"
+                                 AutomationProperties.Name="自訂場景 ID"
+                                 AutomationProperties.HelpText="使用小寫英數、點、底線或連字號，最多 31 字元" />
+                        <TextBox Header="名稱"
+                                 Text="{Binding CustomSceneName, Mode=TwoWay}"
+                                 AutomationProperties.Name="自訂場景名稱" />
+                        <TextBox Header="說明"
+                                 Text="{Binding CustomSceneDescription, Mode=TwoWay}"
+                                 AutomationProperties.Name="自訂場景說明" />
+                        <Button Content="加入自訂預設" Click="OnAddCustomSceneClick"
+                                AutomationProperties.Name="加入自訂預設"
+                                AutomationProperties.HelpText="加入後會保存到本機 user-space preset 檔案" />
+                    </StackPanel>
+                </Border>
+
+                <Border Padding="20" CornerRadius="12" Background="#1D2028">
                     <StackPanel Spacing="12">
                         <Grid>
                             <Grid.ColumnDefinitions>

@@ -16,6 +16,26 @@ Check(!customScenes.Upsert(new SceneCard("game", "覆寫遊戲", "", "", true)) 
     "Custom Scene catalog must reject reserved or invalid IDs.");
 Check(customScenes.Remove("quiet-game") && customScenes.Count == 0,
     "Custom Scene card removal failed.");
+var customScenePath = Path.Combine(Path.GetTempPath(), $"hibiki-scene-check-{Guid.NewGuid():N}.json");
+try
+{
+    Check(customScenes.Upsert(new SceneCard("quiet-game", "安靜遊戲", "遊戲音量保護",
+                                             "零額外緩衝", true)) &&
+          customScenes.TrySave(customScenePath, out _),
+        "Custom Scene catalog save failed.");
+    var loadedScenes = new CustomSceneCatalogV1();
+    Check(loadedScenes.TryLoad(customScenePath, out _) && loadedScenes.Count == 1 &&
+          loadedScenes.Scenes[0].Id == "quiet-game",
+        "Custom Scene catalog load failed.");
+    File.WriteAllText(customScenePath,
+        "{\"schema_version\":1,\"scenes\":[{\"id\":\"Bad ID\",\"name\":\"x\",\"description\":\"\",\"latency_label\":\"\",\"safety_enabled\":true}]}");
+    Check(!loadedScenes.TryLoad(customScenePath, out _) && loadedScenes.Count == 1,
+        "Invalid custom Scene load must preserve the previous catalog.");
+}
+finally
+{
+    if (File.Exists(customScenePath)) File.Delete(customScenePath);
+}
 Check(OutputGroupCatalog.Fixed.Count == 3 &&
       OutputGroupCatalog.Fixed.Select(group => group.Id).SequenceEqual(
           ["main", "low-latency", "surround"]),

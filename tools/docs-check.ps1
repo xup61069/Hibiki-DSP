@@ -26,6 +26,7 @@ $required = @(
   'schemas/basic-noise-suppressor-policy-v1.schema.json',
   'schemas/virtual-mic-policy-v1.schema.json',
   'schemas/graph-config-v1.schema.json', 'schemas/scene-definition-v1.schema.json',
+  'schemas/custom-scene-cards-v1.schema.json',
   'schemas/peq-filter-v1.schema.json',
   'schemas/calibration-response-v1.schema.json',
   'schemas/vst3-latency-alignment-v1.schema.json',

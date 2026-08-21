@@ -33,7 +33,8 @@ foreach ($requiredText in @('x:Name="RootGrid"', 'ItemsSource="{Binding Scenes}"
     'AutomationProperties.Name="一鍵改善聲音"',
     'AutomationProperties.Name="系統音量"',
     'AutomationProperties.Name="Expert 詳細模式"',
-    'AutomationProperties.LiveSetting="Polite"')) {
+    'AutomationProperties.LiveSetting="Polite"', 'CustomSceneId', 'CustomSceneName',
+    'CustomSceneDescription', 'OnAddCustomSceneClick')) {
   if (-not $xaml.Contains($requiredText)) { throw "WinUI shell binding missing: $requiredText" }
 }
 if (-not $codeBehind.Contains('RootGrid.DataContext = ViewModel') -or

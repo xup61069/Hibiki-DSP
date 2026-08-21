@@ -6,7 +6,7 @@ authority: product-behavior
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["src/hub/**scene_catalog*", "src/hub/**engine_control*", "apps/control-model/**Scene*", "schemas/scene-definition-v1.schema.json", "tests/**"]
+source_globs: ["src/hub/**scene_catalog*", "src/hub/**engine_control*", "apps/control-model/**Scene*", "apps/winui-shell/**", "schemas/scene-definition-v1.schema.json", "schemas/custom-scene-cards-v1.schema.json", "tests/**"]
 ---
 
 # SPEC-0014：自定義 Scene catalog 與 SceneApply resolver
@@ -23,6 +23,10 @@ Scene 完全相同，避免 UI 顯示一組 Scene 卻把音訊送到另一個 gr
 `SceneDefinitionV1` 管理。UI mirror 不得覆寫四個內建 ID，選取自訂卡片仍只能送出既有
 `SceneApply(scene_id, output_group)`，因此 output-group exact-match 與引擎端 fail-closed
 規則不會被繞過。
+
+UI mirror 以 `custom-scene-cards-v1.schema.json` 保存到 user-space 的本機設定檔；寫入採同目錄
+暫存檔替換，載入先完整驗證後才交換 catalog。檔案只含顯示卡片，不含裝置 ID、校正資料、
+plugin state 或完整 graph；載入失敗時保留目前記憶體內容。
 
 ## 交易與容量
 

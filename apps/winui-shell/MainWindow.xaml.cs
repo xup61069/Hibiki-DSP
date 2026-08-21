@@ -14,6 +14,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        ViewModel.LoadCustomScenes(out _);
         RootGrid.DataContext = ViewModel;
         Closed += OnClosed;
     }
@@ -32,6 +33,11 @@ public sealed partial class MainWindow : Window
     {
         if (sender is Button { Tag: string sceneId })
             await ViewModel.SelectSceneAsync(sceneId);
+    }
+
+    private void OnAddCustomSceneClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.AddCustomScene();
     }
 
     private async void OnVolumeChanged(object sender, RangeBaseValueChangedEventArgs e)

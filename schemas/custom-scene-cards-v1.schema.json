@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/custom-scene-cards-v1.schema.json",
+  "title": "Hibiki custom Scene cards v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "scenes"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "scenes": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "description", "latency_label", "safety_enabled"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,30}$"},
+          "name": {"type": "string", "minLength": 1, "maxLength": 120},
+          "description": {"type": "string", "maxLength": 240},
+          "latency_label": {"type": "string", "maxLength": 64},
+          "safety_enabled": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}

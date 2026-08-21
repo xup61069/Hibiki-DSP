@@ -26,6 +26,9 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private ControlConnectionState _connectionState = ControlConnectionState.Disconnected;
     private bool _isBusy;
     private CancellationTokenSource? _volumeDebounce;
+    private string _customSceneId = string.Empty;
+    private string _customSceneName = string.Empty;
+    private string _customSceneDescription = string.Empty;
 
     public ExpertSurfaceModel Expert { get; } = new();
 
@@ -40,6 +43,9 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public IReadOnlyList<SceneCard> Scenes => _session.Scenes;
     public IReadOnlyList<OutputGroupCard> OutputGroups => OutputGroupCatalog.Fixed;
+    public string CustomSceneCatalogPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Hibiki DSP", "scene-cards-v1.json");
     public UiMode Mode => _isExpert ? UiMode.Expert : UiMode.Easy;
     public AudioControlStatus Status => _session.Status;
     public ControlConnectionState ConnectionState => _connectionState;
@@ -74,6 +80,24 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             _statusText = value;
             OnPropertyChanged();
         }
+    }
+
+    public string CustomSceneId
+    {
+        get => _customSceneId;
+        set { if (value != _customSceneId) { _customSceneId = value; OnPropertyChanged(); } }
+    }
+
+    public string CustomSceneName
+    {
+        get => _customSceneName;
+        set { if (value != _customSceneName) { _customSceneName = value; OnPropertyChanged(); } }
+    }
+
+    public string CustomSceneDescription
+    {
+        get => _customSceneDescription;
+        set { if (value != _customSceneDescription) { _customSceneDescription = value; OnPropertyChanged(); } }
     }
 
     public bool IsExpert
@@ -168,6 +192,32 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(Scenes));
         return true;
     }
+
+    public bool AddCustomScene()
+    {
+        var scene = new SceneCard(CustomSceneId.Trim(), CustomSceneName.Trim(),
+                                  CustomSceneDescription.Trim(), "平衡", true);
+        if (!UpsertCustomScene(scene))
+        {
+            StatusText = "自訂場景無效、重複或已達 32 筆上限";
+            return false;
+        }
+        CustomSceneId = string.Empty;
+        CustomSceneName = string.Empty;
+        CustomSceneDescription = string.Empty;
+        StatusText = $"已加入自訂場景：{scene.Name}";
+        return SaveCustomScenes(out _);
+    }
+
+    public bool LoadCustomScenes(out string error)
+    {
+        var loaded = _session.CustomScenes.TryLoad(CustomSceneCatalogPath, out error);
+        if (loaded) OnPropertyChanged(nameof(Scenes));
+        return loaded;
+    }
+
+    public bool SaveCustomScenes(out string error) =>
+        _session.CustomScenes.TrySave(CustomSceneCatalogPath, out error);
 
     public bool RemoveCustomScene(string sceneId)
     {
