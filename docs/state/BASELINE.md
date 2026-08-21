@@ -328,7 +328,8 @@ working tree 與該 scope 是否一致。
 `9dc903a`；catalog publisher 的 source commit 是 `9be7f15`；Windows COM worker／request
 provider 的 source commit 是 `0b2800f`；opt-in live probe 的 source commit 是 `b92cc1f`；連線後自動刷新
 裝置清單的 source commit 是 `80d9cad`；snapshot store stale-sequence fail-closed 的 source
-commit 是 `a18e785`；其餘較早 scope 仍以下方 evidence manifest 的各自 commit 與限制為準。
+commit 是 `a18e785`；live probe service-provider coverage 的 source commit 是 `25bd3a3`；其餘較早
+scope 仍以下方 evidence manifest 的各自 commit 與限制為準。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 67 個必要入口與
 15 份 Spec 通過；`source-policy.ps1` 掃描 288 個路徑且無 blocked binary/secret；
