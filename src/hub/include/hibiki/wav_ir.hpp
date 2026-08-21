@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "hibiki/ir_convolver.hpp"
+#include "hibiki/ir_phase_kernel.hpp"
 
 #include <cstddef>
 #include <cstdint>

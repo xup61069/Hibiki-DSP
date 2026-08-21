@@ -146,7 +146,7 @@ internal sealed class PreviewForm : Form
             : "路由狀態：" + string.Join("／", _viewModel.Expert.RouteHealth.Select(route =>
                 $"{route.Name} {route.StateLabel}"));
         _status.Text = _viewModel.StatusText;
-        _irStatus.Text = $"{_viewModel.IrPhaseModeText}；實測延遲 {_viewModel.IrAddedDelayMs:0.0} ms。尚未送出 FIR 係數。";
+        _irStatus.Text = $"{_viewModel.IrPhaseModeText}；實測延遲 {_viewModel.IrAddedDelayMs:0.0} ms。尚未送出 IR／kernel prepare command。";
         var requested = Math.Clamp((int)Math.Round(_viewModel.RequestedVolumeDb), _volume.Minimum, _volume.Maximum);
         if (_volume.Value != requested) _volume.Value = requested;
         if (_irModes.SelectedValue is not IrPhaseMode currentMode || currentMode != _viewModel.IrPhaseMode)

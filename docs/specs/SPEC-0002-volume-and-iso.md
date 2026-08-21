@@ -103,15 +103,18 @@ ISO 係數 fit。
 
 `IrConvolverV1` 提供最多 4096 taps、mono 或逐聲道 kernel 的固定容量 direct FIR；它保存
 跨 block history，會檢查 `IrPhaseResolutionV1` 已經 valid、sample rate／聲道一致與所有
-係數 finite。它只執行 caller 提供的 IR，不自行推導 minimum/mixed/linear-phase kernel；
-宣告的 delay 仍須由實際量測驗證。
+係數 finite。`build_ir_phase_kernel_v1` 是 control-plane 的 bounded phase transform：
+minimum-phase 使用 real-cepstrum reconstruction，mixed/linear-phase 以 source magnitude
+建立 causal integer-sample linear-phase target，再依 strength 做 phase interpolation；它
+不在 RT thread 配置或執行。轉換後的 declared delay 仍須由實際量測驗證，不能把 FFT 轉換
+結果宣稱成 ISO 或聲學 conformance。
 
 `decode_ir_wav_v1` 是 control-plane 的 bounded RIFF/WAVE importer：接受 IEEE Float32 與 signed
 PCM16/24/32、最多 8 聲道與 4096 frames，檢查 RIFF container/chunk 邊界、block alignment、
 sample-rate、finite samples 與記憶體上限；它不讀檔、不配置在 RT thread。`prepare_ir_convolver_from_wav_v1`
 會把 interleaved file samples 轉成 convolver 的 channel-major kernel，並在 graph commit 前
-套用已解析的 phase policy。這仍不代表已推導 minimum/mixed/linear kernel，或已在實體 sink
-上套用校正。
+套用已解析的 phase policy；Bypass 會 fail-closed，不會把 IR 偷掛到 Strict Direct。這仍不
+代表已在 graph／實體 sink 上套用校正。
 
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
 `Program-aware` 另有 `ProgramAwareLevelControllerV1` 的慢速內容音量控制：預設保留無配置的
@@ -127,14 +130,15 @@ RMS 代理；`KWeightedProxy` 會在固定容量狀態內串接高通與高頻 s
 `IrPhasePolicyV1` 是獨立於 ISO magnitude 的 control-plane contract。`strength` 固定為
 0..1，0 代表不增加 buffering；1 代表該模式允許的最高相位校正。模式語意固定如下：
 
-- `minimum-phase`：Game 預設，IIR、0 ms 額外 buffering。
+- `minimum-phase`：Game 預設，minimum-phase IIR／FIR 路徑、0 ms 額外 buffering。
 - `mixed-phase`：Balanced，最多 80 ms 的 mixed-phase FIR。
 - `linear-phase`：Movie 預設，最多 160 ms 的 linear-phase FIR。
 - `bypass`：Strict Direct，完全不掛 IR／校正鏈。
 
-`resolve_ir_phase_policy` 只解析可承諾的最大延遲與是否需要 FIR，不假裝已經生成 FIR
-係數；實際 IR 仍由 caller 提供，graph commit 前必須以量測的實際 latency 取代預估值。
-UI 顯示「0 ms 額外緩衝」「最高 80/160 ms」等可驗證文字，不使用「零延遲完美相位」宣稱。
+`resolve_ir_phase_policy` 解析可承諾的最大延遲與是否需要 FIR；`build_ir_phase_kernel_v1`
+才會在 control-plane 生成 bounded kernel。UI 目前尚未送出 IR 檔／kernel prepare command，
+因此不能把 UI 選擇寫成已套用。graph commit 前必須以量測的實際 latency 取代預估值。UI 顯示
+「0 ms 額外緩衝」「最高 80/160 ms」等可驗證文字，不使用「零延遲完美相位」宣稱。
 Scene 若省略 `ir_phase` 欄位，向後相容地採用 `minimum-phase/strength=0`。
 
 公開 repository 不得包含 ISO 授權文件、掃圖、完整受限表格或未核准 golden data。正式係數加入

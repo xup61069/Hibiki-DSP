@@ -20,6 +20,7 @@ add_library(hibiki_hub STATIC
   src/engine_control.cpp
   src/exporters.cpp
   src/ir_phase.cpp
+  src/ir_phase_kernel.cpp
   src/ipc.cpp
   src/ipc_pipe.cpp
   src/ir_convolver.cpp

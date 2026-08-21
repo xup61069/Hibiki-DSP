@@ -2283,6 +2283,38 @@ int main() {
     malformed_wav[34U] = 16U;
     CHECK(!decode_ir_wav_v1(malformed_wav).valid);
 
+    const std::vector<float> phase_source = {
+        0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F,
+        0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F};
+    const auto minimum_resolution = resolve_ir_phase_policy(
+        IrPhasePolicyV1{1U, IrPhaseMode::MinimumPhase, 1.0});
+    const auto minimum_kernel = build_ir_phase_kernel_v1(
+        phase_source, 8U, 2U, 48000U, minimum_resolution);
+    CHECK(minimum_kernel.valid && minimum_kernel.channel_major.size() == phase_source.size() &&
+          std::abs(minimum_kernel.channel_major[0] - 1.0F) < 1.0e-4F &&
+          std::abs(minimum_kernel.channel_major[3]) < 1.0e-4F &&
+          std::abs(minimum_kernel.channel_major[8] - 1.0F) < 1.0e-4F &&
+          std::abs(minimum_kernel.channel_major[9]) < 1.0e-4F);
+    const auto linear_resolution = resolve_ir_phase_policy(
+        IrPhasePolicyV1{1U, IrPhaseMode::LinearPhase, 1.0});
+    const auto linear_kernel = build_ir_phase_kernel_v1(
+        phase_source, 8U, 2U, 48000U, linear_resolution);
+    CHECK(linear_kernel.valid && std::abs(linear_kernel.channel_major[4] - 1.0F) < 1.0e-4F &&
+          std::abs(linear_kernel.channel_major[12] - 1.0F) < 1.0e-4F);
+    const auto mixed_source_resolution = resolve_ir_phase_policy(
+        IrPhasePolicyV1{1U, IrPhaseMode::MixedPhase, 0.0});
+    const auto mixed_source = build_ir_phase_kernel_v1(
+        phase_source, 8U, 2U, 48000U, mixed_source_resolution);
+    CHECK(mixed_source.valid && mixed_source.channel_major == phase_source);
+    const auto bypass_resolution = resolve_ir_phase_policy(
+        IrPhasePolicyV1{1U, IrPhaseMode::Bypass, 0.0});
+    const auto bypass_kernel = build_ir_phase_kernel_v1(
+        phase_source, 8U, 2U, 48000U, bypass_resolution);
+    CHECK(bypass_kernel.valid && bypass_kernel.channel_major == phase_source);
+    IrConvolverV1 bypass_convolver;
+    CHECK(!prepare_ir_convolver_from_wav_v1(bypass_convolver, decoded_ir.data,
+                                            bypass_resolution));
+
     AudioEngineModel engine;
     GraphConfigV1 engine_graph;
     engine_graph.lanes.push_back(LaneConfigV1{"game", "main", 2, 0.0, true});

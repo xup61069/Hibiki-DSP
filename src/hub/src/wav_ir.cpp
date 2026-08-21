@@ -171,8 +171,14 @@ bool prepare_ir_convolver_from_wav_v1(IrConvolverV1& convolver,
                     data.interleaved_samples[frame * data.channels + channel];
             }
         }
-        return convolver.prepare(channel_major, data.frames(), data.channels, data.channels,
-                                 data.sample_rate, phase);
+        const auto transformed = build_ir_phase_kernel_v1(
+            channel_major, data.frames(), data.channels, data.sample_rate, phase);
+        if (!transformed.valid ||
+            (phase.mode == IrPhaseMode::Bypass && transformed.resolution.mode == IrPhaseMode::Bypass)) {
+            return false;
+        }
+        return convolver.prepare(transformed.channel_major, transformed.taps,
+                                 transformed.kernel_channels, data.channels, data.sample_rate, phase);
     } catch (...) {
         return false;
     }

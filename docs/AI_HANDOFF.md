@@ -32,6 +32,9 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
 - C++ control-plane 已有 bounded RIFF/WAVE IR importer，支援 Float32/PCM16/24/32、finite/tap/file
   bounds 與 channel-major convolver prepare；它仍不做 FIR phase kernel derivation、graph commit 或
   physical sink playback，見 `evidence/0000-foundation/ir-wav-decoder-v1.json`。
+- `build_ir_phase_kernel_v1` 已補上 control-plane 的 real-cepstrum minimum-phase 與
+  source-magnitude causal linear-phase transform，並由 WAV→kernel prepare 測試覆蓋；UI 尚未送出
+  IR/kernel prepare command，不能宣稱已在 graph 或實體 sink 套用。
 - C++ Engine Preview 已可由 `tools/build-engine-preview.ps1` 建置；`tools/engine-preview-smoke.ps1`
   會啟動它並驗證 v1 named-pipe Hello/Ack request correlation 與 ControlStatusSnapshot 回覆。
   `tools/control-model-engine-smoke.ps1` 另外以 C# `EasyControlViewModel` 驗證 −18 dB 音量

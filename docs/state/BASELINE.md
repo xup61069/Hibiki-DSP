@@ -29,6 +29,10 @@
   without file I/O on the RT thread. This is a file/import contract only; it does not derive
   minimum/mixed/linear kernels or prove physical-sink playback. Evidence:
   `evidence/0000-foundation/ir-wav-decoder-v1.json`.
+- `build_ir_phase_kernel_v1` now performs the bounded control-plane phase transform: real-cepstrum
+  minimum-phase reconstruction and source-magnitude causal linear-phase targeting for mixed/linear
+  strength. Tests cover delayed impulses, independent channels, source-strength zero and Bypass
+  fail-closed behavior; UI still has no IR/kernel prepare command or physical sink.
 - 公開 monorepo 文件、component license map 與 source-only paid-release policy。
 - AI 接手規則、fresh-clone 流程與 source-only policy。
 - `OutputGroupVolumeState` 與 ISO compensation public C++ boundary 的初始骨架。
