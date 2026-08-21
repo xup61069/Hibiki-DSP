@@ -46,5 +46,10 @@ Windows endpoint enumeration 是額外的 opt-in live check：
 `pwsh -File tools/live-device-catalog-check.ps1`。它只產生 `.local/` 暫存輸出；不得把
 真實 endpoint ID、friendly name、簽章檔或任何編譯產物提交到 Git。
 
+Shared-mode WASAPI handoff 也是額外的 opt-in live check：
+`pwsh -File tools/live-wasapi-handoff-check.ps1`。它只送靜音 block，輸出 mix format
+與 aggregate worker counters；沒有可用 endpoint 時只能記錄 `wasapi=unavailable`，不能
+把 user-space probe 當成已完成的 WaveRT／HLK／Microsoft signing 驗收。
+
 遇到環境差異先記錄 fingerprint 並更新 handoff，不要自行重生
 `config/distribution-profile.yml` 裡的 endpoint、ASIO、IPC GUID。
