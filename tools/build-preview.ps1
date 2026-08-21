@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-  [ValidateSet('WinUI', 'WinUICompat', 'DesktopCompat', 'ControlModel')][string]$Target = 'WinUI'
+  [ValidateSet('WinUI', 'WinUICompat', 'DesktopCompat', 'ControlModel')][string]$Target = 'DesktopCompat',
+  [switch]$SmokeTest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,6 +35,16 @@ if ($Target -eq 'DesktopCompat') {
   $project = Join-Path $repo 'apps/desktop-compat-preview/Hibiki.DesktopPreview.csproj'
   dotnet publish $project --configuration Release --runtime win-x64 --self-contained true --output $previewRoot
   if ($LASTEXITCODE -ne 0) { throw "Desktop compatibility preview build failed: $LASTEXITCODE" }
+  if ($SmokeTest) {
+    $executable = Join-Path $previewRoot 'Hibiki.DesktopPreview.exe'
+    if (-not (Test-Path -LiteralPath $executable)) { throw "Desktop preview executable was not produced: $executable" }
+    $process = Start-Process -FilePath $executable -WorkingDirectory $previewRoot -WindowStyle Hidden -PassThru
+    Start-Sleep -Seconds 3
+    if ($process.HasExited) { throw "Desktop compatibility preview exited during smoke test: $($process.ExitCode)" }
+    Stop-Process -Id $process.Id
+    $process.WaitForExit()
+    Write-Output "Desktop compatibility preview launch smoke passed."
+  }
   Write-Output "Self-contained desktop preview build succeeded. It needs no Windows App Runtime, is driver-free and excluded from Git."
   return
 }
