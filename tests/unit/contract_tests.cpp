@@ -1364,6 +1364,9 @@ int main() {
     CHECK(wasapi_handoff.state() == WasapiSinkHandoffStateV1::Unbound);
     CHECK(!wasapi_handoff.process(nullptr, 128U, 2U));
     CHECK(!wasapi_handoff.begin(WasapiOutputConfigV1{L"", 2U, 48000U, 20U}, 128U, 30U));
+    CHECK(!wasapi_handoff.start_initial(WasapiOutputConfigV1{L"", 3U, 48000U, 20U}, 128U));
+    CHECK(wasapi_handoff.state() == WasapiSinkHandoffStateV1::Degraded);
+    wasapi_handoff.stop();
     wasapi_handoff.rollback();
     CHECK(wasapi_handoff.state() == WasapiSinkHandoffStateV1::Unbound);
 #endif
