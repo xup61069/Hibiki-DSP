@@ -5,6 +5,7 @@
 #include "hibiki/control_payloads.hpp"
 #include "hibiki/control_status.hpp"
 #include "hibiki/device_catalog_snapshot.hpp"
+#include "hibiki/session_catalog.hpp"
 #include "hibiki/ipc_pipe.hpp"
 
 #include <array>
@@ -20,6 +21,8 @@ using DeviceCatalogSnapshotReplyV1 = bool (*)(IpcFrameV1& response,
                                               void* context) noexcept;
 using ControlStatusSnapshotReplyV1 = bool (*)(IpcFrameV1& response,
                                               void* context) noexcept;
+using SessionCatalogSnapshotReplyV1 = bool (*)(IpcFrameV1& response,
+                                               void* context) noexcept;
 
 struct ControlPlaneHandlerContextV1 {
     ControlCommandSinkV1 sink{nullptr};
@@ -28,6 +31,8 @@ struct ControlPlaneHandlerContextV1 {
     void* snapshot_context{nullptr};
     ControlStatusSnapshotReplyV1 status_reply{nullptr};
     void* status_context{nullptr};
+    SessionCatalogSnapshotReplyV1 session_catalog_reply{nullptr};
+    void* session_catalog_context{nullptr};
 };
 
 // Single-producer (pipe worker), single-consumer (control worker) queue. The
@@ -69,12 +74,14 @@ public:
         ControlCommandSinkV1 sink,
         void* sink_context,
         DeviceCatalogSnapshotStoreV1* snapshot_store = nullptr,
-        ControlStatusSnapshotStoreV1* status_store = nullptr) noexcept;
+        ControlStatusSnapshotStoreV1* status_store = nullptr,
+        SessionCatalogSnapshotStoreV1* session_catalog_store = nullptr) noexcept;
 
     [[nodiscard]] bool start_with_queue(
         const IpcNamedPipeConfigV1& config,
         DeviceCatalogSnapshotStoreV1* snapshot_store = nullptr,
-        ControlStatusSnapshotStoreV1* status_store = nullptr) noexcept;
+        ControlStatusSnapshotStoreV1* status_store = nullptr,
+        SessionCatalogSnapshotStoreV1* session_catalog_store = nullptr) noexcept;
 
     void stop() noexcept;
 

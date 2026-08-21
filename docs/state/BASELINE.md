@@ -45,6 +45,10 @@
   the named-pipe handler replies by request ID and the C# ViewModel rejects stale/malformed
   frames while preserving its prior safe state. The local live probe reports
   `volume=pass status=pass route_status=pass routes=4 status_sequence=4`.
+- `SessionCatalogSnapshot` v1 now publishes a bounded App/session selection list through the
+  worker-owned route coordinator. Generation-scoped ephemeral handles, safe metadata fallback,
+  C++/C# codec/store/handler correlation and stale ViewModel replacement are covered; this is
+  still a selection boundary rather than proof of physical per-App delivery.
 - `CalibrationResponsePointV1` and `compile_bounded_peq_correction_v1` now provide a deterministic
   control-plane measured-response to bounded PEQ compiler (16-filter cap, frequency/spacing/Q and
   boost/cut policy validation, explicit `limited` result) that feeds the existing APO/CamillaDSP/

@@ -24,6 +24,9 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private ulong _generation;
     private VolumeSafetyStateV1 _volumeState = VolumeSafetyStateV1.Initial();
     private ulong _statusSequence;
+    private ulong _sessionCatalogSequence;
+    private IReadOnlyList<SessionCatalogEntryV1> _sessionCatalog =
+        Array.Empty<SessionCatalogEntryV1>();
     private IrPhaseMode _irPhaseMode = IrPhaseMode.MinimumPhase;
     private double _irPhaseStrength;
     private ControlConnectionState _connectionState = ControlConnectionState.Disconnected;
@@ -47,6 +50,11 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     public IReadOnlyList<SceneCard> Scenes => _session.Scenes;
     public IReadOnlyList<OutputGroupCard> OutputGroups => OutputGroupCatalog.Fixed;
     public IReadOnlyList<PhysicalDeviceCard> PhysicalDevices => _session.PhysicalDevices.Devices;
+    // The engine publishes ephemeral handles instead of raw Windows session
+    // identifiers. A refresh replaces the list atomically; callers must not
+    // retain a handle across a newer sequence.
+    public IReadOnlyList<SessionCatalogEntryV1> SessionCatalog => _sessionCatalog;
+    public ulong SessionCatalogSequence => _sessionCatalogSequence;
     public string CustomSceneCatalogPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Hibiki DSP", "scene-cards-v1.json");
@@ -315,6 +323,34 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         return true;
     }
 
+    // Applies the bounded App/session catalog without exposing endpoint IDs,
+    // PIDs or Windows session-instance strings to the UI. Malformed or stale
+    // frames leave the previous visible catalog untouched.
+    public bool ApplySessionCatalogSnapshot(IpcEnvelopeV1 frame, out string error)
+    {
+        error = string.Empty;
+        if (frame.Type != ControlMessageType.SessionCatalogSnapshot ||
+            !ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(frame.Payload.Span,
+                                                                 out var sequence,
+                                                                 out _,
+                                                                 out var sessions))
+        {
+            error = "工作階段清單格式無效";
+            return false;
+        }
+        if (sequence < _sessionCatalogSequence)
+        {
+            error = "工作階段清單已過期";
+            return false;
+        }
+        _sessionCatalog = sessions.ToArray();
+        _sessionCatalogSequence = sequence;
+        OnPropertyChanged(nameof(SessionCatalog));
+        OnPropertyChanged(nameof(SessionCatalogSequence));
+        StatusText = "App 工作階段清單已更新；可選擇每個 App 的路由";
+        return true;
+    }
+
     // A future versioned status frame can call this after the engine has
     // reconciled Windows dB, the safety ceiling and the actual actuator. It is
     // intentionally fail-closed and never writes Windows or the audio graph.
@@ -477,6 +513,53 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         }
     }
 
+    public async Task<bool> RefreshSessionCatalogAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_controlClient is null || !_controlClient.IsConnected)
+        {
+            StatusText = "引擎未連線；無法更新 App 清單";
+            return false;
+        }
+        var gateHeld = false;
+        try
+        {
+            await _commandGate.WaitAsync(cancellationToken).ConfigureAwait(true);
+            gateHeld = true;
+            SetBusy(true);
+            var reply = await _controlClient.RoundTripAsync(_commands.RequestSessionCatalog(),
+                                                              cancellationToken)
+                .ConfigureAwait(true);
+            var snapshotError = string.Empty;
+            var applied = reply.Type == ControlMessageType.SessionCatalogSnapshot &&
+                          ApplySessionCatalogSnapshot(reply, out snapshotError);
+            if (!applied)
+            {
+                StatusText = reply.Type == ControlMessageType.Error
+                    ? "引擎拒絕 App 清單要求"
+                    : $"App 清單無效：{snapshotError}";
+                return false;
+            }
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "App 清單更新已取消；保留上一份清單";
+            return false;
+        }
+        catch (Exception)
+        {
+            SetConnectionState(ControlConnectionState.Degraded);
+            StatusText = "App 清單更新失敗；保留上一份清單";
+            return false;
+        }
+        finally
+        {
+            SetBusy(false);
+            if (gateHeld) _commandGate.Release();
+        }
+    }
+
     public bool SelectPhysicalDevice(string endpointId)
     {
         if (!_session.PhysicalDevices.TryGet(endpointId, out var device) || device is null ||
@@ -553,6 +636,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
                 StatusText = "引擎已連線；裝置清單暫不可用，音訊保持安全狀態";
             if (IsConnected && !await RefreshControlStatusAsync(cancellationToken).ConfigureAwait(true))
                 StatusText = "引擎已連線；控制狀態暫不可用，音訊保持安全狀態";
+            if (IsConnected && !await RefreshSessionCatalogAsync(cancellationToken).ConfigureAwait(true))
+                StatusText = "引擎已連線；App 清單暫不可用，音訊保持安全狀態";
             return true;
         }
         catch (OperationCanceledException)

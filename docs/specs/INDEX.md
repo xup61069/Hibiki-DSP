@@ -20,6 +20,7 @@
 | SPEC-0016 | accepted | Windows process-loopback capture 與 per-App source boundary |
 | SPEC-0017 | accepted | Control status snapshot IPC、volume safety 與 route-health UI 同步 |
 | SPEC-0018 | accepted | Windows per-session volume control boundary 與 ephemeral identity safety |
+| SPEC-0019 | accepted | App 工作階段 catalog、暫時 handle 與 UI 選取邊界 |
 
 Draft spec 有 blocking open question 時不得直接實作；公開行為變更必須在同一 PR
 更新 spec 與測試。

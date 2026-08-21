@@ -7,6 +7,7 @@
 #include "hibiki/session_route.hpp"
 #include "hibiki/session_route_rules.hpp"
 #include "hibiki/process_loopback_plan.hpp"
+#include "hibiki/session_catalog.hpp"
 #include "hibiki/windows_audio_session_watcher.hpp"
 
 #include <cstddef>
@@ -62,6 +63,9 @@ public:
     [[nodiscard]] bool copy_graph(GraphConfigV1& graph) const noexcept;
     [[nodiscard]] ProcessLoopbackPlanResultV1 copy_process_loopback_plan(
         ProcessLoopbackPlanV1& plan) const noexcept;
+    [[nodiscard]] bool make_session_catalog_snapshot(
+        std::uint64_t sequence,
+        SessionCatalogSnapshotV1& snapshot) const noexcept;
     [[nodiscard]] WindowsAudioSessionRouteSnapshotV1 snapshot() const noexcept;
 
 private:

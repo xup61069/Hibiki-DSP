@@ -32,6 +32,7 @@
 #include "hibiki/audio_engine.hpp"
 #include "hibiki/audio_session_registry.hpp"
 #include "hibiki/driver_stream_bridge.hpp"
+#include "hibiki/session_catalog.hpp"
 
 extern "C" {
 #include "hibiki/driver_control_v1.h"
@@ -123,6 +124,14 @@ bool accept_status_request(const hibiki::ControlCommandV1& command, void* contex
     if (context == nullptr) return false;
     auto* accepted = static_cast<bool*>(context);
     *accepted = command.type == hibiki::IpcMessageType::ControlStatusRequest;
+    return *accepted;
+}
+
+bool accept_session_catalog_request(const hibiki::ControlCommandV1& command,
+                                    void* context) noexcept {
+    if (context == nullptr) return false;
+    auto* accepted = static_cast<bool*>(context);
+    *accepted = command.type == hibiki::IpcMessageType::SessionCatalogRequest;
     return *accepted;
 }
 
@@ -1040,6 +1049,62 @@ int main() {
           status_response.payload.size() == status_bytes);
     CHECK(!status_store.publish(status_snapshot) && status_store.sequence() == 3U &&
           control_status_snapshot_reply_v1(status_response, &status_store));
+    SessionCatalogSnapshotV1 session_catalog_snapshot{};
+    session_catalog_snapshot.sequence = 12U;
+    session_catalog_snapshot.generation = 2U;
+    session_catalog_snapshot.entry_count = 2U;
+    session_catalog_snapshot.entries[0].handle = (2ULL << 32U) | 1ULL;
+    session_catalog_snapshot.entries[0].active = 1U;
+    session_catalog_snapshot.entries[0].route_state = SessionCatalogRouteStateV1::Ready;
+    session_catalog_snapshot.entries[0].flags = 1U;
+    session_catalog_snapshot.entries[0].requested_db_q16_16 = -622592; // -9.5 dB
+    session_catalog_snapshot.entries[0].name_bytes = 5U;
+    session_catalog_snapshot.entries[0].app_bytes = 8U;
+    session_catalog_snapshot.entries[0].lane_bytes = 4U;
+    session_catalog_snapshot.entries[0].output_bytes = 4U;
+    std::copy("DJMAX", "DJMAX" + 5, session_catalog_snapshot.entries[0].name.begin());
+    std::copy("game.exe", "game.exe" + 8, session_catalog_snapshot.entries[0].app.begin());
+    std::copy("game", "game" + 4, session_catalog_snapshot.entries[0].lane.begin());
+    std::copy("main", "main" + 4, session_catalog_snapshot.entries[0].output.begin());
+    session_catalog_snapshot.entries[1].handle = (2ULL << 32U) | 2ULL;
+    session_catalog_snapshot.entries[1].route_state = SessionCatalogRouteStateV1::Unavailable;
+    session_catalog_snapshot.entries[1].mute = 1U;
+    session_catalog_snapshot.entries[1].name_bytes = 10U;
+    session_catalog_snapshot.entries[1].app_bytes = 10U;
+    session_catalog_snapshot.entries[1].lane_bytes = 11U;
+    session_catalog_snapshot.entries[1].output_bytes = 4U;
+    std::copy("Chrome tab", "Chrome tab" + 10, session_catalog_snapshot.entries[1].name.begin());
+    std::copy("chrome.exe", "chrome.exe" + 10, session_catalog_snapshot.entries[1].app.begin());
+    std::copy("browser-tab", "browser-tab" + 11, session_catalog_snapshot.entries[1].lane.begin());
+    std::copy("main", "main" + 4, session_catalog_snapshot.entries[1].output.begin());
+    std::array<std::uint8_t, kSessionCatalogSnapshotPayloadBytesV1> session_payload{};
+    std::size_t session_bytes = 0U;
+    CHECK(is_valid_message_type(IpcMessageType::SessionCatalogRequest) &&
+          is_valid_message_type(IpcMessageType::SessionCatalogSnapshot) &&
+          encode_session_catalog_snapshot_v1(session_catalog_snapshot, session_payload, session_bytes) &&
+          session_bytes == kSessionCatalogSnapshotHeaderBytesV1 +
+                               (2U * kSessionCatalogSnapshotEntryBytesV1));
+    SessionCatalogSnapshotV1 decoded_session{};
+    CHECK(decode_session_catalog_snapshot_v1(
+              std::span<const std::uint8_t>(session_payload.data(), session_bytes),
+              decoded_session) &&
+          decoded_session.sequence == 12U && decoded_session.generation == 2U &&
+          decoded_session.entry_count == 2U && decoded_session.entries[0].handle ==
+              session_catalog_snapshot.entries[0].handle &&
+          decoded_session.entries[1].route_state == SessionCatalogRouteStateV1::Unavailable);
+    auto malformed_session = session_payload;
+    malformed_session[2U] = 1U;
+    CHECK(!decode_session_catalog_snapshot_v1(
+        std::span<const std::uint8_t>(malformed_session.data(), session_bytes), decoded_session));
+    SessionCatalogSnapshotStoreV1 session_store;
+    IpcFrameV1 session_response;
+    CHECK(!session_store.has_snapshot() && !session_store.reply(session_response) &&
+          session_store.publish(session_catalog_snapshot) && session_store.sequence() == 12U &&
+          session_store.reply(session_response) &&
+          session_response.header.type == IpcMessageType::SessionCatalogSnapshot &&
+          session_response.payload.size() == session_bytes);
+    CHECK(!session_store.publish(session_catalog_snapshot) && session_store.sequence() == 12U &&
+          session_catalog_snapshot_reply_v1(session_response, &session_store));
     ControlCommandQueueV1 command_queue;
     ControlCommandV1 queued_command{};
     queued_command.type = IpcMessageType::SceneApply;
@@ -1090,6 +1155,18 @@ int main() {
                                   &status_service_context) && status_request_accepted &&
           status_response.header.type == IpcMessageType::ControlStatusSnapshot &&
           status_response.header.request_id == 778U);
+    bool session_request_accepted = false;
+    ControlPlaneHandlerContextV1 session_service_context{
+        accept_session_catalog_request, &session_request_accepted, nullptr, nullptr,
+        nullptr, nullptr, session_catalog_snapshot_reply_v1, &session_store};
+    IpcFrameV1 session_request;
+    session_request.header.type = IpcMessageType::SessionCatalogRequest;
+    session_request.header.request_id = 779U;
+    CHECK(handle_control_frame_v1(session_request, session_response,
+                                  &session_service_context) && session_request_accepted &&
+          session_response.header.type == IpcMessageType::SessionCatalogSnapshot &&
+          session_response.header.request_id == 779U &&
+          session_response.payload.size() == session_bytes);
 
     auto scene_catalog = std::make_unique<SceneCatalogV1>();
     auto custom_defaults = make_easy_scene(EasySceneKind::Movie, "custom-output");

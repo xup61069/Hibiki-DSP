@@ -85,6 +85,7 @@ EngineControlResultV1 EngineControlWorkerV1::consume(
         case IpcMessageType::Hello:
         case IpcMessageType::DeviceCatalogRequest:
         case IpcMessageType::ControlStatusRequest:
+        case IpcMessageType::SessionCatalogRequest:
             return EngineControlResultV1::Ignored;
         case IpcMessageType::VolumeNotification:
             return (command.has_volume_target
@@ -113,6 +114,7 @@ EngineControlResultV1 EngineControlWorkerV1::consume(
         case IpcMessageType::Ack:
         case IpcMessageType::Error:
         case IpcMessageType::ControlStatusSnapshot:
+        case IpcMessageType::SessionCatalogSnapshot:
             return EngineControlResultV1::Invalid;
     }
     return EngineControlResultV1::Invalid;

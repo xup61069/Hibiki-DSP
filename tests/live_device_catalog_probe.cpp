@@ -15,6 +15,7 @@
 
 #include "hibiki/control_payloads.hpp"
 #include "hibiki/control_status.hpp"
+#include "hibiki/session_catalog.hpp"
 #include "hibiki/windows_device_catalog.hpp"
 
 namespace {
@@ -159,6 +160,25 @@ int main() {
                                                   decoded_status.routes[0].detail_bytes)
                                          .find("physical delivery unverified") !=
                                      std::string_view::npos;
+    hibiki::IpcFrameV1 session_request;
+    session_request.header.type = hibiki::IpcMessageType::SessionCatalogRequest;
+    session_request.header.request_id = 779U;
+    std::vector<std::uint8_t> session_bytes;
+    const bool session_read = client != INVALID_HANDLE_VALUE &&
+                              round_trip(session_request, session_bytes);
+    hibiki::IpcDecodeError session_error{hibiki::IpcDecodeError::None};
+    const auto session_response = session_read
+                                      ? hibiki::decode_ipc_frame(session_bytes, session_error)
+                                      : std::optional<hibiki::IpcFrameV1>{};
+    hibiki::SessionCatalogSnapshotV1 decoded_sessions;
+    const bool session_ok = session_response.has_value() &&
+                            session_response->header.type ==
+                                hibiki::IpcMessageType::SessionCatalogSnapshot &&
+                            session_response->header.request_id == 779U &&
+                            hibiki::decode_session_catalog_snapshot_v1(
+                                std::span<const std::uint8_t>(session_response->payload.data(),
+                                                               session_response->payload.size()),
+                                decoded_sessions);
     std::printf("catalog_refresh=pass entries=%zu sequence=%llu payload_bytes=%zu wire=%s runtime=%s request=%s\n",
                 runtime.catalog().size(), static_cast<unsigned long long>(runtime.catalog_sequence()),
                 response.has_value() ? response->payload.size() : 0U,
@@ -170,11 +190,18 @@ int main() {
                 static_cast<unsigned long long>(decoded_status.sequence),
                 static_cast<unsigned int>(decoded_status.routes[0].state),
                 static_cast<unsigned int>(decoded_status.routes[1].state));
+    const auto live_route_snapshot = runtime.session_route_snapshot();
+    std::printf("session_catalog=%s entries=%u generation=%llu bound=%s observed=%zu active=%zu\n",
+                session_ok ? "pass" : "unavailable",
+                decoded_sessions.entry_count,
+                static_cast<unsigned long long>(decoded_sessions.generation),
+                runtime.session_routes_bound() ? "yes" : "no", live_route_snapshot.session_count,
+                live_route_snapshot.active_count);
     if (client != INVALID_HANDLE_VALUE) CloseHandle(client);
     runtime.stop();
     enumerator->Release();
     if (SUCCEEDED(init)) CoUninitialize();
-    return wire_ok && status_ok && route_status_ok &&
+    return wire_ok && status_ok && route_status_ok && session_ok &&
                    decoded.entry_count == runtime.catalog().size()
                ? 0
                : 5;

@@ -22,7 +22,9 @@ public enum ControlMessageType : ushort
     DeviceCatalogSnapshot = 10,
     DeviceCatalogRequest = 11,
     ControlStatusSnapshot = 12,
-    ControlStatusRequest = 13
+    ControlStatusRequest = 13,
+    SessionCatalogSnapshot = 14,
+    SessionCatalogRequest = 15
 }
 
 public enum IpcDecodeError
@@ -120,7 +122,8 @@ public static class IpcCodecV1
         ControlMessageType.GraphRollback or ControlMessageType.Ack or ControlMessageType.Error or
         ControlMessageType.SceneApply or ControlMessageType.DeviceSwitch or
         ControlMessageType.DeviceCatalogSnapshot or ControlMessageType.DeviceCatalogRequest or
-        ControlMessageType.ControlStatusSnapshot or ControlMessageType.ControlStatusRequest;
+        ControlMessageType.ControlStatusSnapshot or ControlMessageType.ControlStatusRequest or
+        ControlMessageType.SessionCatalogSnapshot or ControlMessageType.SessionCatalogRequest;
 }
 
 public static class ControlPayloadsV1
@@ -142,6 +145,12 @@ public static class ControlPayloadsV1
     public const int ControlStatusSnapshotMaxBytes = ControlStatusSnapshotHeaderBytes +
                                                      (ControlStatusSnapshotEntryBytes *
                                                       ControlStatusSnapshotCapacity);
+    public const int SessionCatalogSnapshotHeaderBytes = 24;
+    public const int SessionCatalogSnapshotEntryBytes = 256;
+    public const int SessionCatalogSnapshotCapacity = 32;
+    public const int SessionCatalogSnapshotMaxBytes = SessionCatalogSnapshotHeaderBytes +
+                                                       (SessionCatalogSnapshotEntryBytes *
+                                                        SessionCatalogSnapshotCapacity);
     private static readonly System.Text.UTF8Encoding StrictUtf8 =
         new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
@@ -444,6 +453,128 @@ public static class ControlPayloadsV1
         return true;
     }
 
+    public static byte[] EncodeSessionCatalogSnapshot(
+        ulong sequence,
+        ulong generation,
+        IReadOnlyList<SessionCatalogEntryV1> sessions)
+    {
+        if (sequence == 0UL || sessions is null || sessions.Count > SessionCatalogSnapshotCapacity)
+            throw new ArgumentException("Session catalog snapshot exceeds the v1 limit.",
+                                        nameof(sessions));
+        var payload = new byte[SessionCatalogSnapshotHeaderBytes +
+                               (sessions.Count * SessionCatalogSnapshotEntryBytes)];
+        BinaryPrimitives.WriteUInt16LittleEndian(payload, (ushort)sessions.Count);
+        BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(4), sequence);
+        BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(12), generation);
+        var seen = new HashSet<ulong>();
+        for (var index = 0; index < sessions.Count; index++)
+        {
+            var session = sessions[index];
+            var name = StrictUtf8.GetBytes(session.Name ?? string.Empty);
+            var app = StrictUtf8.GetBytes(session.AppId ?? string.Empty);
+            var lane = StrictUtf8.GetBytes(session.LaneId ?? string.Empty);
+            var output = StrictUtf8.GetBytes(session.OutputGroup ?? string.Empty);
+            if (session.Handle == 0UL || !seen.Add(session.Handle) ||
+                name.Length > 64 || app.Length > 64 || lane.Length > 48 || output.Length > 48 ||
+                name.Any(value => value < 0x20) || app.Any(value => value < 0x20) ||
+                lane.Any(value => value < 0x20) || output.Any(value => value < 0x20) ||
+                !Enum.IsDefined(session.RouteState) ||
+                !double.IsFinite(session.RequestedDb) ||
+                (session.VolumeAvailable && session.RequestedDb is < -144.0 or > 12.0))
+                throw new ArgumentException("Session catalog entry is invalid.", nameof(sessions));
+            var offset = SessionCatalogSnapshotHeaderBytes +
+                         (index * SessionCatalogSnapshotEntryBytes);
+            BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(offset), session.Handle);
+            payload[offset + 8] = session.Active ? (byte)1 : (byte)0;
+            payload[offset + 9] = (byte)session.RouteState;
+            BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(offset + 10),
+                                                     session.VolumeAvailable ? (ushort)1 : (ushort)0);
+            WriteDbQ16(payload.AsSpan(offset + 12), session.VolumeAvailable ? session.RequestedDb : 0.0);
+            payload[offset + 16] = session.Muted ? (byte)1 : (byte)0;
+            BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(offset + 20), (ushort)name.Length);
+            BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(offset + 22), (ushort)app.Length);
+            BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(offset + 24), (ushort)lane.Length);
+            BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(offset + 26), (ushort)output.Length);
+            name.CopyTo(payload.AsSpan(offset + 28));
+            app.CopyTo(payload.AsSpan(offset + 92));
+            lane.CopyTo(payload.AsSpan(offset + 156));
+            output.CopyTo(payload.AsSpan(offset + 204));
+        }
+        return payload;
+    }
+
+    public static bool TryDecodeSessionCatalogSnapshot(
+        ReadOnlySpan<byte> payload,
+        out ulong sequence,
+        out ulong generation,
+        out IReadOnlyList<SessionCatalogEntryV1> sessions)
+    {
+        sequence = generation = 0UL;
+        sessions = Array.Empty<SessionCatalogEntryV1>();
+        if (payload.Length < SessionCatalogSnapshotHeaderBytes ||
+            payload.Length > SessionCatalogSnapshotMaxBytes || payload[2] != 0 || payload[3] != 0 ||
+            payload[20] != 0 || payload[21] != 0 || payload[22] != 0 || payload[23] != 0)
+            return false;
+        var count = BinaryPrimitives.ReadUInt16LittleEndian(payload);
+        var expected = SessionCatalogSnapshotHeaderBytes +
+                       (count * SessionCatalogSnapshotEntryBytes);
+        if (count > SessionCatalogSnapshotCapacity || payload.Length != expected) return false;
+        sequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[4..]);
+        generation = BinaryPrimitives.ReadUInt64LittleEndian(payload[12..]);
+        if (sequence == 0UL) return false;
+        var list = new List<SessionCatalogEntryV1>(count);
+        var seen = new HashSet<ulong>();
+        for (var index = 0; index < count; index++)
+        {
+            var offset = SessionCatalogSnapshotHeaderBytes +
+                         (index * SessionCatalogSnapshotEntryBytes);
+            var entry = payload.Slice(offset, SessionCatalogSnapshotEntryBytes);
+            var handle = BinaryPrimitives.ReadUInt64LittleEndian(entry);
+            var active = entry[8];
+            var rawState = entry[9];
+            var flags = BinaryPrimitives.ReadUInt16LittleEndian(entry[10..]);
+            var muted = entry[16];
+            var nameBytes = BinaryPrimitives.ReadUInt16LittleEndian(entry[20..]);
+            var appBytes = BinaryPrimitives.ReadUInt16LittleEndian(entry[22..]);
+            var laneBytes = BinaryPrimitives.ReadUInt16LittleEndian(entry[24..]);
+            var outputBytes = BinaryPrimitives.ReadUInt16LittleEndian(entry[26..]);
+            if (handle == 0UL || !seen.Add(handle) || active > 1 ||
+                rawState > (byte)SessionCatalogRouteStateV1.Unavailable || (flags & 0xfffe) != 0 ||
+                muted > 1 || entry[17] != 0 || entry[18] != 0 || entry[19] != 0 ||
+                nameBytes > 64 || appBytes > 64 || laneBytes > 48 || outputBytes > 48 ||
+                !IsZero(entry[28..], nameBytes, 64) || !IsZero(entry[92..], appBytes, 64) ||
+                !IsZero(entry[156..], laneBytes, 48) || !IsZero(entry[204..], outputBytes, 48) ||
+                !IsZero(entry[252..], 0, 4))
+                return false;
+            string name;
+            string app;
+            string lane;
+            string output;
+            try
+            {
+                name = StrictUtf8.GetString(entry.Slice(28, nameBytes));
+                app = StrictUtf8.GetString(entry.Slice(92, appBytes));
+                lane = StrictUtf8.GetString(entry.Slice(156, laneBytes));
+                output = StrictUtf8.GetString(entry.Slice(204, outputBytes));
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+            if (name.Any(char.IsControl) || app.Any(char.IsControl) || lane.Any(char.IsControl) ||
+                output.Any(char.IsControl)) return false;
+            var volumeAvailable = (flags & 1) != 0;
+            var requestedDb = ReadDbQ16(entry[12..]);
+            if (volumeAvailable && (requestedDb is < -144.0 or > 12.0)) return false;
+            list.Add(new SessionCatalogEntryV1(handle, active != 0,
+                                                (SessionCatalogRouteStateV1)rawState,
+                                                volumeAvailable, requestedDb, muted != 0,
+                                                name, app, lane, output));
+        }
+        sessions = list;
+        return true;
+    }
+
     public static byte[] EncodeControlStatusSnapshot(
         ulong sequence,
         VolumeSafetyStateV1 volume,
@@ -595,7 +726,9 @@ public sealed class IpcRequestSession
          request.Type == ControlMessageType.DeviceCatalogRequest &&
          reply.Type == ControlMessageType.DeviceCatalogSnapshot ||
          request.Type == ControlMessageType.ControlStatusRequest &&
-         reply.Type == ControlMessageType.ControlStatusSnapshot);
+         reply.Type == ControlMessageType.ControlStatusSnapshot ||
+         request.Type == ControlMessageType.SessionCatalogRequest &&
+         reply.Type == ControlMessageType.SessionCatalogSnapshot);
 }
 
 public sealed class ControlCommandFactoryV1
@@ -628,6 +761,9 @@ public sealed class ControlCommandFactoryV1
 
     public IpcEnvelopeV1 RequestDeviceCatalog() =>
         _requests.Create(ControlMessageType.DeviceCatalogRequest);
+
+    public IpcEnvelopeV1 RequestSessionCatalog() =>
+        _requests.Create(ControlMessageType.SessionCatalogRequest);
 
     public IpcEnvelopeV1 RequestControlStatus() =>
         _requests.Create(ControlMessageType.ControlStatusRequest);

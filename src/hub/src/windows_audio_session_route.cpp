@@ -5,6 +5,7 @@
 #if defined(_WIN32)
 
 #include <cmath>
+#include <limits>
 #include <new>
 #include <utility>
 
@@ -153,6 +154,55 @@ ProcessLoopbackPlanResultV1 WindowsAudioSessionRouteCoordinatorV1::copy_process_
         return ProcessLoopbackPlanResultV1::NoRoutes;
     }
     return build_process_loopback_plan(registry_, plan);
+}
+
+bool WindowsAudioSessionRouteCoordinatorV1::make_session_catalog_snapshot(
+    const std::uint64_t sequence,
+    SessionCatalogSnapshotV1& snapshot) const noexcept {
+    snapshot = {};
+    if (!bound_ || degraded_ || sequence == 0U ||
+        generation_ > static_cast<std::uint64_t>((std::numeric_limits<std::uint32_t>::max)()) ||
+        registry_.sessions().size() > kSessionCatalogSnapshotCapacityV1) {
+        return false;
+    }
+    snapshot.sequence = sequence;
+    snapshot.generation = generation_;
+    snapshot.entry_count = static_cast<std::uint16_t>(registry_.sessions().size());
+    for (std::size_t index = 0U; index < registry_.sessions().size(); ++index) {
+        const auto& source = registry_.sessions()[index];
+        auto& target = snapshot.entries[index];
+        target.handle = (generation_ << 32U) | static_cast<std::uint64_t>(index + 1U);
+        target.active = source.active ? 1U : 0U;
+        target.route_state = !source.active
+                                 ? SessionCatalogRouteStateV1::Unavailable
+                                 : (source.lane_id.empty() || source.output_group.empty()
+                                        ? SessionCatalogRouteStateV1::Pending
+                                        : SessionCatalogRouteStateV1::Ready);
+        const auto copy_text = [](const std::string& source_text,
+                                  auto& target_text,
+                                  std::uint16_t& target_bytes) noexcept {
+            if (source_text.size() > target_text.size() ||
+                !is_printable_utf8_v1(source_text)) {
+                // Metadata is optional. Keep the session handle and route
+                // state usable while omitting a malformed/oversized label;
+                // never copy raw Windows IDs as a fallback label.
+                target_bytes = 0U;
+                target_text.fill('\0');
+                return true;
+            }
+            target_bytes = static_cast<std::uint16_t>(source_text.size());
+            std::copy(source_text.begin(), source_text.end(), target_text.begin());
+            return true;
+        };
+        if (!copy_text(source.display_name, target.name, target.name_bytes) ||
+            !copy_text(source.app_id, target.app, target.app_bytes) ||
+            !copy_text(source.lane_id, target.lane, target.lane_bytes) ||
+            !copy_text(source.output_group, target.output, target.output_bytes)) {
+            snapshot = {};
+            return false;
+        }
+    }
+    return true;
 }
 
 WindowsAudioSessionRouteSnapshotV1

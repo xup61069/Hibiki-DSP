@@ -9,7 +9,8 @@ bool ControlPlaneHostV1::start(
     const ControlCommandSinkV1 sink,
     void* const sink_context,
     DeviceCatalogSnapshotStoreV1* const snapshot_store,
-    ControlStatusSnapshotStoreV1* const status_store) noexcept {
+    ControlStatusSnapshotStoreV1* const status_store,
+    SessionCatalogSnapshotStoreV1* const session_catalog_store) noexcept {
     stop();
     if (sink == nullptr) return false;
     context_.sink = sink;
@@ -22,6 +23,10 @@ bool ControlPlaneHostV1::start(
                                 ? nullptr
                                 : control_status_snapshot_reply_v1;
     context_.status_context = status_store;
+    context_.session_catalog_reply = session_catalog_store == nullptr
+                                         ? nullptr
+                                         : session_catalog_snapshot_reply_v1;
+    context_.session_catalog_context = session_catalog_store;
     if (!pipe_.start(config, handle_control_frame_v1, &context_)) {
         context_ = {};
         return false;
@@ -32,8 +37,10 @@ bool ControlPlaneHostV1::start(
 bool ControlPlaneHostV1::start_with_queue(
     const IpcNamedPipeConfigV1& config,
     DeviceCatalogSnapshotStoreV1* const snapshot_store,
-    ControlStatusSnapshotStoreV1* const status_store) noexcept {
-    return start(config, enqueue_control_command_v1, &queue_, snapshot_store, status_store);
+    ControlStatusSnapshotStoreV1* const status_store,
+    SessionCatalogSnapshotStoreV1* const session_catalog_store) noexcept {
+    return start(config, enqueue_control_command_v1, &queue_, snapshot_store, status_store,
+                 session_catalog_store);
 }
 
 void ControlPlaneHostV1::stop() noexcept {
@@ -68,6 +75,17 @@ bool handle_control_frame_v1(const IpcFrameV1& request,
         if (handler->status_reply == nullptr ||
             !handler->status_reply(response, handler->status_context) ||
             response.header.type != IpcMessageType::ControlStatusSnapshot) {
+            response = make_error_frame_v1(request);
+        } else {
+            response.header.request_id = request.header.request_id;
+        }
+        return true;
+    }
+    if (request.header.type == IpcMessageType::SessionCatalogRequest) {
+        response = {};
+        if (handler->session_catalog_reply == nullptr ||
+            !handler->session_catalog_reply(response, handler->session_catalog_context) ||
+            response.header.type != IpcMessageType::SessionCatalogSnapshot) {
             response = make_error_frame_v1(request);
         } else {
             response.header.request_id = request.header.request_id;

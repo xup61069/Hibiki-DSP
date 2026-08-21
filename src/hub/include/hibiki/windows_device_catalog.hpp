@@ -154,6 +154,10 @@ public:
     [[nodiscard]] bool running() const noexcept { return host_.running(); }
     [[nodiscard]] bool client_connected() const noexcept { return host_.client_connected(); }
     [[nodiscard]] bool volume_bound() const noexcept { return volume_broker_.is_bound(); }
+    [[nodiscard]] bool session_routes_bound() const noexcept { return session_routes_.bound(); }
+    [[nodiscard]] WindowsAudioSessionRouteSnapshotV1 session_route_snapshot() const noexcept {
+        return session_routes_.snapshot();
+    }
     [[nodiscard]] ControlCommandQueueV1& command_queue() noexcept {
         return host_.command_queue();
     }
@@ -165,6 +169,9 @@ public:
     }
     [[nodiscard]] ControlStatusSnapshotStoreV1* status_store() noexcept {
         return &status_store_;
+    }
+    [[nodiscard]] SessionCatalogSnapshotStoreV1* session_catalog_store() noexcept {
+        return &session_catalog_store_;
     }
     // Publishes a caller-built control-plane status candidate. The caller must
     // supply route identities from its worker; this method never queries COM
@@ -181,6 +188,7 @@ private:
     WindowsVolumeBroker volume_broker_{};
     ControlStatusSnapshotStoreV1 status_store_{};
     ControlStatusSnapshotV1 status_snapshot_{};
+    SessionCatalogSnapshotStoreV1 session_catalog_store_{};
     WindowsAudioSessionRouteCoordinatorV1 session_routes_{};
 
     [[nodiscard]] bool publish_status_volume(
@@ -188,6 +196,7 @@ private:
     [[nodiscard]] HRESULT refresh_default_session_routes(
         IMMDeviceEnumerator* enumerator) noexcept;
     [[nodiscard]] bool publish_session_route_status() noexcept;
+    [[nodiscard]] bool publish_session_catalog() noexcept;
 };
 
 }  // namespace hibiki

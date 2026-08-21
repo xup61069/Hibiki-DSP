@@ -167,6 +167,32 @@ Check(statusRequest.Type == ControlMessageType.ControlStatusRequest &&
         new IpcEnvelopeV1(ControlMessageType.ControlStatusSnapshot, statusRequest.RequestId,
                           statusPayload)),
     "Control status snapshot reply correlation failed.");
+var sessionRequest = commandFactory.RequestSessionCatalog();
+Check(sessionRequest.Type == ControlMessageType.SessionCatalogRequest &&
+      sessionRequest.Payload.IsEmpty &&
+      IpcRequestSession.IsReplyTo(sessionRequest,
+        new IpcEnvelopeV1(ControlMessageType.SessionCatalogSnapshot, sessionRequest.RequestId,
+                          Array.Empty<byte>())),
+    "Session catalog request/reply correlation failed.");
+var sessionEntries = new[]
+{
+    new SessionCatalogEntryV1(0x0000000200000001UL, true,
+        SessionCatalogRouteStateV1.Ready, true, -9.5, false,
+        "DJMAX", "game.exe", "game", "main"),
+    new SessionCatalogEntryV1(0x0000000200000002UL, false,
+        SessionCatalogRouteStateV1.Unavailable, false, 0.0, true,
+        "Chrome 分頁", "chrome.exe", "browser-tab", "main")
+};
+var sessionPayload = ControlPayloadsV1.EncodeSessionCatalogSnapshot(12UL, 2UL, sessionEntries);
+Check(ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(sessionPayload,
+          out var sessionSequence, out var sessionGeneration, out var decodedSessions) &&
+      sessionSequence == 12UL && sessionGeneration == 2UL && decodedSessions.Count == 2 &&
+      decodedSessions[0].DisplayName == "DJMAX" && decodedSessions[1].RouteStateLabel == "目前不可用",
+    "Session catalog snapshot did not round-trip.");
+var malformedSessionPayload = sessionPayload.ToArray();
+malformedSessionPayload[2] = 1;
+Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(malformedSessionPayload, out _, out _, out _),
+    "Session catalog decoder must reject reserved bytes.");
 var viewModel = new EasyControlViewModel { SelectedOutputGroup = " main " };
 Check(viewModel.ConnectionState == ControlConnectionState.Disconnected &&
       !viewModel.IsConnected && !viewModel.IsBusy &&
@@ -226,6 +252,18 @@ var malformedSnapshot = snapshotBytes.ToArray();
 malformedSnapshot[2] = 1;
 Check(!ControlPayloadsV1.TryDecodeDeviceCatalogSnapshot(malformedSnapshot, out _, out _),
     "Device catalog snapshot decoder must reject reserved bytes.");
+var sessionFrame = new IpcEnvelopeV1(ControlMessageType.SessionCatalogSnapshot, 0UL, sessionPayload);
+Check(viewModel.ApplySessionCatalogSnapshot(sessionFrame, out _) &&
+      viewModel.SessionCatalogSequence == 12UL && viewModel.SessionCatalog.Count == 2 &&
+      viewModel.SessionCatalog[0].AccessibleSummary.Contains("DJMAX") &&
+      viewModel.SessionCatalog[1].VolumeAvailable == false,
+    "ViewModel did not atomically apply the App session catalog.");
+var staleSession = new IpcEnvelopeV1(
+    ControlMessageType.SessionCatalogSnapshot, 0UL,
+    ControlPayloadsV1.EncodeSessionCatalogSnapshot(11UL, 2UL, [sessionEntries[0]]));
+Check(!viewModel.ApplySessionCatalogSnapshot(staleSession, out var staleSessionError) &&
+      staleSessionError.Contains("過期") && viewModel.SessionCatalog.Count == 2,
+    "Stale App session catalog must preserve the previous catalog.");
 viewModel.IsExpert = true;
 Check(viewModel.Mode == UiMode.Expert && viewModel.SelectScene("movie"),
     "ViewModel Expert scene selection failed.");

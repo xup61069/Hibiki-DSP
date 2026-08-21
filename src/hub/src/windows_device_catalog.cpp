@@ -436,8 +436,15 @@ bool WindowsControlRuntimeV1::start(
                                       ? UINT64_MAX
                                       : status_store_.sequence() + 1U;
     status_snapshot_ = make_initial_status(initial_sequence);
+    SessionCatalogSnapshotV1 initial_session_catalog{};
+    const auto initial_session_sequence = session_catalog_store_.sequence() == UINT64_MAX
+                                              ? UINT64_MAX
+                                              : session_catalog_store_.sequence() + 1U;
+    initial_session_catalog.sequence = initial_session_sequence;
     if (!status_store_.publish(status_snapshot_) ||
-        !host_.start_with_queue(config, catalog_service_.snapshot_store(), &status_store_)) {
+        !session_catalog_store_.publish(initial_session_catalog) ||
+        !host_.start_with_queue(config, catalog_service_.snapshot_store(), &status_store_,
+                                &session_catalog_store_)) {
         catalog_service_.unbind();
         return false;
     }
@@ -460,6 +467,7 @@ HRESULT WindowsControlRuntimeV1::refresh_now() noexcept {
     if (SUCCEEDED(result)) {
         (void)session_routes_.refresh();
         (void)publish_session_route_status();
+        (void)publish_session_catalog();
     }
     return result;
 }
@@ -470,6 +478,7 @@ HRESULT WindowsControlRuntimeV1::poll_and_refresh() noexcept {
     if (SUCCEEDED(result)) {
         (void)session_routes_.poll_and_refresh();
         (void)publish_session_route_status();
+        (void)publish_session_catalog();
     }
     return result;
 }
@@ -520,6 +529,7 @@ HRESULT WindowsControlRuntimeV1::refresh_default_session_routes(
         return E_FAIL;
     }
     (void)publish_session_route_status();
+    (void)publish_session_catalog();
     return S_OK;
 }
 
@@ -626,6 +636,15 @@ bool WindowsControlRuntimeV1::publish_session_route_status() noexcept {
     if (!status_store_.publish(candidate)) return false;
     status_snapshot_ = candidate;
     return true;
+}
+
+bool WindowsControlRuntimeV1::publish_session_catalog() noexcept {
+    if (!session_routes_.bound()) return false;
+    const auto previous = session_catalog_store_.sequence();
+    if (previous == UINT64_MAX) return false;
+    SessionCatalogSnapshotV1 candidate{};
+    if (!session_routes_.make_session_catalog_snapshot(previous + 1U, candidate)) return false;
+    return session_catalog_store_.publish(candidate);
 }
 
 }  // namespace hibiki
