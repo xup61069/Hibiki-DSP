@@ -61,9 +61,10 @@ Shared-mode WASAPI handoff 也是額外的 opt-in live check：
 把 user-space probe 當成已完成的 WaveRT／HLK／Microsoft signing 驗收。
 
 Windows 系統音量的真實讀回／寫入／恢復也是額外的 opt-in live check：
-`pwsh -File tools/live-system-volume-check.ps1 -WriteTest`。只有明確的 `-WriteTest` 才會
-暫時衰減約 3 dB，隨後恢復原值；它不輸出 endpoint identity，但會改變本機音量，無法把
-這個 user-space broker probe 當成 driver、WaveRT 或 HLK evidence。
+`pwsh -File tools/live-system-volume-check.ps1 -WriteTest`。預設會啟動 Engine Preview，從
+named pipe 送出音量命令，暫時衰減約 3 dB，直接讀回 Windows endpoint 並恢復原值；它不輸出
+endpoint identity，但會改變本機音量，無法把這個 user-space write-through probe 當成 driver、
+WaveRT 或 HLK evidence。只有除錯 broker 時才加 `-DirectBroker`。
 
 Windows 單一 App/session 音量的真實讀回／寫入／恢復也是額外的 opt-in live check：
 `pwsh -File tools/live-session-volume-check.ps1 -WriteTest`。預設會啟動 Engine Preview，建立本

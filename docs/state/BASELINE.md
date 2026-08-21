@@ -21,9 +21,10 @@
   commands. `tools/control-model-engine-smoke.ps1` proves −18 dB/generation readback and Game
   One-Tap SceneApply across the real named pipe; this remains a user-space control proof only.
   Evidence is recorded in `evidence/0000-foundation/control-model-engine-v1.json`.
-- `tools/live-system-volume-check.ps1 -WriteTest` now performs an explicit local endpoint volume
-  round-trip: approximately −3 dB attenuation, COM callback/readback verification, and restoration
-  of the original dB/mute state. It is opt-in user-space broker evidence, not driver or WaveRT proof.
+- `tools/live-system-volume-check.ps1 -WriteTest` now starts Engine Preview with
+  `--enable-system-volume`, sends a volume notification through named-pipe IPC, verifies
+  approximately −3 dB on the local endpoint via broker readback, and restores the original dB/mute
+  state. It is opt-in user-space write-through evidence, not driver or WaveRT proof.
 - `tools/live-session-volume-check.ps1 -WriteTest` now starts Engine Preview with session routing,
   creates an inaudible shared-mode test session, discovers it through the bounded catalog, sends a
   generation-scoped session handle through IPC/control queue/COM worker, verifies approximately −3 dB
@@ -553,7 +554,7 @@ store、handler 與 atomic ViewModel apply；本機 status probe 通過，但仍
 per-App delivery 或 browser tab capture 已完成。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 78 個必要入口與
-24 份 Spec 通過；`source-policy.ps1` 掃描 379 個 tracked paths 且無 blocked
+24 份 Spec 通過；`source-policy.ps1` 掃描 380 個 tracked paths 且無 blocked
 binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；35 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
