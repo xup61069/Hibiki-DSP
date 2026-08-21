@@ -55,6 +55,8 @@
 - `SessionVolumeCommand` v1 now carries only a generation-scoped handle, catalog sequence, dB
   and mute. C++/C# codecs, EngineControl callback, Windows runtime/coordinator stale guards and
   the C# ViewModel command builder are covered; target-session COM readback remains pending.
+- Active catalog entries now opportunistically expose worker-read `ISimpleAudioVolume` dB/mute
+  availability; expired/inactive/unreadable sessions remain visible with volume unavailable.
 - `CalibrationResponsePointV1` and `compile_bounded_peq_correction_v1` now provide a deterministic
   control-plane measured-response to bounded PEQ compiler (16-filter cap, frequency/spacing/Q and
   boost/cut policy validation, explicit `limited` result) that feeds the existing APO/CamillaDSP/
@@ -458,7 +460,8 @@ parameter frame 與 `IParameterChanges` bridge）unsigned build 亦通過；輸�
 與 C# grouped-volume payload round-trip、legacy payload compatibility、selected group resolver
 及 custom Scene card mirror 的 JSON save/load、atomic replace、malformed rollback 亦已通過本機
 contract/control-model checks。
-本次 SessionVolumeCommand handle boundary 的 source commit 是 `6c4a8b7`；
+本次 session catalog volume availability projection 的 source commit 是 `b1538b1`；
+SessionVolumeCommand handle boundary 的 source commit 是 `6c4a8b7`；
 本次 WinUI App session catalog projection 的 source commit 是 `66f6298`；
 ephemeral App session catalog additions 的 source commit 是 `68cf466`；
 本次 control-status-snapshot additions 的 source commit 是 `e97fb90`；
