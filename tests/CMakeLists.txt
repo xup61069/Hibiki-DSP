@@ -42,4 +42,14 @@ if(HIBIKI_BUILD_LIVE_PROBES AND WIN32)
   else()
     target_compile_options(hibiki_live_audio_session_probe PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
   endif()
+
+  add_executable(hibiki_live_process_loopback_probe
+    live_process_loopback_probe.cpp
+  )
+  target_link_libraries(hibiki_live_process_loopback_probe PRIVATE hibiki_hub hibiki_sdk)
+  if(MSVC)
+    target_compile_options(hibiki_live_process_loopback_probe PRIVATE /W4 /permissive- /EHsc)
+  else()
+    target_compile_options(hibiki_live_process_loopback_probe PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+  endif()
 endif()

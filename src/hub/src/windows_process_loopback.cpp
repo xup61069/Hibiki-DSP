@@ -8,10 +8,11 @@
 #include <ksmedia.h>
 #include <mmdeviceapi.h>
 #include <propidl.h>
+#include <wrl/implements.h>
 
-#include <atomic>
 #include <cstring>
 #include <memory>
+#include <new>
 
 namespace hibiki {
 namespace {
@@ -28,31 +29,13 @@ struct ActivationState final {
     IAudioClient* client{nullptr};
 };
 
-class ActivationHandler final : public IActivateAudioInterfaceCompletionHandler {
+class ActivationHandler final
+    : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
+                                          Microsoft::WRL::FtmBase,
+                                          IActivateAudioInterfaceCompletionHandler> {
 public:
     explicit ActivationHandler(std::shared_ptr<ActivationState> state) noexcept
         : state_(std::move(state)) {}
-
-    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
-        if (object == nullptr) return E_POINTER;
-        *object = nullptr;
-        if (iid == IID_IUnknown || iid == __uuidof(IActivateAudioInterfaceCompletionHandler)) {
-            *object = static_cast<IActivateAudioInterfaceCompletionHandler*>(this);
-            AddRef();
-            return S_OK;
-        }
-        return E_NOINTERFACE;
-    }
-
-    ULONG STDMETHODCALLTYPE AddRef() override {
-        return references_.fetch_add(1U, std::memory_order_relaxed) + 1U;
-    }
-
-    ULONG STDMETHODCALLTYPE Release() override {
-        const auto remaining = references_.fetch_sub(1U, std::memory_order_acq_rel) - 1U;
-        if (remaining == 0U) delete this;
-        return remaining;
-    }
 
     HRESULT STDMETHODCALLTYPE ActivateCompleted(
         IActivateAudioInterfaceAsyncOperation* operation) override {
@@ -72,7 +55,6 @@ public:
     }
 
 private:
-    std::atomic<ULONG> references_{1U};
     std::shared_ptr<ActivationState> state_;
 };
 
@@ -113,7 +95,13 @@ HRESULT WindowsProcessLoopbackSourceV1::start(
         set_degraded(HRESULT_FROM_WIN32(GetLastError()));
         return last_error_;
     }
-    auto* handler = new (std::nothrow) ActivationHandler(activation);
+    Microsoft::WRL::ComPtr<ActivationHandler> handler;
+    try {
+        handler = Microsoft::WRL::Make<ActivationHandler>(activation);
+    } catch (const std::bad_alloc&) {
+        set_degraded(E_OUTOFMEMORY);
+        return last_error_;
+    }
     if (handler == nullptr) {
         set_degraded(E_OUTOFMEMORY);
         return last_error_;
@@ -133,9 +121,8 @@ HRESULT WindowsProcessLoopbackSourceV1::start(
 
     IActivateAudioInterfaceAsyncOperation* operation = nullptr;
     HRESULT result = ActivateAudioInterfaceAsync(
-        VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK, __uuidof(IAudioClient), &property, handler,
+        VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK, __uuidof(IAudioClient), &property, handler.Get(),
         &operation);
-    handler->Release();
     if (operation != nullptr) operation->Release();
     if (FAILED(result)) {
         set_degraded(result);
