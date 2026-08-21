@@ -80,6 +80,12 @@ public:
         Vst3PluginStateMigrationFnV1 migration,
         void* context = nullptr) const noexcept;
 
+    [[nodiscard]] Vst3PluginStateResultV1 inspect(
+        std::string_view state_id,
+        const Vst3PluginStateIdentityV1& expected_identity,
+        std::uint32_t& state_version,
+        std::size_t& byte_count) const noexcept;
+
     [[nodiscard]] bool remove(std::string_view state_id) noexcept;
     void clear() noexcept;
     [[nodiscard]] std::size_t size() const noexcept { return count_; }
@@ -121,6 +127,10 @@ public:
         std::uint32_t expected_state_version,
         std::span<std::uint8_t> destination,
         std::size_t& bytes_written) const noexcept;
+
+    [[nodiscard]] bool has_rule(const Vst3PluginStateIdentityV1& identity,
+                                std::uint32_t source_version,
+                                std::uint32_t target_version) const noexcept;
 
     [[nodiscard]] bool remove_rule(const Vst3PluginStateIdentityV1& identity,
                                    std::uint32_t source_version,

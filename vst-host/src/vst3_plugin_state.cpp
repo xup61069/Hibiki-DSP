@@ -158,6 +158,27 @@ Vst3PluginStateResultV1 Vst3PluginStateStoreV1::restore_with_migration(
     return Vst3PluginStateResultV1::ok;
 }
 
+Vst3PluginStateResultV1 Vst3PluginStateStoreV1::inspect(
+    const std::string_view state_id,
+    const Vst3PluginStateIdentityV1& expected_identity,
+    std::uint32_t& state_version,
+    std::size_t& byte_count) const noexcept {
+    state_version = 0U;
+    byte_count = 0U;
+    if (!valid_state_id(state_id) || !validate_vst3_plugin_state_identity_v1(expected_identity)) {
+        return Vst3PluginStateResultV1::invalid_argument;
+    }
+    const auto index = find(state_id);
+    if (index == slots_.size()) return Vst3PluginStateResultV1::missing;
+    const auto& slot = slots_[index];
+    if (!same_identity(slot.identity, expected_identity)) {
+        return Vst3PluginStateResultV1::identity_mismatch;
+    }
+    state_version = slot.state_version;
+    byte_count = slot.bytes.size();
+    return Vst3PluginStateResultV1::ok;
+}
+
 bool Vst3PluginStateStoreV1::remove(const std::string_view state_id) noexcept {
     const auto index = find(state_id);
     if (index == slots_.size()) return false;
@@ -243,6 +264,13 @@ Vst3PluginStateResultV1 Vst3PluginStateMigrationRegistryV1::restore(
     const auto& rule = rules_[matching_rule];
     return store.restore_with_migration(state_id, expected_identity, expected_state_version,
                                         destination, bytes_written, rule.migration, rule.context);
+}
+
+bool Vst3PluginStateMigrationRegistryV1::has_rule(
+    const Vst3PluginStateIdentityV1& identity,
+    const std::uint32_t source_version,
+    const std::uint32_t target_version) const noexcept {
+    return find(identity, source_version, target_version) != rules_.size();
 }
 
 bool Vst3PluginStateMigrationRegistryV1::remove_rule(

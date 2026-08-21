@@ -32,6 +32,7 @@ $required = @(
   'schemas/latency-graph-commit-v1.schema.json',
   'schemas/vst3-parameter-timeline-v1.schema.json',
   'schemas/vst3-plugin-state-v1.schema.json',
+  'schemas/scene-vst3-state-binding-v1.schema.json',
   'schemas/output-fanout-plan-v1.schema.json',
   'docs/specs/SPEC-0010-winui-shell.md',
   'docs/specs/SPEC-0011-calibration-compiler.md',

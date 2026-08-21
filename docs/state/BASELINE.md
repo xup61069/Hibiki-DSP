@@ -116,6 +116,9 @@
   mismatches; the fixed 16-rule migration registry routes approved identity/version pairs, while
   absent/failed/oversized migrations remain fail-closed. Scene binding and third-party
   compatibility certification remain pending.
+- `Vst3SceneStateCoordinatorV1` now binds Scene/state IDs to plugin identity and target version,
+  inspects private store metadata before activation and restores only into caller-owned buffers;
+  its metadata-only contract is `scene-vst3-state-binding-v1`.
 - `AudioSessionRegistry` keys Windows sessions by endpoint plus session-instance ID, preserves
   user routing on metadata refresh, and supports independent lane/output-group/gain-owner binding;
   Windows `IAudioSessionManager2` worker enumeration now populates it; callbacks remain
@@ -165,9 +168,9 @@
   with Hello/Heartbeat/Process/Shutdown/Error plus bounded `ProcessBlockWithParameters`, exact
   Float32/parameter-point validation and finite sample checks. The optional SDK worker decodes
   those points into the processor's official `IParameterChanges`; named-pipe transport, factory
-  catalog and one-main-bus SDK processing build locally, while supervisor UI timeline editing,
-  Scene-to-migration binding and certification remain pending; private cross-version state is
-  guarded by the explicit identity/version registry.
+  catalog and one-main-bus SDK processing build locally, while supervisor UI timeline editing and
+  certification remain pending; Scene-to-migration binding now uses the bounded coordinator and
+  private cross-version state remains guarded by the explicit identity/version registry.
 - `LatencyAlignmentPlanV1` and `FixedDelayLineV1` provide a fixed 8-channel, 16,384-sample
   bounded delay primitive with active-lane max-latency alignment, impulse and non-finite-input
   tests. `LatencyGraphCommitV1`/`LatencyGraphCommitterV1` now bind that control result to stable

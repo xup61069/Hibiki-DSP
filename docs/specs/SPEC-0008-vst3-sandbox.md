@@ -132,11 +132,17 @@ error、destination 不足與 allocation failure 分開回報。它只建立 wor
 目前已有固定 16-rule `Vst3PluginStateMigrationRegistryV1` primitive，但 handler 仍由受信任的
 control-plane caller 注入，未提供自動探測或遠端下載。
 
+`Vst3SceneStateCoordinatorV1` 將 Scene ID、state ID、plugin identity 與 target state version
+綁定到最多 16 筆固定容量 reference。Scene 啟用前會 inspect 私有 state、檢查 byte bound，
+並要求 exact version 或 registry 中唯一的 source→target rule；`restore` 只寫入 caller-owned
+buffer，絕不把 opaque bytes 放入 Scene JSON、GitHub 或 AI context。其 metadata contract 是
+`schemas/scene-vst3-state-binding-v1.schema.json`。
+
 ## 尚未完成的邊界
 
 plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter、bounded parameter
 frame、latency alignment primitive、latency graph commit 與 optional worker executable 已有 bridge；仍未完成第三方
-plugin certification、Scene-to-registry binding、RT graph lane latency wiring、side-chain/multi-bus、
+plugin certification、第三方 plugin compatibility review、RT graph lane latency wiring、side-chain/multi-bus、
 crash dump redaction 與 production worker policy。目前
 supervisor、named pipe、passthrough worker、catalog、bounded SDK processor、handshake/process
 exchange、timeline lane 與 Scene automation scheduler 提供可測試的 process

@@ -17,6 +17,7 @@
 #include "hibiki/vst3_parameter_timeline.hpp"
 #include "hibiki/vst3_worker_lane.hpp"
 #include "hibiki/vst3_scene_automation.hpp"
+#include "hibiki/vst3_scene_state.hpp"
 #include "hibiki/tab_bridge.hpp"
 #include "hibiki/asio_transport_v1.h"
 #include "hibiki/output_sink.hpp"
@@ -926,6 +927,25 @@ int main() {
     CHECK(plugin.register_plugin_state_migration(plugin_identity, 9U, 2U,
                                                  migrate_test_plugin_state) ==
               Vst3PluginStateResultV1::invalid_argument);
+
+    Vst3PluginStateStoreV1 scene_state_store;
+    Vst3PluginStateMigrationRegistryV1 scene_state_migrations;
+    CHECK(scene_state_store.capture("scene-movie-state", plugin_identity, 1U,
+                                    plugin_state_bytes) == Vst3PluginStateResultV1::ok);
+    CHECK(scene_state_migrations.register_rule(plugin_identity, 1U, 2U,
+                                               migrate_test_plugin_state) ==
+              Vst3PluginStateResultV1::ok);
+    Vst3SceneStateCoordinatorV1 scene_state;
+    CHECK(scene_state.prepare(scene_state_store, scene_state_migrations));
+    CHECK(scene_state.bind("movie", "scene-movie-state", plugin_identity, 2U) ==
+              Vst3SceneStateResultV1::ok);
+    CHECK(scene_state.validate_scene("movie") == Vst3SceneStateResultV1::ok);
+    migrated_state.fill(0U);
+    CHECK(scene_state.restore("movie", "scene-movie-state", migrated_state,
+                             state_bytes_written) == Vst3SceneStateResultV1::ok &&
+          state_bytes_written == 4U && migrated_state[3] == 0x42U);
+    CHECK(scene_state.validate_scene("missing") == Vst3SceneStateResultV1::missing_binding);
+    CHECK(scene_state.remove("movie", "scene-movie-state") && scene_state.binding_count() == 0U);
     plugin.report_crash();
     CHECK(!plugin.process_passthrough(plugin_input, plugin_output, 2));
 

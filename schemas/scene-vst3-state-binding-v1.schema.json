@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/scene-vst3-state-binding-v1.schema.json",
+  "title": "Hibiki Scene VST3 state binding v1",
+  "description": "Metadata-only Scene reference. Opaque bytes remain in private caller-owned storage.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "scene_id", "state_id", "plugin_id", "class_id", "module_sha256", "target_state_version", "storage"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "scene_id": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[^\\u0000]+$"},
+    "state_id": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[^\\u0000]+$"},
+    "plugin_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000]+$"},
+    "class_id": {"type": "string", "pattern": "^[0-9A-Fa-f]{32}$"},
+    "module_sha256": {"type": "string", "pattern": "^[0-9A-Fa-f]{64}$"},
+    "target_state_version": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+    "storage": {"const": "private-caller-owned"}
+  }
+}
