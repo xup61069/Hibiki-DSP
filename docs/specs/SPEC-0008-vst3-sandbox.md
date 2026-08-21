@@ -141,6 +141,11 @@ buffer，絕不把 opaque bytes 放入 Scene JSON、GitHub 或 AI context。其 
 Scene state bindings 時維持 Easy Scene 向後相容，存在 binding 時則在 graph Prepare 前強制
 通過 coordinator。
 
+第三方 plugin state 不得只因為 handler 能執行就自動准入。每一個明確的 source→target
+handler 都必須依 `docs/VST3_STATE_COMPATIBILITY_REVIEW.md` 完成 identity、版本、容量、
+失敗回復、隱私與非 RT 執行檢查；未審查或無法證明 redistribution 權利的 plugin 維持
+quarantined，不得進入 trusted/certified 或 Low Latency Lane。
+
 ## 尚未完成的邊界
 
 plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter、bounded parameter

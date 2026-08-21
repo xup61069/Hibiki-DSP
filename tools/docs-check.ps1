@@ -37,6 +37,7 @@ $required = @(
   'docs/specs/SPEC-0010-winui-shell.md',
   'docs/specs/SPEC-0011-calibration-compiler.md',
   'docs/specs/SPEC-0012-vst3-latency-graph-commit.md',
+  'docs/VST3_STATE_COMPATIBILITY_REVIEW.md',
   'docs/tasks/active/0.md', 'evidence/0000-foundation/initial.json'
 )
 
