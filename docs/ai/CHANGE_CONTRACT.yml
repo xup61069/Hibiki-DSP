@@ -7,6 +7,6 @@ rules:
   build_or_toolchain:
     required: [agents_update, readme_update, ci_update]
   task_handoff:
-    required: [issue, active_handoff, base_commit, next_safe_action]
+    required: [issue, branch, target_branch, owner, scope_globs, shared_paths, depends_on, active_handoff, base_commit, next_safe_action]
   release:
     required: [signed_source_tag, unsigned_reproducibility, release_manifest, source_policy]

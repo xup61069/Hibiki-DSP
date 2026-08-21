@@ -5,17 +5,29 @@
 
 ## Fresh clone 流程
 
-1. 讀 root `AGENTS.md`、本檔、`docs/AI_HANDOFF.md` 與 `docs/PROJECT_MAP.md`。
-2. 確認 branch、HEAD、working tree 與 dependency lock。
-3. 執行 `pwsh -File tools/doctor.ps1 -CheckOnly` 與 `pwsh -File tools/handoff-check.ps1`。
-4. 執行 `pwsh -File tools/probe-environment.ps1`，環境資料只寫入 `.local/`。
-5. 找到要處理的 GitHub Issue，讀 `docs/tasks/active/<issue>.md`。
-6. 讀 handoff 指定的 Spec、ADR、source、tests 與 evidence。
-7. 先用最小 context pack 複製交接內容（目前 foundation Issue 0：
-   `pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource`），再執行 handoff 的 baseline
+1. 讀 root `AGENTS.md`、本檔、`docs/AI_HANDOFF.md`、`docs/ai/MULTI_AGENT.md` 與
+   `docs/PROJECT_MAP.md`。
+2. 執行 `git fetch --all --prune`，檢查 open Issue／PR／active handoff；選擇未被認領且
+   `scope_globs` 不重疊的 Issue。Issue 0 只保留給 foundation integration，不再承載新 feature。
+3. 每個 AI 在 repository 外建立自己的 clone/worktree 與 branch；禁止在另一個仍在工作的 AI
+   所使用的 working tree 執行 `checkout`、`switch`、branch rename 或 rebase。
+4. 在 GitHub Issue 與 `docs/tasks/active/<issue>.md` 宣告 owner、role、target branch、
+   `scope_globs`、shared paths 與 dependencies，push claim commit 並開 draft PR 後才開始寫 code。
+5. 確認 branch、HEAD、working tree 與 dependency lock，再執行
+   `pwsh -File tools/handoff-check.ps1 -Issue <issue>`。有 scope 或文件衝突時停止寫入，交由
+   integration coordinator 切分或排序。
+6. 執行 `pwsh -File tools/doctor.ps1 -CheckOnly` 與 `pwsh -File tools/probe-environment.ps1`；
+   環境資料只寫入 `.local/`。
+7. 讀 handoff 指定的 Spec、ADR、source、tests 與 evidence。
+8. 先用最小 context pack 複製交接內容：
+   `pwsh -File tools/context-pack.ps1 -Issue <issue> -NoSource`。Issue 0 只是 whole-repository
+   foundation 例外；其他工作不得用 Issue 0 取代自己的 handoff。再執行 handoff 的 baseline
    smoke test；結果不一致時先標記 stale/conflict。需要完整 source context 時移除
    `-NoSource`，不要把與該 Issue 無關的聊天內容帶入新工作階段。
-8. 修改後執行 `tools/verify.ps1`、`tools/handoff-check.ps1`、`tools/docs-check.ps1` 與
+9. 修改中定期把可建置的 WIP commit push 到自己的 branch，並同步 handoff 的已完成內容、
+   限制與下一個安全動作；不得靠未 push 的工作樹或聊天紀錄交接。
+10. 修改後執行 `tools/verify.ps1`、`tools/handoff-check.ps1 -Issue <issue>`、
+   `tools/docs-check.ps1` 與
    `tools/source-policy.ps1`、`tools/source-only-ci-check.ps1`；若改動 extension、installer 或 control model，再執行
    `tools/extension-check.ps1`、`tools/installer-check.ps1`、`tools/control-model-check.ps1`、
    `tools/winui-shell-check.ps1`。
@@ -43,9 +55,10 @@ Issue 與 handoff。兩份權威文件衝突時停止修改，建立 `DOC-CONFLI
 
 ## 換 AI／換電腦
 
-更新 active handoff，記錄 base commit、環境 fingerprint、已完成內容、失敗測試、
+只更新自己 Issue 的 active handoff，記錄 owner、scope、base commit、環境 fingerprint、已完成內容、失敗測試、
 剩餘工作、`Next safe action` 與最多五個 resume commands。建立 WIP commit 並 push
-branch。真實裝置資料與 calibration 留在 `.local/`，只提交 schema 和匿名 fixture。
+branch，確認前一個 AI 停止寫入後才把 owner 交給下一個 AI。真實裝置資料與 calibration
+留在 `.local/`，只提交 schema 和匿名 fixture。
 
 ## 尚未完成的主要區域
 

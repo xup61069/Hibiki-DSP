@@ -5,6 +5,7 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $required = @(
   'AGENTS.md', 'CLAUDE.md', 'README.md', 'CONTRIBUTING.md', 'SECURITY.md',
+  '.github/PULL_REQUEST_TEMPLATE.md', '.github/ISSUE_TEMPLATE/ai-task.yml',
   'SOURCE_POLICY.md', 'THIRD_PARTY.yml', 'config/distribution-profile.yml',
   'build/toolchain-lock.yml',
   'extensions/manifest.json', 'tools/extension-check.ps1',
@@ -24,6 +25,8 @@ $required = @(
   'docs/adr/0001-public-monorepo-and-component-licenses.md',
   'docs/adr/0002-virtual-endpoint-engine-boundary.md', 'docs/ai/HANDOFF_SCHEMA.json',
   'docs/ai/DOC_SCHEMA.json', 'docs/ai/CHANGE_CONTRACT.yml', 'docs/ai/CONFLICT_POLICY.md',
+  'docs/ai/MULTI_AGENT.md', 'docs/tasks/active/README.md', 'docs/tasks/active/TEMPLATE.md',
+  'schemas/task-handoff-v1.schema.json', 'schemas/task-handoff-v2.schema.json',
   'schemas/acoustic-anchor-v1.schema.json', 'schemas/equal-loudness-policy-v1.schema.json',
   'schemas/equal-loudness-status-v1.schema.json', 'schemas/ipc-envelope-v1.schema.json',
   'schemas/driver-control-v1.schema.json', 'schemas/ir-phase-policy-v1.schema.json',
@@ -54,6 +57,13 @@ $required = @(
 
 $missing = @($required | Where-Object { -not (Test-Path (Join-Path $repo $_)) })
 if ($missing.Count -gt 0) { throw "Missing required documentation: $($missing -join ', ')" }
+
+$handoffSchemaIndex = Get-Content -LiteralPath (Join-Path $repo 'docs/ai/HANDOFF_SCHEMA.json') -Raw |
+  ConvertFrom-Json
+$handoffSchemaRef = $handoffSchemaIndex.PSObject.Properties['$ref'].Value
+if ($handoffSchemaRef -ne '../../schemas/task-handoff-v2.schema.json') {
+  throw 'docs/ai/HANDOFF_SCHEMA.json must reference the canonical task-handoff-v2 schema.'
+}
 
 $specs = Get-ChildItem -LiteralPath (Join-Path $repo 'docs/specs') -Filter 'SPEC-*.md' -File
 $ids = @($specs | ForEach-Object { Select-String -LiteralPath $_.FullName -Pattern '^id:\s*(\S+)' | ForEach-Object { $_.Matches.Groups[1].Value } })
