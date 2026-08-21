@@ -216,6 +216,10 @@
   user routing on metadata refresh, and supports independent lane/output-group/gain-owner binding;
   Windows `IAudioSessionManager2` worker enumeration now populates it; callbacks remain
   non-blocking and only publish a sequence.
+- `WindowsAudioSessionRouteCoordinatorV1` now exposes bounded per-session volume read/write
+  control through `ISimpleAudioVolume`, requiring a currently enumerated ephemeral session
+  instance ID and finite −144…+12 dB input. Runtime/coordinator unbound, unknown, stale and
+  invalid requests fail closed; this is a worker control boundary, not physical per-App rerouting.
 - `SessionRouteGraphBuilderV1` compiles active bound sessions into graph lanes with explicit
   WindowsSession versus HibikiInternal gain ownership; two Chrome-session fixtures render into
   separate output groups without cross-talk.
@@ -425,7 +429,7 @@ store、handler 與 atomic ViewModel apply；本機 status probe 通過，但仍
 per-App delivery 或 browser tab capture 已完成。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 75 個必要入口與
-17 份 Spec 通過；`source-policy.ps1` 掃描數量以最新 gate 輸出為準且無 blocked
+18 份 Spec 通過；`source-policy.ps1` 掃描數量以最新 gate 輸出為準且無 blocked
 binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
