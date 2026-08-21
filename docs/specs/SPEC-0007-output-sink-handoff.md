@@ -59,11 +59,15 @@ active slot，`rollback` 保留仍在執行的舊 worker。這個 user-space han
 bounded queue 與 source-level fallback；實體 endpoint 的暖機時間、音量連續性、拔插與
 Audio Service restart 仍需 Windows 11 24H2+ 實機／HLK evidence。
 
+Rollback 之後只要舊 worker 仍然 `running` 且 `endpoint_ready`，狀態會保留為
+`RolledBack` 並允許下一次 `begin → prepare` 重試；不能要求重啟整個 engine 或先重新
+`start_initial`。舊 worker 失效時才進入 `Degraded`。
+
 `tools/live-wasapi-handoff-check.ps1` 是 opt-in、無聲的 local probe：它讀取目前 default
-render mix format，啟動 active/candidate workers，等待兩端 warm-up，送出 30 ms equal-power
-silence crossfade，再 commit。probe 只輸出 aggregate format／state／block counters，不會
-寫入 endpoint identity；沒有可接受 endpoint 時回報 `wasapi=unavailable`，不把缺少硬體
-當成成功。
+render mix format，啟動 active/candidate workers，等待兩端 warm-up，先驗證一次 candidate
+rollback 與舊 worker 持續運作，再重試同一候選並送出 30 ms equal-power silence crossfade
+後 commit。probe 只輸出 aggregate format／state／block counters，不會寫入 endpoint
+identity；沒有可接受 endpoint 時回報 `wasapi=unavailable`，不把缺少硬體當成成功。
 
 `AudioEngineModel` 的 `start_wasapi_output`、`begin_wasapi_output_handoff`、
 `prepare/commit/rollback_wasapi_output_handoff` 與 `process_output_group_to_wasapi` 是

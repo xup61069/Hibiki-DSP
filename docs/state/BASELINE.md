@@ -295,6 +295,9 @@
   persistent SRC and clock-observation updates. The opt-in silent local handoff probe now passes
   active/candidate warm-up and 30 ms commit on a 6-channel 48 kHz endpoint; the graph RT thread
   never calls this COM API, and target hotplug/HLK soak remains pending.
+- `WindowsWasapiSinkHandoffV1` now permits a new candidate `begin` after a failed candidate
+  rollback while the active worker remains ready; the live silent probe verifies rollback,
+  active-worker retention, retry, 30 ms fade and commit on a local 6-channel endpoint.
 - `IpcNamedPipeServerV1` provides the Windows control-plane worker boundary with overlapped,
   bounded read/write, local-only pipe validation, request decoding and callback response framing;
   a Windows loopback contract test exercises Ack/request-ID round-trip.
@@ -371,6 +374,8 @@ WindowsVolumeLink broker-to-engine adapter 的 source commit 是 `a375ff5`。
 Endpoint-ID-preserving volume rebind 的 source commit 是 `4d9e1d5`。
 固定四組 volume event-context GUID 與自動註冊的 source commit 是 `1ebf026`。
 WASAPI PCM render conversion 與 silent 30 ms live handoff probe 的 source commit 是 `9d0d426`。
+WASAPI rollback/retry state-machine fix 與 live probe 的 source commit 是 `135c7ac`；target
+Audio Service restart、hotplug、HLK 與 signed endpoint evidence 仍未完成。
 Driver signability source gate 的 source commit 是 `dc1d3b2`；預設只驗證 INF contract，
 目標 WDK package 才能執行 Inf2Cat。
 Topology-indexed WDK render/capture pin formats 與 Virtual Mic generic format boundary 的
