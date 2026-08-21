@@ -132,6 +132,9 @@
 - The MS-PL WDK property adapter now checks KS instance/value buffers and rejects ambiguous
   access verbs before touching endpoint state; this is source hardening, not a loadable-driver
   result.
+- The portable MS-PL endpoint state core now validates and copies an event-context GUID before
+  changing requested/effective dB, mute or generation; overlong context input is fully atomic
+  and covered by regression tests.
 - MS-PL `endpoint_topology_v1` catalog fixes Main/Low Latency stereo render, Surround 7.1 render
   with Windows `0x63f` mask and Virtual Mic stereo capture, including permanent GUIDs, direction,
   default buffer and supported-rate flags; the catalog is portable input to future SYSVAD tables.

@@ -42,7 +42,8 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   commit／rollback，也不把真實私人 endpoint ID 寫進 Scene 或 repository。
 - `driver/include/hibiki/wavert_endpoint_state_v1.h` 與其 MS-PL C 實作是 WDK adapter 的
   第一個可測試控制核心：格式、Q16.16 dB、safety ceiling、mute、generation 與 actuator
-  都在 driver 邊界驗證；它仍不是完整 PortCls miniport 或可載入 `.sys`。
+  都在 driver 邊界驗證；event-context GUID 會在任何 state mutation 前完整驗證，錯誤
+  請求不會留下半套 volume/mute/generation；它仍不是完整 PortCls miniport 或可載入 `.sys`。
 - `driver/include/hibiki/endpoint_topology_v1.h` 與 `src/endpoint_topology.c` 固定四個 endpoint
   的方向、聲道數、Windows channel mask、預設 buffer、取樣率 flags 與 distribution GUID：
   Main=stereo render、Low Latency=stereo/64-frame render、Surround=7.1 render、Virtual Mic=stereo
