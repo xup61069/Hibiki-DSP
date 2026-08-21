@@ -6,7 +6,7 @@ authority: product-behavior
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["src/hub/include/hibiki/control_status.hpp", "src/hub/src/control_status.cpp", "src/hub/include/hibiki/control_service.hpp", "src/hub/src/control_service.cpp", "apps/control-model/IpcProtocol.cs", "apps/control-model/EasyControlViewModel.cs", "tests/**"]
+source_globs: ["src/hub/include/hibiki/control_status.hpp", "src/hub/src/control_status.cpp", "src/hub/include/hibiki/control_service.hpp", "src/hub/src/control_service.cpp", "src/hub/include/hibiki/windows_device_catalog.hpp", "src/hub/src/windows_device_catalog.cpp", "apps/control-model/IpcProtocol.cs", "apps/control-model/EasyControlViewModel.cs", "tests/**"]
 ---
 
 # SPEC-0017：控制狀態快照 IPC
@@ -34,6 +34,12 @@ pipe reply 複製；不在 RT、COM callback 或 UI callback 中配置或等待�
 在 Hello／device catalog 後以 bounded serialized request 取得狀態，先用暫存 Expert model
 驗證 routes，再一次套用 volume 與 route snapshot。
 
+Windows control runtime 會在 worker/control thread 將同一預設 render endpoint 的
+`WindowsAudioSessionRouteCoordinatorV1::snapshot()` 轉成保守路由健康資訊：session graph
+準備完成才顯示 control-plane `Ready`，process-loopback 仍是 `Pending` 或 `Unavailable`，
+並在說明中明示 physical delivery 未驗證。這條路徑不在 RT 或 COM notification callback
+中執行，也不把 session enumeration 當成 per-App 重送。
+
 ## 失敗／fallback
 
 - unknown type、錯誤長度、非零 padding、非法 UTF-8、重複 route ID、過期 sequence 或 unsafe
@@ -48,4 +54,7 @@ pipe reply 複製；不在 RT、COM callback 或 UI callback 中配置或等待�
    stale store publish 都通過 contract/control-model checks。
 2. named-pipe handler 能以 request ID 回覆 ControlStatusSnapshot；未掛載 store 回 Error。
 3. ViewModel 對完整快照採 atomic-style validation；malformed／stale snapshot 不改變可見狀態。
-4. public repository 不包含編譯後 payload、driver、endpoint identity 或私人 calibration。
+4. local Windows probe 驗證 default endpoint session route summary 會進入 status snapshot，
+   route IDs 固定、說明不洩漏 endpoint/session identity，且 `physical delivery unverified`
+   邊界保留。
+5. public repository 不包含編譯後 payload、driver、endpoint identity 或私人 calibration。

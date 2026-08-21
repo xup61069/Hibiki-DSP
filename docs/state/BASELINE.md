@@ -44,7 +44,7 @@
 - `ControlStatusSnapshotStoreV1` publishes a complete immutable volume/route-health snapshot;
   the named-pipe handler replies by request ID and the C# ViewModel rejects stale/malformed
   frames while preserving its prior safe state. The local live probe reports
-  `volume=pass status=pass routes=4 status_sequence=3`.
+  `volume=pass status=pass route_status=pass routes=4 status_sequence=4`.
 - `CalibrationResponsePointV1` and `compile_bounded_peq_correction_v1` now provide a deterministic
   control-plane measured-response to bounded PEQ compiler (16-filter cap, frequency/spacing/Q and
   boost/cut policy validation, explicit `limited` result) that feeds the existing APO/CamillaDSP/
@@ -139,8 +139,9 @@
   local named pipe; `runtime=pass request=pass` proves service → provider → IPC framing without
   printing endpoint identity data.
 - The same live probe now requests `ControlStatusSnapshot` on a second bounded pipe transaction;
-  this proves Windows dB readback, status-store publication and C++ wire decode. Browser tab
-  capture, process loopback delivery and physical per-App rerouting remain pending.
+  this proves Windows dB readback, status-store publication, session-route summary and C++ wire
+  decode (`route_status=pass`, status sequence 4). Browser tab capture, process loopback delivery
+  and physical per-App rerouting remain pending.
 - `EasyControlViewModel.ConnectAsync` now requests and atomically applies a fresh
   `DeviceCatalogSnapshot` after the Hello handshake; a disconnected or invalid request fails closed,
   preserves the last safe catalog and never claims that a physical endpoint was switched.
