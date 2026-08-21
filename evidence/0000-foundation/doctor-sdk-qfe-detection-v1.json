@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "issue": 30,
+  "scope_digest": "doctor-sdk-qfe-detection-v1",
+  "source_commit": "68a156ebf1be34a77b89a154e6f4117ece125d40",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.1-sdk-wdk-10.0.28000.2526-cmake-4.4.2-pwsh-7.6.5",
+  "commands": [
+    "pwsh -NoProfile -File tools/doctor.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 30",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/doctor.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "exact SDK/WDK QFE match",
+        "missing SDK metadata",
+        "mismatched QFE",
+        "missing kit directory"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly",
+      "status": "pass",
+      "coverage": [
+        "Windows build and AMD64 architecture",
+        "git, CMake and pwsh availability",
+        "Visual Studio 2026 C++ workload",
+        "SDK/WDK on-disk 10.0.28000.0 layout and exact 10.1.28000.2526 package metadata"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 30 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership and branch ancestry",
+        "non-overlapping active scopes"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": ["85 required documentation paths", "24 unique Specs"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": ["tracked source paths", "no blocked binary, secret or workflow publication"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": ["Visual Studio 18 2026 C++ configure/build", "CTest contract suite 1/1 passed"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": ["no whitespace errors"],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Diagnostic gate only; does not claim a loadable driver, WaveRT, HLK, Microsoft signing or physical audio.",
+    "The exact QFE is proven by local installed-package metadata and kit layout, not by a committed registry dump.",
+    "DesktopCompat WinUI build remains dependent on a .NET 8 SDK outside this Issue scope."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "visual_studio": "18.9.12112.369",
+    "msvc": "19.51.36256.0",
+    "cmake": "4.4.2",
+    "powershell": "pwsh 7.6.5"
+  },
+  "started_at": "2026-08-22T04:10:00+08:00",
+  "finished_at": "2026-08-22T04:25:09+08:00"
+}
