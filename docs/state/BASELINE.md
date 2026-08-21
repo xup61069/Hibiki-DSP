@@ -11,6 +11,9 @@
 - Caller-owned output ring buffer、clock-drift estimator、bounded linear SRC prototype、
   Apache C driver ABI 與 portable driver validator。
 - Source-only PowerShell installer bootstrapper with manifest/hash dry-run gate.
+- `ReleaseManifest v1` now requires toolchain/dependency/SBOM digests plus driver package/catalog
+  and Microsoft signature metadata, and installer signer/RFC3161 metadata before a package can be
+  staged; no signed payload is stored in this repository.
 - Easy Scene factory、AcousticAnchor phon mapping、PEQ/APO/CamillaDSP/REW exporters 與 WAV IR
   serializer。
 - `IrPhasePolicyV1` 與 C# binding-ready slider contract 已加入：Game minimum-phase 0 ms、

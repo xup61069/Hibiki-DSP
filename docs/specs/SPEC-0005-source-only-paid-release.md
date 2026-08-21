@@ -29,7 +29,9 @@ gates；任何 gate 失敗都不得視為可交付 source tag。
    Authenticode 加 RFC3161 timestamp 簽署 installer。
 4. 在 Secure Boot/HVCI 開啟且 TESTSIGNING 關閉的乾淨環境安裝、升級、rollback、uninstall。
 5. 產生 `ReleaseManifest v1`，至少記錄 source tag、commit、toolchain、dependency lock、
-   unsigned/signed hash、driver signature、installer signer、SBOM 與 test run。
+   unsigned/signed hash、driver package/catalog hash 與 Microsoft signature thumbprint、
+   installer hash/signer/RFC3161 timestamp、SBOM 與 test run。公開 repository 只放文字
+   manifest；實際 signed payload 仍由 Gumroad 交付。
 6. 由人類手動把同一份 canonical installer 上傳 Gumroad；AI 不接觸憑證、Partner Center
    或 Gumroad 帳密。
 
