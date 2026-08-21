@@ -150,7 +150,16 @@ Vst3PluginStateResultV1 Vst3PluginStateStoreV1::restore_with_migration(
                                   std::span<const std::uint8_t>(slot.bytes.data(), slot.bytes.size()),
                                   expected_state_version,
                                   destination.first(bounded_size), bytes_written, context);
-    if (result != Vst3PluginStateResultV1::ok) return Vst3PluginStateResultV1::migration_failed;
+    if (result != Vst3PluginStateResultV1::ok) {
+        bytes_written = 0U;
+        // Preserve the explicit overflow result so the Scene coordinator and
+        // review evidence can distinguish a bounded-output failure from an
+        // opaque handler error. Other handler-specific failures stay mapped to
+        // the fail-closed generic migration result.
+        return result == Vst3PluginStateResultV1::migration_output_too_large
+                   ? result
+                   : Vst3PluginStateResultV1::migration_failed;
+    }
     if (bytes_written > bounded_size || bytes_written > kVst3PluginStateMaxBytesV1) {
         bytes_written = 0U;
         return Vst3PluginStateResultV1::migration_output_too_large;

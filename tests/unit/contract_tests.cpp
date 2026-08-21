@@ -121,6 +121,19 @@ hibiki::Vst3PluginStateResultV1 migrate_test_plugin_state(
     return hibiki::Vst3PluginStateResultV1::ok;
 }
 
+hibiki::Vst3PluginStateResultV1 migrate_oversized_plugin_state(
+    const std::uint32_t,
+    const std::span<const std::uint8_t>,
+    const std::uint32_t,
+    const std::span<std::uint8_t> destination,
+    std::size_t& bytes_written,
+    void*) noexcept {
+    // Deliberately report a result larger than the caller-owned bounded span;
+    // the store must reject it without exposing a partial state.
+    bytes_written = destination.size() + 1U;
+    return hibiki::Vst3PluginStateResultV1::ok;
+}
+
 int main() {
     using namespace hibiki;
 
@@ -937,6 +950,18 @@ int main() {
           state_bytes_written == 4U && migrated_state[3] == 0x42U);
     CHECK(plugin.register_plugin_state_migration(plugin_identity, 9U, 2U,
                                                  migrate_test_plugin_state) ==
+              Vst3PluginStateResultV1::invalid_argument);
+    CHECK(plugin.restore_plugin_state_with_migration(
+              "movie-state", plugin_identity, 2U, restored_state, state_bytes_written,
+              migrate_oversized_plugin_state) ==
+              Vst3PluginStateResultV1::migration_output_too_large &&
+          state_bytes_written == 0U);
+    std::vector<std::uint8_t> max_plugin_state(kVst3PluginStateMaxBytesV1, 0x5AU);
+    std::vector<std::uint8_t> oversized_plugin_state(kVst3PluginStateMaxBytesV1 + 1U, 0x5AU);
+    CHECK(plugin.capture_plugin_state("max-state", plugin_identity, 1U, max_plugin_state) ==
+              Vst3PluginStateResultV1::ok &&
+          plugin.capture_plugin_state("oversized-state", plugin_identity, 1U,
+                                      oversized_plugin_state) ==
               Vst3PluginStateResultV1::invalid_argument);
 
     Vst3PluginStateStoreV1 scene_state_store;
