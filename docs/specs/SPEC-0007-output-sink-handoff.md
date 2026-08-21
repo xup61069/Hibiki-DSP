@@ -32,6 +32,10 @@ source_globs: ["src/hub/**output*", "src/hub/include/hibiki/output*", "src/hub/s
   pop block，空 queue 補 silence，並透過 `OutputSinkModel` 的 persistent SRC 處理已排程的
   clock observation。`observe_clock` 只寫入 atomic latest-request，實際 SRC 更新在 worker
   套用；graph RT 不呼叫 COM、等待或配置。
+- `WindowsWasapiOutputV1` 在 bind 時取得 `IAudioClock`，worker 以 device position 與 QPC
+  delta 產生每 sink 的 source/sink frame observation，再由 `OutputSinkModel` 更新 SRC；
+  clock 讀取失敗時保留原本的外部 observation／安全 fallback。多聲道 Float32 mix format
+  若為 extensible，channel mask 必須符合 2.0／5.1／7.1 layout。
 - worker snapshot 必須可觀察 `endpoint_ready`、`degraded`、dropped/submitted/rendered blocks、
   `source_step` 與 `drift_ppm`，讓 UI 在實體 endpoint 未綁定時顯示 detached，而不是靜默宣稱
   已輸出。
