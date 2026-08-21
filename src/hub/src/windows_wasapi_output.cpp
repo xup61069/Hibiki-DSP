@@ -21,6 +21,7 @@ IAudioClient* as_client(void* value) noexcept { return static_cast<IAudioClient*
 IAudioRenderClient* as_render(void* value) noexcept {
   return static_cast<IAudioRenderClient*>(value);
 }
+IAudioClock* as_clock(void* value) noexcept { return static_cast<IAudioClock*>(value); }
 HANDLE as_event(void* value) noexcept { return static_cast<HANDLE>(value); }
 
 bool valid_layout(const std::uint32_t channels) noexcept {
@@ -29,6 +30,18 @@ bool valid_layout(const std::uint32_t channels) noexcept {
 
 bool valid_rate(const std::uint32_t rate) noexcept {
   return rate == 44100U || rate == 48000U || rate == 96000U || rate == 192000U;
+}
+
+DWORD expected_channel_mask(const std::uint32_t channels) noexcept {
+  switch (channels) {
+    case 2U: return SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT;
+    case 6U: return SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT | SPEAKER_FRONT_CENTER |
+                     SPEAKER_LOW_FREQUENCY | SPEAKER_BACK_LEFT | SPEAKER_BACK_RIGHT;
+    case 8U: return SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT | SPEAKER_FRONT_CENTER |
+                     SPEAKER_LOW_FREQUENCY | SPEAKER_BACK_LEFT | SPEAKER_BACK_RIGHT |
+                     SPEAKER_SIDE_LEFT | SPEAKER_SIDE_RIGHT;
+    default: return 0U;
+  }
 }
 
 }  // namespace
@@ -47,9 +60,11 @@ bool WindowsWasapiOutputV1::bind(const WasapiOutputConfigV1& config) noexcept {
   WAVEFORMATEX* mix_format = nullptr;
   IAudioClient* client = nullptr;
   IAudioRenderClient* render_client = nullptr;
+  IAudioClock* clock = nullptr;
   HANDLE event_handle = nullptr;
   auto cleanup = [&]() noexcept {
     if (render_client != nullptr) render_client->Release();
+    if (clock != nullptr) clock->Release();
     if (client != nullptr) client->Release();
     if (event_handle != nullptr) CloseHandle(event_handle);
     if (mix_format != nullptr) CoTaskMemFree(mix_format);
@@ -83,6 +98,11 @@ bool WindowsWasapiOutputV1::bind(const WasapiOutputConfigV1& config) noexcept {
     cleanup();
     return false;
   }
+  if (mix_format->wFormatTag == WAVE_FORMAT_EXTENSIBLE &&
+      extensible->dwChannelMask != expected_channel_mask(config.channels)) {
+    cleanup();
+    return false;
+  }
 
   const REFERENCE_TIME duration = static_cast<REFERENCE_TIME>(config.buffer_duration_ms) * 10000;
   const DWORD stream_flags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM;
@@ -90,6 +110,7 @@ bool WindowsWasapiOutputV1::bind(const WasapiOutputConfigV1& config) noexcept {
                                 nullptr)) ||
       FAILED(client->GetBufferSize(&buffer_frames_)) ||
       FAILED(client->GetService(IID_PPV_ARGS(&render_client))) || render_client == nullptr ||
+      FAILED(client->GetService(IID_PPV_ARGS(&clock))) || clock == nullptr ||
       (event_handle = CreateEventW(nullptr, FALSE, FALSE, nullptr)) == nullptr ||
       FAILED(client->SetEventHandle(event_handle))) {
     cleanup();
@@ -99,11 +120,13 @@ bool WindowsWasapiOutputV1::bind(const WasapiOutputConfigV1& config) noexcept {
 
   client_ = client;
   render_client_ = render_client;
+  clock_ = clock;
   event_ = event_handle;
   channels_ = config.channels;
   sample_rate_ = config.sample_rate;
   client = nullptr;
   render_client = nullptr;
+  clock = nullptr;
   event_handle = nullptr;
   cleanup();
   return true;
@@ -126,10 +149,12 @@ void WindowsWasapiOutputV1::stop() noexcept {
 void WindowsWasapiOutputV1::release_resources() noexcept {
   stop();
   if (render_client_ != nullptr) as_render(render_client_)->Release();
+  if (clock_ != nullptr) as_clock(clock_)->Release();
   if (client_ != nullptr) as_client(client_)->Release();
   if (event_ != nullptr) CloseHandle(as_event(event_));
   client_ = nullptr;
   render_client_ = nullptr;
+  clock_ = nullptr;
   event_ = nullptr;
   channels_ = 0;
   sample_rate_ = 0;
@@ -158,6 +183,17 @@ bool WindowsWasapiOutputV1::render(const float* const interleaved,
 bool WindowsWasapiOutputV1::wait_for_buffer(const std::uint32_t timeout_ms) noexcept {
   if (!started_ || event_ == nullptr) return false;
   return WaitForSingleObject(as_event(event_), timeout_ms) == WAIT_OBJECT_0;
+}
+
+bool WindowsWasapiOutputV1::read_clock(WasapiClockSampleV1& sample) const noexcept {
+  sample = {};
+  if (!bound() || clock_ == nullptr) return false;
+  UINT64 device_position = 0U;
+  UINT64 qpc_position = 0U;
+  if (FAILED(as_clock(clock_)->GetPosition(&device_position, &qpc_position))) return false;
+  sample.device_position = device_position;
+  sample.qpc_position = qpc_position;
+  return true;
 }
 
 WindowsWasapiSinkWorkerV1::~WindowsWasapiSinkWorkerV1() { stop(); }
@@ -293,6 +329,13 @@ void WindowsWasapiSinkWorkerV1::run(WasapiOutputConfigV1 config,
     return;
   }
   std::uint64_t applied_clock_sequence = 0U;
+  std::uint64_t source_position = 0U;
+  std::uint64_t previous_source_position = 0U;
+  WasapiClockSampleV1 previous_clock{};
+  bool have_previous_clock = false;
+  LARGE_INTEGER qpc_frequency{};
+  const bool have_qpc_frequency = QueryPerformanceFrequency(&qpc_frequency) != FALSE &&
+                                  qpc_frequency.QuadPart > 0;
   while (!stop_requested_.load(std::memory_order_acquire)) {
     const auto requested_clock_sequence =
         clock_request_sequence_.load(std::memory_order_acquire);
@@ -312,6 +355,7 @@ void WindowsWasapiSinkWorkerV1::run(WasapiOutputConfigV1 config,
       channels = channels_;
       std::fill_n(block.data(), static_cast<std::size_t>(frames) * channels, 0.0F);
     }
+    source_position += frames;
     std::size_t rendered_frames = 0U;
     if (!sink_model_.process(block.data(), frames, rendered.data(), kMaxFrames, rendered_frames)) {
       degraded_.store(true, std::memory_order_release);
@@ -321,6 +365,27 @@ void WindowsWasapiSinkWorkerV1::run(WasapiOutputConfigV1 config,
       rendered_blocks_.fetch_add(1U, std::memory_order_relaxed);
     } else {
       degraded_.store(true, std::memory_order_release);
+    }
+    WasapiClockSampleV1 current_clock{};
+    if (have_qpc_frequency && output.read_clock(current_clock)) {
+      if (have_previous_clock && current_clock.device_position >= previous_clock.device_position &&
+          current_clock.qpc_position > previous_clock.qpc_position &&
+          source_position >= previous_source_position) {
+        const auto sink_delta = current_clock.device_position - previous_clock.device_position;
+        const auto source_delta = source_position - previous_source_position;
+        const auto qpc_delta = current_clock.qpc_position - previous_clock.qpc_position;
+        const double elapsed = static_cast<double>(qpc_delta) /
+                               static_cast<double>(qpc_frequency.QuadPart);
+        if (sink_delta > 0U && source_delta > 0U && elapsed > 0.0) {
+          sink_model_.observe_clock(static_cast<double>(source_delta),
+                                    static_cast<double>(sink_delta), elapsed);
+          source_step_.store(sink_model_.snapshot().source_step, std::memory_order_release);
+          drift_ppm_.store(sink_model_.snapshot().drift_ppm, std::memory_order_release);
+        }
+      }
+      previous_clock = current_clock;
+      previous_source_position = source_position;
+      have_previous_clock = true;
     }
   }
   output.stop();
@@ -358,12 +423,14 @@ void WindowsWasapiOutputV1::unbind() noexcept {
   stop();
   client_ = nullptr;
   render_client_ = nullptr;
+  clock_ = nullptr;
   channels_ = 0;
   sample_rate_ = 0;
   buffer_frames_ = 0;
 }
 bool WindowsWasapiOutputV1::render(const float*, std::uint32_t) noexcept { return false; }
 bool WindowsWasapiOutputV1::wait_for_buffer(std::uint32_t) noexcept { return false; }
+bool WindowsWasapiOutputV1::read_clock(WasapiClockSampleV1&) const noexcept { return false; }
 void WindowsWasapiOutputV1::release_resources() noexcept { unbind(); }
 
 WindowsWasapiSinkWorkerV1::~WindowsWasapiSinkWorkerV1() { stop(); }

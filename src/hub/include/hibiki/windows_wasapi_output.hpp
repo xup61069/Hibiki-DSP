@@ -20,6 +20,11 @@ struct WasapiOutputConfigV1 {
   std::uint32_t buffer_duration_ms{20};
 };
 
+struct WasapiClockSampleV1 {
+  std::uint64_t device_position{0U};
+  std::uint64_t qpc_position{0U};
+};
+
 // WASAPI shared-mode endpoint owned by one dedicated sink worker (not the
 // Hibiki graph RT thread). That worker must initialize COM and perform bind,
 // start, render and unbind on the same apartment; the control plane schedules
@@ -38,6 +43,7 @@ public:
   void unbind() noexcept;
   [[nodiscard]] bool render(const float* interleaved, std::uint32_t frames) noexcept;
   [[nodiscard]] bool wait_for_buffer(std::uint32_t timeout_ms) noexcept;
+  [[nodiscard]] bool read_clock(WasapiClockSampleV1& sample) const noexcept;
 
   [[nodiscard]] bool bound() const noexcept { return client_ != nullptr && render_client_ != nullptr; }
   [[nodiscard]] bool started() const noexcept { return started_; }
@@ -51,10 +57,12 @@ private:
 #if defined(_WIN32)
   void* client_{nullptr};
   void* render_client_{nullptr};
+  void* clock_{nullptr};
   void* event_{nullptr};
 #else
   void* client_{nullptr};
   void* render_client_{nullptr};
+  void* clock_{nullptr};
 #endif
   std::uint32_t channels_{0};
   std::uint32_t sample_rate_{0};
