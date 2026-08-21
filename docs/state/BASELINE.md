@@ -86,7 +86,8 @@
   successfully (`volume=pass`) without touching COM from RT.
 - `WindowsVolumeLinkV1` now provides the explicit control-thread bridge from broker snapshots to
   an `AudioEngineModel` output-group master, with self event-context filtering and stale/invalid
-  generation handling covered by the Windows contract test.
+  generation handling covered by the Windows contract test. UI/Safety/Scene/Session event
+  contexts are stable values from `distribution-profile.yml` and are registered by default.
 - Windows-only `IMMNotificationClient` watcher with bounded default/add/remove/property event
   snapshots, consumed by a worker-side transactional recovery coordinator with safe-start mute
   after endpoint invalidation or Audio Service restart.
@@ -359,6 +360,7 @@ WDK volume/mute basic-support source gate 的 source commit 是 `1572b5f`。
 WindowsControlRuntime default endpoint volume binding/read/poll 的 source commit 是 `df36929`。
 WindowsVolumeLink broker-to-engine adapter 的 source commit 是 `a375ff5`。
 Endpoint-ID-preserving volume rebind 的 source commit 是 `4d9e1d5`。
+固定四組 volume event-context GUID 與自動註冊的 source commit 是 `1ebf026`。
 Driver signability source gate 的 source commit 是 `dc1d3b2`；預設只驗證 INF contract，
 目標 WDK package 才能執行 Inf2Cat。
 

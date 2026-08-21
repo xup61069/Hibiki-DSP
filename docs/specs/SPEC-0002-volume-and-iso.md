@@ -54,6 +54,10 @@ snapshot 轉成 Group Master state，audio callback 不得直接碰 COM。`Windo
 `AudioEngineModel` canonical volume bank，拒絕非法 dB、回報 stale generation，並可登記
 Hibiki UI/Scene/Safety 寫入所使用的 event-context GUID；匹配自家 GUID 的 callback 會回報
 `IgnoredSelf` 而不重複套用。adapter 不寫回 COM、不配置，也不在 queue/RT thread 執行。
+四個預設來源（UI、Safety、Scene、Session）固定寫在
+`config/distribution-profile.yml`，`WindowsVolumeLinkV1` 建構時自動註冊；換電腦或換 AI
+不得重生這些 GUID。其他整合來源只能透過明確的 `add_ignored_context` 加入，並須在
+handoff/evidence 中記錄用途。
 `WindowsDeviceWatcher` 同樣只把 `IMMNotificationClient` 的 default/add/remove/state/property
 事件複製到 bounded snapshot；實際 rebind 必須由 worker 讀取 snapshot 後執行，避免在 OS
 callback 裡 unregister、release 或建立 COM 物件。
