@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "issue": 0,
-  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-token-output-fanout-runtime-v17",
-  "source_commit": "cc28f57",
+  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-token-output-fanout-runtime-engine-boundary-v18",
+  "source_commit": "2ae1b80",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -63,7 +63,7 @@
     {"command": "graph-rollback-resource-lifecycle", "status": "pass", "coverage": ["pending latency bank release", "rollback preserves degraded state without active graph", "re-prepare after rollback"], "compiled_artifacts": false},
     {"command": "ui-device-switch-state", "status": "pass", "coverage": ["preparing/fading/ready-to-commit states", "commit blocked before crossfade", "rollback preserves active device"], "compiled_artifacts": false},
     {"command": "vst3-plugin-latency-token", "status": "pass", "coverage": ["non-zero stable lane token", "missing token quarantine", "host latency lane projection"], "compiled_artifacts": false},
-    {"command": "multi-sink-output-fanout", "status": "pass", "coverage": ["up to 8 sink plan", "same-layout block copy", "disabled sink isolation", "capacity preflight", "duplicate sink rejection", "finite-input preflight", "all-disabled plan rejection", "per-sink persistent SRC", "clock observation", "transactional scratch publish", "SRC state rollback"], "compiled_artifacts": false},
+    {"command": "multi-sink-output-fanout", "status": "pass", "coverage": ["up to 8 sink plan", "same-layout block copy", "disabled sink isolation", "capacity preflight", "duplicate sink rejection", "finite-input preflight", "all-disabled plan rejection", "per-sink persistent SRC", "clock observation", "transactional scratch publish", "SRC state rollback", "AudioEngine graph-to-fanout boundary", "layout mismatch rejection"], "compiled_artifacts": false},
     {"command": "installer-source-hardening", "status": "pass", "coverage": ["relative manifest paths", "path traversal rejection", "64-character SHA-256 validation"]},
     {"command": "ir-phase-policy", "status": "pass", "coverage": ["minimum-phase 0 ms", "mixed-phase 80 ms budget", "linear-phase 160 ms budget", "bypass validation", "C++/C# slider parity"]},
     {"command": "audio-engine-volume-snapshot", "status": "pass", "coverage": ["single 64-bit dB/mute atomic", "mute transition", "Group Master applied once", "8 ms gain ramp", "5 ms mute", "15 ms unmute", "-1 dBTP output guard"]},
@@ -81,7 +81,7 @@
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",
   "limitations": [
-    "Evidence corresponds to commit cc28f57 and the current environment only.",
+    "Evidence corresponds to commit 2ae1b80 and the current environment only.",
     "The native ASIO build is an unsigned local developer verification; no DLL or SDK checkout is committed or published.",
     "Current machine is Windows 22631 with VS 17/SDK 10.0.26100.0; it cannot provide driver-target evidence for the locked Windows 26100+/VS 2026/SDK-WDK 10.0.28000.2526 environment."
   ],

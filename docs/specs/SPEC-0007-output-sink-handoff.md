@@ -51,3 +51,8 @@ observation 只在 control/worker 邊界更新該 sink 的 ratio；audio-side pr
 後才一次發佈到 caller-owned output buffers。任何 sink 失敗會回復 SRC state，不留下部分
 輸出或部分時鐘進度；每次最多 4096 input frames、輸出上限按 0.25x source step 的固定界限
 驗證。這是 user-space bounded runtime，仍不等於真實硬體 sink／clock soak 證據。
+
+`AudioEngineModel::process_output_group_fanout` 會先完成指定 output group 的 graph、Group
+Master ramp 與 limiter，再把同一個 graph block 交給 fan-out runtime；因此 caller 可在不複製
+graph 或重啟引擎的情況下，同時取得多個 sink 的獨立 SRC 結果。fan-out plan 的 output layout
+必須與 active graph 完全相同，否則 fail-closed。
