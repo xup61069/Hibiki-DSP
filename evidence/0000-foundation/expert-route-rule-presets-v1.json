@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "expert-route-rule-presets-v1",
-  "source_commit": "b968bbb",
+  "source_commit": "5b78003",
   "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet8-local",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -30,6 +30,7 @@
       "status": "pass",
       "coverage": [
         "64-entry route-rule catalog insert/update/validation",
+        "case-insensitive App ID/name preview, priority ordering and ambiguity fail-closed",
         "atomic save/load and malformed-file rollback",
         "ViewModel command binding to the current session catalog sequence",
         "disconnected unknown-rule fail-closed behavior"
