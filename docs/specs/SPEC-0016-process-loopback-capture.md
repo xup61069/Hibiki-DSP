@@ -6,7 +6,7 @@ authority: product-behavior
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["src/hub/include/hibiki/windows_process_loopback.hpp", "src/hub/src/windows_process_loopback.cpp", "tests/**"]
+source_globs: ["src/hub/include/hibiki/windows_process_loopback.hpp", "src/hub/src/windows_process_loopback.cpp", "src/hub/include/hibiki/windows_process_loopback_lane.hpp", "src/hub/src/windows_process_loopback_lane.cpp", "tests/**"]
 ---
 
 # SPEC-0016：Windows process-loopback capture boundary
@@ -33,6 +33,9 @@ buffer period 與累計 frame；停止、timeout、格式不符或 WASAPI 失效
   Float32 block，並沿用既有 Lane／Group Master／limiter transaction。
 - process ID 只作即時 activation target，不進 Scene/Profile 或永久 identity；持久路由仍使用
   session instance／endpoint 與規則 store 的語意。
+- `process_windows_process_loopback_lane_v1` 只在 source snapshot 仍為 `Running` 且格式未變時
+  把一個 caller-owned block 送進現有 Lane graph；`to_wasapi` 只是重用既有 handoff，不會在
+  adapter 內偷偷建立或切換實體 endpoint。
 
 ## 失敗／fallback
 
@@ -61,4 +64,3 @@ buffer period 與累計 frame；停止、timeout、格式不符或 WASAPI 失效
    recovery；本機沒有注入的 process-loopback fixture 時只能記錄 source compile，不得宣稱完成。
 3. process-loopback block 進入 Lane 後，使用既有 graph／Group Master／safety／WASAPI handoff
    驗證單次增益、錯誤聲道 fail-closed 與與其他來源不串音。
-
