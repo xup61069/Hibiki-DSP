@@ -32,6 +32,7 @@ pwsh -File tools/probe-environment.ps1
 pwsh -File tools/verify.ps1
 pwsh -File tools/docs-check.ps1
 pwsh -File tools/source-policy.ps1
+pwsh -File tools/source-only-ci-check.ps1
 pwsh -File tools/extension-check.ps1
 pwsh -File tools/installer-check.ps1
 pwsh -File tools/control-model-check.ps1
