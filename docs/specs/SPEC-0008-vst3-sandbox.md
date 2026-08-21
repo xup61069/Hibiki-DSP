@@ -116,6 +116,13 @@ Hello/Heartbeat 沿用既有 frame，ProcessBlock 以 caller-owned packet 驗證
 回傳 ProcessBlockResponse，plugin 或格式錯誤回傳 Error。這個 target 不會在一般 CI 或
 public source-only checkout 自動生成，且仍不提供第三方 plugin binary。
 
+`Vst3PluginStateStoreV1` 是私有 state boundary：每筆最多 1 MiB、最多 16 筆，要求 state
+ID、plugin ID、32-hex class UID、非零 module SHA-256 與明確 state version；restore 必須
+完全匹配 identity/version，destination 不足或 mismatch 會 fail-closed。
+`schemas/vst3-plugin-state-v1.schema.json` 只描述 metadata，`storage` 固定為
+`private-caller-owned`，實際 opaque bytes 不得進 GitHub、Issue、AI context pack 或 release
+artifact；目前不提供自動 migration，版本升級需明確的人工/版本化 migration policy。
+
 ## 尚未完成的邊界
 
 plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter、bounded parameter

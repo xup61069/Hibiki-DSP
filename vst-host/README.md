@@ -61,6 +61,12 @@ rejects concurrent blocks per lane with an explicit `busy` result. It applies
 timeline snapshots to worker lanes but deliberately does not serialize opaque
 plugin state; cross-version state compatibility remains a separate gate.
 
+`Vst3PluginStateStoreV1` provides that boundary without publishing state bytes:
+it stores at most 16 private caller-owned blobs (1 MiB each), binds them to the
+plugin/class/module SHA-256 identity and a state version, and refuses restore on
+identity, version or destination-size mismatch. There is no automatic migration
+or public state serializer.
+
 `LatencyAlignmentPlanV1` and `FixedDelayLineV1` provide a bounded 16,384-sample
 alignment plan and fixed 8-channel delay primitive. They are tested separately
 from supervisor and graph lane commit, so plugin certification and full latency
