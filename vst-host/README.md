@@ -32,8 +32,9 @@ policy, crash-dump redaction and real plugin certification remain separate gates
 The processor API and optional SDK worker accept up to 16 parameter IDs, five
 sample-accurate points per ID and normalized values in `[0,1]`; the bounded
 `ProcessBlockWithParameters` frame converts them to the SDK's
-`IParameterChanges` before `process`. Supervisor timeline persistence and full
-end-to-end automation remain intentionally outside this baseline.
+`IParameterChanges` before `process`. The bounded timeline and Scene scheduler
+are part of this source baseline; supervisor UI editing and full end-to-end
+automation remain separate gates.
 
 The supervisor now exposes `handshake_worker` and `process_worker_block` as the
 only control-plane exchange calls. They validate HelloAck/response IDs, channel
@@ -45,9 +46,9 @@ existing quarantine policy rather than silently restarted.
 `Vst3WorkerLaneSessionV1` is the next control-plane layer: it binds a stable lane
 token and reported latency, requires a successful handshake, extracts events
 from `Vst3ParameterTimelineV1`, and rejects non-contiguous blocks. A worker or
-ordering failure moves that lane to `Degraded`; Scene scheduling,
-back-pressure, state persistence and third-party certification remain explicit
-follow-up gates.
+ordering failure moves that lane to `Degraded`; Scene scheduling and
+back-pressure are bounded source contracts, while third-party certification
+remains a follow-up gate.
 
 `PluginHostModel` now exposes the host-model entry points for preparing,
 handshaking and processing that lane. Only the existing trusted/certified,
@@ -59,13 +60,16 @@ not evidence of a signed driver or a certified third-party plug-in.
 scene/lane bindings, validates the complete scene before activation, and
 rejects concurrent blocks per lane with an explicit `busy` result. It applies
 timeline snapshots to worker lanes but deliberately does not serialize opaque
-plugin state; cross-version state compatibility remains a separate gate.
+plugin state. `Vst3SceneStateCoordinatorV1` separately binds up to 16 Scene
+state references, checks private metadata and approved migration rules, and
+restores only into caller-owned buffers.
 
 `Vst3PluginStateStoreV1` provides that boundary without publishing state bytes:
 it stores at most 16 private caller-owned blobs (1 MiB each), binds them to the
 plugin/class/module SHA-256 identity and a state version, and refuses restore on
-identity, version or destination-size mismatch. There is no automatic migration
-or public state serializer.
+identity, version or destination-size mismatch. Version changes require an
+explicit identity-checked migration handler from the fixed registry; there is
+no automatic migration or public state serializer.
 
 When a local pinned SDK checkout is supplied, the optional SDK processor also
 uses a bounded `IBStream` for component `getState/setState`, with separate

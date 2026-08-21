@@ -98,7 +98,7 @@
   fields. `Vst3SandboxProcess` also exposes bounded HelloAck and ProcessBlock exchange methods
   that verify request IDs, shape, payload and finite output and clear output on failure; Scene
   scheduling and private plugin-state persistence are now bounded source contracts, while
-  Scene binding and production certification remain pending. The
+  third-party production certification remains pending. The
   `Vst3WorkerLaneSessionV1` control-plane bridge now binds that exchange to a stable lane token,
   latency projection, bounded parameter timeline and contiguous block-order/degraded state.
   `PluginHostModel` exposes prepare/handshake/process entry points and detaches the lane when its
@@ -114,8 +114,8 @@
   1 MiB `IBStream`, separating overflow, plugin-error and destination-size failures. The store and
   `PluginHostModel` now accept only an explicit caller-supplied migration handler for version
   mismatches; the fixed 16-rule migration registry routes approved identity/version pairs, while
-  absent/failed/oversized migrations remain fail-closed. Scene binding and third-party
-  compatibility certification remain pending.
+  absent/failed/oversized migrations remain fail-closed. Scene state binding now uses the
+  bounded coordinator; third-party compatibility certification remains pending.
 - `Vst3SceneStateCoordinatorV1` now binds Scene/state IDs to plugin identity and target version,
   inspects private store metadata before activation and restores only into caller-owned buffers;
   its metadata-only contract is `scene-vst3-state-binding-v1`.
