@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 55,
   "scope_digest": "source-only-ci-selftest-v1",
-  "source_commit": "PENDING",
+  "source_commit": "537f6f470b7118ab7dff6a4bce71525dff0f7eeb",
   "environment_fingerprint": "windows-26200-amd64-powershell-5.1-dotnet-only-portable-pwsh-7.6.5-no-cmake-no-vs; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/source-only-ci-check.ps1 -SelfTest",
