@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "session-route-rule-command-v1",
-  "source_commit": "8556de5",
+  "source_commit": "b550642",
   "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet8-local",
   "commands": [
     "pwsh -File tools/verify.ps1",
