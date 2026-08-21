@@ -39,6 +39,7 @@ pwsh -File tools/control-model-check.ps1
 pwsh -File tools/winui-shell-check.ps1
 pwsh -File tools/distribution-check.ps1
 pwsh -File tools/driver-source-check.ps1
+pwsh -File tools/driver-signability-check.ps1
 ```
 
 Windows endpoint enumeration 是額外的 opt-in live check：

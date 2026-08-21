@@ -51,6 +51,10 @@ jobs:
         shell: pwsh
         run: ./tools/driver-source-check.ps1
 
+      - name: Driver signability source gate
+        shell: pwsh
+        run: ./tools/driver-signability-check.ps1
+
       - name: JSON contract parse gate
         shell: pwsh
         run: |

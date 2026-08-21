@@ -23,7 +23,11 @@
    `pwsh -File tools/live-device-catalog-check.ps1`；它是 opt-in，只輸出數量、sequence、
    payload 大小與 wire 結果，不會把真實 endpoint ID 寫入 repository。
    任何 identity/config 變更都必須再執行 `tools/distribution-check.ps1`；改動 driver source
-   boundary 時也執行 `tools/driver-source-check.ps1`。
+   boundary 時也執行 `tools/driver-source-check.ps1` 與
+   `tools/driver-signability-check.ps1`。若有目標 WDK 編出的 package，可用
+   `tools/driver-signability-check.ps1 -PackageRoot <package> -RequireInf2Cat` 產生
+   Inf2Cat signability evidence；fresh clone 沒有 SYS 時，預設命令只驗證 source boundary，
+   不會假裝完成 `.sys`／CAT 或 Microsoft signing。
 
 ## 文件權威順序
 
