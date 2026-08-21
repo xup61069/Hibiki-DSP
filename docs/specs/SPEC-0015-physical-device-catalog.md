@@ -48,14 +48,15 @@ safe-start／Degraded，而不是重試到 100% 音量。
 - 移除未知 ID 回傳 `NotFound`；狀態／flow 不合法回傳 `InvalidState`。
 - catalog 是 UI／worker snapshot，不得在 audio callback 讀取可變字串或呼叫其 mutator。
 - `DeviceSwitchTransaction` 仍負責 Prepare → crossfade → Commit／Rollback；catalog 只回答
-  「是否存在且可選」，不取代 sink handoff。
+  「是否存在且可選」，`DeviceRecoveryCoordinator::begin_rebind(catalog, endpoint_id)` 會在
+  建立 target 前套用這個判定，不取代 sink handoff。
 - v1 不把 endpoint ID 寫入 SceneProfile；Scene 仍綁定 logical output group，裝置切換
   保持 Scene／volume／calibration 的語意連續。
 
 ## 驗收
 
 1. CTest 覆蓋 render default 互斥、capture／render 分流、拔除後不可選、亂序 sequence、
-   非法 descriptor、移除與容量邊界。
+   非法 descriptor、移除、容量邊界，以及 recovery 不得 rebind 到不可選 endpoint。
 2. Windows adapter 將 watcher snapshot 套入 catalog 時，不在 callback 配置、等待或
    釋放 COM；真實 hotplug／Audio Service restart／WASAPI soak 仍由 driver release gate 驗證。
 3. 跨 AI handoff 必須記錄 catalog contract 的 source commit；不得提交真實私人 endpoint

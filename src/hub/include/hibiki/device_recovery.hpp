@@ -3,9 +3,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "hibiki/device_switch.hpp"
+#include "hibiki/device_catalog.hpp"
 #include "hibiki/volume_state.hpp"
 
 #include <cstdint>
+#include <string_view>
 
 namespace hibiki {
 
@@ -48,6 +50,11 @@ public:
 
     [[nodiscard]] bool observe(const DeviceRecoveryEventV1& event) noexcept;
     [[nodiscard]] bool begin_rebind(DeviceTargetV1 target) noexcept;
+    // Resolve a catalog entry before creating the switch target. This keeps
+    // disabled/unplugged endpoints out of the handoff transaction and leaves
+    // the recovery state unchanged when the endpoint is not selectable.
+    [[nodiscard]] bool begin_rebind(const PhysicalDeviceCatalogV1& catalog,
+                                    std::string_view endpoint_id) noexcept;
     [[nodiscard]] bool prepare() noexcept;
     [[nodiscard]] bool commit() noexcept;
     void rollback() noexcept;

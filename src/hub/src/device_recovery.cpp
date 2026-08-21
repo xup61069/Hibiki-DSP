@@ -49,6 +49,21 @@ bool DeviceRecoveryCoordinator::begin_rebind(DeviceTargetV1 target) noexcept {
     return true;
 }
 
+bool DeviceRecoveryCoordinator::begin_rebind(const PhysicalDeviceCatalogV1& catalog,
+                                             const std::string_view endpoint_id) noexcept {
+    try {
+        if (endpoint_id.empty()) return false;
+        const std::string target_id(endpoint_id);
+        if (!catalog.selectable(target_id, PhysicalDeviceFlowV1::Render)) return false;
+        const auto* const descriptor = catalog.find(target_id);
+        if (descriptor == nullptr) return false;
+        return begin_rebind(DeviceTargetV1{descriptor->endpoint_id, descriptor->channels,
+                                           descriptor->sample_rate, descriptor->buffer_frames});
+    } catch (...) {
+        return false;
+    }
+}
+
 bool DeviceRecoveryCoordinator::prepare() noexcept {
     if (state_ != DeviceRecoveryState::Rebinding || !transaction_.prepare_complete()) {
         return false;

@@ -759,6 +759,25 @@ int main() {
           full_devices.upsert(overflow) == PhysicalDeviceCatalogResultV1::CapacityExceeded &&
           full_devices.size() == kPhysicalDeviceCatalogCapacityV1);
 
+    DeviceRecoveryCoordinator catalog_recovery;
+    PhysicalDeviceCatalogV1 recovery_devices;
+    auto recovery_target = speakers;
+    recovery_target.endpoint_id = "recovery-render";
+    recovery_target.display_name = "Recovery render";
+    recovery_target.is_default = false;
+    recovery_target.last_sequence = 20U;
+    CHECK(recovery_devices.upsert(recovery_target) == PhysicalDeviceCatalogResultV1::Accepted);
+    CHECK(catalog_recovery.observe(DeviceRecoveryEventV1{
+              1U, DeviceRecoveryEventKind::EndpointInvalidated, true}) &&
+          catalog_recovery.begin_rebind(recovery_devices, "recovery-render") &&
+          catalog_recovery.prepare() && catalog_recovery.commit() &&
+          catalog_recovery.transaction().active_target().endpoint_id == "recovery-render");
+    CHECK(recovery_devices.set_availability("recovery-render",
+                                            PhysicalDeviceAvailabilityV1::Unplugged, 21U) ==
+              PhysicalDeviceCatalogResultV1::Accepted &&
+          !catalog_recovery.begin_rebind(recovery_devices, "recovery-render") &&
+          catalog_recovery.transaction().active_target().endpoint_id == "recovery-render");
+
     IpcFrameV1 frame;
     frame.header.type = IpcMessageType::VolumeNotification;
     frame.header.request_id = 42;
