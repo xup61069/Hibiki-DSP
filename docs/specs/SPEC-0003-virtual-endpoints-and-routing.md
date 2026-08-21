@@ -3,10 +3,10 @@ id: SPEC-0003
 status: draft
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-22
 review_after_days: 14
 related_adrs: [ADR-0002, ADR-0004]
-source_globs: ["driver/**", "apps/**", "asio/**", "extensions/**", "src/**"]
+source_globs: ["driver/**", "sdk/**", "apps/**", "asio/**", "extensions/**", "src/**"]
 ---
 
 # SPEC-0003：虛擬端點、Lane 與路由
@@ -71,6 +71,13 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   `KSPROPERTY_TYPE_BASICSUPPORT` 回報 `KSPROPERTY_TYPE_GET | KSPROPERTY_TYPE_SET`，並在
   Value／Instance buffer 不足時先回報所需大小；這只是 WDK source boundary，尚未替代
   目標 WDK build、HLK 或 signed `.sys` 驗收。
+- `sdk/include/hibiki/driver_control_transport_v1.h` 定義固定 136-byte little-endian
+  `endpoint-state`／`volume-notification` control packet；所有欄位以明確 offset 編碼，
+  不依賴 C struct padding，並在 driver/user-space boundary 驗證 GUID、LPCM 格式、Q16.16
+  dB、mute、generation 與 actuator。GPL engine 的 `DriverVolumeLinkV1` 只透過此 Apache
+  ABI 解碼，套用 requested dB/mute 到 canonical output-group safety path，並可忽略已登記
+  event-context 防止回授迴圈；這仍是 user-space/control-plane evidence，不是 loadable
+  WaveRT、PortCls、HLK 或 Microsoft-signing evidence。
 - `sdk/include/hibiki/driver_stream_transport_v1.h` 與 `sdk/src/driver_stream_transport_v1.c`
   定義 driver→engine 的固定 80-byte header＋interleaved Float32 packet；C ABI 提供
   allocation-free encode/validate/payload view，`decode_driver_stream_packet_v1` 會複製到

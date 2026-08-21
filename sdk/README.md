@@ -14,3 +14,13 @@ engine consumes them through `driver_stream_bridge.hpp`, while a future
 MS-PL/WaveRT miniport may produce the same packet from its pin callback. The
 packet span passed to validation must be exactly `header.size_bytes`; a larger
 caller-owned slot is not silently accepted.
+
+`include/hibiki/driver_control_transport_v1.h` adds the corresponding fixed
+136-byte little-endian control packet for `endpoint-state` and
+`volume-notification`. It writes every field at an explicit byte offset,
+validates Q16.16 dB/rate/channel/generation bounds and decodes into caller-owned
+storage without relying on compiler struct padding. The GPL engine consumes it
+through `driver_control_bridge.hpp`; the bridge applies only the requested dB
+and mute through the engine's canonical safety path and can ignore registered
+event-context values to prevent feedback loops. This is a control-plane ABI,
+not evidence of a loadable WaveRT driver or a signed IPC transport.

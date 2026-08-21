@@ -73,6 +73,10 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
 - `evidence/0000-foundation/control-model-engine-ir-clear-v1.json` records three consecutive
   session-routing control-model runs, including IR prepare → Scene IR clear and bounded temporary
   fixture cleanup. It is user-space reliability evidence only; it does not prove physical playback.
+- The next driver-facing source milestone is now the Apache `driver_control_transport_v1` fixed
+  136-byte little-endian endpoint-state/volume-notification packet plus the GPL
+  `DriverVolumeLinkV1` adapter. It is contract-tested and ready for a future WDK/SYSVAD project
+  to consume; it does not provide a `.sys`, PortCls wiring, HLK result or Microsoft signature.
 
 ## 唯一下一步
 

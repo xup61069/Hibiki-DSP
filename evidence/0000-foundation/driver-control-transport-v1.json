@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "driver-control-transport-v1",
+  "source_commit": "6343823",
+  "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/driver-source-check.ps1",
+    "pwsh -File tools/source-policy.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "explicit 136-byte little-endian endpoint-state/volume-notification encoding",
+        "exact-size validation and malformed message-type rejection",
+        "decode into caller-owned state with request ID/message type round-trip",
+        "DriverVolumeLinkV1 event-context suppression, canonical volume apply and stale-generation rejection"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/driver-source-check.ps1; tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "MS-PL WDK boundary remains free of GPL linkage",
+        "Apache SDK transport and GPL bridge carry SPDX headers",
+        "no tracked binaries, private endpoint data or restricted ISO material"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The packet codec and bridge are user-space/source-only control evidence; no WDK/SYSVAD PortCls project, loadable SYS, HLK run, physical endpoint or Microsoft signature exists.",
+    "DriverVolumeLinkV1 applies requested dB/mute through the engine's own safety ceiling; endpoint identity-to-output-group policy and real IPC scheduling remain future WDK/worker integration work."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}

@@ -56,6 +56,10 @@
   silently survive a scene switch; a new IR must be explicitly prepared afterwards.
 - 公開 monorepo 文件、component license map 與 source-only paid-release policy。
 - AI 接手規則、fresh-clone 流程與 source-only policy。
+- `hibiki_driver_control_transport_v1` now provides a fixed 136-byte little-endian
+  endpoint-state/volume-notification packet ABI. The GPL `DriverVolumeLinkV1` decodes it,
+  suppresses registered event contexts and applies requested dB/mute through the canonical
+  output-group safety path; contract coverage does not claim a loadable or signed driver.
 - `OutputGroupVolumeState` 與 ISO compensation public C++ boundary 的初始骨架。
 - Scene graph、device-switch transaction 與初始 CMake/CTest 驗證入口。
 - Immutable RT graph snapshot、2/6/8 聲道 mapping、IPC frame codec、ASIO stream model、VST
@@ -534,7 +538,7 @@ store、handler 與 atomic ViewModel apply；本機 status probe 通過，但仍
 per-App delivery 或 browser tab capture 已完成。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 78 個必要入口與
-24 份 Spec 通過；`source-policy.ps1` 掃描 366 個 tracked paths 且無 blocked
+24 份 Spec 通過；`source-policy.ps1` 掃描 371 個 tracked paths 且無 blocked
 binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
