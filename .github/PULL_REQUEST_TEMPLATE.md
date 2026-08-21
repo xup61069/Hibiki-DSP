@@ -12,6 +12,7 @@
 - [ ] `pwsh -File tools/verify.ps1`
 - [ ] `pwsh -File tools/docs-check.ps1`
 - [ ] `pwsh -File tools/source-policy.ps1`
+- [ ] `pwsh -File tools/source-only-ci-check.ps1`
 - [ ] 已附 evidence manifest 或說明為何不適用
 
 ## 開源與隱私
