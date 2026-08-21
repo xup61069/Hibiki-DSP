@@ -13,9 +13,7 @@ public partial class App : Application
 
     public App()
     {
-#if HIBIKI_COMPATIBILITY_PREVIEW
-        Resources.MergedDictionaries.Add(new XamlControlsResources());
-#else
+#if !HIBIKI_COMPATIBILITY_PREVIEW
         InitializeComponent();
 #endif
     }

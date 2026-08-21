@@ -79,9 +79,10 @@ WaveRT endpoint 的 WDK build/signability 工作。不要先做 Microsoft signin
 
 非 target 機器要看同一控制模型，可用 `pwsh -File tools/build-preview.ps1 -Target DesktopCompat`；輸出
 只在 ignored 的 `.local/preview/DesktopCompat/`，不可加入 Git 或發布。若要直接打開可連線的本機
-預覽，使用 `pwsh -File tools/run-preview.ps1 -Build`；它會先啟動 user-space Engine Preview，再
-開啟自帶 .NET runtime 的桌面 UI，關閉 UI 後引擎會一併停止。不要直接執行需要 Windows App
-Runtime 的 `WinUICompat` 輸出。
+  預覽，使用 `pwsh -File tools/run-preview.ps1 -Build`；它會先啟動 user-space Engine Preview，再
+  開啟自帶 .NET runtime 的桌面 UI，關閉 UI 後引擎會一併停止。若已安裝 Windows App Runtime
+  1.7 x64，可用 `pwsh -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest` 驗證
+  WinUI 相容殼；它仍不是正式 XAML/accessibility evidence。沒有 Runtime 時使用 DesktopCompat。
 Windows 使用者也可雙擊 repository 根目錄的 `Start-HibikiPreview.cmd`；這只是上述命令的來源入口，
 不會把任何編譯物加入 Git。
 若需要明確啟動 shared-mode WASAPI sink，使用同一層的 `Start-HibikiPreview-Wasapi.cmd`；它仍是

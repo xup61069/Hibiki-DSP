@@ -151,9 +151,16 @@ pwsh -File tools/engine-preview-smoke.ps1 -EnableSessionRouting -StatusOnly
 pwsh -File tools/control-model-engine-smoke.ps1 -EnableSessionRouting
 ```
 
-不要開啟 `.local/preview/WinUICompat/Hibiki.WinUI.exe` 來當一般預覽：那是需要 Windows App
-Runtime 1.7 的實驗性 WinUI fallback，缺少 runtime 時會出現「Required components of the
-Windows App Runtime are missing」。這個錯誤不代表 Desktop Compatibility Preview 損壞。
+`.local/preview/WinUICompat/Hibiki.WinUI.exe` 是需要 Windows App Runtime 1.7 的實驗性 WinUI
+相容預覽，不是正式 XAML/accessibility evidence。建置並做啟動 smoke：
+
+```powershell
+pwsh -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest
+```
+
+若缺少 Runtime，會出現「Required components of the Windows App Runtime are missing」；請安裝
+Windows App Runtime 1.7 x64，或改用不需要 Runtime 的 Desktop Compatibility Preview。這個錯誤
+不代表 Desktop Compatibility Preview 損壞。
 
 要只驗證 C# control model 與 C++ Engine Preview 的實際命令往返，可執行：
 

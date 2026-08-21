@@ -6,6 +6,10 @@
   preview command. A Compatibility Preview builds and completes a launch smoke on the non-target
   host using the same `EasyControlViewModel`; the formal WinUI XAML build remains explicitly blocked
   on that host and still requires the locked target toolchain.
+- The explicit `WinUICompat` target now skips the non-packaged `XamlControlsResources` merge that
+  crashed during startup on the local host. With Microsoft Windows App Runtime 1.7 x64 installed,
+  `tools/build-preview.ps1 -Target WinUICompat -SmokeTest` now keeps a `WinUI Desktop` window alive;
+  this is a compatibility launch check only, not formal XAML/accessibility evidence.
 - A C++ Engine Preview now owns the local control named pipe and passes a cross-process v1 Hello/Ack
   plus ControlStatusSnapshot smoke; the status exposes four conservative route states and the
   canonical volume mirror. `tools/run-preview.ps1 -Build` launches it with the self-contained
