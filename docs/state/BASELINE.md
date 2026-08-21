@@ -410,6 +410,9 @@ Lane graph／WASAPI handoff。兩者尚未在目標機注入含音訊程序、Au
 完成實體 per-App 重送；`2a85ea5` 新增 active session→bounded process request plan，
 對同一 PID 的不同 Lane/output 以 `AmbiguousProcess` fail-closed。
 `aac9274` 再拒絕不同 PID 共用同一 Lane 的 `DuplicateLane`，與 graph duplicate invariant 對齊。
+`7d43e67` 將 requested/effective/safety dB、origin、actuator、generation 與 bounded
+route-health cards 接到 Easy／Expert control-model；它只顯示保守的 session、process loopback、
+瀏覽器單分頁與 direct bypass 邊界，不宣稱尚未接上的 engine status IPC。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 74 個必要入口與
 16 份 Spec 通過；`docs-check.ps1` 最新已擴充為 75 個必要入口；`source-policy.ps1` 掃描
@@ -430,3 +433,5 @@ parameter frame 與 `IParameterChanges` bridge）unsigned build 亦通過；輸�
 與 C# grouped-volume payload round-trip、legacy payload compatibility、selected group resolver
 及 custom Scene card mirror 的 JSON save/load、atomic replace、malformed rollback 亦已通過本機
 contract/control-model checks。
+本次 control-model route-health／volume-safety additions 的 source commit 是 `7d43e67`，
+對應 handoff/evidence 更新 commit 是 `e13cfd8`。
