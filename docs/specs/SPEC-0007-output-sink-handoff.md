@@ -6,7 +6,7 @@ authority: architecture
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["src/hub/**output*", "src/hub/**wasapi*", "src/hub/include/hibiki/output*", "src/hub/src/output*"]
+source_globs: ["src/hub/**output*", "src/hub/**wasapi*", "src/hub/**audio_engine*", "src/hub/include/hibiki/output*", "src/hub/src/output*"]
 ---
 
 # SPEC-0007：多輸出 sink 交接與時鐘連續性
@@ -56,6 +56,13 @@ audio graph 不重啟、不直接呼叫 COM。候選 submit、endpoint bind 或�
 active slot，`rollback` 保留仍在執行的舊 worker。這個 user-space handoff 只證明狀態機、
 bounded queue 與 source-level fallback；實體 endpoint 的暖機時間、音量連續性、拔插與
 Audio Service restart 仍需 Windows 11 24H2+ 實機／HLK evidence。
+
+`AudioEngineModel` 的 `start_wasapi_output`、`begin_wasapi_output_handoff`、
+`prepare/commit/rollback_wasapi_output_handoff` 與 `process_output_group_to_wasapi` 是
+唯一 graph-to-WASAPI adapter。前者只在 control plane 呼叫；後者先完成 output-group graph、
+Group Master ramp 與 limiter，再把同一個 interleaved block 送進 handoff。若 graph layout
+與 sink channels 不符、沒有 active graph、block 超過 `uint32` 或 handoff 尚未 Fading/Synced，
+整個呼叫 fail-closed，不會部分提交或重啟 graph。
 
 ## Multi-sink fan-out
 
