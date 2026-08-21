@@ -11,7 +11,10 @@
 4. 執行 `pwsh -File tools/probe-environment.ps1`，環境資料只寫入 `.local/`。
 5. 找到要處理的 GitHub Issue，讀 `docs/tasks/active/<issue>.md`。
 6. 讀 handoff 指定的 Spec、ADR、source、tests 與 evidence。
-7. 先執行 handoff 的 baseline smoke test；結果不一致時先標記 stale/conflict。
+7. 先用最小 context pack 複製交接內容（目前 foundation Issue 0：
+   `pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource`），再執行 handoff 的 baseline
+   smoke test；結果不一致時先標記 stale/conflict。需要完整 source context 時移除
+   `-NoSource`，不要把與該 Issue 無關的聊天內容帶入新工作階段。
 8. 修改後執行 `tools/verify.ps1`、`tools/docs-check.ps1` 與
    `tools/source-policy.ps1`；若改動 extension、installer 或 control model，再執行
    `tools/extension-check.ps1`、`tools/installer-check.ps1`、`tools/control-model-check.ps1`、
