@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "system-volume-live-v1",
-  "source_commit": "77d7e4f",
+  "source_commit": "c42cabd",
   "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/live-system-volume-check.ps1 -WriteTest"
@@ -12,9 +12,11 @@
       "command": "tools/live-system-volume-check.ps1 -WriteTest",
       "status": "pass",
       "coverage": [
-        "default eRender/eConsole endpoint broker bind",
-        "temporary approximately −3 dB attenuation write",
-        "COM callback/readback verification",
+        "Engine Preview startup with --enable-system-volume",
+        "default eRender/eConsole endpoint broker readback",
+        "VolumeNotification sent through named-pipe IPC and EngineControl write-through",
+        "temporary approximately −3 dB attenuation on the Windows endpoint",
+        "independent broker readback verification",
         "original dB and mute restoration before probe exit",
         "no endpoint identity printed"
       ],
@@ -27,7 +29,7 @@
     }
   ],
   "limitations": [
-    "This is an explicitly user-invoked user-space IAudioEndpointVolume broker probe; it does not prove a Hibiki virtual endpoint, WaveRT/PortCls driver, physical DSP playback, HLK or Microsoft signing.",
+    "This is an explicitly user-invoked user-space Engine Preview IPC-to-IAudioEndpointVolume write-through probe; it does not prove a Hibiki virtual endpoint, WaveRT/PortCls driver, physical DSP playback, HLK or Microsoft signing.",
     "The probe temporarily changes the local default endpoint volume and must never be run implicitly by CI or application startup."
   ],
   "logs": [],
