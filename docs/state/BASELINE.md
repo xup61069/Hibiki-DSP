@@ -132,6 +132,10 @@
   builds and validates a candidate registry/graph before commit, increments generation on success,
   and republishes status/catalog. The live Engine Preview probe now verifies the queued command and
   `Ready` catalog readback; physical process-loopback delivery remains unverified.
+- `SessionRouteRuleCommand` v1 now has a local live Upsert/Remove proof: the Engine Preview probe
+  applies a bounded display-name matcher, observes route `Ready`, removes the rule and observes
+  `Pending` after the candidate rule transaction. This remains control-plane evidence; process-
+  loopback and physical per-App delivery remain unverified.
 - Session volume/route runtime adapters now validate and enqueue from the EngineControl thread;
   a fixed 64-slot SPSC `SessionCommandQueueV1` is drained only by the COM worker after refresh.
   Direct synchronous read/write APIs still fail closed with `RPC_E_WRONG_THREAD`, while normal UI
@@ -554,7 +558,7 @@ store、handler 與 atomic ViewModel apply；本機 status probe 通過，但仍
 per-App delivery 或 browser tab capture 已完成。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 78 個必要入口與
-24 份 Spec 通過；`source-policy.ps1` 掃描 380 個 tracked paths 且無 blocked
+24 份 Spec 通過；`source-policy.ps1` 掃描 381 個 tracked paths 且無 blocked
 binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；35 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch

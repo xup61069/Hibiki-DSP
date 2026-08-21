@@ -88,6 +88,10 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   delivery are still unverified. `-DirectCoordinator` is a diagnostic-only bypass. The same probe
   then sends a bounded `SessionRouteCommand` and requires the route catalog to read back `Ready`;
   this verifies candidate graph commit in the worker, not physical audio rerouting.
+- The same opt-in probe also exercises `SessionRouteRuleCommand` Upsert/Remove: a bounded display-name
+  matcher drives the route to `Ready`, then removal returns the catalog to `Pending`. Evidence is
+  `evidence/0000-foundation/session-routing-live-v1.json`; this still does not prove process-loopback
+  delivery or physical per-App audio.
 - The next driver-facing source milestone is now the Apache `driver_control_transport_v1` fixed
   136-byte little-endian endpoint-state/volume-notification packet plus the GPL
   `DriverVolumeLinkV1` adapter. It is contract-tested and ready for a future WDK/SYSVAD project

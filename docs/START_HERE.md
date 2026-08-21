@@ -32,6 +32,8 @@
    若要驗證單一 App/session volume 的實際 handle 讀回、短暫衰減與恢復，可額外執行
    `pwsh -File tools/live-session-volume-check.ps1 -WriteTest`；它只建立本 probe 的無聲
    shared-mode session，結束前恢復原值，仍不等於實體 per-App capture/re-send 或 DSP delivery。
+   同一 probe 也會驗證 route command 與 route-rule Upsert/Remove 的 bounded catalog 狀態變化；
+   這是 user-space graph transaction evidence，不是實體 per-App delivery。
    若要驗證 process-level loopback source，可額外執行
    `pwsh -File tools/live-process-loopback-check.ps1`；它只輸出匿名格式與 frame aggregate，
    沒有可用 runtime 時會回報 `loopback=unavailable`，不等於 tabCapture 或實體 per-App routing。

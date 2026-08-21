@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "session-routing-live-v1",
+  "source_commit": "2dcd541",
+  "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/live-session-volume-check.ps1 -WriteTest"
+  ],
+  "results": [
+    {
+      "command": "tools/live-session-volume-check.ps1 -WriteTest",
+      "status": "pass",
+      "coverage": [
+        "Engine Preview --enable-session-routing startup and named-pipe connection",
+        "silent shared-mode session creation and bounded catalog discovery",
+        "SessionVolumeCommand queue delivery with dB readback and restoration",
+        "SessionRouteCommand candidate graph commit with route=ready catalog readback",
+        "SessionRouteRuleCommand Upsert matched by bounded display-name metadata",
+        "SessionRouteRuleCommand Remove and catalog transition ready-to-pending",
+        "no endpoint, session or process identity printed"
+      ],
+      "observed": {
+        "original_db": 0.0,
+        "attenuated_db": -3.0,
+        "restored_db": 0.0,
+        "route": "ready",
+        "rule": "ready-to-pending"
+      },
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "This proves the user-space IPC, EngineControl queue, COM-worker candidate graph/rule transaction and bounded catalog state; it does not prove physical per-App capture/re-send, process-loopback delivery, a signed virtual endpoint, WaveRT/PortCls, HLK or Microsoft signing.",
+    "The probe changes only its own silent session and uses explicit -WriteTest; it must never run implicitly from CI or application startup.",
+    "The local machine is Windows 26200/Visual Studio 17 with SDK 26100, below the locked Windows 11 24H2/VS 2026/WDK target."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "cmake": "local CMake",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}
