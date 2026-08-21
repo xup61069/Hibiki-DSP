@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 
+#include "hibiki/vst3_timeline_editor.hpp"
 #include "hibiki/vst3_worker_lane.hpp"
 
 namespace hibiki {
@@ -52,6 +53,21 @@ public:
         std::string_view timeline_id,
         const Vst3ParameterTimelineSnapshotV1& snapshot);
     [[nodiscard]] bool remove_timeline(std::string_view timeline_id) noexcept;
+
+    // Bounded edit transaction against one stored timeline slot. The control
+    // plane is single-writer: no locking is added and the editor must be used
+    // from the same thread that owns the scheduler. Edits target existing
+    // stored timelines only; new timelines are created via upsert_timeline.
+    [[nodiscard]] bool begin_timeline_edit(std::string_view timeline_id);
+    [[nodiscard]] Vst3TimelineEditorV1* editing_timeline() noexcept {
+        return edit_active_ ? &edit_editor_ : nullptr;
+    }
+    [[nodiscard]] bool commit_timeline_edit();
+    [[nodiscard]] bool cancel_timeline_edit() noexcept;
+
+    // Read-only view of one stored timeline snapshot; null when unknown.
+    [[nodiscard]] const Vst3ParameterTimelineSnapshotV1* timeline_snapshot(
+        std::string_view timeline_id) const noexcept;
     [[nodiscard]] bool bind_scene(
         std::string_view scene_id,
         std::uint64_t lane_token,
@@ -92,10 +108,14 @@ private:
     std::array<std::atomic_flag, kVst3SceneAutomationMaxEntriesV1> busy_{};
     std::array<TimelineSlot, kVst3SceneAutomationMaxEntriesV1> timelines_{};
     std::array<BindingSlot, kVst3SceneAutomationMaxEntriesV1> bindings_{};
+    Vst3TimelineEditorV1 edit_editor_{};
     std::string active_scene_;
     std::size_t lane_count_{0U};
     std::size_t timeline_count_{0U};
     std::size_t binding_count_{0U};
+    // kVst3SceneAutomationMaxEntriesV1 doubles as the "no edit slot" sentinel.
+    std::size_t edit_slot_{kVst3SceneAutomationMaxEntriesV1};
+    bool edit_active_{false};
 };
 
 }  // namespace hibiki
