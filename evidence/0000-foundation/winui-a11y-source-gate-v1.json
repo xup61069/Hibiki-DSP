@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 28,
   "scope_digest": "winui-a11y-source-gate-v1",
-  "source_commit": "pending",
+  "source_commit": "437dd66",
   "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-git-2.55.0-pwsh-7.6.5; target-vs2026-sdk-wdk-missing",
   "commands": [
     "pwsh -File tools/winui-shell-check.ps1 -SelfTest",
