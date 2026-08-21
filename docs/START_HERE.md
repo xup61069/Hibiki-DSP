@@ -63,6 +63,9 @@ branch。真實裝置資料與 calibration 留在 `.local/`，只提交 schema �
   以及 session、process loopback、瀏覽器單分頁、direct bypass 的保守路由健康卡片；
   仍需在鎖定 Windows App SDK 的目標環境編譯、做視覺／無障礙驗證，並把保守狀態
   逐步替換成已驗證的實體端點／引擎 delivery 狀態。
+- 目前最新 accepted control-plane 契約為 `SPEC-0023`：`SessionRouteRuleCommand` 的固定
+  480-byte Upsert/Remove/Clear wire、候選規則交易與 queue handoff；接手者先讀該 Spec、
+  `docs/state/BASELINE.md` 與 `evidence/0000-foundation/session-route-rule-v1.json`。
 - `asio/`：預設為 stream model；需要本機 pinned ASIO SDK 時可開啟 optional native COM
   transport（不進 public CI，也不提交 DLL）。`vst-host/` 已有 supervisor、frame codec、
   named-pipe boundary、source-only passthrough worker、可選的 pinned VST3 SDK factory catalog

@@ -46,7 +46,7 @@
     {
       "command": "source and distribution policy gates",
       "status": "pass",
-      "scanned_paths": 322,
+      "scanned_paths": 324,
       "blocked_files": 0,
       "compiled_artifacts": false
     }
