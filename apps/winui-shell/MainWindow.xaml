@@ -149,7 +149,7 @@
                                 AutomationProperties.HelpText="調整 mixed-phase 或 linear-phase 的延遲與相位折衷" />
                         <TextBlock Text="{Binding IrPhaseModeText}" Opacity="0.72" />
                         <TextBlock Text="{Binding IrAddedDelayMs, StringFormat='IR 額外延遲：{0:0.0} ms'}" Opacity="0.72" />
-                        <TextBlock Text="尚未送出 IR／kernel prepare command；目前只保存相位 policy contract。"
+                        <TextBlock Text="IR WAV 會在 Engine Preview 的 control-plane prepare/commit；尚無實體 sink。"
                                    TextWrapping="Wrap" Opacity="0.72" />
                     </StackPanel>
                 </Border>

@@ -388,6 +388,14 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasPreparedIr));
     }
 
+    private void MarkIrClearedByScene()
+    {
+        if (_irFilePath.Length == 0 && _irPrepareStatus == "尚未載入 IR WAV") return;
+        _irPrepareStatus = "Scene 已切換；IR 已清除，需重新載入";
+        OnPropertyChanged(nameof(IrPrepareStatus));
+        OnPropertyChanged(nameof(HasPreparedIr));
+    }
+
     public async Task<bool> PrepareIrAsync(string filePath,
                                             CancellationToken cancellationToken = default)
     {
@@ -1220,6 +1228,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     {
         if (!OneTapEnhance()) return false;
         var sent = await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+        if (sent) MarkIrClearedByScene();
         if (sent && IsConnected)
             _ = await RefreshControlStatusAsync(cancellationToken).ConfigureAwait(true);
         return sent;
@@ -1230,6 +1239,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     {
         if (!SelectScene(sceneId)) return false;
         var sent = await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+        if (sent) MarkIrClearedByScene();
         if (sent && IsConnected)
             _ = await RefreshControlStatusAsync(cancellationToken).ConfigureAwait(true);
         return sent;

@@ -31,6 +31,7 @@
       "coverage": [
         "C# PrepareIrAsync through named pipe",
         "Engine Preview WAV decode, phase prepare and graph attachment commit Ack",
+        "C# SceneApply status clears the prepared-IR indicator after Ack",
         "volume and Scene status regression"
       ],
       "compiled_artifacts": false

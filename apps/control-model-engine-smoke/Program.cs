@@ -55,11 +55,27 @@ try
         !viewModel.IrPrepareStatus.Contains("已在引擎", StringComparison.Ordinal))
         throw new InvalidOperationException("Control model IR prepare was not acknowledged.");
 
-    Console.WriteLine($"Control model Engine Preview smoke passed (effective={viewModel.EffectiveVolumeDb:0.00} dB, generation={viewModel.VolumeGeneration}, status_sequence={viewModel.StatusSequence}, scene={viewModel.SelectedScene?.Id}, ir=prepared).");
+    if (!await viewModel.SelectSceneAsync("movie") || viewModel.HasPreparedIr ||
+        !viewModel.IrPrepareStatus.Contains("IR 已清除", StringComparison.Ordinal))
+        throw new InvalidOperationException("Scene switch did not clear the prepared IR state.");
+
+    Console.WriteLine($"Control model Engine Preview smoke passed (effective={viewModel.EffectiveVolumeDb:0.00} dB, generation={viewModel.VolumeGeneration}, status_sequence={viewModel.StatusSequence}, scene={viewModel.SelectedScene?.Id}, ir=cleared-on-scene-switch).");
     }
     finally
     {
-        File.Delete(smokeIrPath);
+        for (var attempt = 0; attempt < 20 && File.Exists(smokeIrPath); attempt++)
+        {
+            try
+            {
+                File.Delete(smokeIrPath);
+            }
+            catch (IOException) when (attempt < 19)
+            {
+                Thread.Sleep(25);
+            }
+        }
+        if (File.Exists(smokeIrPath))
+            throw new IOException("Engine Preview still holds the temporary IR file.");
     }
 }
 finally
