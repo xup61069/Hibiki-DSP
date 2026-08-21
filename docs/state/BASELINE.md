@@ -88,7 +88,9 @@
   dispatch, fixed scratch bounds, plugin latency reporting and bounded parameter point conversion;
   the optional worker also bridges
   ProcessBlock frames, while supervisor launch validation now passes explicit class/rate/channel
-  fields and production certification remain pending.
+  fields. `Vst3SandboxProcess` also exposes bounded HelloAck and ProcessBlock exchange methods
+  that verify request IDs, shape, payload and finite output and clear output on failure; Scene
+  scheduling, plugin state persistence and production certification remain pending.
 - `AudioSessionRegistry` keys Windows sessions by endpoint plus session-instance ID, preserves
   user routing on metadata refresh, and supports independent lane/output-group/gain-owner binding;
   Windows `IAudioSessionManager2` worker enumeration now populates it; callbacks remain
@@ -216,8 +218,8 @@
 
 ## 尚未開始
 
-- 可載入的 WaveRT/SYSVAD-derived driver、ASIO physical sink delivery、完整 out-of-process
-  VST3 SDK plugin dispatch、WinUI 3 SDK/build and accessibility validation、physical sink clock
+- 可載入的 WaveRT/SYSVAD-derived driver、ASIO physical sink delivery、Scene-wired out-of-process
+  VST3 SDK plugin host、WinUI 3 SDK/build and accessibility validation、physical sink clock
   fixtures 與 signed package delivery。
 - ISO 226:2023 合法係數來源與正式 conformance oracle（公式本身已完成，但係數資料仍待
   授權／法務確認）。
@@ -233,7 +235,7 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 Windows volume/device、ISO formula、recovery、driver control-core/INF template、persistent SRC、
 VST worker、control pipe/payloads、session volume adapter、sink clock pipeline、optional native
 ASIO transport/ring、tab/Virtual Mic lane adapter、session-route/output-handoff、control-model
-與 VST3 latency graph commit／RT lane latency bank／parameter timeline／Scene automation refs／rollback lifecycle／UI device fade／plugin lane token／multi-sink fan-out、per-sink clock/SRC runtime、AudioEngine fan-out boundary、精確容量 preflight、高倍率 SRC phase guard、portable WaveRT stream ring、WDK pin adapter、driver→engine stream packet bridge、endpoint identity、graph lane binding、WASAPI IAudioClock drift path、雙 worker WASAPI handoff、graph-to-WASAPI adapter、ASIO-to-WASAPI path、driver-to-WASAPI path、tab-to-WASAPI path、virtual-mic-to-WASAPI path、Windows WASAPI fan-out graph adapter 及 WinUI Expert readonly surface 的 fail-closed safety baseline `52d4fa5`；
+與 VST3 latency graph commit／RT lane latency bank／parameter timeline／Scene automation refs／rollback lifecycle／UI device fade／plugin lane token／VST3 supervisor handshake/process exchange／multi-sink fan-out、per-sink clock/SRC runtime、AudioEngine fan-out boundary、精確容量 preflight、高倍率 SRC phase guard、portable WaveRT stream ring、WDK pin adapter、driver→engine stream packet bridge、endpoint identity、graph lane binding、WASAPI IAudioClock drift path、雙 worker WASAPI handoff、graph-to-WASAPI adapter、ASIO-to-WASAPI path、driver-to-WASAPI path、tab-to-WASAPI path、virtual-mic-to-WASAPI path、Windows WASAPI fan-out graph adapter 及 WinUI Expert readonly surface 的 fail-closed safety baseline `40f4e80`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 

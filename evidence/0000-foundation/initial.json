@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "issue": 0,
-  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-output-fanout-runtime-exact-capacity-high-ratio-wavert-stream-wdk-adapter-driver-stream-bridge-endpoint-identity-graph-lane-wasapi-clock-handoff-graph-adapter-expert-surface-asio-wasapi-driver-wasapi-tab-vmic-fanout-engine-v35",
-  "source_commit": "52d4fa5",
+  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-output-fanout-runtime-exact-capacity-high-ratio-wavert-stream-wdk-adapter-driver-stream-bridge-endpoint-identity-graph-lane-wasapi-clock-handoff-graph-adapter-expert-surface-asio-wasapi-driver-wasapi-tab-vmic-fanout-engine-v35-vst-supervisor-exchange-v36",
+  "source_commit": "40f4e80",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -21,6 +21,7 @@
     "virtual-mic-to-wasapi-adapter coverage in hibiki_contract_tests",
     "wasapi-multi-sink-fanout coverage in hibiki_contract_tests",
     "audio-engine-wasapi-fanout coverage in hibiki_contract_tests",
+    "vst3-supervisor-exchange fail-closed coverage in hibiki_contract_tests",
     "cmake -S . -B .local/asio-build -DHIBIKI_ENABLE_NATIVE_ASIO=ON -DHIBIKI_ASIO_SDK_ROOT=.local/asio-sdk",
     "cmake --build .local/asio-build --config RelWithDebInfo --target hibiki_asio_native",
     "cmake -S . -B .local/vst3-build -DHIBIKI_ENABLE_VST3_SDK=ON -DHIBIKI_VST3_SDK_ROOT=.local/vst3sdk",
@@ -60,6 +61,7 @@
     {"command": "virtual-mic-to-wasapi-adapter", "status": "pass", "coverage": ["privacy gate", "optional bounded VirtualMicDsp", "shared lane-to-WASAPI adapter", "single bounded sink submit", "unbound sink fail-closed"], "compiled_artifacts": false},
     {"command": "wasapi-multi-sink-fanout", "status": "pass", "coverage": ["up to 8 sink bound", "same layout/rate validation", "duplicate endpoint rejection", "independent handoff ownership", "degraded on partial submit", "unbound/invalid plan fail-closed"], "compiled_artifacts": false},
     {"command": "audio-engine-wasapi-fanout", "status": "pass", "coverage": ["graph output once", "single Group Master/limiter pass", "all prepared sink submit", "invalid plan fail-closed", "no active graph fail-closed"], "compiled_artifacts": false},
+    {"command": "vst3-supervisor-exchange", "status": "pass", "coverage": ["stopped supervisor handshake rejection", "stopped supervisor process rejection", "bounded HelloAck/ProcessBlock exchange source", "request-ID/shape/payload/finite-output validation", "silence-on-failure output boundary"], "compiled_artifacts": false},
     {"command": "endpoint-topology-contract", "status": "pass", "coverage": ["four stable endpoint GUIDs", "direction and channel count", "Windows stereo/7.1 masks", "supported-rate flags", "buffer defaults"]},
     {"command": "asio-transport-contract", "status": "pass", "coverage": ["fixed-layout SPSC ring", "planar-to-interleaved transfer", "metadata and capacity validation", "no allocation in pop", "Windows mapping-to-engine graph and Group Master path"]},
     {"command": "asio-transport-native-build", "status": "pass", "coverage": ["ASIO callback publication", "named mapping attachment", "detached fallback"], "published_artifacts": false},
@@ -100,7 +102,7 @@
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",
   "limitations": [
-    "Evidence corresponds to commit 52d4fa5 and the current environment only; no real endpoint handoff or WinUI SDK build was exercised.",
+    "Evidence corresponds to commit 40f4e80 and the current environment only; no real endpoint handoff or WinUI SDK build was exercised.",
     "The native ASIO build is an unsigned local developer verification; no DLL or SDK checkout is committed or published.",
     "Current machine is Windows 22631 with VS 17/SDK 10.0.26100.0; it cannot provide driver-target evidence for the locked Windows 26100+/VS 2026/SDK-WDK 10.0.28000.2526 environment."
   ],
