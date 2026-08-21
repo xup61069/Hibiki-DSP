@@ -1270,6 +1270,10 @@ int main() {
                                       2U, mic_lane_inputs, lane_mic_output, 2U, 2U));
     CHECK(std::abs(lane_mic_output[0] - 0.375F) < 1e-5F &&
           std::abs(lane_mic_output[1] + 0.375F) < 1e-5F);
+    lane_mic.set_privacy_mute(true);
+    CHECK(!process_virtual_mic_lane_to_wasapi_v1(
+        engine, lane_mic, 0U, lane_mic_input, 2U, lane_mic_capture, 2U, mic_lane_inputs,
+        lane_mic_output, 2U, 2U));
 #if defined(_WIN32)
     constexpr wchar_t kContractMapping[] = L"Local\\HibikiDSP_v1_contract_asio";
     CHECK(engine.bind_asio_transport(kContractMapping, 2U, 48000U, 4U));

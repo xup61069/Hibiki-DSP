@@ -108,6 +108,38 @@ void VirtualMicRouteModel::reset() noexcept {
   dsp_.reset();
 }
 
+static bool process_virtual_mic_lane_impl(
+    AudioEngineModel& engine,
+    const VirtualMicRouteModel& route,
+    const std::size_t lane_index,
+    const float* const input_interleaved,
+    const std::uint32_t input_capacity_frames,
+    float* const capture_interleaved,
+    const std::uint32_t capture_capacity_frames,
+    const std::span<RtLaneInputV1> lane_inputs,
+    float* const output_interleaved,
+    const std::uint32_t output_capacity_frames,
+    const std::uint32_t frames,
+    const float* const echo_reference_interleaved,
+    const std::uint32_t echo_reference_capacity_frames,
+    const bool to_wasapi) noexcept {
+  const auto& snapshot = route.snapshot();
+  if (!snapshot.prepared || input_interleaved == nullptr || capture_interleaved == nullptr ||
+      output_interleaved == nullptr || frames == 0U || frames > input_capacity_frames ||
+      frames > capture_capacity_frames || frames > output_capacity_frames ||
+      (echo_reference_interleaved != nullptr && frames > echo_reference_capacity_frames)) {
+    return false;
+  }
+  if (!route.process_capture_with_reference(input_interleaved, echo_reference_interleaved,
+                                             capture_interleaved, frames)) return false;
+  return to_wasapi
+             ? engine.process_lane_block_to_wasapi(lane_index, capture_interleaved,
+                                                   snapshot.channels, frames, lane_inputs,
+                                                   output_interleaved)
+             : engine.process_lane_block(lane_index, capture_interleaved, snapshot.channels,
+                                         frames, lane_inputs, output_interleaved);
+}
+
 bool process_virtual_mic_lane_v1(
     AudioEngineModel& engine,
     const VirtualMicRouteModel& route,
@@ -122,17 +154,30 @@ bool process_virtual_mic_lane_v1(
     const std::uint32_t frames,
     const float* const echo_reference_interleaved,
     const std::uint32_t echo_reference_capacity_frames) noexcept {
-  const auto& snapshot = route.snapshot();
-  if (!snapshot.prepared || input_interleaved == nullptr || capture_interleaved == nullptr ||
-      output_interleaved == nullptr || frames == 0U || frames > input_capacity_frames ||
-      frames > capture_capacity_frames || frames > output_capacity_frames ||
-      (echo_reference_interleaved != nullptr && frames > echo_reference_capacity_frames)) {
-    return false;
-  }
-  if (!route.process_capture_with_reference(input_interleaved, echo_reference_interleaved,
-                                             capture_interleaved, frames)) return false;
-  return engine.process_lane_block(lane_index, capture_interleaved, snapshot.channels, frames,
-                                   lane_inputs, output_interleaved);
+  return process_virtual_mic_lane_impl(
+      engine, route, lane_index, input_interleaved, input_capacity_frames, capture_interleaved,
+      capture_capacity_frames, lane_inputs, output_interleaved, output_capacity_frames, frames,
+      echo_reference_interleaved, echo_reference_capacity_frames, false);
+}
+
+bool process_virtual_mic_lane_to_wasapi_v1(
+    AudioEngineModel& engine,
+    const VirtualMicRouteModel& route,
+    const std::size_t lane_index,
+    const float* const input_interleaved,
+    const std::uint32_t input_capacity_frames,
+    float* const capture_interleaved,
+    const std::uint32_t capture_capacity_frames,
+    const std::span<RtLaneInputV1> lane_inputs,
+    float* const output_interleaved,
+    const std::uint32_t output_capacity_frames,
+    const std::uint32_t frames,
+    const float* const echo_reference_interleaved,
+    const std::uint32_t echo_reference_capacity_frames) noexcept {
+  return process_virtual_mic_lane_impl(
+      engine, route, lane_index, input_interleaved, input_capacity_frames, capture_interleaved,
+      capture_capacity_frames, lane_inputs, output_interleaved, output_capacity_frames, frames,
+      echo_reference_interleaved, echo_reference_capacity_frames, true);
 }
 
 bool VirtualMicRouteModel::process_capture(const float* const input,

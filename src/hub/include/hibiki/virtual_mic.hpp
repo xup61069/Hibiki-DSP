@@ -117,6 +117,21 @@ private:
     const float* echo_reference_interleaved = nullptr,
     std::uint32_t echo_reference_capacity_frames = 0U) noexcept;
 
+[[nodiscard]] bool process_virtual_mic_lane_to_wasapi_v1(
+    AudioEngineModel& engine,
+    const VirtualMicRouteModel& route,
+    std::size_t lane_index,
+    const float* input_interleaved,
+    std::uint32_t input_capacity_frames,
+    float* capture_interleaved,
+    std::uint32_t capture_capacity_frames,
+    std::span<RtLaneInputV1> lane_inputs,
+    float* output_interleaved,
+    std::uint32_t output_capacity_frames,
+    std::uint32_t frames,
+    const float* echo_reference_interleaved = nullptr,
+    std::uint32_t echo_reference_capacity_frames = 0U) noexcept;
+
 }  // namespace hibiki
 
 #endif
