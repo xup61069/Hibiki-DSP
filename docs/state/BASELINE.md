@@ -24,6 +24,12 @@
 - `tools/live-system-volume-check.ps1 -WriteTest` now performs an explicit local endpoint volume
   round-trip: approximately −3 dB attenuation, COM callback/readback verification, and restoration
   of the original dB/mute state. It is opt-in user-space broker evidence, not driver or WaveRT proof.
+- `tools/live-session-volume-check.ps1 -WriteTest` now creates an inaudible shared-mode test
+  session, discovers it through the bounded catalog, exercises a generation-scoped session handle
+  through `WindowsAudioSessionRouteCoordinatorV1`, verifies approximately −3 dB readback, and
+  restores the original dB/mute state. This closes the target-session COM readback boundary but
+  remains user-space control evidence; physical per-App capture/re-send and DSP delivery are still
+  unverified.
 - The control-model Engine Preview smoke now exercises the full IR prepare → Scene IR clear
   round-trip and retries temporary fixture cleanup for bounded transient Windows file-indexer
   locks. Three consecutive session-routing runs are recorded in
@@ -111,11 +117,12 @@
   C++/C# codec/store/handler correlation and stale ViewModel replacement are covered; this is
   still a selection boundary rather than proof of physical per-App delivery.
 - The source-only WinUI Expert view now renders the safe App session catalog, sequence and route
-  state without exposing raw Windows session identity; App volume/routing commands remain a
-  separate future contract until handle validation is implemented end to end.
+  state without exposing raw Windows session identity; App volume/routing commands use validated
+  generation-scoped handles, while physical per-App capture/re-send remains unverified.
 - `SessionVolumeCommand` v1 now carries only a generation-scoped handle, catalog sequence, dB
   and mute. C++/C# codecs, EngineControl callback, Windows runtime/coordinator stale guards and
-  the C# ViewModel command builder are covered; target-session COM readback remains pending.
+  the C# ViewModel command builder are covered; the opt-in live session-volume probe now verifies
+  target-session COM readback and restoration through the coordinator.
 - Active catalog entries now opportunistically expose worker-read `ISimpleAudioVolume` dB/mute
   availability; expired/inactive/unreadable sessions remain visible with volume unavailable.
 - `SessionRouteCommand` v1 now carries only handle/sequence/lane/output labels. The coordinator
@@ -543,10 +550,10 @@ store、handler 與 atomic ViewModel apply；本機 status probe 通過，但仍
 per-App delivery 或 browser tab capture 已完成。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 78 個必要入口與
-24 份 Spec 通過；`source-policy.ps1` 掃描 375 個 tracked paths 且無 blocked
+24 份 Spec 通過；`source-policy.ps1` 掃描 378 個 tracked paths 且無 blocked
 binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
-`distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
+`distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；35 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
 288-byte payload、catalog sequence、handler fail-closed、WinUI send-failure rollback、DeviceCatalogSnapshot、ControlStatusSnapshot
 wire/atomic replace、catalog-to-wire publisher、Windows worker unbound/coordinator rollback、
 DeviceCatalogRequest provider response、連線後自動刷新裝置清單、ControlPlaneHost loopback

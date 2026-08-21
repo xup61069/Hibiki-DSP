@@ -82,6 +82,11 @@ Windows 系統音量的真實讀回／寫入／恢復也是額外的 opt-in live
 暫時衰減約 3 dB，隨後恢復原值；它不輸出 endpoint identity，但會改變本機音量，無法把
 這個 user-space broker probe 當成 driver、WaveRT 或 HLK evidence。
 
+Windows 單一 App/session 音量的真實讀回／寫入／恢復也是額外的 opt-in live check：
+`pwsh -File tools/live-session-volume-check.ps1 -WriteTest`。它只建立本 probe 的無聲 shared-mode
+session，以 generation-scoped catalog handle 暫時衰減約 3 dB、讀回並恢復原值；不輸出
+session/endpoint identity，也不等於實體 per-App capture、重送或 DSP delivery evidence。
+
 Windows App/session enumeration 也有 opt-in check：
 `pwsh -File tools/live-audio-session-check.ps1`。只輸出 session／active 數量與固定 identity
 語意，不輸出 PID、session ID、endpoint ID 或顯示名稱；它不等於每個 App 已完成實際
