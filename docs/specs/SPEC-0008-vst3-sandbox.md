@@ -117,7 +117,10 @@ fail-closed tokenizer，僅接受該形式加上無意義空白，未知或重�
 `Vst3TimelineFileStoreV1` 在此之上提供 bounded per-timeline 檔案儲存：每個
 timeline 一份 canonical 文件，ID 限縮為檔名安全子集（[A-Za-z0-9._-]，最長 64 位元
 組）並與檔名一一對應，容量固定為 16、列舉確定排序；損壞、未知或越界內容一律
-fail-closed，絕不部分載入。`Vst3TimelineEditorV1` 現在提供
+fail-closed，絕不部分載入。
+`sync_timeline_store_to_scheduler_v1` 則把整個 store 以確定順序載入 Scene
+automation scheduler：任何單一項目失敗只計入 skipped，不中斷同步、也不改變
+scheduler 既有項目。`Vst3TimelineEditorV1` 現在提供
 supervisor 端 bounded 編輯交易：draft 變更不影響已發布 snapshot，同一
 (parameter_id, sample_position) 的 upsert 以取代而非重複呈現，commit 只在通過既有
 timeline 驗證後才交換已發布 snapshot，discard 直接還原；這是 headless 控制面契約，
