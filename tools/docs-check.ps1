@@ -1,5 +1,7 @@
 [CmdletBinding()]
-param()
+param(
+  [switch]$SelfTest
+)
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
@@ -92,31 +94,86 @@ function Get-BaselineClaim {
   return [int]$match.Groups['count'].Value
 }
 
+function Test-BaselineSummary {
+  param(
+    [string]$Text,
+    [int]$RequiredEntries,
+    [int]$SpecCount,
+    [int]$TrackedPaths,
+    [int]$JsonFiles
+  )
+  $claimedRequired = Get-BaselineClaim $Text 'docs-check\.ps1`\s*的\s*(?<count>\d+)\s*個必要入口' 'docs-check required-entry'
+  if ($claimedRequired -ne $RequiredEntries) {
+    throw ("BASELINE.md claims {0} docs-check required entries but docs-check defines {1}; " +
+           "update the BASELINE.md verification summary.") -f $claimedRequired, $RequiredEntries
+  }
+  $claimedSpecs = Get-BaselineClaim $Text '個必要入口與\s*(?<count>\d+)\s*份\s*Spec\s*通過' 'spec'
+  if ($claimedSpecs -ne $SpecCount) {
+    throw ("BASELINE.md claims {0} specs but the repository tracks {1}; " +
+           "update the BASELINE.md verification summary.") -f $claimedSpecs, $SpecCount
+  }
+  $claimedTracked = Get-BaselineClaim $Text 'source-policy\.ps1`\s*掃描\s*(?<count>\d+)\s*個\s*tracked paths' 'source-policy tracked-path'
+  if ($claimedTracked -ne $TrackedPaths) {
+    throw ("BASELINE.md claims {0} tracked paths but git reports {1}; " +
+           "update the BASELINE.md verification summary.") -f $claimedTracked, $TrackedPaths
+  }
+  $claimedJson = Get-BaselineClaim $Text '(?<count>\d+)\s*個\s*repository JSON\s*檔案均可解析' 'repository-json'
+  if ($claimedJson -ne $JsonFiles) {
+    throw ("BASELINE.md claims {0} repository JSON files but git reports {1}; " +
+           "update the BASELINE.md verification summary.") -f $claimedJson, $JsonFiles
+  }
+}
+
+if ($SelfTest) {
+  $sampleTemplate = '目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 {0} 個必要入口與{1}份 Spec 通過；`source-policy.ps1` 掃描 {2} 個 tracked paths 且無 blocked binary/secret；通過；{3} 個 repository JSON 檔案均可解析。'
+
+  function Assert-GateRejection {
+    param([scriptblock]$Action, [string]$ExpectedPattern, [string]$Label)
+    try { & $Action } catch {
+      if ("$($_.Exception.Message)" -notmatch $ExpectedPattern) {
+        throw ("docs-check self-test case '{0}' failed with an unexpected message: {1}") -f $Label, $_.Exception.Message
+      }
+      return
+    }
+    throw ("docs-check self-test case '{0}' expected a rejection matching '{1}' but the gate passed.") -f $Label, $ExpectedPattern
+  }
+
+  $caseCount = 0
+
+  Test-BaselineSummary -Text ($sampleTemplate -f 85, 24, 397, 65) -RequiredEntries 85 -SpecCount 24 -TrackedPaths 397 -JsonFiles 65
+  $caseCount++
+  Test-BaselineSummary -Text ($sampleTemplate -f 96, 35, 410, 77) -RequiredEntries 96 -SpecCount 35 -TrackedPaths 410 -JsonFiles 77
+  $caseCount++
+
+  Assert-GateRejection -Label 'required-entries-mismatch' -ExpectedPattern 'claims 85 docs-check required entries but docs-check defines 86' `
+    -Action { Test-BaselineSummary -Text ($sampleTemplate -f 85, 24, 397, 65) -RequiredEntries 86 -SpecCount 24 -TrackedPaths 397 -JsonFiles 65 }
+  $caseCount++
+  Assert-GateRejection -Label 'spec-count-mismatch' -ExpectedPattern 'claims 24 specs but the repository tracks 25' `
+    -Action { Test-BaselineSummary -Text ($sampleTemplate -f 85, 24, 397, 65) -RequiredEntries 85 -SpecCount 25 -TrackedPaths 397 -JsonFiles 65 }
+  $caseCount++
+  Assert-GateRejection -Label 'tracked-paths-mismatch' -ExpectedPattern 'claims 397 tracked paths but git reports 401' `
+    -Action { Test-BaselineSummary -Text ($sampleTemplate -f 85, 24, 397, 65) -RequiredEntries 85 -SpecCount 24 -TrackedPaths 401 -JsonFiles 65 }
+  $caseCount++
+  Assert-GateRejection -Label 'repository-json-mismatch' -ExpectedPattern 'claims 65 repository JSON files but git reports 66' `
+    -Action { Test-BaselineSummary -Text ($sampleTemplate -f 85, 24, 397, 65) -RequiredEntries 85 -SpecCount 24 -TrackedPaths 397 -JsonFiles 66 }
+  $caseCount++
+  Assert-GateRejection -Label 'missing-all-markers' -ExpectedPattern 'missing the docs-check required-entry counter' `
+    -Action { Test-BaselineSummary -Text 'no verification summary here' -RequiredEntries 85 -SpecCount 24 -TrackedPaths 397 -JsonFiles 65 }
+  $caseCount++
+  Assert-GateRejection -Label 'missing-tracked-path-marker' -ExpectedPattern 'missing the source-policy tracked-path counter' `
+    -Action { Test-BaselineSummary -Text (($sampleTemplate -f 85, 24, 397, 65) -replace '；`source-policy\.ps1` 掃描 397 個 tracked paths 且無 blocked binary/secret；', '；') -RequiredEntries 85 -SpecCount 24 -TrackedPaths 397 -JsonFiles 65 }
+  $caseCount++
+
+  Write-Output "Documentation baseline-summary gate self-test passed ($caseCount cases)."
+  exit 0
+}
+
 $baselineText = Get-Content -LiteralPath (Join-Path $repo 'docs/state/BASELINE.md') -Raw
 $trackedFiles = @(git -C $repo ls-files)
 if ($LASTEXITCODE -ne 0) { throw 'docs-check could not list tracked files.' }
 $jsonFiles = @(git -C $repo ls-files -- '*.json')
 
-$claimedRequired = Get-BaselineClaim $baselineText 'docs-check\.ps1`\s*的\s*(?<count>\d+)\s*個必要入口' 'docs-check required-entry'
-if ($claimedRequired -ne $required.Count) {
-  throw ("BASELINE.md claims {0} docs-check required entries but docs-check defines {1}; " +
-         "update the BASELINE.md verification summary.") -f $claimedRequired, $required.Count
-}
-$claimedSpecs = Get-BaselineClaim $baselineText '個必要入口與\s*(?<count>\d+)\s*份\s*Spec\s*通過' 'spec'
-if ($claimedSpecs -ne $specs.Count) {
-  throw ("BASELINE.md claims {0} specs but the repository tracks {1}; " +
-         "update the BASELINE.md verification summary.") -f $claimedSpecs, $specs.Count
-}
-$claimedTracked = Get-BaselineClaim $baselineText 'source-policy\.ps1`\s*掃描\s*(?<count>\d+)\s*個\s*tracked paths' 'source-policy tracked-path'
-if ($claimedTracked -ne $trackedFiles.Count) {
-  throw ("BASELINE.md claims {0} tracked paths but git reports {1}; " +
-         "update the BASELINE.md verification summary.") -f $claimedTracked, $trackedFiles.Count
-}
-$claimedJson = Get-BaselineClaim $baselineText '(?<count>\d+)\s*個\s*repository JSON\s*檔案均可解析' 'repository-json'
-if ($claimedJson -ne $jsonFiles.Count) {
-  throw ("BASELINE.md claims {0} repository JSON files but git reports {1}; " +
-         "update the BASELINE.md verification summary.") -f $claimedJson, $jsonFiles.Count
-}
+Test-BaselineSummary -Text $baselineText -RequiredEntries $required.Count -SpecCount $specs.Count -TrackedPaths $trackedFiles.Count -JsonFiles $jsonFiles.Count
 
 $summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; baseline summary verified against {2} tracked paths and {3} repository JSON files.)'
 Write-Output (($summaryTemplate) -f $required.Count, $specs.Count, $trackedFiles.Count, $jsonFiles.Count)
