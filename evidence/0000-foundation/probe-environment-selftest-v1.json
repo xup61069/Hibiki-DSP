@@ -82,6 +82,19 @@
       "command": "tools/docs-check.ps1",
       "status": "blocked_shared_baseline",
       "reason": "Integrator-owned docs/state/BASELINE.md reports 419 tracked paths while this branch reports 421 after the claimed handoff and evidence; the worker did not modify the shared file."
+    },
+    {
+      "command": "GitHub Actions verify (push run 32534968002 / pull_request run 32535025809)",
+      "status": "fail_external_baseline",
+      "coverage": [
+        "both verify jobs reached completed status",
+        "Documentation gate reproduced the same 419-versus-421 shared baseline mismatch"
+      ],
+      "urls": [
+        "https://github.com/xup61069/Hibiki-DSP/actions/runs/32534968002",
+        "https://github.com/xup61069/Hibiki-DSP/actions/runs/32535025809"
+      ],
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
@@ -96,6 +109,13 @@
       "origin_main": "81da555b3d1430fdb119664bfbd31f540ca0754a",
       "merge_commit": "89f59f7",
       "scope": "own Issue 76 branch only"
+    },
+    {
+      "event": "github-actions-verify",
+      "head": "915fba4bad2c6111a468b6d50771bcd55f86524b",
+      "push_run": "32534968002",
+      "pull_request_run": "32535025809",
+      "status": "fail_external_baseline"
     }
   ],
   "tool_versions": {
