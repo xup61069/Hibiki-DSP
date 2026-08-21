@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "runtime-aware-preview-launcher-v1",
+  "source_commit": "6a4efe1",
+  "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/run-preview.ps1 -Ui Auto -SmokeTest",
+    "pwsh -File tools/run-preview.ps1 -Ui DesktopCompat -SmokeTest",
+    "pwsh -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
+    "pwsh -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/run-preview.ps1 -Ui Auto -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "detected Microsoft.WindowsAppRuntime.1.7 x64 >= 7000.456.1632.0",
+        "selected WinUICompat and kept the WinUI Desktop process alive for the launcher smoke",
+        "engine cleanup completed after the smoke"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/run-preview.ps1 -Ui DesktopCompat -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "explicit runtime-free DesktopCompat selection and engine cleanup",
+        "no system volume or WASAPI opt-in was enabled"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target WinUICompat -SmokeTest; tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "both UI variants build and launch independently"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1; tools/source-policy.ps1; tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "handoff/docs remain synchronized",
+        "no tracked binaries, installer or runtime package"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Auto fallback detects an installed Windows App Runtime package; it does not download or install software automatically.",
+    "WinUICompat remains a compatibility launch check, not formal XAML/accessibility evidence.",
+    "The launcher still starts a user-space Engine Preview only; WaveRT, full physical playback and per-App delivery remain separate acceptance gates.",
+    "All preview binaries and the local runtime installer remain under ignored .local paths."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh local",
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "windows_app_runtime": "1.7.7000.785 x64"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}
