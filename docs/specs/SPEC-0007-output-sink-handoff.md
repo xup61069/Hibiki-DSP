@@ -64,6 +64,12 @@ Group Master ramp 與 limiter，再把同一個 interleaved block 送進 handoff
 與 sink channels 不符、沒有 active graph、block 超過 `uint32` 或 handoff 尚未 Fading/Synced，
 整個呼叫 fail-closed，不會部分提交或重啟 graph。
 
+`WindowsWasapiFanoutV1` 將相同 graph block fan-out 到最多 8 個獨立 handoff。prepare 時要求
+所有 enabled sink 使用相同 channel layout／sample rate、非空且不重複 endpoint ID；每個 sink
+仍保有自己的 worker、clock、SRC 與 handoff state。任一 sink submit 失敗會將 fan-out 標記
+`degraded`，後續必須由 control plane 重新 prepare，不能把部分成功當成全數同步。此邊界仍
+只證明 bounded user-space coordination，實體多裝置時鐘與拔插 soak 需另行驗收。
+
 ## Multi-sink fan-out
 
 `OutputFanoutPlanV1` 將同一個 graph block 複製到最多 8 個同聲道 layout 的 sink。所有 enabled
