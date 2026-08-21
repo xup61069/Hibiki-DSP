@@ -52,6 +52,9 @@
 - The source-only WinUI Expert view now renders the safe App session catalog, sequence and route
   state without exposing raw Windows session identity; App volume/routing commands remain a
   separate future contract until handle validation is implemented end to end.
+- `SessionVolumeCommand` v1 now carries only a generation-scoped handle, catalog sequence, dB
+  and mute. C++/C# codecs, EngineControl callback, Windows runtime/coordinator stale guards and
+  the C# ViewModel command builder are covered; target-session COM readback remains pending.
 - `CalibrationResponsePointV1` and `compile_bounded_peq_correction_v1` now provide a deterministic
   control-plane measured-response to bounded PEQ compiler (16-filter cap, frequency/spacing/Q and
   boost/cut policy validation, explicit `limited` result) that feeds the existing APO/CamillaDSP/
@@ -436,7 +439,7 @@ store、handler 與 atomic ViewModel apply；本機 status probe 通過，但仍
 per-App delivery 或 browser tab capture 已完成。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 75 個必要入口與
-19 份 Spec 通過；`source-policy.ps1` 掃描 315 個 tracked paths 且無 blocked
+20 份 Spec 通過；`source-policy.ps1` 掃描 316 個 tracked paths 且無 blocked
 binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
@@ -455,6 +458,7 @@ parameter frame 與 `IParameterChanges` bridge）unsigned build 亦通過；輸�
 與 C# grouped-volume payload round-trip、legacy payload compatibility、selected group resolver
 及 custom Scene card mirror 的 JSON save/load、atomic replace、malformed rollback 亦已通過本機
 contract/control-model checks。
+本次 SessionVolumeCommand handle boundary 的 source commit 是 `6c4a8b7`；
 本次 WinUI App session catalog projection 的 source commit 是 `66f6298`；
 ephemeral App session catalog additions 的 source commit 是 `68cf466`；
 本次 control-status-snapshot additions 的 source commit 是 `e97fb90`；
