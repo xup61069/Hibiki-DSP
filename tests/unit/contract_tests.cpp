@@ -2523,6 +2523,54 @@ int main() {
         std::filesystem::remove(file_path, cleanup_error);
     }
 #endif
+    Vst3WorkerLaneSessionV1 introspect_second_lane;
+    CHECK(introspect_second_lane.prepare(sandbox,
+          Vst3WorkerLaneConfigV1{77U, 2U, 48000.0, 64U, 128U}));
+    const std::array<Vst3WorkerLaneSessionV1*, 2> introspect_lanes{
+        {&worker_lane, &introspect_second_lane}};
+    CHECK(automation_scheduler->timeline_count() == 0U);
+    std::array<std::string, kVst3SceneAutomationMaxEntriesV1> introspect_ids{};
+    std::size_t introspect_id_count = 0U;
+    CHECK(automation_scheduler->timeline_ids(introspect_ids, introspect_id_count) &&
+          introspect_id_count == 0U);
+    CHECK(automation_scheduler->prepare(introspect_lanes) &&
+          automation_scheduler->upsert_timeline("zeta", automation_timeline) &&
+          automation_scheduler->upsert_timeline("alpha-01", automation_timeline) &&
+          automation_scheduler->upsert_timeline("mid", automation_timeline));
+    CHECK(automation_scheduler->timeline_ids(introspect_ids, introspect_id_count) &&
+          introspect_id_count == 3U &&
+          introspect_ids[0] == "alpha-01" && introspect_ids[1] == "mid" &&
+          introspect_ids[2] == "zeta");
+    std::array<std::string, 2> undersized_ids{};
+    std::size_t undersized_count = 99U;
+    CHECK(!automation_scheduler->timeline_ids(undersized_ids, undersized_count) &&
+          undersized_count == 0U);
+    CHECK(automation_scheduler->bind_scene("SCENE-A", 99U, "alpha-01") &&
+          automation_scheduler->bind_scene("SCENE-B", 77U, "mid"));
+    std::array<Vst3SceneAutomationBindingViewV1, kVst3SceneAutomationMaxEntriesV1>
+        introspect_views{};
+    std::size_t introspect_view_count = 0U;
+    CHECK(automation_scheduler->binding_views(introspect_views, introspect_view_count) &&
+          introspect_view_count == 2U &&
+          introspect_views[0].scene_id == "SCENE-A" &&
+          introspect_views[0].lane_token == 99U &&
+          introspect_views[0].timeline_id == "alpha-01" &&
+          introspect_views[1].scene_id == "SCENE-B" &&
+          introspect_views[1].lane_token == 77U &&
+          introspect_views[1].timeline_id == "mid");
+    CHECK(automation_scheduler->remove_timeline("zeta"));
+    CHECK(automation_scheduler->binding_views(introspect_views, introspect_view_count) &&
+          introspect_view_count == 2U &&
+          introspect_views[1].timeline_id == "mid" &&
+          automation_scheduler->timeline_ids(introspect_ids, introspect_id_count) &&
+          introspect_id_count == 2U && introspect_ids[1] == "mid");
+    std::array<Vst3SceneAutomationBindingViewV1, 1> single_view{};
+    std::size_t single_view_count = 0U;
+    CHECK(automation_scheduler->binding_views(single_view, single_view_count) ==
+              false && single_view_count == 0U);
+    automation_scheduler->clear();
+    CHECK(automation_scheduler->timeline_ids(introspect_ids, introspect_id_count) &&
+          introspect_id_count == 0U);
     Vst3WorkerPipeV1 worker_pipe;
     CHECK(!worker_pipe.create_server(Vst3WorkerPipeConfigV1{L"", 1024U, 100U}));
     CHECK(!worker_pipe.connect_client(L"", 100U));

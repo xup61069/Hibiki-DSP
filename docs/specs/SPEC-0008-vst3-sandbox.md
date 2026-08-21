@@ -120,7 +120,10 @@ timeline 一份 canonical 文件，ID 限縮為檔名安全子集（[A-Za-z0-9._
 fail-closed，絕不部分載入。
 `sync_timeline_store_to_scheduler_v1` 則把整個 store 以確定順序載入 Scene
 automation scheduler：任何單一項目失敗只計入 skipped，不中斷同步、也不改變
-scheduler 既有項目。`Vst3TimelineEditorV1` 現在提供
+scheduler 既有項目。
+排程器另提供唯讀內省：`timeline_ids` 以確定排序列舉已儲存 ID，
+`binding_views` 回傳每個 Scene/lane/timeline 綁定的不可變複本；目的地容量
+不足時整體失敗且計數歸零，絕不部分輸出。`Vst3TimelineEditorV1` 現在提供
 supervisor 端 bounded 編輯交易：draft 變更不影響已發布 snapshot，同一
 (parameter_id, sample_position) 的 upsert 以取代而非重複呈現，commit 只在通過既有
 timeline 驗證後才交換已發布 snapshot，discard 直接還原；這是 headless 控制面契約，
