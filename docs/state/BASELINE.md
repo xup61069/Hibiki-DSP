@@ -7,7 +7,8 @@
   host using the same `EasyControlViewModel`; the formal WinUI XAML build remains explicitly blocked
   on that host and still requires the locked target toolchain.
 - A C++ Engine Preview now owns the local control named pipe and passes a cross-process v1 Hello/Ack
-  smoke; it is deliberately driver-free and has no physical audio sink.
+  plus ControlStatusSnapshot smoke; the status exposes four conservative route states and the
+  canonical volume mirror. It is deliberately driver-free and has no physical audio sink.
 - 公開 monorepo 文件、component license map 與 source-only paid-release policy。
 - AI 接手規則、fresh-clone 流程與 source-only policy。
 - `OutputGroupVolumeState` 與 ISO compensation public C++ boundary 的初始骨架。

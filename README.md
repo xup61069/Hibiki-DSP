@@ -84,6 +84,20 @@ Windows App Runtime；但不含 XAML 正式 UI、driver、系統攔截或 access
 加入 `-SmokeTest` 可同時做 3 秒的無視窗啟動檢查；它不會連接音訊引擎。只想重跑控制面可用
 `-Target ControlModel`。
 
+要實際開啟本機預覽（同時啟動 user-space Engine Preview 與桌面 UI），使用：
+
+```powershell
+pwsh -File tools/run-preview.ps1 -Build
+```
+
+視窗開啟後會自動嘗試連接本機引擎；若沒有連線，仍會安全顯示「尚未連接」，不會改動 Windows
+音量或任何實體裝置。直接雙擊 `.local/preview/DesktopCompat/Hibiki.DesktopPreview.exe` 也可以，
+但那只會開 UI，不會自動啟動引擎。
+
+不要開啟 `.local/preview/WinUICompat/Hibiki.WinUI.exe` 來當一般預覽：那是需要 Windows App
+Runtime 1.7 的實驗性 WinUI fallback，缺少 runtime 時會出現「Required components of the
+Windows App Runtime are missing」。這個錯誤不代表 Desktop Compatibility Preview 損壞。
+
 ## 授權與貢獻
 
 Hibiki user-space 為 GPL-3.0-only；SYSVAD-derived driver 為 MS-PL；SDK/schema 為 Apache-2.0；

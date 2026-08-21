@@ -48,7 +48,28 @@ try {
       $reply[6] -ne 6 -or [BitConverter]::ToUInt64($reply, 12) -ne 42) {
     throw 'Engine Preview Hello did not receive the v1 correlated Ack.'
   }
-  Write-Output 'Engine Preview control Hello/Ack smoke passed.'
+
+  # v1 ControlStatusRequest: HIK1, version 1, type 13, request ID 43.
+  [byte[]]$statusRequest = 0x48,0x49,0x4B,0x31,0x01,0x00,0x0D,0x00,0x00,0x00,0x00,0x00,0x2B,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+  $client.Write([BitConverter]::GetBytes([uint32]$statusRequest.Length), 0, 4)
+  $client.Write($statusRequest, 0, $statusRequest.Length)
+  $client.Flush()
+  [byte[]]$statusLength = New-Object byte[] 4
+  Read-Exactly $client $statusLength
+  $statusReplyLength = [BitConverter]::ToUInt32($statusLength, 0)
+  [byte[]]$statusReply = New-Object byte[] $statusReplyLength
+  Read-Exactly $client $statusReply
+  if ($statusReplyLength -lt 60 -or $statusReplyLength -gt 1852 -or
+      [BitConverter]::ToUInt32($statusReply, 8) -ne ($statusReplyLength - 20)) {
+    throw "Unexpected control status reply length: $statusReplyLength"
+  }
+  if ($statusReply[0] -ne 0x48 -or $statusReply[1] -ne 0x49 -or $statusReply[2] -ne 0x4B -or
+      $statusReply[3] -ne 0x31 -or $statusReply[6] -ne 12 -or
+      [BitConverter]::ToUInt64($statusReply, 12) -ne 43 -or
+      [BitConverter]::ToUInt16($statusReply, 20) -lt 1) {
+    throw 'Engine Preview did not return a correlated ControlStatusSnapshot.'
+  }
+  Write-Output "Engine Preview control Hello/Ack and status snapshot smoke passed (payload=$statusReplyLength bytes)."
 } finally {
   if ($null -ne $client) { $client.Dispose() }
   if (-not $engineProcess.HasExited) { Stop-Process -Id $engineProcess.Id; $engineProcess.WaitForExit() }

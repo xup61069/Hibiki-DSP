@@ -1,0 +1,34 @@
+[CmdletBinding()]
+param(
+  [switch]$Build
+)
+
+$ErrorActionPreference = 'Stop'
+$repo = Split-Path -Parent $PSScriptRoot
+$engine = Join-Path $repo '.local/engine-preview/Release/hibiki_engine_preview.exe'
+$desktop = Join-Path $repo '.local/preview/DesktopCompat/Hibiki.DesktopPreview.exe'
+
+if ($Build -or -not (Test-Path -LiteralPath $engine)) {
+  & (Join-Path $repo 'tools/build-engine-preview.ps1')
+  if ($LASTEXITCODE -ne 0) { throw "Engine Preview build failed: $LASTEXITCODE" }
+}
+if ($Build -or -not (Test-Path -LiteralPath $desktop)) {
+  & (Join-Path $repo 'tools/build-preview.ps1')
+  if ($LASTEXITCODE -ne 0) { throw "Desktop Compatibility Preview build failed: $LASTEXITCODE" }
+}
+
+$engineProcess = Start-Process -FilePath $engine -WorkingDirectory (Split-Path $engine) `
+  -WindowStyle Hidden -PassThru
+try {
+  # The desktop preview auto-connects once the local control pipe is ready.
+  $desktopProcess = Start-Process -FilePath $desktop -WorkingDirectory (Split-Path $desktop) -PassThru
+  Wait-Process -Id $desktopProcess.Id
+}
+finally {
+  if ($null -ne $engineProcess -and -not $engineProcess.HasExited) {
+    Stop-Process -Id $engineProcess.Id -ErrorAction SilentlyContinue
+    $engineProcess.WaitForExit()
+  }
+}
+
+Write-Output 'Hibiki Desktop Compatibility Preview closed safely.'

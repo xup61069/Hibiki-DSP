@@ -27,8 +27,10 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   啟動 smoke；它和正式 shell 共用 `EasyControlViewModel`，自帶 .NET runtime、不依賴 Windows App Runtime，
   但不是 XAML、無障礙、driver 或 release evidence。
 - C++ Engine Preview 已可由 `tools/build-engine-preview.ps1` 建置；`tools/engine-preview-smoke.ps1`
-  會啟動它並驗證 v1 named-pipe Hello/Ack request correlation。它只提供 user-space control host，
-  不代表 WaveRT、實體輸出或 Windows session routing 已完成。
+  會啟動它並驗證 v1 named-pipe Hello/Ack request correlation 與 ControlStatusSnapshot 回覆。
+  `tools/run-preview.ps1 -Build` 會把 Engine Preview 與不依賴 Windows App Runtime 的 Desktop
+  Compatibility UI 一起啟動；它只提供 user-space control host，不代表 WaveRT、實體輸出或
+  Windows session routing 已完成。
 - ISO 226 只保留合法 formula/derived boundary；禁止把受限標準文件、完整表格、掃圖或其內容
   放進 source、Issue、prompt、RAG、fixture 或 evidence。
 
@@ -43,7 +45,10 @@ WaveRT endpoint 的 WDK build/signability 工作。不要先做 Microsoft signin
 這不是 installer，也不代表虛擬 driver 已完成。
 
 非 target 機器要看同一控制模型，可用 `pwsh -File tools/build-preview.ps1 -Target DesktopCompat`；輸出
-只在 ignored 的 `.local/preview/DesktopCompat/`，不可加入 Git 或發布。
+只在 ignored 的 `.local/preview/DesktopCompat/`，不可加入 Git 或發布。若要直接打開可連線的本機
+預覽，使用 `pwsh -File tools/run-preview.ps1 -Build`；它會先啟動 user-space Engine Preview，再
+開啟自帶 .NET runtime 的桌面 UI，關閉 UI 後引擎會一併停止。不要直接執行需要 Windows App
+Runtime 的 `WinUICompat` 輸出。
 
 ## 必讀順序
 

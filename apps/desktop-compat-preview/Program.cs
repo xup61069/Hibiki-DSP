@@ -58,6 +58,14 @@ internal sealed class PreviewForm : Form
         Controls.Add(panel);
         _viewModel.PropertyChanged += OnViewModelChanged;
         FormClosed += async (_, _) => await _viewModel.DisconnectAsync();
+        Shown += async (_, _) =>
+        {
+            // The compatibility preview is deliberately useful as a single
+            // double-click experience when the local Engine Preview is already
+            // running, while still remaining safe when no engine is present.
+            await _viewModel.ConnectAsync(TimeSpan.FromSeconds(1));
+            RefreshView();
+        };
         RefreshView();
     }
 
