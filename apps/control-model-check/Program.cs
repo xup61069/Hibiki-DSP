@@ -540,4 +540,118 @@ catch (ArgumentOutOfRangeException)
     invalidDebounceRejected = true;
 }
 Check(invalidDebounceRejected, "Volume debounce must enforce a bounded control interval.");
+var validPoint = new CalibrationPointV1(1000.0, -3.0, 0.0);
+Check(validPoint.IsValid, "Valid calibration point must be accepted.");
+Check(!new CalibrationPointV1(0.0, 0.0, 0.0).IsValid &&
+      !new CalibrationPointV1(25000.0, 0.0, 0.0).IsValid &&
+      !new CalibrationPointV1(double.NaN, 0.0, 0.0).IsValid,
+    "Invalid calibration point must fail closed.");
+var calibPoints = new List<CalibrationPointV1>
+{
+    new(100.0, -8.0, 0.0),
+    new(250.0, 4.0, 0.0),
+    new(1000.0, -2.0, 0.0),
+    new(4000.0, 5.0, 0.0),
+    new(10000.0, -1.0, 0.0)
+};
+var validResponse = new CalibrationResponseV1(1U, 48000.0, 2, "test-endpoint", calibPoints);
+Check(validResponse.IsValid, "Valid calibration response must be accepted.");
+Check(!new CalibrationResponseV1(2U, 48000.0, 2, "test", calibPoints).IsValid &&
+      !new CalibrationResponseV1(1U, 4000.0, 2, "test", calibPoints).IsValid &&
+      !new CalibrationResponseV1(1U, 48000.0, 3, "test", calibPoints).IsValid &&
+      !new CalibrationResponseV1(1U, 48000.0, 2, "test", [new(200.0, 0.0, 0.0), new(100.0, 0.0, 0.0)]).IsValid,
+    "Invalid calibration response must fail closed.");
+var validFilter = new PeqFilterV1("peaking", 1000.0, 3.0, 1.414);
+Check(validFilter.IsValid, "Valid PEQ filter must be accepted.");
+Check(!new PeqFilterV1("lowpass", 1000.0, 3.0, 1.414).IsValid &&
+      !new PeqFilterV1("peaking", 5.0, 0.0, 1.0).IsValid &&
+      !new PeqFilterV1("peaking", 1000.0, 30.0, 1.0).IsValid &&
+      !new PeqFilterV1("peaking", 1000.0, 0.0, 0.05).IsValid,
+    "Invalid PEQ filter must fail closed.");
+var validPreset = new PeqPresetV1(1U, [validFilter]);
+Check(validPreset.IsValid, "Valid PEQ preset must be accepted.");
+Check(!new PeqPresetV1(2U, [validFilter]).IsValid &&
+      !new PeqPresetV1(1U, [new PeqFilterV1("peaking", 5.0, 0.0, 1.0)]).IsValid,
+    "Invalid PEQ preset must fail closed.");
+var calibPolicy = new CalibrationCompilePolicyV1();
+Check(calibPolicy.IsValid && CalibrationCompilerV1.ValidatePolicy(calibPolicy),
+    "Default calibration compile policy must be valid.");
+Check(!new CalibrationCompilePolicyV1 { MaxFilters = 0 }.IsValid &&
+      !new CalibrationCompilePolicyV1 { MaxFilters = 20 }.IsValid &&
+      !new CalibrationCompilePolicyV1 { MinFrequencyHz = 5000.0, MaxFrequencyHz = 1000.0 }.IsValid &&
+      !new CalibrationCompilePolicyV1 { MaxBoostDb = 30.0 }.IsValid,
+    "Invalid calibration policy must fail closed.");
+var compileResult = CalibrationCompilerV1.CompileBoundedPeqCorrection(calibPoints, calibPolicy);
+Check(compileResult.Filters.Count == 5 && compileResult.Limited &&
+      Math.Abs(compileResult.MaximumRequestedCorrectionDb - 8.0) < 1e-6 &&
+      compileResult.Filters[0].FrequencyHz == 100.0 &&
+      compileResult.Filters[0].GainDb == 6.0 &&
+      compileResult.Filters[1].GainDb == -4.0 &&
+      compileResult.Diagnostic.Contains("clipped"),
+    "Bounded PEQ compiler failed on standard response.");
+var normalCompile = CalibrationCompilerV1.CompileBoundedPeqCorrection(
+    [new(100.0, -3.0, 0.0), new(1000.0, 2.0, 0.0)],
+    calibPolicy with { MaxBoostDb = 6.0, MaxCutDb = 12.0 });
+Check(!normalCompile.Limited && normalCompile.Filters.Count == 2 &&
+      normalCompile.Filters[0].GainDb == 3.0 &&
+      normalCompile.Filters[1].GainDb == -2.0 &&
+      normalCompile.Diagnostic.Contains("verify"),
+    "Normal within-limit PEQ compilation must succeed without limited flag.");
+var spacingCompile = CalibrationCompilerV1.CompileBoundedPeqCorrection(
+    [new(1000.0, -5.0, 0.0), new(1020.0, -4.8, 0.0), new(2000.0, 3.0, 0.0)],
+    calibPolicy with { MinSpacingOctaves = 0.5 });
+Check(spacingCompile.Filters.Count == 2 && spacingCompile.Filters[0].FrequencyHz == 1000.0 &&
+      spacingCompile.Filters[1].FrequencyHz == 2000.0,
+    "Compiler min spacing octaves must prevent clustered filters.");
+var ignoreCompile = CalibrationCompilerV1.CompileBoundedPeqCorrection(
+    [new(1000.0, -0.1, 0.0)], calibPolicy with { IgnoreErrorDb = 0.25 });
+Check(ignoreCompile.Filters.Count == 0 && !ignoreCompile.Limited &&
+      ignoreCompile.Diagnostic.Contains("ignore threshold"),
+    "Compiler must ignore errors within threshold.");
+var apoExport = CalibrationCompilerV1.ExportEqualizerApo(compileResult.Filters);
+Check(apoExport.Contains("Preamp: -1 dB") && apoExport.Contains("Filter 1: ON PK Fc 100.000 Hz"),
+    "Equalizer APO export format failed.");
+var camillaExport = CalibrationCompilerV1.ExportCamillaDspYaml(compileResult.Filters);
+Check(camillaExport.Contains("filters:") && camillaExport.Contains("type: Peaking"),
+    "CamillaDSP YAML export format failed.");
+var rewExport = CalibrationCompilerV1.ExportRewFilterList(compileResult.Filters);
+Check(rewExport.Contains("Filter\tType\tFreq (Hz)\tGain (dB)\tQ"),
+    "REW filter list export format failed.");
+var jsonExport = CalibrationCompilerV1.ExportHibikiProfile(compileResult.Filters);
+Check(jsonExport.Contains("\"schema_version\": 1") && jsonExport.Contains("\"type\": \"peaking\""),
+    "Hibiki profile export format failed.");
+var calibPath = Path.Combine(Path.GetTempPath(), $"hibiki-calib-check-{Guid.NewGuid():N}.json");
+try
+{
+    Check(CalibrationCompilerV1.TrySaveResponse(calibPath, validResponse, out _),
+        "Calibration response save failed.");
+    Check(CalibrationCompilerV1.TryLoadResponse(calibPath, out var loadedResponse, out _) &&
+          loadedResponse is not null && loadedResponse.Points.Count == 5 &&
+          loadedResponse.DeviceId == "test-endpoint",
+        "Calibration response load failed.");
+    File.WriteAllText(calibPath, "{\"schema_version\":1,\"sample_rate\":48000,\"channels\":2,\"points\":[{\"frequency_hz\":200,\"measured_db\":0,\"target_db\":0},{\"frequency_hz\":100,\"measured_db\":0,\"target_db\":0}]}");
+    Check(!CalibrationCompilerV1.TryLoadResponse(calibPath, out _, out _),
+        "Unsorted calibration response load must fail closed.");
+}
+finally
+{
+    if (File.Exists(calibPath)) File.Delete(calibPath);
+}
+var presetPath = Path.Combine(Path.GetTempPath(), $"hibiki-peq-check-{Guid.NewGuid():N}.json");
+try
+{
+    Check(CalibrationCompilerV1.TrySavePreset(presetPath, validPreset, out _),
+        "PEQ preset save failed.");
+    Check(CalibrationCompilerV1.TryLoadPreset(presetPath, out var loadedPreset, out _) &&
+          loadedPreset is not null && loadedPreset.Filters.Count == 1 &&
+          loadedPreset.Filters[0].FrequencyHz == 1000.0,
+        "PEQ preset load failed.");
+    File.WriteAllText(presetPath, "{\"schema_version\":1,\"filters\":[{\"type\":\"invalid\",\"frequency_hz\":1000,\"gain_db\":0,\"q\":1}]}");
+    Check(!CalibrationCompilerV1.TryLoadPreset(presetPath, out _, out _),
+        "Invalid PEQ preset load must fail closed.");
+}
+finally
+{
+    if (File.Exists(presetPath)) File.Delete(presetPath);
+}
 Console.WriteLine("Control model checks passed.");

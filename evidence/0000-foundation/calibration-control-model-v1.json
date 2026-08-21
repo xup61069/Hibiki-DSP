@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "issue": 16,
+  "scope_digest": "calibration-control-model-v1",
+  "source_commit": "12ee53b8e30c5a6f696253d3d1a34cdb827368eb",
+  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-msvc-17.14-dotnet-10.0.301-pwsh-7.6.5",
+  "commands": [
+    "pwsh -File tools/control-model-check.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 16",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "CalibrationPointV1 and CalibrationResponseV1 schema validation and bounds checks",
+        "PeqFilterV1 and PeqPresetV1 schema validation and bounds checks",
+        "CalibrationCompilePolicyV1 policy validation and limits",
+        "CalibrationCompilerV1 bounded PEQ compiler matching SPEC-0011 algorithm",
+        "Clipping and capacity limited-flag diagnostics",
+        "Octave spacing and ignore error threshold enforcement",
+        "Equalizer APO, CamillaDSP YAML, REW, and Hibiki profile exporters",
+        "Atomic JSON load and save with temporary file cleanup and malformed-file rollback"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "documentation and source policy gates",
+      "status": "pass",
+      "required_paths": 85,
+      "specs": 24,
+      "scanned_paths": 382,
+      "blocked_files": 0,
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The local machine is Windows 26200 with MSVC 17.14, below the target Windows 11 24H2+ / VS 2026 / WDK 10.0.28000.2526 toolchain.",
+    "The calibration model is a user-space control-plane contract only; it does not claim physical acoustic measurement, microphone calibration, room optimization, driver, HLK, or signing evidence."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.301",
+    "powershell": "pwsh 7.6.5"
+  },
+  "started_at": "2026-08-22T03:30:00Z",
+  "finished_at": "2026-08-22T03:32:00Z"
+}
