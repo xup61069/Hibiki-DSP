@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "session-command-worker-queue-v1",
+  "source_commit": "6f9d6b1",
+  "environment_fingerprint": "windows-22631-vs17-sdk-26100-local",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "SessionCommandQueueV1 volume/route FIFO",
+        "64-slot capacity and dropped counter",
+        "reset and empty queue",
+        "Windows runtime compile with queue-only adapters",
+        "COM-worker drain sequence guard"
+      ],
+      "tests": 1,
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "required_paths": 75,
+      "specs": 22
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "scanned_paths": 317,
+      "blocked_files": 0
+    }
+  ],
+  "limitations": [
+    "The queue and runtime adapter are source/user-space verified only; target Windows 11 24H2 active-session readback, physical per-App delivery, Audio Service restart and signed driver evidence remain external gates.",
+    "The local machine is Windows 22631 with VS 17 and SDK 10.0.26100.0, below the locked target toolchain."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "cmake": "local verify.ps1 generator",
+    "compiler": "MSBuild 17.14.51",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00Z",
+  "finished_at": "2026-08-21T00:00:00Z"
+}

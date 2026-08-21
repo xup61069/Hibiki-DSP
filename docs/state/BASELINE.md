@@ -60,9 +60,10 @@
 - `SessionRouteCommand` v1 now carries only handle/sequence/lane/output labels. The coordinator
   builds and validates a candidate registry/graph before commit, increments generation on success,
   and republishes status/catalog; physical process-loopback delivery remains unverified.
-- Session volume/route runtime adapters now fail closed with `RPC_E_WRONG_THREAD` unless invoked
-  on the COM worker thread that started the runtime, preventing pipe/control callbacks from
-  touching Windows session COM objects directly.
+- Session volume/route runtime adapters now validate and enqueue from the EngineControl thread;
+  a fixed 64-slot SPSC `SessionCommandQueueV1` is drained only by the COM worker after refresh.
+  Direct synchronous read/write APIs still fail closed with `RPC_E_WRONG_THREAD`, while normal UI
+  commands no longer touch Windows session COM objects from pipe/control callbacks.
 - Expert source UI now allows selecting an App catalog entry and entering lane/output labels;
   disconnected or stale route submission remains visibly fail-closed.
 - `CalibrationResponsePointV1` and `compile_bounded_peq_correction_v1` now provide a deterministic
@@ -468,6 +469,7 @@ parameter frame 與 `IParameterChanges` bridge）unsigned build 亦通過；輸�
 與 C# grouped-volume payload round-trip、legacy payload compatibility、selected group resolver
 及 custom Scene card mirror 的 JSON save/load、atomic replace、malformed rollback 亦已通過本機
 contract/control-model checks。
+本次 Session command worker queue 的 source commit 是 `6f9d6b1`；
 本次 App route selection controls 的 source commit 是 `d4862d9`；
 COM worker-thread guard 的 source commit 是 `cbc860e`；
 SessionRouteCommand graph boundary 的 source commit 是 `662abbb`；
