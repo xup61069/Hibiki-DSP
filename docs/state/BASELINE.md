@@ -48,6 +48,9 @@
 - `EngineControlWorkerV1` consumes that queue and applies the four Easy Scene presets through
   AudioEngine Validate → Prepare → Commit; invalid scene IDs leave the last committed graph
   and revision unchanged, while volume commands share the same Group Master path.
+- `EngineControlWorkerV1::set_scene_preflight` adds an optional control-plane gate before graph
+  Prepare; a failed VST3/state/calibration/safety preflight leaves the prior Scene, revision and
+  graph untouched.
 - `RtLaneSnapshotV1` now carries fixed-size output-group bytes and exposes a group-filtered render
   path; four-lane fixtures verify that selecting one group does not mix the other three.
 - `AudioEngineModel` facade connecting graph transaction, Windows volume notification and RT

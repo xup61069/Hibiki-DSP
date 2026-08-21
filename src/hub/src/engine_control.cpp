@@ -37,6 +37,9 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
     }
 
     const auto candidate = make_easy_scene(kind, std::string(output_group));
+    if (scene_preflight_ != nullptr && !scene_preflight_(candidate.scene, scene_preflight_context_)) {
+        return EngineControlResultV1::Failed;
+    }
     const auto next_revision = revision_ + 1U;
     if (!engine_.prepare_graph(candidate.graph, next_revision)) {
         engine_.rollback_graph();

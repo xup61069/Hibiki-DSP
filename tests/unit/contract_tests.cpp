@@ -100,6 +100,10 @@ bool accept_control_command(const hibiki::ControlCommandV1& command, void* conte
     return *accepted;
 }
 
+bool allow_scene_preflight(const hibiki::SceneProfileV1&, void* context) noexcept {
+    return context != nullptr && *static_cast<const bool*>(context);
+}
+
 hibiki::Vst3PluginStateResultV1 migrate_test_plugin_state(
     const std::uint32_t source_version,
     const std::span<const std::uint8_t> source,
@@ -721,6 +725,13 @@ int main() {
     CHECK(control_queue.try_push(scene_command));
     CHECK(control_worker.drain(control_queue) == 1U && control_worker.has_active_scene() &&
           control_worker.active_scene().output_group == "main" && control_worker.revision() == 1U);
+    bool scene_gate_open = false;
+    control_worker.set_scene_preflight(allow_scene_preflight, &scene_gate_open);
+    CHECK(control_worker.consume(scene_command) == EngineControlResultV1::Failed &&
+          control_worker.revision() == 1U && control_worker.active_scene().output_group == "main");
+    scene_gate_open = true;
+    CHECK(control_worker.consume(scene_command) == EngineControlResultV1::Applied &&
+          control_worker.revision() == 2U);
     control_engine.set_sample_rate(8000U);
     ControlCommandV1 control_volume{};
     control_volume.type = IpcMessageType::VolumeNotification;
@@ -756,7 +767,7 @@ int main() {
     scene_command.scene.scene_id_bytes = 7U;
     std::copy_n("unknown", 7U, scene_command.scene.scene_id.data());
     CHECK(control_queue.try_push(scene_command));
-    CHECK(control_worker.drain(control_queue) == 1U && control_worker.revision() == 1U);
+    CHECK(control_worker.drain(control_queue) == 1U && control_worker.revision() == 2U);
     auto malformed = encoded;
     malformed[0] = 0;
     CHECK(!decode_ipc_frame(malformed, decode_error).has_value());

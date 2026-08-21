@@ -55,6 +55,9 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
 - `EngineControlWorkerV1` 是目前的單一 consumer：它將 `SceneApply` 解析為四個受控 Easy
   preset，執行 `prepare_graph` → `commit_graph`，失敗則 rollback；`VolumeNotification`
   同樣在 control worker 套用，pipe callback 只負責 validate、enqueue、回 ACK。
+- `EngineControlWorkerV1::set_scene_preflight` 可注入一個 control-plane-only gate，讓 VST3
+  state coordinator、校正資料或安全策略在 graph Prepare 前驗證；gate 失敗會保留既有
+  Scene、revision 與 active graph，不會部分套用。
 - `AudioSessionRegistry` 以 `endpoint_id + session_instance_id` 作為唯一 session key；PID
   只作顯示／診斷用途。OS metadata refresh 不得覆蓋使用者已選 lane、output group 或 gain
   owner，避免同一 process 的多個 Chrome tab／session 互相串音。
