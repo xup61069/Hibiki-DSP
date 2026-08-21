@@ -10,6 +10,12 @@
     "pwsh -NoProfile -File tools/live-session-volume-check.ps1 -SelfTest",
     "pwsh -NoProfile -File tools/live-session-volume-check.ps1 -SelfTest -DirectCoordinator",
     "pwsh -NoProfile -File tools/live-session-volume-check.ps1 -DirectCoordinator (without -WriteTest)",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 97",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1 (with VS2026 CMake directory prepended process-locally)",
     "git diff --check"
   ],
   "results": [
@@ -61,6 +67,41 @@
       "compiled_artifacts": false
     },
     {
+      "command": "tools/handoff-check.ps1 -Issue 97; tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Issue 97 schema-v2 ownership and full active-handoff scope checks passed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "blocked_by_shared_baseline",
+      "coverage": [
+        "handoff checks passed before the shared baseline count check",
+        "BASELINE.md claims 423 tracked paths while this branch reports 425"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1; tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "source-only policy passed for 425 tracked paths",
+        "source-only CI policy passed for 1 workflow and 425 tracked paths"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1 (with VS2026 CMake directory prepended process-locally)",
+      "status": "pass",
+      "coverage": [
+        "unsigned CMake configure/build completed",
+        "CTest passed 1/1"
+      ],
+      "compiled_artifacts": true
+    },
+    {
       "command": "git diff --check",
       "status": "pass",
       "coverage": [
@@ -73,7 +114,8 @@
     "The actual -WriteTest live probe was intentionally not run because it creates a silent session and temporarily changes local session volume; no session or volume state was changed by this evidence run.",
     "This self-test validates wrapper planning and opt-in safety only; it is not physical per-App capture/re-send, DSP delivery, WaveRT, driver, HLK, signing, or endpoint/session identity evidence.",
     "CMake/SDK/WDK availability is recorded from doctor; no compiled live-probe artifact is committed or treated as release evidence.",
-    "The shared docs/state/BASELINE.md counter remains integrator-owned and was not modified."
+    "The shared docs/state/BASELINE.md counter remains integrator-owned and was not modified.",
+    "The direct verify.ps1 invocation could not find CMake on PATH; the successful verification used only the existing VS2026 CMake directory for that process."
   ],
   "logs": [],
   "tool_versions": {
