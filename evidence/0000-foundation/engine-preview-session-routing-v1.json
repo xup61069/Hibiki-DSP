@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "engine-preview-session-routing-v1",
+  "source_commit": "d668982",
+  "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/build-engine-preview.ps1",
+    "pwsh -File tools/engine-preview-smoke.ps1",
+    "pwsh -File tools/engine-preview-smoke.ps1 -EnableSessionRouting -StatusOnly",
+    "pwsh -File tools/engine-preview-smoke.ps1 -EnableSystemVolume -EnableSessionRouting -StatusOnly",
+    "pwsh -File tools/control-model-engine-smoke.ps1",
+    "pwsh -File tools/control-model-engine-smoke.ps1 -EnableSessionRouting",
+    "pwsh -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/source-policy.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/build-engine-preview.ps1",
+      "status": "pass",
+      "coverage": [
+        "Engine Preview session-routing opt-in builds with Windows session coordinator and fixed command queue",
+        "default launcher remains user-space and source-only"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/engine-preview-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "normal Hello/Ack, volume, status, physical catalog and IR regression path",
+        "six-route status payload remains backward-compatible for existing routes"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/engine-preview-smoke.ps1 -EnableSessionRouting -StatusOnly",
+      "status": "pass",
+      "coverage": [
+        "explicit opt-in binds default render IAudioSessionManager2",
+        "bounded SessionCatalogSnapshot response contains 2 local entries",
+        "per-App delivery is explicitly reported unverified"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/engine-preview-smoke.ps1 -EnableSystemVolume -EnableSessionRouting -StatusOnly",
+      "status": "pass",
+      "coverage": [
+        "system volume and session routing opt-ins coexist",
+        "Windows volume broker reports Ready and session catalog reports Ready",
+        "status-only path sends no volume or App command"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/control-model-engine-smoke.ps1 -EnableSessionRouting",
+      "status": "pass",
+      "coverage": [
+        "C# ViewModel receives non-empty catalog and sequence",
+        "windows-session route is not Unavailable",
+        "probe sends no App volume or route write"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "Expert App/session panel compiles and launches without Windows App Runtime",
+        "UI remains driver-free and source-only"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1; tools/docs-check.ps1; tools/handoff-check.ps1; tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "C++ contract tests",
+        "documentation and AI handoff consistency",
+        "source-only policy with 361 tracked paths"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Session routing is opt-in and currently binds the default physical render endpoint in user-space; it is not the Hibiki virtual WaveRT endpoint.",
+    "App volume commands can target Windows session COM objects only after handle/sequence validation; physical per-App capture/re-send and DSP lane delivery remain unverified.",
+    "Process-loopback and Chrome/Edge tabCapture are separate boundaries and are not silently enabled by this preview.",
+    "The local machine is Windows 22631/Visual Studio 17 with SDK 26100, below the locked Windows 11 24H2/VS 2026/WDK target.",
+    "All build outputs remain under ignored .local paths and are not GitHub artifacts."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00+08:00",
+  "finished_at": "2026-08-21T00:00:00+08:00"
+}

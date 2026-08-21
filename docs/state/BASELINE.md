@@ -178,6 +178,12 @@
   render endpoint's `IAudioEndpointVolume`, mirrors external dB/mute notifications into Main Group
   Master, and writes UI volume requests back with the UI event-context GUID. The default Preview
   remains non-mutating; status-only broker smoke coverage does not send a volume command.
+- Engine Preview now has an independent `--enable-session-routing` opt-in: it binds the current
+  default render endpoint's `IAudioSessionManager2`, publishes a bounded `SessionCatalogSnapshot`,
+  and drains App volume, lane/output and route-rule commands through the COM-worker-owned fixed
+  queue. Desktop Compatibility Preview exposes the catalog and explicit Expert controls without
+  raw Windows identity. This proves the selection/command and Windows session-volume control-plane
+  boundary only; physical per-App capture/re-send and DSP delivery remain explicitly unverified.
 - Windows-only `IMMNotificationClient` watcher with bounded default/add/remove/property event
   snapshots, consumed by a worker-side transactional recovery coordinator with safe-start mute
   after endpoint invalidation or Audio Service restart.
@@ -511,7 +517,7 @@ store、handler 與 atomic ViewModel apply；本機 status probe 通過，但仍
 per-App delivery 或 browser tab capture 已完成。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 75 個必要入口與
-21 份 Spec 通過；`source-policy.ps1` 掃描 317 個 tracked paths 且無 blocked
+21 份 Spec 通過；`source-policy.ps1` 掃描 361 個 tracked paths 且無 blocked
 binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
@@ -546,4 +552,5 @@ volume broker unchanged-endpoint result 修正的最新 source commit 是 `ca8ea
 volume node 與 session-route 獨立重綁的最新 source commit 是 `ef4af32`；
 control-model route-health／volume-safety additions 的 source commit 是 `7d43e67`，
 對應 handoff/evidence 更新 commit 是 `e13cfd8`；最後一次 live session evidence 更新是
-`2ba5299`。
+`2ba5299`；Engine Preview opt-in session-routing vertical slice、Desktop Compatibility Expert
+controls 與 smoke evidence 的 source commit 是 `d668982`。
