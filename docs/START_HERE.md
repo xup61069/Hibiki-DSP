@@ -22,6 +22,9 @@
    Windows 主機若要驗證 worker-owned endpoint enumeration，可額外執行
    `pwsh -File tools/live-device-catalog-check.ps1`；它是 opt-in，只輸出數量、sequence、
    payload 大小與 wire 結果，不會把真實 endpoint ID 寫入 repository。
+   若要驗證實際 shared-mode sink 與 30 ms 無聲 handoff，可額外執行
+   `pwsh -File tools/live-wasapi-handoff-check.ps1`；它只輸出 mix format 與 aggregate
+   worker counters，沒有可用 endpoint 時會回報 `wasapi=unavailable`。
    任何 identity/config 變更都必須再執行 `tools/distribution-check.ps1`；改動 driver source
    boundary 時也執行 `tools/driver-source-check.ps1` 與
    `tools/driver-signability-check.ps1`。若有目標 WDK 編出的 package，可用

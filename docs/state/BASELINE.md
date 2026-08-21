@@ -283,9 +283,11 @@
   and Group Master, while `process_asio_transport_to_wasapi` submits the processed block once to
   the dual-worker sink handoff. Physical driver/endpoint delivery remains pending.
 - `WindowsWasapiOutputV1` plus `WindowsWasapiSinkWorkerV1` now supply a Windows shared-mode
-  Float32 physical render boundary: one dedicated sink-worker apartment owns COM bind/start/stop,
-  event waits, bounded SPSC blocks, silence underrun fill, persistent SRC and clock-observation
-  updates. The graph RT thread never calls this COM API; real-device/hotplug soak remains pending.
+  physical render boundary: one dedicated sink-worker apartment owns COM bind/start/stop, event
+  waits, bounded SPSC blocks, silence underrun fill, Float32-to-Float32/PCM16/24/32 conversion,
+  persistent SRC and clock-observation updates. The opt-in silent local handoff probe now passes
+  active/candidate warm-up and 30 ms commit on a 6-channel 48 kHz endpoint; the graph RT thread
+  never calls this COM API, and target hotplug/HLK soak remains pending.
 - `IpcNamedPipeServerV1` provides the Windows control-plane worker boundary with overlapped,
   bounded read/write, local-only pipe validation, request decoding and callback response framing;
   a Windows loopback contract test exercises Ack/request-ID round-trip.
@@ -361,11 +363,12 @@ WindowsControlRuntime default endpoint volume binding/read/poll 的 source commi
 WindowsVolumeLink broker-to-engine adapter 的 source commit 是 `a375ff5`。
 Endpoint-ID-preserving volume rebind 的 source commit 是 `4d9e1d5`。
 固定四組 volume event-context GUID 與自動註冊的 source commit 是 `1ebf026`。
+WASAPI PCM render conversion 與 silent 30 ms live handoff probe 的 source commit 是 `9d0d426`。
 Driver signability source gate 的 source commit 是 `dc1d3b2`；預設只驗證 INF contract，
 目標 WDK package 才能執行 Inf2Cat。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 68 個必要入口與
-15 份 Spec 通過；`source-policy.ps1` 掃描 291 個路徑且無 blocked binary/secret；
+15 份 Spec 通過；`source-policy.ps1` 掃描 293 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
 288-byte payload、catalog sequence、handler fail-closed、WinUI send-failure rollback、DeviceCatalogSnapshot

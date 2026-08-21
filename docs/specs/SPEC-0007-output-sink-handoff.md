@@ -31,11 +31,13 @@ source_globs: ["src/hub/**output*", "src/hub/**wasapi*", "src/hub/**audio_engine
   graph/ASIO/TabCapture producer 只呼叫 bounded SPSC `submit`，worker 在 endpoint event 後
   pop block，空 queue 補 silence，並透過 `OutputSinkModel` 的 persistent SRC 處理已排程的
   clock observation。`observe_clock` 只寫入 atomic latest-request，實際 SRC 更新在 worker
-  套用；graph RT 不呼叫 COM、等待或配置。
+  套用；graph RT 不呼叫 COM、等待或配置。caller 一律提供 Float32，worker render boundary
+  依 endpoint mix format 無配置地寫入 Float32、PCM16、PCM24 或 PCM32。
 - `WindowsWasapiOutputV1` 在 bind 時取得 `IAudioClock`，worker 以 device position 與 QPC
   delta 產生每 sink 的 source/sink frame observation，再由 `OutputSinkModel` 更新 SRC；
-  clock 讀取失敗時保留原本的外部 observation／安全 fallback。多聲道 Float32 mix format
-  若為 extensible，channel mask 必須符合 2.0／5.1／7.1 layout。
+  clock 讀取失敗時保留原本的外部 observation／安全 fallback。多聲道 Float32／PCM mix
+  format 若為 extensible，channel mask 必須符合 2.0／5.1／7.1 layout；5.1 接受 back 或
+  side speaker variant，避免合法 Windows endpoint 被錯誤標成 detached。
 - worker snapshot 必須可觀察 `endpoint_ready`、`degraded`、dropped/submitted/rendered blocks、
   `source_step` 與 `drift_ppm`，讓 UI 在實體 endpoint 未綁定時顯示 detached，而不是靜默宣稱
   已輸出。
@@ -56,6 +58,12 @@ audio graph 不重啟、不直接呼叫 COM。候選 submit、endpoint bind 或�
 active slot，`rollback` 保留仍在執行的舊 worker。這個 user-space handoff 只證明狀態機、
 bounded queue 與 source-level fallback；實體 endpoint 的暖機時間、音量連續性、拔插與
 Audio Service restart 仍需 Windows 11 24H2+ 實機／HLK evidence。
+
+`tools/live-wasapi-handoff-check.ps1` 是 opt-in、無聲的 local probe：它讀取目前 default
+render mix format，啟動 active/candidate workers，等待兩端 warm-up，送出 30 ms equal-power
+silence crossfade，再 commit。probe 只輸出 aggregate format／state／block counters，不會
+寫入 endpoint identity；沒有可接受 endpoint 時回報 `wasapi=unavailable`，不把缺少硬體
+當成成功。
 
 `AudioEngineModel` 的 `start_wasapi_output`、`begin_wasapi_output_handoff`、
 `prepare/commit/rollback_wasapi_output_handoff` 與 `process_output_group_to_wasapi` 是
