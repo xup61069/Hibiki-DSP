@@ -65,6 +65,9 @@
 - Parameterized ISO 226:2023 SPL-from-phon formula using caller-supplied legal parameters;
   the 1 kHz invariant and phon bounds are covered by CTest without embedding the licensed
   29-point coefficient table.
+- `build_formula_compensation` now computes caller-supplied current/reference phon curves with
+  1 kHz normalization, F3/boost limits and explicit `limited` diagnostics; it does not embed
+  standard coefficients or imply calibrated SPL without an acoustic anchor.
 - MS-PL WaveRT endpoint control-state core with fixed-format validation, Q16.16 dB safety
   ceiling, mute/generation ordering and Strict Direct behavior; the PortCls miniport is not
   yet wired and no `.sys` is built here.
@@ -239,7 +242,7 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 Windows volume/device、ISO formula、recovery、driver control-core/INF template、persistent SRC、
 VST worker、control pipe/payloads、session volume adapter、sink clock pipeline、optional native
 ASIO transport/ring、tab/Virtual Mic lane adapter、session-route/output-handoff、control-model
-與 VST3 latency graph commit／RT lane latency bank／parameter timeline／Scene automation refs／rollback lifecycle／UI device fade／plugin lane token／VST3 supervisor handshake/process exchange／VST3 worker lane timeline bridge／PluginHostModel worker-lane wiring／multi-sink fan-out、per-sink clock/SRC runtime、AudioEngine fan-out boundary、精確容量 preflight、高倍率 SRC phase guard、portable WaveRT stream ring、WDK pin adapter、driver→engine stream packet bridge、endpoint identity、graph lane binding、WASAPI IAudioClock drift path、雙 worker WASAPI handoff、graph-to-WASAPI adapter、ASIO-to-WASAPI path、driver-to-WASAPI path、tab-to-WASAPI path、virtual-mic-to-WASAPI path、Windows WASAPI fan-out graph adapter 及 WinUI Expert readonly surface 的 fail-closed safety baseline `ede0ead`；
+與 VST3 latency graph commit／RT lane latency bank／parameter timeline／Scene automation refs／rollback lifecycle／UI device fade／plugin lane token／VST3 supervisor handshake/process exchange／VST3 worker lane timeline bridge／PluginHostModel worker-lane wiring／ISO formula compensation builder／multi-sink fan-out、per-sink clock/SRC runtime、AudioEngine fan-out boundary、精確容量 preflight、高倍率 SRC phase guard、portable WaveRT stream ring、WDK pin adapter、driver→engine stream packet bridge、endpoint identity、graph lane binding、WASAPI IAudioClock drift path、雙 worker WASAPI handoff、graph-to-WASAPI adapter、ASIO-to-WASAPI path、driver-to-WASAPI path、tab-to-WASAPI path、virtual-mic-to-WASAPI path、Windows WASAPI fan-out graph adapter 及 WinUI Expert readonly surface 的 fail-closed safety baseline `cdb2094`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
