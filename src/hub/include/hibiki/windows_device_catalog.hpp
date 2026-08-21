@@ -17,11 +17,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <thread>
 
 namespace hibiki {
 
-// Adapter for EngineControlWorkerV1::set_session_volume_handler. The context
-// must be a live WindowsControlRuntimeV1 owned by the control worker.
+// Adapters for EngineControlWorkerV1. The callback must execute on the same
+// worker thread that called WindowsControlRuntimeV1::start; other threads get
+// a fail-closed wrong-thread result instead of touching COM.
 [[nodiscard]] bool apply_session_volume_command_v1(
     const SessionVolumeCommandV1& request,
     void* context) noexcept;
@@ -222,6 +224,11 @@ private:
         IMMDeviceEnumerator* enumerator) noexcept;
     [[nodiscard]] bool publish_session_route_status() noexcept;
     [[nodiscard]] bool publish_session_catalog() noexcept;
+    [[nodiscard]] bool on_worker_thread() const noexcept {
+        return worker_thread_id_ == std::this_thread::get_id();
+    }
+
+    std::thread::id worker_thread_id_{};
 };
 
 }  // namespace hibiki

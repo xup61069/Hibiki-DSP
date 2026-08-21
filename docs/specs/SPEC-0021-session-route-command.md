@@ -43,6 +43,8 @@ generation 遞增，舊 handles 立即失效，runtime 發布新的 route status
   時回報 Failed，不假裝路由已套用。
 - command 失敗保留既有 catalog、volume、graph 與輸出；成功後 UI 必須等待下一個 catalog／
   status snapshot 才把新 generation 顯示為可用。
+- Windows runtime adapter 綁定 `start` 所在的 COM worker thread；其他執行緒不得直接呼叫
+  session watcher，會回傳 wrong-thread 並保留原 graph。
 
 ## 驗收
 

@@ -432,6 +432,7 @@ bool WindowsControlRuntimeV1::start(
     IMMDeviceEnumerator* const enumerator,
     const IpcNamedPipeConfigV1& config) noexcept {
     stop();
+    worker_thread_id_ = std::this_thread::get_id();
     if (FAILED(catalog_service_.bind(enumerator))) return false;
     const auto initial_sequence = status_store_.sequence() == UINT64_MAX
                                       ? UINT64_MAX
@@ -460,6 +461,7 @@ void WindowsControlRuntimeV1::stop() noexcept {
     session_routes_.unbind();
     volume_broker_.unbind();
     catalog_service_.unbind();
+    worker_thread_id_ = {};
 }
 
 HRESULT WindowsControlRuntimeV1::refresh_now() noexcept {
@@ -569,6 +571,7 @@ HRESULT WindowsControlRuntimeV1::write_session_volume(
     const bool mute,
     const GUID& event_context) noexcept {
     if (!running()) return E_UNEXPECTED;
+    if (!on_worker_thread()) return RPC_E_WRONG_THREAD;
     return session_routes_.write_session_volume(session_instance_id, requested_db, mute,
                                                  event_context);
 }
@@ -578,6 +581,7 @@ HRESULT WindowsControlRuntimeV1::read_session_volume(
     double& requested_db,
     bool& mute) noexcept {
     if (!running()) return E_UNEXPECTED;
+    if (!on_worker_thread()) return RPC_E_WRONG_THREAD;
     return session_routes_.read_session_volume(session_instance_id, requested_db, mute);
 }
 
@@ -588,6 +592,7 @@ HRESULT WindowsControlRuntimeV1::write_session_volume_handle(
     const bool mute,
     const GUID& event_context) noexcept {
     if (!running()) return E_UNEXPECTED;
+    if (!on_worker_thread()) return RPC_E_WRONG_THREAD;
     if (catalog_sequence == 0U || catalog_sequence != session_catalog_store_.sequence()) {
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     }
@@ -601,6 +606,7 @@ HRESULT WindowsControlRuntimeV1::read_session_volume_handle(
     double& requested_db,
     bool& mute) noexcept {
     if (!running()) return E_UNEXPECTED;
+    if (!on_worker_thread()) return RPC_E_WRONG_THREAD;
     if (catalog_sequence == 0U || catalog_sequence != session_catalog_store_.sequence()) {
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     }
@@ -613,6 +619,7 @@ HRESULT WindowsControlRuntimeV1::bind_session_route_handle(
     const std::string_view lane_id,
     const std::string_view output_group) noexcept {
     if (!running()) return E_UNEXPECTED;
+    if (!on_worker_thread()) return RPC_E_WRONG_THREAD;
     if (catalog_sequence == 0U || catalog_sequence != session_catalog_store_.sequence()) {
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     }

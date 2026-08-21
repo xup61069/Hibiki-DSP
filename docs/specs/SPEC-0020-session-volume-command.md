@@ -53,6 +53,8 @@ context 固定使用 `WindowsVolumeEventContextsV1::session()`，避免 Windows 
   驗證；清單刷新後若 handle 消失，選取自動清除。
 - dB 越界、未知／stale handle、未連線或 worker 失敗都保留現有可見狀態；不清空 catalog、
   不修改 RT graph、不把錯誤回寫成成功。
+- Windows runtime adapter 綁定 `start` 所在的 COM worker thread；其他執行緒回傳
+  wrong-thread 並 fail closed，避免 EngineControl／pipe callback 越權呼叫 COM。
 
 ## 驗收
 
