@@ -8,7 +8,8 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
     Title="Hibiki DSP">
-    <Grid x:Name="RootGrid" Padding="28" Background="#111217">
+    <Grid x:Name="RootGrid" Padding="28" Background="#111217"
+          AutomationProperties.Name="Hibiki DSP 音訊場景控制">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -26,7 +27,9 @@
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
                 <TextBlock Text="{Binding ConnectionStatusText}" VerticalAlignment="Center" />
-                <Button Content="連接引擎" Click="OnConnectClick" />
+                <Button Content="連接引擎" Click="OnConnectClick"
+                        AutomationProperties.Name="連接 Hibiki 音訊引擎"
+                        AutomationProperties.HelpText="連接後才能套用場景與音量控制" />
             </StackPanel>
         </Grid>
 
@@ -36,12 +39,17 @@
                     <StackPanel Spacing="12">
                         <TextBlock Text="先選輸出，再一鍵變好聽" FontSize="22" FontWeight="SemiBold" />
                         <ComboBox Header="輸出群組"
+                                  AutomationProperties.Name="輸出群組"
+                                  AutomationProperties.HelpText="選擇 Main、Low Latency 或 Surround 輸出"
                                   ItemsSource="{Binding OutputGroups}"
                                   DisplayMemberPath="Name"
                                   SelectedValuePath="Id"
                                   SelectedValue="{Binding SelectedOutputGroup, Mode=TwoWay}" />
-                        <Button Content="一鍵改善" Click="OnEnhanceClick" IsEnabled="{Binding IsConnected}" />
-                        <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" Opacity="0.82" />
+                        <Button Content="一鍵改善" Click="OnEnhanceClick" IsEnabled="{Binding IsConnected}"
+                                AutomationProperties.Name="一鍵改善聲音"
+                                AutomationProperties.HelpText="套用遊戲場景、校正與音量保護" />
+                        <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" Opacity="0.82"
+                                   AutomationProperties.LiveSetting="Polite" />
                     </StackPanel>
                 </Border>
 
@@ -54,7 +62,9 @@
                             </controls:ItemsRepeater.Layout>
                             <controls:ItemsRepeater.ItemTemplate>
                                 <DataTemplate>
-                                    <Button Tag="{Binding Id}" Click="OnSceneClick" HorizontalContentAlignment="Stretch">
+                                    <Button Tag="{Binding Id}" Click="OnSceneClick" HorizontalContentAlignment="Stretch"
+                                            AutomationProperties.Name="{Binding Name}"
+                                            AutomationProperties.HelpText="{Binding Description}">
                                         <StackPanel Spacing="3">
                                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
                                             <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Opacity="0.72" />
@@ -74,16 +84,24 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="音量保護" FontSize="20" FontWeight="SemiBold" />
-                            <ToggleSwitch Grid.Column="1" Header="Expert" IsOn="{Binding IsExpert, Mode=TwoWay}" />
+                            <ToggleSwitch Grid.Column="1" Header="Expert" IsOn="{Binding IsExpert, Mode=TwoWay}"
+                                          AutomationProperties.Name="Expert 詳細模式"
+                                          AutomationProperties.HelpText="顯示 Matrix、DSP Graph、VST3 與校正狀態" />
                         </Grid>
-                        <Slider Minimum="-60" Maximum="0" Value="{Binding RequestedVolumeDb, Mode=TwoWay}" ValueChanged="OnVolumeChanged" />
+                        <Slider Minimum="-60" Maximum="0" Value="{Binding RequestedVolumeDb, Mode=TwoWay}" ValueChanged="OnVolumeChanged"
+                                AutomationProperties.Name="系統音量"
+                                AutomationProperties.HelpText="以 dB 調整音量；安全限制會優先套用" />
                         <TextBlock Text="{Binding RequestedVolumeDb, StringFormat='{}{0:0.0} dB'}" />
-                        <ToggleSwitch Header="靜音" IsOn="{Binding Muted, Mode=TwoWay}" />
+                        <ToggleSwitch Header="靜音" IsOn="{Binding Muted, Mode=TwoWay}"
+                                      AutomationProperties.Name="靜音"
+                                      AutomationProperties.HelpText="淡出目前輸出並保留音量設定" />
                         <TextBlock Text="{Binding IrAddedDelayMs, StringFormat='IR 額外延遲：{0:0.0} ms'}" Opacity="0.72" />
                     </StackPanel>
                 </Border>
 
                 <controls:Expander Header="Expert 詳細控制（唯讀 contract）"
+                                   AutomationProperties.Name="Expert 詳細控制"
+                                   AutomationProperties.HelpText="唯讀顯示 Matrix、DSP Graph、VST3 隔離與校正狀態"
                                    IsExpanded="{Binding IsExpert, Mode=TwoWay}">
                     <StackPanel x:Name="ExpertPanel" Padding="8" Spacing="14">
                         <TextBlock Text="{Binding Expert.StatusText}" TextWrapping="Wrap" />

@@ -28,7 +28,12 @@ foreach ($requiredText in @('x:Name="RootGrid"', 'ItemsSource="{Binding Scenes}"
     'ItemsSource="{Binding OutputGroups}"', 'SelectedOutputGroup', 'IsExpert',
     'RequestedVolumeDb', 'Muted', 'IrAddedDelayMs', 'x:Name="ExpertPanel"',
     'ItemsSource="{Binding Expert.MatrixRoutes}"', 'ItemsSource="{Binding Expert.DspGraph}"',
-    'ItemsSource="{Binding Expert.Vst3Lanes}"', 'Expert.Calibration.Mode')) {
+    'ItemsSource="{Binding Expert.Vst3Lanes}"', 'Expert.Calibration.Mode',
+    'AutomationProperties.Name="Hibiki DSP 音訊場景控制"',
+    'AutomationProperties.Name="一鍵改善聲音"',
+    'AutomationProperties.Name="系統音量"',
+    'AutomationProperties.Name="Expert 詳細模式"',
+    'AutomationProperties.LiveSetting="Polite"')) {
   if (-not $xaml.Contains($requiredText)) { throw "WinUI shell binding missing: $requiredText" }
 }
 if (-not $codeBehind.Contains('RootGrid.DataContext = ViewModel') -or

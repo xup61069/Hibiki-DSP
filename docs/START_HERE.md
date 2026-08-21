@@ -49,7 +49,8 @@ branch。真實裝置資料與 calibration 留在 `.local/`，只提交 schema �
   named-pipe boundary、source-only passthrough worker、可選的 pinned VST3 SDK factory catalog
   與單一主 bus worker-side SDK processor/optional worker executable；bounded parameter timeline、
   latency graph commit、RT compensation、private identity/version-checked state、explicit
-  migration handler/registry 已接入，Scene binding、supervisor UI timeline 編輯、side-chain/multi-bus
-  與 certification 仍待完成。`extensions/` 已有 HIBT decoder、loopback bridge、bounded capture queue 與
+  migration handler/registry、Scene binding、EngineControl preflight gate 與第三方 state review
+  checklist 已接入；supervisor UI timeline 編輯、side-chain/multi-bus 與 certification 仍待完成。
+  `extensions/` 已有 HIBT decoder、loopback bridge、bounded capture queue 與
   graph-lane adapter；Virtual Mic 有 bounded normalized-LMS/gate baseline，但正式 AEC/NS model
   provenance 與 signed capture driver 仍待完成。

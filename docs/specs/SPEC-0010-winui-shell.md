@@ -55,6 +55,15 @@ endpoint bind、30 ms equal-power crossfade 與回復仍由 C++ sink worker 負�
 - Expert 摘要不可宣稱 Matrix/VST3/ISO 校正已提交；沒有對應版本化 IPC command 時，
   UI 必須維持唯讀並顯示「未認證／未校準」狀態。
 
+## 可及性與易用性
+
+- Root、連接、一鍵改善、輸出群組、Expert、音量、靜音與詳細控制面板都必須有
+  明確的 `AutomationProperties.Name`；需要上下文的控制項提供 `HelpText`。
+- 場景按鈕的可及性名稱與說明從 `SceneCard` 綁定，不依賴視覺排版或顏色傳達狀態。
+- 狀態文字以 polite live region 告知連線／控制結果，避免螢幕閱讀器被高頻音量事件打斷。
+- XAML 靜態 gate 必須檢查上述 binding；目標 Windows App SDK 環境仍需做真正的鍵盤、
+  螢幕閱讀器、高對比與文字縮放驗收。
+
 ## 相容性
 
 ViewModel 命令只使用 `IpcEnvelopeV1` 與既有 payload；新增欄位不可改變已知
@@ -70,3 +79,5 @@ bytes。WinUI shell 可在沒有引擎時啟動，並以 Degraded 狀態呈現�
 3. 沒有 engine pipe 時，按連接會在 bounded timeout 後顯示 Degraded，UI 不崩潰；
    連線成功時 Hello 必須先收到 Ack。
 4. UI 關閉或連線失敗不會寫回 Windows Master，也不會把音量恢復到 100%。
+5. WinUI source gate 通過 accessibility names/help text/live-region 檢查；目標環境再補
+   UI Automation 與螢幕閱讀器實機證據。
