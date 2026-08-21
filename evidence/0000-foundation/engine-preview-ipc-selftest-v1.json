@@ -93,6 +93,22 @@
     "The normal smoke is user-space cross-process evidence and does not claim physical audio delivery, WaveRT, driver, HLK, Microsoft signing, or per-App DSP reroute.",
     "Release build outputs remain ignored local artifacts and are not submitted to GitHub."
   ],
+  "ci_runs": [
+    {
+      "run_id": 32533554894,
+      "event": "push",
+      "status": "failure",
+      "failed_gate": "Documentation gate",
+      "message": "BASELINE.md claims 417 tracked paths but git reports 419; later gates were skipped."
+    },
+    {
+      "run_id": 32533558944,
+      "event": "pull_request",
+      "status": "failure",
+      "failed_gate": "Documentation gate",
+      "message": "BASELINE.md claims 417 tracked paths but git reports 419; later gates were skipped."
+    }
+  ],
   "tool_versions": {
     "compiler": "MSVC 19.51.36256.0",
     "cmake": "4.3.1-msvc1",
