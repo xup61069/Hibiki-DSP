@@ -5,9 +5,9 @@
 
 ## Fresh clone 流程
 
-1. 讀 root `AGENTS.md`、本檔與 `docs/PROJECT_MAP.md`。
+1. 讀 root `AGENTS.md`、本檔、`docs/AI_HANDOFF.md` 與 `docs/PROJECT_MAP.md`。
 2. 確認 branch、HEAD、working tree 與 dependency lock。
-3. 執行 `pwsh -File tools/doctor.ps1 -CheckOnly`。
+3. 執行 `pwsh -File tools/doctor.ps1 -CheckOnly` 與 `pwsh -File tools/handoff-check.ps1`。
 4. 執行 `pwsh -File tools/probe-environment.ps1`，環境資料只寫入 `.local/`。
 5. 找到要處理的 GitHub Issue，讀 `docs/tasks/active/<issue>.md`。
 6. 讀 handoff 指定的 Spec、ADR、source、tests 與 evidence。
@@ -15,7 +15,7 @@
    `pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource`），再執行 handoff 的 baseline
    smoke test；結果不一致時先標記 stale/conflict。需要完整 source context 時移除
    `-NoSource`，不要把與該 Issue 無關的聊天內容帶入新工作階段。
-8. 修改後執行 `tools/verify.ps1`、`tools/docs-check.ps1` 與
+8. 修改後執行 `tools/verify.ps1`、`tools/handoff-check.ps1`、`tools/docs-check.ps1` 與
    `tools/source-policy.ps1`、`tools/source-only-ci-check.ps1`；若改動 extension、installer 或 control model，再執行
    `tools/extension-check.ps1`、`tools/installer-check.ps1`、`tools/control-model-check.ps1`、
    `tools/winui-shell-check.ps1`。

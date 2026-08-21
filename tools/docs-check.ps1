@@ -11,12 +11,13 @@ $required = @(
   'installer/HibikiSetup.ps1', 'tools/installer-check.ps1',
   'apps/control-model/Hibiki.ControlModel.csproj', 'tools/control-model-check.ps1',
   'apps/winui-shell/Hibiki.WinUI.csproj', 'tools/winui-shell-check.ps1',
-  'tools/distribution-check.ps1', 'tools/source-only-ci-check.ps1',
+  'tools/distribution-check.ps1', 'tools/source-only-ci-check.ps1', 'tools/handoff-check.ps1',
+  'tools/build-preview.ps1',
   'tools/live-device-catalog-check.ps1', 'tools/live-wasapi-handoff-check.ps1',
   'tools/live-audio-session-check.ps1', 'tools/live-process-loopback-check.ps1',
   'tools/driver-source-check.ps1', 'tools/driver-signability-check.ps1',
   'schemas/release-manifest-v1.schema.json',
-  'docs/START_HERE.md', 'docs/PROJECT_MAP.md', 'docs/state/BASELINE.md',
+  'docs/START_HERE.md', 'docs/AI_HANDOFF.md', 'docs/PROJECT_MAP.md', 'docs/state/BASELINE.md',
   'docs/specs/INDEX.md', 'docs/specs/SPEC-0001-core-contracts.md',
   'docs/specs/SPEC-0002-volume-and-iso.md', 'docs/specs/SPEC-0003-virtual-endpoints-and-routing.md',
   'docs/specs/SPEC-0004-ai-handoff-and-evidence.md', 'docs/specs/SPEC-0005-source-only-paid-release.md',
@@ -57,6 +58,9 @@ if ($missing.Count -gt 0) { throw "Missing required documentation: $($missing -j
 $specs = Get-ChildItem -LiteralPath (Join-Path $repo 'docs/specs') -Filter 'SPEC-*.md' -File
 $ids = @($specs | ForEach-Object { Select-String -LiteralPath $_.FullName -Pattern '^id:\s*(\S+)' | ForEach-Object { $_.Matches.Groups[1].Value } })
 if (($ids | Sort-Object -Unique).Count -ne $ids.Count) { throw 'Duplicate Spec IDs detected.' }
+
+& (Join-Path $repo 'tools/handoff-check.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'AI handoff check failed.' }
 
 $adapters = @('AGENTS.md', 'CLAUDE.md', 'GEMINI.md', '.github/copilot-instructions.md', '.cursor/rules/project.mdc')
 foreach ($adapter in $adapters) {

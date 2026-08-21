@@ -1,5 +1,8 @@
 # Hibiki DSP 專案地圖
 
+新 AI 先讀 `docs/AI_HANDOFF.md`，再用本檔定位子系統；本檔描述結構，不取代
+`docs/state/BASELINE.md` 的已驗證狀態或 `docs/tasks/active/0.md` 的下一步。
+
 | 子系統 | 目的 | 目前狀態 | 主要契約 |
 | --- | --- | --- | --- |
 | `driver/` | 固定虛擬端點、KS volume/mute、私有 control IPC | ABI + MS-PL endpoint control core + fixed four-endpoint/channel-mask catalog + portable WaveRT Float32 SPSC ring/underrun boundary + topology-indexed WDK render/capture format/pin adapters + source-only INF package template；PortCls 尚未接線 | ADR-0002/ADR-0004/SPEC-0003 |

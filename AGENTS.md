@@ -2,7 +2,7 @@
 
 ## 先讀什麼
 
-每次開始工作先讀本檔與 `docs/START_HERE.md`，再讀 GitHub Issue 指定的
+每次開始工作先讀本檔、`docs/START_HERE.md` 與 `docs/AI_HANDOFF.md`，再讀 GitHub Issue 指定的
 handoff、Spec、ADR、source 與 tests。聊天紀錄、AI memory、個人 IDE 規則
 都不是專案真值。
 
@@ -28,6 +28,8 @@ handoff、Spec、ADR、source 與 tests。聊天紀錄、AI memory、個人 IDE 
 
 ```powershell
 pwsh -File tools/doctor.ps1 -CheckOnly
+pwsh -File tools/handoff-check.ps1
+pwsh -File tools/build-preview.ps1 -Target WinUI
 pwsh -File tools/probe-environment.ps1
 pwsh -File tools/verify.ps1
 pwsh -File tools/docs-check.ps1

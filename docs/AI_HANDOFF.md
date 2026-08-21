@@ -1,0 +1,58 @@
+# Hibiki DSP：下一個 AI 的 90 秒入口
+
+這一頁是交接摘要，不取代 Spec、ADR、source 或 evidence。遇到衝突時，以
+`docs/START_HERE.md` 所列權威順序處理，不要依聊天紀錄猜測。
+
+## 先做這四件事
+
+```powershell
+git status --short
+pwsh -File tools/doctor.ps1 -CheckOnly
+pwsh -File tools/handoff-check.ps1
+pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
+```
+
+工作樹不是乾淨狀態、handoff check 失敗，或 target toolchain 不符合時，先在
+`docs/tasks/active/0.md` 記錄事實；不要直接改 DSP、driver、永久 ID 或 release 設定。
+
+## 現在的真實位置
+
+- `main` 已有可重跑的 C++ user-space contract baseline、C# control model、source-only WinUI
+  shell 與 public source policy gates。
+- Expert per-App route preset 已保存、會對選取 App 做規則預覽，並透過版本化 command 等待
+  engine Ack；這不是已驗證的實體 per-App capture/re-send。
+- 本機 Windows 22631／Visual Studio 17 只能當 portable/user-space 證據。driver、WinUI XAML
+  preview、簽章與 Windows 11 24H2 hardware soak 必須在鎖定 target 環境重新驗證。
+- ISO 226 只保留合法 formula/derived boundary；禁止把受限標準文件、完整表格、掃圖或其內容
+  放進 source、Issue、prompt、RAG、fixture 或 evidence。
+
+## 唯一下一步
+
+在 Windows 11 24H2+ x64、Visual Studio 2026、SDK/WDK 10.0.28000.2526 的乾淨機器上，先完成
+source-only WinUI XAML build 與 accessibility smoke evidence；成功後才進行第一個 loadable
+WaveRT endpoint 的 WDK build/signability 工作。不要先做 Microsoft signing、Gumroad 上傳、
+發佈 binary 或宣稱 consumer preview。
+
+目標機器可用 `pwsh -File tools/build-preview.ps1 -Target WinUI` 產生不追蹤的本機 UI preview；
+這不是 installer，也不代表虛擬 driver 已完成。
+
+## 必讀順序
+
+1. [AGENTS.md](../AGENTS.md)：硬限制與每次必跑命令。
+2. [START_HERE.md](START_HERE.md)：fresh clone、權威順序與資料邊界。
+3. [active Issue 0 handoff](tasks/active/0.md)：已完成、最後驗證、風險與下一步。
+4. [baseline](state/BASELINE.md)：main 已合併能力與限制。
+5. 對應的 [Spec index](specs/INDEX.md) 與 [evidence](../evidence/0000-foundation/)。
+
+## 不可自行做的事
+
+- 不重生 `config/distribution-profile.yml` 的 endpoint GUID、driver hardware ID、ASIO CLSID、IPC namespace。
+- 不把 `.local/`、`bin/`、`obj/`、PE/COFF、簽章檔、金鑰、真實 endpoint/session ID 或私人校正檔加入 Git。
+- 不宣稱 vendor ASIO、WASAPI Exclusive、RAW、Atmos/DTS:X 或未經使用者手勢的 Chrome tab capture 已受 Hibiki 控制。
+- 不把「控制命令已入列」或「預設已保存」寫成「已完成引擎／實體音訊套用」。
+
+## 交接前最小完成條件
+
+每一個後續 AI 在換機前必須：更新 active handoff 的 base commit/驗證/限制/下一步、建立 WIP
+commit、push branch，並跑與改動範圍相符的 gate。所有 public contract 變更都要同步更新
+Spec、tests、evidence 與 `docs/state/BASELINE.md`。
