@@ -190,6 +190,18 @@
                             </controls:ItemsRepeater>
                             <TextBlock Text="{Binding SelectedSession.DisplayName, StringFormat='目前選取：{0}'}"
                                        Opacity="0.72" />
+                            <TextBlock Text="{Binding SessionVolumeDb, StringFormat='App 音量：{0:0.0} dB'}"
+                                       Opacity="0.72" />
+                            <Slider Minimum="-60" Maximum="6" StepFrequency="0.5"
+                                    Value="{Binding SessionVolumeDb, Mode=TwoWay}"
+                                    AutomationProperties.Name="App 工作階段音量" />
+                            <CheckBox Content="App 靜音"
+                                      IsChecked="{Binding SessionMuted, Mode=TwoWay}"
+                                      IsEnabled="{Binding HasSelectedSession}"
+                                      AutomationProperties.Name="App 工作階段靜音" />
+                            <Button Content="套用選取 App 音量" Click="OnApplySessionVolumeClick"
+                                    IsEnabled="{Binding HasSelectedSession}"
+                                    AutomationProperties.Name="套用選取 App 音量" />
                             <TextBox Header="Lane ID" Text="{Binding SessionRouteLaneId, Mode=TwoWay}"
                                      AutomationProperties.Name="App Lane ID" />
                             <TextBox Header="Output Group" Text="{Binding SessionRouteOutputGroup, Mode=TwoWay}"

@@ -65,7 +65,8 @@
   Direct synchronous read/write APIs still fail closed with `RPC_E_WRONG_THREAD`, while normal UI
   commands no longer touch Windows session COM objects from pipe/control callbacks.
 - Expert source UI now allows selecting an App catalog entry and entering lane/output labels;
-  disconnected or stale route submission remains visibly fail-closed.
+  it also mirrors available per-App dB/mute into bounded controls and sends a separate session
+  volume command; disconnected, unavailable or stale submission remains visibly fail-closed.
 - `CalibrationResponsePointV1` and `compile_bounded_peq_correction_v1` now provide a deterministic
   control-plane measured-response to bounded PEQ compiler (16-filter cap, frequency/spacing/Q and
   boost/cut policy validation, explicit `limited` result) that feeds the existing APO/CamillaDSP/
@@ -469,6 +470,7 @@ parameter frame 與 `IParameterChanges` bridge）unsigned build 亦通過；輸�
 與 C# grouped-volume payload round-trip、legacy payload compatibility、selected group resolver
 及 custom Scene card mirror 的 JSON save/load、atomic replace、malformed rollback 亦已通過本機
 contract/control-model checks。
+本次 Expert per-App volume controls 的 source commit 是 `（待提交）`；
 本次 Session command worker queue 的 source commit 是 `6f9d6b1`；
 本次 App route selection controls 的 source commit 是 `d4862d9`；
 COM worker-thread guard 的 source commit 是 `cbc860e`；

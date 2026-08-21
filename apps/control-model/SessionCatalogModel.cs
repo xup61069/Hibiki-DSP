@@ -35,6 +35,10 @@ public sealed record SessionCatalogEntryV1(
         _ => "狀態未知"
     };
 
+    public string VolumeStateLabel => VolumeAvailable
+        ? $"音量 {RequestedDb:0.0} dB{(Muted ? "（靜音）" : string.Empty)}"
+        : "音量控制不可用";
+
     public string AccessibleSummary =>
-        $"{DisplayName}：{RouteStateLabel}。輸出 {OutputGroup}。";
+        $"{DisplayName}：{RouteStateLabel}。{VolumeStateLabel}。輸出 {OutputGroup}。";
 }

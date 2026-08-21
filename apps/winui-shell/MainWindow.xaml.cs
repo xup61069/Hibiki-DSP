@@ -63,6 +63,11 @@ public sealed partial class MainWindow : Window
         await ViewModel.ApplySelectedSessionRouteAsync();
     }
 
+    private async void OnApplySessionVolumeClick(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.ApplySelectedSessionVolumeAsync();
+    }
+
     private async void OnClosed(object sender, WindowEventArgs e)
     {
         await ViewModel.DisconnectAsync();

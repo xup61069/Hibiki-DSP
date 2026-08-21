@@ -309,6 +309,16 @@ Check(viewModel.SelectSession(sessionEntries[0].Handle) &&
       viewModel.BuildSessionVolumeCommand(sessionEntries[0].Handle, -9.5, true).Type ==
           ControlMessageType.SessionVolumeCommand,
     "ViewModel App session volume command failed to bind the current handle.");
+viewModel.SessionVolumeDb = -6.0;
+viewModel.SessionMuted = true;
+var selectedSessionVolume = viewModel.BuildSessionVolumeCommand(
+    sessionEntries[0].Handle, viewModel.SessionVolumeDb, viewModel.SessionMuted);
+Check(ControlPayloadsV1.TryDecodeSessionVolumeCommand(selectedSessionVolume.Payload.Span,
+          out _, out var selectedSessionDb, out var selectedSessionMute, out _) &&
+      Math.Abs(selectedSessionDb + 6.0) < 1e-6 && selectedSessionMute,
+    "ViewModel selected App volume controls did not preserve dB/mute.");
+Check(!await viewModel.ApplySelectedSessionVolumeAsync(),
+    "Disconnected selected App volume must fail closed.");
 var staleHandle = sessionEntries[0].Handle + 100UL;
 Check(!viewModel.SelectSession(staleHandle),
     "ViewModel must reject an unknown or stale App session handle.");

@@ -30,6 +30,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private ulong _selectedSessionHandle;
     private string _sessionRouteLaneId = "app-lane";
     private string _sessionRouteOutputGroup = "main";
+    private double _sessionVolumeDb = -12.0;
+    private bool _sessionMuted;
     private IrPhaseMode _irPhaseMode = IrPhaseMode.MinimumPhase;
     private double _irPhaseStrength;
     private ControlConnectionState _connectionState = ControlConnectionState.Disconnected;
@@ -92,6 +94,28 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             var normalized = value ?? string.Empty;
             if (normalized == _sessionRouteOutputGroup) return;
             _sessionRouteOutputGroup = normalized;
+            OnPropertyChanged();
+        }
+    }
+    public double SessionVolumeDb
+    {
+        get => _sessionVolumeDb;
+        set
+        {
+            if (!double.IsFinite(value)) return;
+            var clamped = Math.Clamp(value, -144.0, 12.0);
+            if (Math.Abs(clamped - _sessionVolumeDb) < 1e-9) return;
+            _sessionVolumeDb = clamped;
+            OnPropertyChanged();
+        }
+    }
+    public bool SessionMuted
+    {
+        get => _sessionMuted;
+        set
+        {
+            if (value == _sessionMuted) return;
+            _sessionMuted = value;
             OnPropertyChanged();
         }
     }
@@ -386,6 +410,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         _sessionCatalog = sessions.ToArray();
         _sessionCatalogSequence = sequence;
         if (SelectedSession is null) SelectedSessionHandle = 0UL;
+        SyncSelectedSessionVolume();
         OnPropertyChanged(nameof(SessionCatalog));
         OnPropertyChanged(nameof(SessionCatalogSequence));
         OnPropertyChanged(nameof(SelectedSession));
@@ -401,8 +426,19 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             return false;
         }
         SelectedSessionHandle = handle;
+        SyncSelectedSessionVolume();
         StatusText = $"已選擇 {SelectedSession?.DisplayName ?? "App 工作階段"}";
         return true;
+    }
+
+    private void SyncSelectedSessionVolume()
+    {
+        var selected = SelectedSession;
+        if (selected is null || !selected.VolumeAvailable) return;
+        _sessionVolumeDb = Math.Clamp(selected.RequestedDb, -144.0, 12.0);
+        _sessionMuted = selected.Muted;
+        OnPropertyChanged(nameof(SessionVolumeDb));
+        OnPropertyChanged(nameof(SessionMuted));
     }
 
     public IpcEnvelopeV1 BuildSessionVolumeCommand(ulong handle,
@@ -477,6 +513,18 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             ? PushSessionRouteAsync(SelectedSessionHandle, SessionRouteLaneId,
                                     SessionRouteOutputGroup, cancellationToken)
             : Task.FromResult(false);
+
+    public Task<bool> ApplySelectedSessionVolumeAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (!HasSelectedSession || SelectedSession?.VolumeAvailable != true)
+        {
+            StatusText = "此 App 工作階段目前沒有可用的 Windows 音量控制";
+            return Task.FromResult(false);
+        }
+        return PushSessionVolumeAsync(SelectedSessionHandle, SessionVolumeDb, SessionMuted,
+                                      cancellationToken);
+    }
 
     // A future versioned status frame can call this after the engine has
     // reconciled Windows dB, the safety ceiling and the actual actuator. It is

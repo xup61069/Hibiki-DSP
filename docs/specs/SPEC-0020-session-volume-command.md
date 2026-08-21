@@ -50,7 +50,8 @@ context 固定使用 `WindowsVolumeEventContextsV1::session()`，避免 Windows 
 
 ## UI／失敗行為
 
-- C# `ControlPayloadsV1` 與 C++ codec 使用同一 24-byte known layout。
+- C# `ControlPayloadsV1` 與 C++ codec 使用同一 24-byte known layout；Expert 的選取 App 控制
+  會把目前 catalog 的 dB/mute 同步到 bounded slider／mute 控件，再以目前 sequence 建命令。
 - `EasyControlViewModel` 只能由目前 `SessionCatalog` 選取 handle，Build command 前再次
   驗證；清單刷新後若 handle 消失，選取自動清除。
 - dB 越界、未知／stale handle、未連線或 worker 失敗都保留現有可見狀態；不清空 catalog、
