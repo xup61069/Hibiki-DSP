@@ -101,6 +101,15 @@ Check(!ControlPayloadsV1.TryDecodeSceneApply(invalidUtf8Scene, out _, out _),
 viewModel.IsExpert = true;
 Check(viewModel.Mode == UiMode.Expert && viewModel.SelectScene("movie"),
     "ViewModel Expert scene selection failed.");
+Check(viewModel.Expert.IsVisible && viewModel.Expert.MatrixRoutes.Count == 4 &&
+      viewModel.Expert.DspGraph.Any(node => node.Id == "limiter" && node.Enabled) &&
+      viewModel.Expert.Vst3Lanes.All(lane => !lane.Trusted) &&
+      viewModel.Expert.Calibration.Mode == "Relative Compensation" &&
+      viewModel.Expert.StatusText.Contains("唯讀"),
+    "Expert surface must expose bounded read-only graph details.");
+viewModel.IsExpert = false;
+Check(!viewModel.Expert.IsVisible && viewModel.Expert.StatusText.Contains("隱藏"),
+    "Expert surface must hide when Easy mode is selected.");
 viewModel.RequestedVolumeDb = -6.0205999;
 viewModel.Muted = true;
 var viewModelVolume = viewModel.BuildVolumeCommand();

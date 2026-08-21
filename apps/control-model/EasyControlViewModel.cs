@@ -27,6 +27,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private bool _isBusy;
     private CancellationTokenSource? _volumeDebounce;
 
+    public ExpertSurfaceModel Expert { get; } = new();
+
     public EasyControlViewModel(string pipeName = NamedPipeControlClientV1.DefaultPipeName)
     {
         if (string.IsNullOrWhiteSpace(pipeName) || pipeName.IndexOfAny(['\\', '/']) >= 0)
@@ -82,6 +84,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             if (value == _isExpert) return;
             _isExpert = value;
             _session.SetMode(Mode);
+            Expert.SetVisible(value);
             OnPropertyChanged();
             OnPropertyChanged(nameof(Mode));
         }

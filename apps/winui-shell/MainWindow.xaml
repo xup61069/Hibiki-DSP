@@ -82,6 +82,75 @@
                         <TextBlock Text="{Binding IrAddedDelayMs, StringFormat='IR 額外延遲：{0:0.0} ms'}" Opacity="0.72" />
                     </StackPanel>
                 </Border>
+
+                <controls:Expander Header="Expert 詳細控制（唯讀 contract）"
+                                   IsExpanded="{Binding IsExpert, Mode=TwoWay}">
+                    <StackPanel x:Name="ExpertPanel" Padding="8" Spacing="14">
+                        <TextBlock Text="{Binding Expert.StatusText}" TextWrapping="Wrap" />
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Matrix" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Expert.MatrixSummary}" Opacity="0.72" />
+                            <controls:ItemsRepeater ItemsSource="{Binding Expert.MatrixRoutes}">
+                                <controls:ItemsRepeater.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Padding="4" ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Source}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Destination}" />
+                                            <TextBlock Grid.Column="2" Text="{Binding GainDb, StringFormat='{}{0:0.0} dB'}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </controls:ItemsRepeater.ItemTemplate>
+                            </controls:ItemsRepeater>
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="DSP Graph" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Expert.DspSummary}" Opacity="0.72" />
+                            <controls:ItemsRepeater ItemsSource="{Binding Expert.DspGraph}">
+                                <controls:ItemsRepeater.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Padding="4" Spacing="2">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Detail}" Opacity="0.72" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </controls:ItemsRepeater.ItemTemplate>
+                            </controls:ItemsRepeater>
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="VST3 隔離 Lane" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Expert.Vst3Summary}" Opacity="0.72" TextWrapping="Wrap" />
+                            <controls:ItemsRepeater ItemsSource="{Binding Expert.Vst3Lanes}">
+                                <controls:ItemsRepeater.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Padding="4" ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Name}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Status}" Opacity="0.72" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </controls:ItemsRepeater.ItemTemplate>
+                            </controls:ItemsRepeater>
+                        </StackPanel>
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="校正狀態" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Expert.Calibration.Mode}" />
+                            <TextBlock Text="{Binding Expert.Calibration.Status}" Opacity="0.72" />
+                            <TextBlock Text="{Binding Expert.Calibration.Detail}" TextWrapping="Wrap" Opacity="0.72" />
+                        </StackPanel>
+                    </StackPanel>
+                </controls:Expander>
             </StackPanel>
         </ScrollViewer>
 

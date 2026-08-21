@@ -26,7 +26,9 @@ $xaml = Get-Content (Join-Path $shell 'MainWindow.xaml') -Raw
 $codeBehind = Get-Content (Join-Path $shell 'MainWindow.xaml.cs') -Raw
 foreach ($requiredText in @('x:Name="RootGrid"', 'ItemsSource="{Binding Scenes}"',
     'ItemsSource="{Binding OutputGroups}"', 'SelectedOutputGroup', 'IsExpert',
-    'RequestedVolumeDb', 'Muted', 'IrAddedDelayMs')) {
+    'RequestedVolumeDb', 'Muted', 'IrAddedDelayMs', 'x:Name="ExpertPanel"',
+    'ItemsSource="{Binding Expert.MatrixRoutes}"', 'ItemsSource="{Binding Expert.DspGraph}"',
+    'ItemsSource="{Binding Expert.Vst3Lanes}"', 'Expert.Calibration.Mode')) {
   if (-not $xaml.Contains($requiredText)) { throw "WinUI shell binding missing: $requiredText" }
 }
 if (-not $codeBehind.Contains('RootGrid.DataContext = ViewModel') -or
