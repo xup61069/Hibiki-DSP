@@ -96,6 +96,11 @@ EngineControlResultV1 EngineControlWorkerV1::consume(
                        : EngineControlResultV1::Invalid;
         case IpcMessageType::SceneApply:
             return apply_scene(command.scene);
+        case IpcMessageType::DeviceSwitch:
+            if (device_switch_handler_ == nullptr) return EngineControlResultV1::Failed;
+            return device_switch_handler_(command.device_switch, device_switch_context_)
+                       ? EngineControlResultV1::Applied
+                       : EngineControlResultV1::Failed;
         case IpcMessageType::GraphCommit:
             return engine_.commit_graph() ? EngineControlResultV1::Applied
                                           : EngineControlResultV1::Failed;

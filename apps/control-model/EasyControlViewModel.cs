@@ -15,6 +15,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private readonly string _pipeName;
     private NamedPipeControlClientV1? _controlClient;
     private string? _selectedOutputGroup;
+    private string? _selectedPhysicalDeviceId;
     private SceneCard? _selectedScene;
     private string _statusText = "尚未連接 Hibiki 音訊引擎";
     private bool _isExpert;
@@ -43,6 +44,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public IReadOnlyList<SceneCard> Scenes => _session.Scenes;
     public IReadOnlyList<OutputGroupCard> OutputGroups => OutputGroupCatalog.Fixed;
+    public IReadOnlyList<PhysicalDeviceCard> PhysicalDevices => _session.PhysicalDevices.Devices;
     public string CustomSceneCatalogPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Hibiki DSP", "scene-cards-v1.json");
@@ -70,6 +72,36 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             OnPropertyChanged();
         }
     }
+
+    public string? SelectedPhysicalDeviceId
+    {
+        get => _selectedPhysicalDeviceId;
+        set
+        {
+            var normalized = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            if (normalized == _selectedPhysicalDeviceId) return;
+            _selectedPhysicalDeviceId = normalized;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(SelectedPhysicalDevice));
+        }
+    }
+
+    public PhysicalDeviceCard? SelectedPhysicalDevice =>
+        _selectedPhysicalDeviceId is not null &&
+        _session.PhysicalDevices.TryGet(_selectedPhysicalDeviceId, out var device)
+            ? device
+            : null;
+
+    public string DeviceSwitchStatusText => _session.DeviceSwitch.State switch
+    {
+        DeviceSwitchModel.SwitchState.Preparing => "裝置預熱中…",
+        DeviceSwitchModel.SwitchState.Fading => "裝置交叉淡化中…",
+        DeviceSwitchModel.SwitchState.ReadyToCommit => "裝置已準備，等待引擎提交",
+        DeviceSwitchModel.SwitchState.Synced => "裝置已同步",
+        DeviceSwitchModel.SwitchState.RolledBack => "裝置切換已回復",
+        DeviceSwitchModel.SwitchState.Degraded => "裝置切換降級；保留上一個安全輸出",
+        _ => "尚未選擇實體輸出裝置"
+    };
 
     public string StatusText
     {
@@ -216,6 +248,68 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         CustomSceneDescription = string.Empty;
         StatusText = $"已加入自訂場景：{scene.Name}";
         return true;
+    }
+
+    // Endpoint metadata is supplied by the engine worker; this mirror never
+    // fabricates a device and never claims a switch before an Ack arrives.
+    public bool UpsertPhysicalDevice(PhysicalDeviceCard device, out string error)
+    {
+        var accepted = _session.PhysicalDevices.Upsert(device, out error);
+        if (accepted)
+        {
+            OnPropertyChanged(nameof(PhysicalDevices));
+            OnPropertyChanged(nameof(SelectedPhysicalDevice));
+        }
+        return accepted;
+    }
+
+    public bool SetPhysicalDeviceAvailability(string endpointId,
+                                               PhysicalDeviceAvailabilityV1 availability,
+                                               ulong sequence,
+                                               out string error)
+    {
+        var accepted = _session.PhysicalDevices.SetAvailability(endpointId, availability,
+                                                                  sequence, out error);
+        if (accepted)
+        {
+            OnPropertyChanged(nameof(PhysicalDevices));
+            OnPropertyChanged(nameof(SelectedPhysicalDevice));
+        }
+        return accepted;
+    }
+
+    public bool SelectPhysicalDevice(string endpointId)
+    {
+        if (!_session.PhysicalDevices.TryGet(endpointId, out var device) || device is null ||
+            !device.IsSelectable)
+        {
+            StatusText = "裝置不存在、已拔除或尚未準備完成";
+            return false;
+        }
+        SelectedPhysicalDeviceId = device.EndpointId;
+        if (!_session.DeviceSwitch.Prepare(device))
+        {
+            StatusText = "上一個裝置切換仍在進行；請稍候";
+            return false;
+        }
+        LastCommand = _commands.SwitchDevice(device);
+        StatusText = $"正在切換到 {device.DisplayName}；等待引擎預熱與交叉淡化";
+        OnPropertyChanged(nameof(LastCommand));
+        OnPropertyChanged(nameof(DeviceSwitchStatusText));
+        return true;
+    }
+
+    public async Task<bool> SwitchPhysicalDeviceAsync(string endpointId,
+                                                        CancellationToken cancellationToken = default)
+    {
+        if (!SelectPhysicalDevice(endpointId)) return false;
+        var sent = await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+        if (!sent)
+        {
+            _session.DeviceSwitch.Rollback();
+            OnPropertyChanged(nameof(DeviceSwitchStatusText));
+        }
+        return sent;
     }
 
     public bool LoadCustomScenes(out string error)

@@ -17,7 +17,8 @@ public enum ControlMessageType : ushort
     GraphRollback = 5,
     Ack = 6,
     Error = 7,
-    SceneApply = 8
+    SceneApply = 8,
+    DeviceSwitch = 9
 }
 
 public enum IpcDecodeError
@@ -113,7 +114,7 @@ public static class IpcCodecV1
         type is ControlMessageType.Hello or ControlMessageType.VolumeNotification or
         ControlMessageType.GraphPrepare or ControlMessageType.GraphCommit or
         ControlMessageType.GraphRollback or ControlMessageType.Ack or ControlMessageType.Error or
-        ControlMessageType.SceneApply;
+        ControlMessageType.SceneApply or ControlMessageType.DeviceSwitch;
 }
 
 public static class ControlPayloadsV1
@@ -121,6 +122,8 @@ public static class ControlPayloadsV1
     public const int VolumeNotificationBytes = 16;
     public const int GroupedVolumeNotificationBytes = 48;
     public const int SceneApplyBytes = 64;
+    public const int DeviceSwitchEndpointMaxBytes = 260;
+    public const int DeviceSwitchBytes = 288;
     private static readonly System.Text.UTF8Encoding StrictUtf8 =
         new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
@@ -243,6 +246,65 @@ public static class ControlPayloadsV1
             return false;
         }
     }
+
+    public static byte[] EncodeDeviceSwitch(string endpointId,
+                                             int channels,
+                                             int sampleRate,
+                                             int bufferFrames,
+                                             ulong catalogSequence)
+    {
+        var endpoint = StrictUtf8.GetBytes(endpointId ?? string.Empty);
+        if (endpoint.Length is < 1 or > DeviceSwitchEndpointMaxBytes ||
+            endpoint.Any(value => value < 0x20) ||
+            channels is not (1 or 2 or 6 or 8) ||
+            sampleRate is not (44100 or 48000 or 96000 or 192000) ||
+            bufferFrames is < 16 or > 4096)
+            throw new ArgumentException("Physical device request is outside the v1 contract.");
+        var payload = new byte[DeviceSwitchBytes];
+        BinaryPrimitives.WriteUInt16LittleEndian(payload, (ushort)endpoint.Length);
+        endpoint.CopyTo(payload.AsSpan(2));
+        BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(264), (uint)channels);
+        BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(268), (uint)sampleRate);
+        BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(272), (uint)bufferFrames);
+        BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(280), catalogSequence);
+        return payload;
+    }
+
+    public static bool TryDecodeDeviceSwitch(ReadOnlySpan<byte> payload,
+                                              out string endpointId,
+                                              out int channels,
+                                              out int sampleRate,
+                                              out int bufferFrames,
+                                              out ulong catalogSequence)
+    {
+        endpointId = string.Empty;
+        channels = sampleRate = bufferFrames = 0;
+        catalogSequence = 0UL;
+        if (payload.Length != DeviceSwitchBytes) return false;
+        var endpointBytes = BinaryPrimitives.ReadUInt16LittleEndian(payload);
+        if (endpointBytes is < 1 or > DeviceSwitchEndpointMaxBytes ||
+            payload[262] != 0 || payload[263] != 0 ||
+            payload[276] != 0 || payload[277] != 0 || payload[278] != 0 || payload[279] != 0)
+            return false;
+        for (var index = endpointBytes; index < DeviceSwitchEndpointMaxBytes; index++)
+            if (payload[2 + index] != 0) return false;
+        try
+        {
+            endpointId = StrictUtf8.GetString(payload.Slice(2, endpointBytes));
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        if (endpointId.Any(value => value < 0x20)) return false;
+        channels = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(payload[264..]));
+        sampleRate = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(payload[268..]));
+        bufferFrames = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(payload[272..]));
+        catalogSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[280..]);
+        return channels is 1 or 2 or 6 or 8 &&
+               sampleRate is 44100 or 48000 or 96000 or 192000 &&
+               bufferFrames is >= 16 and <= 4096;
+    }
 }
 
 // The UI/control plane owns request IDs; the audio thread never creates or
@@ -284,6 +346,12 @@ public sealed class ControlCommandFactoryV1
     public IpcEnvelopeV1 ApplyScene(string sceneId, string outputGroup) =>
         _requests.Create(ControlMessageType.SceneApply,
             ControlPayloadsV1.EncodeSceneApply(sceneId, outputGroup));
+
+    public IpcEnvelopeV1 SwitchDevice(PhysicalDeviceCard device) =>
+        _requests.Create(ControlMessageType.DeviceSwitch,
+            ControlPayloadsV1.EncodeDeviceSwitch(device.EndpointId, device.Channels,
+                                                 device.SampleRate, device.BufferFrames,
+                                                 device.LastSequence));
 }
 
 // Thin asynchronous client for the control worker. It owns no UI state and

@@ -45,6 +45,19 @@
                                   DisplayMemberPath="Name"
                                   SelectedValuePath="Id"
                                   SelectedValue="{Binding SelectedOutputGroup, Mode=TwoWay}" />
+                        <ComboBox Header="實體輸出裝置"
+                                  AutomationProperties.Name="實體輸出裝置"
+                                  AutomationProperties.HelpText="只顯示引擎已驗證且目前 Active 的 render 裝置"
+                                  ItemsSource="{Binding PhysicalDevices}"
+                                  DisplayMemberPath="DisplayName"
+                                  SelectedValuePath="EndpointId"
+                                  SelectedValue="{Binding SelectedPhysicalDeviceId, Mode=TwoWay}" />
+                        <Button Content="切換實體裝置" Click="OnSwitchDeviceClick"
+                                IsEnabled="{Binding IsConnected}"
+                                AutomationProperties.Name="切換實體輸出裝置"
+                                AutomationProperties.HelpText="先預熱新裝置，再以 30 ms 交叉淡化；失敗會回復上一個裝置" />
+                        <TextBlock Text="{Binding DeviceSwitchStatusText}" TextWrapping="Wrap" Opacity="0.72"
+                                   AutomationProperties.LiveSetting="Polite" />
                         <Button Content="一鍵改善" Click="OnEnhanceClick" IsEnabled="{Binding IsConnected}"
                                 AutomationProperties.Name="一鍵改善聲音"
                                 AutomationProperties.HelpText="套用遊戲場景、校正與音量保護" />

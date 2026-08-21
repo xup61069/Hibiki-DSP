@@ -36,6 +36,9 @@ Out：COM 枚舉、PortCls／WaveRT driver、WASAPI worker 啟動、實體硬體
 sequence 以單調規則更新；較舊的 descriptor／狀態事件直接拒絕，防止通知亂序回退狀態。
 跨程序／跨 AI 的 JSON 交換使用 `schemas/physical-device-catalog-v1.schema.json`；schema
 不允許把私人裝置資料或未定義欄位靜默帶入正式 handoff。
+WinUI／engine 的 `DeviceSwitch` request 使用 `schemas/device-switch-request-v1.schema.json`
+描述的欄位，再以 288-byte IPC payload 傳輸；UI 只有在 catalog entry 為 Active render 時
+才產生 request，engine 未回 ACK 前不顯示已同步。
 
 只有 `Active` endpoint 才能 `selectable` 或 `mark_default`。進入 Disabled／Unplugged／
 Unknown 時，catalog 清除 default；切換 worker 必須回到上一個已同步 endpoint，或使用

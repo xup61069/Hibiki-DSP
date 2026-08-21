@@ -29,6 +29,12 @@ public sealed partial class MainWindow : Window
         await ViewModel.OneTapEnhanceAsync();
     }
 
+    private async void OnSwitchDeviceClick(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.SelectedPhysicalDeviceId is { Length: > 0 } endpointId)
+            await ViewModel.SwitchPhysicalDeviceAsync(endpointId);
+    }
+
     private async void OnSceneClick(object sender, RoutedEventArgs e)
     {
         if (sender is Button { Tag: string sceneId })

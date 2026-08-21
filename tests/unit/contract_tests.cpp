@@ -108,6 +108,15 @@ bool allow_scene_preflight(const hibiki::SceneProfileV1&, void* context) noexcep
     return context != nullptr && *static_cast<const bool*>(context);
 }
 
+bool accept_device_switch(const hibiki::DeviceSwitchPayloadV1& request,
+                          void* context) noexcept {
+    if (context == nullptr || request.endpoint_id_bytes == 0U) return false;
+    auto* accepted = static_cast<bool*>(context);
+    *accepted = request.channels == 2U && request.sample_rate == 48000U &&
+                request.buffer_frames == 128U;
+    return *accepted;
+}
+
 hibiki::Vst3PluginStateResultV1 migrate_test_plugin_state(
     const std::uint32_t source_version,
     const std::span<const std::uint8_t> source,
@@ -833,6 +842,22 @@ int main() {
     scene_frame.payload.assign(scene_payload.begin(), scene_payload.end());
     CHECK(decode_control_command_v1(scene_frame, decoded_command) &&
           decoded_command.type == IpcMessageType::SceneApply);
+    const auto device_payload = encode_device_switch_payload_v1(
+        "recovery-render", 2U, 48000U, 128U, 21U);
+    DeviceSwitchPayloadV1 decoded_device{};
+    CHECK(decode_device_switch_payload_v1(device_payload, decoded_device) &&
+          decoded_device.endpoint_id_bytes == 15U && decoded_device.channels == 2U &&
+          decoded_device.sample_rate == 48000U && decoded_device.buffer_frames == 128U &&
+          decoded_device.catalog_sequence == 21U);
+    IpcFrameV1 device_frame;
+    device_frame.header.type = IpcMessageType::DeviceSwitch;
+    device_frame.payload.assign(device_payload.begin(), device_payload.end());
+    CHECK(decode_control_command_v1(device_frame, decoded_command) &&
+          decoded_command.type == IpcMessageType::DeviceSwitch &&
+          decoded_command.device_switch.endpoint_id_bytes == 15U);
+    auto malformed_device_payload = device_payload;
+    malformed_device_payload[262U] = 1U;
+    CHECK(!decode_device_switch_payload_v1(malformed_device_payload, decoded_device));
     ControlCommandQueueV1 command_queue;
     ControlCommandV1 queued_command{};
     queued_command.type = IpcMessageType::SceneApply;
@@ -925,6 +950,13 @@ int main() {
     scene_gate_open = true;
     CHECK(control_worker.consume(scene_command) == EngineControlResultV1::Applied &&
           control_worker.revision() == 2U);
+    bool device_switch_accepted = false;
+    control_worker.set_device_switch_handler(accept_device_switch, &device_switch_accepted);
+    CHECK(decode_control_command_v1(device_frame, decoded_command) &&
+          control_worker.consume(decoded_command) == EngineControlResultV1::Applied &&
+          device_switch_accepted);
+    decoded_command.device_switch.channels = 8U;
+    CHECK(control_worker.consume(decoded_command) == EngineControlResultV1::Failed);
     control_engine.set_sample_rate(8000U);
     ControlCommandV1 control_volume{};
     control_volume.type = IpcMessageType::VolumeNotification;

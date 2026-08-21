@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/device-switch-request-v1.schema.json",
+  "title": "Hibiki Device Switch Request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "endpoint_id", "channels", "sample_rate", "buffer_frames", "catalog_sequence"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "endpoint_id": {"type": "string", "minLength": 1, "maxLength": 260},
+    "channels": {"enum": [1, 2, 6, 8]},
+    "sample_rate": {"enum": [44100, 48000, 96000, 192000]},
+    "buffer_frames": {"type": "integer", "minimum": 16, "maximum": 4096},
+    "catalog_sequence": {"type": "integer", "minimum": 0}
+  }
+}

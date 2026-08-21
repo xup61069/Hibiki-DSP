@@ -37,6 +37,154 @@ public static class OutputGroupCatalog
     ];
 }
 
+public enum PhysicalDeviceFlowV1
+{
+    Render,
+    Capture
+}
+
+public enum PhysicalDeviceAvailabilityV1
+{
+    Active,
+    Disabled,
+    Unplugged,
+    Unknown
+}
+
+public sealed record PhysicalDeviceCard(
+    string EndpointId,
+    string DisplayName,
+    PhysicalDeviceFlowV1 Flow,
+    PhysicalDeviceAvailabilityV1 Availability,
+    int Channels,
+    int SampleRate,
+    int BufferFrames,
+    bool IsDefault,
+    ulong LastSequence)
+{
+    public bool IsSelectable => Flow == PhysicalDeviceFlowV1.Render &&
+                                Availability == PhysicalDeviceAvailabilityV1.Active &&
+                                Channels is 1 or 2 or 6 or 8;
+}
+
+// UI/control-plane mirror of the C++ catalog. It is populated by a future
+// endpoint metadata snapshot; it never invents a local device or claims that
+// a switch reached WASAPI until the engine acknowledges the command.
+public sealed class PhysicalDeviceCatalogV1
+{
+    public const int Capacity = 32;
+    private readonly List<PhysicalDeviceCard> _devices = new(Capacity);
+
+    public IReadOnlyList<PhysicalDeviceCard> Devices => _devices;
+    public PhysicalDeviceCard? DefaultRender => _devices.FirstOrDefault(device =>
+        device.Flow == PhysicalDeviceFlowV1.Render && device.IsDefault && device.IsSelectable);
+
+    public bool TryGet(string endpointId, out PhysicalDeviceCard? device)
+    {
+        device = _devices.FirstOrDefault(item => item.EndpointId == endpointId);
+        return device is not null;
+    }
+
+    public bool Upsert(PhysicalDeviceCard device, out string error)
+    {
+        error = string.Empty;
+        if (!Validate(device, out error)) return false;
+        var index = _devices.FindIndex(item => item.EndpointId == device.EndpointId);
+        if (index >= 0)
+        {
+            if (device.LastSequence != 0 && device.LastSequence < _devices[index].LastSequence)
+            {
+                error = "裝置事件已過期";
+                return false;
+            }
+            _devices[index] = device;
+        }
+        else
+        {
+            if (_devices.Count >= Capacity)
+            {
+                error = "裝置目錄已滿";
+                return false;
+            }
+            _devices.Add(device);
+        }
+        if (device.IsDefault)
+            ClearDefaults(device.Flow, device.EndpointId);
+        return true;
+    }
+
+    public bool SetAvailability(string endpointId,
+                                PhysicalDeviceAvailabilityV1 availability,
+                                ulong sequence,
+                                out string error)
+    {
+        error = string.Empty;
+        var index = _devices.FindIndex(item => item.EndpointId == endpointId);
+        if (index < 0) { error = "找不到裝置"; return false; }
+        var current = _devices[index];
+        if (sequence != 0 && sequence < current.LastSequence)
+        {
+            error = "裝置事件已過期";
+            return false;
+        }
+        _devices[index] = current with
+        {
+            Availability = availability,
+            IsDefault = availability == PhysicalDeviceAvailabilityV1.Active && current.IsDefault,
+            LastSequence = Math.Max(current.LastSequence, sequence)
+        };
+        if (availability != PhysicalDeviceAvailabilityV1.Active)
+            _devices[index] = _devices[index] with { IsDefault = false };
+        return true;
+    }
+
+    public bool MarkDefault(string endpointId, ulong sequence, out string error)
+    {
+        error = string.Empty;
+        if (!TryGet(endpointId, out var device) || device is null)
+        { error = "找不到裝置"; return false; }
+        if (!device.IsSelectable)
+        { error = "裝置目前不可選取"; return false; }
+        if (sequence != 0 && sequence < device.LastSequence)
+        { error = "裝置事件已過期"; return false; }
+        ClearDefaults(device.Flow, endpointId);
+        var index = _devices.FindIndex(item => item.EndpointId == endpointId);
+        _devices[index] = device with { IsDefault = true, LastSequence = Math.Max(device.LastSequence, sequence) };
+        return true;
+    }
+
+    public bool Remove(string endpointId) =>
+        _devices.RemoveAll(item => item.EndpointId == endpointId) != 0;
+
+    private void ClearDefaults(PhysicalDeviceFlowV1 flow, string exceptEndpointId)
+    {
+        for (var index = 0; index < _devices.Count; index++)
+        {
+            var item = _devices[index];
+            if (item.Flow == flow && item.EndpointId != exceptEndpointId && item.IsDefault)
+                _devices[index] = item with { IsDefault = false };
+        }
+    }
+
+    private static bool Validate(PhysicalDeviceCard device, out string error)
+    {
+        error = string.Empty;
+        static bool Printable(string value, int maxBytes) =>
+            !string.IsNullOrWhiteSpace(value) &&
+            System.Text.Encoding.UTF8.GetByteCount(value) <= maxBytes &&
+            value.All(character => !char.IsControl(character));
+        if (!Printable(device.EndpointId, 260) || !Printable(device.DisplayName, 128))
+        { error = "裝置身份或名稱無效"; return false; }
+        if (device.Channels is not (1 or 2 or 6 or 8) ||
+            device.SampleRate is not (44100 or 48000 or 96000 or 192000) ||
+            device.BufferFrames is < 16 or > 4096)
+        { error = "裝置格式不受支援"; return false; }
+        if (device.IsDefault && !device.IsSelectable)
+        { error = "只有 Active render 裝置可以是預設"; return false; }
+        return true;
+    }
+}
+
 public sealed record SceneCard(
     string Id,
     string Name,
@@ -80,6 +228,8 @@ public sealed record EnhanceResult(
 public sealed class EasyControlSession
 {
     public CustomSceneCatalogV1 CustomScenes { get; } = new();
+    public PhysicalDeviceCatalogV1 PhysicalDevices { get; } = new();
+    public DeviceSwitchModel DeviceSwitch { get; } = new();
     public UiMode Mode { get; private set; } = UiMode.Easy;
     public SceneCard? ActiveScene { get; private set; }
     public string? ActiveOutputGroup { get; private set; }
@@ -144,6 +294,9 @@ public sealed class DeviceSwitchModel
         State = SwitchState.Preparing;
         return true;
     }
+
+    public bool Prepare(PhysicalDeviceCard device) =>
+        device.IsSelectable && Prepare(device.EndpointId);
 
     public bool MarkPrepared()
     {

@@ -22,6 +22,8 @@ enum class EngineControlResultV1 : std::uint8_t {
 
 using ScenePreflightFnV1 = bool (*)(const SceneProfileV1& scene,
                                     void* context) noexcept;
+using DeviceSwitchHandlerFnV1 = bool (*)(const DeviceSwitchPayloadV1& request,
+                                         void* context) noexcept;
 
 // Control-worker adapter for the fixed queue. It is intentionally not called
 // by the pipe callback or the RT process function. SceneApply resolves only
@@ -46,6 +48,15 @@ public:
         scene_catalog_ = catalog;
     }
 
+    // The callback is control-plane only. It must resolve the request through
+    // a PhysicalDeviceCatalog/RecoveryCoordinator and schedule sink handoff;
+    // it must not call COM or touch the RT graph from the pipe callback.
+    void set_device_switch_handler(DeviceSwitchHandlerFnV1 handler,
+                                   void* context) noexcept {
+        device_switch_handler_ = handler;
+        device_switch_context_ = context;
+    }
+
     [[nodiscard]] EngineControlResultV1 consume(const ControlCommandV1& command) noexcept;
     [[nodiscard]] std::size_t drain(ControlCommandQueueV1& queue,
                                      std::size_t max_commands = ControlCommandQueueV1::kCapacity) noexcept;
@@ -64,6 +75,8 @@ private:
     ScenePreflightFnV1 scene_preflight_{nullptr};
     void* scene_preflight_context_{nullptr};
     const SceneCatalogV1* scene_catalog_{nullptr};
+    DeviceSwitchHandlerFnV1 device_switch_handler_{nullptr};
+    void* device_switch_context_{nullptr};
 };
 
 }  // namespace hibiki

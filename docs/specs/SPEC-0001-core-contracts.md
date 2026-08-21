@@ -44,7 +44,7 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   與 uint64 generation；C++ `control_payloads.hpp` 與 C# `ControlPayloadsV1` 必須保持相同
   little-endian bytes，超出 -144..12 dB 或 reserved 非零一律拒絕。
 - C++ `decode_control_command_v1` 只接受 Hello、VolumeNotification、GraphCommit 與
-  GraphRollback、SceneApply request；Ack/Error 只能作 response，未知或 GraphPrepare 未定義
+  GraphRollback、SceneApply、DeviceSwitch request；Ack/Error 只能作 response，未知或 GraphPrepare 未定義
   payload 一律回 Error，避免 UI 任意注入未驗證 graph。SceneApply payload 固定 64 bytes，
   以兩段 length-prefixed printable UTF-8（scene ID、output group）及 zero padding 表示。
 - `handle_control_frame_v1` 是 pipe worker 到 host control queue 的唯一 typed adapter；sink
@@ -55,6 +55,11 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
 - `EngineControlWorkerV1` 是目前的單一 consumer：它將 `SceneApply` 解析為四個受控 Easy
   preset，執行 `prepare_graph` → `commit_graph`，失敗則 rollback；`VolumeNotification`
   同樣在 control worker 套用，pipe callback 只負責 validate、enqueue、回 ACK。
+- `DeviceSwitch` v1 使用固定 288-byte little-endian payload：uint16 endpoint ID bytes、
+  260-byte zero-padded UTF-8 endpoint ID、channels、sample rate、buffer frames 與 catalog
+  sequence。control worker 只能交給明確註冊的 device-switch handler；handler 必須先透過
+  `PhysicalDeviceCatalogV1`／`DeviceRecoveryCoordinator` 驗證，再排程 sink handoff。沒有
+  handler 或 payload／catalog 驗證失敗時 fail-closed，不會假裝裝置已切換。
 - `EngineControlWorkerV1::set_scene_preflight` 可注入一個 control-plane-only gate，讓 VST3
   state coordinator、校正資料或安全策略在 graph Prepare 前驗證；gate 失敗會保留既有
   Scene、revision 與 active graph，不會部分套用。

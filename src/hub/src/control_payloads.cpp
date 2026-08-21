@@ -198,6 +198,63 @@ bool decode_scene_apply_payload_v1(const std::span<const std::uint8_t> payload,
                std::string_view(command.output_group.data(), command.output_group_bytes));
 }
 
+std::array<std::uint8_t, kDeviceSwitchPayloadBytesV1>
+encode_device_switch_payload_v1(const std::string_view endpoint_id,
+                                const std::uint32_t channels,
+                                const std::uint32_t sample_rate,
+                                const std::uint32_t buffer_frames,
+                                const std::uint64_t catalog_sequence) noexcept {
+    std::array<std::uint8_t, kDeviceSwitchPayloadBytesV1> payload{};
+    if (endpoint_id.empty() || endpoint_id.size() > kDeviceSwitchEndpointMaxBytesV1 ||
+        !is_printable_utf8(endpoint_id)) {
+        return payload;
+    }
+    payload[0] = static_cast<std::uint8_t>(endpoint_id.size() & 0xffU);
+    payload[1] = static_cast<std::uint8_t>((endpoint_id.size() >> 8U) & 0xffU);
+    std::copy(endpoint_id.begin(), endpoint_id.end(),
+              payload.begin() + static_cast<std::ptrdiff_t>(2U));
+    write_u32(payload.data() + 264U, channels);
+    write_u32(payload.data() + 268U, sample_rate);
+    write_u32(payload.data() + 272U, buffer_frames);
+    write_u64(payload.data() + 280U, catalog_sequence);
+    return payload;
+}
+
+bool decode_device_switch_payload_v1(const std::span<const std::uint8_t> payload,
+                                     DeviceSwitchPayloadV1& command) noexcept {
+    command = {};
+    if (payload.size() != kDeviceSwitchPayloadBytesV1) return false;
+    const auto endpoint_bytes = static_cast<std::size_t>(payload[0]) |
+                                (static_cast<std::size_t>(payload[1]) << 8U);
+    if (endpoint_bytes == 0U || endpoint_bytes > kDeviceSwitchEndpointMaxBytesV1 ||
+        payload[262U] != 0U || payload[263U] != 0U || payload[276U] != 0U ||
+        payload[277U] != 0U || payload[278U] != 0U || payload[279U] != 0U) {
+        return false;
+    }
+    for (std::size_t index = endpoint_bytes; index < kDeviceSwitchEndpointMaxBytesV1; ++index) {
+        if (payload[2U + index] != 0U) return false;
+    }
+    const std::string_view endpoint(reinterpret_cast<const char*>(payload.data() + 2U),
+                                    endpoint_bytes);
+    if (!is_printable_utf8(endpoint)) return false;
+    const auto channels = read_u32(payload.data() + 264U);
+    const auto sample_rate = read_u32(payload.data() + 268U);
+    const auto buffer_frames = read_u32(payload.data() + 272U);
+    if ((channels != 1U && channels != 2U && channels != 6U && channels != 8U) ||
+        (sample_rate != 44100U && sample_rate != 48000U && sample_rate != 96000U &&
+         sample_rate != 192000U) ||
+        buffer_frames < 16U || buffer_frames > 4096U) {
+        return false;
+    }
+    command.endpoint_id_bytes = static_cast<std::uint16_t>(endpoint_bytes);
+    std::copy_n(endpoint.data(), endpoint_bytes, command.endpoint_id.data());
+    command.channels = channels;
+    command.sample_rate = sample_rate;
+    command.buffer_frames = buffer_frames;
+    command.catalog_sequence = read_u64(payload.data() + 280U);
+    return true;
+}
+
 bool decode_control_command_v1(const IpcFrameV1& frame,
                                ControlCommandV1& command) noexcept {
     command = {};
@@ -217,6 +274,8 @@ bool decode_control_command_v1(const IpcFrameV1& frame,
             return command.has_volume_target;
         case IpcMessageType::SceneApply:
             return decode_scene_apply_payload_v1(frame.payload, command.scene);
+        case IpcMessageType::DeviceSwitch:
+            return decode_device_switch_payload_v1(frame.payload, command.device_switch);
         case IpcMessageType::GraphPrepare:
         case IpcMessageType::Ack:
         case IpcMessageType::Error:

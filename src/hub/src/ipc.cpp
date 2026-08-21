@@ -57,6 +57,7 @@ bool is_valid_message_type(const IpcMessageType type) noexcept {
         case IpcMessageType::Ack:
         case IpcMessageType::Error:
         case IpcMessageType::SceneApply:
+        case IpcMessageType::DeviceSwitch:
             return true;
     }
     return false;

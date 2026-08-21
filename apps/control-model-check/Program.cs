@@ -16,6 +16,30 @@ Check(!customScenes.Upsert(new SceneCard("game", "覆寫遊戲", "", "", true)) 
     "Custom Scene catalog must reject reserved or invalid IDs.");
 Check(customScenes.Remove("quiet-game") && customScenes.Count == 0,
     "Custom Scene card removal failed.");
+var physicalDevices = new PhysicalDeviceCatalogV1();
+var speakers = new PhysicalDeviceCard("endpoint-a", "客廳喇叭",
+    PhysicalDeviceFlowV1.Render, PhysicalDeviceAvailabilityV1.Active, 8, 48000, 128, true, 10UL);
+Check(physicalDevices.Upsert(speakers, out _) && physicalDevices.DefaultRender?.EndpointId == "endpoint-a" &&
+      physicalDevices.Devices[0].IsSelectable, "Physical device catalog insert failed.");
+var headphones = speakers with
+{
+    EndpointId = "endpoint-b", DisplayName = "耳機", Channels = 2, IsDefault = true, LastSequence = 11UL
+};
+Check(physicalDevices.Upsert(headphones, out _) && physicalDevices.DefaultRender?.EndpointId == "endpoint-b" &&
+      !physicalDevices.Devices[0].IsDefault, "Physical device default uniqueness failed.");
+Check(physicalDevices.SetAvailability("endpoint-b", PhysicalDeviceAvailabilityV1.Unplugged, 12UL, out _) &&
+      physicalDevices.DefaultRender is null &&
+      !physicalDevices.SetAvailability("endpoint-b", PhysicalDeviceAvailabilityV1.Active, 9UL, out _),
+    "Physical device stale/unplugged guard failed.");
+Check(physicalDevices.SetAvailability("endpoint-b", PhysicalDeviceAvailabilityV1.Active, 13UL, out _) &&
+      physicalDevices.MarkDefault("endpoint-b", 14UL, out _),
+    "Physical device recovery to Active failed.");
+var invalidDefault = speakers with
+{
+    EndpointId = "endpoint-c", Availability = PhysicalDeviceAvailabilityV1.Unplugged
+};
+Check(!physicalDevices.Upsert(invalidDefault, out _),
+    "Unplugged device must not be accepted as default.");
 var customScenePath = Path.Combine(Path.GetTempPath(), $"hibiki-scene-check-{Guid.NewGuid():N}.json");
 try
 {
@@ -138,6 +162,17 @@ var invalidUtf8Scene = viewModel.LastCommand.Payload.ToArray();
 invalidUtf8Scene[1] = 0xFF;
 Check(!ControlPayloadsV1.TryDecodeSceneApply(invalidUtf8Scene, out _, out _),
     "SceneApply decoder must reject invalid UTF-8 rather than substitute characters.");
+Check(viewModel.UpsertPhysicalDevice(speakers, out _) &&
+      viewModel.SelectPhysicalDevice("endpoint-a") &&
+      viewModel.SelectedPhysicalDevice?.DisplayName == "客廳喇叭" &&
+      viewModel.LastCommand?.Type == ControlMessageType.DeviceSwitch,
+    "ViewModel physical device selection command failed.");
+Check(ControlPayloadsV1.TryDecodeDeviceSwitch(viewModel.LastCommand!.Payload.Span,
+          out var selectedEndpoint, out var selectedChannels, out var selectedRate,
+          out var selectedFrames, out var selectedSequence) &&
+      selectedEndpoint == "endpoint-a" && selectedChannels == 8 && selectedRate == 48000 &&
+      selectedFrames == 128 && selectedSequence == 10UL,
+    "Physical device switch payload did not round-trip.");
 viewModel.IsExpert = true;
 Check(viewModel.Mode == UiMode.Expert && viewModel.SelectScene("movie"),
     "ViewModel Expert scene selection failed.");

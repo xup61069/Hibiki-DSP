@@ -16,6 +16,8 @@ namespace hibiki {
 constexpr std::size_t kVolumeNotificationPayloadBytesV1 = 16U;
 constexpr std::size_t kGroupedVolumeNotificationPayloadBytesV1 = 48U;
 constexpr std::size_t kSceneApplyPayloadBytesV1 = 64U;
+constexpr std::size_t kDeviceSwitchEndpointMaxBytesV1 = 260U;
+constexpr std::size_t kDeviceSwitchPayloadBytesV1 = 288U;
 
 // Fixed little-endian control payload shared with apps/control-model. The
 // legacy 16-byte form stores dB Q16.16 at offset 0, mute at offset 4, reserved
@@ -58,6 +60,25 @@ struct SceneApplyPayloadV1 {
     std::span<const std::uint8_t> payload,
     SceneApplyPayloadV1& command) noexcept;
 
+struct DeviceSwitchPayloadV1 {
+    std::uint16_t endpoint_id_bytes{0U};
+    std::array<char, kDeviceSwitchEndpointMaxBytesV1> endpoint_id{};
+    std::uint32_t channels{0U};
+    std::uint32_t sample_rate{0U};
+    std::uint32_t buffer_frames{0U};
+    std::uint64_t catalog_sequence{0U};
+};
+
+[[nodiscard]] std::array<std::uint8_t, kDeviceSwitchPayloadBytesV1>
+encode_device_switch_payload_v1(std::string_view endpoint_id,
+                                 std::uint32_t channels,
+                                 std::uint32_t sample_rate,
+                                 std::uint32_t buffer_frames,
+                                 std::uint64_t catalog_sequence) noexcept;
+[[nodiscard]] bool decode_device_switch_payload_v1(
+    std::span<const std::uint8_t> payload,
+    DeviceSwitchPayloadV1& command) noexcept;
+
 struct ControlCommandV1 {
     IpcMessageType type{IpcMessageType::Error};
     std::uint64_t request_id{0U};
@@ -65,6 +86,7 @@ struct ControlCommandV1 {
     GroupedVolumeNotificationPayloadV1 volume_target{};
     bool has_volume_target{false};
     SceneApplyPayloadV1 scene{};
+    DeviceSwitchPayloadV1 device_switch{};
 };
 
 [[nodiscard]] bool decode_control_command_v1(const IpcFrameV1& frame,

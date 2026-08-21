@@ -19,8 +19,9 @@ source_globs: ["apps/control-model/**", "apps/winui-shell/**"]
 
 ## In / Out
 
-In：WinUI 3 視窗、Easy/Expert 顯示、固定輸出群組卡片、場景卡片、Windows
-音量與 IR 相位滑桿、Expert 的 Matrix／DSP Graph／VST3 隔離／校正唯讀摘要、版本化 named-pipe Hello／SceneApply／VolumeNotification
+In：WinUI 3 視窗、Easy/Expert 顯示、固定輸出群組卡片、場景卡片、實體裝置目錄鏡像與
+DeviceSwitch request、Windows 音量與 IR 相位滑桿、Expert 的 Matrix／DSP Graph／VST3
+隔離／校正唯讀摘要、版本化 named-pipe Hello／SceneApply／VolumeNotification／DeviceSwitch
 命令、連線失敗回復；音量拖曳使用 40 ms bounded debounce 與 command serialization，
 只送出最新的控制值。
 
@@ -36,6 +37,11 @@ versioned IPC，Hello 成功後才可送出 SceneApply 或 VolumeNotification。
 
 固定輸出群組 ID 為 `main`、`low-latency`、`surround`；它們是 UI 選擇值，
 不是實體 Endpoint ID。場景 ID 延用 `game`、`movie`、`voice`、`studio`。
+
+`PhysicalDeviceCatalogV1` 是引擎提供的 bounded metadata snapshot；ViewModel 只鏡像
+Active render/capture 裝置，不自行枚舉或捏造裝置。可選 render 卡片以
+`ControlMessageType.DeviceSwitch` 發送固定 288-byte request，帶 endpoint identity、格式
+與 catalog sequence；在引擎 Ack 前 UI 只顯示 Preparing/Fading，不宣稱已同步。
 
 `DeviceSwitchModel` 的控制面狀態固定為 `Preparing → Fading → ReadyToCommit → Synced`；
 未完成暖機或 crossfade 時 `Commit` 必須失敗，Rollback 保留上一個 active device。實際
@@ -73,7 +79,8 @@ bytes。WinUI shell 可在沒有引擎時啟動，並以 Degraded 狀態呈現�
 ## 驗收
 
 1. Fresh clone 的 control-model check 通過，並覆蓋固定輸出群組、連線狀態、
-   One-Tap／Scene／音量命令、Expert Matrix/DSP/VST3/校正摘要與 bounded debounce。
+   One-Tap／Scene／音量／DeviceSwitch 命令、目錄 stale/unplugged rejection、Expert
+   Matrix/DSP/VST3/校正摘要與 bounded debounce。
 2. WinUI source-only shell 只引用 control-model；git history、CI artifacts
    與 release 不包含編譯產物。
 3. 沒有 engine pipe 時，按連接會在 bounded timeout 後顯示 Degraded，UI 不崩潰；

@@ -26,6 +26,8 @@ $xaml = Get-Content (Join-Path $shell 'MainWindow.xaml') -Raw
 $codeBehind = Get-Content (Join-Path $shell 'MainWindow.xaml.cs') -Raw
 foreach ($requiredText in @('x:Name="RootGrid"', 'ItemsSource="{Binding Scenes}"',
     'ItemsSource="{Binding OutputGroups}"', 'SelectedOutputGroup', 'IsExpert',
+    'ItemsSource="{Binding PhysicalDevices}"', 'SelectedPhysicalDeviceId',
+    'DeviceSwitchStatusText', 'OnSwitchDeviceClick',
     'RequestedVolumeDb', 'Muted', 'IrAddedDelayMs', 'x:Name="ExpertPanel"',
     'ItemsSource="{Binding Expert.MatrixRoutes}"', 'ItemsSource="{Binding Expert.DspGraph}"',
     'ItemsSource="{Binding Expert.Vst3Lanes}"', 'Expert.Calibration.Mode',
