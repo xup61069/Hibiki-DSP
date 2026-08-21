@@ -23,15 +23,18 @@ internal sealed class PreviewForm : Form
     private readonly EasyControlViewModel _viewModel;
     private readonly Label _connection = new() { AutoSize = true };
     private readonly Label _status = new() { AutoSize = false, Height = 48 };
+    private readonly Label _routes = new() { AutoSize = false, Width = 550, Height = 58 };
     private readonly Label _effective = new() { AutoSize = true };
+    private readonly ComboBox _scenes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly TrackBar _volume = new() { Minimum = -60, Maximum = 0, TickFrequency = 5, Width = 460 };
     private readonly Button _enhance = new() { Text = "一鍵改善", AutoSize = true, Margin = new Padding(3, 12, 3, 3) };
+    private bool _updatingScene;
 
     internal PreviewForm(EasyControlViewModel viewModel)
     {
         _viewModel = viewModel;
         Text = "Hibiki DSP — Compatibility Preview";
-        ClientSize = new Size(620, 430);
+        ClientSize = new Size(620, 540);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 10);
 
@@ -47,6 +50,18 @@ internal sealed class PreviewForm : Form
         connect.Click += async (_, _) => { await _viewModel.ConnectAsync(TimeSpan.FromSeconds(3)); RefreshView(); };
         panel.Controls.Add(connect);
         panel.Controls.Add(_connection);
+        panel.Controls.Add(new Label { Text = "場景", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        _scenes.DataSource = _viewModel.Scenes.ToList();
+        _scenes.DisplayMember = "Name";
+        _scenes.ValueMember = "Id";
+        _scenes.SelectedIndexChanged += async (_, _) =>
+        {
+            if (_updatingScene || _scenes.SelectedValue is not string id || !_viewModel.IsConnected)
+                return;
+            await _viewModel.SelectSceneAsync(id);
+            RefreshView();
+        };
+        panel.Controls.Add(_scenes);
         _enhance.Click += async (_, _) => { await _viewModel.OneTapEnhanceAsync(); RefreshView(); };
         panel.Controls.Add(_enhance);
         panel.Controls.Add(new Label { Text = "系統音量（dB）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
@@ -54,6 +69,7 @@ internal sealed class PreviewForm : Form
         _volume.ValueChanged += async (_, _) => { _viewModel.RequestedVolumeDb = _volume.Value; if (_viewModel.IsConnected) await _viewModel.QueueVolumeAsync(); RefreshView(); };
         panel.Controls.Add(_volume);
         panel.Controls.Add(_effective);
+        panel.Controls.Add(_routes);
         panel.Controls.Add(_status);
         Controls.Add(panel);
         _viewModel.PropertyChanged += OnViewModelChanged;
@@ -78,10 +94,23 @@ internal sealed class PreviewForm : Form
     {
         _connection.Text = _viewModel.ConnectionStatusText;
         _enhance.Enabled = _viewModel.IsConnected;
+        _scenes.Enabled = _viewModel.IsConnected;
         _volume.Enabled = _viewModel.IsConnected;
-        _effective.Text = $"實際有效音量：{_viewModel.EffectiveVolumeDb:0.0} dB；{_viewModel.SafetyStatusText}";
+        _effective.Text = $"實際有效音量：{_viewModel.EffectiveVolumeDb:0.0} dB；{_viewModel.VolumeOriginText}；{_viewModel.VolumeActuatorText}";
+        _routes.Text = _viewModel.Expert.RouteHealth.Count == 0
+            ? "路由狀態：尚未收到引擎快照"
+            : "路由狀態：" + string.Join("／", _viewModel.Expert.RouteHealth.Select(route =>
+                $"{route.Name} {route.StateLabel}"));
         _status.Text = _viewModel.StatusText;
         var requested = Math.Clamp((int)Math.Round(_viewModel.RequestedVolumeDb), _volume.Minimum, _volume.Maximum);
         if (_volume.Value != requested) _volume.Value = requested;
+        var selectedScene = _viewModel.SelectedScene?.Id;
+        if (selectedScene is not null && !string.Equals(_scenes.SelectedValue as string, selectedScene,
+                                                         StringComparison.Ordinal))
+        {
+            _updatingScene = true;
+            _scenes.SelectedValue = selectedScene;
+            _updatingScene = false;
+        }
     }
 }

@@ -25,7 +25,8 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   preview、簽章與 Windows 11 24H2 hardware soak 必須在鎖定 target 環境重新驗證。
 - 本機 Desktop Compatibility Preview 已可由 `tools/build-preview.ps1 -Target DesktopCompat` 建置並通過
   啟動 smoke；它和正式 shell 共用 `EasyControlViewModel`，自帶 .NET runtime、不依賴 Windows App Runtime，
-  但不是 XAML、無障礙、driver 或 release evidence。
+  現在包含場景選擇、路由健康摘要與音量來源／致動器顯示，但不是 XAML、無障礙、driver 或
+  release evidence。
 - C++ Engine Preview 已可由 `tools/build-engine-preview.ps1` 建置；`tools/engine-preview-smoke.ps1`
   會啟動它並驗證 v1 named-pipe Hello/Ack request correlation 與 ControlStatusSnapshot 回覆。
   `tools/control-model-engine-smoke.ps1` 另外以 C# `EasyControlViewModel` 驗證 −18 dB 音量
