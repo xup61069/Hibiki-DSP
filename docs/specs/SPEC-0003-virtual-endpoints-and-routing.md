@@ -80,6 +80,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   走現有 immutable graph 與唯一 Group Master，再寫入 caller-owned output；完成後還原 caller
   的 Lane view。它只證明 user-space graph data path，不代表已連接實體 sink、WaveRT endpoint
   或 vendor ASIO。
+- `AudioEngineModel::process_asio_transport_to_wasapi` 在同一個 caller-owned block 完成 graph、
+  Group Master 與 limiter 後，將結果單次提交到雙 worker WASAPI handoff；因此 Hibiki ASIO
+  client 不需要另寫一套音量／裝置切換邏輯。ASIO ring、graph 或 sink 任一邊界失敗都 fail-closed，
+  不會標記為已播放；目前仍缺真實 driver／endpoint delivery evidence。
 - `AudioEngineModel::process_lane_block` 是同一條 caller-owned block API，讓 TabCapture、
   Virtual Mic 或其他已驗證來源共用 Lane／Group Master 行為；平台 bridge 不得在 RT path
   配置、等待或直接操作 Windows COM。

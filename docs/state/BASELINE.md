@@ -171,7 +171,8 @@
   optional native ASIO DLL writes eight-channel Float32 blocks after callbacks, and
   `AsioTransportConsumerV1` creates/owns `Local\\HibikiDSP_v1_asio` for an allocation-free pop;
   `AudioEngineModel::process_asio_transport` now runs that block through the selected graph lane
-  and Group Master. Physical sink/WaveRT delivery remains pending.
+  and Group Master, while `process_asio_transport_to_wasapi` submits the processed block once to
+  the dual-worker sink handoff. Physical driver/endpoint delivery remains pending.
 - `WindowsWasapiOutputV1` plus `WindowsWasapiSinkWorkerV1` now supply a Windows shared-mode
   Float32 physical render boundary: one dedicated sink-worker apartment owns COM bind/start/stop,
   event waits, bounded SPSC blocks, silence underrun fill, persistent SRC and clock-observation
@@ -220,7 +221,7 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 Windows volume/device、ISO formula、recovery、driver control-core/INF template、persistent SRC、
 VST worker、control pipe/payloads、session volume adapter、sink clock pipeline、optional native
 ASIO transport/ring、tab/Virtual Mic lane adapter、session-route/output-handoff、control-model
-與 VST3 latency graph commit／RT lane latency bank／parameter timeline／Scene automation refs／rollback lifecycle／UI device fade／plugin lane token／multi-sink fan-out、per-sink clock/SRC runtime、AudioEngine fan-out boundary、精確容量 preflight、高倍率 SRC phase guard、portable WaveRT stream ring、WDK pin adapter、driver→engine stream packet bridge、endpoint identity、graph lane binding、WASAPI IAudioClock drift path、雙 worker WASAPI handoff、graph-to-WASAPI adapter 及 WinUI Expert readonly surface 的 fail-closed safety baseline `177637d`；
+與 VST3 latency graph commit／RT lane latency bank／parameter timeline／Scene automation refs／rollback lifecycle／UI device fade／plugin lane token／multi-sink fan-out、per-sink clock/SRC runtime、AudioEngine fan-out boundary、精確容量 preflight、高倍率 SRC phase guard、portable WaveRT stream ring、WDK pin adapter、driver→engine stream packet bridge、endpoint identity、graph lane binding、WASAPI IAudioClock drift path、雙 worker WASAPI handoff、graph-to-WASAPI adapter、ASIO-to-WASAPI path 及 WinUI Expert readonly surface 的 fail-closed safety baseline `6457dfd`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
