@@ -55,6 +55,7 @@ extern "C" {
 #include "hibiki/windows_audio_session_watcher.hpp"
 #include "hibiki/windows_wasapi_output.hpp"
 #include "hibiki/windows_wasapi_handoff.hpp"
+#include "hibiki/windows_wasapi_fanout.hpp"
 #endif
 
 #include <cmath>
@@ -1399,6 +1400,13 @@ int main() {
     CHECK(!wasapi_engine.process_driver_stream_packet_to_wasapi(
         0U, "endpoint", {}, {}, std::span<RtLaneInputV1>(wasapi_lane_inputs),
         wasapi_graph_buffer.data()));
+    WindowsWasapiFanoutV1 wasapi_fanout;
+    const std::array<WasapiFanoutSinkConfigV1, 2U> invalid_fanout{{
+        {true, WasapiOutputConfigV1{L"endpoint-a", 2U, 48000U, 20U}},
+        {true, WasapiOutputConfigV1{L"endpoint-b", 8U, 48000U, 20U}}}};
+    CHECK(!wasapi_fanout.prepare(invalid_fanout, 128U));
+    CHECK(wasapi_fanout.snapshot().degraded);
+    wasapi_fanout.stop();
 #endif
 
     return 0;
