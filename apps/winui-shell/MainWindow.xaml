@@ -127,7 +127,8 @@
                                 AutomationProperties.HelpText="以 dB 調整音量；安全限制會優先套用" />
                         <TextBlock Text="{Binding RequestedVolumeDisplayText}" />
                         <TextBlock Text="{Binding EffectiveVolumeDisplayText}"
-                                   AutomationProperties.Name="實際有效音量" />
+                                   AutomationProperties.Name="實際有效音量"
+                                   AutomationProperties.HelpText="{Binding EffectiveVolumeDb}" />
                         <TextBlock Text="{Binding SafetyStatusText}" TextWrapping="Wrap" Opacity="0.82"
                                    AutomationProperties.LiveSetting="Polite" />
                         <TextBlock Text="{Binding VolumeOriginText}" Opacity="0.72" />
@@ -148,7 +149,9 @@
                                 AutomationProperties.Name="IR 相位強度"
                                 AutomationProperties.HelpText="調整 mixed-phase 或 linear-phase 的延遲與相位折衷" />
                         <TextBlock Text="{Binding IrPhaseModeText}" Opacity="0.72" />
-                        <TextBlock Text="{Binding IrAddedDelayDisplayText}" Opacity="0.72" />
+                        <TextBlock Text="{Binding IrAddedDelayDisplayText}"
+                                   AutomationProperties.HelpText="{Binding IrAddedDelayMs}"
+                                   Opacity="0.72" />
                         <TextBlock Text="IR WAV 會在 Engine Preview 的 control-plane prepare/commit；尚無實體 sink。"
                                    TextWrapping="Wrap" Opacity="0.72" />
                     </StackPanel>
