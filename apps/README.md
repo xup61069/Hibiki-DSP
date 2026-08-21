@@ -44,10 +44,12 @@ compiled UI output is committed or published.
 `apps/engine-preview/` now performs a user-space Windows endpoint catalog pass on
 startup: it enumerates render/capture metadata through `IMMDeviceEnumerator`, keeps
 the bounded snapshot provider alive for control-plane requests, and polls watcher
-changes without touching a physical sink. The Desktop Compatibility Preview can
-therefore show the current local render/capture counts and default-render metadata. This is
-metadata only; no endpoint is opened, no Windows system volume is changed, and no
-device switch is claimed until a future physical sink transaction is implemented.
+changes without touching a physical sink by default. With the explicit
+`--enable-wasapi-output` flag it can bind the active default render descriptor to the
+existing dedicated shared-mode WASAPI worker and publish `Pending/Ready/Degraded`
+through the `main-output` status route. This is a user-space output boundary only:
+without graph source blocks the worker renders silence, and it does not claim a
+loadable driver, full playback, per-App re-send or completed device-switch soak.
 
 The combined launcher accepts `-EnableSystemVolume` only as an explicit opt-in. In
 that mode Engine Preview binds the current render endpoint's `IAudioEndpointVolume`,

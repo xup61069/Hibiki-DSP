@@ -82,7 +82,7 @@ pwsh -File tools/build-preview.ps1 -Target DesktopCompat
 Windows App Runtime；但不含 XAML 正式 UI、driver、系統攔截或 accessibility evidence。所有輸出都在
 `.local/preview/`，不可加入 Git。
 Engine Preview 連線後也會在 user-space 以 `IMMDeviceEnumerator` 枚舉本機 render/capture metadata，
-讓預覽顯示裝置數量與預設輸出 metadata；它只提供 bounded catalog snapshot，不開啟 physical
+讓預覽顯示裝置數量與預設輸出 metadata；預設只提供 bounded catalog snapshot，不開啟 physical
 WASAPI sink、不切換實體裝置，也不修改 Windows 系統音量。Desktop Compatibility Preview 只顯示
 render/capture 數量與預設輸出 metadata；正式 WinUI shell 才提供實體輸出選擇器。
 預覽也會顯示 IR 相位 policy 的 Game／Balanced／Movie／Bypass 與預估延遲。C++ control-plane 已能將
@@ -101,6 +101,9 @@ pwsh -File tools/run-preview.ps1 -Build
 
 Windows 使用者也可以直接雙擊 repository 根目錄的 `Start-HibikiPreview.cmd`；它會執行同一個
 流程，先建置必要的 unsigned preview，再啟動 Engine Preview 與自帶 .NET runtime 的桌面 UI。
+若要明確啟用 shared-mode WASAPI sink，可雙擊同一層的
+`Start-HibikiPreview-Wasapi.cmd`；它等同於加入 `-EnableWasapiOutput`，不會安裝 driver 或
+改變正式系統路徑。
 
 視窗開啟後會自動嘗試連接本機引擎；若沒有連線，仍會安全顯示「尚未連接」，不會改動 Windows
 音量或任何實體裝置。直接雙擊 `.local/preview/DesktopCompat/Hibiki.DesktopPreview.exe` 也可以，
@@ -115,6 +118,20 @@ pwsh -File tools/run-preview.ps1 -Build -EnableSystemVolume
 這個選項會讀取目前 Windows render endpoint 音量、監聽外部音量鍵，並把 Preview 的音量調整
 寫回同一 endpoint；預設預覽不會寫入系統音量。只想驗證 endpoint volume broker 是否可用而不送出
 音量命令，可執行 `pwsh -File tools/engine-preview-smoke.ps1 -EnableSystemVolume -StatusOnly`。
+
+若要明確啟動現有的 shared-mode WASAPI sink，使用：
+
+```powershell
+pwsh -File tools/run-preview.ps1 -Build -EnableWasapiOutput
+pwsh -File tools/engine-preview-smoke.ps1 -EnableWasapiOutput -StatusOnly
+```
+
+這個旗標只會在 physical catalog 找到支援的 active default render endpoint（2／5.1／7.1、
+44.1／48／96／192 kHz）後啟動 dedicated sink worker；worker 未回報 Ready 前，主輸出保持
+Pending／Degraded 並 fail-closed。它驗證的是 user-space WASAPI output boundary，不等於
+WaveRT driver、per-App capture/re-send、ASIO physical delivery 或完整音訊播放；正常預覽仍不
+會啟動 sink。裝置切換的 handoff/crossfade 核心已在 `AudioEngineModel`，Engine Preview 目前
+只綁定明確 opt-in 的預設端點，避免把未驗證的實體交付誤報成完成。
 
 若要在 Expert 預覽中查看 Windows App／工作階段清單與測試 per-App 控制，必須明確啟用 session
 routing：

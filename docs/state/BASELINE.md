@@ -9,8 +9,9 @@
 - A C++ Engine Preview now owns the local control named pipe and passes a cross-process v1 Hello/Ack
   plus ControlStatusSnapshot smoke; the status exposes four conservative route states and the
   canonical volume mirror. `tools/run-preview.ps1 -Build` launches it with the self-contained
-  Desktop Compatibility UI. It is deliberately driver-free and has no physical audio sink;
-  evidence is recorded in `evidence/0000-foundation/engine-preview-v1.json`.
+  Desktop Compatibility UI. It is deliberately driver-free and keeps the physical sink disabled by
+  default; explicit `--enable-wasapi-output` binds the existing shared-mode worker and publishes
+  `main-output` readiness without claiming driver or full playback evidence.
 - The C# `EasyControlViewModel` now refreshes ControlStatus after acknowledged volume and Scene
   commands. `tools/control-model-engine-smoke.ps1` proves −18 dB/generation readback and Game
   One-Tap SceneApply across the real named pipe; this remains a user-space control proof only.
@@ -20,8 +21,8 @@
   command/Ack/status-refresh based. While connected it polls the bounded ControlStatusSnapshot once
   per second (coalesced while a command is busy) so external engine/Windows-volume changes can be
   reflected without touching the audio thread. It also displays the local render/capture catalog
-  counts and default-render metadata, while keeping physical sink activation and switching out of
-  scope.
+  counts and default-render metadata; physical sink activation remains an explicit Engine Preview
+  opt-in and switching/playback evidence remains out of scope.
 - Both the formal WinUI source shell and Desktop Compatibility Preview now expose the bounded IR
   phase policy: Game minimum-phase/0 ms, Balanced mixed-phase/80 ms maximum, Movie linear-phase/
   160 ms maximum and Bypass. The fixed command now reaches Engine Preview and attaches the prepared
@@ -184,6 +185,11 @@
   queue. Desktop Compatibility Preview exposes the catalog and explicit Expert controls without
   raw Windows identity. This proves the selection/command and Windows session-volume control-plane
   boundary only; physical per-App capture/re-send and DSP delivery remain explicitly unverified.
+- Engine Preview now has an independent `--enable-wasapi-output` opt-in: it resolves the active
+  default render descriptor from the physical catalog, starts the existing dedicated shared-mode
+  WASAPI sink worker, and projects its `Pending/Ready/Degraded` state into `main-output`. The normal
+  launcher remains sink-disabled; the opt-in is a user-space output-boundary smoke only, with no
+  claim of WaveRT, full graph playback, per-App delivery or target-device soak.
 - Windows-only `IMMNotificationClient` watcher with bounded default/add/remove/property event
   snapshots, consumed by a worker-side transactional recovery coordinator with safe-start mute
   after endpoint invalidation or Audio Service restart.
@@ -204,7 +210,8 @@
 - `DeviceCatalogSnapshotPublisherV1` now converts a validated C++ `PhysicalDeviceCatalogV1`
   into one bounded snapshot frame without introducing COM or RT work. Engine Preview now feeds
   it from a COM-initialized, worker-owned Windows endpoint enumeration at startup and polls the
-  watcher for metadata changes; this still does not open a physical sink.
+  watcher for metadata changes; the default path still does not open a physical sink, while the
+  explicit WASAPI opt-in uses the same catalog to start the dedicated shared-mode worker.
 - `DeviceCatalogSnapshotStoreV1` now serializes complete control-plane snapshot publication and
   replies, rejecting empty or invalid frames while retaining the previous safe snapshot. The
   Windows `PhysicalDeviceCatalogServiceV1` joins this store to worker refresh transactions; it

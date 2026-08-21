@@ -27,8 +27,12 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   啟動 smoke；它和正式 shell 共用 `EasyControlViewModel`，自帶 .NET runtime、不依賴 Windows App Runtime，
   現在包含場景選擇、路由健康摘要與音量來源／致動器顯示，但不是 XAML、無障礙、driver 或
   release evidence；連線後每秒輪詢一次 bounded ControlStatusSnapshot，命令忙碌時會合併輪詢。
-  目前也顯示本機 physical catalog 的 render/capture 數量與預設輸出 metadata，但不提供實體
-  sink 啟用或切換。
+ 目前也顯示本機 physical catalog 的 render/capture 數量與預設輸出 metadata；預設不提供實體
+  sink 啟用或切換。若明確傳入 `--enable-wasapi-output`，Engine Preview 會在 catalog 找到
+  支援的 active default render endpoint 後啟動既有 dedicated shared-mode WASAPI sink worker，
+  並把 worker 的 `Pending/Ready/Degraded` 狀態送進 `main-output` route-health card。這只是
+  user-space output boundary；沒有 source block 時 worker 只保持安全 silence，不能寫成完整
+  physical playback、WaveRT 或 per-App DSP delivery。
 - WinUI 與 Desktop Preview 都有 IR phase policy controls（Game/Balanced/Movie/Bypass）與明確的
   0/80/160 ms delay semantics；控制面會把 bounded IR WAV 送入 Engine Preview。
 - C++ control-plane 已有 bounded RIFF/WAVE IR importer，支援 Float32/PCM16/24/32、finite/tap/file
@@ -44,13 +48,17 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   會啟動它並驗證 v1 named-pipe Hello/Ack request correlation 與 ControlStatusSnapshot 回覆。
   `tools/control-model-engine-smoke.ps1` 另外以 C# `EasyControlViewModel` 驗證 −18 dB 音量
   往返、引擎快照讀回、Game One-Tap SceneApply Ack，以及本機 Windows render/capture
-  catalog（目前環境 14 筆）的跨程序 snapshot。Engine Preview 只枚舉 metadata、保留
-  bounded snapshot 與 watcher poll；不啟用 physical WASAPI sink，也不改 Windows 音量。
+  catalog（目前環境 14 筆）的跨程序 snapshot。Engine Preview 預設只枚舉 metadata、保留
+  bounded snapshot 與 watcher poll；只有 `--enable-wasapi-output` 才啟動既有 shared-mode
+  WASAPI sink worker，且不改 Windows 音量。
   `tools/run-preview.ps1 -Build` 會把 Engine Preview 與不依賴 Windows App Runtime 的 Desktop
   Compatibility UI 一起啟動；它只提供 user-space control host，不代表 WaveRT、實體輸出或
-  Windows session routing 已完成。若要明確驗證 Windows endpoint 音量聯動，使用
+  Windows session routing 已完成。若要明確啟動現有 shared-mode sink，加入
+  `-EnableWasapiOutput`；若要明確驗證 Windows endpoint 音量聯動，使用
   `tools/run-preview.ps1 -Build -EnableSystemVolume`；預設不會寫入系統音量，且
   `tools/engine-preview-smoke.ps1 -EnableSystemVolume -StatusOnly` 只檢查 broker Ready、不送音量命令。
+  `tools/engine-preview-smoke.ps1 -EnableWasapiOutput -StatusOnly` 只檢查 sink route state，
+  不把 status-only 結果當成實體音訊播放證據。
 - Engine Preview 另有獨立的 `--enable-session-routing` opt-in：它在 COM worker 綁定
   `IAudioSessionManager2`，發布 bounded App/session catalog，並把 App 音量、lane/output 與
   route-rule 命令送入固定 queue；`-EnableSessionRouting` 可與系統音量旗標同時使用。這是
@@ -76,6 +84,8 @@ WaveRT endpoint 的 WDK build/signability 工作。不要先做 Microsoft signin
 Runtime 的 `WinUICompat` 輸出。
 Windows 使用者也可雙擊 repository 根目錄的 `Start-HibikiPreview.cmd`；這只是上述命令的來源入口，
 不會把任何編譯物加入 Git。
+若需要明確啟動 shared-mode WASAPI sink，使用同一層的 `Start-HibikiPreview-Wasapi.cmd`；它仍是
+user-space opt-in，不代表 driver 或完整播放驗收。
 
 ## 必讀順序
 
