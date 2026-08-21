@@ -2,6 +2,7 @@
 param(
   [switch]$EnableSystemVolume,
   [switch]$EnableSessionRouting,
+  [switch]$EnableWasapiOutput,
   [switch]$StatusOnly
 )
 
@@ -85,6 +86,7 @@ function Write-TestIrWav([string]$Path) {
 $engineArguments = @()
 if ($EnableSystemVolume) { $engineArguments += '--enable-system-volume' }
 if ($EnableSessionRouting) { $engineArguments += '--enable-session-routing' }
+if ($EnableWasapiOutput) { $engineArguments += '--enable-wasapi-output' }
 $engineProcess = Start-Process -FilePath $engine -ArgumentList $engineArguments `
   -WorkingDirectory (Split-Path $engine) -WindowStyle Hidden -PassThru
 $irPath = Join-Path $repo '.local/engine-preview-smoke-ir.wav'
@@ -123,8 +125,8 @@ try {
   }
 
   if ($StatusOnly) {
-    if (-not $EnableSystemVolume -and -not $EnableSessionRouting) {
-      throw 'StatusOnly requires -EnableSystemVolume or -EnableSessionRouting.'
+    if (-not $EnableSystemVolume -and -not $EnableSessionRouting -and -not $EnableWasapiOutput) {
+      throw 'StatusOnly requires an explicit integration flag.'
     }
     $statusFrame = New-IpcFrame 13 43 @()
     Send-IpcFrame $client $statusFrame
@@ -163,6 +165,14 @@ try {
         throw "Engine Preview session catalog payload shape is invalid: bytes=$sessionPayloadBytes count=$sessionCount."
       }
       $statusSummary += "session catalog Ready; entries=$sessionCount; per-App delivery unverified"
+    }
+    if ($EnableWasapiOutput) {
+      $mainOutputRouteOffset = 20 + 40 + (1 * 224)
+      $mainOutputState = $statusReply[$mainOutputRouteOffset + 1]
+      if ($mainOutputState -gt 4) {
+        throw "WASAPI main output route state is invalid: $mainOutputState."
+      }
+      $statusSummary += "WASAPI output route state=$mainOutputState; physical delivery is endpoint-dependent"
     }
     Write-Output "Engine Preview status-only smoke passed ($($statusSummary -join '; '))."
     return
@@ -226,6 +236,14 @@ try {
   }
   if (-not $statusMatched) {
     throw 'Engine Preview status did not reflect the queued -12 dB volume command.'
+  }
+  $mainOutputRouteOffset = 20 + 40 + (1 * 224)
+  $mainOutputState = $statusReply[$mainOutputRouteOffset + 1]
+  if (-not $EnableWasapiOutput -and $mainOutputState -ne 4) {
+    throw "Default Engine Preview unexpectedly exposed a physical output route (state=$mainOutputState)."
+  }
+  if ($EnableWasapiOutput -and $mainOutputState -gt 4) {
+    throw "WASAPI main output route state is invalid: $mainOutputState."
   }
 
   # IR prepare is a control-worker-only file import. The payload carries a

@@ -8,6 +8,7 @@ add_library(hibiki_hub STATIC
   src/control_service.cpp
   src/calibration.cpp
   src/calibration_compiler.cpp
+  src/driver_control_bridge.cpp
   src/driver_stream_bridge.cpp
   src/lane_latency.cpp
   src/audio_session_registry.cpp

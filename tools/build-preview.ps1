@@ -25,6 +25,17 @@ if ($Target -eq 'WinUICompat') {
   $project = Join-Path $repo 'apps/winui-shell/Hibiki.WinUI.csproj'
   dotnet build $project --configuration Release "-p:OutputPath=$previewRoot/" '-p:HibikiCompatibilityPreview=true' '-p:Platform=x64'
   if ($LASTEXITCODE -ne 0) { throw "Compatibility preview build failed: $LASTEXITCODE" }
+  if ($SmokeTest) {
+    $executable = Join-Path $previewRoot 'Hibiki.WinUI.exe'
+    if (-not (Test-Path -LiteralPath $executable)) { throw "Compatibility preview executable was not produced: $executable" }
+    $process = Start-Process -FilePath $executable -WorkingDirectory $previewRoot -PassThru
+    Start-Sleep -Seconds 3
+    $process.Refresh()
+    if ($process.HasExited) { throw "Compatibility WinUI preview exited during smoke test: $($process.ExitCode)" }
+    Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
+    $process.WaitForExit()
+    Write-Output "Compatibility WinUI preview launch smoke passed."
+  }
   Write-Output "Compatibility WinUI preview build succeeded. It is unsigned, driver-free, not release evidence and excluded from Git."
   return
 }

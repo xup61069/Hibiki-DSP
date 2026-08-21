@@ -6,7 +6,7 @@ authority: product-behavior
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["src/hub/include/hibiki/control_status.hpp", "src/hub/src/control_status.cpp", "src/hub/include/hibiki/control_service.hpp", "src/hub/src/control_service.cpp", "src/hub/include/hibiki/windows_device_catalog.hpp", "src/hub/src/windows_device_catalog.cpp", "apps/control-model/IpcProtocol.cs", "apps/control-model/EasyControlViewModel.cs", "tests/**"]
+source_globs: ["src/hub/include/hibiki/control_status.hpp", "src/hub/src/control_status.cpp", "src/hub/include/hibiki/control_service.hpp", "src/hub/src/control_service.cpp", "src/hub/include/hibiki/windows_device_catalog.hpp", "src/hub/src/windows_device_catalog.cpp", "apps/engine-preview/engine_preview.cpp", "apps/control-model/IpcProtocol.cs", "apps/control-model/EasyControlViewModel.cs", "tests/**"]
 ---
 
 # SPEC-0017：控制狀態快照 IPC
@@ -40,6 +40,13 @@ Windows control runtime 會在 worker/control thread 將同一預設 render endp
 並在說明中明示 physical delivery 未驗證。這條路徑不在 RT 或 COM notification callback
 中執行，也不把 session enumeration 當成 per-App 重送。
 
+Engine Preview 的 `main-output` route 預設只描述 physical catalog，不啟動 sink。只有明確
+傳入 `--enable-wasapi-output` 時，control thread 才從 catalog 的 active default render
+descriptor 建立 `WasapiOutputConfigV1` 並啟動既有 dedicated shared-mode sink worker；worker
+狀態映射為 `Pending/Ready/Degraded`。這條 opt-in 只證明 user-space WASAPI output boundary，
+沒有 graph source block 時 sink 維持安全 silence，不得把 route `Ready` 說成完整播放、WaveRT
+driver 或 per-App DSP delivery。
+
 ## 失敗／fallback
 
 - unknown type、錯誤長度、非零 padding、非法 UTF-8、重複 route ID、過期 sequence 或 unsafe
@@ -47,6 +54,8 @@ Windows control runtime 會在 worker/control thread 將同一預設 render endp
 - status store 沒有 snapshot 時回 Error；UI 保留上一個狀態並顯示控制狀態暫不可用。
 - status snapshot 只描述 control-plane truth，不代表 physical per-App audio delivery、
   Chrome tabCapture、signed driver 或 process-loopback runtime 已可用。
+- WASAPI opt-in 沒有支援的 active endpoint、格式不符、worker bind/start 失敗或 device
+  invalidation 時，`main-output` 不得回報 `Ready`；應保持 `Pending`／`Degraded` 並 fail-closed。
 
 ## 驗收
 
@@ -57,4 +66,6 @@ Windows control runtime 會在 worker/control thread 將同一預設 render endp
 4. local Windows probe 驗證 default endpoint session route summary 會進入 status snapshot，
    route IDs 固定、說明不洩漏 endpoint/session identity，且 `physical delivery unverified`
    邊界保留。
-5. public repository 不包含編譯後 payload、driver、endpoint identity 或私人 calibration。
+5. Engine Preview normal path 維持 sink disabled；`--enable-wasapi-output -StatusOnly` 只在
+   worker 回報 endpoint-ready 時呈現 `main-output=Ready`，且 smoke 不輸出 endpoint ID。
+6. public repository 不包含編譯後 payload、driver、endpoint identity 或私人 calibration。

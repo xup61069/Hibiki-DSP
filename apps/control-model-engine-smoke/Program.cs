@@ -81,15 +81,19 @@ try
     }
     finally
     {
-        for (var attempt = 0; attempt < 20 && File.Exists(smokeIrPath); attempt++)
+        // Windows Defender and other file indexers can briefly retain a handle
+        // after the Engine Preview has consumed the control-plane WAV.  Keep
+        // the smoke deterministic without hiding a genuinely stuck handle:
+        // retry for up to four seconds, then fail with the original path.
+        for (var attempt = 0; attempt < 80 && File.Exists(smokeIrPath); attempt++)
         {
             try
             {
                 File.Delete(smokeIrPath);
             }
-            catch (IOException) when (attempt < 19)
+            catch (IOException) when (attempt < 79)
             {
-                Thread.Sleep(25);
+                Thread.Sleep(50);
             }
         }
         if (File.Exists(smokeIrPath))

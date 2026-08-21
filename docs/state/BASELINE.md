@@ -6,22 +6,42 @@
   preview command. A Compatibility Preview builds and completes a launch smoke on the non-target
   host using the same `EasyControlViewModel`; the formal WinUI XAML build remains explicitly blocked
   on that host and still requires the locked target toolchain.
+- The explicit `WinUICompat` target now skips the non-packaged `XamlControlsResources` merge that
+  crashed during startup on the local host. With Microsoft Windows App Runtime 1.7 x64 installed,
+  `tools/build-preview.ps1 -Target WinUICompat -SmokeTest` now keeps a `WinUI Desktop` window alive;
+  this is a compatibility launch check only, not formal XAML/accessibility evidence.
 - A C++ Engine Preview now owns the local control named pipe and passes a cross-process v1 Hello/Ack
   plus ControlStatusSnapshot smoke; the status exposes four conservative route states and the
-  canonical volume mirror. `tools/run-preview.ps1 -Build` launches it with the self-contained
-  Desktop Compatibility UI. It is deliberately driver-free and has no physical audio sink;
-  evidence is recorded in `evidence/0000-foundation/engine-preview-v1.json`.
+  canonical volume mirror. `tools/run-preview.ps1 -Build` uses the runtime-aware `Ui=Auto` launcher:
+  it selects WinUICompat when Windows App Runtime 1.7 is available and otherwise uses the self-contained
+  Desktop Compatibility UI. It is deliberately driver-free and keeps the physical sink disabled by
+  default; explicit `--enable-wasapi-output` binds the existing shared-mode worker and publishes
+  `main-output` readiness without claiming driver or full playback evidence.
 - The C# `EasyControlViewModel` now refreshes ControlStatus after acknowledged volume and Scene
   commands. `tools/control-model-engine-smoke.ps1` proves −18 dB/generation readback and Game
   One-Tap SceneApply across the real named pipe; this remains a user-space control proof only.
   Evidence is recorded in `evidence/0000-foundation/control-model-engine-v1.json`.
+- `tools/live-system-volume-check.ps1 -WriteTest` now performs an explicit local endpoint volume
+  round-trip: approximately −3 dB attenuation, COM callback/readback verification, and restoration
+  of the original dB/mute state. It is opt-in user-space broker evidence, not driver or WaveRT proof.
+- `tools/live-session-volume-check.ps1 -WriteTest` now creates an inaudible shared-mode test
+  session, discovers it through the bounded catalog, exercises a generation-scoped session handle
+  through `WindowsAudioSessionRouteCoordinatorV1`, verifies approximately −3 dB readback, and
+  restores the original dB/mute state. This closes the target-session COM readback boundary but
+  remains user-space control evidence; physical per-App capture/re-send and DSP delivery are still
+  unverified.
+- The control-model Engine Preview smoke now exercises the full IR prepare → Scene IR clear
+  round-trip and retries temporary fixture cleanup for bounded transient Windows file-indexer
+  locks. Three consecutive session-routing runs are recorded in
+  `evidence/0000-foundation/control-model-engine-ir-clear-v1.json`; this remains a user-space
+  reliability proof only.
 - Desktop Compatibility Preview now exposes a scene selector, route-health summary and volume
   origin/actuator text; scene selection is disabled until the engine is connected and remains
   command/Ack/status-refresh based. While connected it polls the bounded ControlStatusSnapshot once
   per second (coalesced while a command is busy) so external engine/Windows-volume changes can be
   reflected without touching the audio thread. It also displays the local render/capture catalog
-  counts and default-render metadata, while keeping physical sink activation and switching out of
-  scope.
+  counts and default-render metadata; physical sink activation remains an explicit Engine Preview
+  opt-in and switching/playback evidence remains out of scope.
 - Both the formal WinUI source shell and Desktop Compatibility Preview now expose the bounded IR
   phase policy: Game minimum-phase/0 ms, Balanced mixed-phase/80 ms maximum, Movie linear-phase/
   160 ms maximum and Bypass. The fixed command now reaches Engine Preview and attaches the prepared
@@ -45,6 +65,12 @@
   silently survive a scene switch; a new IR must be explicitly prepared afterwards.
 - 公開 monorepo 文件、component license map 與 source-only paid-release policy。
 - AI 接手規則、fresh-clone 流程與 source-only policy。
+- `hibiki_driver_control_transport_v1` now provides a fixed 136-byte little-endian
+  endpoint-state/volume-notification packet ABI. The GPL `DriverVolumeLinkV1` decodes it,
+  suppresses registered event contexts and applies requested dB/mute through the canonical
+  output-group safety path; its 16-byte header-only Hello/Ack/Error request-correlation path
+  is also contract-tested. This remains source/control evidence and does not claim a loadable
+  or signed driver.
 - `OutputGroupVolumeState` 與 ISO compensation public C++ boundary 的初始骨架。
 - Scene graph、device-switch transaction 與初始 CMake/CTest 驗證入口。
 - Immutable RT graph snapshot、2/6/8 聲道 mapping、IPC frame codec、ASIO stream model、VST
@@ -91,11 +117,12 @@
   C++/C# codec/store/handler correlation and stale ViewModel replacement are covered; this is
   still a selection boundary rather than proof of physical per-App delivery.
 - The source-only WinUI Expert view now renders the safe App session catalog, sequence and route
-  state without exposing raw Windows session identity; App volume/routing commands remain a
-  separate future contract until handle validation is implemented end to end.
+  state without exposing raw Windows session identity; App volume/routing commands use validated
+  generation-scoped handles, while physical per-App capture/re-send remains unverified.
 - `SessionVolumeCommand` v1 now carries only a generation-scoped handle, catalog sequence, dB
   and mute. C++/C# codecs, EngineControl callback, Windows runtime/coordinator stale guards and
-  the C# ViewModel command builder are covered; target-session COM readback remains pending.
+  the C# ViewModel command builder are covered; the opt-in live session-volume probe now verifies
+  target-session COM readback and restoration through the coordinator.
 - Active catalog entries now opportunistically expose worker-read `ISimpleAudioVolume` dB/mute
   availability; expired/inactive/unreadable sessions remain visible with volume unavailable.
 - `SessionRouteCommand` v1 now carries only handle/sequence/lane/output labels. The coordinator
@@ -184,6 +211,11 @@
   queue. Desktop Compatibility Preview exposes the catalog and explicit Expert controls without
   raw Windows identity. This proves the selection/command and Windows session-volume control-plane
   boundary only; physical per-App capture/re-send and DSP delivery remain explicitly unverified.
+- Engine Preview now has an independent `--enable-wasapi-output` opt-in: it resolves the active
+  default render descriptor from the physical catalog, starts the existing dedicated shared-mode
+  WASAPI sink worker, and projects its `Pending/Ready/Degraded` state into `main-output`. The normal
+  launcher remains sink-disabled; the opt-in is a user-space output-boundary smoke only, with no
+  claim of WaveRT, full graph playback, per-App delivery or target-device soak.
 - Windows-only `IMMNotificationClient` watcher with bounded default/add/remove/property event
   snapshots, consumed by a worker-side transactional recovery coordinator with safe-start mute
   after endpoint invalidation or Audio Service restart.
@@ -204,7 +236,8 @@
 - `DeviceCatalogSnapshotPublisherV1` now converts a validated C++ `PhysicalDeviceCatalogV1`
   into one bounded snapshot frame without introducing COM or RT work. Engine Preview now feeds
   it from a COM-initialized, worker-owned Windows endpoint enumeration at startup and polls the
-  watcher for metadata changes; this still does not open a physical sink.
+  watcher for metadata changes; the default path still does not open a physical sink, while the
+  explicit WASAPI opt-in uses the same catalog to start the dedicated shared-mode worker.
 - `DeviceCatalogSnapshotStoreV1` now serializes complete control-plane snapshot publication and
   replies, rejecting empty or invalid frames while retaining the previous safe snapshot. The
   Windows `PhysicalDeviceCatalogServiceV1` joins this store to worker refresh transactions; it
@@ -218,7 +251,7 @@
   to the Desktop Compatibility Preview; target 24H2/driver/hotplug soak remains unverified.
 - The opt-in `tools/live-device-catalog-check.ps1` probe now built and ran the worker against the
   local `IMMDeviceEnumerator`: 14 endpoints were enumerated, sequence 1 and a 5,840-byte snapshot
-  decoded successfully. It prints counts only; this is local Windows 22631 evidence, not target
+  decoded successfully. It prints counts only; this is local Windows 26200 evidence, not target
   Windows 24H2/WDK or driver/handoff soak evidence.
 - The same live probe now starts `WindowsControlRuntimeV1` and requests the snapshot through the
   local named pipe; `runtime=pass request=pass` proves service → provider → IPC framing without
@@ -453,7 +486,7 @@
   授權／法務確認）。
 - Microsoft driver signing、Gumroad release artifact 與 production installer。
 
-目前開發機是 Windows build 22631、VS 17／SDK 10.0.26100.0，低於鎖定的 driver 目標
+目前開發機是 Windows build 26200、VS 17／SDK 10.0.26100.0，低於鎖定的 driver 目標
 Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可通過，但
 不能把本機結果當成 driver-target evidence。
 
@@ -516,11 +549,11 @@ route-health cards 接到 Easy／Expert control-model；它只顯示保守的 se
 store、handler 與 atomic ViewModel apply；本機 status probe 通過，但仍不宣稱 physical
 per-App delivery 或 browser tab capture 已完成。
 
-目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 75 個必要入口與
-21 份 Spec 通過；`source-policy.ps1` 掃描 361 個 tracked paths 且無 blocked
+目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 78 個必要入口與
+24 份 Spec 通過；`source-policy.ps1` 掃描 378 個 tracked paths 且無 blocked
 binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
-`distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
+`distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；35 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
 288-byte payload、catalog sequence、handler fail-closed、WinUI send-failure rollback、DeviceCatalogSnapshot、ControlStatusSnapshot
 wire/atomic replace、catalog-to-wire publisher、Windows worker unbound/coordinator rollback、
 DeviceCatalogRequest provider response、連線後自動刷新裝置清單、ControlPlaneHost loopback

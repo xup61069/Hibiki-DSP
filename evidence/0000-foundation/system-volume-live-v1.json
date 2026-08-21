@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "system-volume-live-v1",
+  "source_commit": "77d7e4f",
+  "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/live-system-volume-check.ps1 -WriteTest"
+  ],
+  "results": [
+    {
+      "command": "tools/live-system-volume-check.ps1 -WriteTest",
+      "status": "pass",
+      "coverage": [
+        "default eRender/eConsole endpoint broker bind",
+        "temporary approximately −3 dB attenuation write",
+        "COM callback/readback verification",
+        "original dB and mute restoration before probe exit",
+        "no endpoint identity printed"
+      ],
+      "observed": {
+        "original_db": -38.08,
+        "attenuated_db": -41.08,
+        "restored_db": -38.08
+      },
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "This is an explicitly user-invoked user-space IAudioEndpointVolume broker probe; it does not prove a Hibiki virtual endpoint, WaveRT/PortCls driver, physical DSP playback, HLK or Microsoft signing.",
+    "The probe temporarily changes the local default endpoint volume and must never be run implicitly by CI or application startup."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "cmake": "local CMake",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}

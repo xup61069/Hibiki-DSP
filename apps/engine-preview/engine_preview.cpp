@@ -61,6 +61,90 @@ struct SessionRoutingState final {
     bool bound{false};
 };
 
+struct WasapiOutputState final {
+    hibiki::AudioEngineModel* engine{nullptr};
+    hibiki::WasapiOutputConfigV1 config{};
+    std::string endpoint_id{};
+    std::uint32_t block_frames{128U};
+    bool requested{false};
+    bool active{false};
+};
+
+bool supported_wasapi_layout(const std::uint32_t channels) noexcept {
+    return channels == 2U || channels == 6U || channels == 8U;
+}
+
+bool supported_wasapi_rate(const std::uint32_t sample_rate) noexcept {
+    return sample_rate == 44100U || sample_rate == 48000U ||
+           sample_rate == 96000U || sample_rate == 192000U;
+}
+
+bool start_default_wasapi_output(
+    WasapiOutputState& state,
+    hibiki::AudioEngineModel& engine,
+    const hibiki::PhysicalDeviceCatalogV1& catalog) noexcept {
+    state.active = false;
+    state.endpoint_id.clear();
+    state.config = {};
+    const auto* const descriptor = catalog.default_device(hibiki::PhysicalDeviceFlowV1::Render);
+    if (descriptor == nullptr || descriptor->availability !=
+                                     hibiki::PhysicalDeviceAvailabilityV1::Active ||
+        descriptor->endpoint_id.empty() || !supported_wasapi_layout(descriptor->channels) ||
+        !supported_wasapi_rate(descriptor->sample_rate)) {
+        return false;
+    }
+
+    const auto block_frames = descriptor->buffer_frames == 0U
+                                  ? 128U
+                                  : std::clamp(descriptor->buffer_frames, 16U, 4096U);
+    hibiki::WasapiOutputConfigV1 config{
+        std::wstring(descriptor->endpoint_id.begin(), descriptor->endpoint_id.end()),
+        descriptor->channels, descriptor->sample_rate, 20U};
+    if (!engine.start_wasapi_output(config, block_frames)) return false;
+    state.engine = &engine;
+    state.config = std::move(config);
+    state.endpoint_id = descriptor->endpoint_id;
+    state.block_frames = block_frames;
+    state.active = true;
+    return true;
+}
+
+hibiki::ControlRouteHealthStateV1 wasapi_route_state(
+    const WasapiOutputState& state,
+    const hibiki::WasapiSinkHandoffSnapshotV1& snapshot) noexcept {
+    if (!state.requested) return hibiki::ControlRouteHealthStateV1::Unavailable;
+    if (!state.active) return hibiki::ControlRouteHealthStateV1::Pending;
+    if (snapshot.state == hibiki::WasapiSinkHandoffStateV1::Degraded ||
+        snapshot.primary.degraded || snapshot.secondary.degraded) {
+        return hibiki::ControlRouteHealthStateV1::Degraded;
+    }
+    if (snapshot.state == hibiki::WasapiSinkHandoffStateV1::Synced &&
+        snapshot.primary.endpoint_ready) {
+        return hibiki::ControlRouteHealthStateV1::Ready;
+    }
+    return hibiki::ControlRouteHealthStateV1::Pending;
+}
+
+std::string_view wasapi_route_detail(
+    const WasapiOutputState& state,
+    const hibiki::WasapiSinkHandoffSnapshotV1& snapshot) noexcept {
+    if (!state.requested) {
+        return "physical catalog ready; shared-mode WASAPI sink disabled by default.";
+    }
+    if (!state.active) {
+        return "WASAPI sink requested; no supported active default render endpoint; output remains muted.";
+    }
+    if (snapshot.state == hibiki::WasapiSinkHandoffStateV1::Degraded ||
+        snapshot.primary.degraded || snapshot.secondary.degraded) {
+        return "WASAPI sink degraded; fail-closed until a supported endpoint is available.";
+    }
+    if (snapshot.state == hibiki::WasapiSinkHandoffStateV1::Synced &&
+        snapshot.primary.endpoint_ready) {
+        return "shared-mode WASAPI sink ready; graph/ASIO delivery remains an explicit source boundary.";
+    }
+    return "WASAPI sink warming; no audio is reported ready until the worker confirms the endpoint.";
+}
+
 bool has_command_line_flag(const int argc,
                            wchar_t* const* argv,
                            const std::wstring_view flag) noexcept {
@@ -350,6 +434,8 @@ void set_route(hibiki::ControlRouteHealthEntryV1& route,
 hibiki::ControlStatusSnapshotV1 make_initial_status(
     const hibiki::OutputGroupVolumeStateV1 volume,
     const std::string_view physical_catalog_detail,
+    const WasapiOutputState& wasapi_output,
+    const hibiki::WasapiSinkHandoffSnapshotV1& wasapi_snapshot,
     const bool system_volume_enabled,
     const std::string_view system_volume_detail,
     const bool session_routing_enabled,
@@ -363,8 +449,11 @@ hibiki::ControlStatusSnapshotV1 make_initial_status(
               "named pipe 已啟動；目前為本機 user-space preview。",
               hibiki::ControlRouteHealthStateV1::Ready);
     set_route(snapshot.routes[1U], "main-output", "主輸出",
-              physical_catalog_detail,
-              hibiki::ControlRouteHealthStateV1::Unavailable, 1U);
+              wasapi_output.requested ? wasapi_route_detail(wasapi_output, wasapi_snapshot)
+                                      : physical_catalog_detail,
+              wasapi_output.requested ? wasapi_route_state(wasapi_output, wasapi_snapshot)
+                                      : hibiki::ControlRouteHealthStateV1::Unavailable,
+              wasapi_output.requested ? 0U : 1U);
     set_route(snapshot.routes[2U], "windows-volume", "Windows 音量",
               system_volume_detail,
               system_volume_enabled ? hibiki::ControlRouteHealthStateV1::Ready
@@ -421,6 +510,8 @@ int wmain(const int argc, wchar_t* const* argv) {
         has_command_line_flag(argc, argv, L"--enable-system-volume");
     const bool session_routing_requested =
         has_command_line_flag(argc, argv, L"--enable-session-routing");
+    const bool wasapi_output_requested =
+        has_command_line_flag(argc, argv, L"--enable-wasapi-output");
 
     hibiki::AudioEngineModel engine;
     hibiki::EngineControlWorkerV1 control_worker{engine};
@@ -430,6 +521,9 @@ int wmain(const int argc, wchar_t* const* argv) {
     system_volume.enabled = system_volume_requested;
     SessionRoutingState session_routing;
     session_routing.requested = session_routing_requested;
+    WasapiOutputState wasapi_output;
+    wasapi_output.engine = &engine;
+    wasapi_output.requested = wasapi_output_requested;
     const HRESULT com_result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     const bool com_initialized = SUCCEEDED(com_result) || com_result == RPC_E_CHANGED_MODE;
     IMMDeviceEnumerator* device_enumerator = nullptr;
@@ -447,8 +541,14 @@ int wmain(const int argc, wchar_t* const* argv) {
             }
         }
     }
+    const auto wasapi_started = wasapi_output_requested && physical_catalog_ready
+                                    ? start_default_wasapi_output(wasapi_output, engine,
+                                                                 physical_catalog.catalog())
+                                    : false;
+    (void)wasapi_started;
+    const auto initial_wasapi_snapshot = engine.wasapi_output_snapshot();
     const std::string catalog_detail = physical_catalog_ready
-        ? "physical catalog ready; Preview sink disabled."
+        ? "physical catalog ready; Preview sink disabled unless WASAPI opt-in is requested."
         : "physical catalog unavailable; safe Preview retained.";
     std::string system_volume_detail = system_volume_requested
         ? "system volume link requested; binding Windows endpoint..."
@@ -527,7 +627,8 @@ int wmain(const int argc, wchar_t* const* argv) {
     control_worker.set_session_route_rule_handler(enqueue_session_route_rule_command,
                                                   &session_routing);
     hibiki::ControlStatusSnapshotStoreV1 status_store;
-    auto status = make_initial_status(engine.volume(), catalog_detail, system_volume_active,
+    auto status = make_initial_status(engine.volume(), catalog_detail, wasapi_output,
+                                      initial_wasapi_snapshot, system_volume_active,
                                       system_volume_detail, session_routing_active,
                                       session_routing_detail, process_loopback_detail);
     if (!status_store.publish(status)) return 4;
@@ -537,6 +638,7 @@ int wmain(const int argc, wchar_t* const* argv) {
                                &status_store,
                                session_routing_requested ? &session_routing.catalog_store
                                                          : nullptr)) {
+        engine.stop_wasapi_output();
         physical_catalog.unbind();
         session_routing.coordinator.unbind();
         system_volume.broker.unbind();
@@ -633,12 +735,26 @@ int wmain(const int argc, wchar_t* const* argv) {
             next_catalog_poll = std::chrono::steady_clock::now() +
                                 std::chrono::milliseconds{250};
         }
+        const auto wasapi_snapshot = engine.wasapi_output_snapshot();
         const auto volume = engine.volume();
         bool status_changed = false;
         if (!same_volume(volume, status.volume)) {
             status.volume = volume;
             status_changed = true;
         }
+        const auto previous_main_output_route = status.routes[1U];
+        set_route(status.routes[1U], "main-output", "主輸出",
+                  wasapi_output.requested
+                      ? wasapi_route_detail(wasapi_output, wasapi_snapshot)
+                      : (physical_catalog_ready
+                             ? std::string_view(
+                                   "physical catalog ready; shared-mode WASAPI sink disabled by default.")
+                             : std::string_view("physical catalog unavailable; safe Preview retained.")),
+                  wasapi_output.requested
+                      ? wasapi_route_state(wasapi_output, wasapi_snapshot)
+                      : hibiki::ControlRouteHealthStateV1::Unavailable,
+                  wasapi_output.requested ? 0U : 1U);
+        if (!same_route(previous_main_output_route, status.routes[1U])) status_changed = true;
         const bool volume_route_ready = system_volume_requested && system_volume.bound;
         const auto volume_detail = volume_route_ready
             ? std::string_view("system endpoint volume linked; write-through explicitly enabled.")
@@ -693,6 +809,7 @@ int wmain(const int argc, wchar_t* const* argv) {
         std::this_thread::sleep_for(std::chrono::milliseconds{2});
     }
     host.stop();
+    engine.stop_wasapi_output();
     physical_catalog.unbind();
     session_routing.coordinator.unbind();
     system_volume.broker.unbind();

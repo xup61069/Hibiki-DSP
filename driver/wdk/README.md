@@ -11,8 +11,11 @@ It is deliberately not part of the default CMake target: this machine does
 not have the locked WDK 10.0.28000.2526 and no `.sys` is produced. A future WDK
 adapter must provide one context per endpoint, wire the functions into the
 SYSVAD property/automation tables, expose the fixed LPCM pin formats and use
-the Apache driver-control ABI over IPC. It must not include or link GPL
-user-space code. The portable `wavert_stream_v1` core is the intended ring/
+the Apache driver-control ABI over IPC. For endpoint-state and volume
+notifications, use `hibiki_driver_control_transport_v1.h`'s explicit 136-byte
+little-endian encoder rather than copying a C struct; the future driver may
+share that Apache C codec without linking GPL code. It must not include or link
+GPL user-space code. The portable `wavert_stream_v1` core is the intended ring/
 underrun boundary for those pin callbacks; WDK code must add the required
 interlocked producer/consumer publication around it. The companion
 `hibiki_stream_adapter.cpp` demonstrates that WDK boundary with a spin lock,
@@ -32,3 +35,8 @@ capture direction without creating a second format contract.
 Before enabling a driver build, the maintainer must compile this source in a
 clean WDK project, run Driver Verifier/HLK and record signability evidence for
 Windows 11 24H2+; source presence alone is not driver evidence.
+
+The Apache transport also provides a 16-byte header-only Hello/Ack/Error
+exchange for request correlation. It is suitable for a future bounded kernel/
+user control channel, but does not define an unbounded error payload or replace
+the target WDK IPC implementation.
