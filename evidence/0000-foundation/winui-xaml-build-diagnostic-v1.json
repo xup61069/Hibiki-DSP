@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "issue": 52,
+  "scope_digest": "winui-xaml-build-diagnostic-v1",
+  "source_commit": "326303321bffa24ac0f9c83a7d5e2bd56c19baa4",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.1-universal-sdk-wdk-10.0.28000.2526-cmake-4.3.1-dotnet-8.0.424-pwsh-7.6.5",
+  "commands": [
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUI (locked-package baseline)",
+    "dotnet build apps/winui-shell/Hibiki.WinUI.csproj --configuration Release --nologo -p:WindowsAppSDKVersion=1.8.260710003 (diagnostic-only process override)",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUI",
+    "pwsh -NoProfile -File tools/winui-shell-check.ps1",
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 52",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1 (with Visual Studio CMake bin added to process-local PATH)",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "locked-package WinUI baseline",
+      "status": "fail_expected_before_repair",
+      "details": "Windows App SDK 1.7.250401001 XamlCompiler.exe returned exit code 1 through the dotnet preview path; the initial MSB3073 failure did not include actionable XAML diagnostics or output.json."
+    },
+    {
+      "command": "diagnostic-only Windows App SDK 1.8.260710003 override",
+      "status": "diagnostic_capture",
+      "details": "The compiler reported seven WMC0011 Unknown member 'StringFormat' diagnostics in apps/winui-shell/MainWindow.xaml at lines 128, 129, 151, 182, 206, 208, and 308. The package override was not committed."
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target WinUI",
+      "status": "pass",
+      "details": "The script selected Visual Studio MSBuild through vswhere and completed with 0 warnings and 0 errors. XBF and PRI outputs were generated under ignored .local/preview/WinUI output."
+    },
+    {
+      "command": "tools/winui-shell-check.ps1",
+      "status": "pass",
+      "details": "Interactive-control accessibility scan found 32 controls and the source shell checks passed against the locked Windows App SDK 1.7.250401001 contract."
+    },
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "details": "Control-model checks passed after adding the display-only projections and property-change notifications."
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "details": "Process-local Visual Studio CMake discovery enabled the unsigned local C++ build; 1 of 1 CTest tests passed."
+    },
+    {
+      "command": "handoff, source-policy, source-only-ci, and git diff --check gates",
+      "status": "pass",
+      "details": "Issue/full handoff checks, source-only policy, source-only CI policy, and whitespace validation passed."
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "blocked_integrator_baseline",
+      "details": "The shared BASELINE.md still claims 411 tracked paths while this branch has 413 after its handoff and evidence files; Issue #0 owns the refresh."
+    }
+  ],
+  "limitations": [
+    "This is formal WinUI/XAML compile evidence only; it does not claim UI Automation execution, physical audio delivery, endpoint control, driver/WaveRT, HLK, Microsoft signing, or release packaging evidence.",
+    "The locked Windows App SDK package remains 1.7.250401001; the 1.8.260710003 run was diagnostic-only and did not change package declarations.",
+    "The local doctor check reports cmake and the exact SDK/WDK QFE as missing from the default PATH/detection surface; verification used process-local Visual Studio CMake and the successful WinUI build used Visual Studio MSBuild.",
+    "The merge-tree documentation gate remains dependent on the integrator-owned BASELINE.md refresh."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.400",
+    "dotnet_target_sdk": "8.0.424",
+    "visual_studio": "18.9.12112.369",
+    "visual_studio_msbuild": "18.9.1",
+    "windows_app_sdk_locked": "1.7.250401001",
+    "windows_app_sdk_diagnostic_override": "1.8.260710003",
+    "powershell": "pwsh 7.6.5"
+  },
+  "started_at": "2026-08-22T05:28:33+08:00",
+  "finished_at": "2026-08-22T05:41:17+08:00"
+}
