@@ -112,6 +112,22 @@
       "compiled_artifacts": false
     }
   ],
+  "ci_runs": [
+    {
+      "run_id": 32526424840,
+      "event": "push",
+      "status": "failure",
+      "failed_job": "Documentation gate",
+      "reason": "BASELINE claims 407 tracked paths while the merge ref reports 409."
+    },
+    {
+      "run_id": 32526484108,
+      "event": "pull_request",
+      "status": "failure",
+      "failed_job": "Documentation gate",
+      "reason": "BASELINE claims 407 tracked paths while the merge ref reports 409."
+    }
+  ],
   "limitations": [
     "This is a source-only AST and text boundary check; it does not execute HibikiSetup.ps1 or pnputil.exe.",
     "It does not prove signed package hashes, Authenticode, Secure Boot/HVCI installation, upgrade/rollback, uninstall, driver loading, HLK, or physical audio.",
