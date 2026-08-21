@@ -370,6 +370,24 @@ int main() {
     const std::array<OutputFanoutSinkConfigV1, 1> disabled_sinks{{
         {"disabled", 2U, false}}};
     CHECK(!prepare_output_fanout_plan_v1(disabled_sinks, 2U, 9U, fanout_plan));
+    OutputFanoutRuntimeV1 fanout_runtime;
+    CHECK(fanout_runtime.prepare(fanout_plan, 1.0));
+    std::array<float, 16> runtime_a{};
+    std::array<float, 16> runtime_b{};
+    std::array<float, 16> runtime_disabled{};
+    std::array<float*, 3> runtime_outputs{{runtime_a.data(), runtime_b.data(),
+                                            runtime_disabled.data()}};
+    const std::array<std::size_t, 3> runtime_capacities{{16U, 16U, 16U}};
+    std::array<std::size_t, 3> runtime_frames{};
+    CHECK(fanout_runtime.process(fanout_input, 2U, runtime_outputs, runtime_capacities,
+                                 runtime_frames) &&
+          runtime_frames[0] == 1U && runtime_frames[1] == 1U && runtime_frames[2] == 0U &&
+          runtime_a[0] == fanout_input[0] && runtime_b[1] == fanout_input[1]);
+    CHECK(fanout_runtime.observe_clock(0U, 48000.0, 48012.0, 1.0));
+    CHECK(fanout_runtime.snapshot().sinks[0].drift_ppm > 0.0);
+    const std::array<std::size_t, 3> runtime_short_capacities{{16U, 1U, 16U}};
+    CHECK(!fanout_runtime.process(fanout_input, 2U, runtime_outputs,
+                                  runtime_short_capacities, runtime_frames));
 
     DeviceRecoveryCoordinator recovery;
     CHECK(recovery.observe(DeviceRecoveryEventV1{

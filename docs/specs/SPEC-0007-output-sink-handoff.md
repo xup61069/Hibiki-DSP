@@ -44,3 +44,10 @@ source_globs: ["src/hub/**output*", "src/hub/include/hibiki/output*", "src/hub/s
 sink 的 pointer／capacity 在第一次寫入前一次驗證；任何容量不足或 plan 無效都 fail-closed，
 不會只更新部分 sink。每個 sink 後續仍由自己的 ring、clock drift 與 SRC worker 處理；fan-out
 本身不碰 COM、裝置或 physical endpoint。
+
+`OutputFanoutRuntimeV1` 將每個 enabled sink 綁定一個 persistent `OutputSinkModel`。clock
+observation 只在 control/worker 邊界更新該 sink 的 ratio；audio-side process 先做有限值與
+容量上限 preflight，再把各 sink 的 SRC 結果寫入 prepare 階段配置的 scratch，所有 sink 成功
+後才一次發佈到 caller-owned output buffers。任何 sink 失敗會回復 SRC state，不留下部分
+輸出或部分時鐘進度；每次最多 4096 input frames、輸出上限按 0.25x source step 的固定界限
+驗證。這是 user-space bounded runtime，仍不等於真實硬體 sink／clock soak 證據。

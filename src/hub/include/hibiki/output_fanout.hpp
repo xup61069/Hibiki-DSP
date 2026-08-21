@@ -5,13 +5,19 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <span>
+
+#include "hibiki/output_sink.hpp"
 #include <string>
 
 namespace hibiki {
 
 constexpr std::size_t kOutputFanoutMaxSinksV1 = 8U;
 constexpr std::size_t kOutputFanoutMaxIdBytesV1 = 64U;
+constexpr std::size_t kOutputFanoutMaxInputFramesV1 = 4096U;
+constexpr std::size_t kOutputFanoutMaxResampledFramesV1 =
+    (kOutputFanoutMaxInputFramesV1 * 4U) + 1U;
 
 struct OutputFanoutSinkConfigV1 {
     std::string sink_id;
@@ -52,5 +58,49 @@ struct OutputFanoutPlanV1 {
     std::size_t frames,
     std::span<float* const> outputs,
     std::span<const std::size_t> output_capacities) noexcept;
+
+struct OutputFanoutRuntimeSnapshotV1 {
+    bool prepared{false};
+    std::uint32_t sink_count{0U};
+    std::array<OutputSinkClockSnapshotV1, kOutputFanoutMaxSinksV1> sinks{};
+};
+
+// Owns one persistent clock/SRC pipeline per enabled fan-out sink. Scratch is
+// allocated once during prepare(); process() performs no allocation, lock or
+// wait and only publishes output after every enabled sink succeeds.
+class OutputFanoutRuntimeV1 final {
+public:
+    OutputFanoutRuntimeV1() noexcept = default;
+    ~OutputFanoutRuntimeV1() = default;
+    OutputFanoutRuntimeV1(const OutputFanoutRuntimeV1&) = delete;
+    OutputFanoutRuntimeV1& operator=(const OutputFanoutRuntimeV1&) = delete;
+
+    [[nodiscard]] bool prepare(const OutputFanoutPlanV1& plan,
+                               double source_step = 1.0) noexcept;
+    void reset() noexcept;
+    [[nodiscard]] bool observe_clock(std::size_t sink_index,
+                                     double source_frames,
+                                     double sink_frames,
+                                     double elapsed_seconds) noexcept;
+    [[nodiscard]] bool process(const float* input_interleaved,
+                               std::size_t input_frames,
+                               std::span<float* const> outputs,
+                               std::span<const std::size_t> output_capacities,
+                               std::span<std::size_t> output_frames) noexcept;
+    [[nodiscard]] OutputFanoutRuntimeSnapshotV1 snapshot() const noexcept;
+
+private:
+    struct ScratchStorage {
+        std::array<std::array<float,
+                              kOutputFanoutMaxResampledFramesV1 * 8U>,
+                   kOutputFanoutMaxSinksV1>
+            blocks{};
+    };
+
+    OutputFanoutPlanV1 plan_{};
+    std::array<OutputSinkModel, kOutputFanoutMaxSinksV1> sinks_{};
+    std::unique_ptr<ScratchStorage> scratch_{};
+    bool prepared_{false};
+};
 
 }  // namespace hibiki

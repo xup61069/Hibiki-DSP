@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <new>
+#include <utility>
 
 namespace hibiki {
 namespace {
@@ -99,6 +101,115 @@ bool fanout_interleaved_v1(const OutputFanoutPlanV1& plan,
         }
     }
     return true;
+}
+
+bool OutputFanoutRuntimeV1::prepare(const OutputFanoutPlanV1& plan,
+                                    const double source_step) noexcept {
+    if (!validate_output_fanout_plan_v1(plan) || !std::isfinite(source_step) ||
+        source_step < 0.25 || source_step > 4.0) {
+        return false;
+    }
+    std::array<OutputSinkModel, kOutputFanoutMaxSinksV1> candidates{};
+    for (std::size_t index = 0U; index < plan.sink_count; ++index) {
+        if (plan.sinks[index].enabled &&
+            !candidates[index].prepare(plan.output_channels, source_step)) {
+            return false;
+        }
+    }
+    auto candidate_scratch =
+        std::unique_ptr<ScratchStorage>(new (std::nothrow) ScratchStorage{});
+    if (candidate_scratch == nullptr) {
+        return false;
+    }
+    plan_ = plan;
+    sinks_ = candidates;
+    scratch_ = std::move(candidate_scratch);
+    prepared_ = true;
+    return true;
+}
+
+void OutputFanoutRuntimeV1::reset() noexcept {
+    if (!prepared_) {
+        return;
+    }
+    for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
+        if (plan_.sinks[index].enabled) {
+            sinks_[index].reset();
+        }
+    }
+}
+
+bool OutputFanoutRuntimeV1::observe_clock(const std::size_t sink_index,
+                                          const double source_frames,
+                                          const double sink_frames,
+                                          const double elapsed_seconds) noexcept {
+    if (!prepared_ || sink_index >= plan_.sink_count || !plan_.sinks[sink_index].enabled ||
+        !std::isfinite(source_frames) || !std::isfinite(sink_frames) ||
+        !std::isfinite(elapsed_seconds) || source_frames <= 0.0 || sink_frames <= 0.0 ||
+        elapsed_seconds <= 0.0) {
+        return false;
+    }
+    sinks_[sink_index].observe_clock(source_frames, sink_frames, elapsed_seconds);
+    return true;
+}
+
+bool OutputFanoutRuntimeV1::process(
+    const float* const input_interleaved,
+    const std::size_t input_frames,
+    const std::span<float* const> outputs,
+    const std::span<const std::size_t> output_capacities,
+    const std::span<std::size_t> output_frames) noexcept {
+    if (!prepared_ || scratch_ == nullptr || input_interleaved == nullptr || input_frames == 0U ||
+        input_frames > kOutputFanoutMaxInputFramesV1 || outputs.size() < plan_.sink_count ||
+        output_capacities.size() < plan_.sink_count || output_frames.size() < plan_.sink_count) {
+        return false;
+    }
+    const auto samples = input_frames * static_cast<std::size_t>(plan_.output_channels);
+    for (std::size_t sample = 0U; sample < samples; ++sample) {
+        if (!std::isfinite(input_interleaved[sample])) {
+            return false;
+        }
+    }
+    const auto capacity_bound = (input_frames * 4U) + 1U;
+    for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
+        output_frames[index] = 0U;
+        if (!plan_.sinks[index].enabled) {
+            continue;
+        }
+        if (outputs[index] == nullptr || output_capacities[index] < capacity_bound) {
+            return false;
+        }
+    }
+
+    const auto state_before = sinks_;
+    std::array<std::size_t, kOutputFanoutMaxSinksV1> rendered_frames{};
+    for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
+        if (plan_.sinks[index].enabled &&
+            !sinks_[index].process(input_interleaved, input_frames,
+                                    scratch_->blocks[index].data(),
+                                    kOutputFanoutMaxResampledFramesV1, rendered_frames[index])) {
+            sinks_ = state_before;
+            return false;
+        }
+    }
+    for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
+        if (plan_.sinks[index].enabled) {
+            const auto sink_samples = rendered_frames[index] * plan_.output_channels;
+            std::copy_n(scratch_->blocks[index].data(), sink_samples, outputs[index]);
+            output_frames[index] = rendered_frames[index];
+        }
+    }
+    return true;
+}
+
+OutputFanoutRuntimeSnapshotV1 OutputFanoutRuntimeV1::snapshot() const noexcept {
+    OutputFanoutRuntimeSnapshotV1 result{};
+    result.prepared = prepared_;
+    result.sink_count = plan_.sink_count;
+    for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
+        result.sinks[index] = sinks_[index].snapshot();
+    }
+    return result;
 }
 
 }  // namespace hibiki
