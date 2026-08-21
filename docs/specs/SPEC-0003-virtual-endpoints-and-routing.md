@@ -36,6 +36,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   `IMMNotificationClient` snapshot 只能透過單調 sequence 投遞，失效、拔除、format change
   或 Audio Service restart 進入 `RebindPending`，再以 `begin → prepare → commit/rollback`
   交易換端點。恢復前使用 safe-start dB 並保持 mute，不能回到 0 dB／100%。
+- `PhysicalDeviceCatalogV1` 是 watcher 與切換 worker 之間的固定 32 筆 control-plane
+  catalog；它驗證 endpoint identity、顯示名稱、LPCM format、Active 狀態與每個 flow 唯一
+  default。它只決定 endpoint 是否可選，不取代 `DeviceSwitchTransaction` 的暖機、交叉淡化、
+  commit／rollback，也不把真實私人 endpoint ID 寫進 Scene 或 repository。
 - `driver/include/hibiki/wavert_endpoint_state_v1.h` 與其 MS-PL C 實作是 WDK adapter 的
   第一個可測試控制核心：格式、Q16.16 dB、safety ceiling、mute、generation 與 actuator
   都在 driver 邊界驗證；它仍不是完整 PortCls miniport 或可載入 `.sys`。

@@ -11,6 +11,7 @@ add_library(hibiki_hub STATIC
   src/audio_engine.cpp
   src/asio_transport_consumer.cpp
   src/device_recovery.cpp
+  src/device_catalog.cpp
   src/device_switch.cpp
   src/engine_control.cpp
   src/exporters.cpp

@@ -3,6 +3,7 @@
 #include "hibiki/control_service.hpp"
 #include "hibiki/device_switch.hpp"
 #include "hibiki/device_recovery.hpp"
+#include "hibiki/device_catalog.hpp"
 #include "hibiki/ipc.hpp"
 #include "hibiki/ipc_pipe.hpp"
 #include "hibiki/asio_bridge.hpp"
@@ -689,6 +690,47 @@ int main() {
     transaction.rollback();
     CHECK(transaction.state() == DeviceSwitchState::Synced);
     CHECK(transaction.active_target().endpoint_id == "endpoint-a");
+
+    PhysicalDeviceCatalogV1 devices;
+    PhysicalDeviceDescriptorV1 speakers;
+    speakers.endpoint_id = "endpoint-a";
+    speakers.display_name = "Living room speakers";
+    speakers.flow = PhysicalDeviceFlowV1::Render;
+    speakers.availability = PhysicalDeviceAvailabilityV1::Active;
+    speakers.channels = 8U;
+    speakers.sample_rate = 48000U;
+    speakers.buffer_frames = 128U;
+    speakers.is_default = true;
+    speakers.last_sequence = 10U;
+    CHECK(devices.upsert(speakers) == PhysicalDeviceCatalogResultV1::Accepted &&
+          devices.size() == 1U && devices.default_device(PhysicalDeviceFlowV1::Render) != nullptr &&
+          devices.selectable("endpoint-a", PhysicalDeviceFlowV1::Render));
+    auto headphones = speakers;
+    headphones.endpoint_id = "endpoint-b";
+    headphones.display_name = "Headphones";
+    headphones.channels = 2U;
+    headphones.is_default = true;
+    headphones.last_sequence = 11U;
+    CHECK(devices.upsert(headphones) == PhysicalDeviceCatalogResultV1::Accepted &&
+          devices.default_device(PhysicalDeviceFlowV1::Render) != nullptr &&
+          devices.default_device(PhysicalDeviceFlowV1::Render)->endpoint_id == "endpoint-b" &&
+          !devices.find("endpoint-a")->is_default);
+    CHECK(devices.set_availability("endpoint-b", PhysicalDeviceAvailabilityV1::Unplugged, 12U) ==
+              PhysicalDeviceCatalogResultV1::Accepted &&
+          !devices.selectable("endpoint-b", PhysicalDeviceFlowV1::Render) &&
+          devices.default_device(PhysicalDeviceFlowV1::Render) == nullptr);
+    CHECK(devices.set_availability("endpoint-b", PhysicalDeviceAvailabilityV1::Active, 9U) ==
+              PhysicalDeviceCatalogResultV1::Accepted &&
+          devices.find("endpoint-b")->last_sequence == 12U);
+    CHECK(devices.mark_default("endpoint-b", PhysicalDeviceFlowV1::Render, 13U) ==
+              PhysicalDeviceCatalogResultV1::Accepted);
+    auto invalid_device = speakers;
+    invalid_device.endpoint_id.clear();
+    CHECK(devices.upsert(invalid_device) == PhysicalDeviceCatalogResultV1::InvalidDescriptor &&
+          devices.size() == 2U);
+    CHECK(devices.remove("endpoint-a") == PhysicalDeviceCatalogResultV1::Accepted &&
+          devices.remove("missing") == PhysicalDeviceCatalogResultV1::NotFound &&
+          devices.size() == 1U);
 
     IpcFrameV1 frame;
     frame.header.type = IpcMessageType::VolumeNotification;
