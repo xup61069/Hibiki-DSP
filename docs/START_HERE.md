@@ -25,6 +25,9 @@
    若要驗證實際 shared-mode sink 與 30 ms 無聲 handoff，可額外執行
    `pwsh -File tools/live-wasapi-handoff-check.ps1`；它只輸出 mix format 與 aggregate
    worker counters，沒有可用 endpoint 時會回報 `wasapi=unavailable`。
+   若要驗證 Windows endpoint volume 的實際讀回、短暫衰減與恢復，可額外執行
+   `pwsh -File tools/live-system-volume-check.ps1 -WriteTest`；只有明確旗標才會改變本機音量，
+   probe 結束前會恢復原值，仍不等於 driver/WaveRT/HLK evidence。
    若要驗證 process-level loopback source，可額外執行
    `pwsh -File tools/live-process-loopback-check.ps1`；它只輸出匿名格式與 frame aggregate，
    沒有可用 runtime 時會回報 `loopback=unavailable`，不等於 tabCapture 或實體 per-App routing。

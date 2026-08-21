@@ -21,6 +21,9 @@
   commands. `tools/control-model-engine-smoke.ps1` proves −18 dB/generation readback and Game
   One-Tap SceneApply across the real named pipe; this remains a user-space control proof only.
   Evidence is recorded in `evidence/0000-foundation/control-model-engine-v1.json`.
+- `tools/live-system-volume-check.ps1 -WriteTest` now performs an explicit local endpoint volume
+  round-trip: approximately −3 dB attenuation, COM callback/readback verification, and restoration
+  of the original dB/mute state. It is opt-in user-space broker evidence, not driver or WaveRT proof.
 - The control-model Engine Preview smoke now exercises the full IR prepare → Scene IR clear
   round-trip and retries temporary fixture cleanup for bounded transient Windows file-indexer
   locks. Three consecutive session-routing runs are recorded in
