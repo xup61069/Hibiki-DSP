@@ -56,6 +56,64 @@
         "no whitespace errors in the source diff"
       ],
       "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 102",
+      "status": "pass",
+      "coverage": [
+        "schema-v2 issue handoff and ownership contract validated"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "all active handoffs and repository ownership contracts validated"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "blocked_by_integrator_baseline",
+      "coverage": [
+        "documentation validation reached the shared baseline counter",
+        "BASELINE.md claims 425 tracked paths while this branch has 427"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "source-only policy passed for 427 tracked paths"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "one workflow and 427 tracked paths satisfy source-only CI policy"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1 (with VS2026 CMake directory prepended process-locally)",
+      "status": "pass",
+      "coverage": [
+        "unsigned local verification passed",
+        "CTest passed 1 of 1 contract test"
+      ],
+      "compiled_artifacts": true
+    },
+    {
+      "command": "tools/verify.ps1 (without process-local CMake PATH adjustment)",
+      "status": "environment_limited",
+      "coverage": [
+        "direct invocation cannot locate cmake because CMake is not on PATH"
+      ],
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
