@@ -51,5 +51,10 @@ Shared-mode WASAPI handoff 也是額外的 opt-in live check：
 與 aggregate worker counters；沒有可用 endpoint 時只能記錄 `wasapi=unavailable`，不能
 把 user-space probe 當成已完成的 WaveRT／HLK／Microsoft signing 驗收。
 
+Windows App/session enumeration 也有 opt-in check：
+`pwsh -File tools/live-audio-session-check.ps1`。只輸出 session／active 數量與固定 identity
+語意，不輸出 PID、session ID、endpoint ID 或顯示名稱；它不等於每個 App 已完成實際
+Lane routing 或 DSP delivery。
+
 遇到環境差異先記錄 fingerprint 並更新 handoff，不要自行重生
 `config/distribution-profile.yml` 裡的 endpoint、ASIO、IPC GUID。

@@ -54,3 +54,9 @@ session instance ID、私人裝置路徑或使用者校正資料寫入公開 rep
    規則測試通過。
 5. Windows session watcher 的 rule store 是 non-owning、只在 worker enumerate 套用；
    callback 不查詢規則、不配置、不修改 registry。
+
+`tools/live-audio-session-check.ps1` 是 opt-in Windows probe：它在 worker-owned
+`IAudioSessionManager2` enumeration 上只輸出 session 總數、active 總數與固定 identity
+語意，不輸出 endpoint ID、session instance ID、PID 或顯示名稱。它驗證 default render
+endpoint 的 session enumeration 可用，但不把「有 session」誤當成每個 App 已完成實際
+路由或 DSP delivery；後者仍需 target endpoint／Lane integration evidence。

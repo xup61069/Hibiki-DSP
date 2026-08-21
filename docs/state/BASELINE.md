@@ -390,8 +390,11 @@ ReleaseManifest custody metadata source commit 是 `b1c64d4`；documentation gat
 commit 是 `2a6aa8f`，文件與 evidence 對應 commit 是 `015a4eb`。
 ReleaseManifest hash-casing schema compatibility fix 的 source commit 是 `8ae3499`；目前
 evidence manifest 以此 commit 為 source anchor。
+Anonymous live Windows audio-session probe 的 source commit 是 `6fb6efc`；documentation
+gate 對應 commit 是 `6154a5c`，本機 probe 僅證明 session enumeration，不證明每個 App 已完成
+實際 Lane routing 或 DSP delivery。
 
-目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 72 個必要入口與
+目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 73 個必要入口與
 15 份 Spec 通過；`source-policy.ps1` 掃描 293 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
