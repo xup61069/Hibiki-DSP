@@ -167,6 +167,8 @@ pwsh -File tools/live-session-volume-check.ps1 -WriteTest
 queue/COM worker 使用 bounded catalog handle 暫時衰減約 3 dB、讀回並在結束前恢復原始 dB/mute；
 不輸出 session/endpoint identity，也不代表實體 per-App capture/re-send 或 DSP delivery。結果記錄於
 `evidence/0000-foundation/session-volume-live-v1.json`。
+同一個 probe 也會送出一個暫時的 `SessionRouteCommand`，確認 route catalog 回報 `Ready`；這是
+控制面 graph transaction 證據，不代表實體音訊已完成 per-App 重送。
 
 `.local/preview/WinUICompat/Hibiki.WinUI.exe` 是需要 Windows App Runtime 1.7 的實驗性 WinUI
 相容預覽，不是正式 XAML/accessibility evidence。建置並做啟動 smoke：
