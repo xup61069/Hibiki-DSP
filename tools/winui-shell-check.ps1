@@ -29,6 +29,8 @@ foreach ($requiredText in @('x:Name="RootGrid"', 'ItemsSource="{Binding Scenes}"
     'ItemsSource="{Binding PhysicalDevices}"', 'SelectedPhysicalDeviceId',
     'DeviceSwitchStatusText', 'OnSwitchDeviceClick',
     'RequestedVolumeDb', 'Muted', 'IrAddedDelayMs', 'x:Name="ExpertPanel"',
+    'EffectiveVolumeDb', 'SafetyStatusText', 'VolumeOriginText', 'VolumeActuatorText',
+    'ItemsSource="{Binding Expert.RouteHealth}"', 'Expert.RouteSummary',
     'ItemsSource="{Binding Expert.MatrixRoutes}"', 'ItemsSource="{Binding Expert.DspGraph}"',
     'ItemsSource="{Binding Expert.Vst3Lanes}"', 'Expert.Calibration.Mode',
     'AutomationProperties.Name="Hibiki DSP 音訊場景控制"',

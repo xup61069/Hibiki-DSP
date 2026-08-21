@@ -66,6 +66,15 @@ Check(OutputGroupCatalog.Fixed.Count == 3 &&
     "Fixed output-group catalog changed unexpectedly.");
 var snapshot = new ControlSnapshot(UiMode.Easy, AudioControlStatus.Controlled, "main", -8.5, -8.5, false, null, null);
 Check(snapshot.DisplayVolume == "-8.5 dB", "dB display must use the effective value.");
+var cappedVolume = new VolumeSafetyStateV1(-6.0, -12.0, -12.0, false, 4UL,
+    VolumeStateOriginV1.Safety, VolumeActuatorV1.InternalDsp);
+Check(cappedVolume.IsValid && cappedVolume.IsSafetyCapped &&
+      cappedVolume.SafetyStatusText.Contains("安全限制") &&
+      cappedVolume.ActuatorLabel.Contains("單次套用"),
+    "Volume safety projection must expose the capped effective value.");
+Check(!new VolumeSafetyStateV1(-6.0, -12.0, -5.0, false, 4UL,
+    VolumeStateOriginV1.Safety, VolumeActuatorV1.InternalDsp).IsValid,
+    "Volume safety projection must reject an effective value above the ceiling.");
 var device = new DeviceSwitchModel();
 Check(device.Prepare("endpoint-a") && device.State == DeviceSwitchModel.SwitchState.Preparing,
     "Device A prepare state failed.");
@@ -147,7 +156,9 @@ Check(IpcRequestSession.IsReplyTo(catalogRequest,
     "Device catalog snapshot reply correlation failed.");
 var viewModel = new EasyControlViewModel { SelectedOutputGroup = " main " };
 Check(viewModel.ConnectionState == ControlConnectionState.Disconnected &&
-      !viewModel.IsConnected && !viewModel.IsBusy,
+      !viewModel.IsConnected && !viewModel.IsBusy &&
+      viewModel.EffectiveVolumeDb == -12.0 &&
+      viewModel.SafetyStatusText.Contains("未截頂"),
     "ViewModel must start disconnected and idle.");
 Check(viewModel.OneTapEnhance() && viewModel.SelectedScene?.Id == "game" &&
       viewModel.Status == AudioControlStatus.Controlled &&
@@ -209,8 +220,27 @@ Check(viewModel.Expert.IsVisible && viewModel.Expert.MatrixRoutes.Count == 4 &&
       viewModel.Expert.DspGraph.Any(node => node.Id == "limiter" && node.Enabled) &&
       viewModel.Expert.Vst3Lanes.All(lane => !lane.Trusted) &&
       viewModel.Expert.Calibration.Mode == "Relative Compensation" &&
-      viewModel.Expert.StatusText.Contains("唯讀"),
+      viewModel.Expert.StatusText.Contains("唯讀") &&
+      viewModel.Expert.RouteHealth.Any(card => card.Id == "process-loopback" &&
+                                               card.State == RouteHealthStateV1.Pending) &&
+      viewModel.Expert.RouteHealth.Any(card => card.Id == "direct-path" &&
+                                               card.State == RouteHealthStateV1.Bypassed),
     "Expert surface must expose bounded read-only graph details.");
+var routeSnapshot = new[]
+{
+    new RouteHealthCardV1("process-loopback", "Process Loopback", RouteHealthStateV1.Ready,
+                          "目前引擎已回報可用。"),
+    new RouteHealthCardV1("browser-tab", "Chrome／Edge 單分頁", RouteHealthStateV1.Pending,
+                          "需要擴充功能。", true)
+};
+Check(viewModel.ApplyRouteHealth(routeSnapshot, out _) &&
+      viewModel.Expert.RouteHealth.Count == 2 &&
+      viewModel.Expert.RouteHealth[0].StateLabel == "已可用",
+    "Validated route-health snapshots must replace the conservative defaults.");
+var duplicateRoutes = new[] { routeSnapshot[0], routeSnapshot[0] };
+Check(!viewModel.ApplyRouteHealth(duplicateRoutes, out var duplicateRouteError) &&
+      duplicateRouteError.Contains("重複"),
+    "Duplicate route-health identities must fail closed.");
 viewModel.IsExpert = false;
 Check(!viewModel.Expert.IsVisible && viewModel.Expert.StatusText.Contains("隱藏"),
     "Expert surface must hide when Easy mode is selected.");
@@ -220,6 +250,15 @@ var viewModelVolume = viewModel.BuildVolumeCommand();
 Check(viewModelVolume.Type == ControlMessageType.VolumeNotification &&
       viewModelVolume.RequestId > 1,
     "ViewModel volume command was not generated.");
+Check(viewModel.VolumeGeneration > 0 && viewModel.VolumeOriginText.Contains("Hibiki UI"),
+    "ViewModel volume command must update the visible control-plane origin.");
+Check(viewModel.ApplyVolumeSafetyState(cappedVolume, out _) &&
+      Math.Abs(viewModel.EffectiveVolumeDb + 12.0) < 1e-9 &&
+      viewModel.SafetyStatusText.Contains("安全限制"),
+    "ViewModel must expose an engine-reconciled safety cap without writing it back.");
+Check(!viewModel.ApplyVolumeSafetyState(cappedVolume with { Generation = 3UL }, out var staleVolumeError) &&
+      staleVolumeError.Contains("過期"),
+    "Stale volume safety state must be rejected.");
 viewModel.IrPhaseMode = IrPhaseMode.LinearPhase;
 viewModel.IrPhaseStrength = 0.5;
 Check(viewModel.IrPhasePolicy.IsValid && viewModel.IrPhasePolicy.UsesFir &&

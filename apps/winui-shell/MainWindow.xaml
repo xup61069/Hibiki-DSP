@@ -126,6 +126,12 @@
                                 AutomationProperties.Name="系統音量"
                                 AutomationProperties.HelpText="以 dB 調整音量；安全限制會優先套用" />
                         <TextBlock Text="{Binding RequestedVolumeDb, StringFormat='{}{0:0.0} dB'}" />
+                        <TextBlock Text="{Binding EffectiveVolumeDb, StringFormat='實際有效音量：{0:0.0} dB'}"
+                                   AutomationProperties.Name="實際有效音量" />
+                        <TextBlock Text="{Binding SafetyStatusText}" TextWrapping="Wrap" Opacity="0.82"
+                                   AutomationProperties.LiveSetting="Polite" />
+                        <TextBlock Text="{Binding VolumeOriginText}" Opacity="0.72" />
+                        <TextBlock Text="{Binding VolumeActuatorText}" Opacity="0.72" />
                         <ToggleSwitch Header="靜音" IsOn="{Binding Muted, Mode=TwoWay}"
                                       AutomationProperties.Name="靜音"
                                       AutomationProperties.HelpText="淡出目前輸出並保留音量設定" />
@@ -139,6 +145,22 @@
                                    IsExpanded="{Binding IsExpert, Mode=TwoWay}">
                     <StackPanel x:Name="ExpertPanel" Padding="8" Spacing="14">
                         <TextBlock Text="{Binding Expert.StatusText}" TextWrapping="Wrap" />
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="來源與路由狀態" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Expert.RouteSummary}" Opacity="0.72" TextWrapping="Wrap" />
+                            <controls:ItemsRepeater ItemsSource="{Binding Expert.RouteHealth}">
+                                <controls:ItemsRepeater.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Padding="4" Spacing="2">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding StateLabel}" />
+                                            <TextBlock Text="{Binding Detail}" TextWrapping="Wrap" Opacity="0.72" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </controls:ItemsRepeater.ItemTemplate>
+                            </controls:ItemsRepeater>
+                        </StackPanel>
 
                         <StackPanel Spacing="6">
                             <TextBlock Text="Matrix" FontSize="18" FontWeight="SemiBold" />

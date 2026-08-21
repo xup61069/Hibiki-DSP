@@ -22,6 +22,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private double _requestedVolumeDb = -12.0;
     private bool _muted;
     private ulong _generation;
+    private VolumeSafetyStateV1 _volumeState = VolumeSafetyStateV1.Initial();
     private IrPhaseMode _irPhaseMode = IrPhaseMode.MinimumPhase;
     private double _irPhaseStrength;
     private ControlConnectionState _connectionState = ControlConnectionState.Disconnected;
@@ -92,6 +93,14 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             ? device
             : null;
 
+    public VolumeSafetyStateV1 VolumeState => _volumeState;
+    public double EffectiveVolumeDb => _volumeState.EffectiveDb;
+    public double SafetyCeilingDb => _volumeState.SafetyCeilingDb;
+    public string SafetyStatusText => _volumeState.SafetyStatusText;
+    public string VolumeOriginText => $"來源：{_volumeState.OriginLabel}";
+    public string VolumeActuatorText => $"致動器：{_volumeState.ActuatorLabel}";
+    public ulong VolumeGeneration => _volumeState.Generation;
+
     public string DeviceSwitchStatusText => _session.DeviceSwitch.State switch
     {
         DeviceSwitchModel.SwitchState.Preparing => "裝置預熱中…",
@@ -155,6 +164,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             var clamped = Math.Clamp(value, -144.0, 12.0);
             if (Math.Abs(clamped - _requestedVolumeDb) < 1e-9) return;
             _requestedVolumeDb = clamped;
+            UpdateLocalVolumeState(VolumeStateOriginV1.HibikiUi);
             OnPropertyChanged();
         }
     }
@@ -166,6 +176,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         {
             if (value == _muted) return;
             _muted = value;
+            UpdateLocalVolumeState(VolumeStateOriginV1.HibikiUi);
             OnPropertyChanged();
         }
     }
@@ -299,6 +310,45 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(PhysicalDevices));
         OnPropertyChanged(nameof(SelectedPhysicalDevice));
         StatusText = "裝置清單已更新；可選擇輸出裝置";
+        return true;
+    }
+
+    // A future versioned status frame can call this after the engine has
+    // reconciled Windows dB, the safety ceiling and the actual actuator. It is
+    // intentionally fail-closed and never writes Windows or the audio graph.
+    public bool ApplyVolumeSafetyState(VolumeSafetyStateV1 state, out string error)
+    {
+        error = string.Empty;
+        if (!state.IsValid)
+        {
+            error = "音量安全狀態無效";
+            return false;
+        }
+        if (state.Generation < _volumeState.Generation)
+        {
+            error = "音量安全狀態已過期";
+            return false;
+        }
+        _volumeState = state;
+        _requestedVolumeDb = state.RequestedDb;
+        _muted = state.Muted;
+        _generation = state.Generation;
+        OnPropertyChanged(nameof(RequestedVolumeDb));
+        OnPropertyChanged(nameof(Muted));
+        OnPropertyChanged(nameof(VolumeState));
+        OnPropertyChanged(nameof(EffectiveVolumeDb));
+        OnPropertyChanged(nameof(SafetyCeilingDb));
+        OnPropertyChanged(nameof(SafetyStatusText));
+        OnPropertyChanged(nameof(VolumeOriginText));
+        OnPropertyChanged(nameof(VolumeActuatorText));
+        OnPropertyChanged(nameof(VolumeGeneration));
+        return true;
+    }
+
+    public bool ApplyRouteHealth(IReadOnlyList<RouteHealthCardV1> cards, out string error)
+    {
+        if (!Expert.TryApplyRouteHealth(cards, out error)) return false;
+        OnPropertyChanged(nameof(Expert));
         return true;
     }
 
@@ -522,6 +572,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     public IpcEnvelopeV1 BuildVolumeCommand()
     {
         _generation++;
+        UpdateLocalVolumeState(VolumeStateOriginV1.HibikiUi);
         LastCommand = _commands.SetVolume(RequestedVolumeDb, Muted, _generation,
                                            _selectedOutputGroup);
         OnPropertyChanged(nameof(LastCommand));
@@ -604,5 +655,24 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         if (_isBusy == value) return;
         _isBusy = value;
         OnPropertyChanged(nameof(IsBusy));
+    }
+
+    private void UpdateLocalVolumeState(VolumeStateOriginV1 origin)
+    {
+        _volumeState = _volumeState with
+        {
+            RequestedDb = _requestedVolumeDb,
+            EffectiveDb = Math.Min(_requestedVolumeDb, _volumeState.SafetyCeilingDb),
+            Muted = _muted,
+            Generation = _generation,
+            Origin = origin
+        };
+        OnPropertyChanged(nameof(VolumeState));
+        OnPropertyChanged(nameof(EffectiveVolumeDb));
+        OnPropertyChanged(nameof(SafetyCeilingDb));
+        OnPropertyChanged(nameof(SafetyStatusText));
+        OnPropertyChanged(nameof(VolumeOriginText));
+        OnPropertyChanged(nameof(VolumeActuatorText));
+        OnPropertyChanged(nameof(VolumeGeneration));
     }
 }

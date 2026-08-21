@@ -36,6 +36,7 @@ public sealed record ExpertCalibrationSummary(
 public sealed class ExpertSurfaceModel : INotifyPropertyChanged
 {
     private bool _isVisible;
+    private IReadOnlyList<RouteHealthCardV1> _routeHealth = RouteHealthCatalogV1.Defaults;
 
     public ExpertSurfaceModel()
     {
@@ -82,6 +83,10 @@ public sealed class ExpertSurfaceModel : INotifyPropertyChanged
     public IReadOnlyList<ExpertDspNode> DspGraph { get; }
     public IReadOnlyList<ExpertVst3Lane> Vst3Lanes { get; }
     public ExpertCalibrationSummary Calibration { get; }
+    public IReadOnlyList<RouteHealthCardV1> RouteHealth => _routeHealth;
+
+    public string RouteSummary =>
+        "每個來源的處理邊界獨立顯示；未收到引擎快照前不宣稱已路由。";
 
     public string StatusText =>
         IsVisible
@@ -96,6 +101,33 @@ public sealed class ExpertSurfaceModel : INotifyPropertyChanged
     {
         IsVisible = value;
         OnPropertyChanged(nameof(StatusText));
+    }
+
+    public bool TryApplyRouteHealth(IReadOnlyList<RouteHealthCardV1> cards,
+                                    out string error)
+    {
+        error = string.Empty;
+        if (cards is null || cards.Count is < 1 or > 16)
+        {
+            error = "路由狀態快照超過容量";
+            return false;
+        }
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var card in cards)
+        {
+            if (string.IsNullOrWhiteSpace(card.Id) || card.Id.Length > 31 ||
+                card.Id.Any(char.IsControl) || !seen.Add(card.Id) ||
+                string.IsNullOrWhiteSpace(card.Name) || string.IsNullOrWhiteSpace(card.Detail) ||
+                !Enum.IsDefined(card.State))
+            {
+                error = "路由狀態快照含有無效或重複身份";
+                return false;
+            }
+        }
+        _routeHealth = cards.ToArray();
+        OnPropertyChanged(nameof(RouteHealth));
+        OnPropertyChanged(nameof(RouteSummary));
+        return true;
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>

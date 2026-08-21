@@ -35,6 +35,12 @@
   shell now renders a bounded read-only Matrix/DSP Graph/VST3/calibration summary through
   `ExpertSurfaceModel`; no unsent edit is presented as committed. The shell is not compiled on
   this machine.
+- The control model now projects `VolumeSafetyStateV1` as separate requested/effective/safety
+  values with origin, actuator and generation text, and rejects stale/unsafe snapshots. Expert
+  also shows bounded route-health cards for Windows sessions, process loopback, browser tab
+  capture and direct/bypass paths; defaults are conservative and never claim an unconnected
+  adapter is active. The route snapshot is control-plane-only until a future versioned status
+  message supplies live engine state.
 - `CalibrationResponsePointV1` and `compile_bounded_peq_correction_v1` now provide a deterministic
   control-plane measured-response to bounded PEQ compiler (16-filter cap, frequency/spacing/Q and
   boost/cut policy validation, explicit `limited` result) that feeds the existing APO/CamillaDSP/
