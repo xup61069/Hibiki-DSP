@@ -2084,6 +2084,10 @@ int main() {
           !catalog_service.has_snapshot() &&
           !device_catalog_snapshot_reply_v1(service_catalog_response,
                                              catalog_service.snapshot_store()));
+    WindowsControlRuntimeV1 control_runtime;
+    CHECK(!control_runtime.start(nullptr, IpcNamedPipeConfigV1{L"", 1024U, 100U}) &&
+          !control_runtime.running() && control_runtime.refresh_now() == E_UNEXPECTED &&
+          control_runtime.poll_and_refresh() == E_UNEXPECTED);
     auto* session_watcher = new WindowsAudioSessionWatcher();
     std::uint64_t session_sequence = 0;
     CHECK(!session_watcher->poll(session_sequence));

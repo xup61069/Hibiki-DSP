@@ -359,6 +359,33 @@ HRESULT WindowsPhysicalDeviceCatalogServiceV1::refresh_impl(const bool poll) noe
     }
 }
 
+bool WindowsControlRuntimeV1::start(
+    IMMDeviceEnumerator* const enumerator,
+    const IpcNamedPipeConfigV1& config) noexcept {
+    stop();
+    if (FAILED(catalog_service_.bind(enumerator))) return false;
+    if (!host_.start_with_queue(config, catalog_service_.snapshot_store())) {
+        catalog_service_.unbind();
+        return false;
+    }
+    return true;
+}
+
+void WindowsControlRuntimeV1::stop() noexcept {
+    host_.stop();
+    catalog_service_.unbind();
+}
+
+HRESULT WindowsControlRuntimeV1::refresh_now() noexcept {
+    if (!running()) return E_UNEXPECTED;
+    return catalog_service_.refresh_now();
+}
+
+HRESULT WindowsControlRuntimeV1::poll_and_refresh() noexcept {
+    if (!running()) return E_UNEXPECTED;
+    return catalog_service_.poll_and_refresh();
+}
+
 }  // namespace hibiki
 
 #endif  // defined(_WIN32)

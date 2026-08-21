@@ -4,6 +4,7 @@
 
 #if defined(_WIN32)
 
+#include "hibiki/control_service.hpp"
 #include "hibiki/device_catalog.hpp"
 #include "hibiki/device_catalog_snapshot.hpp"
 #include "hibiki/windows_device_watcher.hpp"
@@ -112,6 +113,42 @@ private:
     PhysicalDeviceCatalogV1 catalog_{};
     std::uint64_t catalog_sequence_{0U};
     DeviceCatalogSnapshotStoreV1 snapshot_store_{};
+};
+
+// Minimal Windows control runtime composition. The caller owns the COM/
+// engine threads: start() binds the worker-owned endpoint service and the
+// local-only control host, refresh methods run on the caller's COM-initialized
+// worker, and command_queue() is drained by EngineControlWorkerV1. No method
+// here is an audio callback entry point.
+class WindowsControlRuntimeV1 final {
+public:
+    WindowsControlRuntimeV1() noexcept = default;
+    ~WindowsControlRuntimeV1() { stop(); }
+
+    WindowsControlRuntimeV1(const WindowsControlRuntimeV1&) = delete;
+    WindowsControlRuntimeV1& operator=(const WindowsControlRuntimeV1&) = delete;
+
+    [[nodiscard]] bool start(IMMDeviceEnumerator* enumerator,
+                             const IpcNamedPipeConfigV1& config) noexcept;
+    void stop() noexcept;
+
+    [[nodiscard]] HRESULT refresh_now() noexcept;
+    [[nodiscard]] HRESULT poll_and_refresh() noexcept;
+    [[nodiscard]] bool running() const noexcept { return host_.running(); }
+    [[nodiscard]] bool client_connected() const noexcept { return host_.client_connected(); }
+    [[nodiscard]] ControlCommandQueueV1& command_queue() noexcept {
+        return host_.command_queue();
+    }
+    [[nodiscard]] const PhysicalDeviceCatalogV1& catalog() const noexcept {
+        return catalog_service_.catalog();
+    }
+    [[nodiscard]] std::uint64_t catalog_sequence() const noexcept {
+        return catalog_service_.sequence();
+    }
+
+private:
+    WindowsPhysicalDeviceCatalogServiceV1 catalog_service_{};
+    ControlPlaneHostV1 host_{};
 };
 
 }  // namespace hibiki
