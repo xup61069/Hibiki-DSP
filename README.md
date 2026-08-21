@@ -71,14 +71,16 @@ check），不是可安裝產品。正式 WinUI shell 需要 target toolchain �
 pwsh -File tools/build-preview.ps1 -Target WinUI
 ```
 
-在非 target 機器若 XAML compiler 不能執行，可建立清楚標示的 Compatibility Preview：
+在非 target 機器若 XAML compiler 或 Windows App Runtime 不能使用，可建立自帶 .NET runtime 的
+Desktop Compatibility Preview：
 
 ```powershell
-pwsh -File tools/build-preview.ps1 -Target WinUICompat
+pwsh -File tools/build-preview.ps1 -Target DesktopCompat
 ```
 
-它以同一個 `EasyControlViewModel` 展示連線、一鍵改善、輸出群組與安全音量的控制面，但不含 XAML
-正式 UI、driver、系統攔截或 accessibility evidence。所有輸出都在 `.local/preview/`，不可加入 Git。
+它以同一個 `EasyControlViewModel` 展示連線、一鍵改善、輸出群組與安全音量的控制面，不需要
+Windows App Runtime；但不含 XAML 正式 UI、driver、系統攔截或 accessibility evidence。所有輸出都在
+`.local/preview/`，不可加入 Git。
 只想重跑控制面可用 `-Target ControlModel`。
 
 ## 授權與貢獻

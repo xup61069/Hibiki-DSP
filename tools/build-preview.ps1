@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-  [ValidateSet('WinUI', 'WinUICompat', 'ControlModel')][string]$Target = 'WinUI'
+  [ValidateSet('WinUI', 'WinUICompat', 'DesktopCompat', 'ControlModel')][string]$Target = 'WinUI'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,9 +22,19 @@ if ($Target -eq 'WinUICompat') {
   # ViewModel on a machine where the App SDK XAML compiler cannot run, but it
   # is not a substitute for the target WinUI/XAML accessibility gate.
   $project = Join-Path $repo 'apps/winui-shell/Hibiki.WinUI.csproj'
-  dotnet build $project --configuration Release "-p:OutputPath=$previewRoot/" '-p:HibikiCompatibilityPreview=true'
+  dotnet build $project --configuration Release "-p:OutputPath=$previewRoot/" '-p:HibikiCompatibilityPreview=true' '-p:Platform=x64'
   if ($LASTEXITCODE -ne 0) { throw "Compatibility preview build failed: $LASTEXITCODE" }
   Write-Output "Compatibility WinUI preview build succeeded. It is unsigned, driver-free, not release evidence and excluded from Git."
+  return
+}
+
+if ($Target -eq 'DesktopCompat') {
+  # A self-contained .NET fallback for machines without Windows App Runtime.
+  # It shares the control model, but is not the formal WinUI shell.
+  $project = Join-Path $repo 'apps/desktop-compat-preview/Hibiki.DesktopPreview.csproj'
+  dotnet publish $project --configuration Release --runtime win-x64 --self-contained true --output $previewRoot
+  if ($LASTEXITCODE -ne 0) { throw "Desktop compatibility preview build failed: $LASTEXITCODE" }
+  Write-Output "Self-contained desktop preview build succeeded. It needs no Windows App Runtime, is driver-free and excluded from Git."
   return
 }
 
