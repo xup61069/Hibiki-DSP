@@ -38,3 +38,11 @@ capture. Every descriptor carries direction, default rate, supported-rate
 flags, buffer size, channel mask and the permanent distribution GUID. The
 catalog is a portable MS-PL input to the eventual SYSVAD tables; it is not a
 PortCls miniport or a signed driver.
+
+`include/hibiki/wavert_stream_v1.h` and `src/wavert_stream.c` provide the next
+portable WaveRT data-path core: caller-owned byte storage, fixed LPCM Float32
+frame geometry, single-producer/single-consumer ring operations, whole-block
+overrun rejection and an underrun-safe silence fallback. It is deliberately
+free of allocation, waits and GPL/user-space linkage. A future miniport must
+provide the required synchronization and connect its pin callbacks to this
+core; the source still does not constitute a loadable or signed `.sys`.

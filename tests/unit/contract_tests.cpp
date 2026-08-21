@@ -30,6 +30,7 @@ extern "C" {
 #include "hibiki/driver_control_v1.h"
 #include "hibiki/driver_validation_v1.h"
 #include "hibiki/wavert_endpoint_state_v1.h"
+#include "hibiki/wavert_stream_v1.h"
 #include "hibiki/endpoint_topology_v1.h"
 }
 #include "hibiki/iso226.hpp"
@@ -283,6 +284,34 @@ int main() {
     CHECK(wavert_state.effective_db_q16_16 == 0);
     CHECK(!hibiki_wavert_endpoint_state_init_v1(
         &wavert_state, "bad", 4, 48000, HIBIKI_ACTUATOR_INTERNAL_DSP));
+    std::array<std::uint8_t, 32> wavert_storage{};
+    std::array<std::uint8_t, 24> wavert_input{};
+    std::array<std::uint8_t, 32> wavert_output{};
+    for (std::size_t index = 0U; index < wavert_input.size(); ++index) {
+        wavert_input[index] = static_cast<std::uint8_t>(index + 1U);
+    }
+    hibiki_wavert_stream_v1 wavert_stream{};
+    CHECK(hibiki_wavert_stream_init_v1(&wavert_stream, wavert_storage.data(),
+                                       wavert_storage.size(), 2U, 48000U, 2U, 2U) ==
+          HIBIKI_WAVERT_STREAM_OK_V1);
+    CHECK(hibiki_wavert_stream_push_v1(&wavert_stream, wavert_input.data(), 3U) ==
+          HIBIKI_WAVERT_STREAM_OK_V1);
+    CHECK(hibiki_wavert_stream_push_v1(&wavert_stream, wavert_input.data(), 2U) ==
+          HIBIKI_WAVERT_STREAM_REJECTED_V1 && wavert_stream.dropped_frames == 2U);
+    CHECK(hibiki_wavert_stream_pop_v1(&wavert_stream, wavert_output.data(), 2U) ==
+          HIBIKI_WAVERT_STREAM_OK_V1 && wavert_output[0] == wavert_input[0] &&
+          wavert_output[15] == wavert_input[15]);
+    CHECK(hibiki_wavert_stream_push_v1(&wavert_stream, wavert_input.data(), 2U) ==
+          HIBIKI_WAVERT_STREAM_OK_V1);
+    wavert_output.fill(0xA5U);
+    CHECK(hibiki_wavert_stream_pop_or_silence_v1(&wavert_stream, wavert_output.data(), 4U) ==
+          HIBIKI_WAVERT_STREAM_UNDERRUN_V1 && wavert_stream.underrun_frames == 1U);
+    CHECK(wavert_output[31] == 0U);
+    hibiki_wavert_stream_reset_v1(&wavert_stream);
+    CHECK(wavert_stream.available_frames == 0U && wavert_stream.dropped_frames == 0U &&
+          wavert_stream.underrun_frames == 0U);
+    CHECK(hibiki_wavert_stream_init_v1(&wavert_stream, wavert_storage.data(), 8U, 2U, 48000U,
+                                       2U, 2U) == HIBIKI_WAVERT_STREAM_REJECTED_V1);
 
     PersistentLinearResampler persistent_src;
     CHECK(persistent_src.prepare(1, 1.0));
