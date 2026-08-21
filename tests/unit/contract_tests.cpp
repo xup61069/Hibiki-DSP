@@ -4,6 +4,7 @@
 #include "hibiki/device_switch.hpp"
 #include "hibiki/device_recovery.hpp"
 #include "hibiki/device_catalog.hpp"
+#include "hibiki/device_catalog_snapshot.hpp"
 #include "hibiki/ipc.hpp"
 #include "hibiki/ipc_pipe.hpp"
 #include "hibiki/asio_bridge.hpp"
@@ -897,6 +898,17 @@ int main() {
     snapshot_frame.payload.assign(snapshot_payload.begin(), snapshot_payload.begin() +
                                                         static_cast<std::ptrdiff_t>(snapshot_bytes));
     CHECK(!decode_control_command_v1(snapshot_frame, decoded_command));
+    DeviceCatalogSnapshotPublisherV1 snapshot_publisher;
+    std::array<std::uint8_t, kDeviceCatalogSnapshotPayloadBytesV1> published_payload{};
+    std::size_t published_bytes = 0U;
+    CHECK(snapshot_publisher.publish(full_devices, 32U, published_payload, published_bytes) &&
+          published_bytes == kDeviceCatalogSnapshotPayloadBytesV1);
+    CHECK(decode_device_catalog_snapshot_v1(
+              std::span<const std::uint8_t>(published_payload.data(), published_bytes),
+              decoded_snapshot) &&
+          decoded_snapshot.entry_count == kPhysicalDeviceCatalogCapacityV1 &&
+          decoded_snapshot.catalog_sequence == 32U &&
+          decoded_snapshot.entries[0].endpoint_id_bytes == 6U);
     ControlCommandQueueV1 command_queue;
     ControlCommandV1 queued_command{};
     queued_command.type = IpcMessageType::SceneApply;

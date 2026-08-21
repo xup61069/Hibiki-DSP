@@ -12,6 +12,7 @@ add_library(hibiki_hub STATIC
   src/asio_transport_consumer.cpp
   src/device_recovery.cpp
   src/device_catalog.cpp
+  src/device_catalog_snapshot.cpp
   src/device_switch.cpp
   src/engine_control.cpp
   src/exporters.cpp
