@@ -89,6 +89,10 @@ Hello 與裝置 catalog 成功後，ViewModel 會以序列化的 `ControlStatusR
 
 - Root、連接、一鍵改善、輸出群組、Expert、音量、靜音與詳細控制面板都必須有
   明確的 `AutomationProperties.Name`；需要上下文的控制項提供 `HelpText`。
+- `tools/winui-shell-check.ps1` 必須枚舉 `MainWindow.xaml` 內的 `Button`、`ComboBox`、
+  `Slider`、`ToggleSwitch`、`CheckBox`、`TextBox` 與 `NumberBox` opening elements，任何
+  缺少或空白的 `AutomationProperties.Name` 都要 fail closed；固定 anchor 檢查只是額外
+  的 binding gate，不得取代完整 control 掃描。
 - 場景按鈕的可及性名稱與說明從 `SceneCard` 綁定，不依賴視覺排版或顏色傳達狀態。
 - 狀態文字以 polite live region 告知連線／控制結果，避免螢幕閱讀器被高頻音量事件打斷。
 - XAML 靜態 gate 必須檢查上述 binding；目標 Windows App SDK 環境仍需做真正的鍵盤、
