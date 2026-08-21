@@ -81,6 +81,10 @@
   and Disabled/Unplugged/Unknown endpoints cannot be selected. `DeviceRecoveryCoordinator` now
   resolves catalog entries before starting a rebind transaction. COM enumeration and physical
   hotplug soak remain external gates.
+- `DeviceSwitch` v1 now has a fixed 288-byte C++/C# request and schema, strict endpoint/format/
+  padding validation, catalog-sequence propagation and an explicit EngineControl handler gate.
+  The WinUI shell mirrors selectable render cards and rolls back its UI transaction when the
+  command send fails; it does not claim a physical switch before an engine Ack.
 - Parameterized ISO 226:2023 SPL-from-phon formula using caller-supplied legal parameters;
   the 1 kHz invariant and phon bounds are covered by CTest without embedding the licensed
   29-point coefficient table.
@@ -294,13 +298,15 @@ ASIO transport/ring、tab/Virtual Mic lane adapter、session-route/output-handof
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
-目前 catalog-gated recovery rebind 的 source commit 是 `bc66229`；其餘較早 scope 仍以
+目前 catalog-gated recovery rebind 的 source commit 是 `bc66229`；DeviceSwitch control-plane
+與 WinUI picker 的 source commit 是 `a97e9f8`；其餘較早 scope 仍以
 下方 evidence manifest 的各自 commit 與限制為準。
 
-目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 65 個必要入口與
-15 份 Spec 通過；`source-policy.ps1` 掃描 280 個路徑且無 blocked binary/secret；
+目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 66 個必要入口與
+15 份 Spec 通過；`source-policy.ps1` 掃描 281 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
-`distribution-check.ps1` 與 `driver-source-check.ps1` 通過；32 個 repository JSON 檔案均可解析。以本機 pinned ASIO SDK
+`distribution-check.ps1` 與 `driver-source-check.ps1` 通過；33 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
+288-byte payload、catalog sequence、handler fail-closed 與 WinUI send-failure rollback 亦通過。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
 `.local/`，未提交或發布。以本機 pinned VST3 SDK 另行執行的 optional target
 `hibiki_vst3_sdk_catalog` 與 `hibiki_vst3_sdk_worker`（含 bounded one-main-bus processor、
