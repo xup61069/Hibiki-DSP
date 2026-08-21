@@ -22,11 +22,11 @@
         "allowed text extension acceptance",
         "case-insensitive blocked extension rejection",
         "PE MZ header rejection",
-        "BEGIN PRIVATE KEY secret-pattern rejection",
-        "GUMROAD_ACCESS_TOKEN secret-pattern rejection",
-        "PARTNER_CENTER_TOKEN secret-pattern rejection",
-        "ghp_ secret-pattern rejection",
-        "github_pat_ secret-pattern rejection"
+        "private-key marker secret-pattern rejection",
+        "Gumroad token marker secret-pattern rejection",
+        "Partner Center token marker secret-pattern rejection",
+        "GitHub classic-token prefix secret-pattern rejection",
+        "GitHub fine-grained-token prefix secret-pattern rejection"
       ],
       "cases": 10,
       "compiled_artifacts": false
