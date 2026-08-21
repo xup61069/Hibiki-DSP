@@ -179,6 +179,14 @@ int main() {
                                 std::span<const std::uint8_t>(session_response->payload.data(),
                                                                session_response->payload.size()),
                                 decoded_sessions);
+    std::size_t session_volume_available = 0U;
+    if (session_ok) {
+        for (std::size_t index = 0U; index < decoded_sessions.entry_count; ++index) {
+            if ((decoded_sessions.entries[index].flags & 1U) != 0U) {
+                ++session_volume_available;
+            }
+        }
+    }
     std::printf("catalog_refresh=pass entries=%zu sequence=%llu payload_bytes=%zu wire=%s runtime=%s request=%s\n",
                 runtime.catalog().size(), static_cast<unsigned long long>(runtime.catalog_sequence()),
                 response.has_value() ? response->payload.size() : 0U,
@@ -191,12 +199,12 @@ int main() {
                 static_cast<unsigned int>(decoded_status.routes[0].state),
                 static_cast<unsigned int>(decoded_status.routes[1].state));
     const auto live_route_snapshot = runtime.session_route_snapshot();
-    std::printf("session_catalog=%s entries=%u generation=%llu bound=%s observed=%zu active=%zu\n",
+    std::printf("session_catalog=%s entries=%u generation=%llu bound=%s observed=%zu active=%zu volume_available=%zu\n",
                 session_ok ? "pass" : "unavailable",
                 decoded_sessions.entry_count,
                 static_cast<unsigned long long>(decoded_sessions.generation),
                 runtime.session_routes_bound() ? "yes" : "no", live_route_snapshot.session_count,
-                live_route_snapshot.active_count);
+                live_route_snapshot.active_count, session_volume_available);
     if (client != INVALID_HANDLE_VALUE) CloseHandle(client);
     runtime.stop();
     enumerator->Release();

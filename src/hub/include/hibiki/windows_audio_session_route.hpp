@@ -72,7 +72,7 @@ public:
         ProcessLoopbackPlanV1& plan) const noexcept;
     [[nodiscard]] bool make_session_catalog_snapshot(
         std::uint64_t sequence,
-        SessionCatalogSnapshotV1& snapshot) const noexcept;
+        SessionCatalogSnapshotV1& snapshot) noexcept;
     [[nodiscard]] WindowsAudioSessionRouteSnapshotV1 snapshot() const noexcept;
 
 private:

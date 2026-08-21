@@ -189,7 +189,7 @@ ProcessLoopbackPlanResultV1 WindowsAudioSessionRouteCoordinatorV1::copy_process_
 
 bool WindowsAudioSessionRouteCoordinatorV1::make_session_catalog_snapshot(
     const std::uint64_t sequence,
-    SessionCatalogSnapshotV1& snapshot) const noexcept {
+    SessionCatalogSnapshotV1& snapshot) noexcept {
     snapshot = {};
     if (!bound_ || degraded_ || sequence == 0U ||
         generation_ > static_cast<std::uint64_t>((std::numeric_limits<std::uint32_t>::max)()) ||
@@ -209,6 +209,16 @@ bool WindowsAudioSessionRouteCoordinatorV1::make_session_catalog_snapshot(
                                  : (source.lane_id.empty() || source.output_group.empty()
                                         ? SessionCatalogRouteStateV1::Pending
                                         : SessionCatalogRouteStateV1::Ready);
+        if (source.active) {
+            double requested_db = 0.0;
+            bool mute = false;
+            if (SUCCEEDED(watcher_.read_session_volume(source.identity.session_instance_id,
+                                                       requested_db, mute))) {
+                target.flags = 1U;
+                target.requested_db_q16_16 = db_to_q16_16(requested_db);
+                target.mute = mute ? 1U : 0U;
+            }
+        }
         const auto copy_text = [](const std::string& source_text,
                                   auto& target_text,
                                   std::uint16_t& target_bytes) noexcept {
