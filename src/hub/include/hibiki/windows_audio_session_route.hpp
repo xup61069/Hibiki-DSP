@@ -11,6 +11,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 namespace hibiki {
 
@@ -46,6 +47,15 @@ public:
     [[nodiscard]] HRESULT bind(IMMDevice* device);
     void unbind() noexcept;
     [[nodiscard]] bool set_rules(const SessionRouteRuleStoreV1& rules) noexcept;
+    // Control-plane per-session volume access. The instance ID is an
+    // ephemeral Windows session key; it is never persisted as profile identity.
+    [[nodiscard]] HRESULT write_session_volume(std::string_view session_instance_id,
+                                                double requested_db,
+                                                bool mute,
+                                                const GUID& event_context) noexcept;
+    [[nodiscard]] HRESULT read_session_volume(std::string_view session_instance_id,
+                                               double& requested_db,
+                                               bool& mute) noexcept;
     [[nodiscard]] WindowsAudioSessionRouteRefreshResultV1 refresh() noexcept;
     [[nodiscard]] WindowsAudioSessionRouteRefreshResultV1 poll_and_refresh() noexcept;
     [[nodiscard]] bool bound() const noexcept { return bound_; }

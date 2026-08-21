@@ -552,6 +552,24 @@ bool WindowsControlRuntimeV1::poll_volume(
     return true;
 }
 
+HRESULT WindowsControlRuntimeV1::write_session_volume(
+    const std::string_view session_instance_id,
+    const double requested_db,
+    const bool mute,
+    const GUID& event_context) noexcept {
+    if (!running()) return E_UNEXPECTED;
+    return session_routes_.write_session_volume(session_instance_id, requested_db, mute,
+                                                 event_context);
+}
+
+HRESULT WindowsControlRuntimeV1::read_session_volume(
+    const std::string_view session_instance_id,
+    double& requested_db,
+    bool& mute) noexcept {
+    if (!running()) return E_UNEXPECTED;
+    return session_routes_.read_session_volume(session_instance_id, requested_db, mute);
+}
+
 bool WindowsControlRuntimeV1::publish_status_snapshot(
     const ControlStatusSnapshotV1& snapshot) noexcept {
     if (!status_store_.publish(snapshot)) return false;

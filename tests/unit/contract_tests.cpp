@@ -2256,17 +2256,23 @@ int main() {
           !device_catalog_snapshot_reply_v1(service_catalog_response,
                                              catalog_service.snapshot_store()));
     WindowsControlRuntimeV1 control_runtime;
+    double unbound_session_db = -4.0;
+    bool unbound_session_mute = true;
+    GUID session_context{};
     CHECK(!control_runtime.start(nullptr, IpcNamedPipeConfigV1{L"", 1024U, 100U}) &&
           !control_runtime.running() && control_runtime.refresh_now() == E_UNEXPECTED &&
           control_runtime.poll_and_refresh() == E_UNEXPECTED &&
           control_runtime.refresh_default_volume(nullptr) == E_INVALIDARG &&
-          control_runtime.refresh_default_volume_if_changed(nullptr) == E_INVALIDARG);
+          control_runtime.refresh_default_volume_if_changed(nullptr) == E_INVALIDARG &&
+          control_runtime.write_session_volume("missing", -12.0, false, session_context) ==
+              E_UNEXPECTED &&
+          control_runtime.read_session_volume("missing", unbound_session_db,
+                                             unbound_session_mute) == E_UNEXPECTED);
     auto* session_watcher = new WindowsAudioSessionWatcher();
     std::uint64_t session_sequence = 0;
     CHECK(!session_watcher->poll(session_sequence));
     CHECK(session_watcher->OnSessionCreated(nullptr) == S_OK);
     CHECK(session_watcher->poll(session_sequence) && session_sequence == 1U);
-    GUID session_context{};
     CHECK(session_watcher->write_session_volume("missing", -12.0, false, session_context) ==
           E_UNEXPECTED);
     double session_db = 0.0;
@@ -2285,7 +2291,11 @@ int main() {
           !session_route_coordinator.copy_graph(session_route_graph) &&
           session_route_coordinator.copy_process_loopback_plan(session_process_plan) ==
               ProcessLoopbackPlanResultV1::NoRoutes && session_process_plan.size == 0U &&
-          !session_route_coordinator.snapshot().has_graph);
+          !session_route_coordinator.snapshot().has_graph &&
+          session_route_coordinator.write_session_volume("missing", -12.0, false,
+                                                         session_context) == E_UNEXPECTED &&
+          session_route_coordinator.read_session_volume("missing", unbound_session_db,
+                                                        unbound_session_mute) == E_UNEXPECTED);
     WindowsProcessLoopbackSourceV1 process_loopback;
     std::uint32_t loopback_frames = 99U;
     CHECK(process_loopback.start(WindowsProcessLoopbackConfigV1{}) == E_INVALIDARG &&

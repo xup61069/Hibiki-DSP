@@ -16,6 +16,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 namespace hibiki {
 
@@ -143,6 +144,13 @@ public:
     [[nodiscard]] HRESULT write_volume(const OutputGroupVolumeStateV1& state,
                                        const GUID& event_context) noexcept;
     [[nodiscard]] bool poll_volume(WindowsVolumeNotificationSnapshotV1& snapshot) noexcept;
+    [[nodiscard]] HRESULT write_session_volume(std::string_view session_instance_id,
+                                               double requested_db,
+                                               bool mute,
+                                               const GUID& event_context) noexcept;
+    [[nodiscard]] HRESULT read_session_volume(std::string_view session_instance_id,
+                                              double& requested_db,
+                                              bool& mute) noexcept;
     [[nodiscard]] bool running() const noexcept { return host_.running(); }
     [[nodiscard]] bool client_connected() const noexcept { return host_.client_connected(); }
     [[nodiscard]] bool volume_bound() const noexcept { return volume_broker_.is_bound(); }

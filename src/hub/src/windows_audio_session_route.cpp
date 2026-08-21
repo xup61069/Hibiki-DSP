@@ -4,6 +4,7 @@
 
 #if defined(_WIN32)
 
+#include <cmath>
 #include <new>
 #include <utility>
 
@@ -38,6 +39,57 @@ bool WindowsAudioSessionRouteCoordinatorV1::set_rules(
     }
     watcher_.set_route_rules(&rules_);
     return true;
+}
+
+namespace {
+
+constexpr std::size_t kMaxSessionControlIdentityBytesV1 = 260U;
+
+bool valid_session_control_request(const std::string_view session_instance_id,
+                                   const double requested_db) noexcept {
+    return !session_instance_id.empty() &&
+           session_instance_id.size() <= kMaxSessionControlIdentityBytesV1 &&
+           std::isfinite(requested_db) && requested_db >= -144.0 && requested_db <= 12.0;
+}
+
+bool has_session_instance(const AudioSessionRegistry& registry,
+                          const std::string_view session_instance_id) noexcept {
+    for (const auto& session : registry.sessions()) {
+        if (session.identity.session_instance_id == session_instance_id) return true;
+    }
+    return false;
+}
+
+}  // namespace
+
+HRESULT WindowsAudioSessionRouteCoordinatorV1::write_session_volume(
+    const std::string_view session_instance_id,
+    const double requested_db,
+    const bool mute,
+    const GUID& event_context) noexcept {
+    if (!bound_) return E_UNEXPECTED;
+    if (!valid_session_control_request(session_instance_id, requested_db)) {
+        return E_INVALIDARG;
+    }
+    if (!has_session_instance(registry_, session_instance_id)) {
+        return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+    }
+    return watcher_.write_session_volume(session_instance_id, requested_db, mute, event_context);
+}
+
+HRESULT WindowsAudioSessionRouteCoordinatorV1::read_session_volume(
+    const std::string_view session_instance_id,
+    double& requested_db,
+    bool& mute) noexcept {
+    if (!bound_) return E_UNEXPECTED;
+    if (session_instance_id.empty() ||
+        session_instance_id.size() > kMaxSessionControlIdentityBytesV1) {
+        return E_INVALIDARG;
+    }
+    if (!has_session_instance(registry_, session_instance_id)) {
+        return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+    }
+    return watcher_.read_session_volume(session_instance_id, requested_db, mute);
 }
 
 WindowsAudioSessionRouteRefreshResultV1 WindowsAudioSessionRouteCoordinatorV1::refresh() noexcept {
