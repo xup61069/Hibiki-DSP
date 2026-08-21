@@ -66,6 +66,9 @@
 - The control pipe now preserves the legacy 16-byte Main volume command and adds a validated
   48-byte grouped command; C++ and C# route the selected UI output group to its own canonical
   volume bank instead of silently writing Main.
+- C# control model now exposes a bounded 32-entry custom Scene card mirror. Reserved built-in IDs,
+  malformed IDs and over-capacity inserts fail closed; selecting a custom card still emits the
+  existing SceneApply payload and never claims that its engine graph is loaded.
 - `TruePeakLimiterV1` 已接在非 Strict Direct render 尾端：固定 8-channel、非有限值歸零、
   −1 dBTP bounded inter-sample guard；目前仍不宣稱正式 ITU/BS.1770 conformance。
 - Windows-only `IAudioEndpointVolume` broker with non-blocking callback snapshot, dB/mute
@@ -278,12 +281,12 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 Windows volume/device、ISO formula、recovery、driver control-core/INF template、persistent SRC、
 VST worker、control pipe/payloads、session volume adapter、sink clock pipeline、optional native
 ASIO transport/ring、tab/Virtual Mic lane adapter、session-route/output-handoff、control-model
-與 VST3 latency graph commit／RT lane latency bank／parameter timeline／Scene automation refs／rollback lifecycle／UI device fade／plugin lane token／VST3 supervisor handshake/process exchange／VST3 worker lane timeline bridge／PluginHostModel worker-lane wiring／VST3 Scene automation scheduler／VST3 private plugin-state store／VST3 bounded SDK IBStream／VST3 state migration registry／VST3 Scene state coordinator／ISO formula compensation builder／source-only CI publication gate／WDK property request hardening／multi-sink fan-out、per-sink clock/SRC runtime、AudioEngine fan-out boundary、精確容量 preflight、高倍率 SRC phase guard、portable WaveRT stream ring、WDK pin adapter、driver→engine stream packet bridge、endpoint identity、graph lane binding、WASAPI IAudioClock drift path、雙 worker WASAPI handoff、graph-to-WASAPI adapter、ASIO-to-WASAPI path、driver-to-WASAPI path、tab-to-WASAPI path、virtual-mic-to-WASAPI path、Windows WASAPI fan-out graph adapter、K-weighted program-level proxy、WinUI Expert readonly surface、VST3 Scene state preflight adapter、第三方 state compatibility review checklist、migration output overflow fail-closed coverage、WinUI accessibility source gate、bounded per-App session route rules、64-rule capacity、Windows watcher enumerate 套用、per-output-group volume bank、bounded custom Scene catalog/resolver 與 grouped volume IPC coverage 的 fail-closed safety baseline `0158f8d`；
+與 VST3 latency graph commit／RT lane latency bank／parameter timeline／Scene automation refs／rollback lifecycle／UI device fade／plugin lane token／VST3 supervisor handshake/process exchange／VST3 worker lane timeline bridge／PluginHostModel worker-lane wiring／VST3 Scene automation scheduler／VST3 private plugin-state store／VST3 bounded SDK IBStream／VST3 state migration registry／VST3 Scene state coordinator／ISO formula compensation builder／source-only CI publication gate／WDK property request hardening／multi-sink fan-out、per-sink clock/SRC runtime、AudioEngine fan-out boundary、精確容量 preflight、高倍率 SRC phase guard、portable WaveRT stream ring、WDK pin adapter、driver→engine stream packet bridge、endpoint identity、graph lane binding、WASAPI IAudioClock drift path、雙 worker WASAPI handoff、graph-to-WASAPI adapter、ASIO-to-WASAPI path、driver-to-WASAPI path、tab-to-WASAPI path、virtual-mic-to-WASAPI path、Windows WASAPI fan-out graph adapter、K-weighted program-level proxy、WinUI Expert readonly surface、VST3 Scene state preflight adapter、第三方 state compatibility review checklist、migration output overflow fail-closed coverage、WinUI accessibility source gate、bounded per-App session route rules、64-rule capacity、Windows watcher enumerate 套用、per-output-group volume bank、bounded custom Scene catalog/resolver、grouped volume IPC、C# custom Scene card mirror coverage 的 fail-closed safety baseline `6219a2e`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 62 個必要入口與
-14 份 Spec 通過；`source-policy.ps1` 掃描 272 個路徑且無 blocked binary/secret；
+14 份 Spec 通過；`source-policy.ps1` 掃描 273 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1` 與 `driver-source-check.ps1` 通過；38 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
@@ -292,5 +295,5 @@ working tree 與該 scope 是否一致。
 parameter frame 與 `IParameterChanges` bridge）unsigned build 亦通過；輸出同樣
 只在 `.local/`。`doctor.ps1 -CheckOnly` 明確顯示本機低於鎖定的 Windows/VS/WDK 版本，因此
 沒有把 driver、HLK、簽章、真實 endpoint 或第三方 plugin certification 結果誇大為已驗收。C++
-與 C# grouped-volume payload round-trip、legacy payload compatibility 與 selected group resolver
-亦已通過本機 contract/control-model checks。
+與 C# grouped-volume payload round-trip、legacy payload compatibility、selected group resolver
+及 custom Scene card mirror 亦已通過本機 contract/control-model checks。

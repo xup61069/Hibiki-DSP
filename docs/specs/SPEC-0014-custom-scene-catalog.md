@@ -6,7 +6,7 @@ authority: product-behavior
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["src/hub/**scene_catalog*", "src/hub/**engine_control*", "schemas/scene-definition-v1.schema.json", "tests/**"]
+source_globs: ["src/hub/**scene_catalog*", "src/hub/**engine_control*", "apps/control-model/**Scene*", "schemas/scene-definition-v1.schema.json", "tests/**"]
 ---
 
 # SPEC-0014：自定義 Scene catalog 與 SceneApply resolver
@@ -17,6 +17,12 @@ source_globs: ["src/hub/**scene_catalog*", "src/hub/**engine_control*", "schemas
 `SceneProfileV1`、`GraphConfigV1` 與 `EqualLoudnessPolicyV1`。`SceneApply` 對四個內建
 ID 維持原本行為；其他 ID 必須由 catalog 解析，且 payload 的 output group 必須與保存的
 Scene 完全相同，避免 UI 顯示一組 Scene 卻把音訊送到另一個 group。
+
+控制模型同時提供一個最多 32 筆的 UI Scene card mirror。它只保存可顯示的 ID、名稱、說明、
+延遲標籤與安全旗標；完整 graph、loudness 與 calibration 仍由引擎端
+`SceneDefinitionV1` 管理。UI mirror 不得覆寫四個內建 ID，選取自訂卡片仍只能送出既有
+`SceneApply(scene_id, output_group)`，因此 output-group exact-match 與引擎端 fail-closed
+規則不會被繞過。
 
 ## 交易與容量
 
@@ -38,7 +44,8 @@ catalog，讓沒有使用者 preset 的 fresh clone 維持向後相容。
 
 ## 驗收
 
-1. 合法 custom Scene 可 upsert、find、替換與透過 SceneApply commit。
+1. 合法 custom Scene 可在引擎 catalog upsert、find、替換並透過 SceneApply commit；C# UI
+   mirror 可 upsert、移除、列舉與選取同一個 ID。
 2. Strict Direct mismatch、非法 policy/graph、未知 ID 與 group mismatch fail-closed。
 3. 32-entry capacity、remove/clear 與 replacement failure 不破壞既有 slot。
 4. CTest、docs-check、source-policy 與 source-only CI gate 通過；沒有 binary 或私人裝置
