@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "winui-compat-preview-v1",
+  "source_commit": "6e84165",
+  "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-vs2026-wdk-missing",
+  "commands": [
+    "Get-AppxPackage -Name Microsoft.WindowsAppRuntime.1.7",
+    "Get-AuthenticodeSignature .local/WindowsAppRuntimeInstall-x64.exe",
+    "pwsh -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
+    "pwsh -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+    "pwsh -File tools/winui-shell-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1"
+  ],
+  "results": [
+    {
+      "command": "Get-AppxPackage -Name Microsoft.WindowsAppRuntime.1.7",
+      "status": "pass",
+      "coverage": [
+        "Microsoft.WindowsAppRuntime.1.7 x64 7000.785.2325.0 is registered with Status Ok"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Get-AuthenticodeSignature .local/WindowsAppRuntimeInstall-x64.exe",
+      "status": "pass",
+      "coverage": [
+        "downloaded runtime installer is Microsoft-signed; installer remains in ignored .local only"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "compatibility WinUI shell builds",
+        "Hibiki.WinUI.exe stays alive for the launch smoke and exposes a WinUI Desktop window"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "runtime-free fallback remains buildable and launchable"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/winui-shell-check.ps1; tools/docs-check.ps1; tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "source-only WinUI contract and documentation remain valid",
+        "no binaries or runtime installer are tracked"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "WinUICompat is a non-packaged compatibility launch check, not formal XAML, accessibility or release evidence.",
+    "The formal WinUI target still requires the locked VS 2026/Windows SDK toolchain; the local VS 17 XamlCompiler target is not accepted as target evidence.",
+    "The installer and all preview binaries stay under ignored .local paths and are not GitHub artifacts."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "windows_app_runtime": "1.7.7000.785 x64",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}

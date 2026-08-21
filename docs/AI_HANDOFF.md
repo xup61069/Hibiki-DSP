@@ -66,6 +66,9 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   delivery 證據；Desktop Preview 只顯示安全摘要與明確的 delivery unverified 警示。
 - ISO 226 只保留合法 formula/derived boundary；禁止把受限標準文件、完整表格、掃圖或其內容
   放進 source、Issue、prompt、RAG、fixture 或 evidence。
+- `evidence/0000-foundation/winui-compat-preview-v1.json` records the local Microsoft App Runtime
+  1.7 installation and the successful `WinUICompat -SmokeTest`; it is only a compatibility launch
+  proof and must not be promoted to formal XAML/accessibility evidence.
 
 ## 唯一下一步
 

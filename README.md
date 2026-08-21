@@ -159,8 +159,9 @@ pwsh -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest
 ```
 
 若缺少 Runtime，會出現「Required components of the Windows App Runtime are missing」；請安裝
-Windows App Runtime 1.7 x64，或改用不需要 Runtime 的 Desktop Compatibility Preview。這個錯誤
-不代表 Desktop Compatibility Preview 損壞。
+Windows App Runtime 1.7 x64（可從 [Microsoft 官方歷史下載頁](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/downloads-archive)
+選擇 Installer (x64)），或改用不需要 Runtime 的 Desktop Compatibility Preview。這個錯誤不代表
+Desktop Compatibility Preview 損壞。
 
 要只驗證 C# control model 與 C++ Engine Preview 的實際命令往返，可執行：
 
