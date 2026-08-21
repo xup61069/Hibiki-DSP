@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "ir-phase-kernel-v1",
+  "source_commit": "8e73ea0",
+  "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "bounded real-cepstrum minimum-phase reconstruction",
+        "source-magnitude causal linear-phase target",
+        "mixed/linear strength interpolation",
+        "independent channel-major kernels",
+        "zero-strength source retention",
+        "Bypass source retention and WAV prepare fail-closed",
+        "C++ build and CTest contract suite"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "SPEC-0002 phase semantics",
+        "BASELINE and AI handoff references",
+        "project map and required documentation paths"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "source-only tracked path policy"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "no compiled artifact or binary upload policy violation"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The transform is control-plane only; no FFT, allocation or file I/O is permitted on the RT thread.",
+    "The UI has no IR file selection or kernel prepare command yet.",
+    "Declared delay remains a policy budget and requires measured graph latency before commit.",
+    "No physical sink, WaveRT driver, ISO coefficient data or audible conformance is claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00+08:00",
+  "finished_at": "2026-08-21T00:00:00+08:00"
+}
