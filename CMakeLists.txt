@@ -4,6 +4,7 @@ project(HibikiDSP VERSION 0.1.0 LANGUAGES C CXX)
 
 option(HIBIKI_BUILD_TESTS "Build contract and DSP tests" ON)
 option(HIBIKI_BUILD_LIVE_PROBES "Build opt-in probes that touch local Windows audio" OFF)
+option(HIBIKI_BUILD_ENGINE_PREVIEW "Build the local named-pipe engine preview" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,6 +21,12 @@ add_subdirectory(driver)
 add_subdirectory(asio)
 add_subdirectory(vst-host)
 add_subdirectory(extensions/native_bridge)
+
+if(WIN32 AND HIBIKI_BUILD_ENGINE_PREVIEW)
+  add_executable(hibiki_engine_preview apps/engine-preview/engine_preview.cpp)
+  target_link_libraries(hibiki_engine_preview PRIVATE hibiki_hub)
+  target_compile_features(hibiki_engine_preview PRIVATE cxx_std_20)
+endif()
 
 if(HIBIKI_BUILD_TESTS)
   enable_testing()
