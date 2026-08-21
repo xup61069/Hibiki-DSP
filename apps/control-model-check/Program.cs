@@ -80,6 +80,19 @@ Check(routeRules.Upsert(quietRule with { Priority = 40 }) && routeRules.Count ==
     "Session route rule catalog validation/update failed.");
 Check(routeRules.Remove("music") && routeRules.Count == 1,
     "Session route rule catalog cleanup failed.");
+var previewSession = new SessionCatalogEntryV1(
+    100UL, true, SessionCatalogRouteStateV1.Ready, true, -8.0, false,
+    "DJMAX", "game.exe", "old-lane", "main");
+Check(routeRules.TryResolve(previewSession, out var resolvedRule) ==
+          SessionRouteRuleResolutionV1.Applied && resolvedRule?.RuleId == "quiet-game",
+    "Session route rule resolver did not match App ID and display name.");
+Check(routeRules.TryResolve(previewSession with { AppId = "other.exe", Name = "Other" },
+                            out _) == SessionRouteRuleResolutionV1.NoMatch,
+    "Session route rule resolver must reject non-matching sessions.");
+Check(routeRules.Upsert(quietRule with { RuleId = "quiet-game-2", Priority = 40 }) &&
+      routeRules.TryResolve(previewSession, out _) == SessionRouteRuleResolutionV1.Ambiguous &&
+      routeRules.Remove("quiet-game-2"),
+    "Equal-priority route rule matches must fail closed as ambiguous.");
 var routeRulePath = Path.Combine(Path.GetTempPath(),
     $"hibiki-route-rule-check-{Guid.NewGuid():N}.json");
 try
@@ -376,6 +389,15 @@ var staleSession = new IpcEnvelopeV1(
 Check(!viewModel.ApplySessionCatalogSnapshot(staleSession, out var staleSessionError) &&
       staleSessionError.Contains("過期") && viewModel.SessionCatalog.Count == 2,
     "Stale App session catalog must preserve the previous catalog.");
+var viewModelRule = new SessionRouteRuleCard(
+    "quiet-game", 20, true, SessionRouteRuleGainOwnerV1.WindowsSession, 3.5,
+    "game.exe", "DJMAX", "game", "surround");
+Check(viewModel.UpsertRouteRule(viewModelRule) &&
+      viewModel.SelectSession(sessionEntries[0].Handle) &&
+      viewModel.SelectedRouteRuleSummary.Contains("預覽預設") &&
+      viewModel.SessionRouteLaneId == "game" &&
+      viewModel.SessionRouteOutputGroup == "surround",
+    "ViewModel must preview a matching App route preset without claiming it was applied.");
 Check(viewModel.SelectSession(sessionEntries[0].Handle) &&
       viewModel.SelectedSession?.DisplayName == "DJMAX" &&
       viewModel.BuildSessionVolumeCommand(sessionEntries[0].Handle, -9.5, true).Type ==
@@ -397,9 +419,6 @@ Check(!viewModel.SelectSession(staleHandle),
 Check(viewModel.BuildSessionRouteCommand(sessionEntries[0].Handle, "game", "surround").Type ==
           ControlMessageType.SessionRouteCommand,
     "ViewModel App session route command failed to bind the current handle.");
-var viewModelRule = new SessionRouteRuleCard(
-    "quiet-game", 20, true, SessionRouteRuleGainOwnerV1.WindowsSession, 3.5,
-    "game.exe", "DJMAX", "game", "surround");
 var viewModelRuleCommand = viewModel.BuildUpsertSessionRouteRuleCommand(viewModelRule);
 Check(viewModelRuleCommand.Type == ControlMessageType.SessionRouteRuleCommand &&
       ControlPayloadsV1.TryDecodeSessionRouteRuleCommand(viewModelRuleCommand.Payload.Span,

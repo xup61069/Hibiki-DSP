@@ -33,6 +33,10 @@ Catalog refresh 產生非零 `SessionCatalogSequence` 後，新增／更新／�
 時可以保存本機預設，但 UI 必須明示「尚未套用」，不可把保存誤報成引擎已套用。送出後仍需
 engine Ack；失敗保留本機預設並顯示未套用狀態，下一次可重試。
 
+選取 App 時，control model 會以與 engine 相同的規則預覽器比對：App ID 必須完整相等、
+顯示名稱為不分大小寫的包含比對；最高優先級唯一命中才填入 Lane／Output 預覽。同優先級
+多筆命中時顯示歧義並停止自動預覽，不能依保存順序猜測。
+
 ## UI 與安全
 
 Expert 面板提供可讀的規則摘要、欄位提示、啟用與 gain owner 選擇；移除與清除都經由同一
@@ -43,9 +47,10 @@ Chrome 單分頁捕捉或 vendor ASIO 攔截。
 ## 驗收
 
 1. C# catalog 的 insert／update／排序／capacity／文字與 gain 驗證通過。
-2. 原子保存、合法載入、schema／JSON／重複 rule 失敗回復上一份狀態通過。
-3. ViewModel 使用目前 session catalog sequence 產生 480-byte Upsert／Remove／Clear 命令；
+2. Resolver 的 App ID／名稱比對、最高優先級與同優先級歧義 fail-closed 通過。
+3. 原子保存、合法載入、schema／JSON／重複 rule 失敗回復上一份狀態通過。
+4. ViewModel 使用目前 session catalog sequence 產生 480-byte Upsert／Remove／Clear 命令；
    sequence 為零時 fail closed。
-4. Expert WinUI source gate 通過；無編譯物、PID、Endpoint ID 或個人路徑進入 repository。
-5. 實體引擎 Ack、active-session delivery、裝置拔插與 Audio Service restart 仍依
+5. Expert WinUI source gate 通過；無編譯物、PID、Endpoint ID 或個人路徑進入 repository。
+6. 實體引擎 Ack、active-session delivery、裝置拔插與 Audio Service restart 仍依
    SPEC-0023 與目標 Windows 11 24H2 硬體驗收，不在本 spec 宣稱完成。

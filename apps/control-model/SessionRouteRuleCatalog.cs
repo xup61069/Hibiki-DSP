@@ -35,6 +35,13 @@ public sealed record SessionRouteRuleCard(
         $"{LaneId}／{OutputGroup}｜{MakeupGainDb:0.0} dB（{GainOwnerLabel}）";
 }
 
+public enum SessionRouteRuleResolutionV1
+{
+    NoMatch,
+    Applied,
+    Ambiguous
+}
+
 public sealed class SessionRouteRuleCatalogV1
 {
     public const int MaxRules = 64;
@@ -79,6 +86,33 @@ public sealed class SessionRouteRuleCatalogV1
     }
 
     public void Clear() => _rules.Clear();
+
+    // Mirrors the engine's control-plane resolver for a safe UI preview. A
+    // matching App ID is exact (case-insensitive); a display matcher is a
+    // case-insensitive substring. Multiple equal-priority matches are
+    // deliberately ambiguous instead of depending on catalog order.
+    public SessionRouteRuleResolutionV1 TryResolve(
+        SessionCatalogEntryV1 session, out SessionRouteRuleCard? selected)
+    {
+        selected = null;
+        foreach (var rule in _rules)
+        {
+            if (!rule.Enabled || !Matches(rule, session)) continue;
+            if (selected is null || rule.Priority > selected.Priority)
+            {
+                selected = rule;
+                continue;
+            }
+            if (rule.Priority == selected.Priority)
+            {
+                selected = null;
+                return SessionRouteRuleResolutionV1.Ambiguous;
+            }
+        }
+        return selected is null
+            ? SessionRouteRuleResolutionV1.NoMatch
+            : SessionRouteRuleResolutionV1.Applied;
+    }
 
     public bool TrySave(string filePath, out string error)
     {
@@ -241,6 +275,18 @@ public sealed class SessionRouteRuleCatalogV1
             if ((!lower && !digit && !separator) ||
                 (index == 0 && !lower && !digit)) return false;
         }
+        return true;
+    }
+
+    private static bool Matches(SessionRouteRuleCard rule, SessionCatalogEntryV1 session)
+    {
+        if (!string.IsNullOrWhiteSpace(rule.AppId) &&
+            !string.Equals(rule.AppId, session.AppId, StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (!string.IsNullOrWhiteSpace(rule.DisplayName) &&
+            (string.IsNullOrEmpty(session.Name) ||
+             session.Name.IndexOf(rule.DisplayName, StringComparison.OrdinalIgnoreCase) < 0))
+            return false;
         return true;
     }
 

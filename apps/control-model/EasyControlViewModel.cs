@@ -30,6 +30,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private ulong _selectedSessionHandle;
     private string _sessionRouteLaneId = "app-lane";
     private string _sessionRouteOutputGroup = "main";
+    private string _selectedRouteRuleSummary = "尚未選取 App；不會自動套用路由";
     private double _sessionVolumeDb = -12.0;
     private bool _sessionMuted;
     private string _routeRuleId = string.Empty;
@@ -110,6 +111,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             OnPropertyChanged();
         }
     }
+    public string SelectedRouteRuleSummary => _selectedRouteRuleSummary;
     public double SessionVolumeDb
     {
         get => _sessionVolumeDb;
@@ -371,6 +373,16 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         return true;
     }
 
+    // In-memory helper for a host that has already loaded or edited a preset;
+    // AddOrUpdateRouteRule remains the persistence-aware UI operation.
+    public bool UpsertRouteRule(SessionRouteRuleCard rule)
+    {
+        if (!_session.RouteRules.Upsert(rule)) return false;
+        OnPropertyChanged(nameof(RouteRules));
+        if (SelectedSession is not null) ApplySelectedRouteRulePreview();
+        return true;
+    }
+
     public bool AddCustomScene()
     {
         var scene = new SceneCard(CustomSceneId.Trim(), CustomSceneName.Trim(),
@@ -472,6 +484,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         _sessionCatalogSequence = sequence;
         if (SelectedSession is null) SelectedSessionHandle = 0UL;
         SyncSelectedSessionVolume();
+        ApplySelectedRouteRulePreview();
         OnPropertyChanged(nameof(SessionCatalog));
         OnPropertyChanged(nameof(SessionCatalogSequence));
         OnPropertyChanged(nameof(SelectedSession));
@@ -488,6 +501,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         }
         SelectedSessionHandle = handle;
         SyncSelectedSessionVolume();
+        ApplySelectedRouteRulePreview();
         StatusText = $"已選擇 {SelectedSession?.DisplayName ?? "App 工作階段"}";
         return true;
     }
@@ -500,6 +514,34 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         _sessionMuted = selected.Muted;
         OnPropertyChanged(nameof(SessionVolumeDb));
         OnPropertyChanged(nameof(SessionMuted));
+    }
+
+    private void ApplySelectedRouteRulePreview()
+    {
+        var selected = SelectedSession;
+        if (selected is null)
+        {
+            _selectedRouteRuleSummary = "尚未選取 App；不會自動套用路由";
+            OnPropertyChanged(nameof(SelectedRouteRuleSummary));
+            return;
+        }
+        var resolution = _session.RouteRules.TryResolve(selected, out var rule);
+        switch (resolution)
+        {
+            case SessionRouteRuleResolutionV1.Applied when rule is not null:
+                SessionRouteLaneId = rule.LaneId;
+                SessionRouteOutputGroup = rule.OutputGroup;
+                _selectedRouteRuleSummary =
+                    $"預覽預設：{rule.RuleId} → {rule.LaneId}／{rule.OutputGroup}；按套用後才送出命令";
+                break;
+            case SessionRouteRuleResolutionV1.Ambiguous:
+                _selectedRouteRuleSummary = "有同優先級路由預設同時符合；已停用自動預覽，請調整優先級";
+                break;
+            default:
+                _selectedRouteRuleSummary = "沒有符合的路由預設；保留目前 Lane／Output 設定";
+                break;
+        }
+        OnPropertyChanged(nameof(SelectedRouteRuleSummary));
     }
 
     public IpcEnvelopeV1 BuildSessionVolumeCommand(ulong handle,

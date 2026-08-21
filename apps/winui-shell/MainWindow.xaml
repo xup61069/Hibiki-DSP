@@ -192,6 +192,8 @@
                                        Opacity="0.72" />
                             <TextBlock Text="{Binding SessionVolumeDb, StringFormat='App 音量：{0:0.0} dB'}"
                                        Opacity="0.72" />
+                            <TextBlock Text="{Binding SelectedRouteRuleSummary}" TextWrapping="Wrap"
+                                       AutomationProperties.Name="目前 App 路由預設預覽" />
                             <Slider Minimum="-60" Maximum="6" StepFrequency="0.5"
                                     Value="{Binding SessionVolumeDb, Mode=TwoWay}"
                                     AutomationProperties.Name="App 工作階段音量" />
