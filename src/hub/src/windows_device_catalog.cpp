@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cwchar>
+#include <exception>
 #include <new>
 #include <string>
 #include <utility>
@@ -309,6 +310,53 @@ HRESULT WindowsPhysicalDeviceCatalogCoordinator::poll_and_refresh(
     WindowsDeviceChangeSnapshotV1 change;
     if (!watcher_->poll(change)) return S_FALSE;
     return worker_.refresh_snapshot(catalog, catalog_sequence, payload, payload_bytes);
+}
+
+HRESULT WindowsPhysicalDeviceCatalogServiceV1::bind(
+    IMMDeviceEnumerator* const enumerator) noexcept {
+    return coordinator_.bind(enumerator);
+}
+
+void WindowsPhysicalDeviceCatalogServiceV1::unbind() noexcept {
+    coordinator_.unbind();
+}
+
+HRESULT WindowsPhysicalDeviceCatalogServiceV1::refresh_now() noexcept {
+    return refresh_impl(false);
+}
+
+HRESULT WindowsPhysicalDeviceCatalogServiceV1::poll_and_refresh() noexcept {
+    return refresh_impl(true);
+}
+
+HRESULT WindowsPhysicalDeviceCatalogServiceV1::refresh_impl(const bool poll) noexcept {
+    try {
+        PhysicalDeviceCatalogV1 candidate = catalog_;
+        auto next_sequence = catalog_sequence_;
+        std::array<std::uint8_t, kDeviceCatalogSnapshotPayloadBytesV1> next_payload{};
+        std::size_t next_payload_bytes = 0U;
+        const auto result = poll
+                                ? coordinator_.poll_and_refresh(candidate, next_sequence,
+                                                                 next_payload, next_payload_bytes)
+                                : coordinator_.refresh_now(candidate, next_sequence,
+                                                            next_payload, next_payload_bytes);
+        if (result == S_FALSE) return result;
+        if (FAILED(result)) return result;
+        if (!snapshot_store_.publish(
+                std::span<const std::uint8_t>(next_payload.data(), next_payload_bytes),
+                next_sequence)) {
+            return E_FAIL;
+        }
+        catalog_.swap(candidate);
+        catalog_sequence_ = next_sequence;
+        return S_OK;
+    } catch (const std::bad_alloc&) {
+        return E_OUTOFMEMORY;
+    } catch (const std::exception&) {
+        return E_FAIL;
+    } catch (...) {
+        return E_FAIL;
+    }
 }
 
 }  // namespace hibiki

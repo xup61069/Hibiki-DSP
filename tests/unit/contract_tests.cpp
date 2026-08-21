@@ -939,6 +939,25 @@ int main() {
           decoded_snapshot.entry_count == kPhysicalDeviceCatalogCapacityV1 &&
           decoded_snapshot.catalog_sequence == 32U &&
           decoded_snapshot.entries[0].endpoint_id_bytes == 6U);
+    DeviceCatalogSnapshotStoreV1 snapshot_store;
+    IpcFrameV1 stored_snapshot_response;
+    CHECK(!snapshot_store.has_snapshot() && snapshot_store.sequence() == 0U &&
+          !snapshot_store.reply(stored_snapshot_response));
+    CHECK(snapshot_store.publish(
+              std::span<const std::uint8_t>(published_payload.data(), published_bytes), 32U) &&
+          snapshot_store.has_snapshot() && snapshot_store.sequence() == 32U &&
+          snapshot_store.reply(stored_snapshot_response) &&
+          stored_snapshot_response.header.type == IpcMessageType::DeviceCatalogSnapshot &&
+          stored_snapshot_response.header.payload_bytes == published_bytes &&
+          stored_snapshot_response.payload.size() == published_bytes);
+    IpcFrameV1 callback_snapshot_response;
+    CHECK(device_catalog_snapshot_reply_v1(callback_snapshot_response, &snapshot_store) &&
+          callback_snapshot_response.payload == stored_snapshot_response.payload);
+    auto invalid_store_payload = published_payload;
+    invalid_store_payload[0U] ^= 0xFFU;
+    CHECK(!snapshot_store.publish(
+        std::span<const std::uint8_t>(invalid_store_payload.data(), published_bytes), 33U) &&
+          snapshot_store.sequence() == 32U);
     ControlCommandQueueV1 command_queue;
     ControlCommandV1 queued_command{};
     queued_command.type = IpcMessageType::SceneApply;
@@ -2012,6 +2031,14 @@ int main() {
                                           worker_payload_bytes) == E_UNEXPECTED &&
           catalog_coordinator.poll_and_refresh(worker_catalog, worker_sequence, worker_payload,
                                                worker_payload_bytes) == E_UNEXPECTED);
+    WindowsPhysicalDeviceCatalogServiceV1 catalog_service;
+    IpcFrameV1 service_catalog_response;
+    CHECK(catalog_service.bind(nullptr) == E_INVALIDARG &&
+          catalog_service.refresh_now() == E_UNEXPECTED &&
+          catalog_service.poll_and_refresh() == E_UNEXPECTED &&
+          !catalog_service.has_snapshot() &&
+          !device_catalog_snapshot_reply_v1(service_catalog_response,
+                                             catalog_service.snapshot_store()));
     auto* session_watcher = new WindowsAudioSessionWatcher();
     std::uint64_t session_sequence = 0;
     CHECK(!session_watcher->poll(session_sequence));

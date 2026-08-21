@@ -80,6 +80,40 @@ private:
     WindowsPhysicalDeviceCatalogWorker worker_{};
 };
 
+// Host-facing adapter that joins the worker-owned coordinator to the control
+// service. Refreshes are transactional: the worker first builds a candidate
+// catalog and wire frame, then the store publishes that frame before the
+// service swaps its committed catalog. The snapshot reply callback is safe to
+// call from a pipe worker and never performs COM work.
+class WindowsPhysicalDeviceCatalogServiceV1 final {
+public:
+    WindowsPhysicalDeviceCatalogServiceV1() noexcept = default;
+    ~WindowsPhysicalDeviceCatalogServiceV1() = default;
+
+    WindowsPhysicalDeviceCatalogServiceV1(const WindowsPhysicalDeviceCatalogServiceV1&) = delete;
+    WindowsPhysicalDeviceCatalogServiceV1& operator=(const WindowsPhysicalDeviceCatalogServiceV1&) = delete;
+
+    [[nodiscard]] HRESULT bind(IMMDeviceEnumerator* enumerator) noexcept;
+    void unbind() noexcept;
+    [[nodiscard]] HRESULT refresh_now() noexcept;
+    [[nodiscard]] HRESULT poll_and_refresh() noexcept;
+
+    [[nodiscard]] bool has_snapshot() const noexcept { return snapshot_store_.has_snapshot(); }
+    [[nodiscard]] std::uint64_t sequence() const noexcept { return snapshot_store_.sequence(); }
+    [[nodiscard]] DeviceCatalogSnapshotStoreV1* snapshot_store() noexcept {
+        return &snapshot_store_;
+    }
+    [[nodiscard]] const PhysicalDeviceCatalogV1& catalog() const noexcept { return catalog_; }
+
+private:
+    [[nodiscard]] HRESULT refresh_impl(bool poll) noexcept;
+
+    WindowsPhysicalDeviceCatalogCoordinator coordinator_{};
+    PhysicalDeviceCatalogV1 catalog_{};
+    std::uint64_t catalog_sequence_{0U};
+    DeviceCatalogSnapshotStoreV1 snapshot_store_{};
+};
+
 }  // namespace hibiki
 
 #endif  // defined(_WIN32)
