@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "issue": 39,
+  "scope_digest": "distribution-profile-gate-v1",
+  "source_commit": "8c464296d9a4a40e55646da9037e41e5caa20415",
+  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-git-2.55.0-pwsh-7.6.5; target-vs2026-sdk-wdk-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/probe-environment.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 39",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/distribution-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/distribution-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+      "status": "pass_with_warnings",
+      "coverage": [
+        "Windows 11 build 26200",
+        "AMD64, Git, CMake and PowerShell presence"
+      ],
+      "warnings": [
+        "Visual Studio 2026 missing",
+        "SDK/WDK 10.0.28000.2526 missing"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/probe-environment.ps1",
+      "status": "pass",
+      "coverage": [
+        "anonymous local environment fingerprint only"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 39 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope, dependency and Git ancestry"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/distribution-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "valid bounded YAML subset",
+        "duplicate root key",
+        "unknown root and nested keys",
+        "unsupported indentation",
+        "missing required field",
+        "invalid schema/platform value",
+        "malformed and duplicate GUID",
+        "stable identity drift"
+      ],
+      "cases": 11,
+      "compiled_artifacts": false
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/distribution-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "canonical config/distribution-profile.yml schema and stable identity validation"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1",
+      "status": "blocked",
+      "coverage": [
+        "required documentation paths and specs were parsed"
+      ],
+      "limitation": "Integrator-owned docs/state/BASELINE.md claims 405 tracked paths while Git reports 406 after this handoff claim; worker did not modify the shared file."
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "406 tracked paths with no blocked binary or secret"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "1 workflow and 406 tracked paths with no source-only policy violation"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "CMake/MSBuild RelWithDebInfo build",
+        "CTest 1/1 passed"
+      ],
+      "compiled_artifacts": true,
+      "artifact_scope": "Ignored .local/build output only; no binary, driver, signing, or installer artifact is tracked or claimed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The parser accepts only the repository's bounded YAML subset; it is not a general YAML parser.",
+    "The gate does not prove runtime consumer behavior, installer behavior, driver loading, physical audio, HLK, or Microsoft signing.",
+    "Canonical stable identities are maintainer-owned and were validated, not regenerated.",
+    "The local machine lacks the locked VS 2026 and SDK/WDK 10.0.28000.2526 toolchain.",
+    "docs-check remains blocked until integrator-owned BASELINE.md counters are refreshed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSVC 19.44 (VS 2022 BuildTools 17.14)",
+    "cmake": "4.4.0",
+    "dotnet": "10.0.301",
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T04:38:00+08:00",
+  "finished_at": "2026-08-22T04:47:00+08:00"
+}
