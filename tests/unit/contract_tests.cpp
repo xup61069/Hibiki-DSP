@@ -1369,6 +1369,13 @@ int main() {
     wasapi_handoff.stop();
     wasapi_handoff.rollback();
     CHECK(wasapi_handoff.state() == WasapiSinkHandoffStateV1::Unbound);
+    AudioEngineModel wasapi_engine;
+    CHECK(!wasapi_engine.start_wasapi_output(WasapiOutputConfigV1{L"", 3U, 48000U, 20U}, 128U));
+    CHECK(wasapi_engine.wasapi_output_snapshot().state == WasapiSinkHandoffStateV1::Degraded);
+    CHECK(!wasapi_engine.begin_wasapi_output_handoff(
+        WasapiOutputConfigV1{L"", 2U, 48000U, 20U}, 128U, 30U));
+    wasapi_engine.stop_wasapi_output();
+    CHECK(wasapi_engine.wasapi_output_snapshot().state == WasapiSinkHandoffStateV1::Unbound);
 #endif
 
     return 0;

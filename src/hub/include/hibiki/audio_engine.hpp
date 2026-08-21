@@ -8,6 +8,7 @@
 #include "hibiki/output_fanout.hpp"
 #include "hibiki/volume_state.hpp"
 #include "hibiki/true_peak_limiter.hpp"
+#include "hibiki/windows_wasapi_handoff.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -74,6 +75,25 @@ public:
         std::span<float> packet_sample_storage,
         std::span<RtLaneInputV1> lane_inputs,
         float* output_interleaved) const noexcept;
+    // Windows/WASAPI sink boundary. The graph remains the only producer of
+    // audio blocks; handoff owns the two bounded sink workers and never
+    // restarts this engine during a device switch.
+    [[nodiscard]] bool start_wasapi_output(const WasapiOutputConfigV1& config,
+                                           std::uint32_t block_frames = 128U) noexcept;
+    [[nodiscard]] bool begin_wasapi_output_handoff(
+        const WasapiOutputConfigV1& candidate,
+        std::uint32_t block_frames = 128U,
+        std::uint32_t fade_ms = 30U) noexcept;
+    [[nodiscard]] bool prepare_wasapi_output_handoff() noexcept;
+    [[nodiscard]] bool commit_wasapi_output_handoff() noexcept;
+    void rollback_wasapi_output_handoff() noexcept;
+    void stop_wasapi_output() noexcept;
+    [[nodiscard]] WasapiSinkHandoffSnapshotV1 wasapi_output_snapshot() const noexcept;
+    [[nodiscard]] bool process_output_group_to_wasapi(
+        std::string_view output_group,
+        std::span<const RtLaneInputV1> inputs,
+        float* graph_output_interleaved,
+        std::size_t frames) noexcept;
     [[nodiscard]] bool process_lane_block(std::size_t lane_index,
                                           const float* input_interleaved,
                                           std::uint32_t input_channels,
@@ -104,6 +124,7 @@ private:
     bool has_pending_graph_{false};
     AsioTransportConsumerV1 asio_transport_{};
     mutable OutputFanoutRuntimeV1 output_fanout_{};
+    WindowsWasapiSinkHandoffV1 wasapi_handoff_{};
 };
 
 }  // namespace hibiki

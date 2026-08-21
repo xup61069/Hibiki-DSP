@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cmath>
+#include <limits>
 #include <utility>
 
 namespace hibiki {
@@ -224,6 +225,51 @@ bool AudioEngineModel::process_driver_stream_packet(
     if (block.frames == 0U) return false;
     return process_lane_block(lane_index, block.interleaved, block.channels, block.frames,
                               lane_inputs, output_interleaved);
+}
+
+bool AudioEngineModel::start_wasapi_output(const WasapiOutputConfigV1& config,
+                                           const std::uint32_t block_frames) noexcept {
+    return wasapi_handoff_.start_initial(config, block_frames);
+}
+
+bool AudioEngineModel::begin_wasapi_output_handoff(const WasapiOutputConfigV1& candidate,
+                                                   const std::uint32_t block_frames,
+                                                   const std::uint32_t fade_ms) noexcept {
+    return wasapi_handoff_.begin(candidate, block_frames, fade_ms);
+}
+
+bool AudioEngineModel::prepare_wasapi_output_handoff() noexcept {
+    return wasapi_handoff_.prepare();
+}
+
+bool AudioEngineModel::commit_wasapi_output_handoff() noexcept {
+    return wasapi_handoff_.commit();
+}
+
+void AudioEngineModel::rollback_wasapi_output_handoff() noexcept {
+    wasapi_handoff_.rollback();
+}
+
+void AudioEngineModel::stop_wasapi_output() noexcept { wasapi_handoff_.stop(); }
+
+WasapiSinkHandoffSnapshotV1 AudioEngineModel::wasapi_output_snapshot() const noexcept {
+    return wasapi_handoff_.snapshot();
+}
+
+bool AudioEngineModel::process_output_group_to_wasapi(
+    const std::string_view output_group,
+    const std::span<const RtLaneInputV1> inputs,
+    float* const graph_output_interleaved,
+    const std::size_t frames) noexcept {
+    if (frames == 0U || frames > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()) ||
+        graph_output_interleaved == nullptr || active_graph_.output_channels == 0U ||
+        active_graph_.output_channels > 8U ||
+        !process_output_group(output_group, inputs, graph_output_interleaved, frames)) {
+        return false;
+    }
+    return wasapi_handoff_.process(graph_output_interleaved,
+                                   static_cast<std::uint32_t>(frames),
+                                   active_graph_.output_channels);
 }
 
 bool AudioEngineModel::process_lane_block(const std::size_t lane_index,
