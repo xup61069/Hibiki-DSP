@@ -447,6 +447,7 @@ contract/control-model checks。
 本次 control-status-snapshot additions 的 source commit 是 `e97fb90`；
 session-route health 接入與避免同端點重綁的最新 source commit 是 `5f8dbcb`；
 volume broker unchanged-endpoint result 修正的最新 source commit 是 `ca8ea40`；
+volume node 與 session-route 獨立重綁的最新 source commit 是 `ef4af32`；
 control-model route-health／volume-safety additions 的 source commit 是 `7d43e67`，
 對應 handoff/evidence 更新 commit 是 `e13cfd8`；最後一次 live session evidence 更新是
 `2ba5299`。
