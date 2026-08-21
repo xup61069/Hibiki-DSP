@@ -61,6 +61,7 @@ struct OutputFanoutPlanV1 {
 
 struct OutputFanoutRuntimeSnapshotV1 {
     bool prepared{false};
+    std::uint32_t output_channels{0U};
     std::uint32_t sink_count{0U};
     std::array<OutputSinkClockSnapshotV1, kOutputFanoutMaxSinksV1> sinks{};
 };

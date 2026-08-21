@@ -121,6 +121,42 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
     return true;
 }
 
+bool AudioEngineModel::prepare_output_fanout(const OutputFanoutPlanV1& plan,
+                                             const double source_step) noexcept {
+    return output_fanout_.prepare(plan, source_step);
+}
+
+bool AudioEngineModel::observe_output_fanout_clock(const std::size_t sink_index,
+                                                   const double source_frames,
+                                                   const double sink_frames,
+                                                   const double elapsed_seconds) noexcept {
+    return output_fanout_.observe_clock(sink_index, source_frames, sink_frames,
+                                        elapsed_seconds);
+}
+
+bool AudioEngineModel::process_output_group_fanout(
+    const std::string_view output_group,
+    const std::span<const RtLaneInputV1> inputs,
+    float* const graph_output_interleaved,
+    const std::size_t frames,
+    const std::span<float* const> outputs,
+    const std::span<const std::size_t> output_capacities,
+    const std::span<std::size_t> output_frames) const noexcept {
+    const auto fanout = output_fanout_.snapshot();
+    if (!fanout.prepared || !has_active_graph_ ||
+        fanout.output_channels != active_graph_.output_channels ||
+        graph_output_interleaved == nullptr || frames == 0U ||
+        !process_output_group(output_group, inputs, graph_output_interleaved, frames)) {
+        return false;
+    }
+    return output_fanout_.process(graph_output_interleaved, frames, outputs,
+                                  output_capacities, output_frames);
+}
+
+OutputFanoutRuntimeSnapshotV1 AudioEngineModel::output_fanout_snapshot() const noexcept {
+    return output_fanout_.snapshot();
+}
+
 void AudioEngineModel::set_sample_rate(const std::uint32_t sample_rate) noexcept {
     if (sample_rate >= 8000U && sample_rate <= 192000U) {
         sample_rate_.store(sample_rate, std::memory_order_release);

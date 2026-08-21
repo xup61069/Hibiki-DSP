@@ -4,6 +4,7 @@
 
 #include "hibiki/scene_graph.hpp"
 #include "hibiki/asio_transport_consumer.hpp"
+#include "hibiki/output_fanout.hpp"
 #include "hibiki/volume_state.hpp"
 #include "hibiki/true_peak_limiter.hpp"
 
@@ -35,6 +36,21 @@ public:
                                              std::span<const RtLaneInputV1> inputs,
                                              float* output_interleaved,
                                              std::size_t frames) const noexcept;
+    [[nodiscard]] bool prepare_output_fanout(const OutputFanoutPlanV1& plan,
+                                              double source_step = 1.0) noexcept;
+    [[nodiscard]] bool observe_output_fanout_clock(std::size_t sink_index,
+                                                   double source_frames,
+                                                   double sink_frames,
+                                                   double elapsed_seconds) noexcept;
+    [[nodiscard]] bool process_output_group_fanout(
+        std::string_view output_group,
+        std::span<const RtLaneInputV1> inputs,
+        float* graph_output_interleaved,
+        std::size_t frames,
+        std::span<float* const> outputs,
+        std::span<const std::size_t> output_capacities,
+        std::span<std::size_t> output_frames) const noexcept;
+    [[nodiscard]] OutputFanoutRuntimeSnapshotV1 output_fanout_snapshot() const noexcept;
     void set_sample_rate(std::uint32_t sample_rate) noexcept;
     [[nodiscard]] bool bind_asio_transport(std::wstring_view mapping_name,
                                             std::uint32_t channels,
@@ -79,6 +95,7 @@ private:
     bool has_active_graph_{false};
     bool has_pending_graph_{false};
     AsioTransportConsumerV1 asio_transport_{};
+    mutable OutputFanoutRuntimeV1 output_fanout_{};
 };
 
 }  // namespace hibiki

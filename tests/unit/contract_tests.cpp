@@ -1111,6 +1111,22 @@ int main() {
                          engine_output.data(), 128U));
     CHECK(std::abs(engine_output[254] - 0.5F) < 1e-5F);
     CHECK(std::abs(engine_output[255] + 0.5F) < 1e-5F);
+    CHECK(engine.prepare_output_fanout(fanout_plan, 1.0));
+    std::array<float, 16> engine_fanout_a{};
+    std::array<float, 16> engine_fanout_b{};
+    std::array<float, 16> engine_fanout_disabled{};
+    std::array<float*, 3> engine_fanout_outputs{{engine_fanout_a.data(), engine_fanout_b.data(),
+                                                  engine_fanout_disabled.data()}};
+    const std::array<std::size_t, 3> engine_fanout_capacities{{16U, 16U, 16U}};
+    std::array<std::size_t, 3> engine_fanout_frames{};
+    CHECK(engine.process_output_group_fanout(
+              "main", std::span<const RtLaneInputV1>(&engine_input_view, 1),
+              engine_output.data(), 2U, engine_fanout_outputs, engine_fanout_capacities,
+              engine_fanout_frames) &&
+          engine_fanout_frames[0] == 1U && engine_fanout_frames[1] == 1U &&
+          engine_fanout_frames[2] == 0U && engine_fanout_a[0] == engine_fanout_b[0]);
+    CHECK(engine.observe_output_fanout_clock(0U, 48000.0, 48012.0, 1.0));
+    CHECK(engine.output_fanout_snapshot().sinks[0].drift_ppm > 0.0);
     CHECK(engine.apply_windows_volume(VolumeNotificationV1{-6.0206, true, 2}) ==
           VolumeNotificationResult::Accepted);
     CHECK(engine.process(std::span<const RtLaneInputV1>(&engine_input_view, 1),

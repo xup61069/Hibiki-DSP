@@ -205,6 +205,7 @@ bool OutputFanoutRuntimeV1::process(
 OutputFanoutRuntimeSnapshotV1 OutputFanoutRuntimeV1::snapshot() const noexcept {
     OutputFanoutRuntimeSnapshotV1 result{};
     result.prepared = prepared_;
+    result.output_channels = plan_.output_channels;
     result.sink_count = plan_.sink_count;
     for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
         result.sinks[index] = sinks_[index].snapshot();
