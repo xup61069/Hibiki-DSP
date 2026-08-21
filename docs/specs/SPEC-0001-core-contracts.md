@@ -54,6 +54,10 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   `handle_control_frame_v1` 綁定到同一個 context；`start_with_queue` 只把命令排入 queue，
   `EngineControlWorkerV1` 仍必須在自己的 control thread drain。若沒有 snapshot store，
   `DeviceCatalogRequest` 必須回 Error；host stop 先停止 pipe worker，再清除 callback context。
+- Windows `WindowsControlRuntimeV1` 進一步把 endpoint catalog service 與 `ControlPlaneHostV1`
+  綁在同一個非 RT runtime；`start` 只負責 COM enumerator/service 與 pipe 綁定，
+  `refresh_now`／`poll_and_refresh` 由 COM-initialized worker 呼叫，engine control thread
+  透過 `command_queue()` 消費命令。任何未綁定或停止狀態都回傳 `E_UNEXPECTED`／false。
 - `ControlCommandQueueV1` 是目前的固定 64-slot SPSC handoff；滿載時丟棄新命令並增加
   dropped counter，consumer 才能呼叫 AudioEngine／graph transaction。這個 queue 不保證
   multi-producer；若未來有第二個 control producer，必須先建立新的版本化協定。

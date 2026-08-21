@@ -49,6 +49,9 @@
   wiring. `start_with_queue` gives a host a single source of truth for pipe stop/cleanup while
   keeping command consumption on the separate EngineControl worker; the loopback contract test
   verifies a SceneApply round-trip and queue handoff.
+- `WindowsControlRuntimeV1` now composes that host with the worker-owned physical-device service;
+  start/stop ordering is host-first on teardown, refresh remains a COM-worker operation, and the
+  unbound runtime contract fails closed without starting a pipe.
 - `EngineControlWorkerV1` consumes that queue and applies the four Easy Scene presets through
   AudioEngine Validate → Prepare → Commit; invalid scene IDs leave the last committed graph
   and revision unchanged, while volume commands share the same Group Master path.
