@@ -82,8 +82,9 @@ pwsh -File tools/build-preview.ps1 -Target DesktopCompat
 Windows App Runtime；但不含 XAML 正式 UI、driver、系統攔截或 accessibility evidence。所有輸出都在
 `.local/preview/`，不可加入 Git。
 Engine Preview 連線後也會在 user-space 以 `IMMDeviceEnumerator` 枚舉本機 render/capture metadata，
-讓預覽顯示裝置數量與可選的 Active render 卡片；它只提供 bounded catalog snapshot，不開啟 physical
-WASAPI sink、不切換實體裝置，也不修改 Windows 系統音量。
+讓預覽顯示裝置數量與預設輸出 metadata；它只提供 bounded catalog snapshot，不開啟 physical
+WASAPI sink、不切換實體裝置，也不修改 Windows 系統音量。Desktop Compatibility Preview 只顯示
+render/capture 數量與預設輸出 metadata；正式 WinUI shell 才提供實體輸出選擇器。
 預覽也會顯示 IR 相位 policy 的 Game／Balanced／Movie／Bypass 與預估延遲。C++ control-plane 已能將
 bounded WAV kernel 轉成 minimum／mixed／linear phase，並透過 `AudioEngineModel` 的
 prepare→commit／rollback attachment 在 user-space preview 的固定 graph render 中實際執行 IR；

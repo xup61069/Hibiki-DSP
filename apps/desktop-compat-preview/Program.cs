@@ -22,6 +22,7 @@ internal sealed class PreviewForm : Form
 {
     private readonly EasyControlViewModel _viewModel;
     private readonly Label _connection = new() { AutoSize = true };
+    private readonly Label _devices = new() { AutoSize = false, Width = 550, Height = 48 };
     private readonly Label _status = new() { AutoSize = false, Height = 48 };
     private readonly Label _routes = new() { AutoSize = false, Width = 550, Height = 58 };
     private readonly Label _effective = new() { AutoSize = true };
@@ -52,6 +53,8 @@ internal sealed class PreviewForm : Form
         var groups = new ComboBox { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, DataSource = _viewModel.OutputGroups.ToList(), DisplayMember = "Name", ValueMember = "Id" };
         groups.SelectedIndexChanged += (_, _) => { if (groups.SelectedValue is string id) _viewModel.SelectedOutputGroup = id; };
         panel.Controls.Add(groups);
+        panel.Controls.Add(new Label { Text = "本機裝置 catalog（僅 metadata）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        panel.Controls.Add(_devices);
         var connect = new Button { Text = "嘗試連接已啟動的 Hibiki 引擎", AutoSize = true, Margin = new Padding(3, 12, 3, 3) };
         connect.Click += async (_, _) => { await _viewModel.ConnectAsync(TimeSpan.FromSeconds(3)); RefreshView(); };
         panel.Controls.Add(connect);
@@ -153,6 +156,17 @@ internal sealed class PreviewForm : Form
     private void RefreshView()
     {
         _connection.Text = _viewModel.ConnectionStatusText;
+        var renderDevices = _viewModel.PhysicalDevices
+            .Where(device => device.Flow == PhysicalDeviceFlowV1.Render)
+            .ToArray();
+        var captureDevices = _viewModel.PhysicalDevices
+            .Where(device => device.Flow == PhysicalDeviceFlowV1.Capture)
+            .ToArray();
+        var defaultRender = renderDevices.FirstOrDefault(device => device.IsDefault)?.DisplayName;
+        _devices.Text = _viewModel.PhysicalDevices.Count == 0
+            ? "裝置 catalog：尚未收到引擎快照；不會自行枚舉或建立裝置。"
+            : $"裝置 catalog：{_viewModel.PhysicalDevices.Count} 筆（render {renderDevices.Length}／capture {captureDevices.Length}）；" +
+              $"預設輸出：{defaultRender ?? "未指定"}\r\n只顯示 metadata；physical sink 與實體切換尚未啟用。";
         _enhance.Enabled = _viewModel.IsConnected;
         _scenes.Enabled = _viewModel.IsConnected;
         _volume.Enabled = _viewModel.IsConnected;

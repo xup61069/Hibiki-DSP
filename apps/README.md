@@ -45,6 +45,6 @@ compiled UI output is committed or published.
 startup: it enumerates render/capture metadata through `IMMDeviceEnumerator`, keeps
 the bounded snapshot provider alive for control-plane requests, and polls watcher
 changes without touching a physical sink. The Desktop Compatibility Preview can
-therefore show the current local device count and selectable render cards. This is
+therefore show the current local render/capture counts and default-render metadata. This is
 metadata only; no endpoint is opened, no Windows system volume is changed, and no
 device switch is claimed until a future physical sink transaction is implemented.
