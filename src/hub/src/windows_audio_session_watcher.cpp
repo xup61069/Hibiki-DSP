@@ -204,6 +204,17 @@ HRESULT WindowsAudioSessionWatcher::enumerate(AudioSessionRegistry& registry) {
             display_name = nullptr;
             descriptor.app_id = std::move(app_id);
             descriptor.active = state == AudioSessionStateActive;
+            if (route_rules_ != nullptr) {
+                const auto rule_result = route_rules_->apply(descriptor);
+                if (rule_result == SessionRouteRuleResultV1::ambiguous ||
+                    rule_result == SessionRouteRuleResultV1::invalid_argument ||
+                    rule_result == SessionRouteRuleResultV1::capacity_exhausted) {
+                    // Keep the session visible but leave it unbound. A bad
+                    // rule must never silently pick a route or alter the
+                    // Windows session gain owner.
+                    if (SUCCEEDED(first_error)) first_error = E_FAIL;
+                }
+            }
             if (instance.empty() || !registry.upsert(std::move(descriptor))) {
                 first_error = E_FAIL;
             }

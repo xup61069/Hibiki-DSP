@@ -5,6 +5,7 @@
 #if defined(_WIN32)
 
 #include "hibiki/audio_session_registry.hpp"
+#include "hibiki/session_route_rules.hpp"
 
 #include <audiopolicy.h>
 #include <audioclient.h>
@@ -35,6 +36,11 @@ public:
     [[nodiscard]] HRESULT bind(IMMDevice* device);
     void unbind() noexcept;
     [[nodiscard]] HRESULT enumerate(AudioSessionRegistry& registry);
+    // Non-owning control-plane rule store. The session callback never reads
+    // this pointer; the worker applies rules during enumerate().
+    void set_route_rules(const SessionRouteRuleStoreV1* rules) noexcept {
+        route_rules_ = rules;
+    }
     [[nodiscard]] HRESULT write_session_volume(std::string_view session_instance_id,
                                                 double requested_db,
                                                 bool mute,
@@ -52,6 +58,7 @@ private:
     IAudioSessionManager2* manager_{nullptr};
     bool registered_{false};
     std::string endpoint_id_;
+    const SessionRouteRuleStoreV1* route_rules_{nullptr};
 };
 
 }  // namespace hibiki

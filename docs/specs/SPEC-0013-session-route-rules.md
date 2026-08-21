@@ -29,9 +29,11 @@ gain owner 與 makeup gain。規則套用後可交給既有 `AudioSessionRegistr
 
 ## 資料流與安全
 
-規則只在 control plane 評估；caller 先取得 session descriptor，再呼叫
-`SessionRouteRuleStoreV1::apply`。套用先建立 candidate，成功後才替換 descriptor；配置失敗
-不得留下部分欄位更新。RT graph 只接收已驗證的 immutable `GraphConfigV1`，不讀取規則文字。
+規則只在 control plane 評估；`WindowsAudioSessionWatcher` 可持有 non-owning rule store，
+在 worker 的 `enumerate()` 階段把規則套到新的 session descriptor；非 Windows host 也可由
+caller 先取得 descriptor，再呼叫 `SessionRouteRuleStoreV1::apply`。套用先建立 candidate，
+成功後才替換 descriptor；配置失敗不得留下部分欄位更新。RT graph 只接收已驗證的 immutable
+`GraphConfigV1`，不讀取規則文字。
 
 規則 metadata 可持久化為 `session-route-rule-v1.schema.json`；不得把短暫 PID、完整 Windows
 session instance ID、私人裝置路徑或使用者校正資料寫入公開 repository。
@@ -50,3 +52,5 @@ session instance ID、私人裝置路徑或使用者校正資料寫入公開 rep
 3. 缺少匹配欄位、空 lane/output、超界 gain／文字與 65 筆規則都被拒絕。
 4. 套用前後 descriptor 的 atomicity、既有 session route graph 與 Strict Direct gain-owner
    規則測試通過。
+5. Windows session watcher 的 rule store 是 non-owning、只在 worker enumerate 套用；
+   callback 不查詢規則、不配置、不修改 registry。
