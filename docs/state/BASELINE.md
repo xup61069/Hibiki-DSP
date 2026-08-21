@@ -8,7 +8,9 @@
   on that host and still requires the locked target toolchain.
 - A C++ Engine Preview now owns the local control named pipe and passes a cross-process v1 Hello/Ack
   plus ControlStatusSnapshot smoke; the status exposes four conservative route states and the
-  canonical volume mirror. It is deliberately driver-free and has no physical audio sink.
+  canonical volume mirror. `tools/run-preview.ps1 -Build` launches it with the self-contained
+  Desktop Compatibility UI. It is deliberately driver-free and has no physical audio sink;
+  evidence is recorded in `evidence/0000-foundation/engine-preview-v1.json`.
 - 公開 monorepo 文件、component license map 與 source-only paid-release policy。
 - AI 接手規則、fresh-clone 流程與 source-only policy。
 - `OutputGroupVolumeState` 與 ISO compensation public C++ boundary 的初始骨架。

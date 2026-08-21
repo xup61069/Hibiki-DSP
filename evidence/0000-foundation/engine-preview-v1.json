@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "engine-preview-status-v1",
+  "source_commit": "b37e709",
+  "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/build-engine-preview.ps1",
+    "pwsh -File tools/engine-preview-smoke.ps1",
+    "pwsh -File tools/build-preview.ps1 -SmokeTest",
+    "pwsh -File tools/run-preview.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/build-engine-preview.ps1",
+      "status": "pass",
+      "coverage": [
+        "C++ user-space Engine Preview executable",
+        "local v1 named-pipe control host",
+        "no driver or physical sink"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/engine-preview-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "Hello/Ack request correlation",
+        "ControlStatusSnapshot request correlation",
+        "four conservative route entries and canonical volume mirror",
+        "956-byte framed status response"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/build-preview.ps1 -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "self-contained Desktop Compatibility Preview",
+        "launch without Windows App Runtime",
+        "three-second process liveness"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/run-preview.ps1",
+      "status": "pass",
+      "coverage": [
+        "Engine Preview and Desktop Compatibility UI stayed alive together",
+        "UI auto-connect path exercised",
+        "closing the UI stopped the local preview engine"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The preview is user-space only: no WaveRT/PortCls driver, physical WASAPI sink, Windows volume node or system interception is active.",
+    "The Desktop Compatibility Preview is not the formal WinUI/XAML shell and carries no accessibility, signing or release evidence.",
+    "All build output remains under ignored .local paths and is not a GitHub artifact."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00+08:00",
+  "finished_at": "2026-08-21T00:00:00+08:00"
+}
