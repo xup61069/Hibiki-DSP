@@ -27,6 +27,10 @@ jobs:
         shell: pwsh
         run: ./tools/source-policy.ps1
 
+      - name: Source-only CI publication gate
+        shell: pwsh
+        run: ./tools/source-only-ci-check.ps1
+
       - name: Browser extension source gate
         shell: pwsh
         run: ./tools/extension-check.ps1

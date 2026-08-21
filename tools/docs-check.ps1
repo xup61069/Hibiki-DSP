@@ -11,7 +11,7 @@ $required = @(
   'installer/HibikiSetup.ps1', 'tools/installer-check.ps1',
   'apps/control-model/Hibiki.ControlModel.csproj', 'tools/control-model-check.ps1',
   'apps/winui-shell/Hibiki.WinUI.csproj', 'tools/winui-shell-check.ps1',
-  'tools/distribution-check.ps1',
+  'tools/distribution-check.ps1', 'tools/source-only-ci-check.ps1',
   'docs/START_HERE.md', 'docs/PROJECT_MAP.md', 'docs/state/BASELINE.md',
   'docs/specs/INDEX.md', 'docs/specs/SPEC-0001-core-contracts.md',
   'docs/specs/SPEC-0002-volume-and-iso.md', 'docs/specs/SPEC-0003-virtual-endpoints-and-routing.md',
