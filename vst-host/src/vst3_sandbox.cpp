@@ -2,14 +2,19 @@
 
 #include "hibiki/vst3_sandbox.hpp"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstring>
+#include <limits>
+#include <new>
+#include <vector>
 
 #if defined(_WIN32)
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -236,3 +241,152 @@ void Vst3SandboxProcess::close_handles() noexcept {}
 }  // namespace hibiki
 
 #endif
+
+namespace hibiki {
+namespace {
+
+constexpr std::size_t kWorkerMaxPacketBytesV1 =
+    kVst3WorkerHeaderBytesV1 + kVst3WorkerMaxPayloadBytesV1;
+
+bool valid_worker_layout(const std::uint32_t channels,
+                         const std::uint32_t frames,
+                         const std::span<const float> input,
+                         const std::span<float> output) noexcept {
+    if ((channels != 2U && channels != 6U && channels != 8U) || frames == 0U ||
+        frames > kVst3WorkerMaxFramesV1) {
+        return false;
+    }
+    const auto sample_count = static_cast<std::size_t>(channels) * frames;
+    return input.size() == sample_count && output.size() == sample_count;
+}
+
+bool make_worker_control_frame(const Vst3WorkerMessageTypeV1 type,
+                               const std::uint64_t request_id,
+                               std::array<std::uint8_t, kVst3WorkerHeaderBytesV1>& packet) noexcept {
+    Vst3WorkerFrameV1 frame{};
+    frame.type = type;
+    frame.request_id = request_id;
+    std::size_t bytes_written = 0U;
+    return encode_vst3_worker_frame_v1(frame, packet, bytes_written) &&
+           bytes_written == packet.size();
+}
+
+}  // namespace
+
+Vst3WorkerExchangeResultV1 Vst3SandboxProcess::handshake_worker(
+    const std::uint64_t request_id) {
+    if (state_ != Vst3SandboxState::Running) return Vst3WorkerExchangeResultV1::not_running;
+    if (!worker_pipe_.connected()) return Vst3WorkerExchangeResultV1::not_connected;
+    if (request_id == 0U) return Vst3WorkerExchangeResultV1::invalid_argument;
+
+    std::array<std::uint8_t, kVst3WorkerHeaderBytesV1> request{};
+    if (!make_worker_control_frame(Vst3WorkerMessageTypeV1::Hello, request_id, request) ||
+        !send_worker_frame(request)) {
+        return Vst3WorkerExchangeResultV1::send_failed;
+    }
+    std::array<std::uint8_t, kVst3WorkerHeaderBytesV1> response{};
+    std::size_t bytes_read = 0U;
+    if (!receive_worker_frame(response, bytes_read)) return Vst3WorkerExchangeResultV1::receive_failed;
+    Vst3WorkerFrameV1 frame{};
+    Vst3WorkerProtocolErrorV1 error{Vst3WorkerProtocolErrorV1::None};
+    if (!decode_vst3_worker_frame_v1(
+            std::span<const std::uint8_t>(response.data(), bytes_read), frame, error) ||
+        frame.request_id != request_id || frame.payload_bytes != 0U) {
+        return Vst3WorkerExchangeResultV1::invalid_response;
+    }
+    if (frame.type == Vst3WorkerMessageTypeV1::Error) return Vst3WorkerExchangeResultV1::worker_error;
+    return frame.type == Vst3WorkerMessageTypeV1::HelloAck
+               ? Vst3WorkerExchangeResultV1::ok
+               : Vst3WorkerExchangeResultV1::invalid_response;
+}
+
+Vst3WorkerExchangeResultV1 Vst3SandboxProcess::process_worker_block(
+    const std::uint64_t request_id,
+    const std::uint32_t channels,
+    const std::uint32_t frames,
+    const std::span<const float> input,
+    const std::span<float> output,
+    const std::span<const Vst3WorkerParameterPointV1> parameters) {
+    if (state_ != Vst3SandboxState::Running) return Vst3WorkerExchangeResultV1::not_running;
+    if (!worker_pipe_.connected()) return Vst3WorkerExchangeResultV1::not_connected;
+    if (request_id == 0U || !valid_worker_layout(channels, frames, input, output) ||
+        parameters.size() > kVst3WorkerMaxParameterPointsV1) {
+        return Vst3WorkerExchangeResultV1::invalid_argument;
+    }
+    std::fill(output.begin(), output.end(), 0.0F);
+    for (const auto sample : input) {
+        if (!std::isfinite(sample)) return Vst3WorkerExchangeResultV1::invalid_argument;
+    }
+
+    const auto sample_count = static_cast<std::size_t>(channels) * frames;
+    try {
+        const auto parameter_bytes = kVst3WorkerParameterPrefixBytesV1 +
+            parameters.size() * kVst3WorkerParameterPointBytesV1;
+        const auto payload_bytes = parameter_bytes + sample_count * sizeof(float);
+        if (payload_bytes > kVst3WorkerMaxPayloadBytesV1 || payload_bytes > UINT32_MAX) {
+            return Vst3WorkerExchangeResultV1::invalid_argument;
+        }
+        const auto wire_payload_bytes = parameters.empty() ? sample_count * sizeof(float)
+                                                            : payload_bytes;
+        std::vector<std::uint8_t> request(kVst3WorkerHeaderBytesV1 + wire_payload_bytes, 0U);
+        Vst3WorkerFrameV1 request_frame{};
+        request_frame.type = parameters.empty()
+                                 ? Vst3WorkerMessageTypeV1::ProcessBlock
+                                 : Vst3WorkerMessageTypeV1::ProcessBlockWithParameters;
+        request_frame.request_id = request_id;
+        request_frame.channels = channels;
+        request_frame.frames = frames;
+        request_frame.payload_bytes = static_cast<std::uint32_t>(
+            wire_payload_bytes);
+        std::size_t bytes_written = 0U;
+        if (parameters.empty()) {
+            if (!encode_vst3_worker_frame_v1(
+                    request_frame,
+                    std::span<std::uint8_t>(request.data(), kVst3WorkerHeaderBytesV1),
+                    bytes_written)) {
+                return Vst3WorkerExchangeResultV1::invalid_argument;
+            }
+            std::memcpy(request.data() + kVst3WorkerHeaderBytesV1, input.data(),
+                        sample_count * sizeof(float));
+        } else {
+            if (!encode_vst3_worker_parameter_frame_v1(
+                    request_frame, parameters, input, request, bytes_written)) {
+                return Vst3WorkerExchangeResultV1::invalid_argument;
+            }
+        }
+        if (!send_worker_frame(request)) return Vst3WorkerExchangeResultV1::send_failed;
+
+        std::vector<std::uint8_t> response(kWorkerMaxPacketBytesV1, 0U);
+        std::size_t bytes_read = 0U;
+        if (!receive_worker_frame(response, bytes_read)) {
+            return Vst3WorkerExchangeResultV1::receive_failed;
+        }
+        Vst3WorkerFrameV1 response_frame{};
+        Vst3WorkerProtocolErrorV1 protocol_error{Vst3WorkerProtocolErrorV1::None};
+        const auto response_packet = std::span<const std::uint8_t>(response.data(), bytes_read);
+        if (!decode_vst3_worker_frame_v1(response_packet, response_frame, protocol_error) ||
+            response_frame.request_id != request_id) {
+            return Vst3WorkerExchangeResultV1::invalid_response;
+        }
+        if (response_frame.type == Vst3WorkerMessageTypeV1::Error) {
+            return Vst3WorkerExchangeResultV1::worker_error;
+        }
+        std::span<const float> response_samples;
+        if (response_frame.type != Vst3WorkerMessageTypeV1::ProcessBlockResponse ||
+            response_frame.channels != channels || response_frame.frames != frames ||
+            !validate_vst3_worker_audio_frame_v1(response_packet, response_frame,
+                                                 response_samples, protocol_error) ||
+            response_samples.size() != sample_count) {
+            return Vst3WorkerExchangeResultV1::invalid_response;
+        }
+        std::memcpy(output.data(), response_samples.data(), sample_count * sizeof(float));
+        for (const auto sample : output) {
+            if (!std::isfinite(sample)) return Vst3WorkerExchangeResultV1::non_finite_output;
+        }
+        return Vst3WorkerExchangeResultV1::ok;
+    } catch (const std::bad_alloc&) {
+        return Vst3WorkerExchangeResultV1::allocation_failed;
+    }
+}
+
+}  // namespace hibiki

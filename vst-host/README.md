@@ -35,6 +35,13 @@ sample-accurate points per ID and normalized values in `[0,1]`; the bounded
 `IParameterChanges` before `process`. Supervisor timeline persistence and full
 end-to-end automation remain intentionally outside this baseline.
 
+The supervisor now exposes `handshake_worker` and `process_worker_block` as the
+only control-plane exchange calls. They validate HelloAck/response IDs, channel
+and frame shape, payload size and finite output, and clear the caller's output
+before a failed exchange. They may wait for the bounded named-pipe timeout and
+must never be called from the RT graph; a failed worker is reported to the
+existing quarantine policy rather than silently restarted.
+
 `LatencyAlignmentPlanV1` and `FixedDelayLineV1` provide a bounded 16,384-sample
 alignment plan and fixed 8-channel delay primitive. They are tested separately
 from supervisor and graph lane commit, so plugin certification and full latency

@@ -50,6 +50,14 @@ connect/read/write timeout 與 caller-owned receive buffer；worker-side 也可�
 Heartbeat、受限 ProcessBlock passthrough 與 Shutdown；它是可執行的 transport/可靠性
 fixture，不宣稱已載入 VST3 SDK 或第三方 plugin。
 
+`Vst3SandboxProcess::handshake_worker` 與 `process_worker_block` 是 supervisor 的唯一
+worker exchange API：前者驗證 HelloAck、request ID 與零 payload，後者在 bounded
+control/IPC thread 建立一般或參數化 ProcessBlock、送出後驗證 response type、request ID、
+聲道／frame shape、payload 與有限輸出，再交給 caller-owned output。任何 send/receive/
+protocol/plugin error 都回傳明確結果，並在已驗證的輸出範圍先填靜音；這些方法不得從 RT
+callback 呼叫，也不會自動重啟 quarantine worker。參數 frame 仍沿用最多 64 點的既有
+protocol limit，SDK worker 才會把它轉成 `IParameterChanges`。
+
 `vst3_sdk_catalog.hpp` 提供 optional control-plane bridge，使用 `THIRD_PARTY.yml` 鎖定的
 Steinberg SDK 3.8.1 build 84 與 submodule commits，掃描 module factory class metadata。
 SDK checkout 由開發者在 `.local/` 提供，public monorepo 不 vendor SDK；catalog 不執行 plugin、
@@ -91,8 +99,8 @@ public source-only checkout 自動生成，且仍不提供第三方 plugin binar
 
 plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter、bounded parameter
 frame、latency alignment primitive、latency graph commit 與 optional worker executable 已有 bridge；仍未完成第三方
-plugin certification、supervisor launch integration、parameter timeline/persistence、RT graph lane
-latency wiring、side-chain/multi-bus、crash dump redaction 與 production
-worker policy。目前 supervisor、named pipe、passthrough worker、catalog 與 bounded SDK
-processor 提供可測試的 process containment/metadata/processing boundary，不能宣稱已完成
-VST3 host。
+plugin certification、將 worker exchange 接入正式 Scene/RT lane 的排程與 back-pressure policy、
+parameter timeline/persistence、RT graph lane latency wiring、side-chain/multi-bus、crash dump
+redaction 與 production worker policy。目前 supervisor、named pipe、passthrough worker、
+catalog、bounded SDK processor 與明確的 handshake/process exchange 提供可測試的 process
+containment/metadata/processing boundary，不能宣稱已完成第三方 VST3 host。

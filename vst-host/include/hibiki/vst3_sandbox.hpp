@@ -8,6 +8,7 @@
 #include <string>
 
 #include "hibiki/vst3_worker_pipe.hpp"
+#include "hibiki/vst3_worker_protocol.hpp"
 
 namespace hibiki {
 
@@ -34,6 +35,22 @@ enum class Vst3SandboxState : std::uint8_t {
     Quarantined,
 };
 
+// Bounded control-plane exchange result.  These calls are intentionally not
+// callable from the RT graph: they may wait for the worker-pipe timeout and
+// copy packet payloads owned by the caller.
+enum class Vst3WorkerExchangeResultV1 : std::uint8_t {
+    ok,
+    not_running,
+    not_connected,
+    invalid_argument,
+    allocation_failed,
+    send_failed,
+    receive_failed,
+    worker_error,
+    invalid_response,
+    non_finite_output,
+};
+
 // Control-plane process supervisor. Audio never calls this class. The future
 // VST3 worker IPC must publish heartbeat only after it has completed its own
 // SDK/plugin work; a dead or stalled worker is terminated as one job.
@@ -53,6 +70,15 @@ public:
     [[nodiscard]] bool send_worker_frame(std::span<const std::uint8_t> frame) noexcept;
     [[nodiscard]] bool receive_worker_frame(std::span<std::uint8_t> destination,
                                              std::size_t& bytes_read) noexcept;
+    [[nodiscard]] Vst3WorkerExchangeResultV1 handshake_worker(
+        std::uint64_t request_id = 1U);
+    [[nodiscard]] Vst3WorkerExchangeResultV1 process_worker_block(
+        std::uint64_t request_id,
+        std::uint32_t channels,
+        std::uint32_t frames,
+        std::span<const float> input,
+        std::span<float> output,
+        std::span<const Vst3WorkerParameterPointV1> parameters = {});
     [[nodiscard]] bool worker_pipe_ready() const noexcept { return worker_pipe_.server_ready(); }
     [[nodiscard]] bool worker_connected() const noexcept { return worker_pipe_.connected(); }
     [[nodiscard]] Vst3SandboxState state() const noexcept { return state_; }

@@ -845,6 +845,12 @@ int main() {
     CHECK(sandbox.state() == Vst3SandboxState::Quarantined);
     sandbox.stop();
     CHECK(sandbox.state() == Vst3SandboxState::Stopped);
+    CHECK(sandbox.handshake_worker() == Vst3WorkerExchangeResultV1::not_running);
+    const std::array<float, 4> worker_exchange_input{0.1F, -0.1F, 0.2F, -0.2F};
+    std::array<float, 4> worker_exchange_output{1.0F, 1.0F, 1.0F, 1.0F};
+    CHECK(sandbox.process_worker_block(1U, 2U, 2U, worker_exchange_input,
+                                       worker_exchange_output) ==
+          Vst3WorkerExchangeResultV1::not_running);
 
     std::array<std::uint8_t, kVst3WorkerHeaderBytesV1 + 4U * sizeof(float)> worker_packet{};
     const Vst3WorkerFrameV1 worker_frame{Vst3WorkerMessageTypeV1::ProcessBlock, 17U, 2U, 2U,
