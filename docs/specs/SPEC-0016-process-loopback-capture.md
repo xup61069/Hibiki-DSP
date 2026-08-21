@@ -40,6 +40,8 @@ buffer period 與累計 frame；停止、timeout、格式不符或 WASAPI 失效
   同一 PID 若所有 session 指向同一 Lane/output 可合併並記錄 `session_count`；同一 PID 若
   指向不同 Lane/output 一律 `AmbiguousProcess`，典型 Chrome 多分頁必須改用 tab bridge，
   不得靜默混音。
+- 不同 PID 若共用同一 Lane ID，回傳 `DuplicateLane`；這與既有 graph builder 的 duplicate
+  lane invariant 一致，避免建立之後才在 RT graph commit 失敗。
 
 ## 失敗／fallback
 

@@ -1358,6 +1358,15 @@ int main() {
         AudioSessionIdentityV1{"hibiki-main", "same-b", 42U}, "lane-b", "main"));
     CHECK(build_process_loopback_plan(duplicate_process_registry, process_plan) ==
           ProcessLoopbackPlanResultV1::AmbiguousProcess && process_plan.size == 0U);
+    AudioSessionRegistry duplicate_lane_registry;
+    CHECK(duplicate_lane_registry.upsert(AudioSessionDescriptorV1{
+        1, AudioSessionIdentityV1{"hibiki-main", "lane-a", 10U}, "A", "app-a", true,
+        SessionGainOwner::WindowsSession, "same-lane", "main", 0.0}));
+    CHECK(duplicate_lane_registry.upsert(AudioSessionDescriptorV1{
+        1, AudioSessionIdentityV1{"hibiki-main", "lane-b", 11U}, "B", "app-b", true,
+        SessionGainOwner::WindowsSession, "same-lane", "main", 0.0}));
+    CHECK(build_process_loopback_plan(duplicate_lane_registry, process_plan) ==
+              ProcessLoopbackPlanResultV1::DuplicateLane && process_plan.size == 0U);
     AudioSessionRegistry invalid_process_registry;
     CHECK(invalid_process_registry.upsert(AudioSessionDescriptorV1{
         1, AudioSessionIdentityV1{"hibiki-main", "zero", 0U}, "zero", "zero", true,

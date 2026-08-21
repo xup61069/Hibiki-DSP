@@ -16,6 +16,14 @@ ProcessLoopbackPlanResultV1 build_process_loopback_plan(
             plan = {};
             return ProcessLoopbackPlanResultV1::InvalidProcessIdentity;
         }
+        for (std::size_t index = 0U; index < plan.size; ++index) {
+            const auto& entry = plan.entries[index];
+            if (entry.lane_id == session.lane_id &&
+                entry.process_id != session.identity.process_id) {
+                plan = {};
+                return ProcessLoopbackPlanResultV1::DuplicateLane;
+            }
+        }
         std::size_t existing_index = plan.size;
         for (std::size_t index = 0U; index < plan.size; ++index) {
             if (plan.entries[index].process_id == session.identity.process_id) {

@@ -16,6 +16,7 @@ enum class ProcessLoopbackPlanResultV1 : std::uint8_t {
     NoRoutes,
     InvalidProcessIdentity,
     AmbiguousProcess,
+    DuplicateLane,
     CapacityExhausted,
 };
 
