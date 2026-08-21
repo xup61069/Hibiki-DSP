@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 where pwsh >nul 2>&1
 if errorlevel 1 (
-  echo PowerShell 7 (pwsh) is required. Run: pwsh -File tools\run-preview.ps1 -Build
+  echo PowerShell 7 is required. Run: pwsh -File tools\run-preview.ps1 -Build
   pause
   exit /b 1
 )
