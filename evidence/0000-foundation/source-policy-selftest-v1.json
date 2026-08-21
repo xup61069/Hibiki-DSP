@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "issue": 56,
+  "scope_digest": "source-policy-selftest-v1",
+  "source_commit": "fb75920",
+  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-git-2.55.0-pwsh-7.6.5; target-vs2026-sdk-wdk-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/source-policy.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 56",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/source-policy.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "valid source text acceptance",
+        "allowed text extension acceptance",
+        "case-insensitive blocked extension rejection",
+        "PE MZ header rejection",
+        "BEGIN PRIVATE KEY secret-pattern rejection",
+        "GUMROAD_ACCESS_TOKEN secret-pattern rejection",
+        "PARTNER_CENTER_TOKEN secret-pattern rejection",
+        "ghp_ secret-pattern rejection",
+        "github_pat_ secret-pattern rejection"
+      ],
+      "cases": 10,
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "tracked-path blocked extension scan",
+        "PE header scan",
+        "secret-pattern scan"
+      ],
+      "tracked_paths": 413,
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 56 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 56",
+        "active handoff ownership and overlap validation"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "blocked",
+      "coverage": [
+        "required documentation, Spec IDs, adapters, handoffs, and baseline summary gate"
+      ],
+      "limitation": "Integrator-owned docs/state/BASELINE.md tracked-path counter requires refresh after this slice's handoff and evidence files are added."
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "workflow source-policy reference and tracked artifact publication boundary"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Source-only policy self-test and repository scan only; no binary is built, loaded, signed, installed, or executed.",
+    "Does not claim driver, WaveRT, HLK, Microsoft signing, installer, or physical audio endpoint behavior.",
+    "docs/state/BASELINE.md is integrator-owned and was not modified; its tracked-path count must be refreshed before CI can pass.",
+    "Local machine is below the locked target toolchain (Windows 26200, no WDK/Windows App SDK)."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "cmake": "4.4.0",
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T05:40:00+08:00",
+  "finished_at": "2026-08-22T05:45:00+08:00"
+}
