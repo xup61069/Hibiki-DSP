@@ -15,6 +15,7 @@
 #include "hibiki/latency_compensation.hpp"
 #include "hibiki/latency_graph_commit.hpp"
 #include "hibiki/vst3_parameter_timeline.hpp"
+#include "hibiki/vst3_worker_lane.hpp"
 #include "hibiki/tab_bridge.hpp"
 #include "hibiki/asio_transport_v1.h"
 #include "hibiki/output_sink.hpp"
@@ -927,6 +928,21 @@ int main() {
           timeline_point_count == 1U);
     CHECK(!parameter_timeline.append(Vst3ParameterTimelineEventV1{99U, 0U, 1.1}) &&
           !parameter_timeline.collect_block(0U, 0U, timeline_points, timeline_point_count));
+    CHECK(!validate_vst3_worker_lane_config_v1(Vst3WorkerLaneConfigV1{0U, 2U, 48000.0, 0U, 128U}));
+    CHECK(validate_vst3_worker_lane_config_v1(Vst3WorkerLaneConfigV1{99U, 2U, 48000.0, 64U, 128U}));
+    Vst3WorkerLaneSessionV1 worker_lane;
+    CHECK(worker_lane.prepare(sandbox, Vst3WorkerLaneConfigV1{99U, 2U, 48000.0, 64U, 128U}) &&
+          worker_lane.state() == Vst3WorkerLaneStateV1::Prepared &&
+          worker_lane.append_parameter_event(Vst3ParameterTimelineEventV1{7U, 4U, 0.5}) &&
+          worker_lane.parameter_timeline().event_count == 1U &&
+          worker_lane.latency_lane_input().lane_token == 99U &&
+          !worker_lane.latency_lane_input().active &&
+          worker_lane.latency_lane_input().reported_latency_samples == 0U);
+    CHECK(worker_lane.handshake() == Vst3WorkerExchangeResultV1::not_running &&
+          worker_lane.state() == Vst3WorkerLaneStateV1::Degraded);
+    CHECK(!worker_lane.append_parameter_event(Vst3ParameterTimelineEventV1{8U, 8U, 0.25}));
+    worker_lane.detach();
+    CHECK(worker_lane.state() == Vst3WorkerLaneStateV1::Detached);
     Vst3ParameterTimelineV1 too_many_parameters;
     bool timeline_parameter_capacity = true;
     for (std::uint32_t parameter_id = 0U; parameter_id < 17U; ++parameter_id) {

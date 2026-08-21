@@ -58,6 +58,13 @@ protocol/plugin error 都回傳明確結果，並在已驗證的輸出範圍先�
 callback 呼叫，也不會自動重啟 quarantine worker。參數 frame 仍沿用最多 64 點的既有
 protocol limit，SDK worker 才會把它轉成 `IParameterChanges`。
 
+`Vst3WorkerLaneSessionV1` 將這個 exchange 與既有 `Vst3ParameterTimelineV1`、stable
+`lane_token` 及 latency projection 接起來。它要求成功 handshake 後才進入 `Ready`，每次
+成功 block 必須連續銜接 `block_start`，並把區間內事件轉成 bounded sample offsets；worker
+或順序／格式錯誤會把 lane 置為 `Degraded`，不自動重啟或重送未知結果。這是 control/IPC
+session boundary，不是 RT graph plugin callback；Scene scheduler、back-pressure 與跨版本
+plugin state persistence 仍由更上層規格負責。
+
 `vst3_sdk_catalog.hpp` 提供 optional control-plane bridge，使用 `THIRD_PARTY.yml` 鎖定的
 Steinberg SDK 3.8.1 build 84 與 submodule commits，掃描 module factory class metadata。
 SDK checkout 由開發者在 `.local/` 提供，public monorepo 不 vendor SDK；catalog 不執行 plugin、

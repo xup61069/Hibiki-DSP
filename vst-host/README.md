@@ -42,6 +42,13 @@ before a failed exchange. They may wait for the bounded named-pipe timeout and
 must never be called from the RT graph; a failed worker is reported to the
 existing quarantine policy rather than silently restarted.
 
+`Vst3WorkerLaneSessionV1` is the next control-plane layer: it binds a stable lane
+token and reported latency, requires a successful handshake, extracts events
+from `Vst3ParameterTimelineV1`, and rejects non-contiguous blocks. A worker or
+ordering failure moves that lane to `Degraded`; Scene scheduling,
+back-pressure, state persistence and third-party certification remain explicit
+follow-up gates.
+
 `LatencyAlignmentPlanV1` and `FixedDelayLineV1` provide a bounded 16,384-sample
 alignment plan and fixed 8-channel delay primitive. They are tested separately
 from supervisor and graph lane commit, so plugin certification and full latency
