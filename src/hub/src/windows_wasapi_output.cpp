@@ -119,12 +119,23 @@ bool channel_mask_allowed(const std::uint32_t channels, const DWORD mask) noexce
   return false;
 }
 
+WasapiOutputFailureV1 classify_failure(const HRESULT result) noexcept {
+  if (result == AUDCLNT_E_DEVICE_INVALIDATED) {
+    return WasapiOutputFailureV1::DeviceInvalidated;
+  }
+  if (result == AUDCLNT_E_SERVICE_NOT_RUNNING) {
+    return WasapiOutputFailureV1::ServiceNotRunning;
+  }
+  return WasapiOutputFailureV1::Other;
+}
+
 }  // namespace
 
 WindowsWasapiOutputV1::~WindowsWasapiOutputV1() { unbind(); }
 
 bool WindowsWasapiOutputV1::bind(const WasapiOutputConfigV1& config) noexcept {
   unbind();
+  failure_ = WasapiOutputFailureV1::None;
   if (!valid_layout(config.channels) || !valid_rate(config.sample_rate) ||
       config.buffer_duration_ms == 0U || config.buffer_duration_ms > 200U) {
     return false;
@@ -202,7 +213,15 @@ bool WindowsWasapiOutputV1::bind(const WasapiOutputConfigV1& config) noexcept {
 }
 
 bool WindowsWasapiOutputV1::start() noexcept {
-  if (!bound() || started_ || FAILED(as_client(client_)->Start())) return false;
+  if (!bound() || started_) {
+    failure_ = WasapiOutputFailureV1::Other;
+    return false;
+  }
+  const auto result = as_client(client_)->Start();
+  if (FAILED(result)) {
+    failure_ = classify_failure(result);
+    return false;
+  }
   started_ = true;
   return true;
 }
@@ -229,6 +248,7 @@ void WindowsWasapiOutputV1::release_resources() noexcept {
   sample_rate_ = 0;
   buffer_frames_ = 0;
   encoding_ = WasapiSampleEncodingV1::Float32;
+  failure_ = WasapiOutputFailureV1::None;
   bytes_per_sample_ = 0;
 }
 
@@ -236,10 +256,18 @@ void WindowsWasapiOutputV1::unbind() noexcept { release_resources(); }
 
 bool WindowsWasapiOutputV1::render(const float* const interleaved,
                                    const std::uint32_t frames) noexcept {
-  if (!started_ || interleaved == nullptr || frames == 0U || frames > buffer_frames_) return false;
+  failure_ = WasapiOutputFailureV1::None;
+  if (!started_ || interleaved == nullptr || frames == 0U || frames > buffer_frames_) {
+    failure_ = WasapiOutputFailureV1::Other;
+    return false;
+  }
   UINT32 padding = 0U;
-  if (FAILED(as_client(client_)->GetCurrentPadding(&padding)) ||
-      frames > buffer_frames_ - (padding < buffer_frames_ ? padding : buffer_frames_)) {
+  const auto padding_result = as_client(client_)->GetCurrentPadding(&padding);
+  if (FAILED(padding_result)) {
+    failure_ = classify_failure(padding_result);
+    return false;
+  }
+  if (frames > buffer_frames_ - (padding < buffer_frames_ ? padding : buffer_frames_)) {
     return false;
   }
   const auto samples = static_cast<std::size_t>(frames) * channels_;
@@ -247,7 +275,10 @@ bool WindowsWasapiOutputV1::render(const float* const interleaved,
     if (!std::isfinite(interleaved[index])) return false;
   }
   BYTE* destination = nullptr;
-  if (FAILED(as_render(render_client_)->GetBuffer(frames, &destination)) || destination == nullptr) {
+  const auto get_buffer_result = as_render(render_client_)->GetBuffer(frames, &destination);
+  if (FAILED(get_buffer_result) || destination == nullptr) {
+    failure_ = FAILED(get_buffer_result) ? classify_failure(get_buffer_result)
+                                         : WasapiOutputFailureV1::Other;
     return false;
   }
   if (encoding_ == WasapiSampleEncodingV1::Float32) {
@@ -271,12 +302,24 @@ bool WindowsWasapiOutputV1::render(const float* const interleaved,
       output[index] = float_to_pcm<std::int32_t>(interleaved[index], 2147483647.0, INT32_MIN);
     }
   }
-  return SUCCEEDED(as_render(render_client_)->ReleaseBuffer(frames, 0U));
+  const auto release_result = as_render(render_client_)->ReleaseBuffer(frames, 0U);
+  if (FAILED(release_result)) failure_ = classify_failure(release_result);
+  return SUCCEEDED(release_result);
 }
 
 bool WindowsWasapiOutputV1::wait_for_buffer(const std::uint32_t timeout_ms) noexcept {
   if (!started_ || event_ == nullptr) return false;
-  return WaitForSingleObject(as_event(event_), timeout_ms) == WAIT_OBJECT_0;
+  const auto wait_result = WaitForSingleObject(as_event(event_), timeout_ms);
+  if (wait_result == WAIT_TIMEOUT) {
+    failure_ = WasapiOutputFailureV1::Timeout;
+    return false;
+  }
+  if (wait_result == WAIT_FAILED) {
+    failure_ = WasapiOutputFailureV1::Other;
+    return false;
+  }
+  failure_ = WasapiOutputFailureV1::None;
+  return wait_result == WAIT_OBJECT_0;
 }
 
 bool WindowsWasapiOutputV1::read_clock(WasapiClockSampleV1& sample) const noexcept {
@@ -345,6 +388,30 @@ void WindowsWasapiSinkWorkerV1::stop() noexcept {
   if (worker_.joinable()) worker_.join();
   running_.store(false, std::memory_order_release);
   endpoint_ready_.store(false, std::memory_order_release);
+}
+
+bool WindowsWasapiSinkWorkerV1::recover_output(
+    WindowsWasapiOutputV1& output,
+    const WasapiOutputConfigV1& config) noexcept {
+  const auto failure = output.failure();
+  if (failure != WasapiOutputFailureV1::DeviceInvalidated &&
+      failure != WasapiOutputFailureV1::ServiceNotRunning) {
+    return false;
+  }
+  endpoint_ready_.store(false, std::memory_order_release);
+  output.unbind();
+  constexpr std::uint32_t kRecoveryAttempts = 10U;
+  for (std::uint32_t attempt = 0U;
+       attempt < kRecoveryAttempts && !stop_requested_.load(std::memory_order_acquire);
+       ++attempt) {
+    if (output.bind(config) && output.start()) {
+      endpoint_ready_.store(true, std::memory_order_release);
+      return true;
+    }
+    Sleep(100U);
+  }
+  degraded_.store(true, std::memory_order_release);
+  return false;
 }
 
 void WindowsWasapiSinkWorkerV1::observe_clock(const double source_frames,
@@ -473,7 +540,17 @@ void WindowsWasapiSinkWorkerV1::run(WasapiOutputConfigV1 config,
       source_step_.store(sink_model_.snapshot().source_step, std::memory_order_release);
       drift_ppm_.store(sink_model_.snapshot().drift_ppm, std::memory_order_release);
     }
-    if (!output.wait_for_buffer(10U)) continue;
+    if (!output.wait_for_buffer(10U)) {
+      const auto failure = output.failure();
+      if (failure == WasapiOutputFailureV1::DeviceInvalidated ||
+          failure == WasapiOutputFailureV1::ServiceNotRunning) {
+        if (!recover_output(output, config)) break;
+        have_previous_clock = false;
+        previous_clock = {};
+        previous_source_position = source_position;
+      }
+      continue;
+    }
     std::uint32_t frames = 0U;
     std::uint32_t channels = 0U;
     if (!pop(block.data(), kMaxFrames, frames, channels)) {
@@ -490,6 +567,15 @@ void WindowsWasapiSinkWorkerV1::run(WasapiOutputConfigV1 config,
     if (rendered_frames > 0U && output.render(rendered.data(), static_cast<std::uint32_t>(rendered_frames))) {
       rendered_blocks_.fetch_add(1U, std::memory_order_relaxed);
     } else {
+      const auto failure = output.failure();
+      if (failure == WasapiOutputFailureV1::DeviceInvalidated ||
+          failure == WasapiOutputFailureV1::ServiceNotRunning) {
+        if (!recover_output(output, config)) break;
+        have_previous_clock = false;
+        previous_clock = {};
+        previous_source_position = source_position;
+        continue;
+      }
       degraded_.store(true, std::memory_order_release);
     }
     WasapiClockSampleV1 current_clock{};
@@ -554,6 +640,7 @@ void WindowsWasapiOutputV1::unbind() noexcept {
   sample_rate_ = 0;
   buffer_frames_ = 0;
   encoding_ = WasapiSampleEncodingV1::Float32;
+  failure_ = WasapiOutputFailureV1::None;
   bytes_per_sample_ = 0;
 }
 bool WindowsWasapiOutputV1::render(const float*, std::uint32_t) noexcept { return false; }

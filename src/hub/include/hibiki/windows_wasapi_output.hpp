@@ -33,6 +33,14 @@ enum class WasapiSampleEncodingV1 : std::uint8_t {
   Pcm32,
 };
 
+enum class WasapiOutputFailureV1 : std::uint8_t {
+  None,
+  Timeout,
+  DeviceInvalidated,
+  ServiceNotRunning,
+  Other,
+};
+
 // WASAPI shared-mode endpoint owned by one dedicated sink worker (not the
 // Hibiki graph RT thread). That worker must initialize COM and perform bind,
 // start, render and unbind on the same apartment; the control plane schedules
@@ -59,6 +67,7 @@ public:
   [[nodiscard]] std::uint32_t sample_rate() const noexcept { return sample_rate_; }
   [[nodiscard]] std::uint32_t buffer_frames() const noexcept { return buffer_frames_; }
   [[nodiscard]] WasapiSampleEncodingV1 encoding() const noexcept { return encoding_; }
+  [[nodiscard]] WasapiOutputFailureV1 failure() const noexcept { return failure_; }
 
 private:
   void release_resources() noexcept;
@@ -77,6 +86,7 @@ private:
   std::uint32_t sample_rate_{0};
   std::uint32_t buffer_frames_{0};
   WasapiSampleEncodingV1 encoding_{WasapiSampleEncodingV1::Float32};
+  WasapiOutputFailureV1 failure_{WasapiOutputFailureV1::None};
   std::uint32_t bytes_per_sample_{0};
   bool started_{false};
 };
@@ -134,6 +144,8 @@ private:
   };
 
   void run(WasapiOutputConfigV1 config, std::uint32_t block_frames) noexcept;
+  [[nodiscard]] bool recover_output(WindowsWasapiOutputV1& output,
+                                    const WasapiOutputConfigV1& config) noexcept;
   [[nodiscard]] bool pop(float* interleaved,
                          std::uint32_t output_capacity_frames,
                          std::uint32_t& frames,
