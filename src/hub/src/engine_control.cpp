@@ -85,7 +85,13 @@ EngineControlResultV1 EngineControlWorkerV1::consume(
         case IpcMessageType::Hello:
             return EngineControlResultV1::Ignored;
         case IpcMessageType::VolumeNotification:
-            return engine_.apply_windows_volume(command.volume) == VolumeNotificationResult::Accepted
+            return (command.has_volume_target
+                        ? engine_.apply_windows_volume(
+                              std::string_view(command.volume_target.output_group.data(),
+                                               command.volume_target.output_group_bytes),
+                              command.volume)
+                        : engine_.apply_windows_volume(command.volume)) ==
+                       VolumeNotificationResult::Accepted
                        ? EngineControlResultV1::Applied
                        : EngineControlResultV1::Invalid;
         case IpcMessageType::SceneApply:

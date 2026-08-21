@@ -279,7 +279,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     public IpcEnvelopeV1 BuildVolumeCommand()
     {
         _generation++;
-        LastCommand = _commands.SetVolume(RequestedVolumeDb, Muted, _generation);
+        LastCommand = _commands.SetVolume(RequestedVolumeDb, Muted, _generation,
+                                           _selectedOutputGroup);
         OnPropertyChanged(nameof(LastCommand));
         return LastCommand;
     }

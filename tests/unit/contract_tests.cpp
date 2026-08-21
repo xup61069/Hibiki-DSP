@@ -708,6 +708,13 @@ int main() {
     auto invalid_volume_payload = volume_payload;
     invalid_volume_payload[4] = 2U;
     CHECK(!decode_volume_notification_payload_v1(invalid_volume_payload, decoded_volume));
+    const auto grouped_volume_payload = encode_grouped_volume_notification_payload_v1(
+        "movie", payload_volume);
+    GroupedVolumeNotificationPayloadV1 decoded_volume_target{};
+    CHECK(decode_grouped_volume_notification_payload_v1(
+              grouped_volume_payload, decoded_volume, decoded_volume_target) &&
+          decoded_volume_target.output_group_bytes == 5U &&
+          std::string_view(decoded_volume_target.output_group.data(), 5U) == "movie");
     ControlCommandV1 decoded_command{};
     IpcFrameV1 volume_command_frame;
     volume_command_frame.header.type = IpcMessageType::VolumeNotification;
@@ -716,7 +723,13 @@ int main() {
     CHECK(decode_control_command_v1(volume_command_frame, decoded_command) &&
           decoded_command.type == IpcMessageType::VolumeNotification &&
           decoded_command.request_id == 99U && decoded_command.volume.mute);
-    CHECK(make_ack_frame_v1(volume_command_frame).header.request_id == 99U &&
+    volume_command_frame.header.request_id = 100U;
+    volume_command_frame.payload.assign(grouped_volume_payload.begin(), grouped_volume_payload.end());
+    CHECK(decode_control_command_v1(volume_command_frame, decoded_command) &&
+          decoded_command.has_volume_target &&
+          std::string_view(decoded_command.volume_target.output_group.data(),
+                           decoded_command.volume_target.output_group_bytes) == "movie");
+    CHECK(make_ack_frame_v1(volume_command_frame).header.request_id == 100U &&
           make_error_frame_v1(volume_command_frame).header.type == IpcMessageType::Error);
     std::array<std::uint8_t, kSceneApplyPayloadBytesV1> scene_payload{};
     CHECK(encode_scene_apply_payload_v1("game", "main", scene_payload));
@@ -795,6 +808,14 @@ int main() {
           custom_scene_worker.active_scene().id == "quiet-game" &&
           custom_scene_worker.active_scene().output_group == "custom-output" &&
           custom_scene_worker.revision() == 1U);
+    ControlCommandV1 grouped_volume_command{};
+    grouped_volume_command.type = IpcMessageType::VolumeNotification;
+    grouped_volume_command.volume = VolumeNotificationV1{-9.0, false, 1U};
+    grouped_volume_command.has_volume_target = true;
+    grouped_volume_command.volume_target.output_group_bytes = 13U;
+    std::copy_n("custom-output", 13U, grouped_volume_command.volume_target.output_group.data());
+    CHECK(custom_scene_worker.consume(grouped_volume_command) == EngineControlResultV1::Applied &&
+          std::abs(custom_scene_engine->volume("custom-output").requested_db + 9.0) < 1e-12);
     CHECK(encode_scene_apply_payload_v1("quiet-game", "main", scene_payload));
     CHECK(decode_scene_apply_payload_v1(scene_payload, custom_scene_command.scene));
     CHECK(custom_scene_worker.consume(custom_scene_command) == EngineControlResultV1::Invalid);

@@ -121,6 +121,43 @@ bool decode_volume_notification_payload_v1(
     return std::isfinite(notification.requested_db);
 }
 
+std::array<std::uint8_t, kGroupedVolumeNotificationPayloadBytesV1>
+encode_grouped_volume_notification_payload_v1(
+    const std::string_view output_group,
+    const VolumeNotificationV1& notification) noexcept {
+    std::array<std::uint8_t, kGroupedVolumeNotificationPayloadBytesV1> payload{};
+    if (output_group.empty() || output_group.size() > 31U ||
+        !is_printable_utf8(output_group)) {
+        return payload;
+    }
+    const auto volume_payload = encode_volume_notification_payload_v1(notification);
+    std::copy(volume_payload.begin(), volume_payload.end(), payload.begin());
+    payload[16] = static_cast<std::uint8_t>(output_group.size());
+    std::copy(output_group.begin(), output_group.end(), payload.begin() + 17U);
+    return payload;
+}
+
+bool decode_grouped_volume_notification_payload_v1(
+    const std::span<const std::uint8_t> payload,
+    VolumeNotificationV1& notification,
+    GroupedVolumeNotificationPayloadV1& target) noexcept {
+    notification = {};
+    target = {};
+    if (payload.size() != kGroupedVolumeNotificationPayloadBytesV1 || payload[16] == 0U ||
+        payload[16] > target.output_group.size() ||
+        !decode_volume_notification_payload_v1(payload.first(kVolumeNotificationPayloadBytesV1),
+                                               notification)) {
+        return false;
+    }
+    target.output_group_bytes = payload[16];
+    std::copy_n(payload.data() + 17U, target.output_group_bytes, target.output_group.data());
+    for (std::size_t index = target.output_group_bytes; index < target.output_group.size(); ++index) {
+        if (payload[17U + index] != 0U) return false;
+    }
+    return is_printable_utf8(
+        std::string_view(target.output_group.data(), target.output_group_bytes));
+}
+
 bool encode_scene_apply_payload_v1(
     const std::string_view scene_id,
     const std::string_view output_group,
@@ -172,7 +209,12 @@ bool decode_control_command_v1(const IpcFrameV1& frame,
         case IpcMessageType::GraphRollback:
             return frame.payload.empty();
         case IpcMessageType::VolumeNotification:
-            return decode_volume_notification_payload_v1(frame.payload, command.volume);
+            if (frame.payload.size() == kVolumeNotificationPayloadBytesV1) {
+                return decode_volume_notification_payload_v1(frame.payload, command.volume);
+            }
+            command.has_volume_target = decode_grouped_volume_notification_payload_v1(
+                frame.payload, command.volume, command.volume_target);
+            return command.has_volume_target;
         case IpcMessageType::SceneApply:
             return decode_scene_apply_payload_v1(frame.payload, command.scene);
         case IpcMessageType::GraphPrepare:

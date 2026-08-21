@@ -14,17 +14,34 @@
 namespace hibiki {
 
 constexpr std::size_t kVolumeNotificationPayloadBytesV1 = 16U;
+constexpr std::size_t kGroupedVolumeNotificationPayloadBytesV1 = 48U;
 constexpr std::size_t kSceneApplyPayloadBytesV1 = 64U;
 
-// Fixed little-endian control payload shared with apps/control-model. dB is
-// Q16.16 at offset 0, mute is 0/1 at offset 4, bytes 5..7 are reserved, and
-// generation is uint64 at offset 8. No native C++ struct layout crosses IPC.
+// Fixed little-endian control payload shared with apps/control-model. The
+// legacy 16-byte form stores dB Q16.16 at offset 0, mute at offset 4, reserved
+// bytes 5..7 and generation at offset 8. The 48-byte grouped form appends a
+// one-byte UTF-8 output-group length at offset 16 and 31 bytes of zero-padded
+// label at offset 17. No native C++ struct layout crosses IPC.
 [[nodiscard]] std::array<std::uint8_t, kVolumeNotificationPayloadBytesV1>
 encode_volume_notification_payload_v1(const VolumeNotificationV1& notification) noexcept;
 
 [[nodiscard]] bool decode_volume_notification_payload_v1(
     std::span<const std::uint8_t> payload,
     VolumeNotificationV1& notification) noexcept;
+
+struct GroupedVolumeNotificationPayloadV1 {
+    std::uint8_t output_group_bytes{0U};
+    std::array<char, 31> output_group{};
+};
+
+[[nodiscard]] std::array<std::uint8_t, kGroupedVolumeNotificationPayloadBytesV1>
+encode_grouped_volume_notification_payload_v1(
+    std::string_view output_group,
+    const VolumeNotificationV1& notification) noexcept;
+[[nodiscard]] bool decode_grouped_volume_notification_payload_v1(
+    std::span<const std::uint8_t> payload,
+    VolumeNotificationV1& notification,
+    GroupedVolumeNotificationPayloadV1& target) noexcept;
 
 struct SceneApplyPayloadV1 {
     std::uint8_t scene_id_bytes{0U};
@@ -45,6 +62,8 @@ struct ControlCommandV1 {
     IpcMessageType type{IpcMessageType::Error};
     std::uint64_t request_id{0U};
     VolumeNotificationV1 volume{};
+    GroupedVolumeNotificationPayloadV1 volume_target{};
+    bool has_volume_target{false};
     SceneApplyPayloadV1 scene{};
 };
 

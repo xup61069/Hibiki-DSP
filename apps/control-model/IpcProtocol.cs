@@ -119,6 +119,7 @@ public static class IpcCodecV1
 public static class ControlPayloadsV1
 {
     public const int VolumeNotificationBytes = 16;
+    public const int GroupedVolumeNotificationBytes = 48;
     public const int SceneApplyBytes = 64;
     private static readonly System.Text.UTF8Encoding StrictUtf8 =
         new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
@@ -155,6 +156,50 @@ public static class ControlPayloadsV1
         mute = payload[4] != 0;
         generation = BinaryPrimitives.ReadUInt64LittleEndian(payload[8..]);
         return true;
+    }
+
+    public static byte[] EncodeGroupedVolumeNotification(string outputGroup,
+                                                          double requestedDb,
+                                                          bool mute,
+                                                          ulong generation)
+    {
+        var group = StrictUtf8.GetBytes(outputGroup ?? string.Empty);
+        if (group.Length is < 1 or > 31 || group.Any(value => value < 0x20))
+            throw new ArgumentException("Output-group ID must be 1..31 printable UTF-8 bytes.",
+                                        nameof(outputGroup));
+        var volume = EncodeVolumeNotification(requestedDb, mute, generation);
+        var payload = new byte[GroupedVolumeNotificationBytes];
+        volume.CopyTo(payload, 0);
+        payload[16] = (byte)group.Length;
+        group.CopyTo(payload.AsSpan(17));
+        return payload;
+    }
+
+    public static bool TryDecodeGroupedVolumeNotification(ReadOnlySpan<byte> payload,
+                                                           out string outputGroup,
+                                                           out double requestedDb,
+                                                           out bool mute,
+                                                           out ulong generation)
+    {
+        outputGroup = string.Empty;
+        requestedDb = 0.0;
+        mute = false;
+        generation = 0UL;
+        if (payload.Length != GroupedVolumeNotificationBytes || payload[16] is < 1 or > 31 ||
+            !TryDecodeVolumeNotification(payload[..VolumeNotificationBytes], out requestedDb,
+                                          out mute, out generation))
+            return false;
+        for (var index = 17 + payload[16]; index < GroupedVolumeNotificationBytes; index++)
+            if (payload[index] != 0) return false;
+        try
+        {
+            outputGroup = StrictUtf8.GetString(payload.Slice(17, payload[16]));
+            return !string.IsNullOrWhiteSpace(outputGroup);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
     public static byte[] EncodeSceneApply(string sceneId, string outputGroup)
@@ -224,9 +269,13 @@ public sealed class ControlCommandFactoryV1
 
     public IpcEnvelopeV1 Hello() => _requests.Create(ControlMessageType.Hello);
 
-    public IpcEnvelopeV1 SetVolume(double requestedDb, bool mute, ulong generation) =>
+    public IpcEnvelopeV1 SetVolume(double requestedDb, bool mute, ulong generation,
+                                   string? outputGroup = null) =>
         _requests.Create(ControlMessageType.VolumeNotification,
-            ControlPayloadsV1.EncodeVolumeNotification(requestedDb, mute, generation));
+            string.IsNullOrWhiteSpace(outputGroup)
+                ? ControlPayloadsV1.EncodeVolumeNotification(requestedDb, mute, generation)
+                : ControlPayloadsV1.EncodeGroupedVolumeNotification(outputGroup, requestedDb, mute,
+                                                                     generation));
 
     public IpcEnvelopeV1 CommitGraph() => _requests.Create(ControlMessageType.GraphCommit);
 

@@ -75,6 +75,12 @@ Check(volumeCommand.Type == ControlMessageType.VolumeNotification &&
           out var commandDb, out var commandMute, out var commandGeneration) &&
       Math.Abs(commandDb + 6.020599365234375) < 1e-6 && commandMute && commandGeneration == 9UL,
     "Control volume payload did not round-trip with the v1 contract.");
+var groupedVolumeCommand = commandFactory.SetVolume(-9.0, false, 10UL, "movie");
+Check(ControlPayloadsV1.TryDecodeGroupedVolumeNotification(groupedVolumeCommand.Payload.Span,
+          out var groupedOutput, out var groupedDb, out var groupedMute, out var groupedGeneration) &&
+      groupedOutput == "movie" && Math.Abs(groupedDb + 9.0) < 1e-6 && !groupedMute &&
+      groupedGeneration == 10UL,
+    "Grouped volume payload did not round-trip with the v1 contract.");
 Check(IpcRequestSession.IsReplyTo(volumeCommand,
         new IpcEnvelopeV1(ControlMessageType.Ack, volumeCommand.RequestId, ReadOnlyMemory<byte>.Empty)),
     "Control command request correlation failed.");
