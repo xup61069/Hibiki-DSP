@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 74,
   "scope_digest": "preview-launcher-selftest-v1",
-  "source_commit": "PENDING",
+  "source_commit": "c073e4e1cf167fb1c16389f7fc922a40887b38a3",
   "environment_fingerprint": "windows-26200-amd64-powershell-5.1-dotnet-only-portable-pwsh-7.6.5-no-cmake-no-vs; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/run-preview.ps1 -SelfTest",
