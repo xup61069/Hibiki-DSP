@@ -46,7 +46,7 @@ $required = @(
   'docs/specs/SPEC-0011-calibration-compiler.md',
   'docs/specs/SPEC-0012-vst3-latency-graph-commit.md',
   'docs/specs/SPEC-0013-session-route-rules.md', 'docs/specs/SPEC-0014-custom-scene-catalog.md',
-  'docs/specs/SPEC-0015-physical-device-catalog.md',
+  'docs/specs/SPEC-0015-physical-device-catalog.md', 'docs/specs/SPEC-0016-process-loopback-capture.md',
   'docs/VST3_STATE_COMPATIBILITY_REVIEW.md',
   'docs/tasks/active/0.md', 'evidence/0000-foundation/initial.json'
 )

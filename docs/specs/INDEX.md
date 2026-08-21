@@ -17,6 +17,7 @@
 | SPEC-0013 | accepted | Per-App session route rules、priority/ambiguity/capacity fail-closed |
 | SPEC-0014 | accepted | 自定義 Scene catalog、bounded resolver 與 SceneApply transaction |
 | SPEC-0015 | accepted | 實體裝置 catalog 與切換前安全資料契約 |
+| SPEC-0016 | accepted | Windows process-loopback capture 與 per-App source boundary |
 
 Draft spec 有 blocking open question 時不得直接實作；公開行為變更必須在同一 PR
 更新 spec 與測試。

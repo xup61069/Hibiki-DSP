@@ -64,6 +64,7 @@ extern "C" {
 #include "hibiki/windows_device_catalog.hpp"
 #include "hibiki/windows_audio_session_watcher.hpp"
 #include "hibiki/windows_audio_session_route.hpp"
+#include "hibiki/windows_process_loopback.hpp"
 #include "hibiki/windows_wasapi_output.hpp"
 #include "hibiki/windows_wasapi_handoff.hpp"
 #include "hibiki/windows_wasapi_fanout.hpp"
@@ -2163,6 +2164,13 @@ int main() {
               WindowsAudioSessionRouteRefreshResultV1::Unbound &&
           !session_route_coordinator.copy_graph(session_route_graph) &&
           !session_route_coordinator.snapshot().has_graph);
+    WindowsProcessLoopbackSourceV1 process_loopback;
+    std::uint32_t loopback_frames = 99U;
+    CHECK(process_loopback.start(WindowsProcessLoopbackConfigV1{}) == E_INVALIDARG &&
+          process_loopback.snapshot().state == WindowsProcessLoopbackStateV1::Degraded &&
+          !process_loopback.read(nullptr, 0U, loopback_frames) && loopback_frames == 0U);
+    process_loopback.stop();
+    CHECK(process_loopback.snapshot().state == WindowsProcessLoopbackStateV1::Degraded);
     WindowsWasapiOutputV1 wasapi_output;
     CHECK(!wasapi_output.bind(WasapiOutputConfigV1{L"", 3U, 48000U, 20U}));
     CHECK(!wasapi_output.start());
