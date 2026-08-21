@@ -1132,19 +1132,28 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     public async Task<bool> OneTapEnhanceAsync(CancellationToken cancellationToken = default)
     {
         if (!OneTapEnhance()) return false;
-        return await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+        var sent = await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+        if (sent && IsConnected)
+            _ = await RefreshControlStatusAsync(cancellationToken).ConfigureAwait(true);
+        return sent;
     }
 
     public async Task<bool> SelectSceneAsync(string sceneId,
                                               CancellationToken cancellationToken = default)
     {
         if (!SelectScene(sceneId)) return false;
-        return await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+        var sent = await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+        if (sent && IsConnected)
+            _ = await RefreshControlStatusAsync(cancellationToken).ConfigureAwait(true);
+        return sent;
     }
 
     public async Task<bool> PushVolumeAsync(CancellationToken cancellationToken = default)
     {
-        return await SendCommandAsync(BuildVolumeCommand, cancellationToken).ConfigureAwait(true);
+        var sent = await SendCommandAsync(BuildVolumeCommand, cancellationToken).ConfigureAwait(true);
+        if (sent && IsConnected)
+            _ = await RefreshControlStatusAsync(cancellationToken).ConfigureAwait(true);
+        return sent;
     }
 
     public async Task<bool> QueueVolumeAsync(TimeSpan debounce = default,

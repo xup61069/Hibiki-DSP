@@ -28,6 +28,8 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   但不是 XAML、無障礙、driver 或 release evidence。
 - C++ Engine Preview 已可由 `tools/build-engine-preview.ps1` 建置；`tools/engine-preview-smoke.ps1`
   會啟動它並驗證 v1 named-pipe Hello/Ack request correlation 與 ControlStatusSnapshot 回覆。
+  `tools/control-model-engine-smoke.ps1` 另外以 C# `EasyControlViewModel` 驗證 −18 dB 音量
+  往返、引擎快照讀回與 Game One-Tap SceneApply Ack。
   `tools/run-preview.ps1 -Build` 會把 Engine Preview 與不依賴 Windows App Runtime 的 Desktop
   Compatibility UI 一起啟動；它只提供 user-space control host，不代表 WaveRT、實體輸出或
   Windows session routing 已完成。

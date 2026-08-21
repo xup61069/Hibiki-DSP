@@ -98,6 +98,15 @@ pwsh -File tools/run-preview.ps1 -Build
 Runtime 1.7 的實驗性 WinUI fallback，缺少 runtime 時會出現「Required components of the
 Windows App Runtime are missing」。這個錯誤不代表 Desktop Compatibility Preview 損壞。
 
+要只驗證 C# control model 與 C++ Engine Preview 的實際命令往返，可執行：
+
+```powershell
+pwsh -File tools/control-model-engine-smoke.ps1
+```
+
+它會送出 −18 dB 音量、讀回引擎快照，再送出 Game One-Tap SceneApply；這是控制面驗證，仍不
+代表已經有實體音訊輸出。
+
 ## 授權與貢獻
 
 Hibiki user-space 為 GPL-3.0-only；SYSVAD-derived driver 為 MS-PL；SDK/schema 為 Apache-2.0；

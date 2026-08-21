@@ -16,6 +16,9 @@ if ($Build -or -not (Test-Path -LiteralPath $desktop)) {
   & (Join-Path $repo 'tools/build-preview.ps1')
   if ($LASTEXITCODE -ne 0) { throw "Desktop Compatibility Preview build failed: $LASTEXITCODE" }
 }
+if (@(Get-Process -Name hibiki_engine_preview -ErrorAction SilentlyContinue).Count -gt 0) {
+  throw 'Another Engine Preview process is already running; close it before starting the combined preview.'
+}
 
 $engineProcess = Start-Process -FilePath $engine -WorkingDirectory (Split-Path $engine) `
   -WindowStyle Hidden -PassThru
