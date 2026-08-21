@@ -739,6 +739,25 @@ int main() {
     CHECK(devices.remove("endpoint-a") == PhysicalDeviceCatalogResultV1::Accepted &&
           devices.remove("missing") == PhysicalDeviceCatalogResultV1::NotFound &&
           devices.size() == 1U);
+    PhysicalDeviceCatalogV1 full_devices;
+    for (std::uint32_t index = 0U;
+         index < static_cast<std::uint32_t>(kPhysicalDeviceCatalogCapacityV1); ++index) {
+        PhysicalDeviceDescriptorV1 entry;
+        entry.endpoint_id = "full-" + std::to_string(index);
+        entry.display_name = "Fixture " + std::to_string(index);
+        entry.flow = index % 2U == 0U ? PhysicalDeviceFlowV1::Render
+                                      : PhysicalDeviceFlowV1::Capture;
+        entry.availability = PhysicalDeviceAvailabilityV1::Active;
+        entry.channels = entry.flow == PhysicalDeviceFlowV1::Render ? 2U : 1U;
+        entry.last_sequence = index + 1U;
+        CHECK(full_devices.upsert(entry) == PhysicalDeviceCatalogResultV1::Accepted);
+    }
+    PhysicalDeviceDescriptorV1 overflow = speakers;
+    overflow.endpoint_id = "overflow";
+    overflow.is_default = false;
+    CHECK(full_devices.size() == kPhysicalDeviceCatalogCapacityV1 &&
+          full_devices.upsert(overflow) == PhysicalDeviceCatalogResultV1::CapacityExceeded &&
+          full_devices.size() == kPhysicalDeviceCatalogCapacityV1);
 
     IpcFrameV1 frame;
     frame.header.type = IpcMessageType::VolumeNotification;
