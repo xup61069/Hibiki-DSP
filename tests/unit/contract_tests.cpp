@@ -363,6 +363,13 @@ int main() {
     const std::array<OutputFanoutSinkConfigV1, 2> duplicate_sinks{{
         {"same", 2U, true}, {"same", 2U, true}}};
     CHECK(!prepare_output_fanout_plan_v1(duplicate_sinks, 2U, 8U, fanout_plan));
+    const float fanout_nan_input[] = {0.25F, std::numeric_limits<float>::quiet_NaN(),
+                                      0.5F, -0.5F};
+    CHECK(!fanout_interleaved_v1(fanout_plan, fanout_nan_input, 2U, fanout_outputs,
+                                 fanout_capacities));
+    const std::array<OutputFanoutSinkConfigV1, 1> disabled_sinks{{
+        {"disabled", 2U, false}}};
+    CHECK(!prepare_output_fanout_plan_v1(disabled_sinks, 2U, 9U, fanout_plan));
 
     DeviceRecoveryCoordinator recovery;
     CHECK(recovery.observe(DeviceRecoveryEventV1{

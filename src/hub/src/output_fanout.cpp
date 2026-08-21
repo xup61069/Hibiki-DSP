@@ -1,6 +1,7 @@
 #include "hibiki/output_fanout.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 namespace hibiki {
@@ -18,6 +19,7 @@ bool validate_output_fanout_plan_v1(const OutputFanoutPlanV1& plan) noexcept {
         plan.sink_count > kOutputFanoutMaxSinksV1) {
         return false;
     }
+    bool has_enabled_sink = false;
     for (std::size_t index = 0U; index < plan.sink_count; ++index) {
         const auto& sink = plan.sinks[index];
         if (sink.id_bytes == 0U || sink.id_bytes > kOutputFanoutMaxIdBytesV1 ||
@@ -35,8 +37,9 @@ bool validate_output_fanout_plan_v1(const OutputFanoutPlanV1& plan) noexcept {
                 return false;
             }
         }
+        has_enabled_sink = has_enabled_sink || sink.enabled;
     }
-    return true;
+    return has_enabled_sink;
 }
 
 bool prepare_output_fanout_plan_v1(
@@ -79,6 +82,11 @@ bool fanout_interleaved_v1(const OutputFanoutPlanV1& plan,
         return false;
     }
     const auto samples = frames * static_cast<std::size_t>(plan.output_channels);
+    for (std::size_t sample = 0U; sample < samples; ++sample) {
+        if (!std::isfinite(input_interleaved[sample])) {
+            return false;
+        }
+    }
     for (std::size_t index = 0U; index < plan.sink_count; ++index) {
         const auto& sink = plan.sinks[index];
         if (sink.enabled && (outputs[index] == nullptr || output_capacities[index] < frames)) {
