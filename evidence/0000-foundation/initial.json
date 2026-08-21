@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "issue": 0,
-  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-output-fanout-runtime-exact-capacity-high-ratio-wavert-stream-wdk-adapter-driver-stream-bridge-endpoint-identity-graph-lane-wasapi-clock-handoff-graph-adapter-expert-surface-asio-wasapi-driver-wasapi-tab-vmic-fanout-engine-v35-vst-supervisor-exchange-v36-vst-worker-lane-v37-plugin-host-wire-v38-iso-formula-builder-v39-source-only-ci-v40-wdk-property-hardening-v41-vst-scene-automation-v42-vst-private-state-v43-vst-sdk-state-v44-program-kweighted-proxy-v45-vst-state-migration-v46-vst-state-registry-v47-vst-scene-state-coordinator-v48-scene-preflight-gate-v49-vst-scene-preflight-adapter-v50-vst-state-bounds-v51",
-  "source_commit": "23c9b0e",
+  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-output-fanout-runtime-exact-capacity-high-ratio-wavert-stream-wdk-adapter-driver-stream-bridge-endpoint-identity-graph-lane-wasapi-clock-handoff-graph-adapter-expert-surface-asio-wasapi-driver-wasapi-tab-vmic-fanout-engine-v35-vst-supervisor-exchange-v36-vst-worker-lane-v37-plugin-host-wire-v38-iso-formula-builder-v39-source-only-ci-v40-wdk-property-hardening-v41-vst-scene-automation-v42-vst-private-state-v43-vst-sdk-state-v44-program-kweighted-proxy-v45-vst-state-migration-v46-vst-state-registry-v47-vst-scene-state-coordinator-v48-scene-preflight-gate-v49-vst-scene-preflight-adapter-v50-vst-state-bounds-v51-winui-accessibility-v52",
+  "source_commit": "be7a33d",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -89,7 +89,7 @@
     {"command": "control-payloads", "status": "pass", "coverage": ["Q16.16 volume payload", "SceneApply fixed 64-byte payload", "typed command sink", "reserved-byte rejection", "strict UTF-8 validation"]},
     {"command": "virtual-mic-contract", "status": "pass", "coverage": ["format validation", "privacy mute default", "capture passthrough", "echo-reference copy", "bounded normalized-LMS cancellation", "finite-input fail-closed", "privacy gate before shared graph"]},
     {"command": "control-model", "status": "pass", "coverage": ["fail-closed One-Tap Enhance", "Easy/Expert scene selection", "fixed Main/Low Latency/Surround output groups", "bounded Hello/Scene/volume lifecycle", "40 ms latest-value volume debounce", "Connected/Degraded fallback", "active output-group identity", "SceneApply envelope encode", "strict UTF-8 rejection"]},
-    {"command": "winui-source-shell", "status": "pass", "coverage": ["Windows App SDK/toolchain lock match", "Easy/Expert binding surface", "source-only audio boundary", "window disconnect cleanup"], "compiled_artifacts": false},
+    {"command": "winui-source-shell", "status": "pass", "coverage": ["Windows App SDK/toolchain lock match", "Easy/Expert binding surface", "source-only audio boundary", "window disconnect cleanup", "AutomationProperties names/help text", "polite status live region"], "compiled_artifacts": false},
     {"command": "calibration-compiler", "status": "pass", "coverage": ["strictly increasing response validation", "16-filter bounded selection", "boost/cut/Q/spacing policy", "explicit limited diagnostic", "exporter-compatible PeqFilterV1"], "compiled_artifacts": false},
     {"command": "vst3-latency-alignment", "status": "pass", "coverage": ["active-lane maximum-latency plan", "16,384-sample bound", "fixed 8-channel delay", "impulse delay", "non-finite reset"], "compiled_artifacts": false},
     {"command": "vst3-latency-graph-commit", "status": "pass", "coverage": ["stable lane tokens", "revision-bound prepare/commit", "stale-base rejection", "rollback preservation", "inactive-lane normalization"], "compiled_artifacts": false},
@@ -117,7 +117,7 @@
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",
   "limitations": [
-    "Evidence corresponds to commit 23c9b0e and the current environment only; no real endpoint handoff or WinUI SDK build was exercised.",
+    "Evidence corresponds to commit be7a33d and the current environment only; no real endpoint handoff, WinUI SDK build or UI Automation run was exercised.",
     "The native ASIO build is an unsigned local developer verification; no DLL or SDK checkout is committed or published.",
     "Current machine is Windows 22631 with VS 17/SDK 10.0.26100.0; it cannot provide driver-target evidence for the locked Windows 26100+/VS 2026/SDK-WDK 10.0.28000.2526 environment."
   ],
