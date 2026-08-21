@@ -62,12 +62,28 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             engine_.rollback_graph();
             return EngineControlResultV1::Failed;
         }
+        // SceneProfile v1 does not carry an IR file/reference.  Detach any
+        // previously prepared IR as part of the same control transaction so
+        // a Movie calibration cannot silently survive a later Game/Studio
+        // scene switch.  The user may explicitly prepare a new IR afterwards.
+        if (!engine_.prepare_ir_clear()) {
+            engine_.rollback_graph();
+            engine_.rollback_ir();
+            return EngineControlResultV1::Failed;
+        }
         // Swapping vectors/strings is noexcept, so a failed commit can restore
         // the prior active Scene without a second allocation.
         std::swap(active_scene_, candidate_scene);
         if (!engine_.commit_graph()) {
             std::swap(active_scene_, candidate_scene);
             engine_.rollback_graph();
+            engine_.rollback_ir();
+            return EngineControlResultV1::Failed;
+        }
+        if (!engine_.commit_ir()) {
+            std::swap(active_scene_, candidate_scene);
+            engine_.rollback_graph();
+            engine_.rollback_ir();
             return EngineControlResultV1::Failed;
         }
         revision_ = next_revision;

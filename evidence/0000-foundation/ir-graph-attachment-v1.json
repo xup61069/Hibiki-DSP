@@ -18,6 +18,7 @@
       "status": "pass",
       "coverage": [
         "AudioEngineModel IR prepare/commit/rollback attachment",
+        "SceneApply prepare/commit IR clear transaction",
         "fixed-capacity convolver in graph render before Group Master and limiter",
         "multi-channel status and finite output contract",
         "Bypass fail-closed and prior active attachment preservation"

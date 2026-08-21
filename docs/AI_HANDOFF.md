@@ -31,8 +31,9 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   0/80/160 ms delay semantics；控制面會把 bounded IR WAV 送入 Engine Preview。
 - C++ control-plane 已有 bounded RIFF/WAVE IR importer，支援 Float32/PCM16/24/32、finite/tap/file
   bounds 與 channel-major convolver prepare；`AudioEngineModel::prepare_ir`／`commit_ir`／
-  `rollback_ir` 會把它接到固定 output-group graph render，IR 在 Group Master 與 limiter 前執行，
-  見 `evidence/0000-foundation/ir-graph-attachment-v1.json`。
+  `prepare_ir_clear`／`rollback_ir` 會把它接到固定 output-group graph render，IR 在 Group Master
+  與 limiter 前執行；SceneApply 會以同一 transaction 清除舊 IR，見
+  `evidence/0000-foundation/ir-graph-attachment-v1.json`。
 - `build_ir_phase_kernel_v1` 已補上 control-plane 的 real-cepstrum minimum-phase 與
   source-magnitude causal linear-phase transform；C# `PrepareIrAsync`、Desktop Preview 與 Engine
   Preview 已能透過固定 288-byte `IrPrepareCommand` 完成 WAV→kernel prepare、graph attachment

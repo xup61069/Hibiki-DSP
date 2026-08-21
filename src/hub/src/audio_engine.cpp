@@ -109,7 +109,13 @@ bool AudioEngineModel::commit_ir() noexcept {
     active_ir_ = std::move(pending_ir_);
     has_active_ir_ = active_ir_.attached;
     has_pending_ir_ = false;
-    return has_active_ir_;
+    return true;
+}
+
+bool AudioEngineModel::prepare_ir_clear() noexcept {
+    pending_ir_ = {};
+    has_pending_ir_ = true;
+    return true;
 }
 
 void AudioEngineModel::rollback_ir() noexcept {

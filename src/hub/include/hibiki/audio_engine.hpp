@@ -44,6 +44,7 @@ public:
     [[nodiscard]] bool prepare_ir(std::string_view output_group,
                                   const IrWavDataV1& data,
                                   const IrPhaseResolutionV1& phase) noexcept;
+    [[nodiscard]] bool prepare_ir_clear() noexcept;
     [[nodiscard]] bool commit_ir() noexcept;
     void rollback_ir() noexcept;
     [[nodiscard]] bool has_active_ir(std::string_view output_group = "main") const noexcept;

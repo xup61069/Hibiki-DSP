@@ -38,6 +38,9 @@
   worker, calls `AudioEngineModel::prepare_ir` and commits the attachment before ACK. The RT render
   applies the immutable fixed-capacity convolver before Group Master/limiter; physical sink playback
   and device/driver evidence remain pending.
+- SceneApply now prepares and commits an IR clear in the same control transaction because
+  `SceneProfileV1` does not yet carry a file/reference. A previously prepared calibration cannot
+  silently survive a scene switch; a new IR must be explicitly prepared afterwards.
 - 公開 monorepo 文件、component license map 與 source-only paid-release policy。
 - AI 接手規則、fresh-clone 流程與 source-only policy。
 - `OutputGroupVolumeState` 與 ISO compensation public C++ boundary 的初始骨架。

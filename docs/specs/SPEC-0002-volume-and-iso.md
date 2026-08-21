@@ -114,10 +114,12 @@ PCM16/24/32、最多 8 聲道與 4096 frames，檢查 RIFF container/chunk 邊�
 sample-rate、finite samples 與記憶體上限；它不讀檔、不配置在 RT thread。`prepare_ir_convolver_from_wav_v1`
 會把 interleaved file samples 轉成 convolver 的 channel-major kernel，並在 graph commit 前
 套用已解析的 phase policy；Bypass 會 fail-closed，不會把 IR 偷掛到 Strict Direct。
-`AudioEngineModel::prepare_ir`／`commit_ir`／`rollback_ir` 現在把已準備的 kernel 作為固定
-output-group attachment 接到 user-space graph render，順序為 graph → IR → Group Master →
-limiter；失敗時保留既有 active attachment。此 attachment 仍不代表已連接實體 sink、WaveRT
-driver 或完成聲學校正，且 production concurrent RT/control swap 仍需 epoch/RCU 驗證。
+`AudioEngineModel::prepare_ir`／`prepare_ir_clear`／`commit_ir`／`rollback_ir` 現在把已準備的
+kernel 作為固定 output-group attachment 接到 user-space graph render，順序為 graph → IR →
+Group Master → limiter；失敗時保留既有 active attachment。SceneApply 因為 v1 SceneProfile
+不攜帶 IR 檔案參照，會在同一個 control transaction 中 prepare/commit clear，避免上一個 Scene
+的校正鏈意外殘留。此 attachment 仍不代表已連接實體 sink、WaveRT driver 或完成聲學校正，且
+production concurrent RT/control swap 仍需 epoch/RCU 驗證。
 
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
 `Program-aware` 另有 `ProgramAwareLevelControllerV1` 的慢速內容音量控制：預設保留無配置的

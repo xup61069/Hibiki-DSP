@@ -2375,6 +2375,18 @@ int main() {
                       [](const float value) { return std::isfinite(value); }) &&
           std::any_of(ir_graph_output.begin(), ir_graph_output.end(),
                       [](const float value) { return std::abs(value) > 1.0e-6F; }));
+    EngineControlWorkerV1 ir_scene_worker(ir_graph_engine);
+    ControlCommandV1 ir_scene_command{};
+    ir_scene_command.type = IpcMessageType::SceneApply;
+    std::array<std::uint8_t, kSceneApplyPayloadBytesV1> ir_scene_payload{};
+    CHECK(encode_scene_apply_payload_v1("game", "main", ir_scene_payload) &&
+          decode_scene_apply_payload_v1(ir_scene_payload, ir_scene_command.scene) &&
+          ir_scene_worker.consume(ir_scene_command) == EngineControlResultV1::Applied &&
+          !ir_graph_engine.has_active_ir("main"));
+    CHECK(ir_graph_engine.prepare_graph(ir_graph, 2U));
+    CHECK(ir_graph_engine.commit_graph());
+    CHECK(ir_graph_engine.prepare_ir("main", decoded_ir.data, ir_phase_resolution));
+    CHECK(ir_graph_engine.commit_ir() && ir_graph_engine.has_active_ir("main"));
     CHECK(!ir_graph_engine.prepare_ir(
         "main", decoded_ir.data,
         resolve_ir_phase_policy(IrPhasePolicyV1{1U, IrPhaseMode::Bypass, 0.0})));
