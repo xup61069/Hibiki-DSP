@@ -51,9 +51,10 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   catalog（目前環境 14 筆）的跨程序 snapshot。Engine Preview 預設只枚舉 metadata、保留
   bounded snapshot 與 watcher poll；只有 `--enable-wasapi-output` 才啟動既有 shared-mode
   WASAPI sink worker，且不改 Windows 音量。
-  `tools/run-preview.ps1 -Build` 會把 Engine Preview 與不依賴 Windows App Runtime 的 Desktop
-  Compatibility UI 一起啟動；它只提供 user-space control host，不代表 WaveRT、實體輸出或
-  Windows session routing 已完成。若要明確啟動現有 shared-mode sink，加入
+  `tools/run-preview.ps1 -Build` 預設使用 `-Ui Auto`：有符合版本的 Windows App Runtime 1.7
+  就啟動 WinUICompat，否則自動退回不依賴 Runtime 的 Desktop Compatibility UI；兩者都只
+  提供 user-space control host，不代表 WaveRT、實體輸出或 Windows session routing 已完成。
+  若要固定 DesktopCompat，加入 `-Ui DesktopCompat`；若要明確啟動現有 shared-mode sink，加入
   `-EnableWasapiOutput`；若要明確驗證 Windows endpoint 音量聯動，使用
   `tools/run-preview.ps1 -Build -EnableSystemVolume`；預設不會寫入系統音量，且
   `tools/engine-preview-smoke.ps1 -EnableSystemVolume -StatusOnly` 只檢查 broker Ready、不送音量命令。

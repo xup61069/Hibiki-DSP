@@ -12,7 +12,8 @@
   this is a compatibility launch check only, not formal XAML/accessibility evidence.
 - A C++ Engine Preview now owns the local control named pipe and passes a cross-process v1 Hello/Ack
   plus ControlStatusSnapshot smoke; the status exposes four conservative route states and the
-  canonical volume mirror. `tools/run-preview.ps1 -Build` launches it with the self-contained
+  canonical volume mirror. `tools/run-preview.ps1 -Build` uses the runtime-aware `Ui=Auto` launcher:
+  it selects WinUICompat when Windows App Runtime 1.7 is available and otherwise uses the self-contained
   Desktop Compatibility UI. It is deliberately driver-free and keeps the physical sink disabled by
   default; explicit `--enable-wasapi-output` binds the existing shared-mode worker and publishes
   `main-output` readiness without claiming driver or full playback evidence.

@@ -99,15 +99,21 @@ Desktop Compatibility Preview 可選擇 IR WAV 並取得 prepare/commit Ack。�
 pwsh -File tools/run-preview.ps1 -Build
 ```
 
+啟動器預設使用 `-Ui Auto`：若已安裝符合版本的 Windows App Runtime 1.7，就開啟
+WinUICompat；否則自動退回不需要 Runtime 的 DesktopCompat，不會再讓使用者直接撞到缺少
+Runtime 的錯誤。要固定指定介面可使用 `-Ui WinUICompat` 或 `-Ui DesktopCompat`。
+
 Windows 使用者也可以直接雙擊 repository 根目錄的 `Start-HibikiPreview.cmd`；它會執行同一個
-流程，先建置必要的 unsigned preview，再啟動 Engine Preview 與自帶 .NET runtime 的桌面 UI。
+流程，先建置必要的 unsigned preview，再啟動 Engine Preview 與可用的桌面 UI。
 若要明確啟用 shared-mode WASAPI sink，可雙擊同一層的
 `Start-HibikiPreview-Wasapi.cmd`；它等同於加入 `-EnableWasapiOutput`，不會安裝 driver 或
 改變正式系統路徑。
 
-視窗開啟後會自動嘗試連接本機引擎；若沒有連線，仍會安全顯示「尚未連接」，不會改動 Windows
-音量或任何實體裝置。直接雙擊 `.local/preview/DesktopCompat/Hibiki.DesktopPreview.exe` 也可以，
-但那只會開 UI，不會自動啟動引擎。
+DesktopCompat 視窗開啟後會自動嘗試連接本機引擎；WinUICompat 則按「連接預覽引擎」。若沒有
+連線，兩者都會安全顯示「尚未連接」，不會改動 Windows 音量或任何實體裝置。要固定使用
+自帶 .NET runtime 的 DesktopCompat，可執行
+`pwsh -File tools/run-preview.ps1 -Build -Ui DesktopCompat`；直接雙擊
+`.local/preview/DesktopCompat/Hibiki.DesktopPreview.exe` 只會開 UI，不會自動啟動引擎。
 
 若要明確測試 Windows 系統音量聯動，才使用：
 
