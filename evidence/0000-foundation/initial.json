@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "issue": 0,
-  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-output-fanout-runtime-exact-capacity-high-ratio-wavert-stream-wdk-adapter-driver-stream-bridge-endpoint-identity-graph-lane-wasapi-clock-handoff-graph-adapter-expert-surface-asio-wasapi-driver-wasapi-tab-vmic-fanout-engine-v35-vst-supervisor-exchange-v36-vst-worker-lane-v37-plugin-host-wire-v38-iso-formula-builder-v39-source-only-ci-v40-wdk-property-hardening-v41-vst-scene-automation-v42-vst-private-state-v43-vst-sdk-state-v44-program-kweighted-proxy-v45-vst-state-migration-v46-vst-state-registry-v47",
-  "source_commit": "99b8ec9",
+  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-output-fanout-runtime-exact-capacity-high-ratio-wavert-stream-wdk-adapter-driver-stream-bridge-endpoint-identity-graph-lane-wasapi-clock-handoff-graph-adapter-expert-surface-asio-wasapi-driver-wasapi-tab-vmic-fanout-engine-v35-vst-supervisor-exchange-v36-vst-worker-lane-v37-plugin-host-wire-v38-iso-formula-builder-v39-source-only-ci-v40-wdk-property-hardening-v41-vst-scene-automation-v42-vst-private-state-v43-vst-sdk-state-v44-program-kweighted-proxy-v45-vst-state-migration-v46-vst-state-registry-v47-vst-scene-state-coordinator-v48",
+  "source_commit": "0e861e9",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -58,7 +58,7 @@
     {"command": "tab-bridge-server", "status": "pass", "coverage": ["loopback-only bind source", "WebSocket handshake/frame parser source", "invalid-start contract"]},
     {"command": "driver-source-check", "status": "pass", "coverage": ["MS-PL scaffold", "source-only INF", "volume/mute dispatch", "fixed topology catalog", "portable WaveRT stream ring", "whole-block overrun rejection", "underrun silence fallback", "WDK spin-lock pin adapter", "render submit/read/reset", "KS instance/value null guard", "single GET/SET verb validation", "no allocation/wait", "no GPL linkage"]},
     {"command": "vst3-scene-automation", "status": "pass", "coverage": ["16-entry timeline/binding capacity", "complete activation preflight", "lane-token binding", "snapshot application to prepared lane", "per-lane in-flight busy rejection", "unready worker fail-closed mapping"], "compiled_artifacts": false},
-    {"command": "vst3-private-plugin-state", "status": "pass", "coverage": ["16-slot/1 MiB bound", "plugin/class/module identity", "state-version match", "destination-size guard", "identity/version mismatch rejection", "explicit migration callback", "fixed 16-rule migration registry", "duplicate target mapping rejection", "migration-unavailable fail-closed", "migration output bound", "metadata-only public schema"], "compiled_artifacts": false},
+    {"command": "vst3-private-plugin-state", "status": "pass", "coverage": ["16-slot/1 MiB bound", "plugin/class/module identity", "state-version match", "destination-size guard", "identity/version mismatch rejection", "explicit migration callback", "fixed 16-rule migration registry", "Scene state coordinator", "private metadata inspect", "duplicate target mapping rejection", "migration-unavailable fail-closed", "migration output bound", "metadata-only public schema"], "compiled_artifacts": false},
     {"command": "optional-vst3-sdk-state-build", "status": "pass", "target": "hibiki_vst3_sdk_worker", "scope": ["bounded IBStream getState/setState", "1 MiB overflow guard", "state error result mapping"], "published_artifacts": false},
     {"command": "driver-stream-packet-bridge", "status": "pass", "coverage": ["80-byte header ABI", "fixed render/capture packet framing", "exact packet length validation", "allocation-free C encode/payload view", "finite Float32 user-space decode", "caller-owned lane storage"], "compiled_artifacts": false},
     {"command": "driver-stream-graph-binding", "status": "pass", "coverage": ["render-only gate", "endpoint GUID match", "sample-rate match", "active-lane channel match", "lane graph/Group Master path", "non-finite rejection"], "compiled_artifacts": false},
@@ -117,7 +117,7 @@
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",
   "limitations": [
-    "Evidence corresponds to commit 99b8ec9 and the current environment only; no real endpoint handoff or WinUI SDK build was exercised.",
+    "Evidence corresponds to commit 0e861e9 and the current environment only; no real endpoint handoff or WinUI SDK build was exercised.",
     "The native ASIO build is an unsigned local developer verification; no DLL or SDK checkout is committed or published.",
     "Current machine is Windows 22631 with VS 17/SDK 10.0.26100.0; it cannot provide driver-target evidence for the locked Windows 26100+/VS 2026/SDK-WDK 10.0.28000.2526 environment."
   ],
