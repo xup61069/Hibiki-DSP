@@ -122,8 +122,15 @@ pwsh -File tools/run-preview.ps1 -Build -EnableSystemVolume
 ```
 
 這個選項會讀取目前 Windows render endpoint 音量、監聽外部音量鍵，並把 Preview 的音量調整
-寫回同一 endpoint；預設預覽不會寫入系統音量。只想驗證 endpoint volume broker 是否可用而不送出
-音量命令，可執行 `pwsh -File tools/engine-preview-smoke.ps1 -EnableSystemVolume -StatusOnly`。
+寫回同一 endpoint；預設預覽不會寫入系統音量。若要做明確的端到端 write-through 測試，可執行：
+
+```powershell
+pwsh -File tools/live-system-volume-check.ps1 -WriteTest
+```
+
+它會啟動 Engine Preview，送出 IPC 音量命令，讀回 Windows endpoint 並在結束前恢復原值；
+這會短暫改變本機音量，只能視為 user-space evidence。只想驗證 broker 是否可用而不送出音量命令，
+可執行 `pwsh -File tools/engine-preview-smoke.ps1 -EnableSystemVolume -StatusOnly`。
 
 若要明確啟動現有的 shared-mode WASAPI sink，使用：
 
