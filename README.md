@@ -23,8 +23,10 @@ the application itself has no activation or runtime license check.
 
 ## Current state
 
-The repository now includes testable user-space graph/routing, volume/ISO,
-IPC, ASIO stream, VST quarantine, output sink and browser-capture prototypes.
+The repository now includes testable user-space graph/routing, volume/ISO formula
+compensation, IPC, ASIO stream, VST supervisor exchange/lane quarantine, output
+sink and browser-capture prototypes. Public CI also enforces the source-only
+publication rule and refuses tracked binaries or release/package upload steps.
 The WaveRT-backed driver, native ASIO/VST/UI bridges, calibrated ISO data and
 signed distribution pipeline remain staged behind their corresponding specs and
 ADR gates.
