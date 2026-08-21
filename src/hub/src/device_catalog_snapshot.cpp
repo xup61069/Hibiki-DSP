@@ -61,6 +61,9 @@ bool DeviceCatalogSnapshotStoreV1::publish(
     }
     try {
         std::lock_guard<std::mutex> lock(mutex_);
+        if (catalog_sequence_ != 0U && catalog_sequence <= catalog_sequence_) {
+            return false;
+        }
         std::copy(payload.begin(), payload.end(), payload_.begin());
         std::fill(payload_.begin() + static_cast<std::ptrdiff_t>(payload.size()),
                   payload_.end(), static_cast<std::uint8_t>(0U));

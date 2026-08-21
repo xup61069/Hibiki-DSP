@@ -958,6 +958,9 @@ int main() {
     CHECK(!snapshot_store.publish(
         std::span<const std::uint8_t>(invalid_store_payload.data(), published_bytes), 33U) &&
           snapshot_store.sequence() == 32U);
+    CHECK(!snapshot_store.publish(
+              std::span<const std::uint8_t>(published_payload.data(), published_bytes), 32U) &&
+          snapshot_store.sequence() == 32U);
     ControlCommandQueueV1 command_queue;
     ControlCommandV1 queued_command{};
     queued_command.type = IpcMessageType::SceneApply;
