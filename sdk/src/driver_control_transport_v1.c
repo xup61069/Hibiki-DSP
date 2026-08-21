@@ -72,6 +72,58 @@ static int valid_message_type(const uint16_t message_type) {
            message_type == HIBIKI_DRIVER_VOLUME_NOTIFICATION;
 }
 
+static int valid_control_message_type(const uint16_t message_type) {
+    return message_type >= HIBIKI_DRIVER_HELLO &&
+           message_type <= HIBIKI_DRIVER_ERROR;
+}
+
+static int valid_header_packet(const uint8_t* const packet, const size_t packet_bytes) {
+    return packet != NULL && packet_bytes == HIBIKI_DRIVER_CONTROL_HEADER_BYTES_V1 &&
+           read_u32_le(packet) == HIBIKI_DRIVER_CONTROL_HEADER_BYTES_V1 &&
+           read_u16_le(packet + 4U) == HIBIKI_DRIVER_CONTROL_ABI_V1 &&
+           valid_control_message_type(read_u16_le(packet + 6U));
+}
+
+int hibiki_driver_control_header_packet_validate_v1(
+    const uint8_t* const packet,
+    const size_t packet_bytes) {
+    return valid_header_packet(packet, packet_bytes);
+}
+
+int hibiki_driver_control_header_packet_encode_v1(
+    uint8_t* const packet,
+    const size_t packet_capacity,
+    const uint16_t message_type,
+    const uint64_t request_id,
+    size_t* const written_bytes) {
+    if (written_bytes != NULL) *written_bytes = 0U;
+    if (packet == NULL || packet_capacity < HIBIKI_DRIVER_CONTROL_HEADER_BYTES_V1 ||
+        written_bytes == NULL || !valid_control_message_type(message_type)) {
+        return 0;
+    }
+    memset(packet, 0, HIBIKI_DRIVER_CONTROL_HEADER_BYTES_V1);
+    write_u32_le(packet, HIBIKI_DRIVER_CONTROL_HEADER_BYTES_V1);
+    write_u16_le(packet + 4U, HIBIKI_DRIVER_CONTROL_ABI_V1);
+    write_u16_le(packet + 6U, message_type);
+    write_u64_le(packet + 8U, request_id);
+    *written_bytes = HIBIKI_DRIVER_CONTROL_HEADER_BYTES_V1;
+    return 1;
+}
+
+int hibiki_driver_control_header_packet_decode_v1(
+    const uint8_t* const packet,
+    const size_t packet_bytes,
+    uint16_t* const message_type,
+    uint64_t* const request_id) {
+    if (message_type == NULL || request_id == NULL ||
+        !valid_header_packet(packet, packet_bytes)) {
+        return 0;
+    }
+    *message_type = read_u16_le(packet + 6U);
+    *request_id = read_u64_le(packet + 8U);
+    return 1;
+}
+
 static int valid_packet_header(const uint8_t* const packet,
                                const size_t packet_bytes) {
     if (packet == NULL || packet_bytes != HIBIKI_DRIVER_CONTROL_ENDPOINT_STATE_PACKET_BYTES_V1 ||

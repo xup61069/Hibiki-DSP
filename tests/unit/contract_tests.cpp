@@ -2227,6 +2227,25 @@ int main() {
           hibiki_driver_validate_endpoint_state_v1(
               &decoded_driver_state, sizeof(decoded_driver_state)) == 1);
 
+    std::array<std::uint8_t, HIBIKI_DRIVER_CONTROL_HEADER_BYTES_V1> driver_header_packet{};
+    std::size_t driver_header_packet_bytes = 0U;
+    CHECK(hibiki_driver_control_header_packet_encode_v1(
+              driver_header_packet.data(), driver_header_packet.size(), HIBIKI_DRIVER_HELLO,
+              456U, &driver_header_packet_bytes) == 1 &&
+          driver_header_packet_bytes == HIBIKI_DRIVER_CONTROL_HEADER_BYTES_V1 &&
+          hibiki_driver_control_header_packet_validate_v1(
+              driver_header_packet.data(), driver_header_packet.size()) == 1);
+    std::uint16_t decoded_driver_header_type = 0U;
+    std::uint64_t decoded_driver_header_request = 0U;
+    CHECK(hibiki_driver_control_header_packet_decode_v1(
+              driver_header_packet.data(), driver_header_packet.size(),
+              &decoded_driver_header_type, &decoded_driver_header_request) == 1 &&
+          decoded_driver_header_type == HIBIKI_DRIVER_HELLO &&
+          decoded_driver_header_request == 456U);
+    driver_header_packet[0U] = 0U;
+    CHECK(hibiki_driver_control_header_packet_validate_v1(
+              driver_header_packet.data(), driver_header_packet.size()) == 0);
+
     DriverEndpointStateV1 driver_bridge_state{};
     std::uint16_t bridge_message_type = 0U;
     std::uint64_t bridge_request_id = 0U;

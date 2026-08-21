@@ -34,6 +34,27 @@ static_assert(HIBIKI_DRIVER_CONTROL_ENDPOINT_STATE_PACKET_BYTES_V1 == 136u,
 extern "C" {
 #endif
 
+// Header-only Hello/Ack/Error framing used to establish request correlation
+// before endpoint-state packets are exchanged. These functions accept all
+// five message types from `driver_control_v1.h`; no error text or private
+// payload is implied by this v1 header-only contract.
+int hibiki_driver_control_header_packet_validate_v1(
+    const uint8_t* packet,
+    size_t packet_bytes);
+
+int hibiki_driver_control_header_packet_encode_v1(
+    uint8_t* packet,
+    size_t packet_capacity,
+    uint16_t message_type,
+    uint64_t request_id,
+    size_t* written_bytes);
+
+int hibiki_driver_control_header_packet_decode_v1(
+    const uint8_t* packet,
+    size_t packet_bytes,
+    uint16_t* message_type,
+    uint64_t* request_id);
+
 // Validates one complete endpoint-state or volume-notification packet.  The
 // span must be exactly the encoded size; larger ring slots are not accepted.
 int hibiki_driver_endpoint_state_packet_validate_v1(
