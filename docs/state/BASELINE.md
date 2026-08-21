@@ -403,6 +403,7 @@ Windows process-loopback source boundary 的 source commit 是 `3cd4620`；`d18a
 Lane graph／WASAPI handoff。兩者尚未在目標機注入含音訊程序、Audio Service restart 或
 完成實體 per-App 重送；`2a85ea5` 新增 active session→bounded process request plan，
 對同一 PID 的不同 Lane/output 以 `AmbiguousProcess` fail-closed。
+`aac9274` 再拒絕不同 PID 共用同一 Lane 的 `DuplicateLane`，與 graph duplicate invariant 對齊。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 74 個必要入口與
 16 份 Spec 通過；`docs-check.ps1` 最新已擴充為 75 個必要入口；`source-policy.ps1` 掃描
