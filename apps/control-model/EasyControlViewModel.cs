@@ -310,8 +310,12 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             StatusText = "引擎未連線；無法更新裝置清單";
             return false;
         }
+        var gateHeld = false;
         try
         {
+            await _commandGate.WaitAsync(cancellationToken).ConfigureAwait(true);
+            gateHeld = true;
+            SetBusy(true);
             var reply = await _controlClient.RoundTripAsync(_commands.RequestDeviceCatalog(),
                                                              cancellationToken)
                 .ConfigureAwait(true);
@@ -337,6 +341,11 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             SetConnectionState(ControlConnectionState.Degraded);
             StatusText = "裝置清單更新失敗；保留上一個安全輸出";
             return false;
+        }
+        finally
+        {
+            SetBusy(false);
+            if (gateHeld) _commandGate.Release();
         }
     }
 
@@ -410,7 +419,10 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
                 throw new InvalidDataException("Hibiki engine rejected the Hello request.");
             _controlClient = client;
             SetConnectionState(ControlConnectionState.Connected);
-            StatusText = "引擎已連線；選擇輸出裝置後即可一鍵改善";
+            StatusText = "引擎已連線；正在更新輸出裝置清單…";
+            if (!await RefreshPhysicalDevicesAsync(cancellationToken).ConfigureAwait(true) &&
+                IsConnected)
+                StatusText = "引擎已連線；裝置清單暫不可用，音訊保持安全狀態";
             return true;
         }
         catch (OperationCanceledException)

@@ -235,6 +235,9 @@ Check(!connectedToMissingEngine && noEngine.ConnectionState == ControlConnection
     "Missing engine must fail closed with a bounded degraded status.");
 Check(!await noEngine.OneTapEnhanceAsync(),
     "One-Tap command must not be reported as applied while disconnected.");
+Check(!await noEngine.RefreshPhysicalDevicesAsync() &&
+      noEngine.StatusText.Contains("未連線"),
+    "Disconnected device catalog refresh must fail closed.");
 Check(!await noEngine.QueueVolumeAsync(TimeSpan.FromMilliseconds(1)),
     "Disconnected volume debounce must fail closed.");
 var invalidDebounceRejected = false;
