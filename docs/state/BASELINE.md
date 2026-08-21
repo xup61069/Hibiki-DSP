@@ -398,8 +398,9 @@ watcher、rule store 與 graph candidate 的 fail-closed control-plane boundary�
 實際 per-App audio capture、physical routing 或 DSP delivery。
 Windows process-loopback source boundary 的 source commit 是 `3cd4620`；它使用官方
 `ActivateAudioInterfaceAsync` 建立 process-tree shared-mode Float32 capture，包含固定容量
-讀取、overflow drop 與明確 Degraded 狀態，但尚未在目標機注入含音訊程序、Audio Service
-restart 或完成實體 per-App 重送。
+讀取、overflow drop 與明確 Degraded 狀態；`3d3735b` 再把 caller-owned block 接到既有
+Lane graph／WASAPI handoff。兩者尚未在目標機注入含音訊程序、Audio Service restart 或
+完成實體 per-App 重送。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 74 個必要入口與
 16 份 Spec 通過；`source-policy.ps1` 掃描 300 個路徑且無 blocked binary/secret；
