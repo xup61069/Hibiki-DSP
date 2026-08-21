@@ -20,6 +20,7 @@
 #include "hibiki/vst3_parameter_timeline.hpp"
 #include "hibiki/vst3_timeline_editor.hpp"
 #include "hibiki/vst3_timeline_persistence.hpp"
+#include "hibiki/vst3_timeline_file_store.hpp"
 #include "hibiki/vst3_worker_lane.hpp"
 #include "hibiki/vst3_scene_automation.hpp"
 #include "hibiki/vst3_scene_state.hpp"
@@ -2311,6 +2312,111 @@ int main() {
     }
     CHECK(parse_expectation(persisted_document + "x",
                             Vst3TimelineParseErrorV1::truncated));
+#if defined(_WIN32)
+    {
+        wchar_t store_temp_root[MAX_PATH];
+        const DWORD store_temp_length = GetTempPathW(MAX_PATH, store_temp_root);
+        CHECK(store_temp_length > 0U && store_temp_length < MAX_PATH);
+        const std::filesystem::path store_root =
+            std::filesystem::path(std::wstring(store_temp_root)) /
+            (L"hibiki_timeline_store_" + std::to_wstring(GetTickCount()));
+        Vst3TimelineFileStoreV1 file_store;
+        Vst3ParameterTimelineSnapshotV1 store_sink{};
+        store_sink.event_count = 1U;
+        store_sink.events[0] = Vst3ParameterTimelineEventV1{9U, 9U, 0.9};
+        CHECK(file_store.save("alpha", persist_source) ==
+              Vst3TimelineStoreStatusV1::invalid_argument);
+        CHECK(file_store.load("alpha", store_sink) ==
+              Vst3TimelineStoreStatusV1::invalid_argument);
+        CHECK(file_store.remove("alpha") ==
+              Vst3TimelineStoreStatusV1::invalid_argument);
+        CHECK(file_store.open(store_root.wstring()) && file_store.is_open());
+        CHECK(file_store.save("", persist_source) ==
+              Vst3TimelineStoreStatusV1::id_rejected);
+        const std::string rejected_store_ids[] = {
+            "..", "../up", "sub/dir", "back\\slash", ".hidden",
+            "-leading", "_underscore", std::string(65U, 'a'),
+            "\xe6\x99\x82\xe9\x96\x93", "con", "COM1",
+        };
+        bool store_ids_rejected = true;
+        for (const auto& rejected : rejected_store_ids) {
+            store_ids_rejected =
+                store_ids_rejected &&
+                file_store.save(rejected, persist_source) ==
+                    Vst3TimelineStoreStatusV1::id_rejected;
+        }
+        CHECK(store_ids_rejected);
+        std::array<std::string, kVst3TimelineStoreMaxEntriesV1> store_listing{};
+        std::size_t store_listing_count = 0U;
+        CHECK(file_store.list_ids(store_listing, store_listing_count) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              store_listing_count == 0U);
+        CHECK(file_store.save("alpha", persist_source) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              file_store.save("beta-01", persist_empty) ==
+                  Vst3TimelineStoreStatusV1::ok);
+        Vst3ParameterTimelineSnapshotV1 loaded_alpha{};
+        Vst3ParameterTimelineSnapshotV1 loaded_beta{};
+        CHECK(file_store.load("alpha", loaded_alpha) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              loaded_alpha.event_count == 2U &&
+              loaded_alpha.events[1].parameter_id == 7U);
+        CHECK(file_store.load("beta-01", loaded_beta) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              loaded_beta.event_count == 0U);
+        CHECK(file_store.list_ids(store_listing, store_listing_count) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              store_listing_count == 2U &&
+              store_listing[0] == "alpha" && store_listing[1] == "beta-01");
+        CHECK(file_store.load("missing", loaded_alpha) ==
+              Vst3TimelineStoreStatusV1::not_found);
+        CHECK(file_store.remove("gamma") == Vst3TimelineStoreStatusV1::not_found);
+        {
+            std::ofstream corrupt_stream(store_root / L"alpha.json",
+                                         std::ios::binary | std::ios::trunc);
+            corrupt_stream << "{ not a timeline";
+            corrupt_stream.close();
+        }
+        CHECK(file_store.load("alpha", store_sink) ==
+                  Vst3TimelineStoreStatusV1::parse_error &&
+              store_sink.event_count == 1U &&
+              store_sink.events[0].parameter_id == 9U);
+        CHECK(file_store.save("alpha", persist_source) ==
+              Vst3TimelineStoreStatusV1::ok);
+        bool store_capacity_filled = true;
+        for (std::uint32_t filler = 0U; filler < 14U; ++filler) {
+            const std::string filler_id =
+                "s" + std::string(filler < 10U ? 1U : 0U, '0') +
+                std::to_string(filler);
+            store_capacity_filled =
+                store_capacity_filled &&
+                file_store.save(filler_id, persist_empty) ==
+                    Vst3TimelineStoreStatusV1::ok;
+        }
+        CHECK(store_capacity_filled);
+        CHECK(file_store.save("overflow", persist_empty) ==
+              Vst3TimelineStoreStatusV1::capacity_exhausted);
+        CHECK(file_store.save("alpha", persist_source) ==
+              Vst3TimelineStoreStatusV1::ok);
+        CHECK(file_store.remove("beta-01") == Vst3TimelineStoreStatusV1::ok &&
+              file_store.remove("beta-01") == Vst3TimelineStoreStatusV1::not_found);
+        CHECK(file_store.list_ids(store_listing, store_listing_count) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              store_listing_count == kVst3TimelineStoreMaxEntriesV1 - 1U &&
+              store_listing[0] == "alpha");
+        file_store.close();
+        CHECK(!file_store.is_open() &&
+              file_store.load("alpha", loaded_alpha) ==
+                  Vst3TimelineStoreStatusV1::invalid_argument);
+        Vst3TimelineFileStoreV1 reopened_store;
+        CHECK(reopened_store.open(store_root.wstring()) &&
+              reopened_store.load("alpha", loaded_alpha) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              loaded_alpha.events[0].normalized_value == 0.25);
+        std::error_code store_cleanup_error;
+        std::filesystem::remove_all(store_root, store_cleanup_error);
+    }
+#endif
 #if defined(_WIN32)
     {
         wchar_t temp_root[MAX_PATH];
