@@ -411,6 +411,18 @@ int main() {
     CHECK(wavert_state.effective_db_q16_16 == -12 * 65536);
     CHECK(!hibiki_wavert_endpoint_state_apply_volume_v1(
         &wavert_state, 0, 0, 0, 1, "stale"));
+    const auto stable_requested_db = wavert_state.requested_db_q16_16;
+    const auto stable_effective_db = wavert_state.effective_db_q16_16;
+    const auto stable_generation = wavert_state.generation;
+    const auto stable_context = std::string(wavert_state.last_event_context_guid);
+    std::array<char, HIBIKI_ENDPOINT_GUID_CAPACITY + 1U> invalid_context{};
+    std::fill(invalid_context.begin(), invalid_context.end() - 1, 'x');
+    CHECK(!hibiki_wavert_endpoint_state_apply_volume_v1(
+              &wavert_state, 0, 0, 1, stable_generation + 1U, invalid_context.data()) &&
+          wavert_state.requested_db_q16_16 == stable_requested_db &&
+          wavert_state.effective_db_q16_16 == stable_effective_db &&
+          wavert_state.generation == stable_generation &&
+          std::string(wavert_state.last_event_context_guid) == stable_context);
     CHECK(hibiki_wavert_endpoint_state_init_v1(
         &wavert_state, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 2, 48000,
         HIBIKI_ACTUATOR_STRICT_DIRECT));

@@ -71,8 +71,12 @@ int hibiki_wavert_endpoint_state_apply_volume_v1(
     const uint32_t mute,
     const uint64_t generation,
     const char* const event_context_guid) {
+    char next_event_context[HIBIKI_ENDPOINT_GUID_CAPACITY];
     if (state == NULL || !valid_db(requested_db_q16_16) || !valid_db(safety_ceiling_db_q16_16) ||
         mute > 1U || generation < state->generation) {
+        return 0;
+    }
+    if (event_context_guid != NULL && !copy_guid(next_event_context, event_context_guid)) {
         return 0;
     }
     state->requested_db_q16_16 = requested_db_q16_16;
@@ -84,8 +88,9 @@ int hibiki_wavert_endpoint_state_apply_volume_v1(
     state->generation = generation;
     if (event_context_guid == NULL) {
         memset(state->last_event_context_guid, 0, sizeof(state->last_event_context_guid));
-    } else if (!copy_guid(state->last_event_context_guid, event_context_guid)) {
-        return 0;
+    } else {
+        memcpy(state->last_event_context_guid, next_event_context,
+               sizeof(state->last_event_context_guid));
     }
     return 1;
 }
