@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "issue": 22,
+  "scope_digest": "scheduler-timeline-edit-v1",
+  "source_commit": "pending",
+  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-msvc-buildtools-17.14-msvc-19.44-dotnet-10.0.301-pwsh-7.6.5; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 22",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "Vst3SceneAutomationSchedulerV1 begin_timeline_edit, editing_timeline, commit_timeline_edit, cancel_timeline_edit, timeline_snapshot",
+        "fail-closed double-begin and unknown-ID begin rejection",
+        "commit updates only the edited slot snapshot after validation passes",
+        "cancel restores the pre-edit snapshot verbatim",
+        "remove_timeline refuses during that slot edit; clear aborts the session",
+        "committed result reaches prepared lane via activate_scene",
+        "C++ build and CTest contract suite (1/1 passed)"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 22 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 22"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "85 required documentation paths",
+        "24 specs including updated SPEC-0008 scheduler wording"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "tracked paths, no blocked binary or secret"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "no compiled artifact or binary upload policy violation"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Headless control-plane scheduler editing transaction only; no supervisor UI surface is implemented yet.",
+    "Cross-version plugin state persistence and complete automation scheduling remain open.",
+    "No IPC frame, schema file, RT-thread, driver or permanent-identity change.",
+    "User-space source-contract evidence only; proves nothing about physical audio, per-App delivery, a loadable driver, HLK or Microsoft signing.",
+    "Local machine is below the locked target toolchain (Windows 26200, VS BuildTools 17.14, no WDK/Windows App SDK)."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSVC 19.44 (VS 2022 BuildTools 17.14)",
+    "cmake": "4.4.0",
+    "dotnet": "10.0.301",
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T04:00:00+08:00",
+  "finished_at": "2026-08-22T04:05:00+08:00"
+}

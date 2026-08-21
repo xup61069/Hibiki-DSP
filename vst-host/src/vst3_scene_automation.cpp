@@ -58,6 +58,9 @@ bool Vst3SceneAutomationSchedulerV1::prepare(
 }
 
 void Vst3SceneAutomationSchedulerV1::clear() noexcept {
+    edit_editor_ = {};
+    edit_active_ = false;
+    edit_slot_ = kVst3SceneAutomationMaxEntriesV1;
     for (auto& slot : timelines_) {
         slot.occupied = false;
         slot.id.clear();
@@ -108,12 +111,55 @@ bool Vst3SceneAutomationSchedulerV1::remove_timeline(
     const std::string_view timeline_id) noexcept {
     const auto index = find_timeline(timeline_id);
     if (index == timelines_.size()) return false;
+    if (edit_active_ && edit_slot_ == index) return false;
     for (const auto& slot : bindings_) {
         if (slot.occupied && slot.binding.timeline_id == timeline_id) return false;
     }
     timelines_[index] = {};
     --timeline_count_;
     return true;
+}
+
+bool Vst3SceneAutomationSchedulerV1::begin_timeline_edit(
+    const std::string_view timeline_id) {
+    if (edit_active_) return false;
+    if (!valid_id(timeline_id)) return false;
+    const auto index = find_timeline(timeline_id);
+    if (index == timelines_.size()) return false;
+    if (!edit_editor_.reset(timelines_[index].snapshot)) return false;
+    if (!edit_editor_.begin_edit()) {
+        edit_editor_ = {};
+        return false;
+    }
+    edit_slot_ = index;
+    edit_active_ = true;
+    return true;
+}
+
+bool Vst3SceneAutomationSchedulerV1::commit_timeline_edit() {
+    if (!edit_active_) return false;
+    if (!edit_editor_.commit()) return false;
+    timelines_[edit_slot_].snapshot = edit_editor_.published();
+    edit_editor_ = {};
+    edit_active_ = false;
+    edit_slot_ = kVst3SceneAutomationMaxEntriesV1;
+    return true;
+}
+
+bool Vst3SceneAutomationSchedulerV1::cancel_timeline_edit() noexcept {
+    if (!edit_active_) return false;
+    (void)edit_editor_.discard();
+    edit_editor_ = {};
+    edit_active_ = false;
+    edit_slot_ = kVst3SceneAutomationMaxEntriesV1;
+    return true;
+}
+
+const Vst3ParameterTimelineSnapshotV1* Vst3SceneAutomationSchedulerV1::timeline_snapshot(
+    const std::string_view timeline_id) const noexcept {
+    const auto index = find_timeline(timeline_id);
+    if (index == timelines_.size()) return nullptr;
+    return &timelines_[index].snapshot;
 }
 
 bool Vst3SceneAutomationSchedulerV1::bind_scene(

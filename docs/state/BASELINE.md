@@ -554,10 +554,10 @@ store、handler 與 atomic ViewModel apply；本機 status probe 通過，但仍
 per-App delivery 或 browser tab capture 已完成。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 85 個必要入口與
-24 份 Spec 通過；`source-policy.ps1` 掃描 397 個 tracked paths 且無 blocked
+24 份 Spec 通過；`source-policy.ps1` 掃描 403 個 tracked paths 且無 blocked
 binary/secret；`docs-check.ps1` 亦會把這些摘要計數對照 git 實測值，落後即 fail-closed；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
-`distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；65 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
+`distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；67 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
 288-byte payload、catalog sequence、handler fail-closed、WinUI send-failure rollback、DeviceCatalogSnapshot、ControlStatusSnapshot
 wire/atomic replace、catalog-to-wire publisher、Windows worker unbound/coordinator rollback、
 DeviceCatalogRequest provider response、連線後自動刷新裝置清單、ControlPlaneHost loopback
@@ -570,9 +570,14 @@ ViewModel atomic apply 與 WDK basic-support source gate 亦通過。以本機 p
 parameter frame 與 `IParameterChanges` bridge）unsigned build 亦通過；輸出同樣
 只在 `.local/`。`doctor.ps1 -CheckOnly` 明確顯示本機低於鎖定的 Windows/VS/WDK 版本，因此
 沒有把 driver、HLK、簽章、真實 endpoint 或第三方 plugin certification 結果誇大為已驗收。C++
-與 C# grouped-volume payload round-trip、legacy payload compatibility、selected group resolver
+與 C# grouped-volume payload round-trip、legacy payload compatibility、selected group resolver、
+VST3 timeline editor 交易、C# CalibrationModel 資料契約／PEQ 編譯器
 及 custom Scene card mirror 的 JSON save/load、atomic replace、malformed rollback 亦已通過本機
 contract/control-model checks。
+本次 CalibrationModel C# control model 與 bounded PEQ compiler 的 source commit 是 `5ef674f`；
+本次 Vst3TimelineEditor supervisor-side parameter timeline editing transaction 的 source commit 是 `9f5f02e`；
+本次 live SessionRouteRuleCommand upsert/remove readback transaction probe 的 source commit 是 `d1ad93e`；
+本次 live Engine Preview system volume write-through IPC probe 的 source commit 是 `c42cabd`；
 本次 Expert per-App volume controls 的 source commit 是 `ebb80a3`；
 本次 Session command worker queue 的 source commit 是 `6f9d6b1`；
 本次 App route selection controls 的 source commit 是 `d4862d9`；

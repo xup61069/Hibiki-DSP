@@ -51,6 +51,12 @@ Issue 0 只保留 foundation integration。全域 `AI_HANDOFF`、`BASELINE`、`P
 最小文件包。Issue 0 是 foundation bootstrap，例外包含所有 tests 作為基準；後續 Issue
 不得把全 repository source 默認塞入 context，若需要跨子系統檔案必須在 Spec 明確加入 glob。
 
+`handoff-check.ps1` 也必須對所有 numeric active handoff 的 `scope_globs` 做 bounded
+repository-relative glob intersection 檢查。完全相同、父子路徑與 wildcard 可相交的 claim
+都必須 fail closed，錯誤訊息列出兩個 Issue 與兩個 scope；若 matcher 在固定狀態上限內無法
+證明不相交，也必須視為衝突。`shared_paths` 是 integrator 協調宣告，不會把重疊的獨占
+`scope_globs` 自動變成合法；不同 scope 的 handoff 才能並行寫入。
+
 ## 文件閘門
 
 Spec、schema、source 與 tests 改動必須同一變更更新。`docs-check.ps1` 檢查必要入口、
