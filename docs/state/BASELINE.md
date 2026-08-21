@@ -49,6 +49,9 @@
   worker-owned route coordinator. Generation-scoped ephemeral handles, safe metadata fallback,
   C++/C# codec/store/handler correlation and stale ViewModel replacement are covered; this is
   still a selection boundary rather than proof of physical per-App delivery.
+- The source-only WinUI Expert view now renders the safe App session catalog, sequence and route
+  state without exposing raw Windows session identity; App volume/routing commands remain a
+  separate future contract until handle validation is implemented end to end.
 - `CalibrationResponsePointV1` and `compile_bounded_peq_correction_v1` now provide a deterministic
   control-plane measured-response to bounded PEQ compiler (16-filter cap, frequency/spacing/Q and
   boost/cut policy validation, explicit `limited` result) that feeds the existing APO/CamillaDSP/
@@ -452,7 +455,8 @@ parameter frame 與 `IParameterChanges` bridge）unsigned build 亦通過；輸�
 與 C# grouped-volume payload round-trip、legacy payload compatibility、selected group resolver
 及 custom Scene card mirror 的 JSON save/load、atomic replace、malformed rollback 亦已通過本機
 contract/control-model checks。
-本次 ephemeral App session catalog additions 的 source commit 是 `68cf466`；
+本次 WinUI App session catalog projection 的 source commit 是 `66f6298`；
+ephemeral App session catalog additions 的 source commit 是 `68cf466`；
 本次 control-status-snapshot additions 的 source commit 是 `e97fb90`；
 session-route health 接入與避免同端點重綁的最新 source commit 是 `5f8dbcb`；
 volume broker unchanged-endpoint result 修正的最新 source commit 是 `ca8ea40`；
