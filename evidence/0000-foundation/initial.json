@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "issue": 0,
-  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-output-fanout-runtime-exact-capacity-high-ratio-wavert-stream-wdk-adapter-driver-stream-bridge-endpoint-identity-graph-lane-wasapi-clock-handoff-graph-adapter-expert-surface-asio-wasapi-driver-wasapi-tab-vmic-fanout-engine-v35-vst-supervisor-exchange-v36-vst-worker-lane-v37-plugin-host-wire-v38-iso-formula-builder-v39-source-only-ci-v40-wdk-property-hardening-v41-vst-scene-automation-v42-vst-private-state-v43-vst-sdk-state-v44-program-kweighted-proxy-v45-vst-state-migration-v46-vst-state-registry-v47-vst-scene-state-coordinator-v48-scene-preflight-gate-v49-scene-preflight-adapter-v50-vst-state-bounds-v51-winui-accessibility-v52-session-route-rules-v53-session-route-capacity-v54-watcher-route-rules-v55-output-group-volume-bank-v56-custom-scene-catalog-v57-grouped-volume-ipc-v58-custom-scene-card-mirror-v59-custom-scene-persistence-v60-vst3-bus-layout-v61-physical-device-catalog-v62-stale-device-event-rejection-v63-device-switch-v66-device-catalog-snapshot-v67-catalog-publisher-v68",
-  "source_commit": "9be7f15",
-  "scope_update": "device-catalog-snapshot-v67-catalog-publisher-v68",
+  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-output-fanout-runtime-exact-capacity-high-ratio-wavert-stream-wdk-adapter-driver-stream-bridge-endpoint-identity-graph-lane-wasapi-clock-handoff-graph-adapter-expert-surface-asio-wasapi-driver-wasapi-tab-vmic-fanout-engine-v35-vst-supervisor-exchange-v36-vst-worker-lane-v37-plugin-host-wire-v38-iso-formula-builder-v39-source-only-ci-v40-wdk-property-hardening-v41-vst-scene-automation-v42-vst-private-state-v43-vst-sdk-state-v44-program-kweighted-proxy-v45-vst-state-migration-v46-vst-state-registry-v47-vst-scene-state-coordinator-v48-scene-preflight-gate-v49-scene-preflight-adapter-v50-vst-state-bounds-v51-winui-accessibility-v52-session-route-rules-v53-session-route-capacity-v54-watcher-route-rules-v55-output-group-volume-bank-v56-custom-scene-catalog-v57-grouped-volume-ipc-v58-custom-scene-card-mirror-v59-custom-scene-persistence-v60-vst3-bus-layout-v61-physical-device-catalog-v62-stale-device-event-rejection-v63-device-switch-v66-device-catalog-snapshot-v67-catalog-publisher-v68-windows-com-catalog-worker-v69-catalog-request-v70",
+  "source_commit": "0b2800f",
+  "scope_update": "windows-com-catalog-worker-v69-catalog-request-v70",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -47,12 +47,13 @@
     "physical device catalog default/availability/sequence/stale-event/capacity/validation and recovery-rebind coverage in hibiki_contract_tests",
     "C++/C# DeviceSwitch fixed 288-byte IPC encode/decode, handler fail-closed and WinUI device picker coverage",
     "C++/C# DeviceCatalogSnapshot fixed-entry wire round-trip, reserved-byte rejection, stale atomic UI replace and unsolicited frame reader",
-    "DeviceCatalogSnapshotPublisherV1 converts validated PhysicalDeviceCatalog entries into one bounded engine frame"
+    "DeviceCatalogSnapshotPublisherV1 converts validated PhysicalDeviceCatalog entries into one bounded engine frame",
+    "WindowsPhysicalDeviceCatalogWorker/Coordinator COM enumeration source, candidate rollback, watcher poll bridge and DeviceCatalogRequest reply provider"
   ],
   "results": [
     {"command": "tools/verify.ps1", "status": "pass", "tests": 1},
     {"command": "tools/docs-check.ps1", "status": "pass", "required_paths": 67, "specs": 15},
-    {"command": "tools/source-policy.ps1", "status": "pass", "scanned_paths": 284, "blocked_files": 0},
+    {"command": "tools/source-policy.ps1", "status": "pass", "scanned_paths": 286, "blocked_files": 0},
     {"command": "tools/extension-check.ps1", "status": "pass"},
     {"command": "tools/installer-check.ps1", "status": "pass"},
     {"command": "tools/control-model-check.ps1", "status": "pass"},
@@ -122,6 +123,7 @@
     {"command": "device-switch-control", "status": "pass", "coverage": ["288-byte C++/C# payload parity", "strict endpoint/padding/format validation", "catalog-sequence propagation", "missing-handler fail-closed", "WinUI selectable-device command and send-failure rollback"], "compiled_artifacts": false},
     {"command": "device-catalog-snapshot", "status": "pass", "coverage": ["16-byte header and 416-byte entry wire contract", "32-entry bounded C++/C# round-trip", "reserved/UTF-8/format/duplicate/default validation", "stale snapshot atomic preservation", "unsolicited control-frame reader source"], "compiled_artifacts": false},
     {"command": "device-catalog-publisher", "status": "pass", "coverage": ["validated catalog-to-wire conversion", "32-entry bounded publisher", "full snapshot C++ round-trip", "allocation-free conversion after catalog ownership"], "compiled_artifacts": false},
+    {"command": "windows-device-catalog-worker", "status": "pass", "coverage": ["worker-owned COM enumerator source", "render/capture state/default/name/format mapping", "candidate catalog rollback", "watcher poll bridge", "unbound/null fail-closed", "DeviceCatalogRequest snapshot provider response"], "compiled_artifacts": false, "hardware_exercised": false},
     {"command": "custom-scene-catalog", "status": "pass", "coverage": ["SceneDefinition schema validation", "bounded 32-entry catalog", "replacement swap", "remove/clear", "SceneApply custom ID resolver", "output-group exact match", "Strict Direct mismatch rejection", "unknown custom ID fail-closed"]},
     {"command": "control-command-queue", "status": "pass", "coverage": ["64-slot SPSC", "full-queue dropped counter", "pipe-to-control handoff"]},
     {"command": "engine-control-worker", "status": "pass", "coverage": ["SceneApply to Easy presets", "Validate-Prepare-Commit", "preflight gate before Prepare", "VST3 Scene coordinator adapter", "bound Scene accepted only after state preflight", "unbound Easy Scene compatibility", "failed preflight preserves Scene/revision/graph", "volume through Group Master", "grouped volume target resolver", "invalid scene preserves revision"]},
@@ -137,7 +139,7 @@
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",
   "limitations": [
-    "Evidence corresponds to commit 9be7f15 and the current environment only; no real endpoint handoff, COM metadata enumeration or UI Automation run was exercised. WinUI SDK build was attempted after restore but XamlCompiler exited 1 on the local toolchain.",
+    "Evidence corresponds to commit 0b2800f and the current environment only; the COM worker source compiles and unbound paths are tested, but no live endpoint enumeration, handoff or UI Automation run was exercised. WinUI SDK build was attempted after restore but XamlCompiler exited 1 on the local toolchain.",
     "The native ASIO build is an unsigned local developer verification; no DLL or SDK checkout is committed or published.",
     "Current machine is Windows 22631 with VS 17/SDK 10.0.26100.0; it cannot provide driver-target evidence for the locked Windows 26100+/VS 2026/SDK-WDK 10.0.28000.2526 environment."
   ],
