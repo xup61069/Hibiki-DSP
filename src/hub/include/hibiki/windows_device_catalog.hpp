@@ -142,6 +142,9 @@ public:
     [[nodiscard]] const PhysicalDeviceCatalogV1& catalog() const noexcept {
         return catalog_service_.catalog();
     }
+    [[nodiscard]] DeviceCatalogSnapshotStoreV1* snapshot_store() noexcept {
+        return catalog_service_.snapshot_store();
+    }
     [[nodiscard]] std::uint64_t catalog_sequence() const noexcept {
         return catalog_service_.sequence();
     }

@@ -9,9 +9,32 @@
 #include <mmdeviceapi.h>
 
 #include <cstdio>
+#include <optional>
+#include <vector>
 
 #include "hibiki/control_payloads.hpp"
 #include "hibiki/windows_device_catalog.hpp"
+
+namespace {
+
+bool transfer_exact(HANDLE handle, void* data, const std::size_t bytes, const bool write) {
+    auto* raw = static_cast<std::uint8_t*>(data);
+    std::size_t offset = 0U;
+    while (offset < bytes) {
+        DWORD transferred = 0U;
+        const auto remaining = bytes - offset;
+        const BOOL ok = write
+                            ? WriteFile(handle, raw + offset, static_cast<DWORD>(remaining),
+                                        &transferred, nullptr)
+                            : ReadFile(handle, raw + offset, static_cast<DWORD>(remaining),
+                                       &transferred, nullptr);
+        if (ok == FALSE || transferred == 0U) return false;
+        offset += transferred;
+    }
+    return true;
+}
+
+}  // namespace
 
 int main() {
     const HRESULT init = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
@@ -30,11 +53,11 @@ int main() {
         return 2;
     }
 
-    hibiki::WindowsPhysicalDeviceCatalogServiceV1 service;
-    result = service.bind(enumerator);
-    if (SUCCEEDED(result)) {
-        result = service.refresh_now();
-    }
+    constexpr wchar_t kProbePipe[] = L"\\\\.\\pipe\\HibikiDSP_live_catalog_probe";
+    hibiki::WindowsControlRuntimeV1 runtime;
+    const bool runtime_started = runtime.start(
+        enumerator, hibiki::IpcNamedPipeConfigV1{kProbePipe, 20000U, 1000U});
+    result = runtime_started ? runtime.refresh_now() : E_FAIL;
     if (FAILED(result)) {
         std::fprintf(stderr, "Device catalog refresh failed: 0x%08lx\n",
                      static_cast<unsigned long>(result));
@@ -42,18 +65,57 @@ int main() {
         if (SUCCEEDED(init)) CoUninitialize();
         return 3;
     }
-    hibiki::IpcFrameV1 response;
-    const bool provider_ok = hibiki::device_catalog_snapshot_reply_v1(
-        response, service.snapshot_store());
+    HANDLE client = INVALID_HANDLE_VALUE;
+    for (int attempt = 0; attempt < 30 && client == INVALID_HANDLE_VALUE; ++attempt) {
+        client = CreateFileW(kProbePipe, GENERIC_READ | GENERIC_WRITE, 0U, nullptr,
+                             OPEN_EXISTING, 0U, nullptr);
+        if (client == INVALID_HANDLE_VALUE) {
+            if (GetLastError() == ERROR_PIPE_BUSY) (void)WaitNamedPipeW(kProbePipe, 100U);
+            Sleep(10U);
+        }
+    }
+    if (client == INVALID_HANDLE_VALUE) {
+        std::fprintf(stderr, "Control probe pipe unavailable\n");
+        runtime.stop();
+        enumerator->Release();
+        if (SUCCEEDED(init)) CoUninitialize();
+        return 4;
+    }
+    hibiki::IpcFrameV1 request;
+    request.header.type = hibiki::IpcMessageType::DeviceCatalogRequest;
+    request.header.request_id = 777U;
+    const auto request_bytes = hibiki::encode_ipc_frame(request);
+    auto request_size = static_cast<std::uint32_t>(request_bytes.size());
+    std::uint32_t response_size = 0U;
+    const bool request_ok = transfer_exact(client, &request_size, sizeof(request_size), true) &&
+                            transfer_exact(client, const_cast<std::uint8_t*>(request_bytes.data()),
+                                           request_bytes.size(), true) &&
+                            transfer_exact(client, &response_size, sizeof(response_size), false) &&
+                            response_size <= 20000U;
+    std::vector<std::uint8_t> response_bytes(response_size);
+    const bool response_read = request_ok &&
+                               transfer_exact(client, response_bytes.data(), response_bytes.size(),
+                                              false);
+    CloseHandle(client);
+    hibiki::IpcDecodeError response_error{hibiki::IpcDecodeError::None};
+    const auto response = response_read
+                              ? hibiki::decode_ipc_frame(response_bytes, response_error)
+                              : std::optional<hibiki::IpcFrameV1>{};
     hibiki::DeviceCatalogSnapshotV1 decoded;
-    const bool wire_ok = provider_ok && hibiki::decode_device_catalog_snapshot_v1(
-        std::span<const std::uint8_t>(response.payload.data(), response.payload.size()), decoded);
-    std::printf("catalog_refresh=pass entries=%zu sequence=%llu payload_bytes=%zu wire=%s provider=%s\n",
-                service.catalog().size(), static_cast<unsigned long long>(service.sequence()),
-                response.payload.size(), wire_ok ? "pass" : "fail",
-                provider_ok ? "pass" : "fail");
-    service.unbind();
+    const bool wire_ok = response.has_value() &&
+                         response->header.type == hibiki::IpcMessageType::DeviceCatalogSnapshot &&
+                         response->header.request_id == 777U &&
+                         hibiki::decode_device_catalog_snapshot_v1(
+                             std::span<const std::uint8_t>(response->payload.data(),
+                                                            response->payload.size()),
+                             decoded);
+    std::printf("catalog_refresh=pass entries=%zu sequence=%llu payload_bytes=%zu wire=%s runtime=%s request=%s\n",
+                runtime.catalog().size(), static_cast<unsigned long long>(runtime.catalog_sequence()),
+                response.has_value() ? response->payload.size() : 0U,
+                wire_ok ? "pass" : "fail", runtime.running() ? "pass" : "fail",
+                wire_ok ? "pass" : "fail");
+    runtime.stop();
     enumerator->Release();
     if (SUCCEEDED(init)) CoUninitialize();
-    return wire_ok && decoded.entry_count == service.catalog().size() ? 0 : 4;
+    return wire_ok && decoded.entry_count == runtime.catalog().size() ? 0 : 5;
 }
