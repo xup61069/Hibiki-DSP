@@ -154,10 +154,14 @@ IrWavDecodeResultV1 decode_ir_wav_v1(const std::span<const std::uint8_t> bytes,
 
 bool prepare_ir_convolver_from_wav_v1(IrConvolverV1& convolver,
                                       const IrWavDataV1& data,
-                                      const IrPhaseResolutionV1& phase) noexcept {
+                                      const IrPhaseResolutionV1& phase,
+                                      const std::uint32_t render_channels) noexcept {
     try {
+        const auto target_channels = render_channels == 0U ? data.channels : render_channels;
         if (data.schema_version != 1U || data.sample_rate < 8000U || data.sample_rate > 192000U ||
             data.channels == 0U || data.channels > 8U || data.frames() == 0U ||
+            target_channels == 0U || target_channels > 8U ||
+            (data.channels != 1U && data.channels != target_channels) ||
             data.frames() > kMaxRealtimeIrTapsV1 ||
             data.interleaved_samples.size() != data.frames() * data.channels ||
             !std::all_of(data.interleaved_samples.begin(), data.interleaved_samples.end(),
@@ -178,7 +182,8 @@ bool prepare_ir_convolver_from_wav_v1(IrConvolverV1& convolver,
             return false;
         }
         return convolver.prepare(transformed.channel_major, transformed.taps,
-                                 transformed.kernel_channels, data.channels, data.sample_rate, phase);
+                                 transformed.kernel_channels, target_channels, data.sample_rate,
+                                 phase);
     } catch (...) {
         return false;
     }

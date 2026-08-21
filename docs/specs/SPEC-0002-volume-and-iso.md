@@ -113,8 +113,11 @@ minimum-phase 使用 real-cepstrum reconstruction，mixed/linear-phase 以 sourc
 PCM16/24/32、最多 8 聲道與 4096 frames，檢查 RIFF container/chunk 邊界、block alignment、
 sample-rate、finite samples 與記憶體上限；它不讀檔、不配置在 RT thread。`prepare_ir_convolver_from_wav_v1`
 會把 interleaved file samples 轉成 convolver 的 channel-major kernel，並在 graph commit 前
-套用已解析的 phase policy；Bypass 會 fail-closed，不會把 IR 偷掛到 Strict Direct。這仍不
-代表已在 graph／實體 sink 上套用校正。
+套用已解析的 phase policy；Bypass 會 fail-closed，不會把 IR 偷掛到 Strict Direct。
+`AudioEngineModel::prepare_ir`／`commit_ir`／`rollback_ir` 現在把已準備的 kernel 作為固定
+output-group attachment 接到 user-space graph render，順序為 graph → IR → Group Master →
+limiter；失敗時保留既有 active attachment。此 attachment 仍不代表已連接實體 sink、WaveRT
+driver 或完成聲學校正，且 production concurrent RT/control swap 仍需 epoch/RCU 驗證。
 
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
 `Program-aware` 另有 `ProgramAwareLevelControllerV1` 的慢速內容音量控制：預設保留無配置的
@@ -136,8 +139,9 @@ RMS 代理；`KWeightedProxy` 會在固定容量狀態內串接高通與高頻 s
 - `bypass`：Strict Direct，完全不掛 IR／校正鏈。
 
 `resolve_ir_phase_policy` 解析可承諾的最大延遲與是否需要 FIR；`build_ir_phase_kernel_v1`
-才會在 control-plane 生成 bounded kernel。UI 目前尚未送出 IR 檔／kernel prepare command，
-因此不能把 UI 選擇寫成已套用。graph commit 前必須以量測的實際 latency 取代預估值。UI 顯示
+才會在 control-plane 生成 bounded kernel。UI 現在可送出 IR 檔／kernel prepare command，
+Engine Preview 會在 Ack 前完成 user-space graph attachment commit；graph commit 前必須以量測
+的實際 latency 取代預估值，且不能把 preview Ack 寫成實體 sink 已播放。UI 顯示
 「0 ms 額外緩衝」「最高 80/160 ms」等可驗證文字，不使用「零延遲完美相位」宣稱。
 Scene 若省略 `ir_phase` 欄位，向後相容地採用 `minimum-phase/strength=0`。
 

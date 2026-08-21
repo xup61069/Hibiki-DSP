@@ -25,7 +25,8 @@ bounded client for the stable `HibikiDSP_v1_control` logical pipe.
 `ControlCommandFactoryV1` emits Hello, VolumeNotification, SceneApply,
 GraphCommit, GraphRollback and bounded IrPrepareCommand envelopes so the UI does
 not handcraft control payloads. The Desktop Compatibility Preview can choose an
-IR WAV and receive a control-plane prepare Ack; it still has no physical sink.
+IR WAV and receive an Ack after the Engine Preview completes its user-space graph
+attachment transaction; it still has no physical sink or loadable driver.
 `EasyControlViewModel` is the binding-ready surface for a future WinUI 3 shell:
 it keeps Easy mode fail-closed, exposes Expert mode explicitly, and emits the
 same versioned commands for engine transport.

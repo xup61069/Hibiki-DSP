@@ -25,7 +25,7 @@ namespace {
 std::atomic_bool g_stop{false};
 
 struct IrPrepareState final {
-    hibiki::IrConvolverV1 convolver{};
+    hibiki::AudioEngineModel* engine{nullptr};
     hibiki::IrPhaseResolutionV1 resolution{};
     std::string path{};
     bool prepared{false};
@@ -33,7 +33,8 @@ struct IrPrepareState final {
 
 bool prepare_ir_file(const hibiki::IrPrepareCommandV1& request, void* const context) noexcept {
     auto* state = static_cast<IrPrepareState*>(context);
-    if (state == nullptr || request.path_bytes == 0U || request.path_bytes > request.path.size() ||
+    if (state == nullptr || state->engine == nullptr || request.path_bytes == 0U ||
+        request.path_bytes > request.path.size() ||
         request.mode > 3U || request.strength_q16_16 < 0 || request.strength_q16_16 > 65536 ||
         (request.mode == 3U && request.strength_q16_16 != 0)) {
         return false;
@@ -62,11 +63,11 @@ bool prepare_ir_file(const hibiki::IrPrepareCommandV1& request, void* const cont
             static_cast<double>(request.strength_q16_16) / 65536.0};
         const auto resolution = hibiki::resolve_ir_phase_policy(policy);
         if (!resolution.valid || resolution.mode == hibiki::IrPhaseMode::Bypass) return false;
-        hibiki::IrConvolverV1 candidate{};
-        if (!hibiki::prepare_ir_convolver_from_wav_v1(candidate, decoded.data, resolution)) {
+        if (!state->engine->prepare_ir("main", decoded.data, resolution) ||
+            !state->engine->commit_ir()) {
+            state->engine->rollback_ir();
             return false;
         }
-        state->convolver = std::move(candidate);
         state->resolution = resolution;
         state->path = path;
         state->prepared = true;
@@ -140,7 +141,7 @@ int wmain() {
 
     hibiki::AudioEngineModel engine;
     hibiki::EngineControlWorkerV1 control_worker{engine};
-    IrPrepareState ir_state{};
+    IrPrepareState ir_state{&engine};
     control_worker.set_ir_prepare_handler(prepare_ir_file, &ir_state);
     hibiki::ControlStatusSnapshotStoreV1 status_store;
     auto status = make_initial_status(engine.volume());

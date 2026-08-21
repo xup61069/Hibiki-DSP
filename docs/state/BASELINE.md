@@ -22,8 +22,9 @@
   reflected without touching the audio thread.
 - Both the formal WinUI source shell and Desktop Compatibility Preview now expose the bounded IR
   phase policy: Game minimum-phase/0 ms, Balanced mixed-phase/80 ms maximum, Movie linear-phase/
-  160 ms maximum and Bypass. The controls explicitly remain policy-only until an engine FIR command
-  exists; no preview claim says that a filter was audibly applied.
+  160 ms maximum and Bypass. The fixed command now reaches Engine Preview and attaches the prepared
+  IR to the user-space graph through an explicit prepare/commit transaction; no physical-sink or
+  audible-device claim is made.
 - The control-plane now decodes bounded RIFF/WAVE IR files (IEEE Float32 and signed PCM16/24/32),
   rejects malformed/non-finite/oversized input, and prepares a channel-major `IrConvolverV1` bank
   without file I/O on the RT thread. This is a file/import contract only; it does not derive
@@ -33,8 +34,10 @@
   minimum-phase reconstruction and source-magnitude causal linear-phase targeting for mixed/linear
   strength. Tests cover delayed impulses, independent channels, source-strength zero and Bypass
   fail-closed behavior. `IrPrepareCommand v1` now carries a bounded local path; C# and Desktop
-  Compatibility Preview send it to Engine Preview, which reads/decodes/prepares only on its control
-  worker before ACK. No physical sink is implied.
+  Compatibility Preview send it to Engine Preview, which reads/decodes/prepares on its control
+  worker, calls `AudioEngineModel::prepare_ir` and commits the attachment before ACK. The RT render
+  applies the immutable fixed-capacity convolver before Group Master/limiter; physical sink playback
+  and device/driver evidence remain pending.
 - 公開 monorepo 文件、component license map 與 source-only paid-release policy。
 - AI 接手規則、fresh-clone 流程與 source-only policy。
 - `OutputGroupVolumeState` 與 ISO compensation public C++ boundary 的初始骨架。

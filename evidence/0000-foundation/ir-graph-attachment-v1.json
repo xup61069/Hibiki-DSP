@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "ir-graph-attachment-v1",
+  "source_commit": "PENDING",
+  "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/control-model-engine-smoke.ps1",
+    "pwsh -File tools/engine-preview-smoke.ps1",
+    "pwsh -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "AudioEngineModel IR prepare/commit/rollback attachment",
+        "fixed-capacity convolver in graph render before Group Master and limiter",
+        "multi-channel status and finite output contract",
+        "Bypass fail-closed and prior active attachment preservation"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/control-model-engine-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "C# PrepareIrAsync through named pipe",
+        "Engine Preview WAV decode, phase prepare and graph attachment commit Ack",
+        "volume and Scene status regression"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/engine-preview-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "raw IrPrepareCommand v1 correlation",
+        "control worker bounded file read and attachment commit"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "self-contained desktop preview compile",
+        "three-second launch liveness"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "IR graph attachment documentation and evidence references"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "no tracked executable or CI binary artifact"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The attachment is currently one bounded IR per named output group and uses the existing user-space graph transaction thread; an epoch/RCU handoff is still required before concurrent production RT/control commits.",
+    "The preview has no loadable WaveRT driver, physical WASAPI sink or Windows endpoint volume node.",
+    "The command carries a bounded same-machine local path and does not embed IR bytes in IPC.",
+    "Phase delay is a policy budget; measured end-to-end latency and acoustic/ISO conformance remain pending."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00+08:00",
+  "finished_at": "2026-08-21T00:00:00+08:00"
+}

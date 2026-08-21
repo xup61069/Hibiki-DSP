@@ -5,6 +5,7 @@
 #include "hibiki/scene_graph.hpp"
 #include "hibiki/asio_transport_consumer.hpp"
 #include "hibiki/driver_stream_bridge.hpp"
+#include "hibiki/wav_ir.hpp"
 #include "hibiki/output_fanout.hpp"
 #include "hibiki/volume_state.hpp"
 #include "hibiki/true_peak_limiter.hpp"
@@ -36,6 +37,18 @@ public:
     [[nodiscard]] bool prepare_graph(const GraphConfigV1& graph, std::uint64_t revision) noexcept;
     [[nodiscard]] bool commit_graph() noexcept;
     void rollback_graph() noexcept;
+    // IR is an independent graph attachment transaction.  Prepare performs
+    // bounded file/data validation and coefficient preparation on the control
+    // worker; commit is the only point at which the RT-visible attachment is
+    // replaced.  The audio callback never reads a path or allocates.
+    [[nodiscard]] bool prepare_ir(std::string_view output_group,
+                                  const IrWavDataV1& data,
+                                  const IrPhaseResolutionV1& phase) noexcept;
+    [[nodiscard]] bool commit_ir() noexcept;
+    void rollback_ir() noexcept;
+    [[nodiscard]] bool has_active_ir(std::string_view output_group = "main") const noexcept;
+    [[nodiscard]] IrConvolverStatusV1 ir_status(
+        std::string_view output_group = "main") const noexcept;
     [[nodiscard]] VolumeNotificationResult apply_windows_volume(
         const VolumeNotificationV1& notification) noexcept;
     [[nodiscard]] VolumeNotificationResult apply_windows_volume(
@@ -156,6 +169,14 @@ public:
     }
 
 private:
+    struct IrGraphAttachmentV1 {
+        bool attached{false};
+        std::uint8_t output_group_bytes{0U};
+        std::array<char, kMaxOutputGroupBytes> output_group{};
+        IrPhaseResolutionV1 phase{};
+        IrConvolverV1 convolver{};
+    };
+
     RtGraphSnapshotV1 active_graph_{};
     RtGraphSnapshotV1 pending_graph_{};
     mutable LaneLatencyBankV1 active_latency_bank_{};
@@ -163,6 +184,10 @@ private:
     std::unique_ptr<OutputGroupVolumeBankV1> volume_bank_{};
     std::atomic<std::uint32_t> sample_rate_{48000U};
     mutable TruePeakLimiterV1 rt_true_peak_limiter_{};
+    mutable IrGraphAttachmentV1 active_ir_{};
+    IrGraphAttachmentV1 pending_ir_{};
+    bool has_active_ir_{false};
+    bool has_pending_ir_{false};
     EngineTransactionState state_{EngineTransactionState::Ready};
     bool has_active_graph_{false};
     bool has_pending_graph_{false};
@@ -174,6 +199,9 @@ private:
     [[nodiscard]] bool apply_group_master(std::string_view output_group,
                                           float* output_interleaved,
                                           std::size_t frames) const noexcept;
+    [[nodiscard]] bool apply_ir(std::string_view output_group,
+                                float* output_interleaved,
+                                std::size_t frames) const noexcept;
 };
 
 }  // namespace hibiki

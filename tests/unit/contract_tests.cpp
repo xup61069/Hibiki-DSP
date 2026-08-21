@@ -2270,6 +2270,14 @@ int main() {
           decoded_convolver.status().valid && decoded_convolver.status().taps == 2U &&
           decoded_convolver.status().uses_fir &&
           std::abs(decoded_convolver.status().declared_delay_ms - 80.0) < 1e-9);
+    IrWavDataV1 mono_ir = decoded_ir.data;
+    mono_ir.channels = 1U;
+    mono_ir.interleaved_samples = {1.0F, 0.0F};
+    IrConvolverV1 broadcast_convolver;
+    CHECK(prepare_ir_convolver_from_wav_v1(broadcast_convolver, mono_ir,
+                                           ir_phase_resolution, 2U) &&
+          broadcast_convolver.status().channels == 2U &&
+          broadcast_convolver.status().kernel_channels == 1U);
     std::array<float, 4> decoded_block{1.0F, 1.0F, 0.0F, 0.0F};
     CHECK(decoded_convolver.process_interleaved(decoded_block.data(), 2U, 2U));
     auto pcm16_wav = wav;
@@ -2343,6 +2351,34 @@ int main() {
     IrConvolverV1 bypass_convolver;
     CHECK(!prepare_ir_convolver_from_wav_v1(bypass_convolver, decoded_ir.data,
                                             bypass_resolution));
+
+    AudioEngineModel ir_graph_engine;
+    GraphConfigV1 ir_graph;
+    ir_graph.lanes.push_back(LaneConfigV1{"ir-lane", "main", 2, 0.0, true});
+    CHECK(ir_graph_engine.prepare_graph(ir_graph, 1U) && ir_graph_engine.commit_graph());
+    CHECK(ir_graph_engine.prepare_ir("main", decoded_ir.data, ir_phase_resolution));
+    CHECK(!ir_graph_engine.has_active_ir("main"));
+    CHECK(ir_graph_engine.commit_ir() && ir_graph_engine.has_active_ir("main"));
+    const auto attached_ir_status = ir_graph_engine.ir_status("main");
+    CHECK(attached_ir_status.valid && attached_ir_status.sample_rate == 48000U &&
+          attached_ir_status.channels == 2U && attached_ir_status.uses_fir);
+    CHECK(ir_graph_engine.apply_windows_volume(VolumeNotificationV1{0.0, false, 1U}) ==
+          VolumeNotificationResult::Accepted);
+    std::array<float, 1024> ir_graph_input{};
+    ir_graph_input[0] = 1.0F;
+    ir_graph_input[1] = -1.0F;
+    std::array<float, 1024> ir_graph_output{};
+    const RtLaneInputV1 ir_graph_input_view{ir_graph_input.data(), 2U};
+    CHECK(ir_graph_engine.process(std::span<const RtLaneInputV1>(&ir_graph_input_view, 1U),
+                                  ir_graph_output.data(), 512U));
+    CHECK(std::all_of(ir_graph_output.begin(), ir_graph_output.end(),
+                      [](const float value) { return std::isfinite(value); }) &&
+          std::any_of(ir_graph_output.begin(), ir_graph_output.end(),
+                      [](const float value) { return std::abs(value) > 1.0e-6F; }));
+    CHECK(!ir_graph_engine.prepare_ir(
+        "main", decoded_ir.data,
+        resolve_ir_phase_policy(IrPhasePolicyV1{1U, IrPhaseMode::Bypass, 0.0})));
+    ir_graph_engine.rollback_ir();
 
     AudioEngineModel engine;
     GraphConfigV1 engine_graph;

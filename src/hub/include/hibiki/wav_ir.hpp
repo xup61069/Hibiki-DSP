@@ -43,11 +43,14 @@ struct IrWavDecodeResultV1 {
     std::size_t max_frames = kMaxRealtimeIrTapsV1) noexcept;
 
 // Copy decoded interleaved samples into the convolver's bounded channel-major
-// kernel and apply an already validated phase resolution. This is a control-
-// plane prepare operation; the caller atomically swaps/commits the convolver.
+// kernel and apply an already validated phase resolution. A mono file may be
+// broadcast to the requested render channel count; multi-channel files must
+// match it. This is a control-plane prepare operation; the caller atomically
+// swaps/commits the convolver.
 [[nodiscard]] bool prepare_ir_convolver_from_wav_v1(
     IrConvolverV1& convolver,
     const IrWavDataV1& data,
-    const IrPhaseResolutionV1& phase) noexcept;
+    const IrPhaseResolutionV1& phase,
+    std::uint32_t render_channels = 0U) noexcept;
 
 }  // namespace hibiki

@@ -1,5 +1,6 @@
 #include "hibiki/audio_engine.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <limits>
@@ -70,6 +71,62 @@ void AudioEngineModel::rollback_graph() noexcept {
     state_ = has_active_graph_ ? EngineTransactionState::Ready : EngineTransactionState::Degraded;
 }
 
+bool AudioEngineModel::prepare_ir(const std::string_view output_group,
+                                  const IrWavDataV1& data,
+                                  const IrPhaseResolutionV1& phase) noexcept {
+    if (output_group.empty() || output_group.size() > kMaxOutputGroupBytes ||
+        output_group.find('\0') != std::string_view::npos || volume_bank_ == nullptr ||
+        !volume_bank_->has_group(output_group) || !phase.valid ||
+        phase.mode == IrPhaseMode::Bypass || data.schema_version != 1U ||
+        data.sample_rate != sample_rate_.load(std::memory_order_acquire) ||
+        data.channels == 0U || data.channels > 8U || data.frames() == 0U ||
+        data.frames() > kMaxRealtimeIrTapsV1 ||
+        (has_active_graph_ && data.channels != 1U &&
+         data.channels != active_graph_.output_channels) ||
+        (has_active_graph_ && active_graph_.strict_direct)) {
+        has_pending_ir_ = false;
+        return false;
+    }
+
+    IrConvolverV1 candidate{};
+    const auto render_channels = has_active_graph_ ? active_graph_.output_channels : data.channels;
+    if (!prepare_ir_convolver_from_wav_v1(candidate, data, phase, render_channels)) {
+        has_pending_ir_ = false;
+        return false;
+    }
+    pending_ir_ = {};
+    pending_ir_.attached = true;
+    pending_ir_.output_group_bytes = static_cast<std::uint8_t>(output_group.size());
+    std::copy(output_group.begin(), output_group.end(), pending_ir_.output_group.begin());
+    pending_ir_.phase = phase;
+    pending_ir_.convolver = std::move(candidate);
+    has_pending_ir_ = true;
+    return true;
+}
+
+bool AudioEngineModel::commit_ir() noexcept {
+    if (!has_pending_ir_) return false;
+    active_ir_ = std::move(pending_ir_);
+    has_active_ir_ = active_ir_.attached;
+    has_pending_ir_ = false;
+    return has_active_ir_;
+}
+
+void AudioEngineModel::rollback_ir() noexcept {
+    pending_ir_ = {};
+    has_pending_ir_ = false;
+}
+
+bool AudioEngineModel::has_active_ir(const std::string_view output_group) const noexcept {
+    return has_active_ir_ && active_ir_.attached &&
+           active_ir_.output_group_bytes == output_group.size() &&
+           std::equal(output_group.begin(), output_group.end(), active_ir_.output_group.begin());
+}
+
+IrConvolverStatusV1 AudioEngineModel::ir_status(const std::string_view output_group) const noexcept {
+    return has_active_ir(output_group) ? active_ir_.convolver.status() : IrConvolverStatusV1{};
+}
+
 VolumeNotificationResult AudioEngineModel::apply_windows_volume(
     const VolumeNotificationV1& notification) noexcept {
     return apply_windows_volume("main", notification);
@@ -91,6 +148,7 @@ bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
                        &active_latency_bank_)) {
         return false;
     }
+    if (!apply_ir("main", output_interleaved, frames)) return false;
     if (!apply_group_master("main", output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
         (void)rt_true_peak_limiter_.limit_in_place(
@@ -108,6 +166,7 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
                                         output_interleaved, frames, &active_latency_bank_)) {
         return false;
     }
+    if (!apply_ir(output_group, output_interleaved, frames)) return false;
     if (!apply_group_master(output_group, output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
         (void)rt_true_peak_limiter_.limit_in_place(
@@ -387,6 +446,19 @@ bool AudioEngineModel::apply_group_master(const std::string_view output_group,
     return volume_bank_ != nullptr && volume_bank_->apply_to_interleaved(
         output_group, output_interleaved, frames, active_graph_.output_channels,
         sample_rate_.load(std::memory_order_relaxed));
+}
+
+bool AudioEngineModel::apply_ir(const std::string_view output_group,
+                                float* const output_interleaved,
+                                const std::size_t frames) const noexcept {
+    if (active_graph_.strict_direct || !has_active_ir_ || !active_ir_.attached ||
+        output_interleaved == nullptr || frames == 0U ||
+        active_ir_.output_group_bytes != output_group.size() ||
+        !std::equal(output_group.begin(), output_group.end(), active_ir_.output_group.begin())) {
+        return true;
+    }
+    return active_ir_.convolver.process_interleaved(output_interleaved, frames,
+                                                    active_graph_.output_channels);
 }
 
 }  // namespace hibiki

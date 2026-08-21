@@ -28,14 +28,15 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   現在包含場景選擇、路由健康摘要與音量來源／致動器顯示，但不是 XAML、無障礙、driver 或
   release evidence；連線後每秒輪詢一次 bounded ControlStatusSnapshot，命令忙碌時會合併輪詢。
 - WinUI 與 Desktop Preview 都有 IR phase policy controls（Game/Balanced/Movie/Bypass）與明確的
-  0/80/160 ms delay semantics；這是 UI contract，尚未送出 FIR coefficients。
+  0/80/160 ms delay semantics；控制面會把 bounded IR WAV 送入 Engine Preview。
 - C++ control-plane 已有 bounded RIFF/WAVE IR importer，支援 Float32/PCM16/24/32、finite/tap/file
-  bounds 與 channel-major convolver prepare；它仍不做 FIR phase kernel derivation、graph commit 或
-  physical sink playback，見 `evidence/0000-foundation/ir-wav-decoder-v1.json`。
+  bounds 與 channel-major convolver prepare；`AudioEngineModel::prepare_ir`／`commit_ir`／
+  `rollback_ir` 會把它接到固定 output-group graph render，IR 在 Group Master 與 limiter 前執行，
+  見 `evidence/0000-foundation/ir-graph-attachment-v1.json`。
 - `build_ir_phase_kernel_v1` 已補上 control-plane 的 real-cepstrum minimum-phase 與
   source-magnitude causal linear-phase transform；C# `PrepareIrAsync`、Desktop Preview 與 Engine
-  Preview 已能透過固定 288-byte `IrPrepareCommand` 完成 WAV→kernel prepare Ack。這仍不能宣稱
-  已在 graph 或實體 sink 套用。
+  Preview 已能透過固定 288-byte `IrPrepareCommand` 完成 WAV→kernel prepare、graph attachment
+  commit Ack。這仍不能宣稱已連接實體 sink、WaveRT driver 或完成聲學校正。
 - C++ Engine Preview 已可由 `tools/build-engine-preview.ps1` 建置；`tools/engine-preview-smoke.ps1`
   會啟動它並驗證 v1 named-pipe Hello/Ack request correlation 與 ControlStatusSnapshot 回覆。
   `tools/control-model-engine-smoke.ps1` 另外以 C# `EasyControlViewModel` 驗證 −18 dB 音量
