@@ -10,6 +10,7 @@
 #include <string_view>
 
 #include "hibiki/vst3_plugin_state.hpp"
+#include "hibiki/contracts.hpp"
 
 namespace hibiki {
 
@@ -86,5 +87,12 @@ private:
     std::array<Slot, kVst3SceneStateMaxBindingsV1> slots_{};
     std::size_t binding_count_{0U};
 };
+
+// Adapter for EngineControlWorkerV1::set_scene_preflight. A coordinator with
+// no bindings is treated as a no-op for backward-compatible Easy Scenes;
+// once bindings exist, the matching Scene must pass the full metadata/migration
+// preflight before graph Prepare.
+[[nodiscard]] bool preflight_scene_vst3_state_v1(const SceneProfileV1& scene,
+                                                 void* context) noexcept;
 
 }  // namespace hibiki

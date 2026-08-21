@@ -137,6 +137,9 @@ control-plane caller 注入，未提供自動探測或遠端下載。
 並要求 exact version 或 registry 中唯一的 source→target rule；`restore` 只寫入 caller-owned
 buffer，絕不把 opaque bytes 放入 Scene JSON、GitHub 或 AI context。其 metadata contract 是
 `schemas/scene-vst3-state-binding-v1.schema.json`。
+`preflight_scene_vst3_state_v1` 可直接交給 `EngineControlWorkerV1::set_scene_preflight`；沒有
+Scene state bindings 時維持 Easy Scene 向後相容，存在 binding 時則在 graph Prepare 前強制
+通過 coordinator。
 
 ## 尚未完成的邊界
 

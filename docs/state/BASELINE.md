@@ -122,6 +122,8 @@
 - `Vst3SceneStateCoordinatorV1` now binds Scene/state IDs to plugin identity and target version,
   inspects private store metadata before activation and restores only into caller-owned buffers;
   its metadata-only contract is `scene-vst3-state-binding-v1`.
+- `preflight_scene_vst3_state_v1` adapts the coordinator to the engine Scene transaction: Scenes
+  without state references remain compatible, while bound Scenes must pass before graph Prepare.
 - `AudioSessionRegistry` keys Windows sessions by endpoint plus session-instance ID, preserves
   user routing on metadata refresh, and supports independent lane/output-group/gain-owner binding;
   Windows `IAudioSessionManager2` worker enumeration now populates it; callbacks remain

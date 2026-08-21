@@ -64,6 +64,11 @@ plugin state. `Vst3SceneStateCoordinatorV1` separately binds up to 16 Scene
 state references, checks private metadata and approved migration rules, and
 restores only into caller-owned buffers.
 
+`preflight_scene_vst3_state_v1` adapts that coordinator to
+`EngineControlWorkerV1::set_scene_preflight`: a Scene with no state bindings
+continues to pass, while a bound Scene must pass the identity/version/byte
+preflight before graph Prepare.
+
 `Vst3PluginStateStoreV1` provides that boundary without publishing state bytes:
 it stores at most 16 private caller-owned blobs (1 MiB each), binds them to the
 plugin/class/module SHA-256 identity and a state version, and refuses restore on

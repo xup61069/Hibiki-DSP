@@ -955,7 +955,14 @@ int main() {
     CHECK(scene_state.restore("movie", "scene-movie-state", migrated_state,
                              state_bytes_written) == Vst3SceneStateResultV1::ok &&
           state_bytes_written == 4U && migrated_state[3] == 0x42U);
+    CHECK(scene_state.bind("main.scene", "scene-movie-state", plugin_identity, 2U) ==
+              Vst3SceneStateResultV1::ok);
+    const auto coordinator_scene = make_easy_scene(EasySceneKind::Game, "main").scene;
+    CHECK(preflight_scene_vst3_state_v1(coordinator_scene, &scene_state));
+    const auto unrelated_scene = make_easy_scene(EasySceneKind::Movie, "other").scene;
+    CHECK(!preflight_scene_vst3_state_v1(unrelated_scene, &scene_state));
     CHECK(scene_state.validate_scene("missing") == Vst3SceneStateResultV1::missing_binding);
+    CHECK(scene_state.remove("main.scene", "scene-movie-state"));
     CHECK(scene_state.remove("movie", "scene-movie-state") && scene_state.binding_count() == 0U);
     plugin.report_crash();
     CHECK(!plugin.process_passthrough(plugin_input, plugin_output, 2));

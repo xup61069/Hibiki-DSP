@@ -10,6 +10,7 @@ add_library(hibiki_vst_host STATIC
   src/vst3_scene_automation.cpp
   src/vst3_plugin_state.cpp
   src/vst3_scene_state.cpp
+  src/vst3_scene_state_preflight.cpp
 )
 
 add_executable(hibiki_vst_worker
@@ -21,6 +22,7 @@ target_link_libraries(hibiki_vst_worker PRIVATE hibiki_vst_host)
 target_include_directories(hibiki_vst_host
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/src/hub/include
 )
 
 target_compile_features(hibiki_vst_host PUBLIC cxx_std_20)
