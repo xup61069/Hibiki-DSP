@@ -3,6 +3,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <span>
 #include <string>
@@ -34,6 +35,15 @@ enum class Vst3SdkProcessResultV1 : std::uint8_t {
     plugin_error,
     non_finite_output,
     invalid_parameter,
+};
+
+enum class Vst3SdkStateResultV1 : std::uint8_t {
+    ok,
+    not_open,
+    invalid_buffer,
+    plugin_error,
+    state_too_large,
+    allocation_failed,
 };
 
 struct Vst3SdkParameterPointV1 {
@@ -77,6 +87,13 @@ public:
                                    float* output,
                                    std::uint32_t frames,
                                    std::span<const Vst3SdkParameterPointV1> parameters = {}) noexcept;
+
+    // Control-plane only. State bytes are caller-owned private storage and
+    // are bounded to the same 1 MiB policy as the host state store. These
+    // methods never run from the RT process callback.
+    Vst3SdkStateResultV1 save_state(std::span<std::uint8_t> destination,
+                                    std::size_t& bytes_written);
+    Vst3SdkStateResultV1 load_state(std::span<const std::uint8_t> state_bytes);
 
 private:
     struct Impl;

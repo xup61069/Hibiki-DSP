@@ -1,6 +1,8 @@
 #include "hibiki/vst3_sdk_processor.hpp"
 
 #include "pluginterfaces/base/funknown.h"
+#include "pluginterfaces/base/funknownimpl.h"
+#include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
 #include "pluginterfaces/vst/vstspeaker.h"
@@ -10,8 +12,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <limits>
 #include <memory>
+#include <new>
+#include <vector>
 
 namespace hibiki {
 namespace {
@@ -30,6 +35,82 @@ constexpr bool result_ok(Steinberg::tresult result) noexcept
 {
     return result == Steinberg::kResultOk;
 }
+
+constexpr std::size_t kMaxPluginStateBytesV1 = 1024U * 1024U;
+
+class BoundedStateStream final
+    : public Steinberg::U::Implements<Steinberg::U::Directly<Steinberg::IBStream>> {
+public:
+    explicit BoundedStateStream(const std::size_t capacity) : data_(capacity, 0U) {}
+
+    Steinberg::tresult PLUGIN_API read(void* buffer, const Steinberg::int32 num_bytes,
+                                       Steinberg::int32* num_read) override {
+        if (num_bytes < 0 || buffer == nullptr || cursor_ > size_) return Steinberg::kInvalidArgument;
+        const auto available = size_ - cursor_;
+        const auto count = std::min<std::size_t>(available, static_cast<std::size_t>(num_bytes));
+        if (count != 0U) std::memcpy(buffer, data_.data() + cursor_, count);
+        cursor_ += count;
+        if (num_read != nullptr) *num_read = static_cast<Steinberg::int32>(count);
+        return Steinberg::kResultTrue;
+    }
+
+    Steinberg::tresult PLUGIN_API write(void* buffer, const Steinberg::int32 num_bytes,
+                                        Steinberg::int32* num_written) override {
+        if (num_bytes < 0 || buffer == nullptr || cursor_ > data_.size()) {
+            return Steinberg::kInvalidArgument;
+        }
+        const auto count = static_cast<std::size_t>(num_bytes);
+        if (count > data_.size() - cursor_) {
+            overflowed_ = true;
+            return Steinberg::kOutOfMemory;
+        }
+        if (count != 0U) std::memcpy(data_.data() + cursor_, buffer, count);
+        cursor_ += count;
+        size_ = std::max(size_, cursor_);
+        if (num_written != nullptr) *num_written = num_bytes;
+        return Steinberg::kResultTrue;
+    }
+
+    Steinberg::tresult PLUGIN_API seek(const Steinberg::int64 position,
+                                       const Steinberg::int32 mode,
+                                       Steinberg::int64* result) override {
+        Steinberg::int64 base = 0;
+        if (mode == Steinberg::IBStream::kIBSeekCur) {
+            base = static_cast<Steinberg::int64>(cursor_);
+        } else if (mode == Steinberg::IBStream::kIBSeekEnd) {
+            base = static_cast<Steinberg::int64>(size_);
+        } else if (mode != Steinberg::IBStream::kIBSeekSet) {
+            return Steinberg::kInvalidArgument;
+        }
+        if ((position > 0 && base > std::numeric_limits<Steinberg::int64>::max() - position) ||
+            (position < 0 && base < std::numeric_limits<Steinberg::int64>::min() - position)) {
+            return Steinberg::kInvalidArgument;
+        }
+        const auto next = base + position;
+        if (next < 0 || static_cast<std::uint64_t>(next) > data_.size()) {
+            return Steinberg::kInvalidArgument;
+        }
+        cursor_ = static_cast<std::size_t>(next);
+        if (result != nullptr) *result = next;
+        return Steinberg::kResultTrue;
+    }
+
+    Steinberg::tresult PLUGIN_API tell(Steinberg::int64* position) override {
+        if (position == nullptr) return Steinberg::kInvalidArgument;
+        *position = static_cast<Steinberg::int64>(cursor_);
+        return Steinberg::kResultTrue;
+    }
+
+    [[nodiscard]] bool overflowed() const noexcept { return overflowed_; }
+    [[nodiscard]] std::size_t size() const noexcept { return size_; }
+    [[nodiscard]] const std::uint8_t* data() const noexcept { return data_.data(); }
+
+private:
+    std::vector<std::uint8_t> data_;
+    std::size_t cursor_{0U};
+    std::size_t size_{0U};
+    bool overflowed_{false};
+};
 
 std::uint32_t layout_channels(Vst3SdkAudioLayoutV1 layout) noexcept
 {
@@ -334,6 +415,50 @@ Vst3SdkProcessResultV1 Vst3SdkProcessorV1::process(const float* input,
         }
     }
     return Vst3SdkProcessResultV1::ok;
+}
+
+Vst3SdkStateResultV1 Vst3SdkProcessorV1::save_state(
+    const std::span<std::uint8_t> destination,
+    std::size_t& bytes_written) {
+    bytes_written = 0U;
+    if (!processing_ || impl_ == nullptr) return Vst3SdkStateResultV1::not_open;
+    try {
+        BoundedStateStream stream(kMaxPluginStateBytesV1);
+        const auto result = impl_->component->getState(&stream);
+        if (!result_ok(result)) {
+            return stream.overflowed() ? Vst3SdkStateResultV1::state_too_large
+                                       : Vst3SdkStateResultV1::plugin_error;
+        }
+        if (stream.overflowed()) return Vst3SdkStateResultV1::state_too_large;
+        if (destination.size() < stream.size()) return Vst3SdkStateResultV1::invalid_buffer;
+        if (stream.size() != 0U) std::memcpy(destination.data(), stream.data(), stream.size());
+        bytes_written = stream.size();
+        return Vst3SdkStateResultV1::ok;
+    } catch (const std::bad_alloc&) {
+        return Vst3SdkStateResultV1::allocation_failed;
+    }
+}
+
+Vst3SdkStateResultV1 Vst3SdkProcessorV1::load_state(
+    const std::span<const std::uint8_t> state_bytes) {
+    if (!processing_ || impl_ == nullptr) return Vst3SdkStateResultV1::not_open;
+    if (state_bytes.size() > kMaxPluginStateBytesV1) return Vst3SdkStateResultV1::state_too_large;
+    try {
+        BoundedStateStream stream(kMaxPluginStateBytesV1);
+        if (!state_bytes.empty()) {
+            if (stream.write(const_cast<std::uint8_t*>(state_bytes.data()),
+                             static_cast<Steinberg::int32>(state_bytes.size()), nullptr) !=
+                Steinberg::kResultTrue ||
+                stream.seek(0, Steinberg::IBStream::kIBSeekSet, nullptr) != Steinberg::kResultTrue) {
+                return Vst3SdkStateResultV1::invalid_buffer;
+            }
+        }
+        return result_ok(impl_->component->setState(&stream))
+                   ? Vst3SdkStateResultV1::ok
+                   : Vst3SdkStateResultV1::plugin_error;
+    } catch (const std::bad_alloc&) {
+        return Vst3SdkStateResultV1::allocation_failed;
+    }
 }
 
 } // namespace hibiki
