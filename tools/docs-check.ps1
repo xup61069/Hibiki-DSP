@@ -13,6 +13,7 @@ $required = @(
   'apps/winui-shell/Hibiki.WinUI.csproj', 'tools/winui-shell-check.ps1',
   'tools/distribution-check.ps1', 'tools/source-only-ci-check.ps1',
   'tools/live-device-catalog-check.ps1', 'tools/live-wasapi-handoff-check.ps1',
+  'tools/live-audio-session-check.ps1',
   'tools/driver-source-check.ps1', 'tools/driver-signability-check.ps1',
   'schemas/release-manifest-v1.schema.json',
   'docs/START_HERE.md', 'docs/PROJECT_MAP.md', 'docs/state/BASELINE.md',
