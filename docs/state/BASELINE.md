@@ -81,8 +81,9 @@
 - Windows-only `IAudioEndpointVolume` broker with non-blocking callback snapshot, dB/mute
   read-back and event-context write path; no physical endpoint was exercised on this machine.
 - `WindowsControlRuntimeV1` now binds the default eRender/eConsole endpoint to that broker and
-  exposes control-thread rebind/read/write/poll methods; the live local probe read the endpoint
-  volume successfully (`volume=pass`) without touching COM from RT.
+  exposes control-thread rebind/read/write/poll methods plus an endpoint-ID-preserving
+  `refresh_default_volume_if_changed` path; the live local probe read the endpoint volume
+  successfully (`volume=pass`) without touching COM from RT.
 - `WindowsVolumeLinkV1` now provides the explicit control-thread bridge from broker snapshots to
   an `AudioEngineModel` output-group master, with self event-context filtering and stale/invalid
   generation handling covered by the Windows contract test.
@@ -357,6 +358,7 @@ Driver endpoint state atomic invalid-context guard 的 source commit 是 `6b3f7f
 WDK volume/mute basic-support source gate 的 source commit 是 `1572b5f`。
 WindowsControlRuntime default endpoint volume binding/read/poll 的 source commit 是 `df36929`。
 WindowsVolumeLink broker-to-engine adapter 的 source commit 是 `a375ff5`。
+Endpoint-ID-preserving volume rebind 的 source commit 是 `d1ae205`。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 68 個必要入口與
 15 份 Spec 通過；`source-policy.ps1` 掃描 288 個路徑且無 blocked binary/secret；

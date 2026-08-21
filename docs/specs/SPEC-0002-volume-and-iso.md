@@ -46,7 +46,9 @@ Windows build 現在提供 `WindowsVolumeBroker`：control thread 可 bind/unbin
 並以 lock-free atomic snapshot 接收 callback；callback 本身不配置、不等待、不呼叫 COM。
 `WindowsControlRuntimeV1` 會在 control/COM worker 綁定目前 eRender/eConsole default endpoint，
 提供 `refresh_default_volume`、`read_volume`、`write_volume` 與 non-blocking `poll_volume`；
-default endpoint 失效時可獨立 rebind。這些方法只能由 control worker 呼叫，caller 必須把
+另提供 `refresh_default_volume_if_changed`：它以 endpoint ID 比對，未切換時保留既有
+callback registration，只有 ID 改變才重綁；失效或錯誤仍由 `refresh_default_volume` 強制
+rebind。這些方法只能由 control worker 呼叫，caller 必須把
 snapshot 轉成 Group Master state，audio callback 不得直接碰 COM。`WindowsVolumeLinkV1`
 是明確的 control-thread adapter：它把 snapshot 送入指定 output group 的
 `AudioEngineModel` canonical volume bank，拒絕非法 dB、回報 stale generation，並可登記
