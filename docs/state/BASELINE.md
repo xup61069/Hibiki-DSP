@@ -132,6 +132,8 @@
 - The MS-PL WDK property adapter now checks KS instance/value buffers and rejects ambiguous
   access verbs before touching endpoint state; this is source hardening, not a loadable-driver
   result.
+- Its volume/mute handlers now negotiate bounded `KSPROPERTY_TYPE_BASICSUPPORT` with explicit
+  GET|SET capability bits and buffer-size reporting; no `.sys` or WDK runtime result is inferred.
 - The portable MS-PL endpoint state core now validates and copies an event-context GUID before
   changing requested/effective dB, mute or generation; overlong context input is fully atomic
   and covered by regression tests.
