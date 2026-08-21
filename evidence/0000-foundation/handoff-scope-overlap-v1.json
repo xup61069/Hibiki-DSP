@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "issue": 25,
+  "scope_digest": "handoff-scope-overlap-v1",
+  "source_commit": "a310fa9bf82a3ccd12ebbdd26f3733a3f0192c49",
+  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-msvc-buildtools-17.14-msvc-19.44-dotnet-10.0.301-pwsh-7.6.5; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/handoff-check.ps1 -SelfTest",
+    "pwsh -File tools/handoff-check.ps1 -Issue 25",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "C++20 configure and build across driver, SDK, VST host, engine, ASIO and extension source targets",
+        "CTest contract suite (1/1 passed)"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "bounded repository-relative glob intersection algorithm",
+        "parent/child segment intersection detection",
+        "wildcard token compatibility and recursive matching",
+        "disjoint directory, file extension and non-overlapping path rejection"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 25 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 25",
+        "multi-agent active handoff non-overlapping scope enforcement"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "85 required documentation paths",
+        "24 specs including updated SPEC-0004 handoff scope overlap section"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "tracked paths, no blocked binary or secret"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "no compiled artifact or binary upload policy violation"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Tooling and governance gate only; does not alter RT-DSP or runtime driver audio behavior.",
+    "Does not claim physical audio, per-App delivery, a loadable driver, HLK or Microsoft signing.",
+    "Local machine is below the locked target toolchain (Windows 26200, VS BuildTools 17.14, no WDK/Windows App SDK)."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSVC 19.44 (VS 2022 BuildTools 17.14)",
+    "cmake": "4.4.0",
+    "dotnet": "10.0.301",
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T04:00:00+08:00",
+  "finished_at": "2026-08-22T04:08:00+08:00"
+}
