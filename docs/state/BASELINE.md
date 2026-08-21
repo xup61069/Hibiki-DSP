@@ -348,6 +348,7 @@ scope 仍以下方 evidence manifest 的各自 commit 與限制為準。
 ControlPlaneHost pipe/queue lifecycle 的 source commit 是 `a087e96`。
 WindowsControlRuntime 與 runtime pipe request probe 的 source commit 是 `bc6952d`。
 Driver endpoint state atomic invalid-context guard 的 source commit 是 `6b3f7fb`。
+WDK volume/mute basic-support source gate 的 source commit 是 `1572b5f`。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 68 個必要入口與
 15 份 Spec 通過；`source-policy.ps1` 掃描 288 個路徑且無 blocked binary/secret；
@@ -356,7 +357,7 @@ Driver endpoint state atomic invalid-context guard 的 source commit 是 `6b3f7f
 288-byte payload、catalog sequence、handler fail-closed、WinUI send-failure rollback、DeviceCatalogSnapshot
 wire/atomic replace、catalog-to-wire publisher、Windows worker unbound/coordinator rollback、
 DeviceCatalogRequest provider response、連線後自動刷新裝置清單、ControlPlaneHost loopback
-queue handoff 與 live 14-endpoint probe 亦通過。以本機 pinned ASIO SDK
+queue handoff、live 14-endpoint runtime pipe probe 與 WDK basic-support source gate 亦通過。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
 `.local/`，未提交或發布。以本機 pinned VST3 SDK 另行執行的 optional target
 `hibiki_vst3_sdk_catalog` 與 `hibiki_vst3_sdk_worker`（含 bounded one-main-bus processor、
