@@ -176,4 +176,28 @@ Vst3TimelineStoreStatusV1 Vst3TimelineFileStoreV1::list_ids(
     return Vst3TimelineStoreStatusV1::ok;
 }
 
+Vst3TimelineStoreStatusV1 sync_timeline_store_to_scheduler_v1(
+    const Vst3TimelineFileStoreV1& store,
+    Vst3SceneAutomationSchedulerV1& scheduler,
+    Vst3TimelineStoreSyncResultV1& result) {
+    result = {};
+    std::array<std::string, kVst3TimelineStoreMaxEntriesV1> ids{};
+    std::size_t id_count = 0U;
+    const auto listing = store.list_ids(ids, id_count);
+    if (listing != Vst3TimelineStoreStatusV1::ok) return listing;
+    for (std::size_t index = 0U; index < id_count; ++index) {
+        Vst3ParameterTimelineSnapshotV1 snapshot{};
+        if (store.load(ids[index], snapshot) != Vst3TimelineStoreStatusV1::ok) {
+            ++result.skipped;
+            continue;
+        }
+        if (!scheduler.upsert_timeline(ids[index], snapshot)) {
+            ++result.skipped;
+            continue;
+        }
+        ++result.loaded;
+    }
+    return Vst3TimelineStoreStatusV1::ok;
+}
+
 }  // namespace hibiki

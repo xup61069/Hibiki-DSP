@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "hibiki/vst3_parameter_timeline.hpp"
+#include "hibiki/vst3_scene_automation.hpp"
 
 #include <span>
 #include <string>
@@ -59,5 +60,21 @@ private:
 
     std::wstring root_;
 };
+
+struct Vst3TimelineStoreSyncResultV1 {
+    std::size_t loaded{0U};
+    std::size_t skipped{0U};
+};
+
+// Loads every stored timeline from the store in its deterministic sorted order
+// and publishes each validator-passing snapshot into the scheduler through
+// upsert_timeline. A single failing entry (unreadable file, invalid document or
+// a scheduler-side rejection such as a full catalog) is counted as skipped and
+// never aborts the run nor disturbs previously stored entries. The result is
+// zeroed before any work; an early failure leaves it zeroed.
+[[nodiscard]] Vst3TimelineStoreStatusV1 sync_timeline_store_to_scheduler_v1(
+    const Vst3TimelineFileStoreV1& store,
+    Vst3SceneAutomationSchedulerV1& scheduler,
+    Vst3TimelineStoreSyncResultV1& result);
 
 }  // namespace hibiki

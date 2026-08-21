@@ -2419,6 +2419,75 @@ int main() {
 #endif
 #if defined(_WIN32)
     {
+        wchar_t sync_temp_root[MAX_PATH];
+        const DWORD sync_temp_length = GetTempPathW(MAX_PATH, sync_temp_root);
+        CHECK(sync_temp_length > 0U && sync_temp_length < MAX_PATH);
+        const std::filesystem::path sync_root =
+            std::filesystem::path(std::wstring(sync_temp_root)) /
+            (L"hibiki_timeline_sync_" + std::to_wstring(GetTickCount()));
+        Vst3TimelineFileStoreV1 sync_store;
+        Vst3TimelineFileStoreV1 closed_sync_store;
+        auto sync_scheduler = std::make_unique<Vst3SceneAutomationSchedulerV1>();
+        Vst3TimelineStoreSyncResultV1 sync_result{};
+        CHECK(sync_timeline_store_to_scheduler_v1(
+                  closed_sync_store, *sync_scheduler, sync_result) ==
+                  Vst3TimelineStoreStatusV1::invalid_argument &&
+              sync_result.loaded == 0U && sync_result.skipped == 0U);
+        CHECK(sync_store.open(sync_root.wstring()));
+        CHECK(sync_timeline_store_to_scheduler_v1(
+                  sync_store, *sync_scheduler, sync_result) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              sync_result.loaded == 0U && sync_result.skipped == 0U &&
+              sync_scheduler->timeline_count() == 0U);
+        CHECK(sync_store.save("alpha", persist_source) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              sync_store.save("beta-01", persist_empty) ==
+                  Vst3TimelineStoreStatusV1::ok);
+        CHECK(sync_timeline_store_to_scheduler_v1(
+                  sync_store, *sync_scheduler, sync_result) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              sync_result.loaded == 2U && sync_result.skipped == 0U &&
+              sync_scheduler->timeline_count() == 2U &&
+              sync_scheduler->timeline_snapshot("alpha") != nullptr &&
+              sync_scheduler->timeline_snapshot("alpha")->event_count == 2U);
+        {
+            std::ofstream corrupt_stream(sync_root / L"alpha.json",
+                                         std::ios::binary | std::ios::trunc);
+            corrupt_stream << "{ broken";
+            corrupt_stream.close();
+        }
+        auto partial_scheduler = std::make_unique<Vst3SceneAutomationSchedulerV1>();
+        CHECK(sync_timeline_store_to_scheduler_v1(
+                  sync_store, *partial_scheduler, sync_result) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              sync_result.loaded == 1U && sync_result.skipped == 1U &&
+              partial_scheduler->timeline_count() == 1U &&
+              partial_scheduler->timeline_snapshot("alpha") == nullptr);
+        auto full_scheduler = std::make_unique<Vst3SceneAutomationSchedulerV1>();
+        bool sync_capacity_filled = true;
+        for (std::uint32_t filler = 0U; filler < kVst3TimelineStoreMaxEntriesV1;
+             ++filler) {
+            Vst3ParameterTimelineSnapshotV1 filler_snapshot{};
+            filler_snapshot.event_count = 1U;
+            filler_snapshot.events[0] = Vst3ParameterTimelineEventV1{
+                filler + 1U, static_cast<std::uint64_t>(filler) * 8U, 0.5};
+            sync_capacity_filled =
+                sync_capacity_filled &&
+                full_scheduler->upsert_timeline(
+                    "f" + std::to_string(filler), filler_snapshot);
+        }
+        CHECK(sync_capacity_filled && full_scheduler->timeline_count() == 16U);
+        CHECK(sync_timeline_store_to_scheduler_v1(
+                  sync_store, *full_scheduler, sync_result) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              sync_result.loaded == 0U && sync_result.skipped == 2U &&
+              full_scheduler->timeline_count() == 16U);
+        std::error_code sync_cleanup_error;
+        std::filesystem::remove_all(sync_root, sync_cleanup_error);
+    }
+#endif
+#if defined(_WIN32)
+    {
         wchar_t temp_root[MAX_PATH];
         const DWORD temp_length = GetTempPathW(MAX_PATH, temp_root);
         CHECK(temp_length > 0U && temp_length < MAX_PATH);
