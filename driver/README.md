@@ -30,6 +30,12 @@ the check deliberately does not claim that a loadable driver exists. The
 source-only INF template is in `inf/HibikiVirtualAudio.inf`; it references the
 future signed SYS/CAT package and is not installable from this repository alone.
 
+The WDK adapter entry points are endpoint-indexed and consume the fixed
+`endpoint_topology_v1` catalog for render geometry, Windows channel mask and
+property-state identity. A future SYSVAD/PortCls project must wire these
+functions into its pin/property tables; this source boundary alone is not a
+loadable, signed driver.
+
 `include/hibiki/endpoint_topology_v1.h` and `src/endpoint_topology.c` fix the
 first topology decision independently of WDK: Main is stereo render, Low
 Latency is stereo render with a 64-frame default, Surround is 7.1 render with

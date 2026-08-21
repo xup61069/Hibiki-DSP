@@ -19,6 +19,14 @@ interlocked producer/consumer publication around it. The companion
 render submit, underrun-safe render read and reset; it is source-only until
 compiled inside a SYSVAD/PortCls project.
 
+The endpoint-indexed entry points consume the fixed `endpoint_topology_v1`
+catalog rather than accepting free-form channel/rate values: render pin
+initialization uses catalog buffer geometry, format construction emits the
+catalog channel mask, and property-context initialization uses the catalog
+GUID/channel/rate. This keeps the eventual SYSVAD tables and portable contract
+on one identity source. It still does not provide a WDK build, `.sys`, HLK
+result or Microsoft signature.
+
 Before enabling a driver build, the maintainer must compile this source in a
 clean WDK project, run Driver Verifier/HLK and record signability evidence for
 Windows 11 24H2+; source presence alone is not driver evidence.

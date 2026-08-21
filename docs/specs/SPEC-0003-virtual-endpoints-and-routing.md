@@ -58,7 +58,12 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   必須補上 interlocked publication、KS pin wiring、實體 endpoint 與 signed package。
 - `driver/wdk/hibiki_stream_adapter.cpp` 示範 WDK-only 的 pin callback 邊界：以 spin lock
   保護 ring、submit render block、讀取時以 silence fallback 填滿 underrun，並提供 reset；
-  它仍需在正式 SYSVAD/PortCls 專案中編譯，不能單獨宣稱可載入 driver。
+  `HibikiWaveRtPinInitializeEndpointV1` 與 `HibikiWaveRtBuildFormatV1` 只能以固定
+  `endpoint_topology_v1` 的 render geometry、channel mask 與取樣率建立 pin；它仍需在正式
+  SYSVAD/PortCls 專案中編譯，不能單獨宣稱可載入 driver。
+- `HibikiPropertyContextInitializeEndpointV1` 同樣以 topology 的 endpoint GUID、聲道數與
+  取樣率初始化每個 WDK property context，避免 miniport 另造一套 identity；它仍只是
+  MS-PL source boundary，未提供 `.sys`、HLK 或 Microsoft signature。
 - `HibikiPropertyHandlerVolumeV1`／`HibikiPropertyHandlerMuteV1` 對
   `KSPROPERTY_TYPE_BASICSUPPORT` 回報 `KSPROPERTY_TYPE_GET | KSPROPERTY_TYPE_SET`，並在
   Value／Instance buffer 不足時先回報所需大小；這只是 WDK source boundary，尚未替代
