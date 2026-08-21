@@ -51,6 +51,9 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   block overrun reject、underrun silence fallback 與 dropped/underrun counters；它限制在
   2/6/8 channels、44.1/48/96/192 kHz、2–16 periods，且不配置、不等待。WDK miniport 仍
   必須補上 interlocked publication、KS pin wiring、實體 endpoint 與 signed package。
+- `driver/wdk/hibiki_stream_adapter.cpp` 示範 WDK-only 的 pin callback 邊界：以 spin lock
+  保護 ring、submit render block、讀取時以 silence fallback 填滿 underrun，並提供 reset；
+  它仍需在正式 SYSVAD/PortCls 專案中編譯，不能單獨宣稱可載入 driver。
 - `PersistentLinearResampler` 保存跨 block 的 phase 與 boundary frame，要求 caller 提供
   整個 input block 的 output capacity，並拒絕在不足時部分消耗；它是 clock-drift/SRC 的
   無配置 baseline，尚未宣稱 production-quality polyphase filter。
