@@ -2,6 +2,7 @@
 
 #include "hibiki/vst3_scene_automation.hpp"
 
+#include <algorithm>
 #include <new>
 
 namespace hibiki {
@@ -160,6 +161,46 @@ const Vst3ParameterTimelineSnapshotV1* Vst3SceneAutomationSchedulerV1::timeline_
     const auto index = find_timeline(timeline_id);
     if (index == timelines_.size()) return nullptr;
     return &timelines_[index].snapshot;
+}
+
+bool Vst3SceneAutomationSchedulerV1::timeline_ids(
+    const std::span<std::string> destination,
+    std::size_t& count) const {
+    count = 0U;
+    std::array<std::string, kVst3SceneAutomationMaxEntriesV1> found{};
+    std::size_t found_count = 0U;
+    for (const auto& slot : timelines_) {
+        if (!slot.occupied) continue;
+        found[found_count++] = slot.id;
+    }
+    std::sort(found.begin(), found.begin() + static_cast<std::ptrdiff_t>(found_count));
+    if (found_count > destination.size()) return false;
+    for (std::size_t index = 0U; index < found_count; ++index) {
+        destination[index] = found[index];
+    }
+    count = found_count;
+    return true;
+}
+
+bool Vst3SceneAutomationSchedulerV1::binding_views(
+    const std::span<Vst3SceneAutomationBindingViewV1> destination,
+    std::size_t& count) const {
+    count = 0U;
+    std::array<Vst3SceneAutomationBindingViewV1, kVst3SceneAutomationMaxEntriesV1> found{};
+    std::size_t found_count = 0U;
+    for (const auto& slot : bindings_) {
+        if (!slot.occupied) continue;
+        found[found_count].scene_id = slot.binding.scene_id;
+        found[found_count].lane_token = slot.binding.lane_token;
+        found[found_count].timeline_id = slot.binding.timeline_id;
+        ++found_count;
+    }
+    if (found_count > destination.size()) return false;
+    for (std::size_t index = 0U; index < found_count; ++index) {
+        destination[index] = found[index];
+    }
+    count = found_count;
+    return true;
 }
 
 bool Vst3SceneAutomationSchedulerV1::bind_scene(

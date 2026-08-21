@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "issue": 51,
+  "scope_digest": "baseline-counter-automation-v1",
+  "source_commit": "608c568",
+  "environment_fingerprint": "windows-26200-amd64-git-2.x-pwsh-7.6.5-cmake-4.4.0-msvc-buildtools-17.14; github-actions-windows-2025-fetch-depth-0; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 51",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "pwsh -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/docs-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "canonical summary text parses to expected required/specs/tracked/json counters",
+        "counter comparator accepts a fully matching set",
+        "removing each of the four summary markers fails the parser fail-closed",
+        "drifted tracked-path number is detected by the comparator",
+        "self-test exits without touching any repository file"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "strict head/index verification retained for local and push-to-main runs",
+        "pull-request mode measures the merge base tree via git ls-tree and requires base-summary consistency",
+        "untouched-BASELINE pull requests tolerate their own tracked-path/JSON drift instead of serializing lanes",
+        "pull requests that edit BASELINE.md remain strictly verified against their own head tree",
+        "required-entry and spec counters stay strict on the head tree in every mode"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 51 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope exclusivity and Git ancestry for all active handoffs"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "C++ build and CTest contract suite unaffected by tooling change"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1 / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "source-only policy, publication gate and whitespace cleanliness"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Pull-request tolerance applies only to the two volatile counters (tracked paths, repository JSON files); required entries and specs stay strict everywhere.",
+    "Local runs have no GitHub base-ref context and intentionally remain strict, so adding files without refreshing counters still fails locally by design.",
+    "Open PR #42 (Issue #41) also edits tools/docs-check.ps1; whoever merges second must reconcile both switch surfaces.",
+    "Tooling-only change; proves nothing about product audio behavior, drivers, HLK or signing."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSVC 19.44 (VS 2022 BuildTools 17.14)",
+    "cmake": "4.4.0",
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}
