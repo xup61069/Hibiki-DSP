@@ -31,12 +31,14 @@
 #include "hibiki/engine_control.hpp"
 #include "hibiki/audio_engine.hpp"
 #include "hibiki/audio_session_registry.hpp"
+#include "hibiki/driver_control_bridge.hpp"
 #include "hibiki/driver_stream_bridge.hpp"
 #include "hibiki/session_catalog.hpp"
 #include "hibiki/session_command_queue.hpp"
 
 extern "C" {
 #include "hibiki/driver_control_v1.h"
+#include "hibiki/driver_control_transport_v1.h"
 #include "hibiki/driver_stream_transport_v1.h"
 #include "hibiki/driver_validation_v1.h"
 #include "hibiki/wavert_endpoint_state_v1.h"
@@ -2188,6 +2190,66 @@ int main() {
     CHECK(hibiki_driver_validate_endpoint_state_v1(&driver_state, sizeof(driver_state)) == 1);
     driver_state.sample_rate = 12345;
     CHECK(hibiki_driver_validate_endpoint_state_v1(&driver_state, sizeof(driver_state)) == 0);
+
+    driver_state.sample_rate = 48000U;
+    driver_state.requested_db_q16_16 = -18 * 65536;
+    driver_state.safety_ceiling_db_q16_16 = 0;
+    driver_state.effective_db_q16_16 = -18 * 65536;
+    driver_state.mute = 0U;
+    driver_state.generation = 7U;
+    driver_state.actuator = HIBIKI_ACTUATOR_DEVICE_HARDWARE;
+    std::memcpy(driver_state.endpoint_guid, "hibiki-main", 12U);
+    std::memcpy(driver_state.event_context_guid, "u", 2U);
+    std::array<std::uint8_t, HIBIKI_DRIVER_CONTROL_ENDPOINT_STATE_PACKET_BYTES_V1>
+        driver_control_packet{};
+    std::size_t driver_control_packet_bytes = 0U;
+    CHECK(hibiki_driver_endpoint_state_packet_encode_v1(
+              driver_control_packet.data(), driver_control_packet.size(),
+              HIBIKI_DRIVER_VOLUME_NOTIFICATION, 123U, &driver_state,
+              &driver_control_packet_bytes) == 1 &&
+          driver_control_packet_bytes == HIBIKI_DRIVER_CONTROL_ENDPOINT_STATE_PACKET_BYTES_V1);
+    CHECK(hibiki_driver_endpoint_state_packet_validate_v1(
+              driver_control_packet.data(), driver_control_packet_bytes) == 1);
+    std::array<std::uint8_t, HIBIKI_DRIVER_CONTROL_ENDPOINT_STATE_PACKET_BYTES_V1>
+        driver_control_packet_copy = driver_control_packet;
+    driver_control_packet_copy[6U] = 0U;
+    CHECK(hibiki_driver_endpoint_state_packet_validate_v1(
+              driver_control_packet_copy.data(), driver_control_packet_copy.size()) == 0);
+    hibiki_driver_endpoint_state_v1 decoded_driver_state{};
+    std::uint16_t decoded_driver_message_type = 0U;
+    std::uint64_t decoded_driver_request_id = 0U;
+    CHECK(hibiki_driver_endpoint_state_packet_decode_v1(
+              driver_control_packet.data(), driver_control_packet.size(), &decoded_driver_state,
+              &decoded_driver_message_type, &decoded_driver_request_id) == 1 &&
+          decoded_driver_message_type == HIBIKI_DRIVER_VOLUME_NOTIFICATION &&
+          decoded_driver_request_id == 123U && decoded_driver_state.channel_count == 8U &&
+          decoded_driver_state.requested_db_q16_16 == -18 * 65536 &&
+          hibiki_driver_validate_endpoint_state_v1(
+              &decoded_driver_state, sizeof(decoded_driver_state)) == 1);
+
+    DriverEndpointStateV1 driver_bridge_state{};
+    std::uint16_t bridge_message_type = 0U;
+    std::uint64_t bridge_request_id = 0U;
+    CHECK(decode_driver_endpoint_state_packet_v1(
+              std::span<const std::uint8_t>(driver_control_packet.data(),
+                                             driver_control_packet.size()),
+              driver_bridge_state, bridge_message_type, bridge_request_id) &&
+          bridge_message_type == HIBIKI_DRIVER_VOLUME_NOTIFICATION &&
+          bridge_request_id == 123U && driver_bridge_state.channel_count == 8U);
+    DriverVolumeLinkV1 driver_volume_link;
+    CHECK(driver_volume_link.add_ignored_event_context("u"));
+    AudioEngineModel driver_volume_engine;
+    CHECK(driver_volume_link.apply(driver_volume_engine, "main", driver_bridge_state) ==
+          DriverVolumeSyncResultV1::IgnoredSelf);
+    driver_bridge_state.event_context_guid.fill('\0');
+    std::memcpy(driver_bridge_state.event_context_guid.data(), "external", 9U);
+    driver_bridge_state.generation = 8U;
+    CHECK(driver_volume_link.apply(driver_volume_engine, "main", driver_bridge_state) ==
+          DriverVolumeSyncResultV1::Applied);
+    CHECK(std::abs(driver_volume_engine.volume().requested_db - (-18.0)) < 0.001);
+    driver_bridge_state.generation = 7U;
+    CHECK(driver_volume_link.apply(driver_volume_engine, "main", driver_bridge_state) ==
+          DriverVolumeSyncResultV1::StaleGeneration);
 
     CHECK(hibiki_endpoint_topology_count_v1() == HIBIKI_ENDPOINT_TOPOLOGY_COUNT_V1);
     hibiki_endpoint_topology_v1 topology{};
