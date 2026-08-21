@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "issue": 86,
+  "scope_digest": "build-preview-dispatch-selftest-v1",
+  "source_commit": "de042f5",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-msvc-14.51.36231-sdk-10.0.28000.0-cmake-path-missing-dotnet-10.0.400-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/probe-environment.ps1",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target ControlModel",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/doctor.ps1 -CheckOnly",
+      "status": "pass_with_limitations",
+      "coverage": [
+        "Windows 11 build 26200, AMD64, Git, PowerShell 7.6.4, Visual Studio 2026 and .NET 10.0.400 detected",
+        "CMake is not on PATH and the locked SDK/WDK prerequisite is reported missing"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/probe-environment.ps1",
+      "status": "pass",
+      "coverage": [
+        "local environment fingerprint written under ignored .local/context.json"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/build-preview.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "four target-to-project/output mappings",
+        "distinct output roots",
+        "unsupported target rejection",
+        "no dotnet, process, CMake or file build activity"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target ControlModel",
+      "status": "pass",
+      "coverage": [
+        "control-model preview baseline passed",
+        "output stayed under ignored .local/preview/ControlModel"
+      ],
+      "compiled_artifacts": true
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "self-contained desktop preview built",
+        "launch smoke passed",
+        "output stayed under ignored .local/preview/DesktopCompat"
+      ],
+      "compiled_artifacts": true
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "compatibility WinUI preview built",
+        "launch smoke passed",
+        "output stayed under ignored .local/preview/WinUICompat"
+      ],
+      "compiled_artifacts": true
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors in the source diff"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The formal WinUI target was not treated as verified because the locked SDK/WDK prerequisite is unavailable on this machine.",
+    "WinUICompat is a non-packaged compatibility launch check, not formal XAML, accessibility, driver, HLK, signing or release evidence.",
+    "Preview outputs remain under ignored .local paths and are not GitHub artifacts.",
+    "An initial parallel DesktopCompat validation raced with VBCSCompiler on the shared control-model obj path; the required sequential rerun passed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.400",
+    "msvc": "14.51.36231",
+    "powershell": "7.6.4",
+    "cmake": "not on PATH"
+  },
+  "started_at": "2026-08-22T07:20:00+08:00",
+  "finished_at": "2026-08-22T07:40:00+08:00"
+}
