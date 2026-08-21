@@ -315,6 +315,10 @@ Check(!viewModel.SelectSession(staleHandle),
 Check(viewModel.BuildSessionRouteCommand(sessionEntries[0].Handle, "game", "surround").Type ==
           ControlMessageType.SessionRouteCommand,
     "ViewModel App session route command failed to bind the current handle.");
+viewModel.SessionRouteLaneId = "game";
+viewModel.SessionRouteOutputGroup = "surround";
+Check(viewModel.HasSelectedSession && !await viewModel.ApplySelectedSessionRouteAsync(),
+    "Disconnected selected App route must fail closed.");
 viewModel.IsExpert = true;
 Check(viewModel.Mode == UiMode.Expert && viewModel.SelectScene("movie"),
     "ViewModel Expert scene selection failed.");

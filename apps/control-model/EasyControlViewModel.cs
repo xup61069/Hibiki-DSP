@@ -28,6 +28,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private IReadOnlyList<SessionCatalogEntryV1> _sessionCatalog =
         Array.Empty<SessionCatalogEntryV1>();
     private ulong _selectedSessionHandle;
+    private string _sessionRouteLaneId = "app-lane";
+    private string _sessionRouteOutputGroup = "main";
     private IrPhaseMode _irPhaseMode = IrPhaseMode.MinimumPhase;
     private double _irPhaseStrength;
     private ControlConnectionState _connectionState = ControlConnectionState.Disconnected;
@@ -65,10 +67,34 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             _selectedSessionHandle = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(SelectedSession));
+            OnPropertyChanged(nameof(HasSelectedSession));
         }
     }
     public SessionCatalogEntryV1? SelectedSession =>
         _sessionCatalog.FirstOrDefault(item => item.Handle == _selectedSessionHandle);
+    public bool HasSelectedSession => SelectedSession is not null;
+    public string SessionRouteLaneId
+    {
+        get => _sessionRouteLaneId;
+        set
+        {
+            var normalized = value ?? string.Empty;
+            if (normalized == _sessionRouteLaneId) return;
+            _sessionRouteLaneId = normalized;
+            OnPropertyChanged();
+        }
+    }
+    public string SessionRouteOutputGroup
+    {
+        get => _sessionRouteOutputGroup;
+        set
+        {
+            var normalized = value ?? string.Empty;
+            if (normalized == _sessionRouteOutputGroup) return;
+            _sessionRouteOutputGroup = normalized;
+            OnPropertyChanged();
+        }
+    }
     public string CustomSceneCatalogPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Hibiki DSP", "scene-cards-v1.json");
@@ -444,6 +470,13 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         }
         return await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
     }
+
+    public Task<bool> ApplySelectedSessionRouteAsync(
+        CancellationToken cancellationToken = default) =>
+        HasSelectedSession
+            ? PushSessionRouteAsync(SelectedSessionHandle, SessionRouteLaneId,
+                                    SessionRouteOutputGroup, cancellationToken)
+            : Task.FromResult(false);
 
     // A future versioned status frame can call this after the engine has
     // reconciled Windows dB, the safety ceiling and the actual actuator. It is

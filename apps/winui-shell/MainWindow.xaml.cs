@@ -52,6 +52,17 @@ public sealed partial class MainWindow : Window
             await ViewModel.QueueVolumeAsync();
     }
 
+    private void OnSessionSelectClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: ulong handle })
+            ViewModel.SelectSession(handle);
+    }
+
+    private async void OnApplySessionRouteClick(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.ApplySelectedSessionRouteAsync();
+    }
+
     private async void OnClosed(object sender, WindowEventArgs e)
     {
         await ViewModel.DisconnectAsync();

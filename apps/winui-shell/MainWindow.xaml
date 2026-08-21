@@ -178,11 +178,25 @@
                                                 <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
                                                 <TextBlock Text="{Binding AccessibleSummary}" Opacity="0.72" TextWrapping="Wrap" />
                                             </StackPanel>
-                                            <TextBlock Grid.Column="1" Text="{Binding RouteStateLabel}" VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1" Spacing="4">
+                                                <TextBlock Text="{Binding RouteStateLabel}" />
+                                                <Button Content="選取" Tag="{Binding Handle}"
+                                                        Click="OnSessionSelectClick"
+                                                        AutomationProperties.Name="選取 App 工作階段" />
+                                            </StackPanel>
                                         </Grid>
                                     </DataTemplate>
                                 </controls:ItemsRepeater.ItemTemplate>
                             </controls:ItemsRepeater>
+                            <TextBlock Text="{Binding SelectedSession.DisplayName, StringFormat='目前選取：{0}'}"
+                                       Opacity="0.72" />
+                            <TextBox Header="Lane ID" Text="{Binding SessionRouteLaneId, Mode=TwoWay}"
+                                     AutomationProperties.Name="App Lane ID" />
+                            <TextBox Header="Output Group" Text="{Binding SessionRouteOutputGroup, Mode=TwoWay}"
+                                     AutomationProperties.Name="App Output Group" />
+                            <Button Content="套用選取 App 路由" Click="OnApplySessionRouteClick"
+                                    IsEnabled="{Binding HasSelectedSession}"
+                                    AutomationProperties.Name="套用選取 App 路由" />
                         </StackPanel>
 
                         <StackPanel Spacing="6">
