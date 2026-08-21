@@ -77,6 +77,9 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   136-byte little-endian endpoint-state/volume-notification packet plus the GPL
   `DriverVolumeLinkV1` adapter. It is contract-tested and ready for a future WDK/SYSVAD project
   to consume; it does not provide a `.sys`, PortCls wiring, HLK result or Microsoft signature.
+- The same transport now has a 16-byte header-only Hello/Ack/Error request-correlation contract;
+  it intentionally has no unbounded error payload. Evidence for this increment is
+  `evidence/0000-foundation/driver-control-handshake-v1.json`.
 
 ## 唯一下一步
 

@@ -24,3 +24,8 @@ through `driver_control_bridge.hpp`; the bridge applies only the requested dB
 and mute through the engine's canonical safety path and can ignore registered
 event-context values to prevent feedback loops. This is a control-plane ABI,
 not evidence of a loadable WaveRT driver or a signed IPC transport.
+
+The same header exposes a 16-byte little-endian header-only Hello/Ack/Error
+framing path for request correlation. It accepts the five message types from
+`driver_control_v1.h`, but intentionally carries no private error text or
+unbounded payload in v1; a future payload needs a new versioned contract.

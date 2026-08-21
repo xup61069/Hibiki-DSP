@@ -59,7 +59,9 @@
 - `hibiki_driver_control_transport_v1` now provides a fixed 136-byte little-endian
   endpoint-state/volume-notification packet ABI. The GPL `DriverVolumeLinkV1` decodes it,
   suppresses registered event contexts and applies requested dB/mute through the canonical
-  output-group safety path; contract coverage does not claim a loadable or signed driver.
+  output-group safety path; its 16-byte header-only Hello/Ack/Error request-correlation path
+  is also contract-tested. This remains source/control evidence and does not claim a loadable
+  or signed driver.
 - `OutputGroupVolumeState` 與 ISO compensation public C++ boundary 的初始骨架。
 - Scene graph、device-switch transaction 與初始 CMake/CTest 驗證入口。
 - Immutable RT graph snapshot、2/6/8 聲道 mapping、IPC frame codec、ASIO stream model、VST

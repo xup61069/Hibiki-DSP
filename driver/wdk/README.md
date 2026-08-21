@@ -35,3 +35,8 @@ capture direction without creating a second format contract.
 Before enabling a driver build, the maintainer must compile this source in a
 clean WDK project, run Driver Verifier/HLK and record signability evidence for
 Windows 11 24H2+; source presence alone is not driver evidence.
+
+The Apache transport also provides a 16-byte header-only Hello/Ack/Error
+exchange for request correlation. It is suitable for a future bounded kernel/
+user control channel, but does not define an unbounded error payload or replace
+the target WDK IPC implementation.

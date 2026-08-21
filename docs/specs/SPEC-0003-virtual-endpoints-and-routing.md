@@ -78,6 +78,9 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   ABI 解碼，套用 requested dB/mute 到 canonical output-group safety path，並可忽略已登記
   event-context 防止回授迴圈；這仍是 user-space/control-plane evidence，不是 loadable
   WaveRT、PortCls、HLK 或 Microsoft-signing evidence。
+- 同一 transport 另提供固定 16-byte little-endian header-only Hello/Ack/Error framing，
+  以 request ID 建立 driver/user-space correlation；v1 不攜帶自由格式錯誤文字或未界定
+  payload，避免把 kernel IPC 變成隱含的變長配置協定。
 - `sdk/include/hibiki/driver_stream_transport_v1.h` 與 `sdk/src/driver_stream_transport_v1.c`
   定義 driver→engine 的固定 80-byte header＋interleaved Float32 packet；C ABI 提供
   allocation-free encode/validate/payload view，`decode_driver_stream_packet_v1` 會複製到

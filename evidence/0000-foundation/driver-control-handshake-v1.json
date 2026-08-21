@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "driver-control-handshake-v1",
+  "source_commit": "d30a070",
+  "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "16-byte little-endian header-only Hello framing",
+        "request ID/message type round-trip",
+        "all five declared driver message types admitted by the header validator",
+        "truncated/invalid-size header rejection",
+        "existing 136-byte endpoint-state packet and DriverVolumeLink regression coverage"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "workflow remains source-only and does not publish build outputs"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Header-only correlation is a wire contract, not a kernel named-pipe/shared-memory implementation.",
+    "No WDK/SYSVAD project, loadable SYS, HLK result, physical endpoint or Microsoft signature is claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}
