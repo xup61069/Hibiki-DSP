@@ -22,6 +22,30 @@ function Read-ReleaseManifest([string]$Path) {
       $manifest.source_commit -notmatch '^[0-9a-f]{40}$') {
     throw 'Manifest source_commit must be a 40-character commit.'
   }
+  if ([string]::IsNullOrWhiteSpace($manifest.toolchain_digest) -or
+      $manifest.toolchain_digest -notmatch '^[0-9a-fA-F]{64}$') {
+    throw 'Manifest toolchain_digest must be a SHA-256 digest.'
+  }
+  if ([string]::IsNullOrWhiteSpace($manifest.dependency_lock_digest) -or
+      $manifest.dependency_lock_digest -notmatch '^[0-9a-fA-F]{64}$') {
+    throw 'Manifest dependency_lock_digest must be a SHA-256 digest.'
+  }
+  if ([string]::IsNullOrWhiteSpace($manifest.sbom_digest) -or
+      $manifest.sbom_digest -notmatch '^[0-9a-fA-F]{64}$') {
+    throw 'Manifest sbom_digest must be a SHA-256 digest.'
+  }
+  if ($null -eq $manifest.driver_package -or
+      $manifest.driver_package.sha256 -notmatch '^[0-9a-fA-F]{64}$' -or
+      $manifest.driver_package.catalog_sha256 -notmatch '^[0-9a-fA-F]{64}$' -or
+      $manifest.driver_package.microsoft_signature_thumbprint -notmatch '^[0-9a-fA-F]{40}$') {
+    throw 'Manifest driver_package must carry package/catalog hashes and Microsoft signature thumbprint.'
+  }
+  if ($null -eq $manifest.installer -or
+      $manifest.installer.sha256 -notmatch '^[0-9a-fA-F]{64}$' -or
+      $manifest.installer.signer_thumbprint -notmatch '^[0-9a-fA-F]{40}$' -or
+      [string]::IsNullOrWhiteSpace($manifest.installer.rfc3161_timestamp)) {
+    throw 'Manifest installer must carry hash, signer thumbprint and RFC3161 timestamp.'
+  }
   return $manifest
 }
 
