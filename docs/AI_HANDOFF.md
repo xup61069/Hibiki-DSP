@@ -77,6 +77,13 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   it attenuates the default endpoint by about 3 dB, reads the callback/readback, restores the
   original value and prints no endpoint identity. It is still user-space broker evidence only;
   do not run it silently or treat it as driver/WaveRT evidence.
+- `pwsh -File tools/live-session-volume-check.ps1 -WriteTest` is the explicit per-App/session
+  volume probe: it creates one silent shared-mode session, discovers it through the bounded
+  `SessionCatalogSnapshot`, uses the generation-scoped handle to attenuate about 3 dB, reads the
+  same `ISimpleAudioVolume` value back through `WindowsAudioSessionRouteCoordinatorV1`, and restores
+  the original dB/mute before exit. It does not print endpoint/session identity and remains
+  user-space control-plane evidence; physical per-App capture/re-send and DSP delivery are still
+  unverified.
 - The next driver-facing source milestone is now the Apache `driver_control_transport_v1` fixed
   136-byte little-endian endpoint-state/volume-notification packet plus the GPL
   `DriverVolumeLinkV1` adapter. It is contract-tested and ready for a future WDK/SYSVAD project
