@@ -21,7 +21,7 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   shell 與 public source policy gates。
 - Expert per-App route preset 已保存、會對選取 App 做規則預覽，並透過版本化 command 等待
   engine Ack；這不是已驗證的實體 per-App capture/re-send。
-- 本機 Windows 22631／Visual Studio 17 只能當 portable/user-space 證據。driver、WinUI XAML
+- 本機 Windows 26200／Visual Studio 17 只能當 portable/user-space 證據。driver、WinUI XAML
   preview、簽章與 Windows 11 24H2 hardware soak 必須在鎖定 target 環境重新驗證。
 - 本機 Desktop Compatibility Preview 已可由 `tools/build-preview.ps1 -Target DesktopCompat` 建置並通過
   啟動 smoke；它和正式 shell 共用 `EasyControlViewModel`，自帶 .NET runtime、不依賴 Windows App Runtime，

@@ -235,7 +235,7 @@
   to the Desktop Compatibility Preview; target 24H2/driver/hotplug soak remains unverified.
 - The opt-in `tools/live-device-catalog-check.ps1` probe now built and ran the worker against the
   local `IMMDeviceEnumerator`: 14 endpoints were enumerated, sequence 1 and a 5,840-byte snapshot
-  decoded successfully. It prints counts only; this is local Windows 22631 evidence, not target
+  decoded successfully. It prints counts only; this is local Windows 26200 evidence, not target
   Windows 24H2/WDK or driver/handoff soak evidence.
 - The same live probe now starts `WindowsControlRuntimeV1` and requests the snapshot through the
   local named pipe; `runtime=pass request=pass` proves service → provider → IPC framing without
@@ -470,7 +470,7 @@
   授權／法務確認）。
 - Microsoft driver signing、Gumroad release artifact 與 production installer。
 
-目前開發機是 Windows build 22631、VS 17／SDK 10.0.26100.0，低於鎖定的 driver 目標
+目前開發機是 Windows build 26200、VS 17／SDK 10.0.26100.0，低於鎖定的 driver 目標
 Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可通過，但
 不能把本機結果當成 driver-target evidence。
 
@@ -533,8 +533,8 @@ route-health cards 接到 Easy／Expert control-model；它只顯示保守的 se
 store、handler 與 atomic ViewModel apply；本機 status probe 通過，但仍不宣稱 physical
 per-App delivery 或 browser tab capture 已完成。
 
-目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 75 個必要入口與
-21 份 Spec 通過；`source-policy.ps1` 掃描 361 個 tracked paths 且無 blocked
+目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 78 個必要入口與
+24 份 Spec 通過；`source-policy.ps1` 掃描 366 個 tracked paths 且無 blocked
 binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
