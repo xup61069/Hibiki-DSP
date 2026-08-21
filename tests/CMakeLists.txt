@@ -11,3 +11,15 @@ else()
 endif()
 
 add_test(NAME hibiki_contract_tests COMMAND hibiki_contract_tests)
+
+if(HIBIKI_BUILD_LIVE_PROBES AND WIN32)
+  add_executable(hibiki_live_device_catalog_probe
+    live_device_catalog_probe.cpp
+  )
+  target_link_libraries(hibiki_live_device_catalog_probe PRIVATE hibiki_hub hibiki_sdk)
+  if(MSVC)
+    target_compile_options(hibiki_live_device_catalog_probe PRIVATE /W4 /permissive- /EHsc)
+  else()
+    target_compile_options(hibiki_live_device_catalog_probe PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+  endif()
+endif()

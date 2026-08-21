@@ -74,5 +74,7 @@ safe-start／Degraded，而不是重試到 100% 音量。
 2. Windows adapter 將 watcher snapshot 交給 worker 時，不在 callback 配置、等待或釋放 COM；
    worker 的 COM enumeration／candidate rollback／snapshot publisher 有 source boundary，
    真實 hotplug／Audio Service restart／WASAPI soak 仍由 driver release gate 驗證。
-3. 跨 AI handoff 必須記錄 catalog contract 的 source commit；不得提交真實私人 endpoint
+3. `tools/live-device-catalog-check.ps1` 是 opt-in、只在 Windows 執行的本機 probe；它只輸出
+   數量、sequence、payload size 與 wire pass，不輸出或提交 endpoint ID／friendly name。
+4. 跨 AI handoff 必須記錄 catalog contract 的 source commit；不得提交真實私人 endpoint
    ID 或顯示名稱到 repository。

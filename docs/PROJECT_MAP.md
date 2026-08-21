@@ -12,7 +12,7 @@
 | `sdk/` | driver／engine 的 Apache-2.0 C ABI 與 schema boundary | driver-control-v1 + fixed driver-stream packet encode/validate/payload ABI | driver-control-v1 / driver-stream-transport-v1 |
 | `schemas/` | IPC、Graph、Scene、custom Scene cards、physical device catalog/snapshot、device switch request、volume、AudioSession、PEQ、ISO status、handoff、release JSON schemas | 初始骨架 | versioned v1 |
 | `build/` | 固定 VS／SDK／WDK 與可重建條件 | 初始鎖定 | toolchain-lock.yml |
-| `tools/` | doctor、probe、verify、docs/source-only CI、license、driver 與 release policy gates | source-only workflow publication gate 會拒絕 artifact/package/release upload、signing permission 與 tracked binary | AGENTS.md |
+| `tools/` | doctor、probe、live Windows device catalog probe、verify、docs/source-only CI、license、driver 與 release policy gates | source-only workflow publication gate 會拒絕 artifact/package/release upload、signing permission 與 tracked binary；live probe 僅 opt-in 且輸出不含私人 endpoint identity | AGENTS.md |
 
 `SceneCatalogV1` 位於 `src/hub/` 的 control plane，保存最多 32 個自定義 Scene definition，
 並由 `EngineControlWorkerV1` 以 output-group exact-match resolver 接入既有

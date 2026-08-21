@@ -166,9 +166,12 @@ HRESULT enumerate_flow(IMMDeviceEnumerator* const enumerator,
         const bool format_ok = SUCCEEDED(result) && read_audio_format(
             device, channels, sample_rate, buffer_frames);
         device->Release();
+        // A single endpoint can disappear or expose a format outside Hibiki's
+        // LPCM contract while the rest of the collection remains usable. Skip
+        // that descriptor; a complete worker refresh must never publish an
+        // invented format or discard healthy endpoints because of it.
         if (FAILED(result) || endpoint_id.empty() || display_name.empty() || !format_ok) {
-            collection->Release();
-            return FAILED(result) ? result : E_NOTIMPL;
+            continue;
         }
         PhysicalDeviceDescriptorV1 descriptor;
         descriptor.endpoint_id = std::move(endpoint_id);

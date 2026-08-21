@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.25)
 project(HibikiDSP VERSION 0.1.0 LANGUAGES C CXX)
 
 option(HIBIKI_BUILD_TESTS "Build contract and DSP tests" ON)
+option(HIBIKI_BUILD_LIVE_PROBES "Build opt-in probes that touch local Windows audio" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -22,5 +23,5 @@ add_subdirectory(extensions/native_bridge)
 
 if(HIBIKI_BUILD_TESTS)
   enable_testing()
-  add_subdirectory(tests)
+add_subdirectory(tests)
 endif()
