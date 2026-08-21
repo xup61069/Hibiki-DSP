@@ -21,6 +21,11 @@
   commands. `tools/control-model-engine-smoke.ps1` proves −18 dB/generation readback and Game
   One-Tap SceneApply across the real named pipe; this remains a user-space control proof only.
   Evidence is recorded in `evidence/0000-foundation/control-model-engine-v1.json`.
+- The control-model Engine Preview smoke now exercises the full IR prepare → Scene IR clear
+  round-trip and retries temporary fixture cleanup for bounded transient Windows file-indexer
+  locks. Three consecutive session-routing runs are recorded in
+  `evidence/0000-foundation/control-model-engine-ir-clear-v1.json`; this remains a user-space
+  reliability proof only.
 - Desktop Compatibility Preview now exposes a scene selector, route-health summary and volume
   origin/actuator text; scene selection is disabled until the engine is connected and remains
   command/Ack/status-refresh based. While connected it polls the bounded ControlStatusSnapshot once

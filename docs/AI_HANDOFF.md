@@ -70,6 +70,9 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
 - `evidence/0000-foundation/winui-compat-preview-v1.json` records the local Microsoft App Runtime
   1.7 installation and the successful `WinUICompat -SmokeTest`; it is only a compatibility launch
   proof and must not be promoted to formal XAML/accessibility evidence.
+- `evidence/0000-foundation/control-model-engine-ir-clear-v1.json` records three consecutive
+  session-routing control-model runs, including IR prepare → Scene IR clear and bounded temporary
+  fixture cleanup. It is user-space reliability evidence only; it does not prove physical playback.
 
 ## 唯一下一步
 
