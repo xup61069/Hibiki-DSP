@@ -54,6 +54,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
 - `driver/wdk/hibiki_stream_adapter.cpp` 示範 WDK-only 的 pin callback 邊界：以 spin lock
   保護 ring、submit render block、讀取時以 silence fallback 填滿 underrun，並提供 reset；
   它仍需在正式 SYSVAD/PortCls 專案中編譯，不能單獨宣稱可載入 driver。
+- `sdk/include/hibiki/driver_stream_transport_v1.h` 與 `sdk/src/driver_stream_transport_v1.c`
+  定義 driver→engine 的固定 80-byte header＋interleaved Float32 packet；C ABI 提供
+  allocation-free encode/validate/payload view，`decode_driver_stream_packet_v1` 會複製到
+  caller-owned lane storage 並拒絕非有限 sample。packet span 必須等於 header 宣告長度。
 - `PersistentLinearResampler` 保存跨 block 的 phase 與 boundary frame，要求 caller 提供
   整個 input block 的 output capacity，並拒絕在不足時部分消耗；它是 clock-drift/SRC 的
   無配置 baseline，尚未宣稱 production-quality polyphase filter。

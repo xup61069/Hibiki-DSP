@@ -25,9 +25,11 @@
 #include "hibiki/engine_control.hpp"
 #include "hibiki/audio_engine.hpp"
 #include "hibiki/audio_session_registry.hpp"
+#include "hibiki/driver_stream_bridge.hpp"
 
 extern "C" {
 #include "hibiki/driver_control_v1.h"
+#include "hibiki/driver_stream_transport_v1.h"
 #include "hibiki/driver_validation_v1.h"
 #include "hibiki/wavert_endpoint_state_v1.h"
 #include "hibiki/wavert_stream_v1.h"
@@ -312,6 +314,33 @@ int main() {
           wavert_stream.underrun_frames == 0U);
     CHECK(hibiki_wavert_stream_init_v1(&wavert_stream, wavert_storage.data(), 8U, 2U, 48000U,
                                        2U, 2U) == HIBIKI_WAVERT_STREAM_REJECTED_V1);
+    const float driver_samples[] = {0.25F, -0.25F, 0.5F, -0.5F};
+    std::array<std::uint8_t, 128> driver_packet{};
+    std::size_t driver_packet_bytes = 0U;
+    CHECK(hibiki_driver_stream_packet_encode_v1(
+              driver_packet.data(), driver_packet.size(), HIBIKI_DRIVER_STREAM_RENDER_V1,
+              42U, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 2U, 48000U, 2U,
+              HIBIKI_DRIVER_STREAM_FLAG_DISCONTINUITY_V1, 9U, driver_samples,
+              &driver_packet_bytes) == 1 && driver_packet_bytes == 96U);
+    CHECK(hibiki_driver_stream_packet_validate_v1(driver_packet.data(), driver_packet_bytes) == 1);
+    std::array<float, 4> decoded_driver_samples{};
+    DriverStreamLaneBlockV1 decoded_driver_block{};
+    const auto driver_packet_view = std::span<const std::uint8_t>(driver_packet.data(),
+                                                                   driver_packet_bytes);
+    CHECK(decode_driver_stream_packet_v1(driver_packet_view, decoded_driver_samples,
+                                         decoded_driver_block) &&
+          decoded_driver_block.interleaved == decoded_driver_samples.data() &&
+          decoded_driver_block.channels == 2U && decoded_driver_block.sample_rate == 48000U &&
+          decoded_driver_block.sequence == 42U && decoded_driver_block.generation == 9U &&
+          decoded_driver_block.flags == HIBIKI_DRIVER_STREAM_FLAG_DISCONTINUITY_V1 &&
+          decoded_driver_samples[3] == driver_samples[3]);
+    const float driver_nan = std::numeric_limits<float>::quiet_NaN();
+    std::memcpy(driver_packet.data() + HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1 + sizeof(float),
+                &driver_nan, sizeof(driver_nan));
+    decoded_driver_samples.fill(1.0F);
+    CHECK(!decode_driver_stream_packet_v1(driver_packet_view, decoded_driver_samples,
+                                          decoded_driver_block) &&
+          decoded_driver_samples[0] == 0.0F && decoded_driver_block.interleaved == nullptr);
 
     PersistentLinearResampler persistent_src;
     CHECK(persistent_src.prepare(1, 1.0));
