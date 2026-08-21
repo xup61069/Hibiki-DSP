@@ -887,6 +887,22 @@ int main() {
     invalid_rule.output_group = "main";
     CHECK(route_rules->upsert(invalid_rule) == SessionRouteRuleResultV1::invalid_argument);
     CHECK(route_rules->remove("chrome-tie") && route_rules->size() == 2U);
+    for (std::size_t rule_index = 0U; rule_index < 62U; ++rule_index) {
+        SessionRouteRuleV1 capacity_rule;
+        capacity_rule.rule_id = "capacity-" + std::to_string(rule_index);
+        capacity_rule.priority = static_cast<std::int32_t>(rule_index);
+        capacity_rule.app_id = "app-" + std::to_string(rule_index);
+        capacity_rule.lane_id = "lane-" + std::to_string(rule_index);
+        capacity_rule.output_group = "main";
+        CHECK(route_rules->upsert(capacity_rule) == SessionRouteRuleResultV1::applied);
+    }
+    SessionRouteRuleV1 over_capacity_rule;
+    over_capacity_rule.rule_id = "capacity-overflow";
+    over_capacity_rule.app_id = "overflow.exe";
+    over_capacity_rule.lane_id = "overflow";
+    over_capacity_rule.output_group = "main";
+    CHECK(route_rules->size() == kMaxSessionRouteRulesV1 &&
+          route_rules->upsert(over_capacity_rule) == SessionRouteRuleResultV1::capacity_exhausted);
     CHECK(session_registry.bind(chrome_tab_a, "vlog-noise", "headphones"));
     CHECK(session_registry.bind(chrome_tab_b, "music", "speakers"));
     CHECK(session_registry.set_gain_owner(chrome_tab_a, SessionGainOwner::HibikiInternal));
