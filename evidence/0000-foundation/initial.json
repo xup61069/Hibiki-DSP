@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "issue": 0,
-  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-output-fanout-runtime-exact-capacity-high-ratio-wavert-stream-wdk-adapter-driver-stream-bridge-endpoint-identity-graph-lane-wasapi-clock-handoff-graph-adapter-expert-surface-asio-wasapi-driver-wasapi-tab-vmic-fanout-engine-v35-vst-supervisor-exchange-v36-vst-worker-lane-v37-plugin-host-wire-v38-iso-formula-builder-v39-source-only-ci-v40-wdk-property-hardening-v41-vst-scene-automation-v42-vst-private-state-v43-vst-sdk-state-v44-program-kweighted-proxy-v45-vst-state-migration-v46-vst-state-registry-v47-vst-scene-state-coordinator-v48-scene-preflight-gate-v49",
-  "source_commit": "72d2210",
+  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-output-fanout-runtime-exact-capacity-high-ratio-wavert-stream-wdk-adapter-driver-stream-bridge-endpoint-identity-graph-lane-wasapi-clock-handoff-graph-adapter-expert-surface-asio-wasapi-driver-wasapi-tab-vmic-fanout-engine-v35-vst-supervisor-exchange-v36-vst-worker-lane-v37-plugin-host-wire-v38-iso-formula-builder-v39-source-only-ci-v40-wdk-property-hardening-v41-vst-scene-automation-v42-vst-private-state-v43-vst-sdk-state-v44-program-kweighted-proxy-v45-vst-state-migration-v46-vst-state-registry-v47-vst-scene-state-coordinator-v48-scene-preflight-gate-v49-vst-scene-preflight-adapter-v50",
+  "source_commit": "a82442f",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -104,7 +104,7 @@
     {"command": "ir-phase-policy", "status": "pass", "coverage": ["minimum-phase 0 ms", "mixed-phase 80 ms budget", "linear-phase 160 ms budget", "bypass validation", "C++/C# slider parity"]},
     {"command": "audio-engine-volume-snapshot", "status": "pass", "coverage": ["single 64-bit dB/mute atomic", "mute transition", "Group Master applied once", "8 ms gain ramp", "5 ms mute", "15 ms unmute", "-1 dBTP output guard"]},
     {"command": "control-command-queue", "status": "pass", "coverage": ["64-slot SPSC", "full-queue dropped counter", "pipe-to-control handoff"]},
-    {"command": "engine-control-worker", "status": "pass", "coverage": ["SceneApply to Easy presets", "Validate-Prepare-Commit", "preflight gate before Prepare", "failed preflight preserves Scene/revision/graph", "volume through Group Master", "invalid scene preserves revision"]},
+    {"command": "engine-control-worker", "status": "pass", "coverage": ["SceneApply to Easy presets", "Validate-Prepare-Commit", "preflight gate before Prepare", "VST3 Scene coordinator adapter", "bound Scene accepted only after state preflight", "unbound Easy Scene compatibility", "failed preflight preserves Scene/revision/graph", "volume through Group Master", "invalid scene preserves revision"]},
     {"command": "output-group-routing", "status": "pass", "coverage": ["fixed-size RT group identity", "four-lane isolation", "missing-group fail-closed", "AudioEngine process_output_group"]},
     {"command": "session-route-graph-builder", "status": "pass", "coverage": ["active bound session compilation", "WindowsSession/HibikiInternal gain ownership", "two Chrome session groups", "Strict Direct gain rejection", "bounded makeup gain mutator"]},
     {"command": "program-aware-level-controller", "status": "pass", "coverage": ["bounded RMS proxy", "fixed-state K-weighted proxy", "optional LFE exclusion", "3 second analysis window", "silence gate", "boost/cut caps", "dB-per-second rate limit", "nonfinite sample guard", "optional tab-lane integration", "sample-rate mismatch fail-closed"], "formal_bs1770_conformance": false},
@@ -117,7 +117,7 @@
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",
   "limitations": [
-    "Evidence corresponds to commit 72d2210 and the current environment only; no real endpoint handoff or WinUI SDK build was exercised.",
+    "Evidence corresponds to commit a82442f and the current environment only; no real endpoint handoff or WinUI SDK build was exercised.",
     "The native ASIO build is an unsigned local developer verification; no DLL or SDK checkout is committed or published.",
     "Current machine is Windows 22631 with VS 17/SDK 10.0.26100.0; it cannot provide driver-target evidence for the locked Windows 26100+/VS 2026/SDK-WDK 10.0.28000.2526 environment."
   ],
