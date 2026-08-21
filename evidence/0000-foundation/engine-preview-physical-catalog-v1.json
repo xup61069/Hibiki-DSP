@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "engine-preview-physical-catalog-v1",
+  "source_commit": "0bc986b",
+  "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/build-engine-preview.ps1",
+    "pwsh -File tools/engine-preview-smoke.ps1",
+    "pwsh -File tools/control-model-engine-smoke.ps1",
+    "pwsh -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest"
+  ],
+  "results": [
+    {
+      "command": "tools/build-engine-preview.ps1",
+      "status": "pass",
+      "coverage": [
+        "COM-initialized user-space Engine Preview startup",
+        "WindowsPhysicalDeviceCatalogServiceV1 bind and initial refresh",
+        "bounded catalog provider remains attached to the named-pipe host"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/engine-preview-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "DeviceCatalogRequest correlation",
+        "14 local render/capture metadata entries and 5,840-byte snapshot",
+        "wire entry shape summary without endpoint IDs or friendly names",
+        "Hello/Ack, volume round-trip, status snapshot and IR prepare remain passing"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/control-model-engine-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "EasyControlViewModel ConnectAsync applies the live catalog",
+        "14 devices visible after C# snapshot validation",
+        "capture default accepted while only Active render remains selectable",
+        "volume, SceneApply, IR prepare and Scene IR clear regression path"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "self-contained Desktop Compatibility Preview launch",
+        "no Windows App Runtime dependency",
+        "driver-free UI/control-plane boundary"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The catalog is metadata only: Engine Preview does not open a physical WASAPI sink or switch a device.",
+    "No Windows system volume, virtual endpoint, WaveRT driver or per-App audio delivery is active.",
+    "The evidence is local Windows 22631 user-space coverage; Windows 11 24H2/WDK, hotplug soak and signed driver gates remain pending.",
+    "All build output stays under ignored .local paths and is not a GitHub artifact."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00+08:00",
+  "finished_at": "2026-08-21T00:00:00+08:00"
+}
