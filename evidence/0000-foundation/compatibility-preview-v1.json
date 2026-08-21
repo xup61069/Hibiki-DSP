@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "local-winui-compatibility-preview-v1",
+  "source_commit": "3a3a6c8",
+  "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/build-preview.ps1 -Target WinUICompat",
+    "Start-Process .local/preview/WinUICompat/Hibiki.WinUI.exe -WindowStyle Hidden; 3-second liveness smoke; controlled close"
+  ],
+  "results": [
+    {
+      "command": "tools/build-preview.ps1 -Target WinUICompat",
+      "status": "pass",
+      "coverage": [
+        "same EasyControlViewModel used by the formal shell",
+        "unpackaged unsigned WinUI executable compilation",
+        "no XAML compiler or PRI tooling dependency"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "3-second launch smoke",
+      "status": "pass",
+      "coverage": [
+        "process stayed alive after initialization",
+        "process was deliberately closed after the smoke check"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The formal WinUI XAML build still fails on this Windows 22631/Visual Studio 17 host and must be rerun on the locked target toolchain.",
+    "Compatibility Preview intentionally excludes XAML markup compilation, PRI generation, virtual audio driver, system interception, hardware audio, signing and installer behavior.",
+    "All outputs remain under ignored .local/preview/WinUICompat and are neither tracked nor GitHub release artifacts."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00+08:00",
+  "finished_at": "2026-08-21T00:00:00+08:00"
+}
