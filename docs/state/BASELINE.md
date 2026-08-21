@@ -14,6 +14,7 @@
 - The C# `EasyControlViewModel` now refreshes ControlStatus after acknowledged volume and Scene
   commands. `tools/control-model-engine-smoke.ps1` proves −18 dB/generation readback and Game
   One-Tap SceneApply across the real named pipe; this remains a user-space control proof only.
+  Evidence is recorded in `evidence/0000-foundation/control-model-engine-v1.json`.
 - 公開 monorepo 文件、component license map 與 source-only paid-release policy。
 - AI 接手規則、fresh-clone 流程與 source-only policy。
 - `OutputGroupVolumeState` 與 ISO compensation public C++ boundary 的初始骨架。

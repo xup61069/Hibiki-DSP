@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "control-model-engine-roundtrip-v1",
+  "source_commit": "a2c42cc",
+  "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/engine-preview-smoke.ps1",
+    "pwsh -File tools/control-model-engine-smoke.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/engine-preview-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "cross-process Hello/Ack correlation",
+        "volume command Ack",
+        "−12 dB Q16.16 and generation 1 read back through ControlStatusSnapshot",
+        "fresh-engine process guard"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/control-model-engine-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "C# EasyControlViewModel ConnectAsync",
+        "−18 dB volume command and effective dB/generation reconciliation",
+        "Game One-Tap SceneApply Ack",
+        "status refresh after acknowledged commands"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The named pipe is a user-space control proof; no WaveRT/PortCls driver, physical sink or Windows endpoint volume node is active.",
+    "SceneApply acknowledgement proves command validation and graph worker handling, not audible Scene DSP on a physical device.",
+    "Build outputs remain under ignored .local paths and are not published."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00+08:00",
+  "finished_at": "2026-08-21T00:00:00+08:00"
+}
