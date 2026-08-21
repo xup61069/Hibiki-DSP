@@ -15,6 +15,7 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         ViewModel.LoadCustomScenes(out _);
+        ViewModel.LoadRouteRules(out _);
         RootGrid.DataContext = ViewModel;
         Closed += OnClosed;
     }
@@ -66,6 +67,22 @@ public sealed partial class MainWindow : Window
     private async void OnApplySessionVolumeClick(object sender, RoutedEventArgs e)
     {
         await ViewModel.ApplySelectedSessionVolumeAsync();
+    }
+
+    private async void OnApplyRouteRuleClick(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.ApplyRouteRuleAsync();
+    }
+
+    private async void OnRemoveRouteRuleClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string ruleId })
+            await ViewModel.ApplyRemoveRouteRuleAsync(ruleId);
+    }
+
+    private async void OnClearRouteRulesClick(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.ApplyClearRouteRulesAsync();
     }
 
     private async void OnClosed(object sender, WindowEventArgs e)

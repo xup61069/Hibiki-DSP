@@ -71,6 +71,10 @@
   bounded printable UTF-8 matchers, priority, makeup gain and gain-owner semantics. C++/C# codec,
   EngineControl callback, COM-worker queue handoff and candidate rule-store/route-graph transaction
   are contract-tested; physical active-session delivery remains unverified.
+- Expert control model now provides a bounded 64-entry per-App route-rule catalog with atomic
+  JSON persistence, stable priority ordering, validation/rollback on malformed files, and WinUI
+  editor bindings. It can build SPEC-0023 commands only after a non-zero App catalog sequence;
+  local save without an engine sync is explicitly shown as not yet applied.
 - `CalibrationResponsePointV1` and `compile_bounded_peq_correction_v1` now provide a deterministic
   control-plane measured-response to bounded PEQ compiler (16-filter cap, frequency/spacing/Q and
   boost/cut policy validation, explicit `limited` result) that feeds the existing APO/CamillaDSP/

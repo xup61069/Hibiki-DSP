@@ -32,6 +32,16 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private string _sessionRouteOutputGroup = "main";
     private double _sessionVolumeDb = -12.0;
     private bool _sessionMuted;
+    private string _routeRuleId = string.Empty;
+    private string _routeRuleAppId = string.Empty;
+    private string _routeRuleDisplayName = string.Empty;
+    private string _routeRuleLaneId = "app-lane";
+    private string _routeRuleOutputGroup = "main";
+    private int _routeRulePriority;
+    private double _routeRuleMakeupGainDb;
+    private bool _routeRuleEnabled = true;
+    private SessionRouteRuleGainOwnerV1 _routeRuleGainOwner =
+        SessionRouteRuleGainOwnerV1.WindowsSession;
     private IrPhaseMode _irPhaseMode = IrPhaseMode.MinimumPhase;
     private double _irPhaseStrength;
     private ControlConnectionState _connectionState = ControlConnectionState.Disconnected;
@@ -59,6 +69,9 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     // identifiers. A refresh replaces the list atomically; callers must not
     // retain a handle across a newer sequence.
     public IReadOnlyList<SessionCatalogEntryV1> SessionCatalog => _sessionCatalog;
+    public IReadOnlyList<SessionRouteRuleCard> RouteRules => _session.RouteRules.Rules;
+    public IReadOnlyList<SessionRouteRuleGainOwnerV1> RouteRuleGainOwners { get; } =
+        Enum.GetValues<SessionRouteRuleGainOwnerV1>();
     public ulong SessionCatalogSequence => _sessionCatalogSequence;
     public ulong SelectedSessionHandle
     {
@@ -118,6 +131,54 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             _sessionMuted = value;
             OnPropertyChanged();
         }
+    }
+    public string RouteRuleCatalogPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Hibiki DSP", "session-route-rules-v1.json");
+    public string RouteRuleId
+    {
+        get => _routeRuleId;
+        set { var normalized = value ?? string.Empty; if (normalized != _routeRuleId) { _routeRuleId = normalized; OnPropertyChanged(); } }
+    }
+    public string RouteRuleAppId
+    {
+        get => _routeRuleAppId;
+        set { var normalized = value ?? string.Empty; if (normalized != _routeRuleAppId) { _routeRuleAppId = normalized; OnPropertyChanged(); } }
+    }
+    public string RouteRuleDisplayName
+    {
+        get => _routeRuleDisplayName;
+        set { var normalized = value ?? string.Empty; if (normalized != _routeRuleDisplayName) { _routeRuleDisplayName = normalized; OnPropertyChanged(); } }
+    }
+    public string RouteRuleLaneId
+    {
+        get => _routeRuleLaneId;
+        set { var normalized = value ?? string.Empty; if (normalized != _routeRuleLaneId) { _routeRuleLaneId = normalized; OnPropertyChanged(); } }
+    }
+    public string RouteRuleOutputGroup
+    {
+        get => _routeRuleOutputGroup;
+        set { var normalized = value ?? string.Empty; if (normalized != _routeRuleOutputGroup) { _routeRuleOutputGroup = normalized; OnPropertyChanged(); } }
+    }
+    public int RouteRulePriority
+    {
+        get => _routeRulePriority;
+        set { var clamped = Math.Clamp(value, -1_000_000, 1_000_000); if (clamped != _routeRulePriority) { _routeRulePriority = clamped; OnPropertyChanged(); } }
+    }
+    public double RouteRuleMakeupGainDb
+    {
+        get => _routeRuleMakeupGainDb;
+        set { if (!double.IsFinite(value)) return; var clamped = Math.Clamp(value, -144.0, 12.0); if (Math.Abs(clamped - _routeRuleMakeupGainDb) >= 1e-9) { _routeRuleMakeupGainDb = clamped; OnPropertyChanged(); } }
+    }
+    public bool RouteRuleEnabled
+    {
+        get => _routeRuleEnabled;
+        set { if (value != _routeRuleEnabled) { _routeRuleEnabled = value; OnPropertyChanged(); } }
+    }
+    public SessionRouteRuleGainOwnerV1 RouteRuleGainOwner
+    {
+        get => _routeRuleGainOwner;
+        set { if (!Enum.IsDefined(value) || value == _routeRuleGainOwner) return; _routeRuleGainOwner = value; OnPropertyChanged(); }
     }
     public string CustomSceneCatalogPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -526,6 +587,177 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
                                       cancellationToken);
     }
 
+    public IpcEnvelopeV1 BuildUpsertSessionRouteRuleCommand(SessionRouteRuleCard rule)
+    {
+        if (_sessionCatalogSequence == 0UL)
+            throw new InvalidOperationException("App 清單尚未同步");
+        var validator = new SessionRouteRuleCatalogV1();
+        if (!validator.Upsert(rule))
+            throw new ArgumentException("App 路由預設內容無效", nameof(rule));
+        LastCommand = _commands.UpsertSessionRouteRule(
+            _sessionCatalogSequence, rule.RuleId, rule.AppId, rule.DisplayName,
+            rule.LaneId, rule.OutputGroup, rule.Priority, rule.MakeupGainDb,
+            rule.Enabled, rule.GainOwner);
+        OnPropertyChanged(nameof(LastCommand));
+        return LastCommand;
+    }
+
+    public IpcEnvelopeV1 BuildRemoveSessionRouteRuleCommand(string ruleId)
+    {
+        if (_sessionCatalogSequence == 0UL)
+            throw new InvalidOperationException("App 清單尚未同步");
+        if (string.IsNullOrWhiteSpace(ruleId))
+            throw new ArgumentException("規則身份不可為空", nameof(ruleId));
+        LastCommand = _commands.RemoveSessionRouteRule(_sessionCatalogSequence, ruleId.Trim());
+        OnPropertyChanged(nameof(LastCommand));
+        return LastCommand;
+    }
+
+    public IpcEnvelopeV1 BuildClearSessionRouteRulesCommand()
+    {
+        if (_sessionCatalogSequence == 0UL)
+            throw new InvalidOperationException("App 清單尚未同步");
+        LastCommand = _commands.ClearSessionRouteRules(_sessionCatalogSequence);
+        OnPropertyChanged(nameof(LastCommand));
+        return LastCommand;
+    }
+
+    public bool AddOrUpdateRouteRule()
+    {
+        var rule = new SessionRouteRuleCard(
+            RouteRuleId.Trim(), RouteRulePriority, RouteRuleEnabled, RouteRuleGainOwner,
+            RouteRuleMakeupGainDb, RouteRuleAppId.Trim(), RouteRuleDisplayName.Trim(),
+            RouteRuleLaneId.Trim(), RouteRuleOutputGroup.Trim());
+        var previous = _session.RouteRules.Rules.FirstOrDefault(item =>
+            item.RuleId == rule.RuleId);
+        if (!_session.RouteRules.Upsert(rule))
+        {
+            StatusText = "路由預設無效、需要 App ID/名稱，或已達 64 筆上限";
+            return false;
+        }
+        if (!SaveRouteRules(out var saveError))
+        {
+            if (previous is null) _session.RouteRules.Remove(rule.RuleId);
+            else _session.RouteRules.Upsert(previous);
+            OnPropertyChanged(nameof(RouteRules));
+            StatusText = $"路由預設未保存：{saveError}";
+            return false;
+        }
+        OnPropertyChanged(nameof(RouteRules));
+        LastCommand = null;
+        OnPropertyChanged(nameof(LastCommand));
+        if (_sessionCatalogSequence != 0UL)
+        {
+            try { BuildUpsertSessionRouteRuleCommand(rule); }
+            catch (ArgumentException)
+            {
+                StatusText = "路由預設已保存，但命令內容無效；未送出";
+                return true;
+            }
+        }
+        StatusText = _sessionCatalogSequence == 0UL
+            ? $"已保存路由預設：{rule.RuleId}；刷新 App 清單後才能套用"
+            : $"已保存路由預設：{rule.RuleId}；等待引擎確認套用";
+        return true;
+    }
+
+    public async Task<bool> ApplyRouteRuleAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (!AddOrUpdateRouteRule()) return false;
+        if (LastCommand is null)
+        {
+            StatusText = "路由預設已保存；引擎尚未同步 App 清單，尚未套用";
+            return false;
+        }
+        return await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    public bool RemoveRouteRule(string ruleId)
+    {
+        var previous = _session.RouteRules.Rules.FirstOrDefault(item =>
+            item.RuleId == ruleId?.Trim());
+        if (previous is null)
+        {
+            StatusText = "找不到這個路由預設";
+            return false;
+        }
+        if (!_session.RouteRules.Remove(previous.RuleId)) return false;
+        if (!SaveRouteRules(out var saveError))
+        {
+            _session.RouteRules.Upsert(previous);
+            OnPropertyChanged(nameof(RouteRules));
+            StatusText = $"路由預設未保存：{saveError}";
+            return false;
+        }
+        OnPropertyChanged(nameof(RouteRules));
+        LastCommand = null;
+        OnPropertyChanged(nameof(LastCommand));
+        if (_sessionCatalogSequence != 0UL)
+        {
+            try { BuildRemoveSessionRouteRuleCommand(previous.RuleId); }
+            catch (ArgumentException)
+            {
+                StatusText = "路由預設已移除，但命令內容無效；未送出";
+                return true;
+            }
+        }
+        StatusText = _sessionCatalogSequence == 0UL
+            ? "已移除路由預設；刷新 App 清單後才會同步引擎"
+            : "已移除路由預設；等待引擎確認套用";
+        return true;
+    }
+
+    public async Task<bool> ApplyRemoveRouteRuleAsync(
+        string ruleId, CancellationToken cancellationToken = default)
+    {
+        if (!RemoveRouteRule(ruleId)) return false;
+        if (LastCommand is null)
+        {
+            StatusText = "已移除並保存路由預設；引擎尚未同步 App 清單";
+            return false;
+        }
+        return await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    public bool ClearRouteRules()
+    {
+        var previous = _session.RouteRules.Rules.ToArray();
+        if (previous.Length == 0)
+        {
+            StatusText = "目前沒有路由預設";
+            return false;
+        }
+        _session.RouteRules.Clear();
+        if (!SaveRouteRules(out var saveError))
+        {
+            foreach (var rule in previous) _session.RouteRules.Upsert(rule);
+            OnPropertyChanged(nameof(RouteRules));
+            StatusText = $"路由預設未保存：{saveError}";
+            return false;
+        }
+        OnPropertyChanged(nameof(RouteRules));
+        LastCommand = null;
+        OnPropertyChanged(nameof(LastCommand));
+        if (_sessionCatalogSequence != 0UL) BuildClearSessionRouteRulesCommand();
+        StatusText = _sessionCatalogSequence == 0UL
+            ? "已清除路由預設；刷新 App 清單後才會同步引擎"
+            : "已清除路由預設；等待引擎確認套用";
+        return true;
+    }
+
+    public async Task<bool> ApplyClearRouteRulesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (!ClearRouteRules()) return false;
+        if (LastCommand is null)
+        {
+            StatusText = "已清除並保存路由預設；引擎尚未同步 App 清單";
+            return false;
+        }
+        return await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+    }
+
     // A future versioned status frame can call this after the engine has
     // reconciled Windows dB, the safety ceiling and the actual actuator. It is
     // intentionally fail-closed and never writes Windows or the audio graph.
@@ -778,6 +1010,16 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public bool SaveCustomScenes(out string error) =>
         _session.CustomScenes.TrySave(CustomSceneCatalogPath, out error);
+
+    public bool LoadRouteRules(out string error)
+    {
+        var loaded = _session.RouteRules.TryLoad(RouteRuleCatalogPath, out error);
+        if (loaded) OnPropertyChanged(nameof(RouteRules));
+        return loaded;
+    }
+
+    public bool SaveRouteRules(out string error) =>
+        _session.RouteRules.TrySave(RouteRuleCatalogPath, out error);
 
     public bool RemoveCustomScene(string sceneId)
     {

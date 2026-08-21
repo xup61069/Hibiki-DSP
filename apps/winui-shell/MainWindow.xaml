@@ -211,6 +211,69 @@
                                     AutomationProperties.Name="套用選取 App 路由" />
                         </StackPanel>
 
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="App 路由預設（Expert）" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock Text="建立後會保存到本機；只有 App 清單已同步且引擎回覆 Ack，才會顯示為已套用。App ID 或顯示名稱至少填一項。"
+                                       TextWrapping="Wrap" Opacity="0.72" />
+                            <controls:ItemsRepeater ItemsSource="{Binding RouteRules}">
+                                <controls:ItemsRepeater.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Padding="4" ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Summary}" TextWrapping="Wrap"
+                                                       AutomationProperties.Name="App 路由預設摘要" />
+                                            <Button Grid.Column="1" Content="移除" Tag="{Binding RuleId}"
+                                                    Click="OnRemoveRouteRuleClick"
+                                                    AutomationProperties.Name="移除 App 路由預設" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </controls:ItemsRepeater.ItemTemplate>
+                            </controls:ItemsRepeater>
+                            <TextBox Header="預設 ID（小寫英文／數字／- _ .）"
+                                     Text="{Binding RouteRuleId, Mode=TwoWay}"
+                                     AutomationProperties.Name="App 路由預設 ID" />
+                            <TextBox Header="App ID（例如 game.exe，可留空）"
+                                     Text="{Binding RouteRuleAppId, Mode=TwoWay}"
+                                     AutomationProperties.Name="App 路由預設 App ID" />
+                            <TextBox Header="顯示名稱（可留空）"
+                                     Text="{Binding RouteRuleDisplayName, Mode=TwoWay}"
+                                     AutomationProperties.Name="App 路由預設顯示名稱" />
+                            <TextBox Header="Lane ID" Text="{Binding RouteRuleLaneId, Mode=TwoWay}"
+                                     AutomationProperties.Name="App 路由預設 Lane ID" />
+                            <TextBox Header="Output Group（main／low-latency／surround）"
+                                     Text="{Binding RouteRuleOutputGroup, Mode=TwoWay}"
+                                     AutomationProperties.Name="App 路由預設 Output Group" />
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <controls:NumberBox Header="優先級" Value="{Binding RouteRulePriority, Mode=TwoWay}"
+                                                    SpinButtonPlacementMode="Compact"
+                                                    AutomationProperties.Name="App 路由預設優先級" />
+                                <controls:NumberBox Grid.Column="1" Header="補償增益 dB" Value="{Binding RouteRuleMakeupGainDb, Mode=TwoWay}"
+                                                    SpinButtonPlacementMode="Compact"
+                                                    AutomationProperties.Name="App 路由預設補償增益" />
+                            </Grid>
+                            <Grid ColumnSpacing="10">
+                                <CheckBox Content="啟用預設" IsChecked="{Binding RouteRuleEnabled, Mode=TwoWay}"
+                                          AutomationProperties.Name="啟用 App 路由預設" />
+                                <ComboBox Grid.Column="1" Header="增益控制者"
+                                          ItemsSource="{Binding RouteRuleGainOwners}"
+                                          SelectedItem="{Binding RouteRuleGainOwner, Mode=TwoWay}"
+                                          AutomationProperties.Name="App 路由預設增益控制者" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="新增／更新預設" Click="OnApplyRouteRuleClick"
+                                        AutomationProperties.Name="新增或更新 App 路由預設" />
+                                <Button Content="清除全部預設" Click="OnClearRouteRulesClick"
+                                        AutomationProperties.Name="清除全部 App 路由預設" />
+                            </StackPanel>
+                        </StackPanel>
+
                         <StackPanel Spacing="6">
                             <TextBlock Text="Matrix" FontSize="18" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding Expert.MatrixSummary}" Opacity="0.72" />

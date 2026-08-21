@@ -263,6 +263,7 @@ public sealed record EnhanceResult(
 public sealed class EasyControlSession
 {
     public CustomSceneCatalogV1 CustomScenes { get; } = new();
+    public SessionRouteRuleCatalogV1 RouteRules { get; } = new();
     public PhysicalDeviceCatalogV1 PhysicalDevices { get; } = new();
     public DeviceSwitchModel DeviceSwitch { get; } = new();
     public UiMode Mode { get; private set; } = UiMode.Easy;

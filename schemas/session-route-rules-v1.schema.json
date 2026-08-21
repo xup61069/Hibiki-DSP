@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.invalid/schema/session-route-rules-v1.schema.json",
+  "title": "Hibiki Session Route Rules v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "rules"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "rules": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rule_id", "priority", "enabled", "gain_owner", "makeup_gain_db", "app_id", "display_name", "lane_id", "output_group"],
+        "properties": {
+          "rule_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "priority": { "type": "integer", "minimum": -1000000, "maximum": 1000000 },
+          "enabled": { "type": "boolean" },
+          "gain_owner": { "enum": [0, 1] },
+          "makeup_gain_db": { "type": "number", "minimum": -144, "maximum": 12 },
+          "app_id": { "type": "string", "maxLength": 128 },
+          "display_name": { "type": "string", "maxLength": 128 },
+          "lane_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "output_group": { "type": "string", "minLength": 1, "maxLength": 64 }
+        }
+      }
+    }
+  }
+}

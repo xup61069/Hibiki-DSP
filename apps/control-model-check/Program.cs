@@ -60,6 +60,42 @@ finally
 {
     if (File.Exists(customScenePath)) File.Delete(customScenePath);
 }
+var routeRules = new SessionRouteRuleCatalogV1();
+var quietRule = new SessionRouteRuleCard(
+    "quiet-game", 20, true, SessionRouteRuleGainOwnerV1.WindowsSession, 3.5,
+    "game.exe", "DJMAX", "game", "surround");
+Check(routeRules.Upsert(quietRule) && routeRules.Count == 1 &&
+      routeRules.Rules[0].Summary.Contains("DJMAX") &&
+      routeRules.Rules[0].Summary.Contains("surround"),
+    "Session route rule catalog insert failed.");
+Check(routeRules.Upsert(quietRule with { Priority = 40 }) && routeRules.Count == 1 &&
+      routeRules.Rules[0].Priority == 40 &&
+      !routeRules.Upsert(quietRule with { RuleId = "Bad ID" }) &&
+      !routeRules.Upsert(quietRule with { AppId = "", DisplayName = "" }) &&
+      !routeRules.Upsert(quietRule with { LaneId = "" }),
+    "Session route rule catalog validation/update failed.");
+var routeRulePath = Path.Combine(Path.GetTempPath(),
+    $"hibiki-route-rule-check-{Guid.NewGuid():N}.json");
+try
+{
+    Check(routeRules.TrySave(routeRulePath, out _),
+        "Session route rule catalog save failed.");
+    var loadedRules = new SessionRouteRuleCatalogV1();
+    Check(loadedRules.TryLoad(routeRulePath, out _) && loadedRules.Count == 1 &&
+          loadedRules.Rules[0].Priority == 40,
+        "Session route rule catalog load failed.");
+    File.WriteAllText(routeRulePath,
+        "{\"schema_version\":1,\"rules\":[{\"rule_id\":\"Bad ID\",\"priority\":0,\"enabled\":true,\"gain_owner\":0,\"makeup_gain_db\":0,\"app_id\":\"x.exe\",\"display_name\":\"\",\"lane_id\":\"game\",\"output_group\":\"main\"}]}");
+    Check(!loadedRules.TryLoad(routeRulePath, out _) && loadedRules.Count == 1 &&
+          loadedRules.Rules[0].RuleId == "quiet-game",
+        "Invalid route rule load must preserve the previous catalog.");
+    Check(routeRules.Remove("quiet-game") && routeRules.Count == 0,
+        "Session route rule catalog removal failed.");
+}
+finally
+{
+    if (File.Exists(routeRulePath)) File.Delete(routeRulePath);
+}
 Check(OutputGroupCatalog.Fixed.Count == 3 &&
       OutputGroupCatalog.Fixed.Select(group => group.Id).SequenceEqual(
           ["main", "low-latency", "surround"]),
@@ -355,6 +391,19 @@ Check(!viewModel.SelectSession(staleHandle),
 Check(viewModel.BuildSessionRouteCommand(sessionEntries[0].Handle, "game", "surround").Type ==
           ControlMessageType.SessionRouteCommand,
     "ViewModel App session route command failed to bind the current handle.");
+var viewModelRule = new SessionRouteRuleCard(
+    "quiet-game", 20, true, SessionRouteRuleGainOwnerV1.WindowsSession, 3.5,
+    "game.exe", "DJMAX", "game", "surround");
+var viewModelRuleCommand = viewModel.BuildUpsertSessionRouteRuleCommand(viewModelRule);
+Check(viewModelRuleCommand.Type == ControlMessageType.SessionRouteRuleCommand &&
+      ControlPayloadsV1.TryDecodeSessionRouteRuleCommand(viewModelRuleCommand.Payload.Span,
+          out var decodedViewModelRule) && decodedViewModelRule is not null &&
+      decodedViewModelRule.RuleId == "quiet-game" &&
+      decodedViewModelRule.CatalogSequence == 12UL &&
+      decodedViewModelRule.OutputGroup == "surround",
+    "ViewModel App route-rule command failed to bind the current catalog sequence.");
+Check(!await viewModel.ApplyRemoveRouteRuleAsync("missing-rule"),
+    "Unknown disconnected route-rule removal must fail closed.");
 viewModel.SessionRouteLaneId = "game";
 viewModel.SessionRouteOutputGroup = "surround";
 Check(viewModel.HasSelectedSession && !await viewModel.ApplySelectedSessionRouteAsync(),

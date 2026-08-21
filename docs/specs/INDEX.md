@@ -25,6 +25,7 @@
 | SPEC-0021 | accepted | 以暫時 handle 套用 per-App lane/output route 的 graph boundary |
 | SPEC-0022 | accepted | Session volume/route 命令的固定容量 COM worker 佇列 |
 | SPEC-0023 | accepted | per-App 路由規則命令與候選交易 |
+| SPEC-0024 | accepted | Expert per-App 路由預設 catalog、保存與 UI |
 
 Draft spec 有 blocking open question 時不得直接實作；公開行為變更必須在同一 PR
 更新 spec 與測試。
