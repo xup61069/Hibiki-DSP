@@ -105,8 +105,12 @@ points，將 normalized `[0,1]` 值轉成官方 `IParameterChanges`；非法 off
 會在交給 plugin 前拒絕。`ProcessBlockWithParameters` 已由 frame codec 與 optional SDK
 worker 解碼並交給 adapter。`Vst3ParameterTimelineV1` 現在提供最多 256 個已排序事件的
 control-plane snapshot、穩定 sample-position block extraction 與 worker point conversion；
-它可持久化為 `vst3-parameter-timeline-v1.schema.json`，但 supervisor 的 UI 編輯器、跨版本
-plugin state persistence 與完整自動化排程仍未接入，因此不能宣稱完整 host automation。
+它可持久化為 `vst3-parameter-timeline-v1.schema.json`。`Vst3TimelineEditorV1` 現在提供
+supervisor 端 bounded 編輯交易：draft 變更不影響已發布 snapshot，同一
+(parameter_id, sample_position) 的 upsert 以取代而非重複呈現，commit 只在通過既有
+timeline 驗證後才交換已發布 snapshot，discard 直接還原；這是 headless 控制面契約，
+supervisor 的 UI 編輯器、跨版本 plugin state persistence 與完整自動化排程仍未接入，
+因此不能宣稱完整 host automation。
 
 `LatencyAlignmentPlanV1` 會在 control plane 取所有 active lane 的 reported latency，將每個
 lane 的補償量設為 `maximum_latency - lane_latency`，上限 16,384 samples。
