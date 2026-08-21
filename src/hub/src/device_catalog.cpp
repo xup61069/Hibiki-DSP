@@ -172,4 +172,9 @@ const PhysicalDeviceDescriptorV1* PhysicalDeviceCatalogV1::default_device(
     return nullptr;
 }
 
+void PhysicalDeviceCatalogV1::swap(PhysicalDeviceCatalogV1& other) noexcept {
+    entries_.swap(other.entries_);
+    std::swap(size_, other.size_);
+}
+
 }  // namespace hibiki

@@ -22,7 +22,7 @@ source_globs: ["apps/control-model/**", "apps/winui-shell/**"]
 In：WinUI 3 視窗、Easy/Expert 顯示、固定輸出群組卡片、場景卡片、實體裝置目錄鏡像與
 DeviceSwitch request、Windows 音量與 IR 相位滑桿、Expert 的 Matrix／DSP Graph／VST3
 隔離／校正唯讀摘要、版本化 named-pipe Hello／SceneApply／VolumeNotification／DeviceSwitch
-命令、連線失敗回復；音量拖曳使用 40 ms bounded debounce 與 command serialization，
+／DeviceCatalogRequest／DeviceCatalogSnapshot 命令、連線失敗回復；音量拖曳使用 40 ms bounded debounce 與 command serialization，
 只送出最新的控制值。
 
 Out：WaveRT/PortCls 驅動、實體裝置枚舉、音訊處理、VST3 UI、校正量測與
@@ -42,6 +42,8 @@ versioned IPC，Hello 成功後才可送出 SceneApply 或 VolumeNotification。
 Active render/capture 裝置，不自行枚舉或捏造裝置。可選 render 卡片以
 `ControlMessageType.DeviceSwitch` 發送固定 288-byte request，帶 endpoint identity、格式
 與 catalog sequence；在引擎 Ack 前 UI 只顯示 Preparing/Fading，不宣稱已同步。
+`RefreshPhysicalDevicesAsync` 送出空 payload 的 `DeviceCatalogRequest`，只接受帶相同 request
+ID 的 `DeviceCatalogSnapshot` 回覆；錯誤、逾時或過期快照會保留上一份 picker 狀態。
 
 `DeviceSwitchModel` 的控制面狀態固定為 `Preparing → Fading → ReadyToCommit → Synced`；
 未完成暖機或 crossfade 時 `Commit` 必須失敗，Rollback 保留上一個 active device。實際

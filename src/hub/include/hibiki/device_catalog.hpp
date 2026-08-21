@@ -90,6 +90,11 @@ public:
         return entries_;
     }
 
+    // Control-plane transaction primitive. Both catalogs remain valid and the
+    // swap is non-throwing, so a worker can publish a complete candidate
+    // without exposing a partially enumerated list.
+    void swap(PhysicalDeviceCatalogV1& other) noexcept;
+
 private:
     [[nodiscard]] std::size_t index_of(const std::string& endpoint_id) const noexcept;
     void clear_defaults(PhysicalDeviceFlowV1 flow,

@@ -21,11 +21,12 @@ Windows worker 從 `IMMNotificationClient`／WASAPI 枚舉到的實體 endpoint�
 
 In：最多 32 個 render/capture endpoint、穩定 endpoint ID、顯示名稱、LPCM 聲道／取樣率／
 buffer 能力、Active／Disabled／Unplugged／Unknown 狀態、每個 flow 唯一 default、單調
-事件 sequence、可選取判定與 bounded remove/upsert，以及引擎到 UI 的版本化 catalog snapshot。
+事件 sequence、可選取判定與 bounded remove/upsert、worker-owned Windows COM enumeration，
+以及引擎到 UI 的版本化 catalog snapshot。
 
-Out：COM 枚舉、PortCls／WaveRT driver、WASAPI worker 啟動、實體硬體能力測量與 UI 顯示。
-那些元件只能透過 catalog 的 descriptor 與 `DeviceSwitchTransaction` 交接；本契約不宣稱
-已完成可載入 driver 或真實裝置 soak test。
+Out：PortCls／WaveRT driver、WASAPI worker 啟動、實體硬體能力測量與 UI 顯示。COM
+enumerator 的 source adapter 已存在，但只能在 worker-owned、COM-initialized thread 執行；
+本契約不宣稱已完成可載入 driver、目標 Windows/WDK 驗證或真實裝置 soak test。
 
 ## 介面與資料流
 
@@ -39,10 +40,15 @@ sequence 以單調規則更新；較舊的 descriptor／狀態事件直接拒絕
 WinUI／engine 的 `DeviceSwitch` request 使用 `schemas/device-switch-request-v1.schema.json`
 描述的欄位，再以 288-byte IPC payload 傳輸；UI 只有在 catalog entry 為 Active render 時
 才產生 request，engine 未回 ACK 前不顯示已同步。
+UI 可送出空 payload 的 `DeviceCatalogRequest` 取得當前快照；control service 只有在註冊
+snapshot provider 時才回傳 `DeviceCatalogSnapshot`，否則回 Error，避免把空目錄誤報為成功。
 引擎提供的 `DeviceCatalogSnapshot` v1 使用固定 16-byte header 與每筆 416-byte wire entry
 （最多 32 筆），由 control worker 產生；C# 端必須驗證 reserved bytes、UTF-8、格式、重複
 身份、default 互斥與 catalog sequence，通過後才以 atomic replace 更新 picker。快照過期或
 格式錯誤時保留上一份目錄，不得清空或捏造裝置。
+`WindowsPhysicalDeviceCatalogWorker` 在刷新時先建立 candidate catalog，再一次產生 snapshot
+並提交 catalog／sequence；任一 flow、ID、friendly name、mix format、device period 或
+publisher 驗證失敗，都保留上一份狀態並回傳 HRESULT。通知 callback 不得直接呼叫此 worker。
 
 只有 `Active` endpoint 才能 `selectable` 或 `mark_default`。進入 Disabled／Unplugged／
 Unknown 時，catalog 清除 default；切換 worker 必須回到上一個已同步 endpoint，或使用
@@ -65,7 +71,8 @@ safe-start／Degraded，而不是重試到 100% 音量。
 1. CTest 覆蓋 render default 互斥、capture／render 分流、拔除後不可選、亂序 sequence、
    非法 descriptor、移除、容量邊界、snapshot wire round-trip／reserved rejection，以及
    recovery 不得 rebind 到不可選 endpoint。
-2. Windows adapter 將 watcher snapshot 套入 catalog 時，不在 callback 配置、等待或
-   釋放 COM；真實 hotplug／Audio Service restart／WASAPI soak 仍由 driver release gate 驗證。
+2. Windows adapter 將 watcher snapshot 交給 worker 時，不在 callback 配置、等待或釋放 COM；
+   worker 的 COM enumeration／candidate rollback／snapshot publisher 有 source boundary，
+   真實 hotplug／Audio Service restart／WASAPI soak 仍由 driver release gate 驗證。
 3. 跨 AI handoff 必須記錄 catalog contract 的 source commit；不得提交真實私人 endpoint
    ID 或顯示名稱到 repository。

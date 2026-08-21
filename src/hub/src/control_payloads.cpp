@@ -413,6 +413,7 @@ bool decode_control_command_v1(const IpcFrameV1& frame,
         case IpcMessageType::Hello:
         case IpcMessageType::GraphCommit:
         case IpcMessageType::GraphRollback:
+        case IpcMessageType::DeviceCatalogRequest:
             return frame.payload.empty();
         case IpcMessageType::VolumeNotification:
             if (frame.payload.size() == kVolumeNotificationPayloadBytesV1) {

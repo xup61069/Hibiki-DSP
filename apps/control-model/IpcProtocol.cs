@@ -19,7 +19,8 @@ public enum ControlMessageType : ushort
     Error = 7,
     SceneApply = 8,
     DeviceSwitch = 9,
-    DeviceCatalogSnapshot = 10
+    DeviceCatalogSnapshot = 10,
+    DeviceCatalogRequest = 11
 }
 
 public enum IpcDecodeError
@@ -116,7 +117,7 @@ public static class IpcCodecV1
         ControlMessageType.GraphPrepare or ControlMessageType.GraphCommit or
         ControlMessageType.GraphRollback or ControlMessageType.Ack or ControlMessageType.Error or
         ControlMessageType.SceneApply or ControlMessageType.DeviceSwitch or
-        ControlMessageType.DeviceCatalogSnapshot;
+        ControlMessageType.DeviceCatalogSnapshot or ControlMessageType.DeviceCatalogRequest;
 }
 
 public static class ControlPayloadsV1
@@ -450,7 +451,9 @@ public sealed class IpcRequestSession
 
     public static bool IsReplyTo(IpcEnvelopeV1 request, IpcEnvelopeV1 reply) =>
         request.RequestId != 0 && request.RequestId == reply.RequestId &&
-        reply.Type is ControlMessageType.Ack or ControlMessageType.Error;
+        (reply.Type is ControlMessageType.Ack or ControlMessageType.Error ||
+         request.Type == ControlMessageType.DeviceCatalogRequest &&
+         reply.Type == ControlMessageType.DeviceCatalogSnapshot);
 }
 
 public sealed class ControlCommandFactoryV1
@@ -480,6 +483,9 @@ public sealed class ControlCommandFactoryV1
             ControlPayloadsV1.EncodeDeviceSwitch(device.EndpointId, device.Channels,
                                                  device.SampleRate, device.BufferFrames,
                                                  device.LastSequence));
+
+    public IpcEnvelopeV1 RequestDeviceCatalog() =>
+        _requests.Create(ControlMessageType.DeviceCatalogRequest);
 }
 
 // Thin asynchronous client for the control worker. It owns no UI state and

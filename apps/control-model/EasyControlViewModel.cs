@@ -302,6 +302,44 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         return true;
     }
 
+    public async Task<bool> RefreshPhysicalDevicesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_controlClient is null || !_controlClient.IsConnected)
+        {
+            StatusText = "引擎未連線；無法更新裝置清單";
+            return false;
+        }
+        try
+        {
+            var reply = await _controlClient.RoundTripAsync(_commands.RequestDeviceCatalog(),
+                                                             cancellationToken)
+                .ConfigureAwait(true);
+            var snapshotError = string.Empty;
+            var applied = reply.Type == ControlMessageType.DeviceCatalogSnapshot &&
+                          ApplyPhysicalDeviceSnapshot(reply, out snapshotError);
+            if (!applied)
+            {
+                StatusText = reply.Type == ControlMessageType.Error
+                    ? "引擎拒絕裝置清單要求"
+                    : $"裝置清單無效：{snapshotError}";
+                return false;
+            }
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "裝置清單更新已取消";
+            return false;
+        }
+        catch (Exception)
+        {
+            SetConnectionState(ControlConnectionState.Degraded);
+            StatusText = "裝置清單更新失敗；保留上一個安全輸出";
+            return false;
+        }
+    }
+
     public bool SelectPhysicalDevice(string endpointId)
     {
         if (!_session.PhysicalDevices.TryGet(endpointId, out var device) || device is null ||

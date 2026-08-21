@@ -134,9 +134,17 @@ Check(ControlPayloadsV1.TryDecodeGroupedVolumeNotification(groupedVolumeCommand.
       groupedOutput == "movie" && Math.Abs(groupedDb + 9.0) < 1e-6 && !groupedMute &&
       groupedGeneration == 10UL,
     "Grouped volume payload did not round-trip with the v1 contract.");
+var catalogRequest = commandFactory.RequestDeviceCatalog();
+Check(catalogRequest.Type == ControlMessageType.DeviceCatalogRequest &&
+      catalogRequest.Payload.IsEmpty,
+    "Device catalog request must use an empty v1 payload.");
 Check(IpcRequestSession.IsReplyTo(volumeCommand,
         new IpcEnvelopeV1(ControlMessageType.Ack, volumeCommand.RequestId, ReadOnlyMemory<byte>.Empty)),
     "Control command request correlation failed.");
+Check(IpcRequestSession.IsReplyTo(catalogRequest,
+        new IpcEnvelopeV1(ControlMessageType.DeviceCatalogSnapshot, catalogRequest.RequestId,
+                          ReadOnlyMemory<byte>.Empty)),
+    "Device catalog snapshot reply correlation failed.");
 var viewModel = new EasyControlViewModel { SelectedOutputGroup = " main " };
 Check(viewModel.ConnectionState == ControlConnectionState.Disconnected &&
       !viewModel.IsConnected && !viewModel.IsBusy,

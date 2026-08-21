@@ -44,7 +44,8 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   與 uint64 generation；C++ `control_payloads.hpp` 與 C# `ControlPayloadsV1` 必須保持相同
   little-endian bytes，超出 -144..12 dB 或 reserved 非零一律拒絕。
 - C++ `decode_control_command_v1` 只接受 Hello、VolumeNotification、GraphCommit 與
-  GraphRollback、SceneApply、DeviceSwitch request；Ack/Error 只能作 response，未知或 GraphPrepare 未定義
+  GraphRollback、SceneApply、DeviceSwitch、DeviceCatalogRequest request；Ack/Error 與
+  DeviceCatalogSnapshot 只能作 response，未知或 GraphPrepare 未定義
   payload 一律回 Error，避免 UI 任意注入未驗證 graph。SceneApply payload 固定 64 bytes，
   以兩段 length-prefixed printable UTF-8（scene ID、output group）及 zero padding 表示。
 - `handle_control_frame_v1` 是 pipe worker 到 host control queue 的唯一 typed adapter；sink
@@ -62,7 +63,9 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   handler 或 payload／catalog 驗證失敗時 fail-closed，不會假裝裝置已切換。
 - `DeviceCatalogSnapshot` v1 是 engine → UI 的 bounded response/broadcast：16-byte header、
   每筆 416-byte entry、最多 32 筆；它不是 audio command，C++ command decoder 不會把它
-  排入 RT queue。UI worker 必須驗證 snapshot 後 atomic replace catalog，過期快照保留舊值。
+  排入 RT queue。UI 可送出空 payload 的 `DeviceCatalogRequest`，control service 由明確
+  snapshot-reply provider 回傳 snapshot；沒有 provider 時回 Error。UI worker 必須驗證
+  snapshot 後 atomic replace catalog，過期快照保留舊值。
 - `EngineControlWorkerV1::set_scene_preflight` 可注入一個 control-plane-only gate，讓 VST3
   state coordinator、校正資料或安全策略在 graph Prepare 前驗證；gate 失敗會保留既有
   Scene、revision 與 active graph，不會部分套用。

@@ -15,6 +15,17 @@ bool handle_control_frame_v1(const IpcFrameV1& request,
         response = make_error_frame_v1(request);
         return true;
     }
+    if (request.header.type == IpcMessageType::DeviceCatalogRequest) {
+        response = {};
+        if (handler->snapshot_reply == nullptr ||
+            !handler->snapshot_reply(response, handler->snapshot_context) ||
+            response.header.type != IpcMessageType::DeviceCatalogSnapshot) {
+            response = make_error_frame_v1(request);
+        } else {
+            response.header.request_id = request.header.request_id;
+        }
+        return true;
+    }
     response = make_ack_frame_v1(request);
     return true;
 }

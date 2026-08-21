@@ -60,6 +60,7 @@ extern "C" {
 #include <windows.h>
 #include "hibiki/windows_volume_broker.hpp"
 #include "hibiki/windows_device_watcher.hpp"
+#include "hibiki/windows_device_catalog.hpp"
 #include "hibiki/windows_audio_session_watcher.hpp"
 #include "hibiki/windows_wasapi_output.hpp"
 #include "hibiki/windows_wasapi_handoff.hpp"
@@ -103,6 +104,35 @@ bool accept_control_command(const hibiki::ControlCommandV1& command, void* conte
     auto* accepted = static_cast<bool*>(context);
     *accepted = command.type == hibiki::IpcMessageType::SceneApply;
     return *accepted;
+}
+
+bool accept_catalog_request(const hibiki::ControlCommandV1& command, void* context) noexcept {
+    if (context == nullptr) return false;
+    auto* accepted = static_cast<bool*>(context);
+    *accepted = command.type == hibiki::IpcMessageType::DeviceCatalogRequest;
+    return *accepted;
+}
+
+struct SnapshotReplyContext {
+    const std::uint8_t* payload{nullptr};
+    std::size_t payload_bytes{0U};
+};
+
+bool provide_catalog_snapshot(hibiki::IpcFrameV1& response, void* context) noexcept {
+    if (context == nullptr) return false;
+    const auto* source = static_cast<const SnapshotReplyContext*>(context);
+    if (source->payload == nullptr || source->payload_bytes == 0U ||
+        source->payload_bytes > hibiki::kDeviceCatalogSnapshotPayloadBytesV1) {
+        return false;
+    }
+    try {
+        response.header.type = hibiki::IpcMessageType::DeviceCatalogSnapshot;
+        response.payload.assign(source->payload, source->payload + source->payload_bytes);
+        return true;
+    } catch (...) {
+        response = {};
+        return false;
+    }
 }
 
 bool allow_scene_preflight(const hibiki::SceneProfileV1&, void* context) noexcept {
@@ -927,6 +957,27 @@ int main() {
     CHECK(handle_control_frame_v1(scene_frame, service_response, &service_context) &&
           command_accepted && service_response.header.type == IpcMessageType::Ack &&
           service_response.header.request_id == scene_frame.header.request_id);
+    bool catalog_request_accepted = false;
+    SnapshotReplyContext snapshot_reply_context{snapshot_payload.data(), snapshot_bytes};
+    ControlPlaneHandlerContextV1 catalog_service_context{
+        accept_catalog_request, &catalog_request_accepted, provide_catalog_snapshot,
+        &snapshot_reply_context};
+    IpcFrameV1 catalog_request;
+    catalog_request.header.type = IpcMessageType::DeviceCatalogRequest;
+    catalog_request.header.request_id = 777U;
+    IpcFrameV1 catalog_response;
+    CHECK(handle_control_frame_v1(catalog_request, catalog_response,
+                                  &catalog_service_context) &&
+          catalog_request_accepted &&
+          catalog_response.header.type == IpcMessageType::DeviceCatalogSnapshot &&
+          catalog_response.header.request_id == 777U &&
+          catalog_response.payload.size() == snapshot_bytes);
+    ControlPlaneHandlerContextV1 no_snapshot_service_context{
+        accept_catalog_request, &catalog_request_accepted, nullptr, nullptr};
+    CHECK(handle_control_frame_v1(catalog_request, catalog_response,
+                                  &no_snapshot_service_context) &&
+          catalog_response.header.type == IpcMessageType::Error &&
+          catalog_response.header.request_id == 777U);
 
     auto scene_catalog = std::make_unique<SceneCatalogV1>();
     auto custom_defaults = make_easy_scene(EasySceneKind::Movie, "custom-output");
@@ -1945,6 +1996,22 @@ int main() {
     CHECK(device_change.kind == WindowsDeviceChangeKind::DefaultChanged &&
           device_change.flow == eRender && device_change.endpoint_id[0] == L'h');
     CHECK(watcher->Release() == 0U);
+    WindowsPhysicalDeviceCatalogWorker catalog_worker;
+    PhysicalDeviceCatalogV1 worker_catalog;
+    std::uint64_t worker_sequence = 0U;
+    std::array<std::uint8_t, kDeviceCatalogSnapshotPayloadBytesV1> worker_payload{};
+    std::size_t worker_payload_bytes = 99U;
+    CHECK(catalog_worker.bind(nullptr) == E_INVALIDARG &&
+          catalog_worker.refresh(worker_catalog, worker_sequence) == E_UNEXPECTED &&
+          catalog_worker.refresh_snapshot(worker_catalog, worker_sequence, worker_payload,
+                                          worker_payload_bytes) == E_UNEXPECTED &&
+          worker_payload_bytes == 0U && worker_catalog.size() == 0U);
+    WindowsPhysicalDeviceCatalogCoordinator catalog_coordinator;
+    CHECK(catalog_coordinator.bind(nullptr) == E_INVALIDARG &&
+          catalog_coordinator.refresh_now(worker_catalog, worker_sequence, worker_payload,
+                                          worker_payload_bytes) == E_UNEXPECTED &&
+          catalog_coordinator.poll_and_refresh(worker_catalog, worker_sequence, worker_payload,
+                                               worker_payload_bytes) == E_UNEXPECTED);
     auto* session_watcher = new WindowsAudioSessionWatcher();
     std::uint64_t session_sequence = 0;
     CHECK(!session_watcher->poll(session_sequence));

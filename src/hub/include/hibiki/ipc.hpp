@@ -25,6 +25,7 @@ enum class IpcMessageType : std::uint16_t {
     SceneApply = 8,
     DeviceSwitch = 9,
     DeviceCatalogSnapshot = 10,
+    DeviceCatalogRequest = 11,
 };
 
 struct IpcHeaderV1 {

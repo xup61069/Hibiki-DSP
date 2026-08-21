@@ -13,10 +13,14 @@ namespace hibiki {
 
 using ControlCommandSinkV1 = bool (*)(const ControlCommandV1& command,
                                       void* context) noexcept;
+using DeviceCatalogSnapshotReplyV1 = bool (*)(IpcFrameV1& response,
+                                              void* context) noexcept;
 
 struct ControlPlaneHandlerContextV1 {
     ControlCommandSinkV1 sink{nullptr};
     void* sink_context{nullptr};
+    DeviceCatalogSnapshotReplyV1 snapshot_reply{nullptr};
+    void* snapshot_context{nullptr};
 };
 
 // Single-producer (pipe worker), single-consumer (control worker) queue. The
