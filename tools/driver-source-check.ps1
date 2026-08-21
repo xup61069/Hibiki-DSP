@@ -9,10 +9,11 @@ $topologySource = Join-Path $repo 'driver/src/endpoint_topology.c'
 $streamHeader = Join-Path $repo 'driver/include/hibiki/wavert_stream_v1.h'
 $streamSource = Join-Path $repo 'driver/src/wavert_stream.c'
 $streamAdapter = Join-Path $repo 'driver/wdk/hibiki_stream_adapter.cpp'
+$propertyAdapter = Join-Path $repo 'driver/wdk/hibiki_property_adapter.cpp'
 $readme = Join-Path $repo 'driver/wdk/README.md'
 $inf = Join-Path $repo 'driver/inf/HibikiVirtualAudio.inf'
 $infReadme = Join-Path $repo 'driver/inf/README.md'
-foreach ($path in @($adapter, $topologyHeader, $topologySource, $streamHeader, $streamSource, $streamAdapter, $readme, $inf, $infReadme)) {
+foreach ($path in @($adapter, $topologyHeader, $topologySource, $streamHeader, $streamSource, $streamAdapter, $propertyAdapter, $readme, $inf, $infReadme)) {
     if (-not (Test-Path -LiteralPath $path)) { throw "Missing WDK source boundary: $path" }
 }
 $source = Get-Content -LiteralPath $adapter -Raw
@@ -45,11 +46,21 @@ if ($stream -match '(?i)malloc|calloc|realloc|free|CreateThread|KeWaitFor') {
 }
 $adapterSource = Get-Content -LiteralPath $streamAdapter -Raw
 foreach ($required in @('KeAcquireSpinLock', 'KeReleaseSpinLock', 'HibikiWaveRtPinSubmitRenderV1',
-    'HibikiWaveRtPinReadRenderV1', 'hibiki_wavert_stream_pop_or_silence_v1')) {
+    'HibikiWaveRtPinReadRenderV1', 'HibikiWaveRtPinInitializeEndpointV1',
+    'HibikiWaveRtBuildFormatV1', 'KSDATAFORMAT_SUBTYPE_IEEE_FLOAT',
+    'hibiki_wavert_stream_pop_or_silence_v1')) {
     if (-not $adapterSource.Contains($required)) { throw "WDK stream adapter missing required boundary: $required" }
 }
 if ($adapterSource -match '(?i)malloc|calloc|realloc|free|CreateThread|audio_engine|scene_graph|asio_bridge') {
     throw 'WDK stream adapter must remain non-allocating and independent from GPL user-space.'
+}
+$propertySource = Get-Content -LiteralPath $propertyAdapter -Raw
+foreach ($required in @('HibikiPropertyContextInitializeEndpointV1',
+    'hibiki_endpoint_topology_get_v1', 'hibiki_wavert_endpoint_state_init_v1')) {
+    if (-not $propertySource.Contains($required)) { throw "WDK property adapter missing endpoint initialization: $required" }
+}
+if ($propertySource -match '(?i)audio_engine|scene_graph|asio_bridge|malloc|calloc|realloc') {
+    throw 'WDK property adapter must remain independent from GPL user-space and allocation.'
 }
 $infSource = Get-Content -LiteralPath $inf -Raw
 foreach ($required in @('Root\HibikiDSP', 'HibikiVirtualAudio.sys', 'EndpointMainGuid', 'EndpointVirtualMicGuid', 'PnpLockdown=1')) {

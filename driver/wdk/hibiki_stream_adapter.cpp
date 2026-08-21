@@ -9,7 +9,9 @@
 #endif
 
 #include <ntddk.h>
+#include <ksmedia.h>
 
+#include "hibiki/endpoint_topology_v1.h"
 #include "hibiki/wavert_stream_v1.h"
 
 struct hibiki_wdk_stream_context_v1 {
@@ -35,6 +37,46 @@ extern "C" NTSTATUS HibikiWaveRtPinInitializeV1(
             sample_rate, frames_per_period, period_count) != HIBIKI_WAVERT_STREAM_OK_V1) {
         return STATUS_INVALID_PARAMETER;
     }
+    return STATUS_SUCCESS;
+}
+
+extern "C" NTSTATUS HibikiWaveRtPinInitializeEndpointV1(
+    _Out_ hibiki_wdk_stream_context_v1* context,
+    _In_reads_bytes_(storage_bytes) uint8_t* storage,
+    _In_ SIZE_T storage_bytes,
+    _In_ ULONG endpoint_index,
+    _In_ ULONG period_count) {
+    hibiki_endpoint_topology_v1 topology{};
+    if (hibiki_endpoint_topology_get_v1(endpoint_index, &topology) == 0 ||
+        topology.direction != HIBIKI_ENDPOINT_DIRECTION_RENDER_V1) {
+        return STATUS_INVALID_PARAMETER;
+    }
+    return HibikiWaveRtPinInitializeV1(
+        context, storage, storage_bytes, topology.channel_count, topology.sample_rate,
+        topology.frames_per_buffer, period_count);
+}
+
+extern "C" NTSTATUS HibikiWaveRtBuildFormatV1(
+    _In_ ULONG endpoint_index,
+    _Out_ WAVEFORMATEXTENSIBLE* format) {
+    if (format == nullptr) return STATUS_INVALID_PARAMETER;
+    hibiki_endpoint_topology_v1 topology{};
+    if (hibiki_endpoint_topology_get_v1(endpoint_index, &topology) == 0 ||
+        topology.direction != HIBIKI_ENDPOINT_DIRECTION_RENDER_V1 ||
+        topology.channel_mask > MAXULONG) {
+        return STATUS_INVALID_PARAMETER;
+    }
+    RtlZeroMemory(format, sizeof(*format));
+    format->Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
+    format->Format.nChannels = static_cast<WORD>(topology.channel_count);
+    format->Format.nSamplesPerSec = topology.sample_rate;
+    format->Format.wBitsPerSample = 32U;
+    format->Format.nBlockAlign = static_cast<WORD>(topology.channel_count * 4U);
+    format->Format.nAvgBytesPerSec = topology.sample_rate * format->Format.nBlockAlign;
+    format->Format.cbSize = sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX);
+    format->Samples.wValidBitsPerSample = 32U;
+    format->dwChannelMask = static_cast<DWORD>(topology.channel_mask);
+    format->SubFormat = KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
     return STATUS_SUCCESS;
 }
 
