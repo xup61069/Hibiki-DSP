@@ -49,6 +49,12 @@ ordering failure moves that lane to `Degraded`; Scene scheduling,
 back-pressure, state persistence and third-party certification remain explicit
 follow-up gates.
 
+`PluginHostModel` now exposes the host-model entry points for preparing,
+handshaking and processing that lane. Only the existing trusted/certified,
+same-layout descriptor can enter the session; a failed exchange detaches the
+lane and moves the host to `Quarantined`. This is still a source-level contract,
+not evidence of a signed driver or a certified third-party plug-in.
+
 `LatencyAlignmentPlanV1` and `FixedDelayLineV1` provide a bounded 16,384-sample
 alignment plan and fixed 8-channel delay primitive. They are tested separately
 from supervisor and graph lane commit, so plugin certification and full latency

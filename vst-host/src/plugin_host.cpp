@@ -3,6 +3,7 @@
 namespace hibiki {
 
 bool PluginHostModel::start(const PluginDescriptorV1& descriptor) {
+    worker_lane_.detach();
     if (descriptor.plugin_id.empty() || descriptor.input_channels == 0 ||
         descriptor.input_channels > 8 || descriptor.output_channels == 0 ||
         descriptor.output_channels > 8 || !descriptor.trusted ||
@@ -19,10 +20,12 @@ bool PluginHostModel::start(const PluginDescriptorV1& descriptor) {
 }
 
 void PluginHostModel::stop() noexcept {
+    worker_lane_.detach();
     state_ = PluginHostState::Disabled;
 }
 
 void PluginHostModel::report_crash() noexcept {
+    worker_lane_.detach();
     state_ = PluginHostState::Quarantined;
 }
 
@@ -57,6 +60,38 @@ bool PluginHostModel::process_passthrough(const float* const input,
         output[index] = input[index];
     }
     return true;
+}
+
+bool PluginHostModel::prepare_worker_session(
+    Vst3SandboxProcess& sandbox,
+    const double sample_rate,
+    const std::uint32_t max_block_frames) noexcept {
+    if (state_ != PluginHostState::Running) return false;
+    return worker_lane_.prepare(
+        sandbox,
+        Vst3WorkerLaneConfigV1{descriptor_.lane_token, descriptor_.output_channels,
+                               sample_rate, descriptor_.reported_latency_samples,
+                               max_block_frames});
+}
+
+Vst3WorkerExchangeResultV1 PluginHostModel::handshake_worker(
+    const std::uint64_t request_id) {
+    if (state_ != PluginHostState::Running) return Vst3WorkerExchangeResultV1::not_running;
+    const auto result = worker_lane_.handshake(request_id);
+    if (result != Vst3WorkerExchangeResultV1::ok) report_crash();
+    return result;
+}
+
+Vst3WorkerExchangeResultV1 PluginHostModel::process_worker_block(
+    const std::uint64_t request_id,
+    const std::uint64_t block_start,
+    const std::uint32_t frames,
+    const std::span<const float> input,
+    const std::span<float> output) {
+    if (state_ != PluginHostState::Running) return Vst3WorkerExchangeResultV1::not_running;
+    const auto result = worker_lane_.process_block(request_id, block_start, frames, input, output);
+    if (result != Vst3WorkerExchangeResultV1::ok) report_crash();
+    return result;
 }
 
 }  // namespace hibiki

@@ -852,6 +852,14 @@ int main() {
     CHECK(sandbox.process_worker_block(1U, 2U, 2U, worker_exchange_input,
                                        worker_exchange_output) ==
           Vst3WorkerExchangeResultV1::not_running);
+    CHECK(plugin.start(PluginDescriptorV1{"builtin-test", 2, 2, 64, true, 250, true, 42U}) &&
+          plugin.prepare_worker_session(sandbox, 48000.0, 128U) &&
+          plugin.worker_lane_state() == Vst3WorkerLaneStateV1::Prepared &&
+          plugin.worker_latency_lane_input().lane_token == 42U &&
+          !plugin.worker_latency_lane_input().active);
+    CHECK(plugin.handshake_worker() == Vst3WorkerExchangeResultV1::not_running &&
+          plugin.state() == PluginHostState::Quarantined &&
+          plugin.worker_lane_state() == Vst3WorkerLaneStateV1::Detached);
 
     std::array<std::uint8_t, kVst3WorkerHeaderBytesV1 + 4U * sizeof(float)> worker_packet{};
     const Vst3WorkerFrameV1 worker_frame{Vst3WorkerMessageTypeV1::ProcessBlock, 17U, 2U, 2U,

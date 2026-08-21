@@ -65,6 +65,12 @@ protocol limit，SDK worker 才會把它轉成 `IParameterChanges`。
 session boundary，不是 RT graph plugin callback；Scene scheduler、back-pressure 與跨版本
 plugin state persistence 仍由更上層規格負責。
 
+`PluginHostModel` 的 `prepare_worker_session`、`handshake_worker` 與
+`process_worker_block` 是目前 host model 的接線點：只有 trusted/certified、same-channel、
+有 stable lane token 的 descriptor 才能建立 session；握手或 block exchange 失敗會沿用
+host 的 `Quarantined` 狀態並 detach lane。這仍是 source-level control contract，沒有把
+任何第三方 plugin binary、SDK checkout 或實體 endpoint 納入公開建置。
+
 `vst3_sdk_catalog.hpp` 提供 optional control-plane bridge，使用 `THIRD_PARTY.yml` 鎖定的
 Steinberg SDK 3.8.1 build 84 與 submodule commits，掃描 module factory class metadata。
 SDK checkout 由開發者在 `.local/` 提供，public monorepo 不 vendor SDK；catalog 不執行 plugin、
