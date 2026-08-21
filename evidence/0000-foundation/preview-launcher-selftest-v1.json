@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "issue": 74,
+  "scope_digest": "preview-launcher-selftest-v1",
+  "source_commit": "PENDING",
+  "environment_fingerprint": "windows-26200-amd64-powershell-5.1-dotnet-only-portable-pwsh-7.6.5-no-cmake-no-vs; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/run-preview.ps1 -SelfTest",
+    "pwsh -File tools/handoff-check.ps1 -Issue 74",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/run-preview.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "Auto resolution selects WinUICompat when a qualifying Windows App Runtime 1.7 x64 package exists",
+        "Auto resolution falls back to DesktopCompat without a qualifying package",
+        "explicit DesktopCompat resolves identically with and without the runtime",
+        "explicit WinUICompat passes when the runtime qualifies",
+        "explicit WinUICompat without the runtime fails closed with the actionable install-or-fallback message",
+        "runtime qualification boundary accepts versions >= 7000.456.1632.0 including exact equality",
+        "versions below the boundary are rejected",
+        "X86 architecture packages are ignored even with high versions",
+        "packages whose status is not Ok are ignored",
+        "multi-package lists fall back to later qualifying entries",
+        "empty or null package lists fail qualification",
+        "engine argument construction yields zero tokens when every opt-in flag is off",
+        "each single opt-in flag produces exactly its own token",
+        "all flags on produce the exact ordered token sequence --enable-system-volume --enable-session-routing --enable-wasapi-output"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 74 / tools/handoff-check.ps1 / tools/docs-check.ps1 / tools/source-policy.ps1 / tools/source-only-ci-check.ps1 / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 74",
+        "documentation gate with baseline summary counters refreshed after staging all slice files",
+        "tracked paths with no blocked binary or secret",
+        "source-only CI publication policy intact",
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Launcher process orchestration (Start-Process/Wait-Process/build invocation/cleanup) is intentionally outside SelfTest coverage; only pure decision functions are tested.",
+    "SelfTest fixtures share version constants and flag tokens with the production launcher; changes must update both together by design.",
+    "This slice adds no compiled-XAML, UI Automation, physical audio, driver/WaveRT, HLK, Microsoft signing, or release artifact claim.",
+    "Local machine cannot build the C++ engine or previews; launcher runtime behavior beyond decision logic must be exercised on capable machines."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5 portable"
+  },
+  "started_at": "2026-08-22T06:05:00+08:00",
+  "finished_at": "2026-08-22T06:15:00+08:00"
+}
