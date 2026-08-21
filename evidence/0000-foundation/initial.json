@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "issue": 0,
-  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-token-output-fanout-runtime-engine-boundary-exact-capacity-high-ratio-wavert-stream-wdk-adapter-driver-stream-bridge-v23",
-  "source_commit": "9f2ffad",
+  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-token-output-fanout-runtime-engine-boundary-exact-capacity-high-ratio-wavert-stream-wdk-adapter-driver-stream-bridge-graph-lane-v24",
+  "source_commit": "da4dd0f",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -42,6 +42,7 @@
     {"command": "tab-bridge-server", "status": "pass", "coverage": ["loopback-only bind source", "WebSocket handshake/frame parser source", "invalid-start contract"]},
     {"command": "driver-source-check", "status": "pass", "coverage": ["MS-PL scaffold", "source-only INF", "volume/mute dispatch", "fixed topology catalog", "portable WaveRT stream ring", "whole-block overrun rejection", "underrun silence fallback", "WDK spin-lock pin adapter", "render submit/read/reset", "no allocation/wait", "no GPL linkage"]},
     {"command": "driver-stream-packet-bridge", "status": "pass", "coverage": ["80-byte header ABI", "fixed render/capture packet framing", "exact packet length validation", "allocation-free C encode/payload view", "finite Float32 user-space decode", "caller-owned lane storage"], "compiled_artifacts": false},
+    {"command": "driver-stream-graph-binding", "status": "pass", "coverage": ["render-only gate", "sample-rate match", "active-lane channel match", "lane graph/Group Master path", "non-finite rejection"], "compiled_artifacts": false},
     {"command": "endpoint-topology-contract", "status": "pass", "coverage": ["four stable endpoint GUIDs", "direction and channel count", "Windows stereo/7.1 masks", "supported-rate flags", "buffer defaults"]},
     {"command": "asio-transport-contract", "status": "pass", "coverage": ["fixed-layout SPSC ring", "planar-to-interleaved transfer", "metadata and capacity validation", "no allocation in pop", "Windows mapping-to-engine graph and Group Master path"]},
     {"command": "asio-transport-native-build", "status": "pass", "coverage": ["ASIO callback publication", "named mapping attachment", "detached fallback"], "published_artifacts": false},
@@ -82,7 +83,7 @@
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",
   "limitations": [
-    "Evidence corresponds to commit 9f2ffad and the current environment only.",
+    "Evidence corresponds to commit da4dd0f and the current environment only.",
     "The native ASIO build is an unsigned local developer verification; no DLL or SDK checkout is committed or published.",
     "Current machine is Windows 22631 with VS 17/SDK 10.0.26100.0; it cannot provide driver-target evidence for the locked Windows 26100+/VS 2026/SDK-WDK 10.0.28000.2526 environment."
   ],
