@@ -286,9 +286,9 @@ ASIO transport/ring、tab/Virtual Mic lane adapter、session-route/output-handof
 working tree 與該 scope 是否一致。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 62 個必要入口與
-14 份 Spec 通過；`source-policy.ps1` 掃描 273 個路徑且無 blocked binary/secret；
+14 份 Spec 通過；`source-policy.ps1` 掃描 274 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
-`distribution-check.ps1` 與 `driver-source-check.ps1` 通過；38 個 JSON 檔案均可解析。以本機 pinned ASIO SDK
+`distribution-check.ps1` 與 `driver-source-check.ps1` 通過；31 個 repository JSON 檔案均可解析。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
 `.local/`，未提交或發布。以本機 pinned VST3 SDK 另行執行的 optional target
 `hibiki_vst3_sdk_catalog` 與 `hibiki_vst3_sdk_worker`（含 bounded one-main-bus processor、
@@ -296,4 +296,5 @@ parameter frame 與 `IParameterChanges` bridge）unsigned build 亦通過；輸�
 只在 `.local/`。`doctor.ps1 -CheckOnly` 明確顯示本機低於鎖定的 Windows/VS/WDK 版本，因此
 沒有把 driver、HLK、簽章、真實 endpoint 或第三方 plugin certification 結果誇大為已驗收。C++
 與 C# grouped-volume payload round-trip、legacy payload compatibility、selected group resolver
-及 custom Scene card mirror 亦已通過本機 contract/control-model checks。
+及 custom Scene card mirror 的 JSON save/load、atomic replace、malformed rollback 亦已通過本機
+contract/control-model checks。
