@@ -85,6 +85,11 @@ observation 只在 control/worker 邊界更新該 sink 的 ratio；audio-side pr
 只用於 prepare-time scratch；caller-owned capacity 則依每個 sink 當下 phase 與 source step
 精確 preflight。這是 user-space bounded runtime，仍不等於真實硬體 sink／clock soak 證據。
 
+`AudioEngineModel::prepare_wasapi_fanout` 與 `process_output_group_to_wasapi_fanout` 將上述
+physical sink fan-out 接到 graph：graph、Group Master 與 limiter 只執行一次，之後同一個
+interleaved block 交給每個 enabled WASAPI handoff。fan-out plan 無效、沒有 active graph、
+layout 不符或任一 sink degraded 時回傳失敗；這個 API 不會把部分 sink 成功轉成全域成功。
+
 `AudioEngineModel::process_output_group_fanout` 會先完成指定 output group 的 graph、Group
 Master ramp 與 limiter，再把同一個 graph block 交給 fan-out runtime；因此 caller 可在不複製
 graph 或重啟引擎的情況下，同時取得多個 sink 的獨立 SRC 結果。fan-out plan 的 output layout
