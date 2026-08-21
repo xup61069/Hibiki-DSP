@@ -50,7 +50,7 @@
       "status": "pass",
       "required_paths": 75,
       "specs": 24,
-      "scanned_paths": 324,
+      "scanned_paths": 328,
       "blocked_files": 0,
       "compiled_artifacts": false
     }
