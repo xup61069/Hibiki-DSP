@@ -18,6 +18,7 @@
 #include "hibiki/latency_compensation.hpp"
 #include "hibiki/latency_graph_commit.hpp"
 #include "hibiki/vst3_parameter_timeline.hpp"
+#include "hibiki/vst3_timeline_editor.hpp"
 #include "hibiki/vst3_worker_lane.hpp"
 #include "hibiki/vst3_scene_automation.hpp"
 #include "hibiki/vst3_scene_state.hpp"
@@ -2039,6 +2040,91 @@ int main() {
             timeline_parameter_capacity;
     }
     CHECK(!timeline_parameter_capacity && too_many_parameters.snapshot().event_count == 16U);
+    Vst3TimelineEditorV1 timeline_editor;
+    CHECK(timeline_editor.published().event_count == 0U &&
+          !timeline_editor.has_edit_session() && timeline_editor.draft() == nullptr);
+    CHECK(!timeline_editor.upsert(Vst3ParameterTimelineEventV1{1U, 0U, 0.5}) &&
+          !timeline_editor.remove_at(0U) &&
+          !timeline_editor.set_value_at(0U, 0.5));
+    CHECK(!timeline_editor.commit() && !timeline_editor.discard());
+    Vst3ParameterTimelineSnapshotV1 corrupt_editor_base{};
+    corrupt_editor_base.schema_version = 2U;
+    CHECK(!timeline_editor.reset(corrupt_editor_base) &&
+          timeline_editor.published().event_count == 0U);
+    CHECK(timeline_editor.begin_edit() &&
+          timeline_editor.upsert(Vst3ParameterTimelineEventV1{7U, 48003U, 0.75}) &&
+          timeline_editor.upsert(Vst3ParameterTimelineEventV1{3U, 48000U, 0.25}) &&
+          timeline_editor.draft() != nullptr &&
+          timeline_editor.draft()->event_count == 2U &&
+          timeline_editor.published().event_count == 0U);
+    CHECK(!timeline_editor.begin_edit());
+    CHECK(timeline_editor.upsert(Vst3ParameterTimelineEventV1{7U, 48000U, 0.5}) &&
+          timeline_editor.draft()->event_count == 3U &&
+          timeline_editor.draft()->events[1].parameter_id == 7U);
+    CHECK(timeline_editor.upsert(Vst3ParameterTimelineEventV1{7U, 48000U, 0.625}) &&
+          timeline_editor.draft()->event_count == 3U &&
+          timeline_editor.draft()->events[1].normalized_value == 0.625);
+    CHECK(!timeline_editor.upsert(Vst3ParameterTimelineEventV1{9U, 10U, 1.1}) &&
+          !timeline_editor.upsert(Vst3ParameterTimelineEventV1{9U, 10U, -0.25}) &&
+          !timeline_editor.upsert(Vst3ParameterTimelineEventV1{9U, 10U, std::nan("")}) &&
+          timeline_editor.draft()->event_count == 3U);
+    CHECK(timeline_editor.set_value_at(1U, 0.125) &&
+          timeline_editor.draft()->events[1].normalized_value == 0.125 &&
+          !timeline_editor.set_value_at(3U, 0.5) &&
+          !timeline_editor.set_value_at(0U, -1.0) &&
+          !timeline_editor.set_value_at(0U, std::nan("")) &&
+          timeline_editor.draft()->events[0].normalized_value == 0.25);
+    CHECK(!timeline_editor.remove_at(3U));
+    CHECK(timeline_editor.commit() && !timeline_editor.has_edit_session() &&
+          timeline_editor.draft() == nullptr &&
+          timeline_editor.published().event_count == 3U &&
+          validate_vst3_parameter_timeline_v1(timeline_editor.published()) &&
+          timeline_editor.published().events[0].parameter_id == 3U &&
+          timeline_editor.published().events[0].sample_position == 48000U &&
+          timeline_editor.published().events[1].normalized_value == 0.125 &&
+          timeline_editor.published().events[2].sample_position == 48003U);
+    CHECK(timeline_editor.begin_edit() &&
+          timeline_editor.remove_at(0U) &&
+          timeline_editor.draft()->event_count == 2U &&
+          timeline_editor.draft()->events[0].sample_position == 48000U &&
+          timeline_editor.discard() &&
+          !timeline_editor.has_edit_session() &&
+          timeline_editor.published().event_count == 3U);
+    Vst3TimelineEditorV1 adopted_editor;
+    CHECK(adopted_editor.reset(timeline_editor.published()) &&
+          adopted_editor.begin_edit() &&
+          adopted_editor.set_value_at(2U, 0.5) &&
+          adopted_editor.commit() &&
+          adopted_editor.published().events[2].normalized_value == 0.5 &&
+          timeline_editor.published().events[2].normalized_value == 0.75);
+    CHECK(adopted_editor.begin_edit());
+    Vst3ParameterTimelineSnapshotV1 empty_editor_base{};
+    CHECK(!adopted_editor.reset(empty_editor_base) && adopted_editor.has_edit_session());
+    CHECK(adopted_editor.discard() &&
+          adopted_editor.reset(empty_editor_base) &&
+          adopted_editor.published().event_count == 0U && !adopted_editor.has_edit_session());
+    Vst3TimelineEditorV1 capacity_editor;
+    CHECK(capacity_editor.begin_edit());
+    bool editor_capacity_ok = true;
+    for (std::uint32_t editor_index = 0U; editor_index <= kVst3TimelineMaxEventsV1;
+         ++editor_index) {
+        editor_capacity_ok =
+            capacity_editor.upsert(Vst3ParameterTimelineEventV1{
+                editor_index % 8U, static_cast<std::uint64_t>(editor_index) * 4U, 0.5}) &&
+            editor_capacity_ok;
+    }
+    CHECK(!editor_capacity_ok &&
+          capacity_editor.draft()->event_count == kVst3TimelineMaxEventsV1);
+    Vst3TimelineEditorV1 parameter_cap_editor;
+    CHECK(parameter_cap_editor.begin_edit());
+    bool editor_parameters_ok = true;
+    for (std::uint32_t parameter_id = 0U; parameter_id < 17U; ++parameter_id) {
+        editor_parameters_ok =
+            parameter_cap_editor.upsert(
+                Vst3ParameterTimelineEventV1{parameter_id, parameter_id * 2U, 0.25}) &&
+            editor_parameters_ok;
+    }
+    CHECK(!editor_parameters_ok && parameter_cap_editor.draft()->event_count == 16U);
     Vst3WorkerPipeV1 worker_pipe;
     CHECK(!worker_pipe.create_server(Vst3WorkerPipeConfigV1{L"", 1024U, 100U}));
     CHECK(!worker_pipe.connect_client(L"", 100U));
