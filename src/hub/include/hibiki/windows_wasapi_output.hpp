@@ -6,6 +6,7 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <thread>
 
@@ -105,6 +106,10 @@ public:
   [[nodiscard]] bool submit(const float* interleaved,
                             std::uint32_t frames,
                             std::uint32_t channels) noexcept;
+  [[nodiscard]] bool submit_scaled(const float* interleaved,
+                                   std::uint32_t frames,
+                                   std::uint32_t channels,
+                                   float gain) noexcept;
   [[nodiscard]] WasapiSinkWorkerSnapshotV1 snapshot() const noexcept;
 
 private:
@@ -142,7 +147,10 @@ private:
   std::uint32_t channels_{0U};
   std::uint32_t sample_rate_{0U};
   std::uint32_t block_frames_{0U};
-  std::array<Slot, kSlotCount> slots_{};
+  // The bounded ring is prepared on the control side. Keeping the large
+  // sample storage off the object stack is required because two workers are
+  // alive during a handoff; submit/pop never allocate or resize it.
+  std::unique_ptr<std::array<Slot, kSlotCount>> slots_{};
   OutputSinkModel sink_model_{};
   std::thread worker_;
 };

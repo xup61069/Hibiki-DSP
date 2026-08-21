@@ -54,6 +54,7 @@ extern "C" {
 #include "hibiki/windows_device_watcher.hpp"
 #include "hibiki/windows_audio_session_watcher.hpp"
 #include "hibiki/windows_wasapi_output.hpp"
+#include "hibiki/windows_wasapi_handoff.hpp"
 #endif
 
 #include <cmath>
@@ -1358,6 +1359,13 @@ int main() {
     auto wasapi_worker = std::make_unique<WindowsWasapiSinkWorkerV1>();
     CHECK(!wasapi_worker->start(WasapiOutputConfigV1{L"", 3U, 48000U, 20U}, 128U));
     CHECK(!wasapi_worker->submit(nullptr, 128U, 2U));
+    CHECK(!wasapi_worker->submit_scaled(nullptr, 128U, 2U, 0.5F));
+    WindowsWasapiSinkHandoffV1 wasapi_handoff;
+    CHECK(wasapi_handoff.state() == WasapiSinkHandoffStateV1::Unbound);
+    CHECK(!wasapi_handoff.process(nullptr, 128U, 2U));
+    CHECK(!wasapi_handoff.begin(WasapiOutputConfigV1{L"", 2U, 48000U, 20U}, 128U, 30U));
+    wasapi_handoff.rollback();
+    CHECK(wasapi_handoff.state() == WasapiSinkHandoffStateV1::Unbound);
 #endif
 
     return 0;

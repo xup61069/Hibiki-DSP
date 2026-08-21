@@ -205,6 +205,19 @@ bool WindowsWasapiSinkWorkerV1::start(const WasapiOutputConfigV1& config,
       block_frames > kMaxFrames) {
     return false;
   }
+  if (!slots_) {
+    try {
+      slots_ = std::make_unique<std::array<Slot, kSlotCount>>();
+    } catch (...) {
+      degraded_.store(true, std::memory_order_release);
+      return false;
+    }
+  }
+  for (auto& slot : *slots_) {
+    slot.ready_sequence.store(0U, std::memory_order_relaxed);
+    slot.frames = 0U;
+    slot.channels = 0U;
+  }
   channels_ = config.channels;
   sample_rate_ = config.sample_rate;
   block_frames_ = block_frames;
@@ -257,9 +270,21 @@ void WindowsWasapiSinkWorkerV1::observe_clock(const double source_frames,
 bool WindowsWasapiSinkWorkerV1::submit(const float* const interleaved,
                                        const std::uint32_t frames,
                                        const std::uint32_t channels) noexcept {
+  return submit_scaled(interleaved, frames, channels, 1.0F);
+}
+
+bool WindowsWasapiSinkWorkerV1::submit_scaled(const float* const interleaved,
+                                              const std::uint32_t frames,
+                                              const std::uint32_t channels,
+                                              const float gain) noexcept {
   if (!running_.load(std::memory_order_acquire) || interleaved == nullptr || frames == 0U ||
-      frames > kMaxFrames || channels != channels_) {
+      frames > kMaxFrames || channels != channels_ || !std::isfinite(gain) || gain < 0.0F ||
+      gain > 1.0F) {
     return false;
+  }
+  const auto samples = static_cast<std::size_t>(frames) * channels;
+  for (std::size_t index = 0U; index < samples; ++index) {
+    if (!std::isfinite(interleaved[index])) return false;
   }
   const auto producer = producer_sequence_.load(std::memory_order_relaxed);
   const auto consumer = consumer_sequence_.load(std::memory_order_acquire);
@@ -267,9 +292,15 @@ bool WindowsWasapiSinkWorkerV1::submit(const float* const interleaved,
     dropped_blocks_.fetch_add(1U, std::memory_order_relaxed);
     return false;
   }
-  auto& slot = slots_[producer % kSlotCount];
-  const auto samples = static_cast<std::size_t>(frames) * channels;
-  std::copy_n(interleaved, samples, slot.samples.data());
+  if (!slots_) return false;
+  auto& slot = (*slots_)[producer % kSlotCount];
+  if (gain == 1.0F) {
+    std::copy_n(interleaved, samples, slot.samples.data());
+  } else {
+    for (std::size_t index = 0U; index < samples; ++index) {
+      slot.samples[index] = interleaved[index] * gain;
+    }
+  }
   slot.frames = frames;
   slot.channels = channels;
   slot.ready_sequence.store(producer + 1U, std::memory_order_release);
@@ -288,7 +319,8 @@ bool WindowsWasapiSinkWorkerV1::pop(float* const interleaved,
   const auto consumer = consumer_sequence_.load(std::memory_order_relaxed);
   const auto producer = producer_sequence_.load(std::memory_order_acquire);
   if (consumer == producer) return false;
-  auto& slot = slots_[consumer % kSlotCount];
+  if (!slots_) return false;
+  auto& slot = (*slots_)[consumer % kSlotCount];
   if (slot.ready_sequence.load(std::memory_order_acquire) != consumer + 1U ||
       slot.frames == 0U || slot.frames > output_capacity_frames || slot.channels != channels_) {
     return false;
@@ -444,6 +476,10 @@ void WindowsWasapiSinkWorkerV1::stop() noexcept {
   running_.store(false, std::memory_order_release);
 }
 bool WindowsWasapiSinkWorkerV1::submit(const float*, std::uint32_t, std::uint32_t) noexcept {
+  return false;
+}
+bool WindowsWasapiSinkWorkerV1::submit_scaled(const float*, std::uint32_t, std::uint32_t,
+                                              float) noexcept {
   return false;
 }
 void WindowsWasapiSinkWorkerV1::observe_clock(double, double, double) noexcept {}

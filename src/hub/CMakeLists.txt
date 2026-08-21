@@ -34,6 +34,7 @@ add_library(hibiki_hub STATIC
   src/volume_state.cpp
   src/virtual_mic.cpp
   src/windows_wasapi_output.cpp
+  src/windows_wasapi_handoff.cpp
 )
 
 target_include_directories(hibiki_hub
