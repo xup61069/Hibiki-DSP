@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "issue": 32,
+  "scope_digest": "extension-permission-csp-gate-v1",
+  "source_commit": "7d7c6a1",
+  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-git-2.55.0-pwsh-7.6.5; target-vs2026-sdk-wdk-missing",
+  "commands": [
+    "pwsh -File tools/extension-check.ps1 -SelfTest",
+    "pwsh -File tools/extension-check.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 32",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/extension-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "valid MV3 manifest acceptance",
+        "missing required permission rejection",
+        "disallowed or broad permission rejection",
+        "wildcard host permission rejection",
+        "unsafe-eval and dangerous CSP rejection",
+        "external non-loopback connect-src CSP rejection"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/extension-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "MV3 least-privilege permission validation",
+        "http://127.0.0.1/* host boundary validation",
+        "self-only and loopback-only extension_pages CSP validation",
+        "required source component existence validation"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 32 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 32"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "85 required documentation paths",
+        "24 specs including updated SPEC-0009 extension security/CSP section"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "tracked paths, no blocked binary or secret"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "no compiled artifact or binary upload policy violation"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Source-only static manifest and CSP validation only; does not prove browser runtime execution, user gesture handling, localhost websocket connection or audio playback.",
+    "Does not claim audio, driver, HLK, Microsoft signing or physical endpoint behavior.",
+    "Local machine is below the locked target toolchain (Windows 26200, VS BuildTools 17.14, no WDK/Windows App SDK)."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSVC 19.44 (VS 2022 BuildTools 17.14)",
+    "cmake": "4.4.0",
+    "dotnet": "10.0.301",
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T04:25:00+08:00",
+  "finished_at": "2026-08-22T04:30:00+08:00"
+}
