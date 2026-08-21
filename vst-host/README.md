@@ -55,6 +55,12 @@ same-layout descriptor can enter the session; a failed exchange detaches the
 lane and moves the host to `Quarantined`. This is still a source-level contract,
 not evidence of a signed driver or a certified third-party plug-in.
 
+`Vst3SceneAutomationSchedulerV1` stores up to 16 stable timeline IDs and
+scene/lane bindings, validates the complete scene before activation, and
+rejects concurrent blocks per lane with an explicit `busy` result. It applies
+timeline snapshots to worker lanes but deliberately does not serialize opaque
+plugin state; cross-version state compatibility remains a separate gate.
+
 `LatencyAlignmentPlanV1` and `FixedDelayLineV1` provide a bounded 16,384-sample
 alignment plan and fixed 8-channel delay primitive. They are tested separately
 from supervisor and graph lane commit, so plugin certification and full latency

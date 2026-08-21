@@ -71,6 +71,14 @@ plugin state persistence 仍由更上層規格負責。
 host 的 `Quarantined` 狀態並 detach lane。這仍是 source-level control contract，沒有把
 任何第三方 plugin binary、SDK checkout 或實體 endpoint 納入公開建置。
 
+`Vst3SceneAutomationSchedulerV1` 提供 Scene reference 到 lane 的 control-plane registry：
+最多 16 條 timeline、16 個 scene/lane binding，啟用時先驗證所有 timeline、lane token 與
+lane state，再套用 snapshot；每個 lane 用 `atomic_flag` 保持最多一個 in-flight block，
+重入直接回傳 `busy`，不建立無界 queue。block 仍由 `Vst3WorkerLaneSessionV1` 執行，worker
+錯誤映射為 `worker_failed`／lane degraded。這個 scheduler 不執行 DSP、不持有 audio
+buffer，也不包含 plugin state blob；跨版本 state persistence 必須另用版本化 schema 與
+plugin identity/checksum policy。
+
 `vst3_sdk_catalog.hpp` 提供 optional control-plane bridge，使用 `THIRD_PARTY.yml` 鎖定的
 Steinberg SDK 3.8.1 build 84 與 submodule commits，掃描 module factory class metadata。
 SDK checkout 由開發者在 `.local/` 提供，public monorepo 不 vendor SDK；catalog 不執行 plugin、
@@ -112,8 +120,8 @@ public source-only checkout 自動生成，且仍不提供第三方 plugin binar
 
 plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter、bounded parameter
 frame、latency alignment primitive、latency graph commit 與 optional worker executable 已有 bridge；仍未完成第三方
-plugin certification、將 worker exchange 接入正式 Scene/RT lane 的排程與 back-pressure policy、
-parameter timeline/persistence、RT graph lane latency wiring、side-chain/multi-bus、crash dump
-redaction 與 production worker policy。目前 supervisor、named pipe、passthrough worker、
-catalog、bounded SDK processor 與明確的 handshake/process exchange 提供可測試的 process
-containment/metadata/processing boundary，不能宣稱已完成第三方 VST3 host。
+plugin certification、plugin state blob persistence/compatibility policy、RT graph lane latency
+wiring、side-chain/multi-bus、crash dump redaction 與 production worker policy。目前
+supervisor、named pipe、passthrough worker、catalog、bounded SDK processor、handshake/process
+exchange、timeline lane 與 Scene automation scheduler 提供可測試的 process
+containment/metadata/automation boundary，不能宣稱已完成第三方 VST3 host。
