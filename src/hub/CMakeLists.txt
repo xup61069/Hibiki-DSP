@@ -65,6 +65,7 @@ set_target_properties(hibiki_hub PROPERTIES
 
 if(WIN32)
   target_sources(hibiki_hub PRIVATE src/windows_volume_broker.cpp)
+  target_sources(hibiki_hub PRIVATE src/windows_volume_link.cpp)
   target_sources(hibiki_hub PRIVATE src/windows_device_watcher.cpp)
   target_sources(hibiki_hub PRIVATE src/windows_device_catalog.cpp)
   target_sources(hibiki_hub PRIVATE src/windows_audio_session_watcher.cpp)

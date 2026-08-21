@@ -59,6 +59,7 @@ extern "C" {
 #if defined(_WIN32)
 #include <windows.h>
 #include "hibiki/windows_volume_broker.hpp"
+#include "hibiki/windows_volume_link.hpp"
 #include "hibiki/windows_device_watcher.hpp"
 #include "hibiki/windows_device_catalog.hpp"
 #include "hibiki/windows_audio_session_watcher.hpp"
@@ -2065,6 +2066,39 @@ int main() {
           callback_snapshot.channel_scalars[1] == 0.25F &&
           callback_snapshot.event_context.Data1 == 0x12345678U);
     CHECK(callback->Release() == 0U);
+    AudioEngineModel linked_engine;
+    WindowsVolumeLinkV1 volume_link;
+    GUID hibiki_write_context{};
+    hibiki_write_context.Data1 = 0xABCDEF01U;
+    CHECK(volume_link.add_ignored_context(hibiki_write_context));
+    WindowsVolumeNotificationSnapshotV1 external_snapshot{};
+    external_snapshot.generation = 1U;
+    external_snapshot.requested_db = -18.0;
+    external_snapshot.event_context.Data1 = 0x01020304U;
+    CHECK(volume_link.apply(linked_engine, "main", external_snapshot) ==
+          WindowsVolumeSyncResultV1::Applied);
+    CHECK(std::abs(linked_engine.volume().requested_db + 18.0) < 1e-9 &&
+          linked_engine.volume().generation == 1U);
+    external_snapshot.event_context = hibiki_write_context;
+    external_snapshot.generation = 2U;
+    CHECK(volume_link.apply(linked_engine, "main", external_snapshot) ==
+          WindowsVolumeSyncResultV1::IgnoredSelf &&
+          linked_engine.volume().generation == 1U);
+    volume_link.clear_ignored_contexts();
+    external_snapshot.event_context = GUID{};
+    external_snapshot.generation = 3U;
+    external_snapshot.requested_db = -6.0;
+    CHECK(volume_link.apply(linked_engine, "main", external_snapshot) ==
+          WindowsVolumeSyncResultV1::Applied &&
+          linked_engine.volume().generation == 3U);
+    external_snapshot.event_context = GUID{};
+    external_snapshot.generation = 1U;
+    CHECK(volume_link.apply(linked_engine, "main", external_snapshot) ==
+          WindowsVolumeSyncResultV1::StaleGeneration);
+    external_snapshot.generation = 4U;
+    external_snapshot.requested_db = 24.0;
+    CHECK(volume_link.apply(linked_engine, "main", external_snapshot) ==
+          WindowsVolumeSyncResultV1::Invalid);
     auto* watcher = new WindowsDeviceWatcher();
     CHECK(watcher->OnDefaultDeviceChanged(eRender, eConsole, L"hibiki-endpoint") == S_OK);
     WindowsDeviceChangeSnapshotV1 device_change;
