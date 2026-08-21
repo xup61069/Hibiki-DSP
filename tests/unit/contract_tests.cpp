@@ -385,7 +385,7 @@ int main() {
           runtime_a[0] == fanout_input[0] && runtime_b[1] == fanout_input[1]);
     CHECK(fanout_runtime.observe_clock(0U, 48000.0, 48012.0, 1.0));
     CHECK(fanout_runtime.snapshot().sinks[0].drift_ppm > 0.0);
-    const std::array<std::size_t, 3> runtime_short_capacities{{16U, 1U, 16U}};
+    const std::array<std::size_t, 3> runtime_short_capacities{{16U, 0U, 16U}};
     CHECK(!fanout_runtime.process(fanout_input, 2U, runtime_outputs,
                                   runtime_short_capacities, runtime_frames));
 

@@ -68,6 +68,7 @@ public:
                                float* output,
                                std::size_t output_capacity_frames,
                                std::size_t& output_frames) noexcept;
+    [[nodiscard]] std::size_t required_output_frames(std::size_t input_frames) const noexcept;
     [[nodiscard]] double phase() const noexcept { return phase_; }
     [[nodiscard]] double source_step() const noexcept { return source_step_; }
 
@@ -100,6 +101,7 @@ public:
                                float* output,
                                std::size_t output_capacity_frames,
                                std::size_t& output_frames) noexcept;
+    [[nodiscard]] std::size_t required_output_frames(std::size_t input_frames) const noexcept;
     [[nodiscard]] const OutputSinkClockSnapshotV1& snapshot() const noexcept {
         return snapshot_;
     }

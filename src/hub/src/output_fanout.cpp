@@ -170,13 +170,13 @@ bool OutputFanoutRuntimeV1::process(
             return false;
         }
     }
-    const auto capacity_bound = (input_frames * 4U) + 1U;
     for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
         output_frames[index] = 0U;
         if (!plan_.sinks[index].enabled) {
             continue;
         }
-        if (outputs[index] == nullptr || output_capacities[index] < capacity_bound) {
+        const auto required_frames = sinks_[index].required_output_frames(input_frames);
+        if (outputs[index] == nullptr || output_capacities[index] < required_frames) {
             return false;
         }
     }

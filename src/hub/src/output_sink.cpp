@@ -135,12 +135,7 @@ bool PersistentLinearResampler::process(const float* const input,
         has_previous_ = true;
         return true;
     }
-    // Interpolation needs both a left and a right sample, so the last valid
-    // left index is virtual_frames - 2.
-    const auto available = static_cast<double>(virtual_frames - 2U) - phase_;
-    const auto expected = available < 0.0
-                              ? 0U
-                              : static_cast<std::size_t>(std::floor(available / source_step_)) + 1U;
+    const auto expected = required_output_frames(input_frames);
     if (expected > output_capacity_frames) {
         return false;
     }
@@ -174,6 +169,24 @@ bool PersistentLinearResampler::process(const float* const input,
     phase_ = std::clamp(phase_, 0.0, source_step_);
     has_previous_ = true;
     return true;
+}
+
+std::size_t PersistentLinearResampler::required_output_frames(
+    const std::size_t input_frames) const noexcept {
+    if (channels_ == 0U || input_frames == 0U || !std::isfinite(phase_) || phase_ < 0.0 ||
+        phase_ >= 2.0 || !std::isfinite(source_step_) || source_step_ <= 0.0) {
+        return 0U;
+    }
+    const std::size_t virtual_frames = input_frames + (has_previous_ ? 1U : 0U);
+    if (virtual_frames < 2U) {
+        return 0U;
+    }
+    // Interpolation needs both a left and a right sample, so the last valid
+    // left index is virtual_frames - 2.
+    const auto available = static_cast<double>(virtual_frames - 2U) - phase_;
+    return available < 0.0
+               ? 0U
+               : static_cast<std::size_t>(std::floor(available / source_step_)) + 1U;
 }
 
 bool OutputSinkModel::prepare(const std::uint32_t channels,
@@ -219,6 +232,10 @@ bool OutputSinkModel::process(const float* const input,
                               std::size_t& output_frames) noexcept {
     return snapshot_.prepared && resampler_.process(
                                      input, input_frames, output, output_capacity_frames, output_frames);
+}
+
+std::size_t OutputSinkModel::required_output_frames(const std::size_t input_frames) const noexcept {
+    return snapshot_.prepared ? resampler_.required_output_frames(input_frames) : 0U;
 }
 
 }  // namespace hibiki
