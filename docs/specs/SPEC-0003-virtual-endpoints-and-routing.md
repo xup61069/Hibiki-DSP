@@ -49,8 +49,11 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   Main=stereo render、Low Latency=stereo/64-frame render、Surround=7.1 render、Virtual Mic=stereo
   capture。未來 SYSVAD topology 必須消費此 catalog，不得只由 channel count 推斷排列。
 - `driver/inf/HibikiVirtualAudio.inf` 固定 Root\HibikiDSP hardware ID、四個 endpoint GUID
-  與 service/package 邊界；它只引用未提交的 SYS/CAT，`Inf2Cat`、HLK、Microsoft signing
-  與真正 PortCls/SYSVAD topology 仍是 release gate。
+  與 service/package 邊界；source-only `tools/driver-signability-check.ps1` 會先移除
+  `;` 註解，再只在預期的 INF section 內驗證 Version、NTamd64 install mapping、CopyFiles、
+  service 與 ServiceBinary；缺 section、錯置或只有註解的 directive 一律 fail closed，並拒絕
+  GPL/private payload 與 traversal path。它只引用未提交的 SYS/CAT，`Inf2Cat`、HLK、Microsoft
+  signing 與真正 PortCls/SYSVAD topology 仍是 release gate。
 - `driver/include/hibiki/wavert_stream_v1.h` 與 `src/wavert_stream.c` 提供可由未來 pin
   callback 掛接的 portable WaveRT data-path core：caller-owned Float32 frame ring、完整
   block overrun reject、underrun silence fallback 與 dropped/underrun counters；它限制在
