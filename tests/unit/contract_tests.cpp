@@ -1383,6 +1383,9 @@ int main() {
     CHECK(!wasapi_engine.process_asio_transport_to_wasapi(
         0U, wasapi_transport_buffer.data(), 128U, std::span<RtLaneInputV1>(wasapi_lane_inputs),
         wasapi_graph_buffer.data(), wasapi_graph_buffer.size(), wasapi_asio_block));
+    CHECK(!wasapi_engine.process_driver_stream_packet_to_wasapi(
+        0U, "endpoint", {}, {}, std::span<RtLaneInputV1>(wasapi_lane_inputs),
+        wasapi_graph_buffer.data()));
 #endif
 
     return 0;

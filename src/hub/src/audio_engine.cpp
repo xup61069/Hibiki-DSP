@@ -207,17 +207,17 @@ bool AudioEngineModel::process_asio_transport_to_wasapi(
     float* const output_interleaved,
     const std::size_t output_capacity_frames,
     AsioTransportBlockV1& block) noexcept {
-    if (!process_asio_transport(lane_index, transport_interleaved, transport_capacity_frames,
-                                lane_inputs, output_interleaved, output_capacity_frames, block)) {
+    block = {};
+    if (!has_active_graph_ || lane_index >= active_graph_.lane_count ||
+        lane_inputs.size() < active_graph_.lane_count || transport_interleaved == nullptr ||
+        output_interleaved == nullptr || active_graph_.lanes[lane_index].input_channels == 0U ||
+        !asio_transport_.pop(transport_interleaved, transport_capacity_frames, block) ||
+        block.frames == 0U || block.frames > output_capacity_frames ||
+        block.channels != active_graph_.lanes[lane_index].input_channels) {
         return false;
     }
-    if (static_cast<std::uint64_t>(block.frames) >
-            static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max()) ||
-        active_graph_.output_channels == 0U || active_graph_.output_channels > 8U) {
-        return false;
-    }
-    return wasapi_handoff_.process(output_interleaved, block.frames,
-                                   active_graph_.output_channels);
+    return process_lane_block_to_wasapi(lane_index, transport_interleaved, block.channels,
+                                        block.frames, lane_inputs, output_interleaved);
 }
 
 bool AudioEngineModel::process_driver_stream_packet(
@@ -246,6 +246,32 @@ bool AudioEngineModel::process_driver_stream_packet(
     if (block.frames == 0U) return false;
     return process_lane_block(lane_index, block.interleaved, block.channels, block.frames,
                               lane_inputs, output_interleaved);
+}
+
+bool AudioEngineModel::process_driver_stream_packet_to_wasapi(
+    const std::size_t lane_index,
+    const std::string_view expected_endpoint_guid,
+    const std::span<const std::uint8_t> packet,
+    const std::span<float> packet_sample_storage,
+    const std::span<RtLaneInputV1> lane_inputs,
+    float* const output_interleaved) noexcept {
+    if (!has_active_graph_ || expected_endpoint_guid.empty() ||
+        expected_endpoint_guid.size() >= HIBIKI_DRIVER_STREAM_ENDPOINT_GUID_CAPACITY_V1 ||
+        lane_index >= active_graph_.lane_count || lane_inputs.size() < active_graph_.lane_count ||
+        output_interleaved == nullptr || active_graph_.lanes[lane_index].input_channels == 0U) {
+        return false;
+    }
+    DriverStreamLaneBlockV1 block{};
+    if (!decode_driver_stream_packet_v1(packet, packet_sample_storage, block) ||
+        block.packet_type != HIBIKI_DRIVER_STREAM_RENDER_V1 ||
+        std::string_view(block.endpoint_guid.data()) != expected_endpoint_guid ||
+        block.sample_rate != sample_rate_.load(std::memory_order_acquire) ||
+        block.channels != active_graph_.lanes[lane_index].input_channels ||
+        block.interleaved == nullptr || block.frames == 0U) {
+        return false;
+    }
+    return process_lane_block_to_wasapi(lane_index, block.interleaved, block.channels,
+                                        block.frames, lane_inputs, output_interleaved);
 }
 
 bool AudioEngineModel::start_wasapi_output(const WasapiOutputConfigV1& config,
@@ -311,6 +337,24 @@ bool AudioEngineModel::process_lane_block(const std::size_t lane_index,
                                    output_interleaved, frames);
     lane_inputs[lane_index] = previous;
     return processed;
+}
+
+bool AudioEngineModel::process_lane_block_to_wasapi(
+    const std::size_t lane_index,
+    const float* const input_interleaved,
+    const std::uint32_t input_channels,
+    const std::size_t frames,
+    const std::span<RtLaneInputV1> lane_inputs,
+    float* const output_interleaved) noexcept {
+    if (frames == 0U ||
+        frames > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()) ||
+        !process_lane_block(lane_index, input_interleaved, input_channels, frames, lane_inputs,
+                            output_interleaved) || active_graph_.output_channels == 0U ||
+        active_graph_.output_channels > 8U) {
+        return false;
+    }
+    return wasapi_handoff_.process(output_interleaved, static_cast<std::uint32_t>(frames),
+                                   active_graph_.output_channels);
 }
 
 }  // namespace hibiki

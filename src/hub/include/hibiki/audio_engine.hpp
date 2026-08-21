@@ -83,6 +83,13 @@ public:
         std::span<float> packet_sample_storage,
         std::span<RtLaneInputV1> lane_inputs,
         float* output_interleaved) const noexcept;
+    [[nodiscard]] bool process_driver_stream_packet_to_wasapi(
+        std::size_t lane_index,
+        std::string_view expected_endpoint_guid,
+        std::span<const std::uint8_t> packet,
+        std::span<float> packet_sample_storage,
+        std::span<RtLaneInputV1> lane_inputs,
+        float* output_interleaved) noexcept;
     // Windows/WASAPI sink boundary. The graph remains the only producer of
     // audio blocks; handoff owns the two bounded sink workers and never
     // restarts this engine during a device switch.
@@ -108,6 +115,12 @@ public:
                                           std::size_t frames,
                                           std::span<RtLaneInputV1> lane_inputs,
                                           float* output_interleaved) const noexcept;
+    [[nodiscard]] bool process_lane_block_to_wasapi(std::size_t lane_index,
+                                                    const float* input_interleaved,
+                                                    std::uint32_t input_channels,
+                                                    std::size_t frames,
+                                                    std::span<RtLaneInputV1> lane_inputs,
+                                                    float* output_interleaved) noexcept;
     [[nodiscard]] EngineTransactionState transaction_state() const noexcept { return state_; }
     [[nodiscard]] const RtGraphSnapshotV1& active_graph() const noexcept { return active_graph_; }
     // Control-plane snapshot.  The RT process path reads the two atomics
