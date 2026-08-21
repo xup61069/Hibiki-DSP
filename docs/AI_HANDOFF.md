@@ -26,6 +26,9 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
 - 本機 Desktop Compatibility Preview 已可由 `tools/build-preview.ps1 -Target DesktopCompat` 建置並通過
   啟動 smoke；它和正式 shell 共用 `EasyControlViewModel`，自帶 .NET runtime、不依賴 Windows App Runtime，
   但不是 XAML、無障礙、driver 或 release evidence。
+- C++ Engine Preview 已可由 `tools/build-engine-preview.ps1` 建置；`tools/engine-preview-smoke.ps1`
+  會啟動它並驗證 v1 named-pipe Hello/Ack request correlation。它只提供 user-space control host，
+  不代表 WaveRT、實體輸出或 Windows session routing 已完成。
 - ISO 226 只保留合法 formula/derived boundary；禁止把受限標準文件、完整表格、掃圖或其內容
   放進 source、Issue、prompt、RAG、fixture 或 evidence。
 

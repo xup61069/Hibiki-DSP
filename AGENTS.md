@@ -38,6 +38,8 @@ pwsh -File tools/source-only-ci-check.ps1
 pwsh -File tools/extension-check.ps1
 pwsh -File tools/installer-check.ps1
 pwsh -File tools/control-model-check.ps1
+pwsh -File tools/build-engine-preview.ps1
+pwsh -File tools/engine-preview-smoke.ps1
 pwsh -File tools/winui-shell-check.ps1
 pwsh -File tools/distribution-check.ps1
 pwsh -File tools/driver-source-check.ps1
