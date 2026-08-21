@@ -66,6 +66,7 @@ extern "C" {
 #include "hibiki/windows_audio_session_route.hpp"
 #include "hibiki/windows_process_loopback.hpp"
 #include "hibiki/windows_process_loopback_lane.hpp"
+#include "hibiki/process_loopback_plan.hpp"
 #include "hibiki/windows_wasapi_output.hpp"
 #include "hibiki/windows_wasapi_handoff.hpp"
 #include "hibiki/windows_wasapi_fanout.hpp"
@@ -1328,6 +1329,41 @@ int main() {
           std::abs(session_output[1] + 0.25F) < 1e-5F);
     CHECK(!build_session_route_graph(session_registry,
                                      SessionRouteGraphPolicyV1{1, 2U, true}, session_graph));
+    ProcessLoopbackPlanV1 process_plan;
+    CHECK(build_process_loopback_plan(session_registry, process_plan) ==
+              ProcessLoopbackPlanResultV1::AmbiguousProcess && process_plan.size == 0U);
+    AudioSessionRegistry distinct_process_registry;
+    CHECK(distinct_process_registry.upsert(AudioSessionDescriptorV1{
+        1, AudioSessionIdentityV1{"hibiki-main", "distinct-a", 100U}, "A", "app-a", true,
+        SessionGainOwner::WindowsSession, "lane-a", "main", 0.0}));
+    CHECK(distinct_process_registry.upsert(AudioSessionDescriptorV1{
+        1, AudioSessionIdentityV1{"hibiki-main", "distinct-b", 101U}, "B", "app-b", true,
+        SessionGainOwner::WindowsSession, "lane-b", "main", 0.0}));
+    CHECK(build_process_loopback_plan(distinct_process_registry, process_plan) ==
+              ProcessLoopbackPlanResultV1::Applied && process_plan.size == 2U &&
+          process_plan.entries[0].session_count == 1U);
+    AudioSessionRegistry duplicate_process_registry;
+    CHECK(duplicate_process_registry.upsert(AudioSessionDescriptorV1{
+        1, AudioSessionIdentityV1{"hibiki-main", "same-a", 42U}, "A", "app-a", true,
+        SessionGainOwner::WindowsSession, "lane-a", "main", 0.0}));
+    CHECK(duplicate_process_registry.upsert(AudioSessionDescriptorV1{
+        1, AudioSessionIdentityV1{"hibiki-main", "same-b", 42U}, "B", "app-b", true,
+        SessionGainOwner::WindowsSession, "lane-a", "main", 0.0}));
+    CHECK(build_process_loopback_plan(duplicate_process_registry, process_plan) ==
+              ProcessLoopbackPlanResultV1::Applied && process_plan.size == 1U &&
+          process_plan.entries[0].session_count == 2U);
+    CHECK(duplicate_process_registry.set_makeup_gain_db(
+        AudioSessionIdentityV1{"hibiki-main", "same-b", 42U}, 0.0));
+    CHECK(duplicate_process_registry.bind(
+        AudioSessionIdentityV1{"hibiki-main", "same-b", 42U}, "lane-b", "main"));
+    CHECK(build_process_loopback_plan(duplicate_process_registry, process_plan) ==
+          ProcessLoopbackPlanResultV1::AmbiguousProcess && process_plan.size == 0U);
+    AudioSessionRegistry invalid_process_registry;
+    CHECK(invalid_process_registry.upsert(AudioSessionDescriptorV1{
+        1, AudioSessionIdentityV1{"hibiki-main", "zero", 0U}, "zero", "zero", true,
+        SessionGainOwner::WindowsSession, "lane", "main", 0.0}));
+    CHECK(build_process_loopback_plan(invalid_process_registry, process_plan) ==
+              ProcessLoopbackPlanResultV1::InvalidProcessIdentity && process_plan.size == 0U);
     CHECK(session_registry.upsert(AudioSessionDescriptorV1{
         1, AudioSessionIdentityV1{"hibiki-main", "chrome-instance-a", 5678},
         "Chrome tab A renamed", "chrome.exe", true,
@@ -2158,12 +2194,15 @@ int main() {
     CHECK(session_watcher->Release() == 0U);
     WindowsAudioSessionRouteCoordinatorV1 session_route_coordinator;
     GraphConfigV1 session_route_graph;
+    ProcessLoopbackPlanV1 session_process_plan;
     CHECK(session_route_coordinator.bind(nullptr) == E_INVALIDARG &&
           session_route_coordinator.refresh() ==
               WindowsAudioSessionRouteRefreshResultV1::Unbound &&
           session_route_coordinator.poll_and_refresh() ==
               WindowsAudioSessionRouteRefreshResultV1::Unbound &&
           !session_route_coordinator.copy_graph(session_route_graph) &&
+          session_route_coordinator.copy_process_loopback_plan(session_process_plan) ==
+              ProcessLoopbackPlanResultV1::NoRoutes && session_process_plan.size == 0U &&
           !session_route_coordinator.snapshot().has_graph);
     WindowsProcessLoopbackSourceV1 process_loopback;
     std::uint32_t loopback_frames = 99U;

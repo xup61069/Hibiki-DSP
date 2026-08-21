@@ -94,6 +94,15 @@ bool WindowsAudioSessionRouteCoordinatorV1::copy_graph(GraphConfigV1& graph) con
     return true;
 }
 
+ProcessLoopbackPlanResultV1 WindowsAudioSessionRouteCoordinatorV1::copy_process_loopback_plan(
+    ProcessLoopbackPlanV1& plan) const noexcept {
+    if (!bound_ || degraded_ || !has_graph_) {
+        plan = {};
+        return ProcessLoopbackPlanResultV1::NoRoutes;
+    }
+    return build_process_loopback_plan(registry_, plan);
+}
+
 WindowsAudioSessionRouteSnapshotV1
 WindowsAudioSessionRouteCoordinatorV1::snapshot() const noexcept {
     std::size_t active_count = 0U;

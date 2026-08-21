@@ -36,6 +36,10 @@ buffer period 與累計 frame；停止、timeout、格式不符或 WASAPI 失效
 - `process_windows_process_loopback_lane_v1` 只在 source snapshot 仍為 `Running` 且格式未變時
   把一個 caller-owned block 送進現有 Lane graph；`to_wasapi` 只是重用既有 handoff，不會在
   adapter 內偷偷建立或切換實體 endpoint。
+- `build_process_loopback_plan` 將目前 active、已綁定 session 壓成最多 64 個 process request。
+  同一 PID 若所有 session 指向同一 Lane/output 可合併並記錄 `session_count`；同一 PID 若
+  指向不同 Lane/output 一律 `AmbiguousProcess`，典型 Chrome 多分頁必須改用 tab bridge，
+  不得靜默混音。
 
 ## 失敗／fallback
 

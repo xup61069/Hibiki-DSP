@@ -34,6 +34,7 @@ add_library(hibiki_hub STATIC
   src/scene_safety.cpp
   src/session_route.cpp
   src/session_route_rules.cpp
+  src/process_loopback_plan.cpp
   src/true_peak_limiter.cpp
   src/volume_state.cpp
   src/virtual_mic.cpp
