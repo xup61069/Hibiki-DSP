@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "issue": 34,
+  "scope_digest": "driver-inf-section-gate-v1",
+  "source_commit": "e3889a1",
+  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-git-2.55.0-pwsh-7.6.5; target-vs2026-sdk-wdk-missing",
+  "commands": [
+    "pwsh -File tools/driver-signability-check.ps1 -SelfTest",
+    "pwsh -File tools/driver-signability-check.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 34",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/driver-signability-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "valid INF section structure acceptance",
+        "missing section directive fail-closed rejection",
+        "misplaced section directive fail-closed rejection",
+        "commented-out directive fail-closed rejection",
+        "forbidden path traversal and secret rejection"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/driver-signability-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "source-only driver INF section validation",
+        "PnpLockdown=1 in Version section",
+        "MEDIA class and catalog file directives in Version section",
+        "manufacturer and hardware ID mapping sections",
+        "service and CopyFiles directives validation"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 34 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 34"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "85 required documentation paths",
+        "24 specs including updated SPEC-0003 section-aware INF gate boundary"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "tracked paths, no blocked binary or secret"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "no compiled artifact or binary upload policy violation"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Source-only static INF section and directive policy scanning only; does not build SYS/CAT binaries or run Inf2Cat on this machine.",
+    "Does not claim driver signing, Driver Verifier, HLK, WaveRT runtime, or physical audio endpoint behavior.",
+    "Local machine is below the locked target toolchain (Windows 26200, VS BuildTools 17.14, no WDK 10.0.28000.2526)."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSVC 19.44 (VS 2022 BuildTools 17.14)",
+    "cmake": "4.4.0",
+    "dotnet": "10.0.301",
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T04:30:00+08:00",
+  "finished_at": "2026-08-22T04:35:00+08:00"
+}
