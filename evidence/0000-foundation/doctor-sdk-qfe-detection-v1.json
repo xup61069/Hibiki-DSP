@@ -13,6 +13,7 @@
     "pwsh -NoProfile -File tools/source-policy.ps1",
     "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
     "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
     "git diff --check"
   ],
   "results": [
@@ -66,6 +67,12 @@
       "compiled_artifacts": false
     },
     {
+      "command": "tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+      "status": "pass",
+      "coverage": [".NET 8 restore and net8.0 build", "self-contained win-x64 publish", "3-second launch smoke"],
+      "compiled_artifacts": false
+    },
+    {
       "command": "git diff --check",
       "status": "pass",
       "coverage": ["no whitespace errors"],
@@ -75,15 +82,16 @@
   "limitations": [
     "Diagnostic gate only; does not claim a loadable driver, WaveRT, HLK, Microsoft signing or physical audio.",
     "The exact QFE is proven by local installed-package metadata and kit layout, not by a committed registry dump.",
-    "DesktopCompat WinUI build remains dependent on a .NET 8 SDK outside this Issue scope."
+    "DesktopCompat is self-contained user-space preview evidence only; it is not formal WinUI XAML, accessibility, driver or physical-audio evidence."
   ],
   "logs": [],
   "tool_versions": {
     "visual_studio": "18.9.12112.369",
     "msvc": "19.51.36256.0",
     "cmake": "4.4.2",
+    "dotnet_sdk": "8.0.424",
     "powershell": "pwsh 7.6.5"
   },
   "started_at": "2026-08-22T04:10:00+08:00",
-  "finished_at": "2026-08-22T04:27:48+08:00"
+  "finished_at": "2026-08-22T04:46:29+08:00"
 }
