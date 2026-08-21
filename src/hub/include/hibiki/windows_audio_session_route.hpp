@@ -48,6 +48,7 @@ public:
     [[nodiscard]] bool set_rules(const SessionRouteRuleStoreV1& rules) noexcept;
     [[nodiscard]] WindowsAudioSessionRouteRefreshResultV1 refresh() noexcept;
     [[nodiscard]] WindowsAudioSessionRouteRefreshResultV1 poll_and_refresh() noexcept;
+    [[nodiscard]] bool bound() const noexcept { return bound_; }
     [[nodiscard]] bool copy_graph(GraphConfigV1& graph) const noexcept;
     [[nodiscard]] ProcessLoopbackPlanResultV1 copy_process_loopback_plan(
         ProcessLoopbackPlanV1& plan) const noexcept;

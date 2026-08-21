@@ -482,7 +482,9 @@ HRESULT WindowsControlRuntimeV1::refresh_default_volume(
     if (FAILED(result) || device == nullptr) return FAILED(result) ? result : E_FAIL;
     const auto bind_result = volume_broker_.bind(device);
     device->Release();
-    if (bind_result == S_OK) (void)refresh_default_session_routes(enumerator);
+    // Volume and session control are independent Windows interfaces. Keep
+    // route health truthful even when the endpoint volume node is unavailable.
+    (void)refresh_default_session_routes(enumerator);
     return bind_result;
 }
 
@@ -494,7 +496,12 @@ HRESULT WindowsControlRuntimeV1::refresh_default_volume_if_changed(
     if (FAILED(result) || device == nullptr) return FAILED(result) ? result : E_FAIL;
     const auto bind_result = volume_broker_.bind_if_changed(device);
     device->Release();
-    if (bind_result == S_OK) (void)refresh_default_session_routes(enumerator);
+    // S_FALSE means the volume endpoint identity is unchanged. Retry the
+    // route bind only when it was previously unbound/degraded, otherwise keep
+    // the existing watcher registration and session metadata continuity.
+    if (bind_result == S_OK || !session_routes_.bound()) {
+        (void)refresh_default_session_routes(enumerator);
+    }
     return bind_result;
 }
 
