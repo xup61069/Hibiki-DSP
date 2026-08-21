@@ -1,0 +1,44 @@
+﻿{
+  "schema_version": 1,
+  "issue": 88,
+  "scope_digest": "ai-docs-refresh-v1",
+  "source_commit": "pending",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-cmake-4.4.0-msvc-buildtools-17.14-dotnet-10.0.301; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 88",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "all gates",
+      "status": "pass",
+      "coverage": [
+        "AGENTS.md gains execution-environment rules (pwsh 7 requirement, winget install, ExecutionPolicy bypass, -SelfTest availability) and multi-session etiquette (branch-squatting checks, issue-number-first naming, same-owner worktree isolation, takeover recording)",
+        "START_HERE.md fresh-clone flow leads with the pwsh-7 prerequisite and documents vst-host timeline chain completion status in the pending-areas list",
+        "MULTI_AGENT.md claim protocol now includes remote branch-squatting checks and issue-number-first branch naming; new single-machine multi-session section codifies worktree isolation and interrupted-slice recovery with the PR #24 precedent",
+        "MULTI_AGENT.md documents the #21 counter gate workflow (mechanical shared_paths refreshes), #51 merge-ref tolerance and #25 scope-overlap gate",
+        "AI_HANDOFF.md records the merged vst-host timeline chain with source commits and the week's process-gate changes without overstating claims",
+        "PROJECT_MAP.md vst-host row lists persistence/file store/sync/introspection while keeping UI editing, side-chain/multi-bus worker process and certification pending",
+        "BASELINE.md carries factual capability lines with commits plus gate-change notes; user-space limits preserved"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation-only change reflecting repository reality through base commit 5e9e8a6.",
+    "docs/state/BASELINE.md was triple-hot in flight (#42/#49/#58/#75 refresh the same counters); integration may require a conflict-resolution merge.",
+    "No product source, schema, IPC, RT-thread, driver or signing behavior is changed or claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}
