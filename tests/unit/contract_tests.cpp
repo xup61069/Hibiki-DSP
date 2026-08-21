@@ -2125,6 +2125,51 @@ int main() {
             editor_parameters_ok;
     }
     CHECK(!editor_parameters_ok && parameter_cap_editor.draft()->event_count == 16U);
+    CHECK(automation_scheduler->prepare(automation_lanes) &&
+          automation_scheduler->upsert_timeline("djmax-default", automation_timeline) &&
+          automation_scheduler->bind_scene("DJMAX", 99U, "djmax-default") &&
+          automation_scheduler->timeline_snapshot("djmax-default") != nullptr &&
+          automation_scheduler->timeline_snapshot("djmax-default")->event_count == 1U &&
+          automation_scheduler->timeline_snapshot("missing") == nullptr);
+    CHECK(!automation_scheduler->begin_timeline_edit("") &&
+          !automation_scheduler->begin_timeline_edit("nope"));
+    CHECK(automation_scheduler->begin_timeline_edit("djmax-default") &&
+          !automation_scheduler->begin_timeline_edit("djmax-default"));
+    auto* scheduler_editor = automation_scheduler->editing_timeline();
+    CHECK(scheduler_editor != nullptr && scheduler_editor->has_edit_session() &&
+          scheduler_editor->draft() != nullptr &&
+          scheduler_editor->draft()->event_count == 1U);
+    CHECK(scheduler_editor->upsert(Vst3ParameterTimelineEventV1{7U, 6U, 0.875}) &&
+          scheduler_editor->draft()->event_count == 2U);
+    CHECK(!automation_scheduler->remove_timeline("djmax-default"));
+    CHECK(automation_scheduler->cancel_timeline_edit() &&
+          automation_scheduler->timeline_snapshot("djmax-default")->event_count == 1U);
+    CHECK(automation_scheduler->begin_timeline_edit("djmax-default"));
+    scheduler_editor = automation_scheduler->editing_timeline();
+    CHECK(scheduler_editor->upsert(Vst3ParameterTimelineEventV1{7U, 6U, 0.875}) &&
+          scheduler_editor->draft()->event_count == 2U);
+    CHECK(automation_scheduler->commit_timeline_edit());
+    CHECK(!automation_scheduler->commit_timeline_edit());
+    const auto* committed_timeline = automation_scheduler->timeline_snapshot("djmax-default");
+    CHECK(committed_timeline != nullptr && committed_timeline->event_count == 2U &&
+          committed_timeline->events[1].sample_position == 6U &&
+          committed_timeline->events[1].normalized_value == 0.875);
+    CHECK(automation_scheduler->activate_scene("DJMAX") ==
+              Vst3SceneAutomationResultV1::ok &&
+          worker_lane.parameter_timeline().event_count == 2U);
+    CHECK(automation_scheduler->begin_timeline_edit("djmax-default"));
+    scheduler_editor = automation_scheduler->editing_timeline();
+    CHECK(scheduler_editor->remove_at(0U) &&
+          scheduler_editor->draft()->event_count == 1U);
+    CHECK(automation_scheduler->cancel_timeline_edit());
+    CHECK(!automation_scheduler->cancel_timeline_edit() &&
+          automation_scheduler->editing_timeline() == nullptr &&
+          automation_scheduler->timeline_snapshot("djmax-default")->event_count == 2U);
+    CHECK(automation_scheduler->begin_timeline_edit("djmax-default"));
+    automation_scheduler->clear();
+    CHECK(automation_scheduler->editing_timeline() == nullptr &&
+          automation_scheduler->timeline_count() == 0U &&
+          automation_scheduler->active_scene().empty());
     Vst3WorkerPipeV1 worker_pipe;
     CHECK(!worker_pipe.create_server(Vst3WorkerPipeConfigV1{L"", 1024U, 100U}));
     CHECK(!worker_pipe.connect_client(L"", 100U));

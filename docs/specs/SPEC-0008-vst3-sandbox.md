@@ -83,9 +83,12 @@ SDK processor／worker 仍只實作一個 Main input/output bus，因此 side-ch
 最多 16 條 timeline、16 個 scene/lane binding，啟用時先驗證所有 timeline、lane token 與
 lane state，再套用 snapshot；每個 lane 用 `atomic_flag` 保持最多一個 in-flight block，
 重入直接回傳 `busy`，不建立無界 queue。block 仍由 `Vst3WorkerLaneSessionV1` 執行，worker
-錯誤映射為 `worker_failed`／lane degraded。這個 scheduler 不執行 DSP、不持有 audio
-buffer，也不包含 plugin state blob；跨版本 state persistence 必須另用版本化 schema 與
-plugin identity/checksum policy。
+錯誤映射為 `worker_failed`／lane degraded。它另提供以 `Vst3TimelineEditorV1` 為基礎的
+slot 編輯交易（`begin_timeline_edit`／`editing_timeline`／`commit_timeline_edit`／
+`cancel_timeline_edit`）與 `timeline_snapshot` 讀回存取，編輯中拒絕重入與 slot 刪除，
+commit 只發布通過驗證之 draft，`clear()` 強制中止進行中編輯。這個 scheduler 不執行 DSP、
+不持有 audio buffer，也不包含 plugin state blob；跨版本 state persistence 必須另用版本化
+schema 與 plugin identity/checksum policy。
 
 `vst3_sdk_catalog.hpp` 提供 optional control-plane bridge，使用 `THIRD_PARTY.yml` 鎖定的
 Steinberg SDK 3.8.1 build 84 與 submodule commits，掃描 module factory class metadata。
