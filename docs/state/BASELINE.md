@@ -298,6 +298,9 @@
 - `WindowsWasapiSinkHandoffV1` now permits a new candidate `begin` after a failed candidate
   rollback while the active worker remains ready; the live silent probe verifies rollback,
   active-worker retention, retry, 30 ms fade and commit on a local 6-channel endpoint.
+- `WindowsWasapiSinkWorkerV1` now classifies device/service invalidation and retries bind/start
+  inside its dedicated worker; ordinary event timeouts do not trigger recovery. This is source-
+  level only until an actual Audio Service restart/hotplug fixture is run.
 - `IpcNamedPipeServerV1` provides the Windows control-plane worker boundary with overlapped,
   bounded read/write, local-only pipe validation, request decoding and callback response framing;
   a Windows loopback contract test exercises Ack/request-ID round-trip.
@@ -376,6 +379,8 @@ Endpoint-ID-preserving volume rebind 的 source commit 是 `4d9e1d5`。
 WASAPI PCM render conversion 與 silent 30 ms live handoff probe 的 source commit 是 `9d0d426`。
 WASAPI rollback/retry state-machine fix 與 live probe 的 source commit 是 `135c7ac`；target
 Audio Service restart、hotplug、HLK 與 signed endpoint evidence 仍未完成。
+WASAPI service/device invalidation recovery source commit 是 `5333ac4`；本機尚未注入實際
+restart 或拔插事件。
 Driver signability source gate 的 source commit 是 `dc1d3b2`；預設只驗證 INF contract，
 目標 WDK package 才能執行 Inf2Cat。
 Topology-indexed WDK render/capture pin formats 與 Virtual Mic generic format boundary 的

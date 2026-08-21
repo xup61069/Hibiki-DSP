@@ -41,6 +41,10 @@ source_globs: ["src/hub/**output*", "src/hub/**wasapi*", "src/hub/**audio_engine
 - worker snapshot 必須可觀察 `endpoint_ready`、`degraded`、dropped/submitted/rendered blocks、
   `source_step` 與 `drift_ppm`，讓 UI 在實體 endpoint 未綁定時顯示 detached，而不是靜默宣稱
   已輸出。
+- `WindowsWasapiSinkWorkerV1` 對 `AUDCLNT_E_DEVICE_INVALIDATED` 與
+  `AUDCLNT_E_SERVICE_NOT_RUNNING` 只在 dedicated worker 內執行 bounded bind/start retry；
+  普通 event timeout 不會誤觸發重綁。重綁成功恢復 `endpoint_ready`，連續失敗才標記
+  `degraded`，不會由 graph RT thread 直接操作 COM。
 - 真實 WaveRT endpoint、硬體 clock fixture、DPC/拔插 soak 與 WHCP/HLK 證據不在本機
   contract test 中，必須在 Windows 11 24H2+ test machine 完成。
 
