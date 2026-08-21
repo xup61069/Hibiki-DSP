@@ -331,16 +331,57 @@ bool send_route_command(PipeClient& pipe,
     return response.has_value() && response->header.type == hibiki::IpcMessageType::Ack;
 }
 
-bool wait_for_route(PipeClient& pipe,
-                    std::uint64_t& request_id,
-                    const std::string_view lane,
-                    const std::string_view output_group,
-                    SessionReadingV1& reading) noexcept {
+bool send_route_rule_command(PipeClient& pipe,
+                              const std::uint64_t request_id,
+                              const SessionReadingV1& current,
+                              const hibiki::SessionRouteRuleOperationV1 operation,
+                              const std::string_view rule_id,
+                              const std::string_view display_name,
+                              const std::string_view lane,
+                              const std::string_view output_group) noexcept {
+    hibiki::SessionRouteRuleCommandV1 command{};
+    command.schema_version = 1U;
+    command.priority = 100;
+    command.makeup_gain_q16_16 = 0;
+    command.operation = operation;
+    command.enabled = 1U;
+    command.gain_owner = hibiki::SessionRouteRuleGainOwnerV1::WindowsSession;
+    command.catalog_sequence = current.catalog_sequence;
+    if (rule_id.empty() || rule_id.size() > command.rule_id.size()) return false;
+    command.rule_id_bytes = static_cast<std::uint16_t>(rule_id.size());
+    std::copy(rule_id.begin(), rule_id.end(), command.rule_id.begin());
+    if (operation == hibiki::SessionRouteRuleOperationV1::Upsert) {
+        if (display_name.empty() || display_name.size() > command.display_name.size() ||
+            lane.empty() || lane.size() > command.lane.size() || output_group.empty() ||
+            output_group.size() > command.output_group.size()) {
+            return false;
+        }
+        command.display_name_bytes = static_cast<std::uint16_t>(display_name.size());
+        command.lane_bytes = static_cast<std::uint16_t>(lane.size());
+        command.output_group_bytes = static_cast<std::uint16_t>(output_group.size());
+        std::copy(display_name.begin(), display_name.end(), command.display_name.begin());
+        std::copy(lane.begin(), lane.end(), command.lane.begin());
+        std::copy(output_group.begin(), output_group.end(), command.output_group.begin());
+    }
+    const auto encoded = hibiki::encode_session_route_rule_command_v1(command);
+    if (encoded[0U] == 0U) return false;
+    const auto response = pipe.transact(hibiki::IpcMessageType::SessionRouteRuleCommand,
+                                        request_id, encoded);
+    return response.has_value() && response->header.type == hibiki::IpcMessageType::Ack;
+}
+
+bool wait_for_route_state(PipeClient& pipe,
+                          std::uint64_t& request_id,
+                          const hibiki::SessionCatalogRouteStateV1 expected_state,
+                          const std::string_view lane,
+                          const std::string_view output_group,
+                          const std::uint64_t minimum_sequence,
+                          SessionReadingV1& reading) noexcept {
     for (std::uint32_t attempt = 0U; attempt < 80U; ++attempt) {
         SessionReadingV1 candidate{};
         if (read_catalog(pipe, request_id++, candidate) &&
-            candidate.route_state ==
-                static_cast<std::uint8_t>(hibiki::SessionCatalogRouteStateV1::Ready) &&
+            candidate.catalog_sequence > minimum_sequence &&
+            candidate.route_state == static_cast<std::uint8_t>(expected_state) &&
             std::string_view(candidate.lane.data(), candidate.lane_bytes) == lane &&
             std::string_view(candidate.output.data(), candidate.output_bytes) == output_group) {
             reading = candidate;
@@ -349,6 +390,15 @@ bool wait_for_route(PipeClient& pipe,
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
     return false;
+}
+
+bool wait_for_route(PipeClient& pipe,
+                    std::uint64_t& request_id,
+                    const std::string_view lane,
+                    const std::string_view output_group,
+                    SessionReadingV1& reading) noexcept {
+    return wait_for_route_state(pipe, request_id, hibiki::SessionCatalogRouteStateV1::Ready,
+                                lane, output_group, 0U, reading);
 }
 
 }  // namespace
@@ -430,8 +480,8 @@ int wmain() {
             std::printf("session_volume_engine_live=fail reason=attenuation-readback\n");
             break;
         }
-        passed = restore();
-        if (!passed) {
+        const bool restored = restore();
+        if (!restored) {
             std::printf("session_volume_engine_live=fail reason=restore\n");
             break;
         }
@@ -448,7 +498,35 @@ int wmain() {
             std::printf("session_volume_engine_live=fail reason=route-readback\n");
             break;
         }
-        std::printf("session_volume_engine_live=pass original_db=%.2f attenuated_db=%.2f restored_db=%.2f route=ready transport=ipc-control-queue-com-worker\n",
+        constexpr std::string_view kProbeRule = "live-engine-route-rule";
+        constexpr std::string_view kProbeMatch = "Hibiki live engine session volume probe";
+        if (!send_route_rule_command(pipe, request_id++, routed,
+                                     hibiki::SessionRouteRuleOperationV1::Upsert, kProbeRule,
+                                     kProbeMatch, kProbeLane, kProbeOutput)) {
+            std::printf("session_volume_engine_live=fail reason=route-rule-upsert\n");
+            break;
+        }
+        SessionReadingV1 rule_ready{};
+        if (!wait_for_route_state(pipe, request_id, hibiki::SessionCatalogRouteStateV1::Ready,
+                                  kProbeLane, kProbeOutput, routed.catalog_sequence,
+                                  rule_ready)) {
+            std::printf("session_volume_engine_live=fail reason=route-rule-readback\n");
+            break;
+        }
+        if (!send_route_rule_command(pipe, request_id++, rule_ready,
+                                     hibiki::SessionRouteRuleOperationV1::Remove, kProbeRule, {},
+                                     {}, {})) {
+            std::printf("session_volume_engine_live=fail reason=route-rule-remove\n");
+            break;
+        }
+        SessionReadingV1 rule_removed{};
+        if (!wait_for_route_state(pipe, request_id, hibiki::SessionCatalogRouteStateV1::Pending,
+                                  {}, {}, rule_ready.catalog_sequence, rule_removed)) {
+            std::printf("session_volume_engine_live=fail reason=route-rule-clear-readback\n");
+            break;
+        }
+        passed = true;
+        std::printf("session_volume_engine_live=pass original_db=%.2f attenuated_db=%.2f restored_db=%.2f route=ready rule=ready-to-pending transport=ipc-control-queue-com-worker\n",
                     original_db, attenuated_db, restored_db);
     } while (false);
 
