@@ -27,6 +27,11 @@ source_globs: ["AGENTS.md", "docs/**", "evidence/**", "tools/**"]
 `Next safe action`。新 AI 先讀 repository 與 Issue，再執行 `doctor.ps1 -CheckOnly`、
 `context-pack.ps1` 與必要測試；不得依賴聊天記憶、舊機 registry 或私人路徑。
 
+`tools/context-pack.ps1 -Issue <id>` 會讀 handoff 指定的 Spec/ADR，依各 Spec front matter
+的 `source_globs` 只輸出相關 source，並附上該 Issue 的 evidence JSON；`-NoSource` 可先取得
+最小文件包。Issue 0 是 foundation bootstrap，例外包含所有 tests 作為基準；後續 Issue
+不得把全 repository source 默認塞入 context，若需要跨子系統檔案必須在 Spec 明確加入 glob。
+
 ## 文件閘門
 
 Spec、schema、source 與 tests 改動必須同一變更更新。`docs-check.ps1` 檢查必要入口、
