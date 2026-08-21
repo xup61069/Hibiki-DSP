@@ -1123,6 +1123,10 @@ int main() {
     CHECK(decode_error == IpcDecodeError::InvalidMagic);
     IpcNamedPipeServerV1 ipc_server;
     CHECK(!ipc_server.start(IpcNamedPipeConfigV1{L"", 1024U, 100U}, nullptr, nullptr));
+    ControlPlaneHostV1 control_host;
+    CHECK(!control_host.start(IpcNamedPipeConfigV1{L"", 1024U, 100U}, nullptr, nullptr) &&
+          !control_host.running() &&
+          !control_host.start_with_queue(IpcNamedPipeConfigV1{L"", 1024U, 100U}));
 #if defined(_WIN32)
     constexpr wchar_t kControlPipe[] = L"\\\\.\\pipe\\HibikiDSP_contract_control";
     CHECK(ipc_server.start(IpcNamedPipeConfigV1{kControlPipe, 1024U, 1000U},
@@ -1158,6 +1162,44 @@ int main() {
     CloseHandle(ipc_client);
     ipc_server.stop();
     CHECK(!ipc_server.running());
+
+    constexpr wchar_t kHostControlPipe[] = L"\\\\.\\pipe\\HibikiDSP_contract_host";
+    ControlPlaneHostV1 host;
+    CHECK(host.start_with_queue(IpcNamedPipeConfigV1{kHostControlPipe, 1024U, 1000U}));
+    HANDLE host_client = INVALID_HANDLE_VALUE;
+    for (int attempt = 0; attempt < 30 && host_client == INVALID_HANDLE_VALUE; ++attempt) {
+        host_client = CreateFileW(kHostControlPipe, GENERIC_READ | GENERIC_WRITE, 0U, nullptr,
+                                  OPEN_EXISTING, 0U, nullptr);
+        if (host_client == INVALID_HANDLE_VALUE) {
+            if (GetLastError() == ERROR_PIPE_BUSY) (void)WaitNamedPipeW(kHostControlPipe, 100U);
+            Sleep(10U);
+        }
+    }
+    CHECK(host_client != INVALID_HANDLE_VALUE);
+    auto host_frame = scene_frame;
+    host_frame.header.request_id = 314U;
+    const auto host_request_bytes = encode_ipc_frame(host_frame);
+    const auto host_request_size = static_cast<std::uint32_t>(host_request_bytes.size());
+    transferred = 0U;
+    CHECK(WriteFile(host_client, &host_request_size, sizeof(host_request_size), &transferred,
+                    nullptr) != FALSE && transferred == sizeof(host_request_size) &&
+          WriteFile(host_client, host_request_bytes.data(), host_request_size, &transferred,
+                    nullptr) != FALSE && transferred == host_request_size);
+    response_size = 0U;
+    CHECK(ReadFile(host_client, &response_size, sizeof(response_size), &transferred, nullptr) !=
+              FALSE &&
+          transferred == sizeof(response_size) && response_size <= 1024U);
+    std::vector<std::uint8_t> host_response_bytes(response_size);
+    CHECK(ReadFile(host_client, host_response_bytes.data(), response_size, &transferred, nullptr) !=
+              FALSE &&
+          transferred == response_size);
+    const auto host_response = decode_ipc_frame(host_response_bytes, pipe_decode_error);
+    CHECK(host_response.has_value() && host_response->header.type == IpcMessageType::Ack &&
+          host_response->header.request_id == 314U);
+    CloseHandle(host_client);
+    host.stop();
+    CHECK(!host.running() && host.command_queue().try_pop(decoded_command) &&
+          decoded_command.type == IpcMessageType::SceneApply);
 #endif
 
     AsioBridgeModel asio;
