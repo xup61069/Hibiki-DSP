@@ -9,7 +9,10 @@ public sealed record ExpertMatrixRoute(
     string Source,
     string Destination,
     double GainDb,
-    bool Enabled);
+    bool Enabled)
+{
+    public string GainDisplayText => $"{GainDb:0.0} dB";
+}
 
 public sealed record ExpertDspNode(
     string Id,

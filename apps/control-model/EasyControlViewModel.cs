@@ -84,6 +84,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     public IReadOnlyList<SessionRouteRuleGainOwnerV1> RouteRuleGainOwners { get; } =
         Enum.GetValues<SessionRouteRuleGainOwnerV1>();
     public ulong SessionCatalogSequence => _sessionCatalogSequence;
+    public string SessionCatalogSequenceDisplayText =>
+        $"清單序號：{SessionCatalogSequence}；刷新後 handle 會更新";
     public ulong SelectedSessionHandle
     {
         get => _selectedSessionHandle;
@@ -93,11 +95,14 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             _selectedSessionHandle = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(SelectedSession));
+            OnPropertyChanged(nameof(SelectedSessionDisplayText));
             OnPropertyChanged(nameof(HasSelectedSession));
         }
     }
     public SessionCatalogEntryV1? SelectedSession =>
         _sessionCatalog.FirstOrDefault(item => item.Handle == _selectedSessionHandle);
+    public string SelectedSessionDisplayText =>
+        $"目前選取：{SelectedSession?.DisplayName ?? string.Empty}";
     public bool HasSelectedSession => SelectedSession is not null;
     public string SessionRouteLaneId
     {
@@ -132,8 +137,10 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             if (Math.Abs(clamped - _sessionVolumeDb) < 1e-9) return;
             _sessionVolumeDb = clamped;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(SessionVolumeDisplayText));
         }
     }
+    public string SessionVolumeDisplayText => $"App 音量：{SessionVolumeDb:0.0} dB";
     public bool SessionMuted
     {
         get => _sessionMuted;
@@ -241,6 +248,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public VolumeSafetyStateV1 VolumeState => _volumeState;
     public double EffectiveVolumeDb => _volumeState.EffectiveDb;
+    public string EffectiveVolumeDisplayText => $"實際有效音量：{EffectiveVolumeDb:0.0} dB";
     public double SafetyCeilingDb => _volumeState.SafetyCeilingDb;
     public string SafetyStatusText => _volumeState.SafetyStatusText;
     public string VolumeOriginText => $"來源：{_volumeState.OriginLabel}";
@@ -313,8 +321,10 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             _requestedVolumeDb = clamped;
             UpdateLocalVolumeState(VolumeStateOriginV1.HibikiUi);
             OnPropertyChanged();
+            OnPropertyChanged(nameof(RequestedVolumeDisplayText));
         }
     }
+    public string RequestedVolumeDisplayText => $"{RequestedVolumeDb:0.0} dB";
 
     public bool Muted
     {
@@ -340,6 +350,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(IrPhasePolicy));
             OnPropertyChanged(nameof(IrAddedDelayMs));
+            OnPropertyChanged(nameof(IrAddedDelayDisplayText));
             OnPropertyChanged(nameof(IrPhaseUsesFir));
             OnPropertyChanged(nameof(IrPhaseModeText));
             MarkIrPrepareStale();
@@ -358,6 +369,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(IrPhasePolicy));
             OnPropertyChanged(nameof(IrAddedDelayMs));
+            OnPropertyChanged(nameof(IrAddedDelayDisplayText));
             OnPropertyChanged(nameof(IrPhaseUsesFir));
             MarkIrPrepareStale();
         }
@@ -365,6 +377,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public IrPhasePolicyV1 IrPhasePolicy => new(IrPhaseMode, IrPhaseStrength);
     public double IrAddedDelayMs => IrPhasePolicy.AddedDelayMs;
+    public string IrAddedDelayDisplayText => $"IR 額外延遲：{IrAddedDelayMs:0.0} ms";
     public bool IrPhaseUsesFir => IrPhasePolicy.UsesFir;
     public string IrPhaseModeText => IrPhaseMode switch
     {
@@ -582,7 +595,9 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         ApplySelectedRouteRulePreview();
         OnPropertyChanged(nameof(SessionCatalog));
         OnPropertyChanged(nameof(SessionCatalogSequence));
+        OnPropertyChanged(nameof(SessionCatalogSequenceDisplayText));
         OnPropertyChanged(nameof(SelectedSession));
+        OnPropertyChanged(nameof(SelectedSessionDisplayText));
         StatusText = "App 工作階段清單已更新；可選擇每個 App 的路由";
         return true;
     }
@@ -608,6 +623,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         _sessionVolumeDb = Math.Clamp(selected.RequestedDb, -144.0, 12.0);
         _sessionMuted = selected.Muted;
         OnPropertyChanged(nameof(SessionVolumeDb));
+        OnPropertyChanged(nameof(SessionVolumeDisplayText));
         OnPropertyChanged(nameof(SessionMuted));
     }
 
@@ -916,9 +932,11 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         _muted = state.Muted;
         _generation = state.Generation;
         OnPropertyChanged(nameof(RequestedVolumeDb));
+        OnPropertyChanged(nameof(RequestedVolumeDisplayText));
         OnPropertyChanged(nameof(Muted));
         OnPropertyChanged(nameof(VolumeState));
         OnPropertyChanged(nameof(EffectiveVolumeDb));
+        OnPropertyChanged(nameof(EffectiveVolumeDisplayText));
         OnPropertyChanged(nameof(SafetyCeilingDb));
         OnPropertyChanged(nameof(SafetyStatusText));
         OnPropertyChanged(nameof(VolumeOriginText));
@@ -1399,6 +1417,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         };
         OnPropertyChanged(nameof(VolumeState));
         OnPropertyChanged(nameof(EffectiveVolumeDb));
+        OnPropertyChanged(nameof(EffectiveVolumeDisplayText));
         OnPropertyChanged(nameof(SafetyCeilingDb));
         OnPropertyChanged(nameof(SafetyStatusText));
         OnPropertyChanged(nameof(VolumeOriginText));

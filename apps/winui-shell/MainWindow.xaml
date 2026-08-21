@@ -125,8 +125,8 @@
                         <Slider Minimum="-60" Maximum="0" Value="{Binding RequestedVolumeDb, Mode=TwoWay}" ValueChanged="OnVolumeChanged"
                                 AutomationProperties.Name="系統音量"
                                 AutomationProperties.HelpText="以 dB 調整音量；安全限制會優先套用" />
-                        <TextBlock Text="{Binding RequestedVolumeDb, StringFormat='{}{0:0.0} dB'}" />
-                        <TextBlock Text="{Binding EffectiveVolumeDb, StringFormat='實際有效音量：{0:0.0} dB'}"
+                        <TextBlock Text="{Binding RequestedVolumeDisplayText}" />
+                        <TextBlock Text="{Binding EffectiveVolumeDisplayText}"
                                    AutomationProperties.Name="實際有效音量" />
                         <TextBlock Text="{Binding SafetyStatusText}" TextWrapping="Wrap" Opacity="0.82"
                                    AutomationProperties.LiveSetting="Polite" />
@@ -148,7 +148,7 @@
                                 AutomationProperties.Name="IR 相位強度"
                                 AutomationProperties.HelpText="調整 mixed-phase 或 linear-phase 的延遲與相位折衷" />
                         <TextBlock Text="{Binding IrPhaseModeText}" Opacity="0.72" />
-                        <TextBlock Text="{Binding IrAddedDelayMs, StringFormat='IR 額外延遲：{0:0.0} ms'}" Opacity="0.72" />
+                        <TextBlock Text="{Binding IrAddedDelayDisplayText}" Opacity="0.72" />
                         <TextBlock Text="IR WAV 會在 Engine Preview 的 control-plane prepare/commit；尚無實體 sink。"
                                    TextWrapping="Wrap" Opacity="0.72" />
                     </StackPanel>
@@ -179,7 +179,7 @@
 
                         <StackPanel Spacing="6">
                             <TextBlock Text="App 工作階段（暫時選取清單）" FontSize="18" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding SessionCatalogSequence, StringFormat='清單序號：{0}；刷新後 handle 會更新'}"
+                            <TextBlock Text="{Binding SessionCatalogSequenceDisplayText}"
                                        Opacity="0.72" TextWrapping="Wrap" />
                             <controls:ItemsRepeater ItemsSource="{Binding SessionCatalog}">
                                 <controls:ItemsRepeater.ItemTemplate>
@@ -203,9 +203,9 @@
                                     </DataTemplate>
                                 </controls:ItemsRepeater.ItemTemplate>
                             </controls:ItemsRepeater>
-                            <TextBlock Text="{Binding SelectedSession.DisplayName, StringFormat='目前選取：{0}'}"
+                            <TextBlock Text="{Binding SelectedSessionDisplayText}"
                                        Opacity="0.72" />
-                            <TextBlock Text="{Binding SessionVolumeDb, StringFormat='App 音量：{0:0.0} dB'}"
+                            <TextBlock Text="{Binding SessionVolumeDisplayText}"
                                        Opacity="0.72" />
                             <TextBlock Text="{Binding SelectedRouteRuleSummary}" TextWrapping="Wrap"
                                        AutomationProperties.Name="目前 App 路由預設預覽" />
@@ -305,7 +305,7 @@
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding Source}" />
                                             <TextBlock Grid.Column="1" Text="{Binding Destination}" />
-                                            <TextBlock Grid.Column="2" Text="{Binding GainDb, StringFormat='{}{0:0.0} dB'}" />
+                                            <TextBlock Grid.Column="2" Text="{Binding GainDisplayText}" />
                                         </Grid>
                                     </DataTemplate>
                                 </controls:ItemsRepeater.ItemTemplate>

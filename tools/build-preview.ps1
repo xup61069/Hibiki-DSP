@@ -8,6 +8,19 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $previewRoot = Join-Path $repo ".local/preview/$Target"
 
+function Find-VisualStudioMsBuild {
+  $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+  if (-not (Test-Path -LiteralPath $vswhere)) { return $null }
+  $candidate = & $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild `
+    -find 'MSBuild\**\Bin\MSBuild.exe' 2>$null |
+    Select-Object -First 1
+  if ($candidate) {
+    $resolved = $candidate.ToString().Trim()
+    if (Test-Path -LiteralPath $resolved) { return $resolved }
+  }
+  return $null
+}
+
 if ($Target -eq 'ControlModel') {
   $project = Join-Path $repo 'apps/control-model-check/Hibiki.ControlModel.Check.csproj'
   dotnet run --project $project --configuration Release --nologo `
@@ -63,8 +76,18 @@ if ($Target -eq 'DesktopCompat') {
 # This is deliberately a local developer preview only. It does not build a
 # virtual driver, sign anything, stage an installer, or create a GitHub asset.
 $project = Join-Path $repo 'apps/winui-shell/Hibiki.WinUI.csproj'
-dotnet build $project --configuration Release "-p:OutputPath=$previewRoot/"
+$msbuild = Find-VisualStudioMsBuild
+if ($msbuild) {
+  & $msbuild $project '/nologo' '/t:Build' '/p:Configuration=Release' '/p:Platform=x64' "/p:OutputPath=$previewRoot\"
+} else {
+  Write-Warning 'Visual Studio MSBuild was not found; falling back to dotnet build. The fallback may not provide the Windows App SDK XAML/PRI toolchain on a non-target host.'
+  dotnet build $project --configuration Release "-p:OutputPath=$previewRoot/"
+}
 if ($LASTEXITCODE -ne 0) {
   throw "WinUI preview build failed. Check tools/doctor.ps1; target Windows 11 24H2, VS 2026 and the locked SDK/WDK are required before treating a build as preview evidence."
 }
-Write-Output "WinUI local preview build succeeded. It remains unsigned, driver-free and excluded from Git."
+if ($msbuild) {
+  Write-Output "WinUI local preview build succeeded via Visual Studio MSBuild. It remains unsigned, driver-free and excluded from Git."
+} else {
+  Write-Output "WinUI local preview build succeeded via dotnet fallback. It remains unsigned, driver-free and excluded from Git."
+}
