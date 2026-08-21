@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 41,
   "scope_digest": "docs-check-selftest-v1",
-  "source_commit": "4c5a70203800d0bf3e57f13db0177281018b273b",
+  "source_commit": "0944a8e73a08d8e9a7616bcda313bead1eebb445",
   "environment_fingerprint": "windows-26200-amd64-powershell-5.1-dotnet-only-portable-pwsh-7.6.5-no-cmake-no-vs; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/docs-check.ps1 -SelfTest",
