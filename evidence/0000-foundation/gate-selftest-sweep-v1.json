@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "issue": 92,
+  "scope_digest": "gate-selftest-sweep-v1",
+  "source_commit": "PENDING",
+  "environment_fingerprint": "windows-26200-amd64-powershell-5.1-dotnet-only-portable-pwsh-7.6.5-no-cmake-no-vs; ci-github-actions-windows-2025",
+  "commands": [
+    "pwsh -File .local/sweep-dryrun.ps1 (local mirror of the verify.yml Gate self-test sweep step)",
+    "pwsh -File tools/handoff-check.ps1 -Issue 92",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": ".local/sweep-dryrun.ps1 (Gate self-test sweep logic)",
+      "status": "pass",
+      "coverage": [
+        "discovers scripts exposing a -SelfTest switch via Get-Command parameter reflection",
+        "executes docs-check.ps1 self-test (7 cases) through the sweep",
+        "executes driver-signability-check.ps1 self-test (5 cases) through the sweep",
+        "executes extension-check.ps1 self-test (6 cases) through the sweep",
+        "executes handoff-check.ps1 scope-overlap self-test (9 cases) through the sweep",
+        "executes winui-shell-check.ps1 self-test (4 cases) through the sweep",
+        "minimum-mode threshold satisfied with the current main-tree count of 5 modes",
+        "non-zero mode exit would fail the job naming the script"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 92 / tools/handoff-check.ps1 / tools/docs-check.ps1 / tools/source-policy.ps1 / tools/source-only-ci-check.ps1 / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 92",
+        "documentation gate with baseline summary counters refreshed after staging all slice files",
+        "tracked paths with no blocked binary or secret",
+        "source-only CI publication policy intact including its own self-test mode",
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "CI-only enforcement change: adds no product API, IPC/schema, DSP order, RT-thread, driver boundary, identity, or release behavior.",
+    "Sweep discovery relies on Get-Command parameter reflection; a gate that names its self-test switch differently is silently skipped — the minimum-mode threshold only catches aggregate regressions.",
+    "All current SelfTest modes are bounded in-memory per their accepting slices; a future environment-dependent mode must be excluded explicitly with a recorded reason.",
+    "Threshold is set to the current main-tree count (5) and should be raised as unmerged wave PRs add more modes."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5 portable"
+  },
+  "started_at": "2026-08-22T07:00:00+08:00",
+  "finished_at": "2026-08-22T07:10:00+08:00"
+}
