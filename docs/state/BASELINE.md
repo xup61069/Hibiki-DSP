@@ -39,8 +39,12 @@
   values with origin, actuator and generation text, and rejects stale/unsafe snapshots. Expert
   also shows bounded route-health cards for Windows sessions, process loopback, browser tab
   capture and direct/bypass paths; defaults are conservative and never claim an unconnected
-  adapter is active. The route snapshot is control-plane-only until a future versioned status
-  message supplies live engine state.
+  adapter is active. `ControlStatusSnapshot` v1 now supplies a bounded versioned status message;
+  its four local route entries remain conservative and do not claim physical per-App delivery.
+- `ControlStatusSnapshotStoreV1` publishes a complete immutable volume/route-health snapshot;
+  the named-pipe handler replies by request ID and the C# ViewModel rejects stale/malformed
+  frames while preserving its prior safe state. The local live probe reports
+  `volume=pass status=pass routes=4 status_sequence=3`.
 - `CalibrationResponsePointV1` and `compile_bounded_peq_correction_v1` now provide a deterministic
   control-plane measured-response to bounded PEQ compiler (16-filter cap, frequency/spacing/Q and
   boost/cut policy validation, explicit `limited` result) that feeds the existing APO/CamillaDSP/
@@ -134,6 +138,9 @@
 - The same live probe now starts `WindowsControlRuntimeV1` and requests the snapshot through the
   local named pipe; `runtime=pass request=pass` proves service → provider → IPC framing without
   printing endpoint identity data.
+- The same live probe now requests `ControlStatusSnapshot` on a second bounded pipe transaction;
+  this proves Windows dB readback, status-store publication and C++ wire decode. Browser tab
+  capture, process loopback delivery and physical per-App rerouting remain pending.
 - `EasyControlViewModel.ConnectAsync` now requests and atomically applies a fresh
   `DeviceCatalogSnapshot` after the Hello handshake; a disconnected or invalid request fails closed,
   preserves the last safe catalog and never claims that a physical endpoint was switched.
@@ -414,16 +421,17 @@ Lane graph／WASAPI handoff。兩者尚未在目標機注入含音訊程序、Au
 route-health cards 接到 Easy／Expert control-model；它只顯示保守的 session、process loopback、
 瀏覽器單分頁與 direct bypass 邊界，不宣稱尚未接上的 engine status IPC。
 
-目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 74 個必要入口與
-16 份 Spec 通過；`docs-check.ps1` 最新已擴充為 75 個必要入口；`source-policy.ps1` 掃描
-307 個路徑且無 blocked binary/secret；
+目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 75 個必要入口與
+17 份 Spec 通過；`source-policy.ps1` 掃描數量以最新 gate 輸出為準且無 blocked
+binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
-288-byte payload、catalog sequence、handler fail-closed、WinUI send-failure rollback、DeviceCatalogSnapshot
+288-byte payload、catalog sequence、handler fail-closed、WinUI send-failure rollback、DeviceCatalogSnapshot、ControlStatusSnapshot
 wire/atomic replace、catalog-to-wire publisher、Windows worker unbound/coordinator rollback、
 DeviceCatalogRequest provider response、連線後自動刷新裝置清單、ControlPlaneHost loopback
 queue handoff、live 14-endpoint runtime pipe probe（含 default endpoint volume read）、
-WindowsVolumeLink 外部／自家回授／stale generation contract 與 WDK basic-support source gate 亦通過。以本機 pinned ASIO SDK
+WindowsVolumeLink 外部／自家回授／stale generation contract、ControlStatusSnapshot wire/store/handler/
+ViewModel atomic apply 與 WDK basic-support source gate 亦通過。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
 `.local/`，未提交或發布。以本機 pinned VST3 SDK 另行執行的 optional target
 `hibiki_vst3_sdk_catalog` 與 `hibiki_vst3_sdk_worker`（含 bounded one-main-bus processor、
@@ -433,6 +441,7 @@ parameter frame 與 `IParameterChanges` bridge）unsigned build 亦通過；輸�
 與 C# grouped-volume payload round-trip、legacy payload compatibility、selected group resolver
 及 custom Scene card mirror 的 JSON save/load、atomic replace、malformed rollback 亦已通過本機
 contract/control-model checks。
-本次 control-model route-health／volume-safety additions 的 source commit 是 `7d43e67`，
+本次 control-status-snapshot additions 的 source commit 會在本切片提交後填入；
+control-model route-health／volume-safety additions 的 source commit 是 `7d43e67`，
 對應 handoff/evidence 更新 commit 是 `e13cfd8`；最後一次 live session evidence 更新是
 `2ba5299`。

@@ -17,10 +17,47 @@
 #include <exception>
 #include <new>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace hibiki {
 namespace {
+
+ControlRouteHealthEntryV1 make_status_route(const std::string_view id,
+                                             const std::string_view name,
+                                             const std::string_view detail,
+                                             const ControlRouteHealthStateV1 state,
+                                             const bool requires_action) noexcept {
+    ControlRouteHealthEntryV1 route{};
+    route.id_bytes = static_cast<std::uint8_t>(id.size());
+    route.name_bytes = static_cast<std::uint16_t>(name.size());
+    route.detail_bytes = static_cast<std::uint16_t>(detail.size());
+    route.state = state;
+    route.flags = requires_action ? 1U : 0U;
+    std::copy(id.begin(), id.end(), route.id.begin());
+    std::copy(name.begin(), name.end(), route.name.begin());
+    std::copy(detail.begin(), detail.end(), route.detail.begin());
+    return route;
+}
+
+ControlStatusSnapshotV1 make_initial_status(const std::uint64_t sequence) noexcept {
+    ControlStatusSnapshotV1 snapshot{};
+    snapshot.sequence = sequence;
+    snapshot.route_count = 4U;
+    snapshot.routes[0] = make_status_route(
+        "windows-session", "Windows session", "Waiting for active session report",
+        ControlRouteHealthStateV1::Pending, false);
+    snapshot.routes[1] = make_status_route(
+        "process-loopback", "Process loopback", "Requires supported process-tree capture",
+        ControlRouteHealthStateV1::Pending, false);
+    snapshot.routes[2] = make_status_route(
+        "browser-tab", "Browser tab", "Requires a user-gesture MV3 extension",
+        ControlRouteHealthStateV1::Pending, true);
+    snapshot.routes[3] = make_status_route(
+        "direct-path", "Vendor ASIO / WASAPI Exclusive", "Path bypasses Hibiki",
+        ControlRouteHealthStateV1::Bypassed, false);
+    return snapshot;
+}
 
 std::string utf8_from_wide(const wchar_t* value) {
     if (value == nullptr || *value == L'\0') return {};
@@ -364,11 +401,18 @@ bool WindowsControlRuntimeV1::start(
     const IpcNamedPipeConfigV1& config) noexcept {
     stop();
     if (FAILED(catalog_service_.bind(enumerator))) return false;
-    if (!host_.start_with_queue(config, catalog_service_.snapshot_store())) {
+    const auto initial_sequence = status_store_.sequence() == UINT64_MAX
+                                      ? UINT64_MAX
+                                      : status_store_.sequence() + 1U;
+    status_snapshot_ = make_initial_status(initial_sequence);
+    if (!status_store_.publish(status_snapshot_) ||
+        !host_.start_with_queue(config, catalog_service_.snapshot_store(), &status_store_)) {
         catalog_service_.unbind();
         return false;
     }
     (void)refresh_default_volume(enumerator);
+    OutputGroupVolumeStateV1 initial_volume{};
+    (void)read_volume(initial_volume);
     return true;
 }
 
@@ -412,19 +456,49 @@ HRESULT WindowsControlRuntimeV1::refresh_default_volume_if_changed(
 
 HRESULT WindowsControlRuntimeV1::read_volume(OutputGroupVolumeStateV1& state) noexcept {
     if (!running()) return E_UNEXPECTED;
-    return volume_broker_.read_state(state);
+    const auto result = volume_broker_.read_state(state);
+    if (SUCCEEDED(result)) (void)publish_status_volume(state);
+    return result;
 }
 
 HRESULT WindowsControlRuntimeV1::write_volume(
     const OutputGroupVolumeStateV1& state,
     const GUID& event_context) noexcept {
     if (!running()) return E_UNEXPECTED;
-    return volume_broker_.write(state, event_context);
+    const auto result = volume_broker_.write(state, event_context);
+    if (SUCCEEDED(result)) (void)publish_status_volume(state);
+    return result;
 }
 
 bool WindowsControlRuntimeV1::poll_volume(
     WindowsVolumeNotificationSnapshotV1& snapshot) noexcept {
-    return running() && volume_broker_.poll(snapshot);
+    if (!running() || !volume_broker_.poll(snapshot)) return false;
+    auto state = status_snapshot_.volume;
+    state.requested_db = snapshot.requested_db;
+    state.effective_db = (std::min)(state.requested_db, state.safety_ceiling_db);
+    state.mute = snapshot.mute;
+    state.generation = snapshot.generation;
+    state.origin = VolumeOrigin::Windows;
+    (void)publish_status_volume(state);
+    return true;
+}
+
+bool WindowsControlRuntimeV1::publish_status_snapshot(
+    const ControlStatusSnapshotV1& snapshot) noexcept {
+    if (!status_store_.publish(snapshot)) return false;
+    status_snapshot_ = snapshot;
+    return true;
+}
+
+bool WindowsControlRuntimeV1::publish_status_volume(
+    const OutputGroupVolumeStateV1& state) noexcept {
+    auto candidate = status_snapshot_;
+    if (candidate.sequence == UINT64_MAX) return false;
+    candidate.sequence += 1U;
+    candidate.volume = state;
+    if (!status_store_.publish(candidate)) return false;
+    status_snapshot_ = candidate;
+    return true;
 }
 
 }  // namespace hibiki

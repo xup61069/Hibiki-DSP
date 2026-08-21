@@ -60,6 +60,8 @@ bool is_valid_message_type(const IpcMessageType type) noexcept {
         case IpcMessageType::DeviceSwitch:
         case IpcMessageType::DeviceCatalogSnapshot:
         case IpcMessageType::DeviceCatalogRequest:
+        case IpcMessageType::ControlStatusSnapshot:
+        case IpcMessageType::ControlStatusRequest:
             return true;
     }
     return false;

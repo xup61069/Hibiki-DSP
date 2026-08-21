@@ -13,6 +13,11 @@
 
 namespace hibiki {
 
+// Shared strict UTF-8 predicate for bounded control-plane records. It accepts
+// printable Unicode only and rejects control characters, overlong sequences,
+// surrogates and truncated code points.
+[[nodiscard]] bool is_printable_utf8_v1(std::string_view value) noexcept;
+
 constexpr std::size_t kVolumeNotificationPayloadBytesV1 = 16U;
 constexpr std::size_t kGroupedVolumeNotificationPayloadBytesV1 = 48U;
 constexpr std::size_t kSceneApplyPayloadBytesV1 = 64U;

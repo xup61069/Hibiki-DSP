@@ -103,6 +103,10 @@ bool is_printable_utf8(const std::string_view value) noexcept {
 
 }  // namespace
 
+bool is_printable_utf8_v1(const std::string_view value) noexcept {
+    return is_printable_utf8(value);
+}
+
 std::array<std::uint8_t, kVolumeNotificationPayloadBytesV1>
 encode_volume_notification_payload_v1(const VolumeNotificationV1& notification) noexcept {
     std::array<std::uint8_t, kVolumeNotificationPayloadBytesV1> payload{};
@@ -414,6 +418,7 @@ bool decode_control_command_v1(const IpcFrameV1& frame,
         case IpcMessageType::GraphCommit:
         case IpcMessageType::GraphRollback:
         case IpcMessageType::DeviceCatalogRequest:
+        case IpcMessageType::ControlStatusRequest:
             return frame.payload.empty();
         case IpcMessageType::VolumeNotification:
             if (frame.payload.size() == kVolumeNotificationPayloadBytesV1) {
@@ -429,6 +434,7 @@ bool decode_control_command_v1(const IpcFrameV1& frame,
         case IpcMessageType::GraphPrepare:
         case IpcMessageType::Ack:
         case IpcMessageType::Error:
+        case IpcMessageType::ControlStatusSnapshot:
             return false;
     }
     return false;

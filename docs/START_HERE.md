@@ -59,9 +59,10 @@ branch。真實裝置資料與 calibration 留在 `.local/`，只提交 schema �
   `ActivateAudioInterfaceAsync` 的 worker-owned Float32 source boundary；真實端點、含音訊
   程序與 Audio Service restart soak 仍待目標環境。
 - `apps/`：已有 UI-independent control model 與 source-only WinUI 3 Easy/Expert shell；
-  現已包含有效音量／安全上限／來源／致動器投影與 session、process loopback、瀏覽器
-  單分頁、direct bypass 的保守路由健康卡片；仍需在鎖定 Windows App SDK 的目標環境
-  編譯、做視覺／無障礙驗證，再接上版本化實體端點／引擎狀態訊息。
+  現已包含有效音量／安全上限／來源／致動器投影、ControlStatusSnapshot 原子套用，
+  以及 session、process loopback、瀏覽器單分頁、direct bypass 的保守路由健康卡片；
+  仍需在鎖定 Windows App SDK 的目標環境編譯、做視覺／無障礙驗證，並把保守狀態
+  逐步替換成已驗證的實體端點／引擎 delivery 狀態。
 - `asio/`：預設為 stream model；需要本機 pinned ASIO SDK 時可開啟 optional native COM
   transport（不進 public CI，也不提交 DLL）。`vst-host/` 已有 supervisor、frame codec、
   named-pipe boundary、source-only passthrough worker、可選的 pinned VST3 SDK factory catalog

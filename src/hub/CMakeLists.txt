@@ -1,6 +1,7 @@
 add_library(hibiki_hub STATIC
   src/contracts.cpp
   src/control_payloads.cpp
+  src/control_status.cpp
   src/control_queue.cpp
   src/control_service.cpp
   src/calibration.cpp

@@ -23,6 +23,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private bool _muted;
     private ulong _generation;
     private VolumeSafetyStateV1 _volumeState = VolumeSafetyStateV1.Initial();
+    private ulong _statusSequence;
     private IrPhaseMode _irPhaseMode = IrPhaseMode.MinimumPhase;
     private double _irPhaseStrength;
     private ControlConnectionState _connectionState = ControlConnectionState.Disconnected;
@@ -100,6 +101,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     public string VolumeOriginText => $"來源：{_volumeState.OriginLabel}";
     public string VolumeActuatorText => $"致動器：{_volumeState.ActuatorLabel}";
     public ulong VolumeGeneration => _volumeState.Generation;
+    public ulong StatusSequence => _statusSequence;
 
     public string DeviceSwitchStatusText => _session.DeviceSwitch.State switch
     {
@@ -352,6 +354,82 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         return true;
     }
 
+    // Applies one complete engine status transaction. Route validation happens
+    // against a temporary model first so a malformed snapshot cannot partially
+    // replace the visible volume or route state.
+    public bool ApplyControlStatusSnapshot(IpcEnvelopeV1 frame, out string error)
+    {
+        error = string.Empty;
+        if (frame.Type != ControlMessageType.ControlStatusSnapshot ||
+            !ControlPayloadsV1.TryDecodeControlStatusSnapshot(frame.Payload.Span,
+                                                               out var sequence,
+                                                               out var volume,
+                                                               out var routes))
+        {
+            error = "控制狀態快照格式無效";
+            return false;
+        }
+        if (sequence < _statusSequence)
+        {
+            error = "控制狀態快照已過期";
+            return false;
+        }
+        var validator = new ExpertSurfaceModel();
+        if (!validator.TryApplyRouteHealth(routes, out error)) return false;
+        if (!ApplyVolumeSafetyState(volume, out error)) return false;
+        if (!Expert.TryApplyRouteHealth(routes, out error)) return false;
+        _statusSequence = sequence;
+        OnPropertyChanged(nameof(StatusSequence));
+        OnPropertyChanged(nameof(Expert));
+        StatusText = "引擎狀態已同步；音量安全與來源路由已更新";
+        return true;
+    }
+
+    public async Task<bool> RefreshControlStatusAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_controlClient is null || !_controlClient.IsConnected)
+        {
+            StatusText = "引擎未連線；無法更新控制狀態";
+            return false;
+        }
+        var gateHeld = false;
+        try
+        {
+            await _commandGate.WaitAsync(cancellationToken).ConfigureAwait(true);
+            gateHeld = true;
+            SetBusy(true);
+            var request = _commands.RequestControlStatus();
+            var reply = await _controlClient.RoundTripAsync(request, cancellationToken)
+                .ConfigureAwait(true);
+            var snapshotError = string.Empty;
+            if (!ApplyControlStatusSnapshot(reply, out snapshotError))
+            {
+                StatusText = reply.Type == ControlMessageType.Error
+                    ? "引擎暫未提供控制狀態；保留上一個安全狀態"
+                    : $"控制狀態無效：{snapshotError}";
+                return false;
+            }
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "控制狀態更新已取消；保留上一個安全狀態";
+            return false;
+        }
+        catch (Exception)
+        {
+            SetConnectionState(ControlConnectionState.Degraded);
+            StatusText = "控制狀態更新失敗；保留上一個安全狀態";
+            return false;
+        }
+        finally
+        {
+            SetBusy(false);
+            if (gateHeld) _commandGate.Release();
+        }
+    }
+
     public async Task<bool> RefreshPhysicalDevicesAsync(
         CancellationToken cancellationToken = default)
     {
@@ -473,6 +551,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             if (!await RefreshPhysicalDevicesAsync(cancellationToken).ConfigureAwait(true) &&
                 IsConnected)
                 StatusText = "引擎已連線；裝置清單暫不可用，音訊保持安全狀態";
+            if (IsConnected && !await RefreshControlStatusAsync(cancellationToken).ConfigureAwait(true))
+                StatusText = "引擎已連線；控制狀態暫不可用，音訊保持安全狀態";
             return true;
         }
         catch (OperationCanceledException)

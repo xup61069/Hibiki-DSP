@@ -83,6 +83,8 @@ EngineControlResultV1 EngineControlWorkerV1::consume(
     const ControlCommandV1& command) noexcept {
     switch (command.type) {
         case IpcMessageType::Hello:
+        case IpcMessageType::DeviceCatalogRequest:
+        case IpcMessageType::ControlStatusRequest:
             return EngineControlResultV1::Ignored;
         case IpcMessageType::VolumeNotification:
             return (command.has_volume_target
@@ -110,6 +112,7 @@ EngineControlResultV1 EngineControlWorkerV1::consume(
         case IpcMessageType::GraphPrepare:
         case IpcMessageType::Ack:
         case IpcMessageType::Error:
+        case IpcMessageType::ControlStatusSnapshot:
             return EngineControlResultV1::Invalid;
     }
     return EngineControlResultV1::Invalid;

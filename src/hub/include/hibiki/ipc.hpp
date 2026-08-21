@@ -26,6 +26,8 @@ enum class IpcMessageType : std::uint16_t {
     DeviceSwitch = 9,
     DeviceCatalogSnapshot = 10,
     DeviceCatalogRequest = 11,
+    ControlStatusSnapshot = 12,
+    ControlStatusRequest = 13,
 };
 
 struct IpcHeaderV1 {

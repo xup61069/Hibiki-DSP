@@ -143,6 +143,13 @@ Check(ControlPayloadsV1.TryDecodeGroupedVolumeNotification(groupedVolumeCommand.
       groupedOutput == "movie" && Math.Abs(groupedDb + 9.0) < 1e-6 && !groupedMute &&
       groupedGeneration == 10UL,
     "Grouped volume payload did not round-trip with the v1 contract.");
+var statusPayload = ControlPayloadsV1.EncodeControlStatusSnapshot(
+    7UL, cappedVolume, RouteHealthCatalogV1.Defaults);
+Check(ControlPayloadsV1.TryDecodeControlStatusSnapshot(statusPayload,
+          out var statusSequence, out var statusVolume, out var statusRoutes) &&
+      statusSequence == 7UL && statusVolume.IsSafetyCapped && statusRoutes.Count == 4 &&
+      statusRoutes.Any(route => route.Id == "browser-tab" && route.RequiresUserAction),
+    "Control status snapshot did not round-trip with route and volume state.");
 var catalogRequest = commandFactory.RequestDeviceCatalog();
 Check(catalogRequest.Type == ControlMessageType.DeviceCatalogRequest &&
       catalogRequest.Payload.IsEmpty,
@@ -154,6 +161,12 @@ Check(IpcRequestSession.IsReplyTo(catalogRequest,
         new IpcEnvelopeV1(ControlMessageType.DeviceCatalogSnapshot, catalogRequest.RequestId,
                           ReadOnlyMemory<byte>.Empty)),
     "Device catalog snapshot reply correlation failed.");
+var statusRequest = commandFactory.RequestControlStatus();
+Check(statusRequest.Type == ControlMessageType.ControlStatusRequest &&
+      IpcRequestSession.IsReplyTo(statusRequest,
+        new IpcEnvelopeV1(ControlMessageType.ControlStatusSnapshot, statusRequest.RequestId,
+                          statusPayload)),
+    "Control status snapshot reply correlation failed.");
 var viewModel = new EasyControlViewModel { SelectedOutputGroup = " main " };
 Check(viewModel.ConnectionState == ControlConnectionState.Disconnected &&
       !viewModel.IsConnected && !viewModel.IsBusy &&
@@ -256,6 +269,19 @@ Check(viewModel.ApplyVolumeSafetyState(cappedVolume, out _) &&
       Math.Abs(viewModel.EffectiveVolumeDb + 12.0) < 1e-9 &&
       viewModel.SafetyStatusText.Contains("安全限制"),
     "ViewModel must expose an engine-reconciled safety cap without writing it back.");
+var statusFrame = new IpcEnvelopeV1(ControlMessageType.ControlStatusSnapshot, 0UL,
+                                    statusPayload);
+Check(viewModel.ApplyControlStatusSnapshot(statusFrame, out _) &&
+      viewModel.StatusSequence == 7UL && viewModel.Expert.RouteHealth.Count == 4 &&
+      viewModel.Expert.RouteHealth.Any(route => route.Id == "browser-tab" &&
+                                                route.RequiresUserAction),
+    "ViewModel must atomically apply a validated control status snapshot.");
+var malformedStatus = statusPayload.ToArray();
+malformedStatus[2] = 1;
+Check(!viewModel.ApplyControlStatusSnapshot(
+          new IpcEnvelopeV1(ControlMessageType.ControlStatusSnapshot, 0UL, malformedStatus),
+          out _) && viewModel.StatusSequence == 7UL,
+    "Malformed control status snapshot must preserve prior state.");
 Check(!viewModel.ApplyVolumeSafetyState(cappedVolume with { Generation = 3UL }, out var staleVolumeError) &&
       staleVolumeError.Contains("過期"),
     "Stale volume safety state must be rejected.");

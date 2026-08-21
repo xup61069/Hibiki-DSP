@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "hibiki/control_payloads.hpp"
+#include "hibiki/control_status.hpp"
 #include "hibiki/windows_device_catalog.hpp"
 
 namespace {
@@ -81,22 +82,29 @@ int main() {
         if (SUCCEEDED(init)) CoUninitialize();
         return 4;
     }
+    const auto round_trip = [&client](const hibiki::IpcFrameV1& request,
+                                     std::vector<std::uint8_t>& response_bytes) {
+        const auto request_bytes = hibiki::encode_ipc_frame(request);
+        auto request_size = static_cast<std::uint32_t>(request_bytes.size());
+        std::uint32_t response_size = 0U;
+        const bool request_ok = !request_bytes.empty() &&
+                                transfer_exact(client, &request_size, sizeof(request_size), true) &&
+                                transfer_exact(client,
+                                               const_cast<std::uint8_t*>(request_bytes.data()),
+                                               request_bytes.size(), true) &&
+                                transfer_exact(client, &response_size, sizeof(response_size), false) &&
+                                response_size <= 20000U;
+        response_bytes.assign(response_size, 0U);
+        return request_ok &&
+               transfer_exact(client, response_bytes.data(), response_bytes.size(), false);
+    };
     hibiki::IpcFrameV1 request;
     request.header.type = hibiki::IpcMessageType::DeviceCatalogRequest;
     request.header.request_id = 777U;
-    const auto request_bytes = hibiki::encode_ipc_frame(request);
-    auto request_size = static_cast<std::uint32_t>(request_bytes.size());
-    std::uint32_t response_size = 0U;
-    const bool request_ok = transfer_exact(client, &request_size, sizeof(request_size), true) &&
-                            transfer_exact(client, const_cast<std::uint8_t*>(request_bytes.data()),
-                                           request_bytes.size(), true) &&
-                            transfer_exact(client, &response_size, sizeof(response_size), false) &&
-                            response_size <= 20000U;
-    std::vector<std::uint8_t> response_bytes(response_size);
-    const bool response_read = request_ok &&
-                               transfer_exact(client, response_bytes.data(), response_bytes.size(),
-                                              false);
+    std::vector<std::uint8_t> response_bytes;
+    const bool response_read = round_trip(request, response_bytes);
     CloseHandle(client);
+    client = INVALID_HANDLE_VALUE;
     hibiki::IpcDecodeError response_error{hibiki::IpcDecodeError::None};
     const auto response = response_read
                               ? hibiki::decode_ipc_frame(response_bytes, response_error)
@@ -111,14 +119,44 @@ int main() {
                              decoded);
     hibiki::OutputGroupVolumeStateV1 volume_state{};
     const bool volume_ok = SUCCEEDED(runtime.read_volume(volume_state));
+    for (int attempt = 0; attempt < 30 && client == INVALID_HANDLE_VALUE; ++attempt) {
+        client = CreateFileW(kProbePipe, GENERIC_READ | GENERIC_WRITE, 0U, nullptr,
+                             OPEN_EXISTING, 0U, nullptr);
+        if (client == INVALID_HANDLE_VALUE) {
+            if (GetLastError() == ERROR_PIPE_BUSY) (void)WaitNamedPipeW(kProbePipe, 100U);
+            Sleep(10U);
+        }
+    }
+    hibiki::IpcFrameV1 status_request;
+    status_request.header.type = hibiki::IpcMessageType::ControlStatusRequest;
+    status_request.header.request_id = 778U;
+    std::vector<std::uint8_t> status_bytes;
+    const bool status_read = client != INVALID_HANDLE_VALUE &&
+                             round_trip(status_request, status_bytes);
+    hibiki::IpcDecodeError status_error{hibiki::IpcDecodeError::None};
+    const auto status_response = status_read
+                                     ? hibiki::decode_ipc_frame(status_bytes, status_error)
+                                     : std::optional<hibiki::IpcFrameV1>{};
+    hibiki::ControlStatusSnapshotV1 decoded_status;
+    const bool status_ok = status_response.has_value() &&
+                           status_response->header.type ==
+                               hibiki::IpcMessageType::ControlStatusSnapshot &&
+                           status_response->header.request_id == 778U &&
+                           hibiki::decode_control_status_snapshot_v1(
+                               std::span<const std::uint8_t>(status_response->payload.data(),
+                                                              status_response->payload.size()),
+                               decoded_status);
     std::printf("catalog_refresh=pass entries=%zu sequence=%llu payload_bytes=%zu wire=%s runtime=%s request=%s\n",
                 runtime.catalog().size(), static_cast<unsigned long long>(runtime.catalog_sequence()),
                 response.has_value() ? response->payload.size() : 0U,
                 wire_ok ? "pass" : "fail", runtime.running() ? "pass" : "fail",
                 wire_ok ? "pass" : "fail");
-    std::printf("volume=%s\n", volume_ok ? "pass" : "unavailable");
+    std::printf("volume=%s status=%s routes=%u status_sequence=%llu\n", volume_ok ? "pass" : "unavailable",
+                status_ok ? "pass" : "unavailable", decoded_status.route_count,
+                static_cast<unsigned long long>(decoded_status.sequence));
+    if (client != INVALID_HANDLE_VALUE) CloseHandle(client);
     runtime.stop();
     enumerator->Release();
     if (SUCCEEDED(init)) CoUninitialize();
-    return wire_ok && decoded.entry_count == runtime.catalog().size() ? 0 : 5;
+    return wire_ok && status_ok && decoded.entry_count == runtime.catalog().size() ? 0 : 5;
 }

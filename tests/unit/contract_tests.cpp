@@ -1,6 +1,7 @@
 #include "hibiki/contracts.hpp"
 #include "hibiki/control_payloads.hpp"
 #include "hibiki/control_service.hpp"
+#include "hibiki/control_status.hpp"
 #include "hibiki/device_switch.hpp"
 #include "hibiki/device_recovery.hpp"
 #include "hibiki/device_catalog.hpp"
@@ -115,6 +116,13 @@ bool accept_catalog_request(const hibiki::ControlCommandV1& command, void* conte
     if (context == nullptr) return false;
     auto* accepted = static_cast<bool*>(context);
     *accepted = command.type == hibiki::IpcMessageType::DeviceCatalogRequest;
+    return *accepted;
+}
+
+bool accept_status_request(const hibiki::ControlCommandV1& command, void* context) noexcept {
+    if (context == nullptr) return false;
+    auto* accepted = static_cast<bool*>(context);
+    *accepted = command.type == hibiki::IpcMessageType::ControlStatusRequest;
     return *accepted;
 }
 
@@ -978,6 +986,60 @@ int main() {
     CHECK(!snapshot_store.publish(
               std::span<const std::uint8_t>(published_payload.data(), published_bytes), 32U) &&
           snapshot_store.sequence() == 32U);
+    ControlStatusSnapshotV1 status_snapshot{};
+    status_snapshot.sequence = 3U;
+    status_snapshot.volume.requested_db = -6.0;
+    status_snapshot.volume.safety_ceiling_db = -12.0;
+    status_snapshot.volume.effective_db = -12.0;
+    status_snapshot.volume.generation = 4U;
+    status_snapshot.volume.origin = VolumeOrigin::Safety;
+    status_snapshot.volume.actuator = ActuatorMode::InternalDsp;
+    status_snapshot.route_count = 2U;
+    const auto fill_status_route = [](ControlRouteHealthEntryV1& route,
+                                      const std::string_view id,
+                                      const std::string_view name,
+                                      const std::string_view detail,
+                                      const ControlRouteHealthStateV1 state,
+                                      const bool requires_action) {
+        route.id_bytes = static_cast<std::uint8_t>(id.size());
+        route.name_bytes = static_cast<std::uint16_t>(name.size());
+        route.detail_bytes = static_cast<std::uint16_t>(detail.size());
+        route.state = state;
+        route.flags = requires_action ? 1U : 0U;
+        std::copy(id.begin(), id.end(), route.id.begin());
+        std::copy(name.begin(), name.end(), route.name.begin());
+        std::copy(detail.begin(), detail.end(), route.detail.begin());
+    };
+    fill_status_route(status_snapshot.routes[0], "windows-session", "Windows Session",
+                      "等待 active session", ControlRouteHealthStateV1::Pending, false);
+    fill_status_route(status_snapshot.routes[1], "browser-tab", "Chrome tab",
+                      "需要使用者點擊擴充功能", ControlRouteHealthStateV1::Pending, true);
+    std::array<std::uint8_t, kControlStatusSnapshotPayloadBytesV1> status_payload{};
+    std::size_t status_bytes = 0U;
+    CHECK(is_valid_message_type(IpcMessageType::ControlStatusRequest) &&
+          is_valid_message_type(IpcMessageType::ControlStatusSnapshot) &&
+          encode_control_status_snapshot_v1(status_snapshot, status_payload, status_bytes) &&
+          status_bytes == kControlStatusSnapshotHeaderBytesV1 +
+                              (2U * kControlStatusSnapshotEntryBytesV1));
+    ControlStatusSnapshotV1 decoded_status{};
+    CHECK(decode_control_status_snapshot_v1(
+              std::span<const std::uint8_t>(status_payload.data(), status_bytes), decoded_status) &&
+          decoded_status.sequence == 3U && decoded_status.route_count == 2U &&
+          decoded_status.volume.effective_db < decoded_status.volume.requested_db &&
+          decoded_status.routes[1].flags == 1U);
+    auto malformed_status = status_payload;
+    malformed_status[2U] = 1U;
+    CHECK(!decode_control_status_snapshot_v1(
+        std::span<const std::uint8_t>(malformed_status.data(), status_bytes), decoded_status));
+    ControlStatusSnapshotStoreV1 status_store;
+    IpcFrameV1 status_response;
+    CHECK(!status_store.has_snapshot() && !status_store.reply(status_response) &&
+          status_store.publish(status_snapshot) && status_store.sequence() == 3U &&
+          status_store.reply(status_response) &&
+          status_response.header.type == IpcMessageType::ControlStatusSnapshot &&
+          status_response.payload.size() == status_bytes);
+    CHECK(!status_store.publish(status_snapshot) && status_store.sequence() == 3U &&
+          control_status_snapshot_reply_v1(status_response, &status_store));
     ControlCommandQueueV1 command_queue;
     ControlCommandV1 queued_command{};
     queued_command.type = IpcMessageType::SceneApply;
@@ -1017,6 +1079,17 @@ int main() {
                                   &no_snapshot_service_context) &&
           catalog_response.header.type == IpcMessageType::Error &&
           catalog_response.header.request_id == 777U);
+    bool status_request_accepted = false;
+    ControlPlaneHandlerContextV1 status_service_context{
+        accept_status_request, &status_request_accepted, nullptr, nullptr,
+        control_status_snapshot_reply_v1, &status_store};
+    IpcFrameV1 status_request;
+    status_request.header.type = IpcMessageType::ControlStatusRequest;
+    status_request.header.request_id = 778U;
+    CHECK(handle_control_frame_v1(status_request, status_response,
+                                  &status_service_context) && status_request_accepted &&
+          status_response.header.type == IpcMessageType::ControlStatusSnapshot &&
+          status_response.header.request_id == 778U);
 
     auto scene_catalog = std::make_unique<SceneCatalogV1>();
     auto custom_defaults = make_easy_scene(EasySceneKind::Movie, "custom-output");

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "hibiki/control_payloads.hpp"
+#include "hibiki/control_status.hpp"
 #include "hibiki/device_catalog_snapshot.hpp"
 #include "hibiki/ipc_pipe.hpp"
 
@@ -17,12 +18,16 @@ using ControlCommandSinkV1 = bool (*)(const ControlCommandV1& command,
                                       void* context) noexcept;
 using DeviceCatalogSnapshotReplyV1 = bool (*)(IpcFrameV1& response,
                                               void* context) noexcept;
+using ControlStatusSnapshotReplyV1 = bool (*)(IpcFrameV1& response,
+                                              void* context) noexcept;
 
 struct ControlPlaneHandlerContextV1 {
     ControlCommandSinkV1 sink{nullptr};
     void* sink_context{nullptr};
     DeviceCatalogSnapshotReplyV1 snapshot_reply{nullptr};
     void* snapshot_context{nullptr};
+    ControlStatusSnapshotReplyV1 status_reply{nullptr};
+    void* status_context{nullptr};
 };
 
 // Single-producer (pipe worker), single-consumer (control worker) queue. The
@@ -63,11 +68,13 @@ public:
         const IpcNamedPipeConfigV1& config,
         ControlCommandSinkV1 sink,
         void* sink_context,
-        DeviceCatalogSnapshotStoreV1* snapshot_store = nullptr) noexcept;
+        DeviceCatalogSnapshotStoreV1* snapshot_store = nullptr,
+        ControlStatusSnapshotStoreV1* status_store = nullptr) noexcept;
 
     [[nodiscard]] bool start_with_queue(
         const IpcNamedPipeConfigV1& config,
-        DeviceCatalogSnapshotStoreV1* snapshot_store = nullptr) noexcept;
+        DeviceCatalogSnapshotStoreV1* snapshot_store = nullptr,
+        ControlStatusSnapshotStoreV1* status_store = nullptr) noexcept;
 
     void stop() noexcept;
 

@@ -23,7 +23,7 @@ In：WinUI 3 視窗、Easy/Expert 顯示、固定輸出群組卡片、場景卡�
 DeviceSwitch request、Windows 音量與 IR 相位滑桿、有效音量／安全上限／來源／致動器的
 可讀摘要、Expert 的 Matrix／DSP Graph／VST3 隔離／校正唯讀摘要，以及 Windows session、
 process loopback、瀏覽器單分頁與 direct bypass 的路由健康卡片、版本化 named-pipe Hello／SceneApply／VolumeNotification／DeviceSwitch
-／DeviceCatalogRequest／DeviceCatalogSnapshot 命令、連線失敗回復；音量拖曳使用 40 ms bounded debounce 與 command serialization，
+／DeviceCatalogRequest／DeviceCatalogSnapshot／ControlStatusRequest／ControlStatusSnapshot 命令、連線失敗回復；音量拖曳使用 40 ms bounded debounce 與 command serialization，
 只送出最新的控制值。
 
 Out：WaveRT/PortCls 驅動、實體裝置枚舉、音訊處理、VST3 UI、校正量測與
@@ -52,12 +52,15 @@ endpoint bind、30 ms equal-power crossfade 與回復仍由 C++ sink worker 負�
 
 `RouteHealthCardV1` 是保守的唯讀投影：shell 初始只顯示 `Pending` 或明確的
 `Bypassed`，不能把 process-level loopback 當成瀏覽器單分頁，也不能把 vendor ASIO／
-WASAPI Exclusive 說成已受控。未來的版本化狀態訊息可透過 `ApplyRouteHealth` 以 bounded、
-唯一 ID 的快照取代預設值；無效或重複身份必須整批拒絕。
+WASAPI Exclusive 說成已受控。`ControlStatusSnapshot` 可透過 `ApplyControlStatusSnapshot`
+以 bounded、唯一 ID 的快照取代預設值；無效或重複身份必須整批拒絕。
 
 `VolumeSafetyStateV1` 同時呈現 `requestedDb`、`safetyCeilingDb`、`effectiveDb`、mute、
 generation、origin 與 actuator。UI 永遠分開顯示使用者要求和實際有效值；安全截頂時說明
 「安全限制已介入」，狀態 generation 倒退或數值不合法則保留上一個狀態，不回寫 Windows。
+
+Hello 與裝置 catalog 成功後，ViewModel 會以序列化的 `ControlStatusRequest` 取得一次完整
+狀態；status store 未掛載時顯示控制狀態暫不可用，但不把整個音訊連線誤判為失敗。
 
 ## 失敗與安全
 
@@ -95,8 +98,8 @@ bytes。WinUI shell 可在沒有引擎時啟動，並以 Degraded 狀態呈現�
 
 1. Fresh clone 的 control-model check 通過，並覆蓋固定輸出群組、連線狀態、
    One-Tap／Scene／音量／DeviceSwitch 命令、目錄 stale/unplugged rejection、Expert
-   Matrix/DSP/VST3/校正摘要、路由健康快照的 duplicate rejection、音量安全截頂／過期
-   generation 與 bounded debounce。
+   Matrix/DSP/VST3/校正摘要、ControlStatusSnapshot route／volume round-trip、duplicate
+   rejection、音量安全截頂／過期 generation、status request correlation 與 bounded debounce。
 2. WinUI source-only shell 只引用 control-model；git history、CI artifacts
    與 release 不包含編譯產物。
 3. 沒有 engine pipe 時，按連接會在 bounded timeout 後顯示 Degraded，UI 不崩潰；

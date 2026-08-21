@@ -20,7 +20,9 @@ public enum ControlMessageType : ushort
     SceneApply = 8,
     DeviceSwitch = 9,
     DeviceCatalogSnapshot = 10,
-    DeviceCatalogRequest = 11
+    DeviceCatalogRequest = 11,
+    ControlStatusSnapshot = 12,
+    ControlStatusRequest = 13
 }
 
 public enum IpcDecodeError
@@ -117,7 +119,8 @@ public static class IpcCodecV1
         ControlMessageType.GraphPrepare or ControlMessageType.GraphCommit or
         ControlMessageType.GraphRollback or ControlMessageType.Ack or ControlMessageType.Error or
         ControlMessageType.SceneApply or ControlMessageType.DeviceSwitch or
-        ControlMessageType.DeviceCatalogSnapshot or ControlMessageType.DeviceCatalogRequest;
+        ControlMessageType.DeviceCatalogSnapshot or ControlMessageType.DeviceCatalogRequest or
+        ControlMessageType.ControlStatusSnapshot or ControlMessageType.ControlStatusRequest;
 }
 
 public static class ControlPayloadsV1
@@ -133,6 +136,12 @@ public static class ControlPayloadsV1
     public const int DeviceCatalogSnapshotMaxBytes = DeviceCatalogSnapshotHeaderBytes +
                                                       (DeviceCatalogSnapshotEntryBytes *
                                                        DeviceCatalogSnapshotCapacity);
+    public const int ControlStatusSnapshotHeaderBytes = 40;
+    public const int ControlStatusSnapshotEntryBytes = 224;
+    public const int ControlStatusSnapshotCapacity = 8;
+    public const int ControlStatusSnapshotMaxBytes = ControlStatusSnapshotHeaderBytes +
+                                                     (ControlStatusSnapshotEntryBytes *
+                                                      ControlStatusSnapshotCapacity);
     private static readonly System.Text.UTF8Encoding StrictUtf8 =
         new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
@@ -434,6 +443,137 @@ public static class ControlPayloadsV1
         devices = list;
         return true;
     }
+
+    public static byte[] EncodeControlStatusSnapshot(
+        ulong sequence,
+        VolumeSafetyStateV1 volume,
+        IReadOnlyList<RouteHealthCardV1> routes)
+    {
+        if (!volume.IsValid || routes is null || routes.Count > ControlStatusSnapshotCapacity)
+            throw new ArgumentException("Control status snapshot is outside the v1 limit.");
+        var payload = new byte[ControlStatusSnapshotHeaderBytes +
+                               (routes.Count * ControlStatusSnapshotEntryBytes)];
+        BinaryPrimitives.WriteUInt16LittleEndian(payload, (ushort)routes.Count);
+        BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(4), sequence);
+        WriteDbQ16(payload.AsSpan(12), volume.RequestedDb);
+        WriteDbQ16(payload.AsSpan(16), volume.SafetyCeilingDb);
+        WriteDbQ16(payload.AsSpan(20), volume.EffectiveDb);
+        payload[24] = volume.Muted ? (byte)1 : (byte)0;
+        payload[25] = (byte)volume.Origin;
+        payload[26] = (byte)volume.Actuator;
+        BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(28), volume.Generation);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        for (var index = 0; index < routes.Count; index++)
+        {
+            var route = routes[index];
+            var routeId = route.Id ?? string.Empty;
+            var id = StrictUtf8.GetBytes(routeId);
+            var name = StrictUtf8.GetBytes(route.Name ?? string.Empty);
+            var detail = StrictUtf8.GetBytes(route.Detail ?? string.Empty);
+            if (id.Length is < 1 or > 31 || name.Length is < 1 or > 63 ||
+                detail.Length is < 1 or > 119 || id.Any(value => value < 0x20) ||
+                name.Any(value => value < 0x20) || detail.Any(value => value < 0x20) ||
+                !Enum.IsDefined(route.State) || !seen.Add(routeId))
+                throw new ArgumentException("Route health entry is invalid.", nameof(routes));
+            var offset = ControlStatusSnapshotHeaderBytes +
+                         (index * ControlStatusSnapshotEntryBytes);
+            payload[offset] = (byte)id.Length;
+            payload[offset + 1] = (byte)route.State;
+            BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(offset + 2),
+                                                     route.RequiresUserAction ? (ushort)1 : (ushort)0);
+            BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(offset + 4), (ushort)name.Length);
+            BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(offset + 6), (ushort)detail.Length);
+            id.CopyTo(payload.AsSpan(offset + 8));
+            name.CopyTo(payload.AsSpan(offset + 40));
+            detail.CopyTo(payload.AsSpan(offset + 104));
+        }
+        return payload;
+    }
+
+    public static bool TryDecodeControlStatusSnapshot(
+        ReadOnlySpan<byte> payload,
+        out ulong sequence,
+        out VolumeSafetyStateV1 volume,
+        out IReadOnlyList<RouteHealthCardV1> routes)
+    {
+        sequence = 0UL;
+        volume = VolumeSafetyStateV1.Initial();
+        routes = Array.Empty<RouteHealthCardV1>();
+        if (payload.Length < ControlStatusSnapshotHeaderBytes ||
+            payload.Length > ControlStatusSnapshotMaxBytes || payload[2] != 0 || payload[3] != 0 ||
+            payload[27] != 0 || payload[36] != 0 || payload[37] != 0 ||
+            payload[38] != 0 || payload[39] != 0)
+            return false;
+        var count = BinaryPrimitives.ReadUInt16LittleEndian(payload);
+        var expected = ControlStatusSnapshotHeaderBytes +
+                       (count * ControlStatusSnapshotEntryBytes);
+        if (count > ControlStatusSnapshotCapacity || payload.Length != expected ||
+            payload[24] > 1 || payload[25] > (byte)VolumeStateOriginV1.Session ||
+            payload[26] > (byte)VolumeActuatorV1.StrictDirect)
+            return false;
+        var requested = ReadDbQ16(payload[12..]);
+        var ceiling = ReadDbQ16(payload[16..]);
+        var effective = ReadDbQ16(payload[20..]);
+        volume = new VolumeSafetyStateV1(requested, ceiling, effective, payload[24] != 0,
+                                          BinaryPrimitives.ReadUInt64LittleEndian(payload[28..]),
+                                          (VolumeStateOriginV1)payload[25],
+                                          (VolumeActuatorV1)payload[26]);
+        if (!volume.IsValid) return false;
+        sequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[4..]);
+        var list = new List<RouteHealthCardV1>(count);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        for (var index = 0; index < count; index++)
+        {
+            var offset = ControlStatusSnapshotHeaderBytes +
+                         (index * ControlStatusSnapshotEntryBytes);
+            var entry = payload.Slice(offset, ControlStatusSnapshotEntryBytes);
+            var idBytes = entry[0];
+            var rawState = entry[1];
+            var flags = BinaryPrimitives.ReadUInt16LittleEndian(entry[2..]);
+            var nameBytes = BinaryPrimitives.ReadUInt16LittleEndian(entry[4..]);
+            var detailBytes = BinaryPrimitives.ReadUInt16LittleEndian(entry[6..]);
+            if (idBytes is < 1 or > 31 || nameBytes is < 1 or > 63 ||
+                detailBytes is < 1 or > 119 || rawState > (byte)RouteHealthStateV1.Unavailable ||
+                (flags & 0xfffe) != 0 || !IsZero(entry[8..], idBytes, 32) ||
+                !IsZero(entry[40..], nameBytes, 64) || !IsZero(entry[104..], detailBytes, 120))
+                return false;
+            string id;
+            string name;
+            string detail;
+            try
+            {
+                id = StrictUtf8.GetString(entry.Slice(8, idBytes));
+                name = StrictUtf8.GetString(entry.Slice(40, nameBytes));
+                detail = StrictUtf8.GetString(entry.Slice(104, detailBytes));
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+            if (id.Any(char.IsControl) || name.Any(char.IsControl) || detail.Any(char.IsControl) ||
+                !seen.Add(id)) return false;
+            list.Add(new RouteHealthCardV1(id, name, (RouteHealthStateV1)rawState, detail,
+                                           (flags & 1) != 0));
+        }
+        routes = list;
+        return true;
+    }
+
+    private static void WriteDbQ16(Span<byte> destination, double db)
+    {
+        var q16 = checked((int)Math.Round(db * 65536.0, MidpointRounding.AwayFromZero));
+        BinaryPrimitives.WriteInt32LittleEndian(destination, q16);
+    }
+
+    private static double ReadDbQ16(ReadOnlySpan<byte> source) =>
+        BinaryPrimitives.ReadInt32LittleEndian(source) / 65536.0;
+
+    private static bool IsZero(ReadOnlySpan<byte> source, int used, int capacity)
+    {
+        for (var index = used; index < capacity; index++)
+            if (source[index] != 0) return false;
+        return true;
+    }
 }
 
 // The UI/control plane owns request IDs; the audio thread never creates or
@@ -453,7 +593,9 @@ public sealed class IpcRequestSession
         request.RequestId != 0 && request.RequestId == reply.RequestId &&
         (reply.Type is ControlMessageType.Ack or ControlMessageType.Error ||
          request.Type == ControlMessageType.DeviceCatalogRequest &&
-         reply.Type == ControlMessageType.DeviceCatalogSnapshot);
+         reply.Type == ControlMessageType.DeviceCatalogSnapshot ||
+         request.Type == ControlMessageType.ControlStatusRequest &&
+         reply.Type == ControlMessageType.ControlStatusSnapshot);
 }
 
 public sealed class ControlCommandFactoryV1
@@ -486,6 +628,9 @@ public sealed class ControlCommandFactoryV1
 
     public IpcEnvelopeV1 RequestDeviceCatalog() =>
         _requests.Create(ControlMessageType.DeviceCatalogRequest);
+
+    public IpcEnvelopeV1 RequestControlStatus() =>
+        _requests.Create(ControlMessageType.ControlStatusRequest);
 }
 
 // Thin asynchronous client for the control worker. It owns no UI state and

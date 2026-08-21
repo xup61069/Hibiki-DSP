@@ -154,6 +154,14 @@ public:
     [[nodiscard]] DeviceCatalogSnapshotStoreV1* snapshot_store() noexcept {
         return catalog_service_.snapshot_store();
     }
+    [[nodiscard]] ControlStatusSnapshotStoreV1* status_store() noexcept {
+        return &status_store_;
+    }
+    // Publishes a caller-built control-plane status candidate. The caller must
+    // supply route identities from its worker; this method never queries COM
+    // or the RT graph.
+    [[nodiscard]] bool publish_status_snapshot(
+        const ControlStatusSnapshotV1& snapshot) noexcept;
     [[nodiscard]] std::uint64_t catalog_sequence() const noexcept {
         return catalog_service_.sequence();
     }
@@ -162,6 +170,11 @@ private:
     WindowsPhysicalDeviceCatalogServiceV1 catalog_service_{};
     ControlPlaneHostV1 host_{};
     WindowsVolumeBroker volume_broker_{};
+    ControlStatusSnapshotStoreV1 status_store_{};
+    ControlStatusSnapshotV1 status_snapshot_{};
+
+    [[nodiscard]] bool publish_status_volume(
+        const OutputGroupVolumeStateV1& state) noexcept;
 };
 
 }  // namespace hibiki
