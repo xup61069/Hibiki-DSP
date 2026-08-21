@@ -14,6 +14,8 @@
 
 #include <algorithm>
 #include <cwchar>
+#include <cstdio>
+#include <cstring>
 #include <exception>
 #include <new>
 #include <string>
@@ -57,6 +59,35 @@ ControlStatusSnapshotV1 make_initial_status(const std::uint64_t sequence) noexce
         "direct-path", "Vendor ASIO / WASAPI Exclusive", "Path bypasses Hibiki",
         ControlRouteHealthStateV1::Bypassed, false);
     return snapshot;
+}
+
+bool update_status_route(ControlStatusSnapshotV1& snapshot,
+                         const std::string_view id,
+                         const ControlRouteHealthStateV1 state,
+                         const bool requires_action,
+                         const char* const detail) noexcept {
+    if (detail == nullptr) return false;
+    for (std::size_t index = 0U; index < snapshot.route_count; ++index) {
+        auto& route = snapshot.routes[index];
+        if (std::string_view(route.id.data(), route.id_bytes) != id) continue;
+        char bounded[kControlStatusSnapshotEntryBytesV1]{};
+        const int written = std::snprintf(bounded, sizeof(bounded), "%s", detail);
+        if (written < 0) return false;
+        const auto bytes = static_cast<std::size_t>(written) < route.detail.size()
+                               ? static_cast<std::size_t>(written)
+                               : route.detail.size() - 1U;
+        const auto expected_flags = static_cast<std::uint16_t>(requires_action ? 1U : 0U);
+        const bool changed = route.state != state || route.flags != expected_flags ||
+                             route.detail_bytes != bytes ||
+                             std::memcmp(route.detail.data(), bounded, bytes) != 0;
+        route.state = state;
+        route.flags = expected_flags;
+        route.detail.fill('\0');
+        std::memcpy(route.detail.data(), bounded, bytes);
+        route.detail_bytes = static_cast<std::uint16_t>(bytes);
+        return changed;
+    }
+    return false;
 }
 
 std::string utf8_from_wide(const wchar_t* value) {
@@ -418,18 +449,29 @@ bool WindowsControlRuntimeV1::start(
 
 void WindowsControlRuntimeV1::stop() noexcept {
     host_.stop();
+    session_routes_.unbind();
     volume_broker_.unbind();
     catalog_service_.unbind();
 }
 
 HRESULT WindowsControlRuntimeV1::refresh_now() noexcept {
     if (!running()) return E_UNEXPECTED;
-    return catalog_service_.refresh_now();
+    const auto result = catalog_service_.refresh_now();
+    if (SUCCEEDED(result)) {
+        (void)session_routes_.refresh();
+        (void)publish_session_route_status();
+    }
+    return result;
 }
 
 HRESULT WindowsControlRuntimeV1::poll_and_refresh() noexcept {
     if (!running()) return E_UNEXPECTED;
-    return catalog_service_.poll_and_refresh();
+    const auto result = catalog_service_.poll_and_refresh();
+    if (SUCCEEDED(result)) {
+        (void)session_routes_.poll_and_refresh();
+        (void)publish_session_route_status();
+    }
+    return result;
 }
 
 HRESULT WindowsControlRuntimeV1::refresh_default_volume(
@@ -440,6 +482,7 @@ HRESULT WindowsControlRuntimeV1::refresh_default_volume(
     if (FAILED(result) || device == nullptr) return FAILED(result) ? result : E_FAIL;
     const auto bind_result = volume_broker_.bind(device);
     device->Release();
+    if (SUCCEEDED(bind_result)) (void)refresh_default_session_routes(enumerator);
     return bind_result;
 }
 
@@ -451,7 +494,26 @@ HRESULT WindowsControlRuntimeV1::refresh_default_volume_if_changed(
     if (FAILED(result) || device == nullptr) return FAILED(result) ? result : E_FAIL;
     const auto bind_result = volume_broker_.bind_if_changed(device);
     device->Release();
+    if (SUCCEEDED(bind_result)) (void)refresh_default_session_routes(enumerator);
     return bind_result;
+}
+
+HRESULT WindowsControlRuntimeV1::refresh_default_session_routes(
+    IMMDeviceEnumerator* const enumerator) noexcept {
+    if (!running() || enumerator == nullptr) return E_INVALIDARG;
+    IMMDevice* device = nullptr;
+    const auto result = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
+    if (FAILED(result) || device == nullptr) return FAILED(result) ? result : E_FAIL;
+    const auto bind_result = session_routes_.bind(device);
+    device->Release();
+    if (FAILED(bind_result)) return bind_result;
+    const auto refresh_result = session_routes_.refresh();
+    if (refresh_result == WindowsAudioSessionRouteRefreshResultV1::Degraded) {
+        (void)publish_session_route_status();
+        return E_FAIL;
+    }
+    (void)publish_session_route_status();
+    return S_OK;
 }
 
 HRESULT WindowsControlRuntimeV1::read_volume(OutputGroupVolumeStateV1& state) noexcept {
@@ -496,6 +558,46 @@ bool WindowsControlRuntimeV1::publish_status_volume(
     if (candidate.sequence == UINT64_MAX) return false;
     candidate.sequence += 1U;
     candidate.volume = state;
+    if (!status_store_.publish(candidate)) return false;
+    status_snapshot_ = candidate;
+    return true;
+}
+
+bool WindowsControlRuntimeV1::publish_session_route_status() noexcept {
+    if (!status_store_.has_snapshot()) return false;
+    const auto route_snapshot = session_routes_.snapshot();
+    auto candidate = status_snapshot_;
+    const auto session_state = route_snapshot.degraded
+                                   ? ControlRouteHealthStateV1::Degraded
+                                   : route_snapshot.has_graph
+                                       ? ControlRouteHealthStateV1::Ready
+                                       : route_snapshot.session_count > 0U
+                                           ? ControlRouteHealthStateV1::Pending
+                                           : ControlRouteHealthStateV1::Unavailable;
+    const auto process_state = route_snapshot.degraded
+                                    ? ControlRouteHealthStateV1::Degraded
+                                    : route_snapshot.routed_count > 0U
+                                        ? ControlRouteHealthStateV1::Pending
+                                        : ControlRouteHealthStateV1::Unavailable;
+    char session_detail[120U]{};
+    char process_detail[120U]{};
+    const int session_written = std::snprintf(
+        session_detail, sizeof(session_detail),
+        "sessions=%zu active=%zu routed=%zu; graph=%s; physical delivery unverified",
+        route_snapshot.session_count, route_snapshot.active_count, route_snapshot.routed_count,
+        route_snapshot.has_graph ? "ready" : "idle");
+    const int process_written = std::snprintf(
+        process_detail, sizeof(process_detail),
+        "routed sessions=%zu; process-tree source remains worker-owned and unverified",
+        route_snapshot.routed_count);
+    if (session_written < 0 || process_written < 0) return false;
+    const bool session_changed = update_status_route(
+        candidate, "windows-session", session_state, false, session_detail);
+    const bool process_changed = update_status_route(
+        candidate, "process-loopback", process_state, false, process_detail);
+    if (!session_changed && !process_changed) return true;
+    if (candidate.sequence == UINT64_MAX) return false;
+    ++candidate.sequence;
     if (!status_store_.publish(candidate)) return false;
     status_snapshot_ = candidate;
     return true;

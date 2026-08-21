@@ -7,6 +7,7 @@
 #include "hibiki/control_service.hpp"
 #include "hibiki/device_catalog.hpp"
 #include "hibiki/device_catalog_snapshot.hpp"
+#include "hibiki/windows_audio_session_route.hpp"
 #include "hibiki/windows_device_watcher.hpp"
 #include "hibiki/windows_volume_broker.hpp"
 
@@ -172,9 +173,13 @@ private:
     WindowsVolumeBroker volume_broker_{};
     ControlStatusSnapshotStoreV1 status_store_{};
     ControlStatusSnapshotV1 status_snapshot_{};
+    WindowsAudioSessionRouteCoordinatorV1 session_routes_{};
 
     [[nodiscard]] bool publish_status_volume(
         const OutputGroupVolumeStateV1& state) noexcept;
+    [[nodiscard]] HRESULT refresh_default_session_routes(
+        IMMDeviceEnumerator* enumerator) noexcept;
+    [[nodiscard]] bool publish_session_route_status() noexcept;
 };
 
 }  // namespace hibiki

@@ -10,6 +10,7 @@
 
 #include <cstdio>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 #include "hibiki/control_payloads.hpp"
@@ -145,18 +146,36 @@ int main() {
                            hibiki::decode_control_status_snapshot_v1(
                                std::span<const std::uint8_t>(status_response->payload.data(),
                                                               status_response->payload.size()),
-                               decoded_status);
+                              decoded_status);
+    const auto route_id = [](const hibiki::ControlRouteHealthEntryV1& route) {
+        return std::string_view(route.id.data(), route.id_bytes);
+    };
+    const bool route_status_ok = status_ok && decoded_status.route_count == 4U &&
+                                 route_id(decoded_status.routes[0]) == "windows-session" &&
+                                 route_id(decoded_status.routes[1]) == "process-loopback" &&
+                                 route_id(decoded_status.routes[2]) == "browser-tab" &&
+                                 route_id(decoded_status.routes[3]) == "direct-path" &&
+                                 std::string_view(decoded_status.routes[0].detail.data(),
+                                                  decoded_status.routes[0].detail_bytes)
+                                         .find("physical delivery unverified") !=
+                                     std::string_view::npos;
     std::printf("catalog_refresh=pass entries=%zu sequence=%llu payload_bytes=%zu wire=%s runtime=%s request=%s\n",
                 runtime.catalog().size(), static_cast<unsigned long long>(runtime.catalog_sequence()),
                 response.has_value() ? response->payload.size() : 0U,
                 wire_ok ? "pass" : "fail", runtime.running() ? "pass" : "fail",
                 wire_ok ? "pass" : "fail");
-    std::printf("volume=%s status=%s routes=%u status_sequence=%llu\n", volume_ok ? "pass" : "unavailable",
-                status_ok ? "pass" : "unavailable", decoded_status.route_count,
-                static_cast<unsigned long long>(decoded_status.sequence));
+    std::printf("volume=%s status=%s route_status=%s routes=%u status_sequence=%llu session_state=%u process_state=%u\n",
+                volume_ok ? "pass" : "unavailable", status_ok ? "pass" : "unavailable",
+                route_status_ok ? "pass" : "unavailable", decoded_status.route_count,
+                static_cast<unsigned long long>(decoded_status.sequence),
+                static_cast<unsigned int>(decoded_status.routes[0].state),
+                static_cast<unsigned int>(decoded_status.routes[1].state));
     if (client != INVALID_HANDLE_VALUE) CloseHandle(client);
     runtime.stop();
     enumerator->Release();
     if (SUCCEEDED(init)) CoUninitialize();
-    return wire_ok && status_ok && decoded.entry_count == runtime.catalog().size() ? 0 : 5;
+    return wire_ok && status_ok && route_status_ok &&
+                   decoded.entry_count == runtime.catalog().size()
+               ? 0
+               : 5;
 }
