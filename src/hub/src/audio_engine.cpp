@@ -7,6 +7,10 @@
 
 namespace hibiki {
 
+AudioEngineModel::AudioEngineModel() : volume_bank_(std::make_unique<OutputGroupVolumeBankV1>()) {}
+
+AudioEngineModel::~AudioEngineModel() = default;
+
 bool AudioEngineModel::prepare_graph(const GraphConfigV1& graph,
                                      const std::uint64_t revision) noexcept {
     RtGraphSnapshotV1 candidate;
@@ -30,6 +34,16 @@ bool AudioEngineModel::prepare_graph(const GraphConfigV1& graph,
         has_pending_graph_ = false;
         pending_latency_bank_ = LaneLatencyBankV1{};
         return false;
+    }
+    for (std::size_t index = 0U; index < candidate.lane_count; ++index) {
+        const auto& lane = candidate.lanes[index];
+        if (volume_bank_ == nullptr || !volume_bank_->register_group(std::string_view(
+                lane.output_group.data(), lane.output_group_bytes))) {
+            state_ = EngineTransactionState::Degraded;
+            has_pending_graph_ = false;
+            pending_latency_bank_ = LaneLatencyBankV1{};
+            return false;
+        }
     }
     pending_graph_ = candidate;
     pending_latency_bank_ = std::move(prepared_latency_bank);
@@ -58,17 +72,15 @@ void AudioEngineModel::rollback_graph() noexcept {
 
 VolumeNotificationResult AudioEngineModel::apply_windows_volume(
     const VolumeNotificationV1& notification) noexcept {
-    const auto result = apply_windows_notification(volume_, notification);
-    if (result == VolumeNotificationResult::Accepted) {
-        // Release publishes a complete control-plane update; process() only
-        // consumes these immutable scalar snapshots and never races volume_.
-        const auto effective_q16 = db_to_q16_16(volume_.effective_db);
-        const auto packed = (static_cast<std::uint64_t>(
-                                 static_cast<std::uint32_t>(effective_q16)) << 32U) |
-                            (volume_.mute ? 1ULL : 0ULL);
-        rt_volume_word_.store(packed, std::memory_order_release);
-    }
-    return result;
+    return apply_windows_volume("main", notification);
+}
+
+VolumeNotificationResult AudioEngineModel::apply_windows_volume(
+    const std::string_view output_group,
+    const VolumeNotificationV1& notification) noexcept {
+    return volume_bank_ != nullptr
+               ? volume_bank_->apply_windows_notification(output_group, notification)
+               : VolumeNotificationResult::Invalid;
 }
 
 bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
@@ -79,16 +91,7 @@ bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
                        &active_latency_bank_)) {
         return false;
     }
-    const auto volume_word = rt_volume_word_.load(std::memory_order_acquire);
-    const auto effective_q16 = static_cast<std::int32_t>(volume_word >> 32U);
-    rt_volume_ramp_.observe_target(effective_q16, (volume_word & 1ULL) != 0ULL,
-                                   sample_rate_.load(std::memory_order_relaxed));
-    for (std::size_t frame = 0U; frame < frames; ++frame) {
-        const auto gain = rt_volume_ramp_.next_gain();
-        for (std::uint32_t channel = 0U; channel < active_graph_.output_channels; ++channel) {
-            output_interleaved[frame * active_graph_.output_channels + channel] *= gain;
-        }
-    }
+    if (!apply_group_master("main", output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
         (void)rt_true_peak_limiter_.limit_in_place(
             output_interleaved, frames, active_graph_.output_channels, -1.0);
@@ -105,16 +108,7 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
                                         output_interleaved, frames, &active_latency_bank_)) {
         return false;
     }
-    const auto volume_word = rt_volume_word_.load(std::memory_order_acquire);
-    const auto effective_q16 = static_cast<std::int32_t>(volume_word >> 32U);
-    rt_volume_ramp_.observe_target(effective_q16, (volume_word & 1ULL) != 0ULL,
-                                   sample_rate_.load(std::memory_order_relaxed));
-    for (std::size_t frame = 0U; frame < frames; ++frame) {
-        const auto gain = rt_volume_ramp_.next_gain();
-        for (std::uint32_t channel = 0U; channel < active_graph_.output_channels; ++channel) {
-            output_interleaved[frame * active_graph_.output_channels + channel] *= gain;
-        }
-    }
+    if (!apply_group_master(output_group, output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
         (void)rt_true_peak_limiter_.limit_in_place(
             output_interleaved, frames, active_graph_.output_channels, -1.0);
@@ -384,6 +378,15 @@ bool AudioEngineModel::process_lane_block_to_wasapi(
     }
     return wasapi_handoff_.process(output_interleaved, static_cast<std::uint32_t>(frames),
                                    active_graph_.output_channels);
+}
+
+bool AudioEngineModel::apply_group_master(const std::string_view output_group,
+                                          float* const output_interleaved,
+                                          const std::size_t frames) const noexcept {
+    if (active_graph_.strict_direct) return true;
+    return volume_bank_ != nullptr && volume_bank_->apply_to_interleaved(
+        output_group, output_interleaved, frames, active_graph_.output_channels,
+        sample_rate_.load(std::memory_order_relaxed));
 }
 
 }  // namespace hibiki

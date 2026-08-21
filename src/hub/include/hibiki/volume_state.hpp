@@ -3,6 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include <cstdint>
+#include <array>
+#include <atomic>
+#include <cstddef>
+#include <string_view>
 
 namespace hibiki {
 
@@ -73,6 +77,58 @@ enum class VolumeNotificationResult : std::uint8_t {
     Accepted,
     StaleGeneration,
     Invalid,
+};
+
+// A control-plane registry plus RT-owned ramps for each immutable output-group
+// label. Groups are registered before a graph is committed; the audio thread
+// only reads the per-slot atomic dB/mute word and advances its own ramp.
+constexpr std::size_t kMaxOutputVolumeGroupsV1 = 32U;
+constexpr std::size_t kMaxOutputVolumeGroupBytesV1 = 64U;
+
+class OutputGroupVolumeBankV1 final {
+public:
+    OutputGroupVolumeBankV1() noexcept;
+    OutputGroupVolumeBankV1(const OutputGroupVolumeBankV1&) = delete;
+    OutputGroupVolumeBankV1& operator=(const OutputGroupVolumeBankV1&) = delete;
+
+    // Must be called by the control worker before the group can be rendered.
+    // Registration never allocates and is idempotent for an existing label.
+    [[nodiscard]] bool register_group(std::string_view output_group) noexcept;
+    [[nodiscard]] bool has_group(std::string_view output_group) const noexcept;
+    [[nodiscard]] std::size_t group_count() const noexcept { return group_count_; }
+
+    [[nodiscard]] VolumeNotificationResult apply_windows_notification(
+        std::string_view output_group,
+        const VolumeNotificationV1& notification) noexcept;
+    [[nodiscard]] OutputGroupVolumeStateV1 state(
+        std::string_view output_group) const noexcept;
+
+    // RT-only operation. It returns false when the group is not registered or
+    // the caller supplies an invalid block; it performs no allocation, lock or
+    // platform call.
+    [[nodiscard]] bool apply_to_interleaved(std::string_view output_group,
+                                            float* interleaved,
+                                            std::size_t frames,
+                                            std::uint32_t channels,
+                                            std::uint32_t sample_rate) const noexcept;
+
+private:
+    struct Slot {
+        bool used{false};
+        std::uint8_t group_bytes{0U};
+        std::array<char, kMaxOutputVolumeGroupBytesV1> group{};
+        OutputGroupVolumeStateV1 control{};
+        std::atomic<std::uint64_t> rt_word{};
+        mutable VolumeRampProcessorV1 ramp{};
+    };
+
+    [[nodiscard]] Slot* find_slot(std::string_view output_group) noexcept;
+    [[nodiscard]] const Slot* find_slot(std::string_view output_group) const noexcept;
+    static bool valid_group(std::string_view output_group) noexcept;
+    static void publish_rt_word(Slot& slot) noexcept;
+
+    std::array<Slot, kMaxOutputVolumeGroupsV1> slots_{};
+    std::size_t group_count_{0U};
 };
 
 [[nodiscard]] double effective_gain_db(double requested_db, double safety_ceiling_db) noexcept;

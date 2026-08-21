@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <string_view>
 
 namespace hibiki {
 
@@ -99,6 +100,110 @@ VolumeNotificationResult apply_windows_notification(
     state.origin = VolumeOrigin::Windows;
     state = reconcile(state);
     return VolumeNotificationResult::Accepted;
+}
+
+OutputGroupVolumeBankV1::OutputGroupVolumeBankV1() noexcept {
+    (void)register_group("main");
+}
+
+bool OutputGroupVolumeBankV1::valid_group(const std::string_view output_group) noexcept {
+    return !output_group.empty() && output_group.size() <= kMaxOutputVolumeGroupBytesV1 &&
+           output_group.find('\0') == std::string_view::npos;
+}
+
+OutputGroupVolumeBankV1::Slot* OutputGroupVolumeBankV1::find_slot(
+    const std::string_view output_group) noexcept {
+    if (!valid_group(output_group)) return nullptr;
+    for (auto& slot : slots_) {
+        if (slot.used && slot.group_bytes == output_group.size() &&
+            std::equal(output_group.begin(), output_group.end(), slot.group.begin())) {
+            return &slot;
+        }
+    }
+    return nullptr;
+}
+
+const OutputGroupVolumeBankV1::Slot* OutputGroupVolumeBankV1::find_slot(
+    const std::string_view output_group) const noexcept {
+    if (!valid_group(output_group)) return nullptr;
+    for (const auto& slot : slots_) {
+        if (slot.used && slot.group_bytes == output_group.size() &&
+            std::equal(output_group.begin(), output_group.end(), slot.group.begin())) {
+            return &slot;
+        }
+    }
+    return nullptr;
+}
+
+void OutputGroupVolumeBankV1::publish_rt_word(Slot& slot) noexcept {
+    const auto effective_q16 = db_to_q16_16(slot.control.effective_db);
+    const auto packed = (static_cast<std::uint64_t>(
+                             static_cast<std::uint32_t>(effective_q16)) << 32U) |
+                        (slot.control.mute ? 1ULL : 0ULL);
+    slot.rt_word.store(packed, std::memory_order_release);
+}
+
+bool OutputGroupVolumeBankV1::register_group(const std::string_view output_group) noexcept {
+    if (!valid_group(output_group)) return false;
+    if (find_slot(output_group) != nullptr) return true;
+    if (group_count_ >= kMaxOutputVolumeGroupsV1) return false;
+
+    for (auto& slot : slots_) {
+        if (slot.used) continue;
+        slot.used = true;
+        slot.group_bytes = static_cast<std::uint8_t>(output_group.size());
+        std::copy(output_group.begin(), output_group.end(), slot.group.begin());
+        slot.control = OutputGroupVolumeStateV1{};
+        slot.control = reconcile(slot.control);
+        slot.ramp.reset(slot.control.effective_db, slot.control.mute);
+        publish_rt_word(slot);
+        ++group_count_;
+        return true;
+    }
+    return false;
+}
+
+bool OutputGroupVolumeBankV1::has_group(const std::string_view output_group) const noexcept {
+    return find_slot(output_group) != nullptr;
+}
+
+VolumeNotificationResult OutputGroupVolumeBankV1::apply_windows_notification(
+    const std::string_view output_group,
+    const VolumeNotificationV1& notification) noexcept {
+    auto* const slot = find_slot(output_group);
+    if (slot == nullptr) return VolumeNotificationResult::Invalid;
+    const auto result = hibiki::apply_windows_notification(slot->control, notification);
+    if (result == VolumeNotificationResult::Accepted) publish_rt_word(*slot);
+    return result;
+}
+
+OutputGroupVolumeStateV1 OutputGroupVolumeBankV1::state(
+    const std::string_view output_group) const noexcept {
+    const auto* const slot = find_slot(output_group);
+    if (slot != nullptr) return slot->control;
+    const auto* const main = find_slot("main");
+    return main != nullptr ? main->control : OutputGroupVolumeStateV1{};
+}
+
+bool OutputGroupVolumeBankV1::apply_to_interleaved(const std::string_view output_group,
+                                                   float* const interleaved,
+                                                   const std::size_t frames,
+                                                   const std::uint32_t channels,
+                                                   std::uint32_t sample_rate) const noexcept {
+    if (interleaved == nullptr || frames == 0U || channels == 0U || channels > 8U) return false;
+    const auto* const slot = find_slot(output_group);
+    if (slot == nullptr) return false;
+
+    const auto volume_word = slot->rt_word.load(std::memory_order_acquire);
+    const auto effective_q16 = static_cast<std::int32_t>(volume_word >> 32U);
+    slot->ramp.observe_target(effective_q16, (volume_word & 1ULL) != 0ULL, sample_rate);
+    for (std::size_t frame = 0U; frame < frames; ++frame) {
+        const auto gain = slot->ramp.next_gain();
+        for (std::uint32_t channel = 0U; channel < channels; ++channel) {
+            interleaved[frame * channels + channel] *= gain;
+        }
+    }
+    return true;
 }
 
 }  // namespace hibiki

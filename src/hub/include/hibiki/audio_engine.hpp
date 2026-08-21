@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <atomic>
+#include <memory>
 #include <span>
 #include <string_view>
 
@@ -27,10 +28,18 @@ enum class EngineTransactionState : std::uint8_t {
 
 class AudioEngineModel final {
 public:
+    AudioEngineModel();
+    ~AudioEngineModel();
+    AudioEngineModel(const AudioEngineModel&) = delete;
+    AudioEngineModel& operator=(const AudioEngineModel&) = delete;
+
     [[nodiscard]] bool prepare_graph(const GraphConfigV1& graph, std::uint64_t revision) noexcept;
     [[nodiscard]] bool commit_graph() noexcept;
     void rollback_graph() noexcept;
     [[nodiscard]] VolumeNotificationResult apply_windows_volume(
+        const VolumeNotificationV1& notification) noexcept;
+    [[nodiscard]] VolumeNotificationResult apply_windows_volume(
+        std::string_view output_group,
         const VolumeNotificationV1& notification) noexcept;
     [[nodiscard]] bool process(std::span<const RtLaneInputV1> inputs,
                                float* output_interleaved,
@@ -136,20 +145,23 @@ public:
     [[nodiscard]] const RtGraphSnapshotV1& active_graph() const noexcept { return active_graph_; }
     // Control-plane snapshot.  The RT process path reads the two atomics
     // below instead of touching this mutable control-plane object.
-    [[nodiscard]] OutputGroupVolumeStateV1 volume() const noexcept { return volume_; }
+    [[nodiscard]] OutputGroupVolumeStateV1 volume() const noexcept {
+        return volume_bank_ != nullptr ? volume_bank_->state("main")
+                                       : OutputGroupVolumeStateV1{};
+    }
+    [[nodiscard]] OutputGroupVolumeStateV1 volume(
+        std::string_view output_group) const noexcept {
+        return volume_bank_ != nullptr ? volume_bank_->state(output_group)
+                                       : OutputGroupVolumeStateV1{};
+    }
 
 private:
     RtGraphSnapshotV1 active_graph_{};
     RtGraphSnapshotV1 pending_graph_{};
     mutable LaneLatencyBankV1 active_latency_bank_{};
     LaneLatencyBankV1 pending_latency_bank_{};
-    OutputGroupVolumeStateV1 volume_{};
-    // Upper 32 bits: signed Q16.16 effective dB; bit 0: mute.  One atomic
-    // word keeps dB and mute coherent for a block boundary.
-    std::atomic<std::uint64_t> rt_volume_word_{
-        static_cast<std::uint64_t>(static_cast<std::uint32_t>(-60 * 65536)) << 32U};
+    std::unique_ptr<OutputGroupVolumeBankV1> volume_bank_{};
     std::atomic<std::uint32_t> sample_rate_{48000U};
-    mutable VolumeRampProcessorV1 rt_volume_ramp_{};
     mutable TruePeakLimiterV1 rt_true_peak_limiter_{};
     EngineTransactionState state_{EngineTransactionState::Ready};
     bool has_active_graph_{false};
@@ -158,6 +170,10 @@ private:
     mutable OutputFanoutRuntimeV1 output_fanout_{};
     WindowsWasapiSinkHandoffV1 wasapi_handoff_{};
     WindowsWasapiFanoutV1 wasapi_fanout_{};
+
+    [[nodiscard]] bool apply_group_master(std::string_view output_group,
+                                          float* output_interleaved,
+                                          std::size_t frames) const noexcept;
 };
 
 }  // namespace hibiki

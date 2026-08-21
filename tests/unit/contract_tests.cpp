@@ -340,6 +340,24 @@ int main() {
     const auto q16 = db_to_q16_16(-6.0206);
     CHECK(std::abs(q16_16_to_db(q16) + 6.0206) < 0.00002);
 
+    auto volume_bank = std::make_unique<OutputGroupVolumeBankV1>();
+    CHECK(volume_bank->has_group("main") && volume_bank->register_group("movie") &&
+          volume_bank->group_count() == 2U && !volume_bank->register_group(""));
+    CHECK(volume_bank->apply_windows_notification(
+              "movie", VolumeNotificationV1{-12.0, false, 1U}) ==
+          VolumeNotificationResult::Accepted);
+    CHECK(std::abs(volume_bank->state("movie").requested_db + 12.0) < 1e-12 &&
+          volume_bank->apply_windows_notification("missing", VolumeNotificationV1{-3.0, false, 1U}) ==
+              VolumeNotificationResult::Invalid);
+    std::array<float, 128> movie_volume_samples{};
+    for (std::size_t index = 0U; index < movie_volume_samples.size(); index += 2U) {
+        movie_volume_samples[index] = 1.0F;
+        movie_volume_samples[index + 1U] = -1.0F;
+    }
+    CHECK(volume_bank->apply_to_interleaved("movie", movie_volume_samples.data(), 64U, 2U, 8000U));
+    CHECK(std::abs(movie_volume_samples[126] - 0.25118864F) < 1e-5F &&
+          std::abs(movie_volume_samples[127] + 0.25118864F) < 1e-5F);
+
     hibiki_wavert_endpoint_state_v1 wavert_state{};
     CHECK(hibiki_wavert_endpoint_state_init_v1(
         &wavert_state, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 8, 48000,
@@ -1492,6 +1510,38 @@ int main() {
     CHECK(std::abs(engine_output[254] - 0.5F) < 1e-5F);
     CHECK(engine.apply_windows_volume(VolumeNotificationV1{-6.0206, false, 3}) ==
           VolumeNotificationResult::Accepted);
+
+    auto group_engine = std::make_unique<AudioEngineModel>();
+    GraphConfigV1 group_engine_graph;
+    group_engine_graph.lanes.push_back(LaneConfigV1{"main-lane", "main", 2, 0.0, true});
+    group_engine_graph.lanes.push_back(LaneConfigV1{"movie-lane", "movie", 2, 0.0, true});
+    CHECK(group_engine->prepare_graph(group_engine_graph, 1U) && group_engine->commit_graph());
+    group_engine->set_sample_rate(8000U);
+    CHECK(group_engine->apply_windows_volume("main", VolumeNotificationV1{-6.0206, false, 1U}) ==
+          VolumeNotificationResult::Accepted);
+    CHECK(group_engine->apply_windows_volume("movie", VolumeNotificationV1{-12.0412, false, 1U}) ==
+          VolumeNotificationResult::Accepted);
+    std::array<float, 256> group_engine_main_input{};
+    std::array<float, 256> group_engine_movie_input{};
+    std::array<RtLaneInputV1, 2> group_engine_inputs{{
+        RtLaneInputV1{group_engine_main_input.data(), 2U},
+        RtLaneInputV1{group_engine_movie_input.data(), 2U}}};
+    for (std::size_t index = 0U; index < group_engine_main_input.size(); index += 2U) {
+        group_engine_main_input[index] = 1.0F;
+        group_engine_main_input[index + 1U] = -1.0F;
+        group_engine_movie_input[index] = 1.0F;
+        group_engine_movie_input[index + 1U] = -1.0F;
+    }
+    std::array<float, 256> group_engine_output{};
+    CHECK(group_engine->process_output_group("main", group_engine_inputs,
+                                           group_engine_output.data(), 128U));
+    CHECK(std::abs(group_engine_output[254] - 0.5F) < 1e-5F &&
+          std::abs(group_engine_output[255] + 0.5F) < 1e-5F);
+    CHECK(group_engine->process_output_group("movie", group_engine_inputs,
+                                           group_engine_output.data(), 128U));
+    CHECK(std::abs(group_engine_output[254] - 0.25F) < 1e-5F &&
+          std::abs(group_engine_output[255] + 0.25F) < 1e-5F);
+
     std::vector<RtLaneInputV1> tab_lane_inputs(1);
     float tab_lane_input[8]{};
     float tab_lane_output[8]{};

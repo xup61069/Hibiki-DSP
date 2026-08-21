@@ -22,6 +22,13 @@ fade、device crossfade 與 safety clamp 必須保留 last-known-safe gain。
 因此不會在音量鍵或 Scene 結束時產生 block-level hard step。實體 device crossfade 仍由
 `OutputCrossfade` 的 30 ms sink handoff 負責。
 
+每個已註冊的 output group 都有自己的 canonical `requested_db`／mute／generation、safety
+reconcile 與 RT ramp；`OutputGroupVolumeBankV1` 固定最多 32 組，群組在 graph commit 前
+註冊，RT 只讀該群組 immutable label 對應的 atomic Q16.16 word，不會把 Main 的音量誤套到
+Movie、Surround 或其他 sink。舊的 `apply_windows_volume(notification)` 與 `volume()` 仍
+代表 `main`，新的 overload 可指定 group。Strict Direct graph 直接跳過 Group Master，
+避免把系統音量／校正誤標成 bit-perfect。
+
 Group render 完成後，非 Strict Direct Scene 會經過 `TruePeakLimiterV1` 的 −1 dBTP
 bounded guard；它以三個線性 inter-sample probes 作保守估算並採 block-coherent gain，
 目前不宣稱 ITU/BS.1770 conformance，正式 meter oracle 仍是 release gate。
