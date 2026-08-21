@@ -37,6 +37,14 @@ enum class Vst3SceneAutomationResultV1 : std::uint8_t {
     worker_failed,
 };
 
+// Immutable read-only copy of one stored Scene binding. Views snapshot at call
+// time; they are not handles that track later mutations.
+struct Vst3SceneAutomationBindingViewV1 {
+    std::string scene_id;
+    std::uint64_t lane_token{0U};
+    std::string timeline_id;
+};
+
 // Control-plane store/scheduler for SceneProfile's stable automation IDs.
 // It owns no worker or audio buffer. Scene activation is a validate-all then
 // apply operation; block processing has one in-flight request per lane and
@@ -68,6 +76,16 @@ public:
     // Read-only view of one stored timeline snapshot; null when unknown.
     [[nodiscard]] const Vst3ParameterTimelineSnapshotV1* timeline_snapshot(
         std::string_view timeline_id) const noexcept;
+
+    // Bounded introspection: sorted stored timeline IDs and immutable binding
+    // views copied into caller-owned storage. An undersized destination fails
+    // closed with count zeroed instead of producing partial output.
+    [[nodiscard]] bool timeline_ids(
+        std::span<std::string> destination,
+        std::size_t& count) const;
+    [[nodiscard]] bool binding_views(
+        std::span<Vst3SceneAutomationBindingViewV1> destination,
+        std::size_t& count) const;
     [[nodiscard]] bool bind_scene(
         std::string_view scene_id,
         std::uint64_t lane_token,
