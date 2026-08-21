@@ -470,7 +470,7 @@ parameter frame 與 `IParameterChanges` bridge）unsigned build 亦通過；輸�
 與 C# grouped-volume payload round-trip、legacy payload compatibility、selected group resolver
 及 custom Scene card mirror 的 JSON save/load、atomic replace、malformed rollback 亦已通過本機
 contract/control-model checks。
-本次 Expert per-App volume controls 的 source commit 是 `（待提交）`；
+本次 Expert per-App volume controls 的 source commit 是 `ebb80a3`；
 本次 Session command worker queue 的 source commit 是 `6f9d6b1`；
 本次 App route selection controls 的 source commit 是 `d4862d9`；
 COM worker-thread guard 的 source commit 是 `cbc860e`；

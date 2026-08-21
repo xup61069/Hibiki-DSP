@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "expert-session-volume-ui-v1",
+  "source_commit": "ebb80a3",
+  "environment_fingerprint": "windows-22631-vs17-dotnet-local",
+  "commands": [
+    "pwsh -File tools/control-model-check.ps1",
+    "pwsh -File tools/winui-shell-check.ps1",
+    "pwsh -File tools/docs-check.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "catalog dB/mute synchronization on selected handle",
+        "bounded per-App volume slider state",
+        "selected App volume command C# wire decode",
+        "unavailable/disconnected fail-closed behavior"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/winui-shell-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Expert App volume slider",
+        "App mute control",
+        "apply button event handler",
+        "AutomationProperties labels"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "required_paths": 75,
+      "specs": 22
+    }
+  ],
+  "limitations": [
+    "The WinUI SDK build and physical target-session COM readback remain external platform gates; this evidence verifies source/model behavior only.",
+    "The session catalog currently had no active volume-capable session in the local anonymous probe."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "local control-model-check",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00Z",
+  "finished_at": "2026-08-21T00:00:00Z"
+}
