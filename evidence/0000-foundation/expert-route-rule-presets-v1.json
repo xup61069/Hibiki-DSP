@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "expert-route-rule-presets-v1",
+  "source_commit": "d67ab31",
+  "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet8-local",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/control-model-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "pwsh -File tools/driver-source-check.ps1",
+    "pwsh -File tools/installer-check.ps1",
+    "pwsh -File tools/distribution-check.ps1",
+    "pwsh -File tools/winui-shell-check.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "C++ contract tests including SessionRouteRuleCommand queue and candidate transaction"
+      ],
+      "tests": 1,
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "64-entry route-rule catalog insert/update/validation",
+        "atomic save/load and malformed-file rollback",
+        "ViewModel command binding to the current session catalog sequence",
+        "disconnected unknown-rule fail-closed behavior"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/winui-shell-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Expert route-rule editor bindings",
+        "source-only WinUI route-rule event handlers"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "documentation and source policy gates",
+      "status": "pass",
+      "required_paths": 75,
+      "specs": 24,
+      "scanned_paths": 324,
+      "blocked_files": 0,
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The local machine is Windows 22631 with VS 17 and SDK 10.0.26100.0, below the locked Windows 11 24H2/VS 2026/10.0.28000.2526 target toolchain.",
+    "The catalog and command boundary do not prove physical active-session reroute, Chrome tab capture, vendor ASIO interception, signed driver behavior or hardware soak.",
+    "The source-only WinUI gate does not replace a target-toolchain XAML build or accessibility review."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "cmake": "local verify.ps1 generator",
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "8.x local control-model-check",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00Z",
+  "finished_at": "2026-08-21T00:00:00Z"
+}
