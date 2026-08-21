@@ -93,6 +93,11 @@
 - `DeviceCatalogSnapshotPublisherV1` now converts a validated C++ `PhysicalDeviceCatalogV1`
   into one bounded snapshot frame without introducing COM or RT work. The remaining platform
   step is to feed this publisher from a worker-owned Windows endpoint enumeration.
+- `DeviceCatalogSnapshotStoreV1` now serializes complete control-plane snapshot publication and
+  replies, rejecting empty or invalid frames while retaining the previous safe snapshot. The
+  Windows `PhysicalDeviceCatalogServiceV1` joins this store to worker refresh transactions; it
+  never performs COM work from the IPC reply callback and commits catalog state only after wire
+  publication succeeds.
 - `WindowsPhysicalDeviceCatalogWorker` now owns the COM enumerator on a worker thread, maps
   render/capture state, friendly names, mix format and device period into a candidate catalog,
   and commits only after snapshot encoding succeeds. `WindowsPhysicalDeviceCatalogCoordinator`

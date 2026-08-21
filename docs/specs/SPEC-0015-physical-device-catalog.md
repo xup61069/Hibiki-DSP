@@ -49,6 +49,9 @@ snapshot provider 時才回傳 `DeviceCatalogSnapshot`，否則回 Error，避�
 `WindowsPhysicalDeviceCatalogWorker` 在刷新時先建立 candidate catalog，再一次產生 snapshot
 並提交 catalog／sequence；任一 flow、ID、friendly name、mix format、device period 或
 publisher 驗證失敗，都保留上一份狀態並回傳 HRESULT。通知 callback 不得直接呼叫此 worker。
+`WindowsPhysicalDeviceCatalogServiceV1` 將這個 worker 交易接到 control service：先完成候選
+快照的 wire validation，再發布到 `DeviceCatalogSnapshotStoreV1`，最後才交換已提交 catalog；
+`device_catalog_snapshot_reply_v1` 只複製最近完整 frame，沒有快照時回 Error，不執行 COM。
 
 只有 `Active` endpoint 才能 `selectable` 或 `mark_default`。進入 Disabled／Unplugged／
 Unknown 時，catalog 清除 default；切換 worker 必須回到上一個已同步 endpoint，或使用
@@ -60,6 +63,8 @@ safe-start／Degraded，而不是重試到 100% 音量。
   catalog 保持不變。
 - 移除未知 ID 回傳 `NotFound`；狀態／flow 不合法回傳 `InvalidState`。
 - catalog 是 UI／worker snapshot，不得在 audio callback 讀取可變字串或呼叫其 mutator。
+- snapshot store 的 mutex／vector 複製只存在 control-plane；不得從 RT callback 呼叫 store，
+  也不得把 store 的 mutable catalog reference 傳入音訊執行緒。
 - `DeviceSwitchTransaction` 仍負責 Prepare → crossfade → Commit／Rollback；catalog 只回答
   「是否存在且可選」，`DeviceRecoveryCoordinator::begin_rebind(catalog, endpoint_id)` 會在
   建立 target 前套用這個判定，不取代 sink handoff。
@@ -76,5 +81,7 @@ safe-start／Degraded，而不是重試到 100% 音量。
    真實 hotplug／Audio Service restart／WASAPI soak 仍由 driver release gate 驗證。
 3. `tools/live-device-catalog-check.ps1` 是 opt-in、只在 Windows 執行的本機 probe；它只輸出
    數量、sequence、payload size 與 wire pass，不輸出或提交 endpoint ID／friendly name。
-4. 跨 AI handoff 必須記錄 catalog contract 的 source commit；不得提交真實私人 endpoint
+4. `DeviceCatalogSnapshotStoreV1` 的空 store、合法發布、callback reply、壞 frame 保留舊快照與
+   Windows service 未 bind fail-closed 行為由 CTest 覆蓋。
+5. 跨 AI handoff 必須記錄 catalog contract 的 source commit；不得提交真實私人 endpoint
    ID 或顯示名稱到 repository。
