@@ -26,6 +26,13 @@ struct WasapiClockSampleV1 {
   std::uint64_t qpc_position{0U};
 };
 
+enum class WasapiSampleEncodingV1 : std::uint8_t {
+  Float32,
+  Pcm16,
+  Pcm24,
+  Pcm32,
+};
+
 // WASAPI shared-mode endpoint owned by one dedicated sink worker (not the
 // Hibiki graph RT thread). That worker must initialize COM and perform bind,
 // start, render and unbind on the same apartment; the control plane schedules
@@ -51,6 +58,7 @@ public:
   [[nodiscard]] std::uint32_t channels() const noexcept { return channels_; }
   [[nodiscard]] std::uint32_t sample_rate() const noexcept { return sample_rate_; }
   [[nodiscard]] std::uint32_t buffer_frames() const noexcept { return buffer_frames_; }
+  [[nodiscard]] WasapiSampleEncodingV1 encoding() const noexcept { return encoding_; }
 
 private:
   void release_resources() noexcept;
@@ -68,6 +76,8 @@ private:
   std::uint32_t channels_{0};
   std::uint32_t sample_rate_{0};
   std::uint32_t buffer_frames_{0};
+  WasapiSampleEncodingV1 encoding_{WasapiSampleEncodingV1::Float32};
+  std::uint32_t bytes_per_sample_{0};
   bool started_{false};
 };
 

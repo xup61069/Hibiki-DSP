@@ -32,6 +32,70 @@ bool valid_rate(const std::uint32_t rate) noexcept {
   return rate == 44100U || rate == 48000U || rate == 96000U || rate == 192000U;
 }
 
+DWORD expected_channel_mask(const std::uint32_t channels) noexcept;
+bool channel_mask_allowed(std::uint32_t channels, DWORD mask) noexcept;
+
+bool parse_sample_format(const WAVEFORMATEX* const format,
+                         const std::uint32_t expected_channels,
+                         const std::uint32_t expected_rate,
+                         WasapiSampleEncodingV1& encoding,
+                         std::uint32_t& bytes_per_sample) noexcept {
+  if (format == nullptr || format->nChannels != expected_channels ||
+      format->nSamplesPerSec != expected_rate) {
+    return false;
+  }
+  GUID subformat{};
+  std::uint32_t bits = format->wBitsPerSample;
+  DWORD channel_mask = expected_channel_mask(expected_channels);
+  if (format->wFormatTag == WAVE_FORMAT_EXTENSIBLE &&
+      format->cbSize >= sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX)) {
+    const auto* extensible = reinterpret_cast<const WAVEFORMATEXTENSIBLE*>(format);
+    subformat = extensible->SubFormat;
+    channel_mask = extensible->dwChannelMask;
+    if (extensible->Samples.wValidBitsPerSample != 0U &&
+        extensible->Samples.wValidBitsPerSample > bits) {
+      return false;
+    }
+  } else if (format->wFormatTag == WAVE_FORMAT_IEEE_FLOAT) {
+    subformat = KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
+  } else if (format->wFormatTag == WAVE_FORMAT_PCM) {
+    subformat = KSDATAFORMAT_SUBTYPE_PCM;
+  } else {
+    return false;
+  }
+  if (!channel_mask_allowed(expected_channels, channel_mask)) return false;
+  if (IsEqualGUID(subformat, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT) && bits == 32U) {
+    encoding = WasapiSampleEncodingV1::Float32;
+    bytes_per_sample = 4U;
+    return true;
+  }
+  if (!IsEqualGUID(subformat, KSDATAFORMAT_SUBTYPE_PCM)) return false;
+  switch (bits) {
+    case 16U:
+      encoding = WasapiSampleEncodingV1::Pcm16;
+      bytes_per_sample = 2U;
+      return true;
+    case 24U:
+      encoding = WasapiSampleEncodingV1::Pcm24;
+      bytes_per_sample = 3U;
+      return true;
+    case 32U:
+      encoding = WasapiSampleEncodingV1::Pcm32;
+      bytes_per_sample = 4U;
+      return true;
+    default:
+      return false;
+  }
+}
+
+template <typename Integer>
+Integer float_to_pcm(const float sample, const double maximum, const Integer minimum) noexcept {
+  if (!std::isfinite(sample)) return 0;
+  const auto limited = std::clamp(static_cast<double>(sample), -1.0, 1.0);
+  if (limited <= -1.0) return minimum;
+  return static_cast<Integer>(std::llround(limited * maximum));
+}
+
 DWORD expected_channel_mask(const std::uint32_t channels) noexcept {
   switch (channels) {
     case 2U: return SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT;
@@ -42,6 +106,17 @@ DWORD expected_channel_mask(const std::uint32_t channels) noexcept {
                      SPEAKER_SIDE_LEFT | SPEAKER_SIDE_RIGHT;
     default: return 0U;
   }
+}
+
+bool channel_mask_allowed(const std::uint32_t channels, const DWORD mask) noexcept {
+  if (mask == expected_channel_mask(channels)) return true;
+  if (channels == 6U) {
+    constexpr DWORD kFiveOneSideMask = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT |
+                                       SPEAKER_FRONT_CENTER | SPEAKER_LOW_FREQUENCY |
+                                       SPEAKER_SIDE_LEFT | SPEAKER_SIDE_RIGHT;
+    return mask == kFiveOneSideMask;
+  }
+  return false;
 }
 
 }  // namespace
@@ -88,18 +163,10 @@ bool WindowsWasapiOutputV1::bind(const WasapiOutputConfigV1& config) noexcept {
     return false;
   }
 
-  const auto* extensible = reinterpret_cast<const WAVEFORMATEXTENSIBLE*>(mix_format);
-  const bool is_float = mix_format->wFormatTag == WAVE_FORMAT_IEEE_FLOAT ||
-                        (mix_format->wFormatTag == WAVE_FORMAT_EXTENSIBLE &&
-                         mix_format->cbSize >= sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX) &&
-                         IsEqualGUID(extensible->SubFormat, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT));
-  if (!is_float || mix_format->wBitsPerSample != 32U ||
-      mix_format->nChannels != config.channels || mix_format->nSamplesPerSec != config.sample_rate) {
-    cleanup();
-    return false;
-  }
-  if (mix_format->wFormatTag == WAVE_FORMAT_EXTENSIBLE &&
-      extensible->dwChannelMask != expected_channel_mask(config.channels)) {
+  WasapiSampleEncodingV1 encoding{};
+  std::uint32_t bytes_per_sample = 0U;
+  if (!parse_sample_format(mix_format, config.channels, config.sample_rate, encoding,
+                           bytes_per_sample)) {
     cleanup();
     return false;
   }
@@ -124,6 +191,8 @@ bool WindowsWasapiOutputV1::bind(const WasapiOutputConfigV1& config) noexcept {
   event_ = event_handle;
   channels_ = config.channels;
   sample_rate_ = config.sample_rate;
+  encoding_ = encoding;
+  bytes_per_sample_ = bytes_per_sample;
   client = nullptr;
   render_client = nullptr;
   clock = nullptr;
@@ -159,6 +228,8 @@ void WindowsWasapiOutputV1::release_resources() noexcept {
   channels_ = 0;
   sample_rate_ = 0;
   buffer_frames_ = 0;
+  encoding_ = WasapiSampleEncodingV1::Float32;
+  bytes_per_sample_ = 0;
 }
 
 void WindowsWasapiOutputV1::unbind() noexcept { release_resources(); }
@@ -171,12 +242,35 @@ bool WindowsWasapiOutputV1::render(const float* const interleaved,
       frames > buffer_frames_ - (padding < buffer_frames_ ? padding : buffer_frames_)) {
     return false;
   }
+  const auto samples = static_cast<std::size_t>(frames) * channels_;
+  for (std::size_t index = 0U; index < samples; ++index) {
+    if (!std::isfinite(interleaved[index])) return false;
+  }
   BYTE* destination = nullptr;
   if (FAILED(as_render(render_client_)->GetBuffer(frames, &destination)) || destination == nullptr) {
     return false;
   }
-  std::memcpy(destination, interleaved,
-              static_cast<std::size_t>(frames) * channels_ * sizeof(float));
+  if (encoding_ == WasapiSampleEncodingV1::Float32) {
+    std::memcpy(destination, interleaved, samples * sizeof(float));
+  } else if (encoding_ == WasapiSampleEncodingV1::Pcm16) {
+    auto* output = reinterpret_cast<std::int16_t*>(destination);
+    for (std::size_t index = 0U; index < samples; ++index) {
+      output[index] = float_to_pcm<std::int16_t>(interleaved[index], 32767.0, INT16_MIN);
+    }
+  } else if (encoding_ == WasapiSampleEncodingV1::Pcm24) {
+    for (std::size_t index = 0U; index < samples; ++index) {
+      const auto value = float_to_pcm<std::int32_t>(interleaved[index], 8388607.0, INT32_MIN);
+      const auto offset = index * 3U;
+      destination[offset] = static_cast<BYTE>(value & 0xFF);
+      destination[offset + 1U] = static_cast<BYTE>((value >> 8U) & 0xFF);
+      destination[offset + 2U] = static_cast<BYTE>((value >> 16U) & 0xFF);
+    }
+  } else {
+    auto* output = reinterpret_cast<std::int32_t*>(destination);
+    for (std::size_t index = 0U; index < samples; ++index) {
+      output[index] = float_to_pcm<std::int32_t>(interleaved[index], 2147483647.0, INT32_MIN);
+    }
+  }
   return SUCCEEDED(as_render(render_client_)->ReleaseBuffer(frames, 0U));
 }
 
@@ -459,6 +553,8 @@ void WindowsWasapiOutputV1::unbind() noexcept {
   channels_ = 0;
   sample_rate_ = 0;
   buffer_frames_ = 0;
+  encoding_ = WasapiSampleEncodingV1::Float32;
+  bytes_per_sample_ = 0;
 }
 bool WindowsWasapiOutputV1::render(const float*, std::uint32_t) noexcept { return false; }
 bool WindowsWasapiOutputV1::wait_for_buffer(std::uint32_t) noexcept { return false; }
