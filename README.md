@@ -64,15 +64,22 @@ Microsoft-signed virtual-audio driver 與 Authenticode installer，並透過 Gum
 ## 目前 preview 狀態
 
 目前可重跑的是 unsigned user-space preview baseline（`tools/verify.ps1` 與 C# control-model
-check），不是可安裝產品。WinUI shell 需要 target toolchain 的 XAML build 才能產生本機 UI preview；
-它即使成功也不含虛擬 driver、系統攔截或正式簽章，絕不會上傳 GitHub。
+check），不是可安裝產品。正式 WinUI shell 需要 target toolchain 的 XAML build；它即使成功也不含
+虛擬 driver、系統攔截或正式簽章，絕不會上傳 GitHub。
 
 ```powershell
 pwsh -File tools/build-preview.ps1 -Target WinUI
 ```
 
-失敗時保留 `.local/preview/` 的診斷輸出，不可把它加入 Git；只想重跑控制面可用
-`-Target ControlModel`。
+在非 target 機器若 XAML compiler 不能執行，可建立清楚標示的 Compatibility Preview：
+
+```powershell
+pwsh -File tools/build-preview.ps1 -Target WinUICompat
+```
+
+它以同一個 `EasyControlViewModel` 展示連線、一鍵改善、輸出群組與安全音量的控制面，但不含 XAML
+正式 UI、driver、系統攔截或 accessibility evidence。所有輸出都在 `.local/preview/`，不可加入 Git。
+只想重跑控制面可用 `-Target ControlModel`。
 
 ## 授權與貢獻
 

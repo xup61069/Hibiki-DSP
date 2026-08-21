@@ -3,8 +3,9 @@
 ## 已完成（有 commit 與 evidence）
 
 - AI handoff now has a short canonical entry, Git-ancestry/document gate and source-only local
-  preview command; local control-model preview passes, while the WinUI preview remains explicitly
-  blocked on the non-target Windows/XamlCompiler environment.
+  preview command. A Compatibility Preview builds and completes a launch smoke on the non-target
+  host using the same `EasyControlViewModel`; the formal WinUI XAML build remains explicitly blocked
+  on that host and still requires the locked target toolchain.
 - 公開 monorepo 文件、component license map 與 source-only paid-release policy。
 - AI 接手規則、fresh-clone 流程與 source-only policy。
 - `OutputGroupVolumeState` 與 ISO compensation public C++ boundary 的初始骨架。

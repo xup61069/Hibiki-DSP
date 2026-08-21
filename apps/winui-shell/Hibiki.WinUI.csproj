@@ -14,6 +14,26 @@
     <WindowsAppSDKVersion Condition="'$(WindowsAppSDKVersion)' == ''">1.7.250401001</WindowsAppSDKVersion>
   </PropertyGroup>
 
+  <!--
+    The compatibility preview exists solely for local UX/model exploration on a
+    non-target development host.  It deliberately avoids the Windows App SDK
+    XAML compiler but keeps the same ViewModel and application lifecycle.  It
+    must never be used as release, driver or accessibility evidence.
+  -->
+  <PropertyGroup Condition="'$(HibikiCompatibilityPreview)' == 'true'">
+    <DefineConstants>$(DefineConstants);HIBIKI_COMPATIBILITY_PREVIEW</DefineConstants>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
+    <EnableCoreMrtTooling>false</EnableCoreMrtTooling>
+    <AppxGeneratePriEnabled>false</AppxGeneratePriEnabled>
+    <IncludeCopyLocalFilesOutputGroup>false</IncludeCopyLocalFilesOutputGroup>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(HibikiCompatibilityPreview)' == 'true'">
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Remove="MainWindow.xaml" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\control-model\Hibiki.ControlModel.csproj" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="$(WindowsAppSDKVersion)" />

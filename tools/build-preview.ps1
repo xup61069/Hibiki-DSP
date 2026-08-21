@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-  [ValidateSet('WinUI', 'ControlModel')][string]$Target = 'WinUI'
+  [ValidateSet('WinUI', 'WinUICompat', 'ControlModel')][string]$Target = 'WinUI'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,6 +14,17 @@ if ($Target -eq 'ControlModel') {
     "-p:MSBuildProjectExtensionsPath=$previewRoot/obj/"
   if ($LASTEXITCODE -ne 0) { throw "Control-model preview baseline failed: $LASTEXITCODE" }
   Write-Output "Control-model preview baseline passed. Output stays under $previewRoot and is not publishable."
+  return
+}
+
+if ($Target -eq 'WinUICompat') {
+  # This fallback is intentionally explicit: it is useful to preview the
+  # ViewModel on a machine where the App SDK XAML compiler cannot run, but it
+  # is not a substitute for the target WinUI/XAML accessibility gate.
+  $project = Join-Path $repo 'apps/winui-shell/Hibiki.WinUI.csproj'
+  dotnet build $project --configuration Release "-p:OutputPath=$previewRoot/" '-p:HibikiCompatibilityPreview=true'
+  if ($LASTEXITCODE -ne 0) { throw "Compatibility preview build failed: $LASTEXITCODE" }
+  Write-Output "Compatibility WinUI preview build succeeded. It is unsigned, driver-free, not release evidence and excluded from Git."
   return
 }
 

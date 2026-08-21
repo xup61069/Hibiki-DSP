@@ -23,6 +23,9 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   engine Ack；這不是已驗證的實體 per-App capture/re-send。
 - 本機 Windows 22631／Visual Studio 17 只能當 portable/user-space 證據。driver、WinUI XAML
   preview、簽章與 Windows 11 24H2 hardware soak 必須在鎖定 target 環境重新驗證。
+- 本機 Compatibility Preview 已可由 `tools/build-preview.ps1 -Target WinUICompat` 建置並通過啟動
+  smoke；它和正式 shell 共用 `EasyControlViewModel`，但刻意不跑 XAML compiler/PRI tooling，不能當作
+  XAML、無障礙、driver 或 release evidence。
 - ISO 226 只保留合法 formula/derived boundary；禁止把受限標準文件、完整表格、掃圖或其內容
   放進 source、Issue、prompt、RAG、fixture 或 evidence。
 
@@ -35,6 +38,9 @@ WaveRT endpoint 的 WDK build/signability 工作。不要先做 Microsoft signin
 
 目標機器可用 `pwsh -File tools/build-preview.ps1 -Target WinUI` 產生不追蹤的本機 UI preview；
 這不是 installer，也不代表虛擬 driver 已完成。
+
+非 target 機器要看同一控制模型，可用 `pwsh -File tools/build-preview.ps1 -Target WinUICompat`；輸出
+只在 ignored 的 `.local/preview/WinUICompat/`，不可加入 Git 或發布。
 
 ## 必讀順序
 

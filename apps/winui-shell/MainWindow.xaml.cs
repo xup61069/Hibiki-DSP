@@ -13,10 +13,14 @@ public sealed partial class MainWindow : Window
 
     public MainWindow()
     {
-        InitializeComponent();
         ViewModel.LoadCustomScenes(out _);
         ViewModel.LoadRouteRules(out _);
+#if HIBIKI_COMPATIBILITY_PREVIEW
+        Content = BuildCompatibilityPreview();
+#else
+        InitializeComponent();
         RootGrid.DataContext = ViewModel;
+#endif
         Closed += OnClosed;
     }
 

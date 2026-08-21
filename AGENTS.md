@@ -29,7 +29,7 @@ handoff、Spec、ADR、source 與 tests。聊天紀錄、AI memory、個人 IDE 
 ```powershell
 pwsh -File tools/doctor.ps1 -CheckOnly
 pwsh -File tools/handoff-check.ps1
-pwsh -File tools/build-preview.ps1 -Target WinUI
+pwsh -File tools/build-preview.ps1 -Target WinUICompat
 pwsh -File tools/probe-environment.ps1
 pwsh -File tools/verify.ps1
 pwsh -File tools/docs-check.ps1
@@ -43,6 +43,10 @@ pwsh -File tools/distribution-check.ps1
 pwsh -File tools/driver-source-check.ps1
 pwsh -File tools/driver-signability-check.ps1
 ```
+
+在鎖定的 Windows 11 24H2+/VS 2026/SDK-WDK 機器，將 Compatibility Preview 改為
+`pwsh -File tools/build-preview.ps1 -Target WinUI`，以取得正式 XAML build evidence；
+Compatibility Preview 只能驗證本機 ViewModel/啟動 smoke，不得代替 XAML、無障礙、driver 或發行驗收。
 
 Windows endpoint enumeration 是額外的 opt-in live check：
 `pwsh -File tools/live-device-catalog-check.ps1`。它只產生 `.local/` 暫存輸出；不得把

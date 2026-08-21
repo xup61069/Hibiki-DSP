@@ -9,6 +9,9 @@
 - Expert per-App route presets：bounded local catalog、原子保存、優先級 resolver、同優先級歧義
   fail-closed、版本化 route-rule command 與 source-only WinUI editor。
 - AI 交接入口與 machine-checkable handoff gate；fresh clone 可由文件找到目前限制、證據與唯一下一步。
+- Compatibility Preview：非 target 開發機可跳過失敗的 XAML/PRI tooling，仍用同一個
+  `EasyControlViewModel` 建出並啟動 smoke 的 unsigned 本機 WinUI preview。它明確不是正式 XAML、
+  accessibility、driver 或 release evidence。
 
 ### Changed
 
