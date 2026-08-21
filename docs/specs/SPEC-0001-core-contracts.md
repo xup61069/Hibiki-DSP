@@ -50,6 +50,10 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   以兩段 length-prefixed printable UTF-8（scene ID、output group）及 zero padding 表示。
 - `handle_control_frame_v1` 是 pipe worker 到 host control queue 的唯一 typed adapter；sink
   必須自行 enqueue／排程，不能在 pipe callback 直接跑 RT DSP 或等待 UI/COM。
+- `ControlPlaneHostV1` 是 host 的組合入口：它擁有 named-pipe server 與 64-slot queue，將
+  `handle_control_frame_v1` 綁定到同一個 context；`start_with_queue` 只把命令排入 queue，
+  `EngineControlWorkerV1` 仍必須在自己的 control thread drain。若沒有 snapshot store，
+  `DeviceCatalogRequest` 必須回 Error；host stop 先停止 pipe worker，再清除 callback context。
 - `ControlCommandQueueV1` 是目前的固定 64-slot SPSC handoff；滿載時丟棄新命令並增加
   dropped counter，consumer 才能呼叫 AudioEngine／graph transaction。這個 queue 不保證
   multi-producer；若未來有第二個 control producer，必須先建立新的版本化協定。

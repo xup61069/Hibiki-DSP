@@ -45,6 +45,10 @@
   the graph.
 - `ControlCommandQueueV1` provides a fixed 64-slot SPSC pipe-worker to control-worker handoff;
   overflow is fail-closed with a dropped counter and no allocation/lock/wait.
+- `ControlPlaneHostV1` now owns the named-pipe server lifecycle, typed handler context and queue
+  wiring. `start_with_queue` gives a host a single source of truth for pipe stop/cleanup while
+  keeping command consumption on the separate EngineControl worker; the loopback contract test
+  verifies a SceneApply round-trip and queue handoff.
 - `EngineControlWorkerV1` consumes that queue and applies the four Easy Scene presets through
   AudioEngine Validate → Prepare → Commit; invalid scene IDs leave the last committed graph
   and revision unchanged, while volume commands share the same Group Master path.
@@ -330,14 +334,16 @@ provider 的 source commit 是 `0b2800f`；opt-in live probe 的 source commit �
 裝置清單的 source commit 是 `80d9cad`；snapshot store stale-sequence fail-closed 的 source
 commit 是 `a18e785`；live probe service-provider coverage 的 source commit 是 `25bd3a3`；其餘較早
 scope 仍以下方 evidence manifest 的各自 commit 與限制為準。
+ControlPlaneHost pipe/queue lifecycle 的 source commit 是 `a087e96`。
 
-目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 67 個必要入口與
+目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 68 個必要入口與
 15 份 Spec 通過；`source-policy.ps1` 掃描 288 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1` 與 `driver-source-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
 288-byte payload、catalog sequence、handler fail-closed、WinUI send-failure rollback、DeviceCatalogSnapshot
 wire/atomic replace、catalog-to-wire publisher、Windows worker unbound/coordinator rollback、
-DeviceCatalogRequest provider response、連線後自動刷新裝置清單與 live 14-endpoint probe 亦通過。以本機 pinned ASIO SDK
+DeviceCatalogRequest provider response、連線後自動刷新裝置清單、ControlPlaneHost loopback
+queue handoff 與 live 14-endpoint probe 亦通過。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
 `.local/`，未提交或發布。以本機 pinned VST3 SDK 另行執行的 optional target
 `hibiki_vst3_sdk_catalog` 與 `hibiki_vst3_sdk_worker`（含 bounded one-main-bus processor、
