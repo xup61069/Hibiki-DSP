@@ -106,7 +106,7 @@
       "event": "pull_request",
       "status": "failure",
       "failed_gate": "Documentation gate",
-      "message": "BASELINE.md claims 417 tracked paths but git reports 419; later gates were skipped."
+      "message": "Merge ref BASELINE.md claims 417 tracked paths but git reports 419; later gates were skipped."
     },
     {
       "run_id": 32533778359,
@@ -120,7 +120,21 @@
       "event": "pull_request",
       "status": "failure",
       "failed_gate": "Documentation gate",
-      "message": "BASELINE.md claims 417 tracked paths but git reports 419; later gates were skipped."
+      "message": "Merge ref BASELINE.md claims 419 tracked paths but git reports 421 after Issue #72 integration; later gates were skipped."
+    },
+    {
+      "run_id": 32533974109,
+      "event": "push",
+      "status": "failure",
+      "failed_gate": "Documentation gate",
+      "message": "Branch ref BASELINE.md claims 417 tracked paths but git reports 419; later gates were skipped."
+    },
+    {
+      "run_id": 32533977293,
+      "event": "pull_request",
+      "status": "failure",
+      "failed_gate": "Documentation gate",
+      "message": "Merge ref BASELINE.md claims 419 tracked paths but git reports 421; later gates were skipped."
     }
   ],
   "tool_versions": {
