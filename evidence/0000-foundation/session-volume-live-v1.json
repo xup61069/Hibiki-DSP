@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "session-volume-live-v1",
-  "source_commit": "ad8ca64",
+  "source_commit": "22ce3e5",
   "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/live-session-volume-check.ps1 -WriteTest"
@@ -12,10 +12,11 @@
       "command": "tools/live-session-volume-check.ps1 -WriteTest",
       "status": "pass",
       "coverage": [
-        "default eRender/eConsole endpoint bind",
+        "Engine Preview session-routing startup and local named-pipe connection",
+        "default eRender/eConsole endpoint bind for the temporary test stream",
         "silent shared-mode WASAPI session creation with no audible samples",
-        "bounded SessionCatalogSnapshot discovery of the probe session",
-        "generation-scoped handle read/write through WindowsAudioSessionRouteCoordinatorV1",
+        "bounded SessionCatalogSnapshot discovery of the probe session through IPC",
+        "generation-scoped SessionVolumeCommand through IPC, EngineControl queue and COM worker",
         "temporary approximately −3 dB session attenuation and readback",
         "original session dB and mute restoration before probe exit",
         "no endpoint, session or process identity printed"
@@ -29,7 +30,7 @@
     }
   ],
   "limitations": [
-    "This is an explicitly user-invoked user-space ISimpleAudioVolume probe against a temporary silent session; it does not prove a Hibiki virtual endpoint, physical per-App capture/re-send, DSP lane delivery, WaveRT/PortCls, HLK or Microsoft signing.",
+    "This is an explicitly user-invoked user-space Engine Preview IPC/control-queue probe against a temporary silent session; it does not prove a Hibiki virtual endpoint, physical per-App capture/re-send, DSP lane delivery, WaveRT/PortCls, HLK or Microsoft signing.",
     "The probe temporarily changes only its own test session volume and must never be run implicitly by CI or application startup.",
     "The local machine is Windows 26200/Visual Studio 17 with SDK 26100, below the locked Windows 11 24H2/VS 2026/WDK target."
   ],

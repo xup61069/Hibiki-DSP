@@ -163,9 +163,9 @@ pwsh -File tools/control-model-engine-smoke.ps1 -EnableSessionRouting
 pwsh -File tools/live-session-volume-check.ps1 -WriteTest
 ```
 
-探針只建立自己的無聲 shared-mode session，暫時衰減約 3 dB，透過 bounded catalog handle
-讀回並在結束前恢復原始 dB/mute；不輸出 session/endpoint identity，也不代表實體 per-App
-capture/re-send 或 DSP delivery。結果記錄於
+探針會自動啟動 Engine Preview，只建立自己的無聲 shared-mode session，透過 IPC/control
+queue/COM worker 使用 bounded catalog handle 暫時衰減約 3 dB、讀回並在結束前恢復原始 dB/mute；
+不輸出 session/endpoint identity，也不代表實體 per-App capture/re-send 或 DSP delivery。結果記錄於
 `evidence/0000-foundation/session-volume-live-v1.json`。
 
 `.local/preview/WinUICompat/Hibiki.WinUI.exe` 是需要 Windows App Runtime 1.7 的實驗性 WinUI
