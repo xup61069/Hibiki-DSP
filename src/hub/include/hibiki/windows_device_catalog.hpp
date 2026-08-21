@@ -7,6 +7,7 @@
 #include "hibiki/control_service.hpp"
 #include "hibiki/device_catalog.hpp"
 #include "hibiki/device_catalog_snapshot.hpp"
+#include "hibiki/session_command_queue.hpp"
 #include "hibiki/windows_audio_session_route.hpp"
 #include "hibiki/windows_device_watcher.hpp"
 #include "hibiki/windows_volume_broker.hpp"
@@ -21,9 +22,9 @@
 
 namespace hibiki {
 
-// Adapters for EngineControlWorkerV1. The callback must execute on the same
-// worker thread that called WindowsControlRuntimeV1::start; other threads get
-// a fail-closed wrong-thread result instead of touching COM.
+// Adapters for EngineControlWorkerV1. The callback only validates and queues
+// the command; it never touches COM. The owning worker drains the queue from
+// poll_and_refresh().
 [[nodiscard]] bool apply_session_volume_command_v1(
     const SessionVolumeCommandV1& request,
     void* context) noexcept;
@@ -175,6 +176,15 @@ public:
                                                     std::uint64_t catalog_sequence,
                                                     std::string_view lane_id,
                                                     std::string_view output_group) noexcept;
+    // Queue-only adapters used by EngineControlWorkerV1. They are safe from
+    // a non-COM control thread; the command is applied later by the worker.
+    [[nodiscard]] bool enqueue_session_volume_command(
+        const SessionVolumeCommandV1& request) noexcept;
+    [[nodiscard]] bool enqueue_session_route_command(
+        const SessionRouteCommandV1& request) noexcept;
+    // Drains the queue on the COM-owning worker. Each item is validated again
+    // against the current catalog before it can touch Windows or the graph.
+    [[nodiscard]] std::size_t drain_session_commands() noexcept;
     [[nodiscard]] bool running() const noexcept { return host_.running(); }
     [[nodiscard]] bool client_connected() const noexcept { return host_.client_connected(); }
     [[nodiscard]] bool volume_bound() const noexcept { return volume_broker_.is_bound(); }
@@ -184,6 +194,9 @@ public:
     }
     [[nodiscard]] ControlCommandQueueV1& command_queue() noexcept {
         return host_.command_queue();
+    }
+    [[nodiscard]] SessionCommandQueueV1& session_command_queue() noexcept {
+        return session_command_queue_;
     }
     [[nodiscard]] const PhysicalDeviceCatalogV1& catalog() const noexcept {
         return catalog_service_.catalog();
@@ -216,6 +229,7 @@ private:
     ControlStatusSnapshotStoreV1 status_store_{};
     ControlStatusSnapshotV1 status_snapshot_{};
     SessionCatalogSnapshotStoreV1 session_catalog_store_{};
+    SessionCommandQueueV1 session_command_queue_{};
     WindowsAudioSessionRouteCoordinatorV1 session_routes_{};
 
     [[nodiscard]] bool publish_status_volume(

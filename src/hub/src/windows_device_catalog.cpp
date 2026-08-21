@@ -458,6 +458,7 @@ bool WindowsControlRuntimeV1::start(
 
 void WindowsControlRuntimeV1::stop() noexcept {
     host_.stop();
+    session_command_queue_.reset();
     session_routes_.unbind();
     volume_broker_.unbind();
     catalog_service_.unbind();
@@ -472,6 +473,7 @@ HRESULT WindowsControlRuntimeV1::refresh_now() noexcept {
         (void)publish_session_route_status();
         (void)publish_session_catalog();
     }
+    if (SUCCEEDED(result)) (void)drain_session_commands();
     return result;
 }
 
@@ -479,10 +481,17 @@ HRESULT WindowsControlRuntimeV1::poll_and_refresh() noexcept {
     if (!running()) return E_UNEXPECTED;
     const auto result = catalog_service_.poll_and_refresh();
     if (SUCCEEDED(result)) {
-        (void)session_routes_.poll_and_refresh();
+        const auto session_result = session_routes_.poll_and_refresh();
         (void)publish_session_route_status();
-        (void)publish_session_catalog();
+        // A no-change poll must not invalidate a command merely by advancing
+        // the catalog sequence. Drain first; a changed session registry has
+        // already invalidated its old handles and publishes the new catalog
+        // before the drain below.
+        if (session_result != WindowsAudioSessionRouteRefreshResultV1::NoChange) {
+            (void)publish_session_catalog();
+        }
     }
+    if (SUCCEEDED(result)) (void)drain_session_commands();
     return result;
 }
 
@@ -631,6 +640,70 @@ HRESULT WindowsControlRuntimeV1::bind_session_route_handle(
     return result;
 }
 
+bool WindowsControlRuntimeV1::enqueue_session_volume_command(
+    const SessionVolumeCommandV1& request) noexcept {
+    if (!running() || request.handle == 0U || request.catalog_sequence == 0U ||
+        request.catalog_sequence != session_catalog_store_.sequence() || request.mute > 1U ||
+        request.requested_db_q16_16 < (-144 * 65536) ||
+        request.requested_db_q16_16 > (12 * 65536)) {
+        return false;
+    }
+    return session_command_queue_.try_push_volume(request);
+}
+
+bool WindowsControlRuntimeV1::enqueue_session_route_command(
+    const SessionRouteCommandV1& request) noexcept {
+    if (!running() || request.handle == 0U || request.catalog_sequence == 0U ||
+        request.catalog_sequence != session_catalog_store_.sequence() ||
+        request.lane_bytes == 0U || request.lane_bytes > request.lane.size() ||
+        request.output_group_bytes == 0U ||
+        request.output_group_bytes > request.output_group.size() ||
+        !is_printable_utf8_v1(std::string_view(request.lane.data(), request.lane_bytes)) ||
+        !is_printable_utf8_v1(
+            std::string_view(request.output_group.data(), request.output_group_bytes))) {
+        return false;
+    }
+    return session_command_queue_.try_push_route(request);
+}
+
+std::size_t WindowsControlRuntimeV1::drain_session_commands() noexcept {
+    if (!running() || !on_worker_thread()) return 0U;
+    std::size_t processed = 0U;
+    std::uint64_t expected_sequence = session_catalog_store_.sequence();
+    bool catalog_dirty = false;
+    SessionCommandWorkItemV1 item{};
+    while (session_command_queue_.try_pop(item)) {
+        if (item.kind == SessionCommandKindV1::Volume) {
+            if (item.volume.catalog_sequence != expected_sequence) {
+                ++processed;
+                continue;
+            }
+            const auto requested_db = q16_16_to_db(item.volume.requested_db_q16_16);
+            const auto result = session_routes_.write_session_volume_handle(
+                item.volume.handle, requested_db, item.volume.mute != 0U,
+                WindowsVolumeEventContextsV1::session());
+            catalog_dirty = catalog_dirty || SUCCEEDED(result);
+        } else if (item.kind == SessionCommandKindV1::Route) {
+            if (item.route.catalog_sequence != expected_sequence) {
+                ++processed;
+                continue;
+            }
+            const auto result = session_routes_.bind_session_route_handle(
+                item.route.handle,
+                std::string_view(item.route.lane.data(), item.route.lane_bytes),
+                std::string_view(item.route.output_group.data(), item.route.output_group_bytes));
+            if (SUCCEEDED(result)) {
+                (void)publish_session_route_status();
+                catalog_dirty = true;
+                if (expected_sequence != UINT64_MAX) ++expected_sequence;
+            }
+        }
+        ++processed;
+    }
+    if (catalog_dirty) (void)publish_session_catalog();
+    return processed;
+}
+
 bool WindowsControlRuntimeV1::publish_status_snapshot(
     const ControlStatusSnapshotV1& snapshot) noexcept {
     if (!status_store_.publish(snapshot)) return false;
@@ -702,20 +775,14 @@ bool apply_session_volume_command_v1(const SessionVolumeCommandV1& request,
                                      void* const context) noexcept {
     if (context == nullptr) return false;
     auto* runtime = static_cast<WindowsControlRuntimeV1*>(context);
-    const auto requested_db = static_cast<double>(request.requested_db_q16_16) / 65536.0;
-    return SUCCEEDED(runtime->write_session_volume_handle(
-        request.handle, request.catalog_sequence, requested_db, request.mute != 0U,
-        WindowsVolumeEventContextsV1::session()));
+    return runtime->enqueue_session_volume_command(request);
 }
 
 bool apply_session_route_command_v1(const SessionRouteCommandV1& request,
                                     void* const context) noexcept {
     if (context == nullptr) return false;
     auto* runtime = static_cast<WindowsControlRuntimeV1*>(context);
-    return SUCCEEDED(runtime->bind_session_route_handle(
-        request.handle, request.catalog_sequence,
-        std::string_view(request.lane.data(), request.lane_bytes),
-        std::string_view(request.output_group.data(), request.output_group_bytes)));
+    return runtime->enqueue_session_route_command(request);
 }
 
 }  // namespace hibiki

@@ -3,6 +3,7 @@ add_library(hibiki_hub STATIC
   src/control_payloads.cpp
   src/control_status.cpp
   src/session_catalog.cpp
+  src/session_command_queue.cpp
   src/control_queue.cpp
   src/control_service.cpp
   src/calibration.cpp

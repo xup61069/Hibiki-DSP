@@ -6,7 +6,7 @@ authority: control-plane
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0002, ADR-0004]
-source_globs: ["src/hub/include/hibiki/control_payloads.hpp", "src/hub/src/control_payloads.cpp", "src/hub/include/hibiki/ipc.hpp", "src/hub/src/ipc.cpp", "src/hub/include/hibiki/engine_control.hpp", "src/hub/src/engine_control.cpp", "src/hub/include/hibiki/windows_audio_session_route.hpp", "src/hub/src/windows_audio_session_route.cpp", "src/hub/include/hibiki/windows_device_catalog.hpp", "src/hub/src/windows_device_catalog.cpp", "apps/control-model/IpcProtocol.cs", "apps/control-model/EasyControlViewModel.cs", "tests/unit/contract_tests.cpp", "apps/control-model-check/Program.cs"]
+source_globs: ["src/hub/include/hibiki/control_payloads.hpp", "src/hub/src/control_payloads.cpp", "src/hub/include/hibiki/ipc.hpp", "src/hub/src/ipc.cpp", "src/hub/include/hibiki/engine_control.hpp", "src/hub/src/engine_control.cpp", "src/hub/include/hibiki/session_command_queue.hpp", "src/hub/src/session_command_queue.cpp", "src/hub/include/hibiki/windows_audio_session_route.hpp", "src/hub/src/windows_audio_session_route.cpp", "src/hub/include/hibiki/windows_device_catalog.hpp", "src/hub/src/windows_device_catalog.cpp", "apps/control-model/IpcProtocol.cs", "apps/control-model/EasyControlViewModel.cs", "tests/unit/contract_tests.cpp", "apps/control-model-check/Program.cs"]
 ---
 
 # SPEC-0021：以暫時 handle 套用 per-App lane/output route
@@ -39,12 +39,15 @@ generation 遞增，舊 handles 立即失效，runtime 發布新的 route status
 ## UI／失敗行為
 
 - C# ViewModel 只能從目前 `SessionCatalog` 建立 route command，刷新後 handle 消失會清除選取。
-- EngineControlWorker 透過 `SessionRouteHandlerFnV1` 將命令交給 Windows worker；沒有 handler
-  時回報 Failed，不假裝路由已套用。
+- EngineControlWorker 透過 `SessionRouteHandlerFnV1` 將命令送入固定容量的
+  `SessionCommandQueueV1`；`Applied` 表示已入列，Windows worker drain 後才代表候選 graph
+  transaction 有機會執行。沒有 handler、queue 滿載或 worker 未啟動時回報 Failed，不假裝路由
+  已套用。
 - command 失敗保留既有 catalog、volume、graph 與輸出；成功後 UI 必須等待下一個 catalog／
   status snapshot 才把新 generation 顯示為可用。
-- Windows runtime adapter 綁定 `start` 所在的 COM worker thread；其他執行緒不得直接呼叫
-  session watcher，會回傳 wrong-thread 並保留原 graph。
+- Windows runtime adapter 可從非 COM 執行緒入列；只有 `start` 所在的 COM worker 在 refresh
+  後 drain 並呼叫 session watcher。同步 route API 若由其他執行緒直接呼叫仍回傳
+  wrong-thread，且保留原 graph。
 
 ## 驗收
 

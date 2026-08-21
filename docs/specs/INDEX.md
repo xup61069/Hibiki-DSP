@@ -23,6 +23,7 @@
 | SPEC-0019 | accepted | App 工作階段 catalog、暫時 handle 與 UI 選取邊界 |
 | SPEC-0020 | accepted | 以暫時 handle 套用 per-App session volume 的 control boundary |
 | SPEC-0021 | accepted | 以暫時 handle 套用 per-App lane/output route 的 graph boundary |
+| SPEC-0022 | accepted | Session volume/route 命令的固定容量 COM worker 佇列 |
 
 Draft spec 有 blocking open question 時不得直接實作；公開行為變更必須在同一 PR
 更新 spec 與測試。

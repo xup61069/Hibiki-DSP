@@ -6,7 +6,7 @@ authority: control-plane
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0002, ADR-0004]
-source_globs: ["src/hub/include/hibiki/control_payloads.hpp", "src/hub/src/control_payloads.cpp", "src/hub/include/hibiki/ipc.hpp", "src/hub/src/ipc.cpp", "src/hub/include/hibiki/engine_control.hpp", "src/hub/src/engine_control.cpp", "src/hub/include/hibiki/windows_audio_session_route.hpp", "src/hub/src/windows_audio_session_route.cpp", "src/hub/include/hibiki/windows_device_catalog.hpp", "src/hub/src/windows_device_catalog.cpp", "apps/control-model/IpcProtocol.cs", "apps/control-model/EasyControlViewModel.cs", "tests/unit/contract_tests.cpp", "apps/control-model-check/Program.cs"]
+source_globs: ["src/hub/include/hibiki/control_payloads.hpp", "src/hub/src/control_payloads.cpp", "src/hub/include/hibiki/ipc.hpp", "src/hub/src/ipc.cpp", "src/hub/include/hibiki/engine_control.hpp", "src/hub/src/engine_control.cpp", "src/hub/include/hibiki/session_command_queue.hpp", "src/hub/src/session_command_queue.cpp", "src/hub/include/hibiki/windows_audio_session_route.hpp", "src/hub/src/windows_audio_session_route.cpp", "src/hub/include/hibiki/windows_device_catalog.hpp", "src/hub/src/windows_device_catalog.cpp", "apps/control-model/IpcProtocol.cs", "apps/control-model/EasyControlViewModel.cs", "tests/unit/contract_tests.cpp", "apps/control-model-check/Program.cs"]
 ---
 
 # SPEC-0020：以暫時 handle 套用 per-App session volume
@@ -36,7 +36,9 @@ Chrome tabCapture、vendor ASIO 攔截或對所有 exclusive stream 生效。實
 
 decoder 先驗證完整長度、reserved bytes、有限 dB、非零 handle／sequence；失敗不得部分
 寫入 `ControlCommandV1`。pipe handler 只負責驗證與送入 control queue，EngineControlWorker
-再呼叫明確的 `SessionVolumeHandlerFnV1`。沒有 handler 時回報 Failed，不假裝已套用。
+再呼叫明確的 `SessionVolumeHandlerFnV1`。Windows runtime handler 只把命令送入固定容量的
+`SessionCommandQueueV1`；`Applied` 表示已入列，不表示 COM readback 已完成。沒有 handler、
+queue 滿載或 worker 未啟動時回報 Failed，不假裝已套用。
 
 ## Handle／sequence 驗證
 
@@ -53,8 +55,9 @@ context 固定使用 `WindowsVolumeEventContextsV1::session()`，避免 Windows 
   驗證；清單刷新後若 handle 消失，選取自動清除。
 - dB 越界、未知／stale handle、未連線或 worker 失敗都保留現有可見狀態；不清空 catalog、
   不修改 RT graph、不把錯誤回寫成成功。
-- Windows runtime adapter 綁定 `start` 所在的 COM worker thread；其他執行緒回傳
-  wrong-thread 並 fail closed，避免 EngineControl／pipe callback 越權呼叫 COM。
+- Windows runtime adapter 可由非 COM 的 EngineControl 執行緒入列；只有 `start` 所在的 COM
+  worker 會在 refresh 後 drain，避免 EngineControl／pipe callback 越權呼叫 COM。直接呼叫舊的
+  同步 read/write API 仍維持 wrong-thread fail-closed。
 
 ## 驗收
 

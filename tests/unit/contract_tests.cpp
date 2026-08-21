@@ -33,6 +33,7 @@
 #include "hibiki/audio_session_registry.hpp"
 #include "hibiki/driver_stream_bridge.hpp"
 #include "hibiki/session_catalog.hpp"
+#include "hibiki/session_command_queue.hpp"
 
 extern "C" {
 #include "hibiki/driver_control_v1.h"
@@ -1185,6 +1186,26 @@ int main() {
         CHECK(command_queue.try_push(queued_command));
     }
     CHECK(!command_queue.try_push(queued_command) && command_queue.dropped() == 1U);
+    SessionCommandQueueV1 session_command_queue;
+    CHECK(session_command_queue.try_push_volume(session_volume_command) &&
+          session_command_queue.try_push_route(session_route_command));
+    SessionCommandWorkItemV1 session_work_item{};
+    CHECK(session_command_queue.try_pop(session_work_item) &&
+          session_work_item.kind == SessionCommandKindV1::Volume &&
+          session_work_item.volume.handle == session_volume_command.handle);
+    CHECK(session_command_queue.try_pop(session_work_item) &&
+          session_work_item.kind == SessionCommandKindV1::Route &&
+          session_work_item.route.output_group_bytes ==
+              session_route_command.output_group_bytes);
+    SessionCommandWorkItemV1 filled_session_item{};
+    filled_session_item.kind = SessionCommandKindV1::Volume;
+    for (std::size_t index = 0U; index < SessionCommandQueueV1::kCapacity; ++index) {
+        CHECK(session_command_queue.try_push(filled_session_item));
+    }
+    CHECK(!session_command_queue.try_push(filled_session_item) &&
+          session_command_queue.dropped() == 1U);
+    session_command_queue.reset();
+    CHECK(session_command_queue.dropped() == 0U && !session_command_queue.try_pop(session_work_item));
     bool command_accepted = false;
     ControlPlaneHandlerContextV1 service_context{accept_control_command, &command_accepted};
     IpcFrameV1 service_response;
