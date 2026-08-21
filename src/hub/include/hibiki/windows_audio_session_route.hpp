@@ -57,6 +57,13 @@ public:
     [[nodiscard]] HRESULT read_session_volume(std::string_view session_instance_id,
                                                double& requested_db,
                                                bool& mute) noexcept;
+    [[nodiscard]] HRESULT write_session_volume_handle(std::uint64_t handle,
+                                                       double requested_db,
+                                                       bool mute,
+                                                       const GUID& event_context) noexcept;
+    [[nodiscard]] HRESULT read_session_volume_handle(std::uint64_t handle,
+                                                      double& requested_db,
+                                                      bool& mute) noexcept;
     [[nodiscard]] WindowsAudioSessionRouteRefreshResultV1 refresh() noexcept;
     [[nodiscard]] WindowsAudioSessionRouteRefreshResultV1 poll_and_refresh() noexcept;
     [[nodiscard]] bool bound() const noexcept { return bound_; }

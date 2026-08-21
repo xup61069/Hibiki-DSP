@@ -170,6 +170,16 @@ bool accept_device_switch(const hibiki::DeviceSwitchPayloadV1& request,
     return *accepted;
 }
 
+bool accept_session_volume(const hibiki::SessionVolumeCommandV1& request,
+                           void* context) noexcept {
+    if (context == nullptr) return false;
+    auto* accepted = static_cast<bool*>(context);
+    *accepted = request.handle == ((2ULL << 32U) | 1ULL) &&
+                request.catalog_sequence == 12U && request.mute == 1U &&
+                request.requested_db_q16_16 == -622592;
+    return *accepted;
+}
+
 hibiki::Vst3PluginStateResultV1 migrate_test_plugin_state(
     const std::uint32_t source_version,
     const std::span<const std::uint8_t> source,
@@ -1105,6 +1115,26 @@ int main() {
           session_response.payload.size() == session_bytes);
     CHECK(!session_store.publish(session_catalog_snapshot) && session_store.sequence() == 12U &&
           session_catalog_snapshot_reply_v1(session_response, &session_store));
+    SessionVolumeCommandV1 session_volume_command{(2ULL << 32U) | 1ULL,
+                                                  -622592, 1U, 12U};
+    const auto session_volume_payload =
+        encode_session_volume_command_v1(session_volume_command);
+    SessionVolumeCommandV1 decoded_session_volume{};
+    CHECK(decode_session_volume_command_v1(session_volume_payload, decoded_session_volume) &&
+          decoded_session_volume.handle == session_volume_command.handle &&
+          decoded_session_volume.requested_db_q16_16 == -622592 &&
+          decoded_session_volume.mute == 1U && decoded_session_volume.catalog_sequence == 12U);
+    auto malformed_session_volume = session_volume_payload;
+    malformed_session_volume[13U] = 1U;
+    CHECK(!decode_session_volume_command_v1(malformed_session_volume, decoded_session_volume));
+    IpcFrameV1 session_volume_frame;
+    session_volume_frame.header.type = IpcMessageType::SessionVolumeCommand;
+    session_volume_frame.header.request_id = 780U;
+    session_volume_frame.payload.assign(session_volume_payload.begin(),
+                                        session_volume_payload.end());
+    CHECK(decode_control_command_v1(session_volume_frame, decoded_command) &&
+          decoded_command.type == IpcMessageType::SessionVolumeCommand &&
+          decoded_command.session_volume.handle == session_volume_command.handle);
     ControlCommandQueueV1 command_queue;
     ControlCommandV1 queued_command{};
     queued_command.type = IpcMessageType::SceneApply;
@@ -1248,6 +1278,15 @@ int main() {
           device_switch_accepted);
     decoded_command.device_switch.channels = 8U;
     CHECK(control_worker.consume(decoded_command) == EngineControlResultV1::Failed);
+    bool session_volume_accepted = false;
+    control_worker.set_session_volume_handler(accept_session_volume, &session_volume_accepted);
+    ControlCommandV1 session_volume_control{};
+    session_volume_control.type = IpcMessageType::SessionVolumeCommand;
+    session_volume_control.session_volume = session_volume_command;
+    CHECK(control_worker.consume(session_volume_control) == EngineControlResultV1::Applied &&
+          session_volume_accepted);
+    session_volume_control.session_volume.catalog_sequence = 13U;
+    CHECK(control_worker.consume(session_volume_control) == EngineControlResultV1::Failed);
     control_engine.set_sample_rate(8000U);
     ControlCommandV1 control_volume{};
     control_volume.type = IpcMessageType::VolumeNotification;
@@ -2344,7 +2383,12 @@ int main() {
           control_runtime.write_session_volume("missing", -12.0, false, session_context) ==
               E_UNEXPECTED &&
           control_runtime.read_session_volume("missing", unbound_session_db,
-                                             unbound_session_mute) == E_UNEXPECTED);
+                                             unbound_session_mute) == E_UNEXPECTED &&
+          control_runtime.write_session_volume_handle(0x0000000200000001ULL, 1U, -12.0,
+                                                      false, session_context) == E_UNEXPECTED &&
+          control_runtime.read_session_volume_handle(0x0000000200000001ULL, 1U,
+                                                     unbound_session_db,
+                                                     unbound_session_mute) == E_UNEXPECTED);
     auto* session_watcher = new WindowsAudioSessionWatcher();
     std::uint64_t session_sequence = 0;
     CHECK(!session_watcher->poll(session_sequence));
@@ -2372,7 +2416,11 @@ int main() {
           session_route_coordinator.write_session_volume("missing", -12.0, false,
                                                          session_context) == E_UNEXPECTED &&
           session_route_coordinator.read_session_volume("missing", unbound_session_db,
-                                                        unbound_session_mute) == E_UNEXPECTED);
+                                                        unbound_session_mute) == E_UNEXPECTED &&
+          session_route_coordinator.write_session_volume_handle(
+              0x0000000200000001ULL, -12.0, false, session_context) == E_UNEXPECTED &&
+          session_route_coordinator.read_session_volume_handle(
+              0x0000000200000001ULL, unbound_session_db, unbound_session_mute) == E_UNEXPECTED);
     WindowsProcessLoopbackSourceV1 process_loopback;
     std::uint32_t loopback_frames = 99U;
     CHECK(process_loopback.start(WindowsProcessLoopbackConfigV1{}) == E_INVALIDARG &&

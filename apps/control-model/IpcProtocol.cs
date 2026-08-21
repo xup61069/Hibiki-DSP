@@ -24,7 +24,8 @@ public enum ControlMessageType : ushort
     ControlStatusSnapshot = 12,
     ControlStatusRequest = 13,
     SessionCatalogSnapshot = 14,
-    SessionCatalogRequest = 15
+    SessionCatalogRequest = 15,
+    SessionVolumeCommand = 16
 }
 
 public enum IpcDecodeError
@@ -123,7 +124,8 @@ public static class IpcCodecV1
         ControlMessageType.SceneApply or ControlMessageType.DeviceSwitch or
         ControlMessageType.DeviceCatalogSnapshot or ControlMessageType.DeviceCatalogRequest or
         ControlMessageType.ControlStatusSnapshot or ControlMessageType.ControlStatusRequest or
-        ControlMessageType.SessionCatalogSnapshot or ControlMessageType.SessionCatalogRequest;
+        ControlMessageType.SessionCatalogSnapshot or ControlMessageType.SessionCatalogRequest or
+        ControlMessageType.SessionVolumeCommand;
 }
 
 public static class ControlPayloadsV1
@@ -151,6 +153,7 @@ public static class ControlPayloadsV1
     public const int SessionCatalogSnapshotMaxBytes = SessionCatalogSnapshotHeaderBytes +
                                                        (SessionCatalogSnapshotEntryBytes *
                                                         SessionCatalogSnapshotCapacity);
+    public const int SessionVolumeCommandBytes = 24;
     private static readonly System.Text.UTF8Encoding StrictUtf8 =
         new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
@@ -185,6 +188,46 @@ public static class ControlPayloadsV1
         requestedDb = q16 / 65536.0;
         mute = payload[4] != 0;
         generation = BinaryPrimitives.ReadUInt64LittleEndian(payload[8..]);
+        return true;
+    }
+
+    public static byte[] EncodeSessionVolumeCommand(ulong handle,
+                                                    double requestedDb,
+                                                    bool mute,
+                                                    ulong catalogSequence)
+    {
+        if (handle == 0UL || catalogSequence == 0UL || !double.IsFinite(requestedDb) ||
+            requestedDb < -144.0 || requestedDb > 12.0)
+            throw new ArgumentOutOfRangeException(nameof(requestedDb));
+        var payload = new byte[SessionVolumeCommandBytes];
+        BinaryPrimitives.WriteUInt64LittleEndian(payload, handle);
+        var q16 = checked((int)Math.Round(requestedDb * 65536.0,
+                                          MidpointRounding.AwayFromZero));
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(8), q16);
+        payload[12] = mute ? (byte)1 : (byte)0;
+        BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(16), catalogSequence);
+        return payload;
+    }
+
+    public static bool TryDecodeSessionVolumeCommand(ReadOnlySpan<byte> payload,
+                                                     out ulong handle,
+                                                     out double requestedDb,
+                                                     out bool mute,
+                                                     out ulong catalogSequence)
+    {
+        handle = catalogSequence = 0UL;
+        requestedDb = 0.0;
+        mute = false;
+        if (payload.Length != SessionVolumeCommandBytes ||
+            payload[12] > 1 || payload[13] != 0 || payload[14] != 0 || payload[15] != 0)
+            return false;
+        handle = BinaryPrimitives.ReadUInt64LittleEndian(payload);
+        catalogSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[16..]);
+        var q16 = BinaryPrimitives.ReadInt32LittleEndian(payload[8..]);
+        if (handle == 0UL || catalogSequence == 0UL || q16 < -144 * 65536 || q16 > 12 * 65536)
+            return false;
+        requestedDb = q16 / 65536.0;
+        mute = payload[12] != 0;
         return true;
     }
 
@@ -764,6 +807,12 @@ public sealed class ControlCommandFactoryV1
 
     public IpcEnvelopeV1 RequestSessionCatalog() =>
         _requests.Create(ControlMessageType.SessionCatalogRequest);
+
+    public IpcEnvelopeV1 SetSessionVolume(ulong handle, double requestedDb, bool mute,
+                                          ulong catalogSequence) =>
+        _requests.Create(ControlMessageType.SessionVolumeCommand,
+            ControlPayloadsV1.EncodeSessionVolumeCommand(handle, requestedDb, mute,
+                                                          catalogSequence));
 
     public IpcEnvelopeV1 RequestControlStatus() =>
         _requests.Create(ControlMessageType.ControlStatusRequest);

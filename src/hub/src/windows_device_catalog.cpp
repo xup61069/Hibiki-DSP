@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "hibiki/windows_device_catalog.hpp"
+#include "hibiki/windows_volume_link.hpp"
 
 #if defined(_WIN32)
 
@@ -580,6 +581,32 @@ HRESULT WindowsControlRuntimeV1::read_session_volume(
     return session_routes_.read_session_volume(session_instance_id, requested_db, mute);
 }
 
+HRESULT WindowsControlRuntimeV1::write_session_volume_handle(
+    const std::uint64_t handle,
+    const std::uint64_t catalog_sequence,
+    const double requested_db,
+    const bool mute,
+    const GUID& event_context) noexcept {
+    if (!running()) return E_UNEXPECTED;
+    if (catalog_sequence == 0U || catalog_sequence != session_catalog_store_.sequence()) {
+        return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+    }
+    return session_routes_.write_session_volume_handle(handle, requested_db, mute,
+                                                        event_context);
+}
+
+HRESULT WindowsControlRuntimeV1::read_session_volume_handle(
+    const std::uint64_t handle,
+    const std::uint64_t catalog_sequence,
+    double& requested_db,
+    bool& mute) noexcept {
+    if (!running()) return E_UNEXPECTED;
+    if (catalog_sequence == 0U || catalog_sequence != session_catalog_store_.sequence()) {
+        return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+    }
+    return session_routes_.read_session_volume_handle(handle, requested_db, mute);
+}
+
 bool WindowsControlRuntimeV1::publish_status_snapshot(
     const ControlStatusSnapshotV1& snapshot) noexcept {
     if (!status_store_.publish(snapshot)) return false;
@@ -645,6 +672,16 @@ bool WindowsControlRuntimeV1::publish_session_catalog() noexcept {
     SessionCatalogSnapshotV1 candidate{};
     if (!session_routes_.make_session_catalog_snapshot(previous + 1U, candidate)) return false;
     return session_catalog_store_.publish(candidate);
+}
+
+bool apply_session_volume_command_v1(const SessionVolumeCommandV1& request,
+                                     void* const context) noexcept {
+    if (context == nullptr) return false;
+    auto* runtime = static_cast<WindowsControlRuntimeV1*>(context);
+    const auto requested_db = static_cast<double>(request.requested_db_q16_16) / 65536.0;
+    return SUCCEEDED(runtime->write_session_volume_handle(
+        request.handle, request.catalog_sequence, requested_db, request.mute != 0U,
+        WindowsVolumeEventContextsV1::session()));
 }
 
 }  // namespace hibiki

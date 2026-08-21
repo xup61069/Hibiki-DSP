@@ -27,6 +27,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private ulong _sessionCatalogSequence;
     private IReadOnlyList<SessionCatalogEntryV1> _sessionCatalog =
         Array.Empty<SessionCatalogEntryV1>();
+    private ulong _selectedSessionHandle;
     private IrPhaseMode _irPhaseMode = IrPhaseMode.MinimumPhase;
     private double _irPhaseStrength;
     private ControlConnectionState _connectionState = ControlConnectionState.Disconnected;
@@ -55,6 +56,19 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     // retain a handle across a newer sequence.
     public IReadOnlyList<SessionCatalogEntryV1> SessionCatalog => _sessionCatalog;
     public ulong SessionCatalogSequence => _sessionCatalogSequence;
+    public ulong SelectedSessionHandle
+    {
+        get => _selectedSessionHandle;
+        private set
+        {
+            if (value == _selectedSessionHandle) return;
+            _selectedSessionHandle = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(SelectedSession));
+        }
+    }
+    public SessionCatalogEntryV1? SelectedSession =>
+        _sessionCatalog.FirstOrDefault(item => item.Handle == _selectedSessionHandle);
     public string CustomSceneCatalogPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Hibiki DSP", "scene-cards-v1.json");
@@ -345,10 +359,57 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         }
         _sessionCatalog = sessions.ToArray();
         _sessionCatalogSequence = sequence;
+        if (SelectedSession is null) SelectedSessionHandle = 0UL;
         OnPropertyChanged(nameof(SessionCatalog));
         OnPropertyChanged(nameof(SessionCatalogSequence));
+        OnPropertyChanged(nameof(SelectedSession));
         StatusText = "App 工作階段清單已更新；可選擇每個 App 的路由";
         return true;
+    }
+
+    public bool SelectSession(ulong handle)
+    {
+        if (handle == 0UL || !_sessionCatalog.Any(item => item.Handle == handle))
+        {
+            StatusText = "App 工作階段不存在或清單已刷新";
+            return false;
+        }
+        SelectedSessionHandle = handle;
+        StatusText = $"已選擇 {SelectedSession?.DisplayName ?? "App 工作階段"}";
+        return true;
+    }
+
+    public IpcEnvelopeV1 BuildSessionVolumeCommand(ulong handle,
+                                                     double requestedDb,
+                                                     bool mute)
+    {
+        if (!SelectSession(handle)) throw new InvalidOperationException("App 工作階段已過期");
+        LastCommand = _commands.SetSessionVolume(handle, requestedDb, mute,
+                                                  _sessionCatalogSequence);
+        OnPropertyChanged(nameof(LastCommand));
+        return LastCommand!;
+    }
+
+    public async Task<bool> PushSessionVolumeAsync(ulong handle,
+                                                    double requestedDb,
+                                                    bool mute,
+                                                    CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            BuildSessionVolumeCommand(handle, requestedDb, mute);
+        }
+        catch (ArgumentException)
+        {
+            StatusText = "App 音量超出安全範圍；命令未送出";
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            StatusText = "App 工作階段已過期；請先刷新清單";
+            return false;
+        }
+        return await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
     }
 
     // A future versioned status frame can call this after the engine has

@@ -24,6 +24,8 @@ using ScenePreflightFnV1 = bool (*)(const SceneProfileV1& scene,
                                     void* context) noexcept;
 using DeviceSwitchHandlerFnV1 = bool (*)(const DeviceSwitchPayloadV1& request,
                                          void* context) noexcept;
+using SessionVolumeHandlerFnV1 = bool (*)(const SessionVolumeCommandV1& request,
+                                          void* context) noexcept;
 
 // Control-worker adapter for the fixed queue. It is intentionally not called
 // by the pipe callback or the RT process function. SceneApply resolves only
@@ -57,6 +59,15 @@ public:
         device_switch_context_ = context;
     }
 
+    // The callback runs on the control worker after the pipe has validated the
+    // fixed payload. A Windows adapter may resolve the ephemeral handle and
+    // call COM on its owning worker; RT graph code is never entered here.
+    void set_session_volume_handler(SessionVolumeHandlerFnV1 handler,
+                                    void* context) noexcept {
+        session_volume_handler_ = handler;
+        session_volume_context_ = context;
+    }
+
     [[nodiscard]] EngineControlResultV1 consume(const ControlCommandV1& command) noexcept;
     [[nodiscard]] std::size_t drain(ControlCommandQueueV1& queue,
                                      std::size_t max_commands = ControlCommandQueueV1::kCapacity) noexcept;
@@ -77,6 +88,8 @@ private:
     const SceneCatalogV1* scene_catalog_{nullptr};
     DeviceSwitchHandlerFnV1 device_switch_handler_{nullptr};
     void* device_switch_context_{nullptr};
+    SessionVolumeHandlerFnV1 session_volume_handler_{nullptr};
+    void* session_volume_context_{nullptr};
 };
 
 }  // namespace hibiki

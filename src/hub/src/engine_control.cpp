@@ -87,6 +87,11 @@ EngineControlResultV1 EngineControlWorkerV1::consume(
         case IpcMessageType::ControlStatusRequest:
         case IpcMessageType::SessionCatalogRequest:
             return EngineControlResultV1::Ignored;
+        case IpcMessageType::SessionVolumeCommand:
+            if (session_volume_handler_ == nullptr) return EngineControlResultV1::Failed;
+            return session_volume_handler_(command.session_volume, session_volume_context_)
+                       ? EngineControlResultV1::Applied
+                       : EngineControlResultV1::Failed;
         case IpcMessageType::VolumeNotification:
             return (command.has_volume_target
                         ? engine_.apply_windows_volume(

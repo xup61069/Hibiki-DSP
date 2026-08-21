@@ -135,6 +135,44 @@ bool decode_volume_notification_payload_v1(
     return std::isfinite(notification.requested_db);
 }
 
+std::array<std::uint8_t, kSessionVolumeCommandPayloadBytesV1>
+encode_session_volume_command_v1(const SessionVolumeCommandV1& command) noexcept {
+    std::array<std::uint8_t, kSessionVolumeCommandPayloadBytesV1> payload{};
+    if (command.handle == 0U || command.catalog_sequence == 0U ||
+        command.mute > 1U || command.requested_db_q16_16 < -144 * 65536 ||
+        command.requested_db_q16_16 > 12 * 65536) {
+        return payload;
+    }
+    write_u64(payload.data(), command.handle);
+    write_u32(payload.data() + 8U,
+              static_cast<std::uint32_t>(command.requested_db_q16_16));
+    payload[12] = command.mute;
+    write_u64(payload.data() + 16U, command.catalog_sequence);
+    return payload;
+}
+
+bool decode_session_volume_command_v1(
+    const std::span<const std::uint8_t> payload,
+    SessionVolumeCommandV1& command) noexcept {
+    command = {};
+    if (payload.size() != kSessionVolumeCommandPayloadBytesV1 || payload[12] > 1U ||
+        payload[13] != 0U || payload[14] != 0U || payload[15] != 0U) {
+        return false;
+    }
+    const auto raw_db = static_cast<std::int32_t>(read_u32(payload.data() + 8U));
+    const auto handle = read_u64(payload.data());
+    const auto sequence = read_u64(payload.data() + 16U);
+    if (handle == 0U || sequence == 0U || raw_db < -144 * 65536 ||
+        raw_db > 12 * 65536) {
+        return false;
+    }
+    command.handle = handle;
+    command.requested_db_q16_16 = raw_db;
+    command.mute = payload[12];
+    command.catalog_sequence = sequence;
+    return true;
+}
+
 std::array<std::uint8_t, kGroupedVolumeNotificationPayloadBytesV1>
 encode_grouped_volume_notification_payload_v1(
     const std::string_view output_group,
@@ -428,6 +466,8 @@ bool decode_control_command_v1(const IpcFrameV1& frame,
             command.has_volume_target = decode_grouped_volume_notification_payload_v1(
                 frame.payload, command.volume, command.volume_target);
             return command.has_volume_target;
+        case IpcMessageType::SessionVolumeCommand:
+            return decode_session_volume_command_v1(frame.payload, command.session_volume);
         case IpcMessageType::SceneApply:
             return decode_scene_apply_payload_v1(frame.payload, command.scene);
         case IpcMessageType::DeviceSwitch:

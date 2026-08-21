@@ -30,6 +30,7 @@ enum class IpcMessageType : std::uint16_t {
     ControlStatusRequest = 13,
     SessionCatalogSnapshot = 14,
     SessionCatalogRequest = 15,
+    SessionVolumeCommand = 16,
 };
 
 struct IpcHeaderV1 {

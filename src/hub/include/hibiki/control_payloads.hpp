@@ -29,6 +29,20 @@ constexpr std::size_t kDeviceCatalogSnapshotCapacityV1 = 32U;
 constexpr std::size_t kDeviceCatalogSnapshotPayloadBytesV1 =
     kDeviceCatalogSnapshotHeaderBytesV1 +
     (kDeviceCatalogSnapshotEntryBytesV1 * kDeviceCatalogSnapshotCapacityV1);
+constexpr std::size_t kSessionVolumeCommandPayloadBytesV1 = 24U;
+
+struct SessionVolumeCommandV1 {
+    std::uint64_t handle{0U};
+    std::int32_t requested_db_q16_16{0};
+    std::uint8_t mute{0U};
+    std::uint64_t catalog_sequence{0U};
+};
+
+[[nodiscard]] std::array<std::uint8_t, kSessionVolumeCommandPayloadBytesV1>
+encode_session_volume_command_v1(const SessionVolumeCommandV1& command) noexcept;
+[[nodiscard]] bool decode_session_volume_command_v1(
+    std::span<const std::uint8_t> payload,
+    SessionVolumeCommandV1& command) noexcept;
 
 // Fixed little-endian control payload shared with apps/control-model. The
 // legacy 16-byte form stores dB Q16.16 at offset 0, mute at offset 4, reserved
@@ -130,6 +144,7 @@ struct ControlCommandV1 {
     bool has_volume_target{false};
     SceneApplyPayloadV1 scene{};
     DeviceSwitchPayloadV1 device_switch{};
+    SessionVolumeCommandV1 session_volume{};
 };
 
 [[nodiscard]] bool decode_control_command_v1(const IpcFrameV1& frame,

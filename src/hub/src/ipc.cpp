@@ -64,6 +64,7 @@ bool is_valid_message_type(const IpcMessageType type) noexcept {
         case IpcMessageType::ControlStatusRequest:
         case IpcMessageType::SessionCatalogSnapshot:
         case IpcMessageType::SessionCatalogRequest:
+        case IpcMessageType::SessionVolumeCommand:
             return true;
     }
     return false;

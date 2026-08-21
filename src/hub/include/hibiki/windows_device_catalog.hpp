@@ -20,6 +20,12 @@
 
 namespace hibiki {
 
+// Adapter for EngineControlWorkerV1::set_session_volume_handler. The context
+// must be a live WindowsControlRuntimeV1 owned by the control worker.
+[[nodiscard]] bool apply_session_volume_command_v1(
+    const SessionVolumeCommandV1& request,
+    void* context) noexcept;
+
 // Worker-owned COM boundary for endpoint metadata. All methods must run on
 // the same COM-initialized worker thread that owns the enumerator; notification
 // callbacks only signal that this refresh is needed.
@@ -151,6 +157,15 @@ public:
     [[nodiscard]] HRESULT read_session_volume(std::string_view session_instance_id,
                                               double& requested_db,
                                               bool& mute) noexcept;
+    [[nodiscard]] HRESULT write_session_volume_handle(std::uint64_t handle,
+                                                      std::uint64_t catalog_sequence,
+                                                      double requested_db,
+                                                      bool mute,
+                                                      const GUID& event_context) noexcept;
+    [[nodiscard]] HRESULT read_session_volume_handle(std::uint64_t handle,
+                                                     std::uint64_t catalog_sequence,
+                                                     double& requested_db,
+                                                     bool& mute) noexcept;
     [[nodiscard]] bool running() const noexcept { return host_.running(); }
     [[nodiscard]] bool client_connected() const noexcept { return host_.client_connected(); }
     [[nodiscard]] bool volume_bound() const noexcept { return volume_broker_.is_bound(); }
@@ -180,6 +195,9 @@ public:
         const ControlStatusSnapshotV1& snapshot) noexcept;
     [[nodiscard]] std::uint64_t catalog_sequence() const noexcept {
         return catalog_service_.sequence();
+    }
+    [[nodiscard]] std::uint64_t session_catalog_sequence() const noexcept {
+        return session_catalog_store_.sequence();
     }
 
 private:

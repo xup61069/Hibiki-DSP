@@ -93,6 +93,37 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::read_session_volume(
     return watcher_.read_session_volume(session_instance_id, requested_db, mute);
 }
 
+HRESULT WindowsAudioSessionRouteCoordinatorV1::write_session_volume_handle(
+    const std::uint64_t handle,
+    const double requested_db,
+    const bool mute,
+    const GUID& event_context) noexcept {
+    if (!bound_) return E_UNEXPECTED;
+    const auto handle_generation = handle >> 32U;
+    const auto handle_index = static_cast<std::uint32_t>(handle & 0xffffffffULL);
+    if (handle == 0U || handle_generation == 0U || handle_generation != generation_ ||
+        handle_index == 0U || handle_index > registry_.sessions().size()) {
+        return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+    }
+    const auto& identity = registry_.sessions()[handle_index - 1U].identity.session_instance_id;
+    return write_session_volume(identity, requested_db, mute, event_context);
+}
+
+HRESULT WindowsAudioSessionRouteCoordinatorV1::read_session_volume_handle(
+    const std::uint64_t handle,
+    double& requested_db,
+    bool& mute) noexcept {
+    if (!bound_) return E_UNEXPECTED;
+    const auto handle_generation = handle >> 32U;
+    const auto handle_index = static_cast<std::uint32_t>(handle & 0xffffffffULL);
+    if (handle == 0U || handle_generation == 0U || handle_generation != generation_ ||
+        handle_index == 0U || handle_index > registry_.sessions().size()) {
+        return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+    }
+    const auto& identity = registry_.sessions()[handle_index - 1U].identity.session_instance_id;
+    return read_session_volume(identity, requested_db, mute);
+}
+
 WindowsAudioSessionRouteRefreshResultV1 WindowsAudioSessionRouteCoordinatorV1::refresh() noexcept {
     if (!bound_) return WindowsAudioSessionRouteRefreshResultV1::Unbound;
 

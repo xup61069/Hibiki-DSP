@@ -193,6 +193,26 @@ var malformedSessionPayload = sessionPayload.ToArray();
 malformedSessionPayload[2] = 1;
 Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(malformedSessionPayload, out _, out _, out _),
     "Session catalog decoder must reject reserved bytes.");
+var sessionVolumeBytes = ControlPayloadsV1.EncodeSessionVolumeCommand(
+    sessionEntries[0].Handle, -9.5, true, 12UL);
+Check(ControlPayloadsV1.TryDecodeSessionVolumeCommand(sessionVolumeBytes,
+          out var sessionVolumeHandle, out var sessionVolumeDb,
+          out var sessionVolumeMute, out var sessionVolumeSequence) &&
+      sessionVolumeHandle == sessionEntries[0].Handle && Math.Abs(sessionVolumeDb + 9.5) < 1e-6 &&
+      sessionVolumeMute && sessionVolumeSequence == 12UL,
+    "Session volume command did not round-trip.");
+var malformedSessionVolume = sessionVolumeBytes.ToArray();
+malformedSessionVolume[13] = 1;
+Check(!ControlPayloadsV1.TryDecodeSessionVolumeCommand(malformedSessionVolume,
+                                                        out _, out _, out _, out _),
+    "Session volume decoder must reject reserved bytes.");
+var sessionVolumeRequest = commandFactory.SetSessionVolume(
+    sessionEntries[0].Handle, -9.5, true, 12UL);
+Check(sessionVolumeRequest.Type == ControlMessageType.SessionVolumeCommand &&
+      IpcRequestSession.IsReplyTo(sessionVolumeRequest,
+        new IpcEnvelopeV1(ControlMessageType.Ack, sessionVolumeRequest.RequestId,
+                          Array.Empty<byte>())),
+    "Session volume command request correlation failed.");
 var viewModel = new EasyControlViewModel { SelectedOutputGroup = " main " };
 Check(viewModel.ConnectionState == ControlConnectionState.Disconnected &&
       !viewModel.IsConnected && !viewModel.IsBusy &&
@@ -264,6 +284,14 @@ var staleSession = new IpcEnvelopeV1(
 Check(!viewModel.ApplySessionCatalogSnapshot(staleSession, out var staleSessionError) &&
       staleSessionError.Contains("過期") && viewModel.SessionCatalog.Count == 2,
     "Stale App session catalog must preserve the previous catalog.");
+Check(viewModel.SelectSession(sessionEntries[0].Handle) &&
+      viewModel.SelectedSession?.DisplayName == "DJMAX" &&
+      viewModel.BuildSessionVolumeCommand(sessionEntries[0].Handle, -9.5, true).Type ==
+          ControlMessageType.SessionVolumeCommand,
+    "ViewModel App session volume command failed to bind the current handle.");
+var staleHandle = sessionEntries[0].Handle + 100UL;
+Check(!viewModel.SelectSession(staleHandle),
+    "ViewModel must reject an unknown or stale App session handle.");
 viewModel.IsExpert = true;
 Check(viewModel.Mode == UiMode.Expert && viewModel.SelectScene("movie"),
     "ViewModel Expert scene selection failed.");
