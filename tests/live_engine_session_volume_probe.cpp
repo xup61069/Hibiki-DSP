@@ -220,6 +220,12 @@ struct SessionReadingV1 {
     std::uint64_t catalog_sequence{0U};
     double requested_db{-144.0};
     bool mute{false};
+    std::uint8_t route_state{
+        static_cast<std::uint8_t>(hibiki::SessionCatalogRouteStateV1::Unavailable)};
+    std::uint8_t lane_bytes{0U};
+    std::uint8_t output_bytes{0U};
+    std::array<char, hibiki::kSessionRouteCommandLaneMaxBytesV1> lane{};
+    std::array<char, hibiki::kSessionRouteCommandOutputMaxBytesV1> output{};
 };
 
 bool read_catalog(PipeClient& pipe,
@@ -245,6 +251,13 @@ bool read_catalog(PipeClient& pipe,
             reading.catalog_sequence = catalog.sequence;
             reading.requested_db = hibiki::q16_16_to_db(entry.requested_db_q16_16);
             reading.mute = entry.mute != 0U;
+            reading.route_state = static_cast<std::uint8_t>(entry.route_state);
+            reading.lane_bytes = static_cast<std::uint8_t>(
+                std::min<std::size_t>(entry.lane_bytes, reading.lane.size()));
+            reading.output_bytes = static_cast<std::uint8_t>(
+                std::min<std::size_t>(entry.output_bytes, reading.output.size()));
+            std::copy_n(entry.lane.data(), reading.lane_bytes, reading.lane.data());
+            std::copy_n(entry.output.data(), reading.output_bytes, reading.output.data());
             return true;
         }
     }
@@ -287,6 +300,49 @@ bool wait_for_value(PipeClient& pipe,
         SessionReadingV1 candidate{};
         if (read_catalog(pipe, request_id++, candidate) &&
             close_db(candidate.requested_db, requested_db) && candidate.mute == mute) {
+            reading = candidate;
+            return true;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    return false;
+}
+
+bool send_route_command(PipeClient& pipe,
+                        const std::uint64_t request_id,
+                        const SessionReadingV1& current,
+                        const std::string_view lane,
+                        const std::string_view output_group) noexcept {
+    hibiki::SessionRouteCommandV1 command{};
+    command.handle = current.handle;
+    command.catalog_sequence = current.catalog_sequence;
+    if (lane.empty() || lane.size() > command.lane.size() || output_group.empty() ||
+        output_group.size() > command.output_group.size()) {
+        return false;
+    }
+    command.lane_bytes = static_cast<std::uint8_t>(lane.size());
+    command.output_group_bytes = static_cast<std::uint8_t>(output_group.size());
+    std::copy(lane.begin(), lane.end(), command.lane.begin());
+    std::copy(output_group.begin(), output_group.end(), command.output_group.begin());
+    const auto encoded = hibiki::encode_session_route_command_v1(command);
+    if (encoded[0U] == 0U) return false;
+    const auto response = pipe.transact(hibiki::IpcMessageType::SessionRouteCommand,
+                                        request_id, encoded);
+    return response.has_value() && response->header.type == hibiki::IpcMessageType::Ack;
+}
+
+bool wait_for_route(PipeClient& pipe,
+                    std::uint64_t& request_id,
+                    const std::string_view lane,
+                    const std::string_view output_group,
+                    SessionReadingV1& reading) noexcept {
+    for (std::uint32_t attempt = 0U; attempt < 80U; ++attempt) {
+        SessionReadingV1 candidate{};
+        if (read_catalog(pipe, request_id++, candidate) &&
+            candidate.route_state ==
+                static_cast<std::uint8_t>(hibiki::SessionCatalogRouteStateV1::Ready) &&
+            std::string_view(candidate.lane.data(), candidate.lane_bytes) == lane &&
+            std::string_view(candidate.output.data(), candidate.output_bytes) == output_group) {
             reading = candidate;
             return true;
         }
@@ -379,7 +435,20 @@ int wmain() {
             std::printf("session_volume_engine_live=fail reason=restore\n");
             break;
         }
-        std::printf("session_volume_engine_live=pass original_db=%.2f attenuated_db=%.2f restored_db=%.2f transport=ipc-control-queue-com-worker\n",
+        constexpr std::string_view kProbeLane = "live-engine-session-lane";
+        constexpr std::string_view kProbeOutput = "main";
+        SessionReadingV1 route_current{};
+        if (!wait_for_catalog(pipe, request_id, route_current) ||
+            !send_route_command(pipe, request_id++, route_current, kProbeLane, kProbeOutput)) {
+            std::printf("session_volume_engine_live=fail reason=route-queue-write\n");
+            break;
+        }
+        SessionReadingV1 routed{};
+        if (!wait_for_route(pipe, request_id, kProbeLane, kProbeOutput, routed)) {
+            std::printf("session_volume_engine_live=fail reason=route-readback\n");
+            break;
+        }
+        std::printf("session_volume_engine_live=pass original_db=%.2f attenuated_db=%.2f restored_db=%.2f route=ready transport=ipc-control-queue-com-worker\n",
                     original_db, attenuated_db, restored_db);
     } while (false);
 
