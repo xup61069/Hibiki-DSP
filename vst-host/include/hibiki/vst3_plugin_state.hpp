@@ -100,4 +100,50 @@ private:
     std::size_t count_{0U};
 };
 
+constexpr std::size_t kVst3PluginStateMaxMigrationRulesV1 = 16U;
+
+// Fixed-capacity control-plane registry used by Scene upgrades. Rule context
+// is non-owning and must outlive the registry; no plugin bytes are retained by
+// this table. A missing or ambiguous rule is a hard migration failure.
+class Vst3PluginStateMigrationRegistryV1 final {
+public:
+    [[nodiscard]] Vst3PluginStateResultV1 register_rule(
+        const Vst3PluginStateIdentityV1& identity,
+        std::uint32_t source_version,
+        std::uint32_t target_version,
+        Vst3PluginStateMigrationFnV1 migration,
+        void* context = nullptr);
+
+    [[nodiscard]] Vst3PluginStateResultV1 restore(
+        const Vst3PluginStateStoreV1& store,
+        std::string_view state_id,
+        const Vst3PluginStateIdentityV1& expected_identity,
+        std::uint32_t expected_state_version,
+        std::span<std::uint8_t> destination,
+        std::size_t& bytes_written) const noexcept;
+
+    [[nodiscard]] bool remove_rule(const Vst3PluginStateIdentityV1& identity,
+                                   std::uint32_t source_version,
+                                   std::uint32_t target_version) noexcept;
+    void clear() noexcept;
+    [[nodiscard]] std::size_t size() const noexcept { return count_; }
+
+private:
+    struct Rule {
+        bool occupied{false};
+        Vst3PluginStateIdentityV1 identity{};
+        std::uint32_t source_version{0U};
+        std::uint32_t target_version{0U};
+        Vst3PluginStateMigrationFnV1 migration{nullptr};
+        void* context{nullptr};
+    };
+
+    [[nodiscard]] std::size_t find(const Vst3PluginStateIdentityV1& identity,
+                                   std::uint32_t source_version,
+                                   std::uint32_t target_version) const noexcept;
+
+    std::array<Rule, kVst3PluginStateMaxMigrationRulesV1> rules_{};
+    std::size_t count_{0U};
+};
+
 }  // namespace hibiki

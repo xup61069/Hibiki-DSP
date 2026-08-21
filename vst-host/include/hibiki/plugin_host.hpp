@@ -80,6 +80,21 @@ public:
         std::size_t& bytes_written,
         Vst3PluginStateMigrationFnV1 migration,
         void* context = nullptr) const noexcept;
+    [[nodiscard]] Vst3PluginStateResultV1 register_plugin_state_migration(
+        const Vst3PluginStateIdentityV1& identity,
+        std::uint32_t source_version,
+        std::uint32_t target_version,
+        Vst3PluginStateMigrationFnV1 migration,
+        void* context = nullptr);
+    [[nodiscard]] Vst3PluginStateResultV1 restore_plugin_state_via_registry(
+        std::string_view state_id,
+        const Vst3PluginStateIdentityV1& expected_identity,
+        std::uint32_t expected_state_version,
+        std::span<std::uint8_t> destination,
+        std::size_t& bytes_written) const noexcept;
+    [[nodiscard]] std::size_t plugin_state_migration_count() const noexcept {
+        return plugin_state_migrations_.size();
+    }
     [[nodiscard]] std::size_t plugin_state_count() const noexcept {
         return plugin_state_.size();
     }
@@ -99,6 +114,7 @@ private:
     std::uint64_t last_heartbeat_ms_{0};
     Vst3WorkerLaneSessionV1 worker_lane_{};
     Vst3PluginStateStoreV1 plugin_state_{};
+    Vst3PluginStateMigrationRegistryV1 plugin_state_migrations_{};
 };
 
 }  // namespace hibiki

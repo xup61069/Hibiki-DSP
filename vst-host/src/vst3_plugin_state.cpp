@@ -25,6 +25,12 @@ bool has_hash_byte(const std::array<std::uint8_t, 32U>& hash) noexcept {
     return false;
 }
 
+bool same_identity(const Vst3PluginStateIdentityV1& left,
+                   const Vst3PluginStateIdentityV1& right) noexcept {
+    return left.plugin_id == right.plugin_id && left.class_id == right.class_id &&
+           left.module_sha256 == right.module_sha256;
+}
+
 }  // namespace
 
 bool validate_vst3_plugin_state_identity_v1(
@@ -162,6 +168,99 @@ bool Vst3PluginStateStoreV1::remove(const std::string_view state_id) noexcept {
 
 void Vst3PluginStateStoreV1::clear() noexcept {
     for (auto& slot : slots_) slot = {};
+    count_ = 0U;
+}
+
+std::size_t Vst3PluginStateMigrationRegistryV1::find(
+    const Vst3PluginStateIdentityV1& identity,
+    const std::uint32_t source_version,
+    const std::uint32_t target_version) const noexcept {
+    for (std::size_t index = 0U; index < rules_.size(); ++index) {
+        const auto& rule = rules_[index];
+        if (rule.occupied && same_identity(rule.identity, identity) &&
+            rule.source_version == source_version && rule.target_version == target_version) {
+            return index;
+        }
+    }
+    return rules_.size();
+}
+
+Vst3PluginStateResultV1 Vst3PluginStateMigrationRegistryV1::register_rule(
+    const Vst3PluginStateIdentityV1& identity,
+    const std::uint32_t source_version,
+    const std::uint32_t target_version,
+    const Vst3PluginStateMigrationFnV1 migration,
+    void* const context) {
+    if (!validate_vst3_plugin_state_identity_v1(identity) || source_version == 0U ||
+        target_version == 0U || source_version == target_version || migration == nullptr) {
+        return Vst3PluginStateResultV1::invalid_argument;
+    }
+    for (const auto& rule : rules_) {
+        if (rule.occupied && same_identity(rule.identity, identity) &&
+            rule.target_version == target_version && rule.source_version != source_version) {
+            return Vst3PluginStateResultV1::invalid_argument;
+        }
+    }
+    auto index = find(identity, source_version, target_version);
+    if (index == rules_.size()) {
+        for (std::size_t candidate = 0U; candidate < rules_.size(); ++candidate) {
+            if (!rules_[candidate].occupied) {
+                index = candidate;
+                break;
+            }
+        }
+        if (index == rules_.size()) return Vst3PluginStateResultV1::capacity_exhausted;
+    }
+    rules_[index] = Rule{true, identity, source_version, target_version, migration, context};
+    count_ = 0U;
+    for (const auto& rule : rules_) {
+        if (rule.occupied) ++count_;
+    }
+    return Vst3PluginStateResultV1::ok;
+}
+
+Vst3PluginStateResultV1 Vst3PluginStateMigrationRegistryV1::restore(
+    const Vst3PluginStateStoreV1& store,
+    const std::string_view state_id,
+    const Vst3PluginStateIdentityV1& expected_identity,
+    const std::uint32_t expected_state_version,
+    const std::span<std::uint8_t> destination,
+    std::size_t& bytes_written) const noexcept {
+    const auto exact = store.restore(state_id, expected_identity, expected_state_version,
+                                     destination, bytes_written);
+    if (exact != Vst3PluginStateResultV1::version_mismatch) return exact;
+
+    std::size_t matching_rule = rules_.size();
+    for (std::size_t index = 0U; index < rules_.size(); ++index) {
+        const auto& rule = rules_[index];
+        if (rule.occupied && same_identity(rule.identity, expected_identity) &&
+            rule.target_version == expected_state_version) {
+            if (matching_rule != rules_.size()) return Vst3PluginStateResultV1::migration_unavailable;
+            matching_rule = index;
+        }
+    }
+    if (matching_rule == rules_.size()) return Vst3PluginStateResultV1::migration_unavailable;
+    const auto& rule = rules_[matching_rule];
+    return store.restore_with_migration(state_id, expected_identity, expected_state_version,
+                                        destination, bytes_written, rule.migration, rule.context);
+}
+
+bool Vst3PluginStateMigrationRegistryV1::remove_rule(
+    const Vst3PluginStateIdentityV1& identity,
+    const std::uint32_t source_version,
+    const std::uint32_t target_version) noexcept {
+    const auto index = find(identity, source_version, target_version);
+    if (index == rules_.size()) return false;
+    rules_[index] = {};
+    count_ = 0U;
+    for (const auto& rule : rules_) {
+        if (rule.occupied) ++count_;
+    }
+    return true;
+}
+
+void Vst3PluginStateMigrationRegistryV1::clear() noexcept {
+    for (auto& rule : rules_) rule = {};
     count_ = 0U;
 }
 

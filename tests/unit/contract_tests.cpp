@@ -914,6 +914,18 @@ int main() {
               "movie-state", plugin_identity, 2U, migrated_state, state_bytes_written,
               migrate_test_plugin_state) == Vst3PluginStateResultV1::ok &&
           state_bytes_written == 4U && migrated_state[0] == 1U && migrated_state[3] == 0x42U);
+    CHECK(plugin.register_plugin_state_migration(plugin_identity, 1U, 2U,
+                                                 migrate_test_plugin_state) ==
+              Vst3PluginStateResultV1::ok &&
+          plugin.plugin_state_migration_count() == 1U);
+    migrated_state.fill(0U);
+    CHECK(plugin.restore_plugin_state_via_registry("movie-state", plugin_identity, 2U,
+                                                   migrated_state, state_bytes_written) ==
+              Vst3PluginStateResultV1::ok &&
+          state_bytes_written == 4U && migrated_state[3] == 0x42U);
+    CHECK(plugin.register_plugin_state_migration(plugin_identity, 9U, 2U,
+                                                 migrate_test_plugin_state) ==
+              Vst3PluginStateResultV1::invalid_argument);
     plugin.report_crash();
     CHECK(!plugin.process_passthrough(plugin_input, plugin_output, 2));
 

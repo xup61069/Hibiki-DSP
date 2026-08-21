@@ -129,13 +129,14 @@ opaque bytes 不得進 GitHub、Issue、AI context pack 或 release artifact。
 `IBStream` 呼叫 component `getState/setState`，同樣限制 1 MiB，並將 overflow、plugin
 error、destination 不足與 allocation failure 分開回報。它只建立 worker-side SDK adapter；
 尚未接到正式 Scene migration registry、plugin UI editor 或第三方 compatibility certification；
-目前的 migration handler 仍由受信任的 control-plane caller 注入，未提供自動探測或遠端下載。
+目前已有固定 16-rule `Vst3PluginStateMigrationRegistryV1` primitive，但 handler 仍由受信任的
+control-plane caller 注入，未提供自動探測或遠端下載。
 
 ## 尚未完成的邊界
 
 plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter、bounded parameter
 frame、latency alignment primitive、latency graph commit 與 optional worker executable 已有 bridge；仍未完成第三方
-plugin certification、Scene migration registry、RT graph lane latency wiring、side-chain/multi-bus、
+plugin certification、Scene-to-registry binding、RT graph lane latency wiring、side-chain/multi-bus、
 crash dump redaction 與 production worker policy。目前
 supervisor、named pipe、passthrough worker、catalog、bounded SDK processor、handshake/process
 exchange、timeline lane 與 Scene automation scheduler 提供可測試的 process

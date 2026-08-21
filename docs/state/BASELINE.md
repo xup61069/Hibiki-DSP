@@ -112,8 +112,9 @@
 - Optional pinned-SDK `Vst3SdkProcessorV1` now maps component `getState/setState` through a bounded
   1 MiB `IBStream`, separating overflow, plugin-error and destination-size failures. The store and
   `PluginHostModel` now accept only an explicit caller-supplied migration handler for version
-  mismatches; absent/failed/oversized migrations remain fail-closed, while Scene registry and
-  third-party compatibility certification remain pending.
+  mismatches; the fixed 16-rule migration registry routes approved identity/version pairs, while
+  absent/failed/oversized migrations remain fail-closed. Scene binding and third-party
+  compatibility certification remain pending.
 - `AudioSessionRegistry` keys Windows sessions by endpoint plus session-instance ID, preserves
   user routing on metadata refresh, and supports independent lane/output-group/gain-owner binding;
   Windows `IAudioSessionManager2` worker enumeration now populates it; callbacks remain
