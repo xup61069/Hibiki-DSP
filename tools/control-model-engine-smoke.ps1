@@ -1,5 +1,7 @@
 [CmdletBinding()]
-param()
+param(
+  [switch]$EnableSessionRouting
+)
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
@@ -15,12 +17,18 @@ if (@(Get-Process -Name hibiki_engine_preview -ErrorAction SilentlyContinue).Cou
   throw 'Another Engine Preview process is already running; stop it before running this smoke.'
 }
 
-$engineProcess = Start-Process -FilePath $engine -WorkingDirectory (Split-Path $engine) `
+$engineArguments = @()
+if ($EnableSessionRouting) { $engineArguments += '--enable-session-routing' }
+$engineProcess = Start-Process -FilePath $engine -ArgumentList $engineArguments -WorkingDirectory (Split-Path $engine) `
   -WindowStyle Hidden -PassThru
 try {
-  dotnet run --project $project --configuration Release --nologo `
-    "-p:BaseOutputPath=$outputRoot/bin/" `
+  $smokeArguments = @(
+    '--project', $project, '--configuration', 'Release', '--nologo',
+    "-p:BaseOutputPath=$outputRoot/bin/",
     "-p:MSBuildProjectExtensionsPath=$outputRoot/obj/"
+  )
+  if ($EnableSessionRouting) { $smokeArguments += '--session' }
+  dotnet run @smokeArguments
   if ($LASTEXITCODE -ne 0) { throw "Control model Engine Preview smoke failed: $LASTEXITCODE" }
 }
 finally {

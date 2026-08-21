@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
   [switch]$EnableSystemVolume,
+  [switch]$EnableSessionRouting,
   [switch]$StatusOnly
 )
 
@@ -83,6 +84,7 @@ function Write-TestIrWav([string]$Path) {
 
 $engineArguments = @()
 if ($EnableSystemVolume) { $engineArguments += '--enable-system-volume' }
+if ($EnableSessionRouting) { $engineArguments += '--enable-session-routing' }
 $engineProcess = Start-Process -FilePath $engine -ArgumentList $engineArguments `
   -WorkingDirectory (Split-Path $engine) -WindowStyle Hidden -PassThru
 $irPath = Join-Path $repo '.local/engine-preview-smoke-ir.wav'
@@ -121,6 +123,9 @@ try {
   }
 
   if ($StatusOnly) {
+    if (-not $EnableSystemVolume -and -not $EnableSessionRouting) {
+      throw 'StatusOnly requires -EnableSystemVolume or -EnableSessionRouting.'
+    }
     $statusFrame = New-IpcFrame 13 43 @()
     Send-IpcFrame $client $statusFrame
     $statusReply = Receive-IpcFrame $client
@@ -128,17 +133,38 @@ try {
       throw 'Engine Preview status-only probe did not receive a correlated snapshot.'
     }
     $statusPayloadBytes = [BitConverter]::ToUInt32($statusReply, 8)
-    $statusRouteOffset = 20 + 40 + (2 * 224)
     if ($statusPayloadBytes -ne ($statusReply.Length - 20) -or
-        $statusPayloadBytes -lt (40 + (3 * 224)) -or
-        $statusReply[$statusRouteOffset + 1] -ne 0) {
-      $state = if ($statusPayloadBytes -ge ($statusRouteOffset + 2)) {
-        $statusReply[$statusRouteOffset + 1]
-      } else { 255 }
-      throw "Windows volume route was not Ready (state=$state, payload=$statusPayloadBytes)."
+        $statusPayloadBytes -lt (40 + (6 * 224))) {
+      throw "Engine Preview status payload shape is invalid: bytes=$statusPayloadBytes."
     }
-    $mode = if ($EnableSystemVolume) { 'explicit write-through enabled' } else { 'write-through disabled' }
-    Write-Output "Engine Preview status-only smoke passed (Windows volume route Ready; $mode)."
+    $statusSummary = @()
+    if ($EnableSystemVolume) {
+      $volumeRouteOffset = 20 + 40 + (2 * 224)
+      if ($statusReply[$volumeRouteOffset + 1] -ne 0) {
+        throw "Windows volume route was not Ready (state=$($statusReply[$volumeRouteOffset + 1]))."
+      }
+      $statusSummary += 'Windows volume route Ready; explicit write-through enabled'
+    }
+    if ($EnableSessionRouting) {
+      $sessionRouteOffset = 20 + 40 + (4 * 224)
+      if ($statusReply[$sessionRouteOffset + 1] -gt 4) {
+        throw "Windows session route state is invalid: $($statusReply[$sessionRouteOffset + 1])."
+      }
+      $sessionFrame = New-IpcFrame 15 47 @()
+      Send-IpcFrame $client $sessionFrame
+      $sessionReply = Receive-IpcFrame $client
+      if ($sessionReply[6] -ne 14 -or [BitConverter]::ToUInt64($sessionReply, 12) -ne 47) {
+        throw 'Engine Preview session catalog request did not receive a correlated snapshot.'
+      }
+      $sessionPayloadBytes = [BitConverter]::ToUInt32($sessionReply, 8)
+      $sessionCount = [BitConverter]::ToUInt16($sessionReply, 20)
+      if ($sessionPayloadBytes -ne ($sessionReply.Length - 20) -or
+          $sessionPayloadBytes -ne (24 + ($sessionCount * 256))) {
+        throw "Engine Preview session catalog payload shape is invalid: bytes=$sessionPayloadBytes count=$sessionCount."
+      }
+      $statusSummary += "session catalog Ready; entries=$sessionCount; per-App delivery unverified"
+    }
+    Write-Output "Engine Preview status-only smoke passed ($($statusSummary -join '; '))."
     return
   }
 

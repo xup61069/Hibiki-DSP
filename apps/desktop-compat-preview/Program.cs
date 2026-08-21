@@ -25,6 +25,13 @@ internal sealed class PreviewForm : Form
     private readonly Label _devices = new() { AutoSize = false, Width = 550, Height = 48 };
     private readonly Label _status = new() { AutoSize = false, Height = 48 };
     private readonly Label _routes = new() { AutoSize = false, Width = 550, Height = 58 };
+    private readonly Label _sessions = new() { AutoSize = false, Width = 550, Height = 72 };
+    private readonly ComboBox _sessionSelector = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly TrackBar _sessionVolume = new() { Minimum = -60, Maximum = 0, TickFrequency = 5, Width = 460 };
+    private readonly Button _applySessionVolume = new() { Text = "套用選取 App 音量", AutoSize = true };
+    private readonly TextBox _sessionLane = new() { Width = 220, PlaceholderText = "Lane ID" };
+    private readonly TextBox _sessionOutput = new() { Width = 220, PlaceholderText = "Output Group" };
+    private readonly Button _applySessionRoute = new() { Text = "套用選取 App 路由", AutoSize = true };
     private readonly Label _effective = new() { AutoSize = true };
     private readonly ComboBox _scenes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly ComboBox _irModes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList };
@@ -35,6 +42,7 @@ internal sealed class PreviewForm : Form
     private readonly Button _enhance = new() { Text = "一鍵改善", AutoSize = true, Margin = new Padding(3, 12, 3, 3) };
     private readonly System.Windows.Forms.Timer _statusTimer = new() { Interval = 1000 };
     private bool _updatingScene;
+    private bool _updatingSession;
     private bool _statusRefreshActive;
 
     internal PreviewForm(EasyControlViewModel viewModel)
@@ -113,6 +121,52 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(_volume);
         panel.Controls.Add(_effective);
         panel.Controls.Add(_routes);
+        panel.Controls.Add(new Label { Text = "Expert App／工作階段（需以 -EnableSessionRouting 啟動）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        panel.Controls.Add(_sessions);
+        _sessionSelector.SelectedIndexChanged += (_, _) =>
+        {
+            if (_updatingSession || _sessionSelector.SelectedItem is not SessionCatalogEntryV1 entry) return;
+            _viewModel.SelectSession(entry.Handle);
+            SyncSessionControls();
+            RefreshView();
+        };
+        panel.Controls.Add(_sessionSelector);
+        _sessionVolume.ValueChanged += async (_, _) =>
+        {
+            if (_updatingSession || _viewModel.SelectedSession is null) return;
+            _viewModel.SessionVolumeDb = _sessionVolume.Value;
+            RefreshView();
+        };
+        panel.Controls.Add(_sessionVolume);
+        _applySessionVolume.Click += async (_, _) =>
+        {
+            await _viewModel.ApplySelectedSessionVolumeAsync();
+            RefreshView();
+        };
+        panel.Controls.Add(_applySessionVolume);
+        _sessionLane.TextChanged += (_, _) =>
+        {
+            if (!_updatingSession) _viewModel.SessionRouteLaneId = _sessionLane.Text;
+        };
+        _sessionOutput.TextChanged += (_, _) =>
+        {
+            if (!_updatingSession) _viewModel.SessionRouteOutputGroup = _sessionOutput.Text;
+        };
+        var sessionRouteFields = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false
+        };
+        sessionRouteFields.Controls.Add(_sessionLane);
+        sessionRouteFields.Controls.Add(_sessionOutput);
+        panel.Controls.Add(sessionRouteFields);
+        _applySessionRoute.Click += async (_, _) =>
+        {
+            await _viewModel.ApplySelectedSessionRouteAsync();
+            RefreshView();
+        };
+        panel.Controls.Add(_applySessionRoute);
         panel.Controls.Add(_status);
         Controls.Add(panel);
         _viewModel.PropertyChanged += OnViewModelChanged;
@@ -170,6 +224,37 @@ internal sealed class PreviewForm : Form
         _enhance.Enabled = _viewModel.IsConnected;
         _scenes.Enabled = _viewModel.IsConnected;
         _volume.Enabled = _viewModel.IsConnected;
+        var sessions = _viewModel.SessionCatalog.ToArray();
+        _sessions.Text = sessions.Length == 0
+            ? "App catalog：尚未同步；請以 -EnableSessionRouting 啟動引擎，或目前沒有可控制的工作階段。"
+            : $"App catalog：{sessions.Length} 筆；只顯示 bounded metadata。套用 App 音量會寫入 Windows session，" +
+              "實體 per-App 重新送出仍未驗證。";
+        _updatingSession = true;
+        try
+        {
+            var selectedHandle = _viewModel.SelectedSessionHandle;
+            _sessionSelector.DataSource = null;
+            _sessionSelector.DisplayMember = nameof(SessionCatalogEntryV1.DisplayName);
+            _sessionSelector.ValueMember = nameof(SessionCatalogEntryV1.Handle);
+            _sessionSelector.DataSource = sessions;
+            if (selectedHandle != 0UL)
+            {
+                var selectedIndex = Array.FindIndex(sessions, entry => entry.Handle == selectedHandle);
+                if (selectedIndex >= 0) _sessionSelector.SelectedIndex = selectedIndex;
+            }
+            SyncSessionControls();
+        }
+        finally
+        {
+            _updatingSession = false;
+        }
+        var hasSession = _viewModel.HasSelectedSession;
+        _sessionSelector.Enabled = _viewModel.IsConnected && sessions.Length > 0;
+        _sessionVolume.Enabled = _viewModel.IsConnected && hasSession && _viewModel.SelectedSession?.VolumeAvailable == true;
+        _applySessionVolume.Enabled = _sessionVolume.Enabled;
+        _sessionLane.Enabled = _viewModel.IsConnected && hasSession;
+        _sessionOutput.Enabled = _viewModel.IsConnected && hasSession;
+        _applySessionRoute.Enabled = _viewModel.IsConnected && hasSession;
         _loadIr.Enabled = _viewModel.IsConnected && _viewModel.IrPhaseMode != IrPhaseMode.Bypass;
         _irStrength.Enabled = _viewModel.IrPhaseMode is IrPhaseMode.MixedPhase or IrPhaseMode.LinearPhase;
         _effective.Text = $"實際有效音量：{_viewModel.EffectiveVolumeDb:0.0} dB；{_viewModel.VolumeOriginText}；{_viewModel.VolumeActuatorText}";
@@ -194,5 +279,18 @@ internal sealed class PreviewForm : Form
             _scenes.SelectedValue = selectedScene;
             _updatingScene = false;
         }
+    }
+
+    private void SyncSessionControls()
+    {
+        var selected = _viewModel.SelectedSession;
+        var requested = Math.Clamp((int)Math.Round(_viewModel.SessionVolumeDb),
+                                   _sessionVolume.Minimum, _sessionVolume.Maximum);
+        if (_sessionVolume.Value != requested) _sessionVolume.Value = requested;
+        if (_sessionLane.Text != _viewModel.SessionRouteLaneId)
+            _sessionLane.Text = _viewModel.SessionRouteLaneId;
+        if (_sessionOutput.Text != _viewModel.SessionRouteOutputGroup)
+            _sessionOutput.Text = _viewModel.SessionRouteOutputGroup;
+        if (selected is null) _sessionSelector.SelectedIndex = -1;
     }
 }

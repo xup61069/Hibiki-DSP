@@ -51,6 +51,11 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   Windows session routing 已完成。若要明確驗證 Windows endpoint 音量聯動，使用
   `tools/run-preview.ps1 -Build -EnableSystemVolume`；預設不會寫入系統音量，且
   `tools/engine-preview-smoke.ps1 -EnableSystemVolume -StatusOnly` 只檢查 broker Ready、不送音量命令。
+- Engine Preview 另有獨立的 `--enable-session-routing` opt-in：它在 COM worker 綁定
+  `IAudioSessionManager2`，發布 bounded App/session catalog，並把 App 音量、lane/output 與
+  route-rule 命令送入固定 queue；`-EnableSessionRouting` 可與系統音量旗標同時使用。這是
+  控制面與 Windows session volume 的可重跑邊界，不是實體 per-App capture/re-send 或 DSP
+  delivery 證據；Desktop Preview 只顯示安全摘要與明確的 delivery unverified 警示。
 - ISO 226 只保留合法 formula/derived boundary；禁止把受限標準文件、完整表格、掃圖或其內容
   放進 source、Issue、prompt、RAG、fixture 或 evidence。
 
@@ -87,7 +92,8 @@ Windows 使用者也可雙擊 repository 根目錄的 `Start-HibikiPreview.cmd`�
 - 不宣稱 vendor ASIO、WASAPI Exclusive、RAW、Atmos/DTS:X 或未經使用者手勢的 Chrome tab capture 已受 Hibiki 控制。
 - `PhysicalDeviceCatalog` 的 capture default 允許存在，但只有 Active render 才能被 UI 選取；
   catalog readiness 不等於 physical sink 已開啟。
-- 不把「控制命令已入列」或「預設已保存」寫成「已完成引擎／實體音訊套用」。
+- 不把「控制命令已入列」或「預設已保存」寫成「已完成引擎／實體音訊套用」；session
+  routing smoke 只代表 catalog／queue／Windows session 邊界可用。
 
 ## 交接前最小完成條件
 

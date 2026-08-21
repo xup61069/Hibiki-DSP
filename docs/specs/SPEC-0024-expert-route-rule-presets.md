@@ -6,7 +6,7 @@ authority: control-model
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0001, ADR-0004]
-source_globs: ["apps/control-model/SessionRouteRuleCatalog.cs", "apps/control-model/ControlModel.cs", "apps/control-model/EasyControlViewModel.cs", "apps/winui-shell/MainWindow.xaml", "apps/winui-shell/MainWindow.xaml.cs", "schemas/session-route-rules-v1.schema.json", "apps/control-model-check/Program.cs"]
+source_globs: ["apps/control-model/SessionRouteRuleCatalog.cs", "apps/control-model/ControlModel.cs", "apps/control-model/EasyControlViewModel.cs", "apps/winui-shell/MainWindow.xaml", "apps/winui-shell/MainWindow.xaml.cs", "schemas/session-route-rules-v1.schema.json", "apps/control-model-check/Program.cs", "apps/engine-preview/engine_preview.cpp", "tools/engine-preview-smoke.ps1"]
 ---
 
 # SPEC-0024：Expert per-App 路由預設 catalog
@@ -43,6 +43,17 @@ Expert 面板提供可讀的規則摘要、欄位提示、啟用與 gain owner �
 control model。WinUI code-behind 只呼叫 ViewModel，不在 UI thread 直接接觸 COM、RT graph 或
 Windows session identity。這個 catalog 是控制面便利層，不宣稱已完成實體 per-App reroute、
 Chrome 單分頁捕捉或 vendor ASIO 攔截。
+
+## Engine Preview opt-in 邊界
+
+`apps/engine-preview/engine_preview.cpp` 只有在明確傳入 `--enable-session-routing` 時，才會
+在 COM worker 綁定目前 default render endpoint 的 `IAudioSessionManager2`、刷新 bounded
+`SessionCatalogSnapshot` 並啟用 App 音量／lane-output／route-rule command queue。預設 Engine
+Preview 不枚舉或操作 Windows session；`-EnableSessionRouting` 與系統音量 opt-in 可獨立或同時
+使用。所有命令先檢查 catalog sequence、generation-scoped handle 與 payload，再由 worker 交易套用；
+失敗時保留上一份 catalog／rule graph。這個切片驗證選取、命令與 Windows session volume 控制面，
+不宣稱已完成實體 per-App capture/re-send、process-loopback 或 DSP lane delivery；預覽 UI 必須顯示
+`per-App delivery unverified`。
 
 ## 驗收
 

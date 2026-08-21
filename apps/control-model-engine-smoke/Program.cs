@@ -25,6 +25,8 @@ static string CreateSmokeIrWav()
     return path;
 }
 
+var sessionProbe = args.Any(argument =>
+    string.Equals(argument, "--session", StringComparison.OrdinalIgnoreCase));
 var viewModel = new EasyControlViewModel();
 if (!await viewModel.ConnectAsync(TimeSpan.FromSeconds(2)))
     throw new InvalidOperationException("Control model could not connect to Engine Preview.");
@@ -45,7 +47,9 @@ try
 
     if (!await viewModel.OneTapEnhanceAsync())
         throw new InvalidOperationException("Control model One-Tap SceneApply was not acknowledged.");
-    if (viewModel.StatusSequence != 1UL || viewModel.SelectedScene?.Id != "game")
+    if ((!sessionProbe && viewModel.StatusSequence != 1UL) ||
+        (sessionProbe && viewModel.StatusSequence < 1UL) ||
+        viewModel.SelectedScene?.Id != "game")
         throw new InvalidOperationException(
             $"Engine status/scene did not reconcile: sequence={viewModel.StatusSequence}, scene={viewModel.SelectedScene?.Id ?? "none"}.");
 
@@ -61,6 +65,16 @@ try
 
     var physicalRefresh = await viewModel.RefreshPhysicalDevicesAsync();
     var physicalRefreshStatus = viewModel.StatusText;
+    if (sessionProbe)
+    {
+        if (viewModel.SessionCatalog.Count == 0 || viewModel.SessionCatalogSequence == 0UL)
+            throw new InvalidOperationException("Session routing probe did not receive an App catalog.");
+        var sessionRoute = viewModel.Expert.RouteHealth.FirstOrDefault(route =>
+            route.Id == "windows-session");
+        if (sessionRoute is null || sessionRoute.State == RouteHealthStateV1.Unavailable)
+            throw new InvalidOperationException("Session routing probe did not report a usable route.");
+        Console.WriteLine($"Session routing probe passed (entries={viewModel.SessionCatalog.Count}, sequence={viewModel.SessionCatalogSequence}, route={sessionRoute.StateLabel}); no App volume or route command was sent.");
+    }
     var mainOutputRoute = viewModel.Expert.RouteHealth.FirstOrDefault(route =>
         route.Id == "main-output");
     Console.WriteLine($"Control model Engine Preview smoke passed (effective={viewModel.EffectiveVolumeDb:0.00} dB, generation={viewModel.VolumeGeneration}, status_sequence={viewModel.StatusSequence}, scene={viewModel.SelectedScene?.Id}, devices={viewModel.PhysicalDevices.Count}, catalog_refresh={physicalRefresh}, catalog_status={physicalRefreshStatus}, main_output={mainOutputRoute?.StateLabel ?? "unknown"}, main_detail={mainOutputRoute?.Detail ?? "missing"}, ir=cleared-on-scene-switch).");

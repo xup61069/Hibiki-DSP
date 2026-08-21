@@ -54,3 +54,12 @@ that mode Engine Preview binds the current render endpoint's `IAudioEndpointVolu
 mirrors external dB/mute notifications into the canonical Main Group Master, and
 writes UI volume requests back with the documented event-context GUID. The default
 launcher remains read/write-safe and does not touch Windows volume.
+
+The launcher also accepts `-EnableSessionRouting` as a separate explicit opt-in. Engine
+Preview binds `IAudioSessionManager2` on the current default render endpoint, publishes
+a bounded `SessionCatalogSnapshot` and drains App volume, lane/output and route-rule
+commands through the COM-worker-owned fixed queue. Desktop Compatibility Preview exposes
+this only in Expert mode; it never displays raw PID/session/endpoint identity and every
+write requires an explicit user action. The catalog and control-plane transaction are
+covered by smoke tests, but physical per-App capture/re-send and delivery to a DSP lane
+remain unverified. These two flags are independent and both can be enabled together.

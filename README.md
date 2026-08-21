@@ -116,6 +116,24 @@ pwsh -File tools/run-preview.ps1 -Build -EnableSystemVolume
 寫回同一 endpoint；預設預覽不會寫入系統音量。只想驗證 endpoint volume broker 是否可用而不送出
 音量命令，可執行 `pwsh -File tools/engine-preview-smoke.ps1 -EnableSystemVolume -StatusOnly`。
 
+若要在 Expert 預覽中查看 Windows App／工作階段清單與測試 per-App 控制，必須明確啟用 session
+routing：
+
+```powershell
+pwsh -File tools/run-preview.ps1 -Build -EnableSessionRouting
+```
+
+這會以 `IAudioSessionManager2` 枚舉目前 default render endpoint 的 bounded 工作階段 metadata，
+並由 COM worker 透過固定 queue 接收 App 音量、lane/output 與 route-rule 命令。UI 只顯示安全的
+暫時 handle／摘要，不保存 PID、session instance 或 endpoint ID；每個命令都必須由使用者明確送出，
+且目前只驗證控制面與 Windows session volume 邊界，實體 per-App capture/re-send 與 DSP delivery
+仍標示為 unverified。可用下列命令重跑：
+
+```powershell
+pwsh -File tools/engine-preview-smoke.ps1 -EnableSessionRouting -StatusOnly
+pwsh -File tools/control-model-engine-smoke.ps1 -EnableSessionRouting
+```
+
 不要開啟 `.local/preview/WinUICompat/Hibiki.WinUI.exe` 來當一般預覽：那是需要 Windows App
 Runtime 1.7 的實驗性 WinUI fallback，缺少 runtime 時會出現「Required components of the
 Windows App Runtime are missing」。這個錯誤不代表 Desktop Compatibility Preview 損壞。

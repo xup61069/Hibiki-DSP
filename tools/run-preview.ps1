@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
   [switch]$Build,
-  [switch]$EnableSystemVolume
+  [switch]$EnableSystemVolume,
+  [switch]$EnableSessionRouting
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,6 +24,7 @@ if (@(Get-Process -Name hibiki_engine_preview -ErrorAction SilentlyContinue).Cou
 
 $engineArguments = @()
 if ($EnableSystemVolume) { $engineArguments += '--enable-system-volume' }
+if ($EnableSessionRouting) { $engineArguments += '--enable-session-routing' }
 $engineProcess = Start-Process -FilePath $engine -ArgumentList $engineArguments `
   -WorkingDirectory (Split-Path $engine) -WindowStyle Hidden -PassThru
 try {

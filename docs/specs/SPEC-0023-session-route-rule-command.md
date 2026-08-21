@@ -6,7 +6,7 @@ authority: control-plane
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0002, ADR-0004]
-source_globs: ["src/hub/include/hibiki/control_payloads.hpp", "src/hub/src/control_payloads.cpp", "src/hub/include/hibiki/ipc.hpp", "src/hub/src/ipc.cpp", "src/hub/include/hibiki/engine_control.hpp", "src/hub/src/engine_control.cpp", "src/hub/include/hibiki/session_command_queue.hpp", "src/hub/src/session_command_queue.cpp", "src/hub/include/hibiki/windows_audio_session_route.hpp", "src/hub/src/windows_audio_session_route.cpp", "src/hub/include/hibiki/windows_device_catalog.hpp", "src/hub/src/windows_device_catalog.cpp", "apps/control-model/IpcProtocol.cs", "tests/unit/contract_tests.cpp", "apps/control-model-check/Program.cs"]
+source_globs: ["src/hub/include/hibiki/control_payloads.hpp", "src/hub/src/control_payloads.cpp", "src/hub/include/hibiki/ipc.hpp", "src/hub/src/ipc.cpp", "src/hub/include/hibiki/engine_control.hpp", "src/hub/src/engine_control.cpp", "src/hub/include/hibiki/session_command_queue.hpp", "src/hub/src/session_command_queue.cpp", "src/hub/include/hibiki/windows_audio_session_route.hpp", "src/hub/src/windows_audio_session_route.cpp", "src/hub/include/hibiki/windows_device_catalog.hpp", "src/hub/src/windows_device_catalog.cpp", "apps/control-model/IpcProtocol.cs", "tests/unit/contract_tests.cpp", "apps/control-model-check/Program.cs", "apps/engine-preview/engine_preview.cpp", "tools/engine-preview-smoke.ps1"]
 ---
 
 # SPEC-0023：per-App 路由規則命令與候選交易
@@ -49,6 +49,11 @@ Windows COM worker drain 時複製目前規則、套用單一操作並呼叫 `se
 此規則只定義控制面匹配與候選 graph 邊界，不宣稱 vendor ASIO、WASAPI Exclusive、RAW 或
 Chrome 單分頁可被靜默攔截；實體 process-loopback、tabCapture、Windows 24H2 active-session
 delivery 仍須平台驗收。
+
+Engine Preview 以 `--enable-session-routing` 作為明確的 opt-in boundary：只有帶旗標時才綁定
+`IAudioSessionManager2`、發布 bounded catalog，並由 COM worker drain fixed session command queue。
+未帶旗標時不枚舉或操作 Windows session；帶旗標也只證明 catalog、handle/sequence validation
+與 Windows session volume／候選 graph 控制面，不能把 status 或 Ack 寫成實體 per-App delivery。
 
 ## 驗收
 
