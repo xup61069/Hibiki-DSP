@@ -64,6 +64,9 @@ public:
     [[nodiscard]] HRESULT read_session_volume_handle(std::uint64_t handle,
                                                       double& requested_db,
                                                       bool& mute) noexcept;
+    [[nodiscard]] HRESULT bind_session_route_handle(std::uint64_t handle,
+                                                    std::string_view lane_id,
+                                                    std::string_view output_group) noexcept;
     [[nodiscard]] WindowsAudioSessionRouteRefreshResultV1 refresh() noexcept;
     [[nodiscard]] WindowsAudioSessionRouteRefreshResultV1 poll_and_refresh() noexcept;
     [[nodiscard]] bool bound() const noexcept { return bound_; }

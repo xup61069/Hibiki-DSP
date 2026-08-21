@@ -30,6 +30,9 @@ constexpr std::size_t kDeviceCatalogSnapshotPayloadBytesV1 =
     kDeviceCatalogSnapshotHeaderBytesV1 +
     (kDeviceCatalogSnapshotEntryBytesV1 * kDeviceCatalogSnapshotCapacityV1);
 constexpr std::size_t kSessionVolumeCommandPayloadBytesV1 = 24U;
+constexpr std::size_t kSessionRouteCommandPayloadBytesV1 = 128U;
+constexpr std::size_t kSessionRouteCommandLaneMaxBytesV1 = 48U;
+constexpr std::size_t kSessionRouteCommandOutputMaxBytesV1 = 48U;
 
 struct SessionVolumeCommandV1 {
     std::uint64_t handle{0U};
@@ -43,6 +46,21 @@ encode_session_volume_command_v1(const SessionVolumeCommandV1& command) noexcept
 [[nodiscard]] bool decode_session_volume_command_v1(
     std::span<const std::uint8_t> payload,
     SessionVolumeCommandV1& command) noexcept;
+
+struct SessionRouteCommandV1 {
+    std::uint64_t handle{0U};
+    std::uint64_t catalog_sequence{0U};
+    std::uint8_t lane_bytes{0U};
+    std::uint8_t output_group_bytes{0U};
+    std::array<char, kSessionRouteCommandLaneMaxBytesV1> lane{};
+    std::array<char, kSessionRouteCommandOutputMaxBytesV1> output_group{};
+};
+
+[[nodiscard]] std::array<std::uint8_t, kSessionRouteCommandPayloadBytesV1>
+encode_session_route_command_v1(const SessionRouteCommandV1& command) noexcept;
+[[nodiscard]] bool decode_session_route_command_v1(
+    std::span<const std::uint8_t> payload,
+    SessionRouteCommandV1& command) noexcept;
 
 // Fixed little-endian control payload shared with apps/control-model. The
 // legacy 16-byte form stores dB Q16.16 at offset 0, mute at offset 4, reserved
@@ -145,6 +163,7 @@ struct ControlCommandV1 {
     SceneApplyPayloadV1 scene{};
     DeviceSwitchPayloadV1 device_switch{};
     SessionVolumeCommandV1 session_volume{};
+    SessionRouteCommandV1 session_route{};
 };
 
 [[nodiscard]] bool decode_control_command_v1(const IpcFrameV1& frame,

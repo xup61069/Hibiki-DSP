@@ -206,6 +206,19 @@ malformedSessionVolume[13] = 1;
 Check(!ControlPayloadsV1.TryDecodeSessionVolumeCommand(malformedSessionVolume,
                                                         out _, out _, out _, out _),
     "Session volume decoder must reject reserved bytes.");
+var sessionRouteBytes = ControlPayloadsV1.EncodeSessionRouteCommand(
+    sessionEntries[0].Handle, 12UL, "game", "surround");
+Check(ControlPayloadsV1.TryDecodeSessionRouteCommand(sessionRouteBytes,
+          out var sessionRouteHandle, out var sessionRouteSequence,
+          out var sessionRouteLane, out var sessionRouteOutput) &&
+      sessionRouteHandle == sessionEntries[0].Handle && sessionRouteSequence == 12UL &&
+      sessionRouteLane == "game" && sessionRouteOutput == "surround",
+    "Session route command did not round-trip.");
+var malformedSessionRoute = sessionRouteBytes.ToArray();
+malformedSessionRoute[18] = 1;
+Check(!ControlPayloadsV1.TryDecodeSessionRouteCommand(malformedSessionRoute,
+                                                       out _, out _, out _, out _),
+    "Session route decoder must reject reserved bytes.");
 var sessionVolumeRequest = commandFactory.SetSessionVolume(
     sessionEntries[0].Handle, -9.5, true, 12UL);
 Check(sessionVolumeRequest.Type == ControlMessageType.SessionVolumeCommand &&
@@ -213,6 +226,13 @@ Check(sessionVolumeRequest.Type == ControlMessageType.SessionVolumeCommand &&
         new IpcEnvelopeV1(ControlMessageType.Ack, sessionVolumeRequest.RequestId,
                           Array.Empty<byte>())),
     "Session volume command request correlation failed.");
+var sessionRouteRequest = commandFactory.SetSessionRoute(
+    sessionEntries[0].Handle, 12UL, "game", "surround");
+Check(sessionRouteRequest.Type == ControlMessageType.SessionRouteCommand &&
+      IpcRequestSession.IsReplyTo(sessionRouteRequest,
+        new IpcEnvelopeV1(ControlMessageType.Ack, sessionRouteRequest.RequestId,
+                          Array.Empty<byte>())),
+    "Session route command request correlation failed.");
 var viewModel = new EasyControlViewModel { SelectedOutputGroup = " main " };
 Check(viewModel.ConnectionState == ControlConnectionState.Disconnected &&
       !viewModel.IsConnected && !viewModel.IsBusy &&
@@ -292,6 +312,9 @@ Check(viewModel.SelectSession(sessionEntries[0].Handle) &&
 var staleHandle = sessionEntries[0].Handle + 100UL;
 Check(!viewModel.SelectSession(staleHandle),
     "ViewModel must reject an unknown or stale App session handle.");
+Check(viewModel.BuildSessionRouteCommand(sessionEntries[0].Handle, "game", "surround").Type ==
+          ControlMessageType.SessionRouteCommand,
+    "ViewModel App session route command failed to bind the current handle.");
 viewModel.IsExpert = true;
 Check(viewModel.Mode == UiMode.Expert && viewModel.SelectScene("movie"),
     "ViewModel Expert scene selection failed.");

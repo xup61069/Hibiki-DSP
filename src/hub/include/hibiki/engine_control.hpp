@@ -26,6 +26,8 @@ using DeviceSwitchHandlerFnV1 = bool (*)(const DeviceSwitchPayloadV1& request,
                                          void* context) noexcept;
 using SessionVolumeHandlerFnV1 = bool (*)(const SessionVolumeCommandV1& request,
                                           void* context) noexcept;
+using SessionRouteHandlerFnV1 = bool (*)(const SessionRouteCommandV1& request,
+                                         void* context) noexcept;
 
 // Control-worker adapter for the fixed queue. It is intentionally not called
 // by the pipe callback or the RT process function. SceneApply resolves only
@@ -68,6 +70,12 @@ public:
         session_volume_context_ = context;
     }
 
+    void set_session_route_handler(SessionRouteHandlerFnV1 handler,
+                                   void* context) noexcept {
+        session_route_handler_ = handler;
+        session_route_context_ = context;
+    }
+
     [[nodiscard]] EngineControlResultV1 consume(const ControlCommandV1& command) noexcept;
     [[nodiscard]] std::size_t drain(ControlCommandQueueV1& queue,
                                      std::size_t max_commands = ControlCommandQueueV1::kCapacity) noexcept;
@@ -90,6 +98,8 @@ private:
     void* device_switch_context_{nullptr};
     SessionVolumeHandlerFnV1 session_volume_handler_{nullptr};
     void* session_volume_context_{nullptr};
+    SessionRouteHandlerFnV1 session_route_handler_{nullptr};
+    void* session_route_context_{nullptr};
 };
 
 }  // namespace hibiki

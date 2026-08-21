@@ -25,7 +25,8 @@ public enum ControlMessageType : ushort
     ControlStatusRequest = 13,
     SessionCatalogSnapshot = 14,
     SessionCatalogRequest = 15,
-    SessionVolumeCommand = 16
+    SessionVolumeCommand = 16,
+    SessionRouteCommand = 17
 }
 
 public enum IpcDecodeError
@@ -125,7 +126,7 @@ public static class IpcCodecV1
         ControlMessageType.DeviceCatalogSnapshot or ControlMessageType.DeviceCatalogRequest or
         ControlMessageType.ControlStatusSnapshot or ControlMessageType.ControlStatusRequest or
         ControlMessageType.SessionCatalogSnapshot or ControlMessageType.SessionCatalogRequest or
-        ControlMessageType.SessionVolumeCommand;
+        ControlMessageType.SessionVolumeCommand or ControlMessageType.SessionRouteCommand;
 }
 
 public static class ControlPayloadsV1
@@ -154,6 +155,9 @@ public static class ControlPayloadsV1
                                                        (SessionCatalogSnapshotEntryBytes *
                                                         SessionCatalogSnapshotCapacity);
     public const int SessionVolumeCommandBytes = 24;
+    public const int SessionRouteCommandBytes = 128;
+    public const int SessionRouteCommandLaneMaxBytes = 48;
+    public const int SessionRouteCommandOutputMaxBytes = 48;
     private static readonly System.Text.UTF8Encoding StrictUtf8 =
         new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
@@ -229,6 +233,62 @@ public static class ControlPayloadsV1
         requestedDb = q16 / 65536.0;
         mute = payload[12] != 0;
         return true;
+    }
+
+    public static byte[] EncodeSessionRouteCommand(ulong handle,
+                                                   ulong catalogSequence,
+                                                   string laneId,
+                                                   string outputGroup)
+    {
+        if (handle == 0UL || catalogSequence == 0UL)
+            throw new ArgumentOutOfRangeException(nameof(handle));
+        var lane = StrictUtf8.GetBytes(laneId ?? string.Empty);
+        var output = StrictUtf8.GetBytes(outputGroup ?? string.Empty);
+        if (lane.Length is < 1 or > SessionRouteCommandLaneMaxBytes ||
+            output.Length is < 1 or > SessionRouteCommandOutputMaxBytes ||
+            lane.Any(value => value < 0x20) || output.Any(value => value < 0x20))
+            throw new ArgumentException("Session route labels are outside the v1 limit.");
+        var payload = new byte[SessionRouteCommandBytes];
+        BinaryPrimitives.WriteUInt64LittleEndian(payload, handle);
+        BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(8), catalogSequence);
+        payload[16] = (byte)lane.Length;
+        payload[17] = (byte)output.Length;
+        lane.CopyTo(payload.AsSpan(20));
+        output.CopyTo(payload.AsSpan(68));
+        return payload;
+    }
+
+    public static bool TryDecodeSessionRouteCommand(ReadOnlySpan<byte> payload,
+                                                    out ulong handle,
+                                                    out ulong catalogSequence,
+                                                    out string laneId,
+                                                    out string outputGroup)
+    {
+        handle = catalogSequence = 0UL;
+        laneId = outputGroup = string.Empty;
+        if (payload.Length != SessionRouteCommandBytes || payload[16] is < 1 or > SessionRouteCommandLaneMaxBytes ||
+            payload[17] is < 1 or > SessionRouteCommandOutputMaxBytes || payload[18] != 0 ||
+            payload[19] != 0)
+            return false;
+        handle = BinaryPrimitives.ReadUInt64LittleEndian(payload);
+        catalogSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[8..]);
+        if (handle == 0UL || catalogSequence == 0UL) return false;
+        for (var index = payload[16]; index < SessionRouteCommandLaneMaxBytes; index++)
+            if (payload[20 + index] != 0) return false;
+        for (var index = payload[17]; index < SessionRouteCommandOutputMaxBytes; index++)
+            if (payload[68 + index] != 0) return false;
+        for (var index = 116; index < payload.Length; index++)
+            if (payload[index] != 0) return false;
+        try
+        {
+            laneId = StrictUtf8.GetString(payload.Slice(20, payload[16]));
+            outputGroup = StrictUtf8.GetString(payload.Slice(68, payload[17]));
+            return !laneId.Any(char.IsControl) && !outputGroup.Any(char.IsControl);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
     public static byte[] EncodeGroupedVolumeNotification(string outputGroup,
@@ -813,6 +873,12 @@ public sealed class ControlCommandFactoryV1
         _requests.Create(ControlMessageType.SessionVolumeCommand,
             ControlPayloadsV1.EncodeSessionVolumeCommand(handle, requestedDb, mute,
                                                           catalogSequence));
+
+    public IpcEnvelopeV1 SetSessionRoute(ulong handle, ulong catalogSequence,
+                                         string laneId, string outputGroup) =>
+        _requests.Create(ControlMessageType.SessionRouteCommand,
+            ControlPayloadsV1.EncodeSessionRouteCommand(handle, catalogSequence, laneId,
+                                                        outputGroup));
 
     public IpcEnvelopeV1 RequestControlStatus() =>
         _requests.Create(ControlMessageType.ControlStatusRequest);

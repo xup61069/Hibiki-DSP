@@ -173,6 +173,63 @@ bool decode_session_volume_command_v1(
     return true;
 }
 
+std::array<std::uint8_t, kSessionRouteCommandPayloadBytesV1>
+encode_session_route_command_v1(const SessionRouteCommandV1& command) noexcept {
+    std::array<std::uint8_t, kSessionRouteCommandPayloadBytesV1> payload{};
+    if (command.handle == 0U || command.catalog_sequence == 0U ||
+        command.lane_bytes == 0U || command.lane_bytes > command.lane.size() ||
+        command.output_group_bytes == 0U || command.output_group_bytes > command.output_group.size() ||
+        !is_printable_utf8(std::string_view(command.lane.data(), command.lane_bytes)) ||
+        !is_printable_utf8(std::string_view(command.output_group.data(),
+                                             command.output_group_bytes))) {
+        return payload;
+    }
+    write_u64(payload.data(), command.handle);
+    write_u64(payload.data() + 8U, command.catalog_sequence);
+    payload[16] = command.lane_bytes;
+    payload[17] = command.output_group_bytes;
+    std::copy_n(command.lane.data(), command.lane_bytes, payload.data() + 20U);
+    std::copy_n(command.output_group.data(), command.output_group_bytes,
+                payload.data() + 68U);
+    return payload;
+}
+
+bool decode_session_route_command_v1(
+    const std::span<const std::uint8_t> payload,
+    SessionRouteCommandV1& command) noexcept {
+    command = {};
+    if (payload.size() != kSessionRouteCommandPayloadBytesV1 || payload[16] == 0U ||
+        payload[16] > command.lane.size() || payload[17] == 0U ||
+        payload[17] > command.output_group.size() || payload[18] != 0U ||
+        payload[19] != 0U) {
+        return false;
+    }
+    const auto handle = read_u64(payload.data());
+    const auto sequence = read_u64(payload.data() + 8U);
+    if (handle == 0U || sequence == 0U) return false;
+    for (std::size_t index = payload[16]; index < command.lane.size(); ++index) {
+        if (payload[20U + index] != 0U) return false;
+    }
+    for (std::size_t index = payload[17]; index < command.output_group.size(); ++index) {
+        if (payload[68U + index] != 0U) return false;
+    }
+    for (std::size_t index = 116U; index < payload.size(); ++index) {
+        if (payload[index] != 0U) return false;
+    }
+    const std::string_view lane(reinterpret_cast<const char*>(payload.data() + 20U),
+                                payload[16]);
+    const std::string_view output(reinterpret_cast<const char*>(payload.data() + 68U),
+                                  payload[17]);
+    if (!is_printable_utf8(lane) || !is_printable_utf8(output)) return false;
+    command.handle = handle;
+    command.catalog_sequence = sequence;
+    command.lane_bytes = payload[16];
+    command.output_group_bytes = payload[17];
+    std::copy_n(lane.data(), lane.size(), command.lane.data());
+    std::copy_n(output.data(), output.size(), command.output_group.data());
+    return true;
+}
+
 std::array<std::uint8_t, kGroupedVolumeNotificationPayloadBytesV1>
 encode_grouped_volume_notification_payload_v1(
     const std::string_view output_group,
@@ -468,6 +525,8 @@ bool decode_control_command_v1(const IpcFrameV1& frame,
             return command.has_volume_target;
         case IpcMessageType::SessionVolumeCommand:
             return decode_session_volume_command_v1(frame.payload, command.session_volume);
+        case IpcMessageType::SessionRouteCommand:
+            return decode_session_route_command_v1(frame.payload, command.session_route);
         case IpcMessageType::SceneApply:
             return decode_scene_apply_payload_v1(frame.payload, command.scene);
         case IpcMessageType::DeviceSwitch:

@@ -180,6 +180,18 @@ bool accept_session_volume(const hibiki::SessionVolumeCommandV1& request,
     return *accepted;
 }
 
+bool accept_session_route(const hibiki::SessionRouteCommandV1& request,
+                          void* context) noexcept {
+    if (context == nullptr) return false;
+    auto* accepted = static_cast<bool*>(context);
+    *accepted = request.handle == ((2ULL << 32U) | 1ULL) &&
+                request.catalog_sequence == 12U &&
+                std::string_view(request.lane.data(), request.lane_bytes) == "game" &&
+                std::string_view(request.output_group.data(), request.output_group_bytes) ==
+                    "surround";
+    return *accepted;
+}
+
 hibiki::Vst3PluginStateResultV1 migrate_test_plugin_state(
     const std::uint32_t source_version,
     const std::span<const std::uint8_t> source,
@@ -1127,6 +1139,25 @@ int main() {
     auto malformed_session_volume = session_volume_payload;
     malformed_session_volume[13U] = 1U;
     CHECK(!decode_session_volume_command_v1(malformed_session_volume, decoded_session_volume));
+    SessionRouteCommandV1 session_route_command{};
+    session_route_command.handle = session_volume_command.handle;
+    session_route_command.catalog_sequence = 12U;
+    session_route_command.lane_bytes = 4U;
+    session_route_command.output_group_bytes = 8U;
+    std::copy_n("game", 4U, session_route_command.lane.data());
+    std::copy_n("surround", 8U, session_route_command.output_group.data());
+    const auto session_route_payload = encode_session_route_command_v1(session_route_command);
+    SessionRouteCommandV1 decoded_session_route{};
+    CHECK(decode_session_route_command_v1(session_route_payload, decoded_session_route) &&
+          decoded_session_route.handle == session_route_command.handle &&
+          decoded_session_route.catalog_sequence == 12U &&
+          std::string_view(decoded_session_route.lane.data(), decoded_session_route.lane_bytes) ==
+              "game" &&
+          std::string_view(decoded_session_route.output_group.data(),
+                           decoded_session_route.output_group_bytes) == "surround");
+    auto malformed_session_route = session_route_payload;
+    malformed_session_route[18U] = 1U;
+    CHECK(!decode_session_route_command_v1(malformed_session_route, decoded_session_route));
     IpcFrameV1 session_volume_frame;
     session_volume_frame.header.type = IpcMessageType::SessionVolumeCommand;
     session_volume_frame.header.request_id = 780U;
@@ -1135,6 +1166,13 @@ int main() {
     CHECK(decode_control_command_v1(session_volume_frame, decoded_command) &&
           decoded_command.type == IpcMessageType::SessionVolumeCommand &&
           decoded_command.session_volume.handle == session_volume_command.handle);
+    IpcFrameV1 session_route_frame;
+    session_route_frame.header.type = IpcMessageType::SessionRouteCommand;
+    session_route_frame.header.request_id = 781U;
+    session_route_frame.payload.assign(session_route_payload.begin(), session_route_payload.end());
+    CHECK(decode_control_command_v1(session_route_frame, decoded_command) &&
+          decoded_command.type == IpcMessageType::SessionRouteCommand &&
+          decoded_command.session_route.output_group_bytes == 8U);
     ControlCommandQueueV1 command_queue;
     ControlCommandV1 queued_command{};
     queued_command.type = IpcMessageType::SceneApply;
@@ -1287,6 +1325,15 @@ int main() {
           session_volume_accepted);
     session_volume_control.session_volume.catalog_sequence = 13U;
     CHECK(control_worker.consume(session_volume_control) == EngineControlResultV1::Failed);
+    bool session_route_accepted = false;
+    control_worker.set_session_route_handler(accept_session_route, &session_route_accepted);
+    ControlCommandV1 session_route_control{};
+    session_route_control.type = IpcMessageType::SessionRouteCommand;
+    session_route_control.session_route = session_route_command;
+    CHECK(control_worker.consume(session_route_control) == EngineControlResultV1::Applied &&
+          session_route_accepted);
+    session_route_control.session_route.catalog_sequence = 13U;
+    CHECK(control_worker.consume(session_route_control) == EngineControlResultV1::Failed);
     control_engine.set_sample_rate(8000U);
     ControlCommandV1 control_volume{};
     control_volume.type = IpcMessageType::VolumeNotification;
@@ -2388,7 +2435,9 @@ int main() {
                                                       false, session_context) == E_UNEXPECTED &&
           control_runtime.read_session_volume_handle(0x0000000200000001ULL, 1U,
                                                      unbound_session_db,
-                                                     unbound_session_mute) == E_UNEXPECTED);
+                                                     unbound_session_mute) == E_UNEXPECTED &&
+          control_runtime.bind_session_route_handle(0x0000000200000001ULL, 1U, "game",
+                                                    "surround") == E_UNEXPECTED);
     auto* session_watcher = new WindowsAudioSessionWatcher();
     std::uint64_t session_sequence = 0;
     CHECK(!session_watcher->poll(session_sequence));
@@ -2420,7 +2469,9 @@ int main() {
           session_route_coordinator.write_session_volume_handle(
               0x0000000200000001ULL, -12.0, false, session_context) == E_UNEXPECTED &&
           session_route_coordinator.read_session_volume_handle(
-              0x0000000200000001ULL, unbound_session_db, unbound_session_mute) == E_UNEXPECTED);
+              0x0000000200000001ULL, unbound_session_db, unbound_session_mute) == E_UNEXPECTED &&
+          session_route_coordinator.bind_session_route_handle(
+              0x0000000200000001ULL, "game", "surround") == E_UNEXPECTED);
     WindowsProcessLoopbackSourceV1 process_loopback;
     std::uint32_t loopback_frames = 99U;
     CHECK(process_loopback.start(WindowsProcessLoopbackConfigV1{}) == E_INVALIDARG &&

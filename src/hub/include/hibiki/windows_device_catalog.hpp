@@ -25,6 +25,9 @@ namespace hibiki {
 [[nodiscard]] bool apply_session_volume_command_v1(
     const SessionVolumeCommandV1& request,
     void* context) noexcept;
+[[nodiscard]] bool apply_session_route_command_v1(
+    const SessionRouteCommandV1& request,
+    void* context) noexcept;
 
 // Worker-owned COM boundary for endpoint metadata. All methods must run on
 // the same COM-initialized worker thread that owns the enumerator; notification
@@ -166,6 +169,10 @@ public:
                                                      std::uint64_t catalog_sequence,
                                                      double& requested_db,
                                                      bool& mute) noexcept;
+    [[nodiscard]] HRESULT bind_session_route_handle(std::uint64_t handle,
+                                                    std::uint64_t catalog_sequence,
+                                                    std::string_view lane_id,
+                                                    std::string_view output_group) noexcept;
     [[nodiscard]] bool running() const noexcept { return host_.running(); }
     [[nodiscard]] bool client_connected() const noexcept { return host_.client_connected(); }
     [[nodiscard]] bool volume_bound() const noexcept { return volume_broker_.is_bound(); }

@@ -607,6 +607,23 @@ HRESULT WindowsControlRuntimeV1::read_session_volume_handle(
     return session_routes_.read_session_volume_handle(handle, requested_db, mute);
 }
 
+HRESULT WindowsControlRuntimeV1::bind_session_route_handle(
+    const std::uint64_t handle,
+    const std::uint64_t catalog_sequence,
+    const std::string_view lane_id,
+    const std::string_view output_group) noexcept {
+    if (!running()) return E_UNEXPECTED;
+    if (catalog_sequence == 0U || catalog_sequence != session_catalog_store_.sequence()) {
+        return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+    }
+    const auto result = session_routes_.bind_session_route_handle(handle, lane_id, output_group);
+    if (SUCCEEDED(result)) {
+        (void)publish_session_route_status();
+        (void)publish_session_catalog();
+    }
+    return result;
+}
+
 bool WindowsControlRuntimeV1::publish_status_snapshot(
     const ControlStatusSnapshotV1& snapshot) noexcept {
     if (!status_store_.publish(snapshot)) return false;
@@ -682,6 +699,16 @@ bool apply_session_volume_command_v1(const SessionVolumeCommandV1& request,
     return SUCCEEDED(runtime->write_session_volume_handle(
         request.handle, request.catalog_sequence, requested_db, request.mute != 0U,
         WindowsVolumeEventContextsV1::session()));
+}
+
+bool apply_session_route_command_v1(const SessionRouteCommandV1& request,
+                                    void* const context) noexcept {
+    if (context == nullptr) return false;
+    auto* runtime = static_cast<WindowsControlRuntimeV1*>(context);
+    return SUCCEEDED(runtime->bind_session_route_handle(
+        request.handle, request.catalog_sequence,
+        std::string_view(request.lane.data(), request.lane_bytes),
+        std::string_view(request.output_group.data(), request.output_group_bytes)));
 }
 
 }  // namespace hibiki

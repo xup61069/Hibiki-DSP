@@ -124,6 +124,55 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::read_session_volume_handle(
     return read_session_volume(identity, requested_db, mute);
 }
 
+HRESULT WindowsAudioSessionRouteCoordinatorV1::bind_session_route_handle(
+    const std::uint64_t handle,
+    const std::string_view lane_id,
+    const std::string_view output_group) noexcept {
+    if (!bound_) return E_UNEXPECTED;
+    if (lane_id.empty() || lane_id.size() > kSessionRouteCommandLaneMaxBytesV1 ||
+        output_group.empty() || output_group.size() > kSessionRouteCommandOutputMaxBytesV1 ||
+        !is_printable_utf8_v1(lane_id) || !is_printable_utf8_v1(output_group)) {
+        return E_INVALIDARG;
+    }
+    const auto handle_generation = handle >> 32U;
+    const auto handle_index = static_cast<std::uint32_t>(handle & 0xffffffffULL);
+    if (handle == 0U || handle_generation == 0U || handle_generation != generation_ ||
+        handle_index == 0U || handle_index > registry_.sessions().size()) {
+        return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+    }
+    try {
+        AudioSessionRegistry candidate_registry = registry_;
+        const auto identity = candidate_registry.sessions()[handle_index - 1U].identity;
+        if (!candidate_registry.bind(identity, std::string(lane_id), std::string(output_group))) {
+            return E_INVALIDARG;
+        }
+        std::size_t routed_count = 0U;
+        for (const auto& session : candidate_registry.sessions()) {
+            if (session.active && !session.lane_id.empty() && !session.output_group.empty()) {
+                ++routed_count;
+            }
+        }
+        GraphConfigV1 candidate_graph{};
+        const bool graph_ready = routed_count > 0U &&
+                                 build_session_route_graph(candidate_registry,
+                                                           SessionRouteGraphPolicyV1{},
+                                                           candidate_graph);
+        if (routed_count > 0U && !graph_ready) return E_FAIL;
+        registry_ = std::move(candidate_registry);
+        graph_ = std::move(candidate_graph);
+        has_graph_ = graph_ready;
+        degraded_ = false;
+        ++generation_;
+        return S_OK;
+    } catch (const std::bad_alloc&) {
+        degraded_ = true;
+        return E_OUTOFMEMORY;
+    } catch (...) {
+        degraded_ = true;
+        return E_FAIL;
+    }
+}
+
 WindowsAudioSessionRouteRefreshResultV1 WindowsAudioSessionRouteCoordinatorV1::refresh() noexcept {
     if (!bound_) return WindowsAudioSessionRouteRefreshResultV1::Unbound;
 

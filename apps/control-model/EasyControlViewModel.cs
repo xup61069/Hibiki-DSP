@@ -412,6 +412,39 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         return await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
     }
 
+    public IpcEnvelopeV1 BuildSessionRouteCommand(ulong handle,
+                                                    string laneId,
+                                                    string outputGroup)
+    {
+        if (!SelectSession(handle)) throw new InvalidOperationException("App 工作階段已過期");
+        LastCommand = _commands.SetSessionRoute(handle, _sessionCatalogSequence, laneId,
+                                                 outputGroup);
+        OnPropertyChanged(nameof(LastCommand));
+        return LastCommand!;
+    }
+
+    public async Task<bool> PushSessionRouteAsync(ulong handle,
+                                                   string laneId,
+                                                   string outputGroup,
+                                                   CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            BuildSessionRouteCommand(handle, laneId, outputGroup);
+        }
+        catch (ArgumentException)
+        {
+            StatusText = "App 路由名稱無效；命令未送出";
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            StatusText = "App 工作階段已過期；請先刷新清單";
+            return false;
+        }
+        return await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+    }
+
     // A future versioned status frame can call this after the engine has
     // reconciled Windows dB, the safety ceiling and the actual actuator. It is
     // intentionally fail-closed and never writes Windows or the audio graph.
