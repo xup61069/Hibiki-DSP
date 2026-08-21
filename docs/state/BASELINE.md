@@ -401,11 +401,12 @@ Windows process-loopback source boundary 的 source commit 是 `3cd4620`；`d18a
 `ActivateAudioInterfaceAsync` 建立 process-tree shared-mode Float32 capture，包含固定容量
 讀取、overflow drop 與明確 Degraded 狀態；`3d3735b` 再把 caller-owned block 接到既有
 Lane graph／WASAPI handoff。兩者尚未在目標機注入含音訊程序、Audio Service restart 或
-完成實體 per-App 重送。
+完成實體 per-App 重送；`2a85ea5` 新增 active session→bounded process request plan，
+對同一 PID 的不同 Lane/output 以 `AmbiguousProcess` fail-closed。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 74 個必要入口與
 16 份 Spec 通過；`docs-check.ps1` 最新已擴充為 75 個必要入口；`source-policy.ps1` 掃描
-304 個路徑且無 blocked binary/secret；
+306 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
 288-byte payload、catalog sequence、handler fail-closed、WinUI send-failure rollback、DeviceCatalogSnapshot
