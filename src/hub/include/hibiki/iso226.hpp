@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -81,6 +82,15 @@ struct EqualLoudnessStatusV1 {
 [[nodiscard]] CompensationResult build_compensation(
     const std::vector<IsoContourPoint>& current,
     const std::vector<IsoContourPoint>& reference,
+    const EqualLoudnessPolicyV1& policy) noexcept;
+
+// Compute the normalized ISO compensation directly from caller-supplied
+// ISO-226 formula points. The point table is intentionally not embedded here:
+// the caller must provide legally obtained standard data. `current_phon` and
+// `policy.reference_phon` are restricted to the formal 20–90 phon domain.
+[[nodiscard]] CompensationResult build_formula_compensation(
+    std::span<const Iso226FormulaPointV1> points,
+    double current_phon,
     const EqualLoudnessPolicyV1& policy) noexcept;
 
 }  // namespace hibiki

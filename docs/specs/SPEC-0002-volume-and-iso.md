@@ -53,7 +53,9 @@ Driver ABI 另外使用 Q16.16 dB；`db_to_q16_16`／`q16_16_to_db` 將量化集
 `iso226_spl_from_phon` 實作 ISO 226:2023 的公式，但只接受 caller-supplied
 `Iso226FormulaPointV1 {alpha_f, threshold_db, transfer_db}` 與 reference parameters；
 repository 不包含標準的 29 點係數表。20–90 phon 以外回傳 invalid，1 kHz reference invariant
-由測試固定。
+由測試固定。`build_formula_compensation` 會以同一組 caller-supplied points 計算
+current/reference phon 的 1 kHz 正規化增益、F3/boost 限制與 `limited` 診斷；缺少 1 kHz
+anchor 或任何公式點 invalid 時整批 fail-closed。
 
 預設 reference=80 phon。未校準時只能使用 Relative Compensation；校準模式必須保存 acoustic
 anchor、測試信號、實測 SPL、gain path 與 uncertainty。ISO 只定 magnitude；phase 是 Hibiki 的

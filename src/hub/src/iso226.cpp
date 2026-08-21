@@ -132,4 +132,78 @@ CompensationResult build_compensation(const std::vector<IsoContourPoint>& curren
     return result;
 }
 
+CompensationResult build_formula_compensation(
+    const std::span<const Iso226FormulaPointV1> points,
+    const double current_phon,
+    const EqualLoudnessPolicyV1& policy) noexcept {
+    CompensationResult result;
+    if (!validate_policy(policy) || !std::isfinite(current_phon) || current_phon < 20.0 ||
+        current_phon > 90.0 || points.empty()) {
+        result.diagnostic = "invalid ISO formula compensation inputs";
+        return result;
+    }
+
+    const Iso226FormulaPointV1* one_khz = nullptr;
+    for (const auto& point : points) {
+        if (std::abs(point.frequency_hz - kOneKhz) < 1e-6) {
+            one_khz = &point;
+            break;
+        }
+    }
+    if (one_khz == nullptr) {
+        result.diagnostic = "ISO formula points must contain a 1 kHz anchor";
+        return result;
+    }
+
+    Iso226FormulaReferenceV1 reference{};
+    reference.reference_alpha = one_khz->alpha_f;
+    reference.reference_threshold_db = one_khz->threshold_db;
+    double current_1khz = 0.0;
+    double reference_1khz = 0.0;
+    if (!iso226_spl_from_phon(*one_khz, reference, current_phon, current_1khz) ||
+        !iso226_spl_from_phon(*one_khz, reference, policy.reference_phon, reference_1khz)) {
+        result.diagnostic = "ISO formula failed at the 1 kHz anchor";
+        return result;
+    }
+
+    try {
+        result.points.reserve(points.size());
+        for (const auto& point : points) {
+            double current_spl = 0.0;
+            double reference_spl = 0.0;
+            if (!iso226_spl_from_phon(point, reference, current_phon, current_spl) ||
+                !iso226_spl_from_phon(point, reference, policy.reference_phon, reference_spl)) {
+                result.points.clear();
+                result.diagnostic = "ISO formula point is outside the validated domain";
+                return result;
+            }
+            bool limited = false;
+            double gain = policy.strength *
+                ((current_spl - current_1khz) - (reference_spl - reference_1khz));
+            if (point.frequency_hz < kMinFrequency || point.frequency_hz > kMaxFrequency) {
+                gain = 0.0;
+                limited = true;
+            }
+            if (policy.measured_f3_hz > 0.0 && point.frequency_hz < policy.measured_f3_hz &&
+                gain > 0.0) {
+                gain = 0.0;
+                limited = true;
+            }
+            if (gain > policy.max_boost_db) {
+                gain = policy.max_boost_db;
+                limited = true;
+            }
+            result.limited = result.limited || limited;
+            result.points.push_back(CompensationPoint{point.frequency_hz, gain, limited});
+        }
+    } catch (...) {
+        result.points.clear();
+        result.limited = false;
+        result.diagnostic = "ISO formula compensation allocation failed";
+        return result;
+    }
+    result.diagnostic = result.limited ? "curve limited by policy or safety range" : "ok";
+    return result;
+}
+
 }  // namespace hibiki

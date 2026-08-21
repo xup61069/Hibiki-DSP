@@ -232,6 +232,14 @@ int main() {
     CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{1000.0, 0.25, 2.4, 0.0},
                                Iso226FormulaReferenceV1{0.25, 2.4}, 60.0, one_k_spl));
     CHECK(std::abs(one_k_spl - 60.0) < 1e-10);
+    const std::array<Iso226FormulaPointV1, 2> formula_points{{
+        {100.0, 0.25, 50.0, 0.0}, {1000.0, 0.30, 2.4, 0.0}}};
+    const auto formula_result = build_formula_compensation(formula_points, 60.0, policy);
+    CHECK(formula_result.points.size() == 2U &&
+          std::abs(formula_result.points[1].gain_db) < 1e-10 &&
+          std::isfinite(formula_result.points[0].gain_db));
+    const std::array<Iso226FormulaPointV1, 1> no_anchor{{{100.0, 0.25, 50.0, 0.0}}};
+    CHECK(build_formula_compensation(no_anchor, 60.0, policy).points.empty());
 
     EqualLoudnessPolicyV1 calibrated;
     calibrated.mode = EqualLoudnessMode::Calibrated;
