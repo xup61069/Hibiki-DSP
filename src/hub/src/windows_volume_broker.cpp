@@ -135,7 +135,7 @@ HRESULT WindowsVolumeBroker::bind_if_changed(IMMDevice* const device) noexcept {
     const bool same = endpoint_ != nullptr && SUCCEEDED(id_result) && endpoint_id != nullptr &&
                       endpoint_id_ == endpoint_id;
     if (endpoint_id != nullptr) CoTaskMemFree(endpoint_id);
-    if (same) return S_OK;
+    if (same) return S_FALSE;
     return bind(device);
 }
 
