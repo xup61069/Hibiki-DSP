@@ -199,7 +199,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 $baseTracked = @(git -C $repo ls-tree -r --name-only $baseRefName)
 if ($LASTEXITCODE -ne 0) { throw "docs-check could not list the merge base tree '$baseRefName'." }
-$baseJson = @(git -C $repo ls-tree -r --name-only $baseRefName -- '*.json')
+# git ls-tree does not expand a bare '*.json' pathspec across directories the way
+# git ls-files does; filter the full listing instead of trusting a pathspec.
+$baseJson = @($baseTracked | Where-Object { $_.ToLowerInvariant().EndsWith('.json') })
 $baseBaselineText = git -C $repo show ('{0}:docs/state/BASELINE.md' -f $baseRefName)
 if ($LASTEXITCODE -ne 0) { throw "docs-check could not read BASELINE.md from '$baseRefName'." }
 
