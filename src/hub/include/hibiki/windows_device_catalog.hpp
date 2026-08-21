@@ -8,6 +8,7 @@
 #include "hibiki/device_catalog.hpp"
 #include "hibiki/device_catalog_snapshot.hpp"
 #include "hibiki/windows_device_watcher.hpp"
+#include "hibiki/windows_volume_broker.hpp"
 
 #include <mmdeviceapi.h>
 
@@ -134,8 +135,14 @@ public:
 
     [[nodiscard]] HRESULT refresh_now() noexcept;
     [[nodiscard]] HRESULT poll_and_refresh() noexcept;
+    [[nodiscard]] HRESULT refresh_default_volume(IMMDeviceEnumerator* enumerator) noexcept;
+    [[nodiscard]] HRESULT read_volume(OutputGroupVolumeStateV1& state) noexcept;
+    [[nodiscard]] HRESULT write_volume(const OutputGroupVolumeStateV1& state,
+                                       const GUID& event_context) noexcept;
+    [[nodiscard]] bool poll_volume(WindowsVolumeNotificationSnapshotV1& snapshot) noexcept;
     [[nodiscard]] bool running() const noexcept { return host_.running(); }
     [[nodiscard]] bool client_connected() const noexcept { return host_.client_connected(); }
+    [[nodiscard]] bool volume_bound() const noexcept { return volume_broker_.is_bound(); }
     [[nodiscard]] ControlCommandQueueV1& command_queue() noexcept {
         return host_.command_queue();
     }
@@ -152,6 +159,7 @@ public:
 private:
     WindowsPhysicalDeviceCatalogServiceV1 catalog_service_{};
     ControlPlaneHostV1 host_{};
+    WindowsVolumeBroker volume_broker_{};
 };
 
 }  // namespace hibiki

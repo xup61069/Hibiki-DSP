@@ -109,11 +109,14 @@ int main() {
                              std::span<const std::uint8_t>(response->payload.data(),
                                                             response->payload.size()),
                              decoded);
+    hibiki::OutputGroupVolumeStateV1 volume_state{};
+    const bool volume_ok = SUCCEEDED(runtime.read_volume(volume_state));
     std::printf("catalog_refresh=pass entries=%zu sequence=%llu payload_bytes=%zu wire=%s runtime=%s request=%s\n",
                 runtime.catalog().size(), static_cast<unsigned long long>(runtime.catalog_sequence()),
                 response.has_value() ? response->payload.size() : 0U,
                 wire_ok ? "pass" : "fail", runtime.running() ? "pass" : "fail",
                 wire_ok ? "pass" : "fail");
+    std::printf("volume=%s\n", volume_ok ? "pass" : "unavailable");
     runtime.stop();
     enumerator->Release();
     if (SUCCEEDED(init)) CoUninitialize();
