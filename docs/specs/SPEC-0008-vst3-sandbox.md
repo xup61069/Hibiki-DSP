@@ -123,6 +123,11 @@ ID、plugin ID、32-hex class UID、非零 module SHA-256 與明確 state versio
 `private-caller-owned`，實際 opaque bytes 不得進 GitHub、Issue、AI context pack 或 release
 artifact；目前不提供自動 migration，版本升級需明確的人工/版本化 migration policy。
 
+在本機提供 pinned VST3 SDK 時，`Vst3SdkProcessorV1::save_state/load_state` 以 bounded
+`IBStream` 呼叫 component `getState/setState`，同樣限制 1 MiB，並將 overflow、plugin
+error、destination 不足與 allocation failure 分開回報。它只建立 worker-side SDK adapter；
+尚未接到正式 Scene state migration、plugin UI editor 或第三方 compatibility certification。
+
 ## 尚未完成的邊界
 
 plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter、bounded parameter

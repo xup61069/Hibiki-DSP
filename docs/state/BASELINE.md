@@ -109,6 +109,9 @@
 - `Vst3PluginStateStoreV1` now provides a private caller-owned 16-slot/1 MiB state boundary with
   plugin/class/module SHA-256 identity and state-version checks; the public schema is metadata-only
   and restore fails closed on mismatch or insufficient destination.
+- Optional pinned-SDK `Vst3SdkProcessorV1` now maps component `getState/setState` through a bounded
+  1 MiB `IBStream`, separating overflow, plugin-error and destination-size failures; migration and
+  compatibility certification remain pending.
 - `AudioSessionRegistry` keys Windows sessions by endpoint plus session-instance ID, preserves
   user routing on metadata refresh, and supports independent lane/output-group/gain-owner binding;
   Windows `IAudioSessionManager2` worker enumeration now populates it; callbacks remain

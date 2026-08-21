@@ -67,6 +67,11 @@ plugin/class/module SHA-256 identity and a state version, and refuses restore on
 identity, version or destination-size mismatch. There is no automatic migration
 or public state serializer.
 
+When a local pinned SDK checkout is supplied, the optional SDK processor also
+uses a bounded `IBStream` for component `getState/setState`, with separate
+overflow, plugin-error and destination-size results. This target remains
+unsigned/local and is not a third-party compatibility certification.
+
 `LatencyAlignmentPlanV1` and `FixedDelayLineV1` provide a bounded 16,384-sample
 alignment plan and fixed 8-channel delay primitive. They are tested separately
 from supervisor and graph lane commit, so plugin certification and full latency
