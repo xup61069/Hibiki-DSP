@@ -108,7 +108,12 @@ points，將 normalized `[0,1]` 值轉成官方 `IParameterChanges`；非法 off
 會在交給 plugin 前拒絕。`ProcessBlockWithParameters` 已由 frame codec 與 optional SDK
 worker 解碼並交給 adapter。`Vst3ParameterTimelineV1` 現在提供最多 256 個已排序事件的
 control-plane snapshot、穩定 sample-position block extraction 與 worker point conversion；
-它可持久化為 `vst3-parameter-timeline-v1.schema.json`。`Vst3TimelineEditorV1` 現在提供
+它現在以 bounded canonical JSON 持久化為 `vst3-parameter-timeline-v1.schema.json`：
+writer 只輸出固定鍵組、全部 256 個 event slot 的唯一文件；reader 是嚴格的
+fail-closed tokenizer，僅接受該形式加上無意義空白，未知或重複鍵、缺鍵、非法或越界
+數值、陣列長度與 event_count 不一致、截斷或超過 64 KiB 的輸入都會被拒絕且不改動
+目的地；通過驗證的 snapshot 經 serialize→parse 後逐位元組穩定。檔案寫入先寫暫存再
+取代。這是控制面檔案契約，不是一般 JSON parser。`Vst3TimelineEditorV1` 現在提供
 supervisor 端 bounded 編輯交易：draft 變更不影響已發布 snapshot，同一
 (parameter_id, sample_position) 的 upsert 以取代而非重複呈現，commit 只在通過既有
 timeline 驗證後才交換已發布 snapshot，discard 直接還原；這是 headless 控制面契約，
