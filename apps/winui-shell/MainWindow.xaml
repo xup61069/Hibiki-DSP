@@ -163,6 +163,29 @@
                         </StackPanel>
 
                         <StackPanel Spacing="6">
+                            <TextBlock Text="App 工作階段（暫時選取清單）" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding SessionCatalogSequence, StringFormat='清單序號：{0}；刷新後 handle 會更新'}"
+                                       Opacity="0.72" TextWrapping="Wrap" />
+                            <controls:ItemsRepeater ItemsSource="{Binding SessionCatalog}">
+                                <controls:ItemsRepeater.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Padding="4" ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding AccessibleSummary}" Opacity="0.72" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{Binding RouteStateLabel}" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </controls:ItemsRepeater.ItemTemplate>
+                            </controls:ItemsRepeater>
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
                             <TextBlock Text="Matrix" FontSize="18" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding Expert.MatrixSummary}" Opacity="0.72" />
                             <controls:ItemsRepeater ItemsSource="{Binding Expert.MatrixRoutes}">
