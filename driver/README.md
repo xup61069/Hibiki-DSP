@@ -34,7 +34,8 @@ The WDK adapter entry points are endpoint-indexed and consume the fixed
 `endpoint_topology_v1` catalog for render geometry, Windows channel mask and
 property-state identity. A future SYSVAD/PortCls project must wire these
 functions into its pin/property tables; this source boundary alone is not a
-loadable, signed driver.
+loadable, signed driver. The same indexed format builder and capture-pin
+initializer cover the Virtual Mic topology entry.
 
 `include/hibiki/endpoint_topology_v1.h` and `src/endpoint_topology.c` fix the
 first topology decision independently of WDK: Main is stereo render, Low

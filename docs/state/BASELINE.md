@@ -277,8 +277,9 @@
 - The MS-PL WDK source boundary now has a property-dispatch scaffold for volume/mute that calls
   the portable Q16.16 endpoint core; it is source-checked but intentionally not a loadable `.sys`.
 - WDK endpoint-indexed stream/property entry points now consume the fixed topology catalog for
-  render geometry, channel mask and endpoint identity; this is still only a source boundary and
-  has no target WDK, HLK or Microsoft-signing evidence.
+  render/capture geometry, channel mask and endpoint identity; the Virtual Mic capture entry uses
+  the same format contract. This is still only a source boundary and has no target WDK, HLK or
+  Microsoft-signing evidence.
 - Apache-2.0 `hibiki_asio_transport_v1` now provides a fixed-layout SPSC shared-memory ring. The
   optional native ASIO DLL writes eight-channel Float32 blocks after callbacks, and
   `AsioTransportConsumerV1` creates/owns `Local\\HibikiDSP_v1_asio` for an allocation-free pop;

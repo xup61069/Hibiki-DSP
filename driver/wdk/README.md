@@ -25,7 +25,9 @@ initialization uses catalog buffer geometry, format construction emits the
 catalog channel mask, and property-context initialization uses the catalog
 GUID/channel/rate. This keeps the eventual SYSVAD tables and portable contract
 on one identity source. It still does not provide a WDK build, `.sys`, HLK
-result or Microsoft signature.
+result or Microsoft signature. `HibikiWaveRtPinInitializeCaptureEndpointV1`
+and the generic `HibikiWaveRtBuildFormatEndpointV1` cover the Virtual Mic
+capture direction without creating a second format contract.
 
 Before enabling a driver build, the maintainer must compile this source in a
 clean WDK project, run Driver Verifier/HLK and record signability evidence for

@@ -61,6 +61,9 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   `HibikiWaveRtPinInitializeEndpointV1` 與 `HibikiWaveRtBuildFormatV1` 只能以固定
   `endpoint_topology_v1` 的 render geometry、channel mask 與取樣率建立 pin；它仍需在正式
   SYSVAD/PortCls 專案中編譯，不能單獨宣稱可載入 driver。
+- `HibikiWaveRtPinInitializeCaptureEndpointV1` 與 `HibikiWaveRtBuildFormatEndpointV1` 以同一
+  topology catalog 覆蓋 Virtual Mic capture pin 與格式，避免 capture 端點另造聲道／取樣率
+  契約；仍需正式 PortCls wiring 與 signed package。
 - `HibikiPropertyContextInitializeEndpointV1` 同樣以 topology 的 endpoint GUID、聲道數與
   取樣率初始化每個 WDK property context，避免 miniport 另造一套 identity；它仍只是
   MS-PL source boundary，未提供 `.sys`、HLK 或 Microsoft signature。
