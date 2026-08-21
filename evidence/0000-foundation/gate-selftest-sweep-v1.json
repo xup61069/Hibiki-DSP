@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 92,
   "scope_digest": "gate-selftest-sweep-v1",
-  "source_commit": "PENDING",
+  "source_commit": "425ba5b349ed75cdf8b58bcce35dd60e366ba9c4",
   "environment_fingerprint": "windows-26200-amd64-powershell-5.1-dotnet-only-portable-pwsh-7.6.5-no-cmake-no-vs; ci-github-actions-windows-2025",
   "commands": [
     "pwsh -File .local/sweep-dryrun.ps1 (local mirror of the verify.yml Gate self-test sweep step)",
