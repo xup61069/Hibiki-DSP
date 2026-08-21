@@ -2,6 +2,23 @@
 
 ## 對應 Issue
 
+Closes #
+
+## 多 AI ownership
+
+- Owner:
+- Handoff: `docs/tasks/active/<issue>.md`
+- Head branch:
+- Target branch: `main`
+- `scope_globs`:
+- `shared_paths`:
+- `depends_on`:
+
+- [ ] 一個 Issue、獨立 worktree、唯一 branch、單一 active writer
+- [ ] 已檢查 open Issue／draft PR／active handoff，沒有未協調的 scope overlap
+- [ ] 超出 scope 或共享整合檔已由 integrator 指定 owner／合併順序
+- [ ] branch 未 force-push，且 handoff 的 base/owner/next action 已更新
+
 ## Spec / ADR / schema 影響
 
 - [ ] 沒有 public contract 變更

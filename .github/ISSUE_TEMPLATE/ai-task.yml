@@ -1,0 +1,86 @@
+name: AI task slice
+description: Claim one independently verifiable work slice for one AI writer.
+title: "[AI Task] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One Issue maps to one AI writer, one dedicated clone/worktree, one branch,
+        one active handoff and one draft PR. Split child Issues for parallel writers.
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective and acceptance
+      description: Define one independently verifiable outcome.
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Owner
+      description: Stable AI/person identifier used in the v2 handoff.
+      placeholder: codex-primary
+    validations:
+      required: true
+  - type: input
+    id: branches
+    attributes:
+      label: Head and target branches
+      placeholder: codex/123-short-slug -> main
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: scope_globs
+      description: Exclusive, repository-relative paths this task expects to modify.
+      placeholder: |
+        - src/hub/src/example.cpp
+        - tests/example/**
+    validations:
+      required: true
+  - type: textarea
+    id: shared
+    attributes:
+      label: Shared paths and integration owner
+      description: High-conflict files that require a named integrator; write none when empty.
+      placeholder: tests/unit/contract_tests.cpp — integrator @name
+    validations:
+      required: true
+  - type: input
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Upstream Issues/PRs, or none.
+      placeholder: "#120, PR #121, or none"
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Contract, safety and evidence impact
+      description: List affected Spec/schema/ADR/license/RT/privacy boundaries and required evidence.
+    validations:
+      required: true
+  - type: textarea
+    id: gates
+    attributes:
+      label: Required gates
+      placeholder: |
+        - pwsh -File tools/handoff-check.ps1 -Issue 123
+        - pwsh -File tools/verify.ps1
+        - pwsh -File tools/docs-check.ps1
+    validations:
+      required: true
+  - type: checkboxes
+    id: claim
+    attributes:
+      label: Claim checks
+      options:
+        - label: I checked open Issues, draft PRs and active handoffs for scope overlap.
+          required: true
+        - label: I will use a dedicated clone/worktree and will not share a branch with another active writer.
+          required: true
+        - label: I will open a draft PR after the handoff claim commit and will not force-push a depended-on branch.
+          required: true

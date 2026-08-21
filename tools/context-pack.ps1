@@ -40,6 +40,7 @@ function Test-ContextGlob([string]$relativePath, [string]$glob) {
 
 Write-Output "=== Hibiki context pack: Issue #$Issue ==="
 Write-ContextFile 'RULES' (Join-Path $repo 'AGENTS.md')
+Write-ContextFile 'MULTI_AGENT' (Join-Path $repo 'docs/ai/MULTI_AGENT.md')
 Write-ContextFile 'START' (Join-Path $repo 'docs/START_HERE.md')
 Write-ContextFile 'MAP' (Join-Path $repo 'docs/PROJECT_MAP.md')
 Write-ContextFile 'BASELINE' (Join-Path $repo 'docs/state/BASELINE.md')
