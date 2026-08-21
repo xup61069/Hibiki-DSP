@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
   [ValidateRange(-1, 2147483647)]
-  [int]$Issue = -1
+  [int]$Issue = -1,
+  [switch]$SelfTest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -91,6 +92,112 @@ function Assert-SafeScopePath([string]$value, [string]$field, [string]$path) {
   }
 }
 
+function Test-GlobSegmentIntersection([string]$left, [string]$right) {
+  $queue = [System.Collections.Generic.Queue[string]]::new()
+  $visited = [System.Collections.Generic.HashSet[string]]::new()
+  $queue.Enqueue('0:0')
+  [void]$visited.Add('0:0')
+
+  while ($queue.Count -gt 0) {
+    $state = $queue.Dequeue().Split(':')
+    $leftIndex = [int]$state[0]
+    $rightIndex = [int]$state[1]
+    if ($leftIndex -eq $left.Length -and $rightIndex -eq $right.Length) { return $true }
+    if ($visited.Count -gt 4096) { return $true }
+
+    if ($leftIndex -lt $left.Length -and $left[$leftIndex] -ceq '*') {
+      $next = "$($leftIndex + 1):$rightIndex"
+      if ($visited.Add($next)) { $queue.Enqueue($next) }
+    }
+    if ($rightIndex -lt $right.Length -and $right[$rightIndex] -ceq '*') {
+      $next = "$($leftIndex):$($rightIndex + 1)"
+      if ($visited.Add($next)) { $queue.Enqueue($next) }
+    }
+    if ($leftIndex -ge $left.Length -or $rightIndex -ge $right.Length) { continue }
+
+    $leftToken = $left[$leftIndex]
+    $rightToken = $right[$rightIndex]
+    $compatible = $leftToken -ceq '*' -or $leftToken -ceq '?' -or
+      $rightToken -ceq '*' -or $rightToken -ceq '?' -or
+      $leftToken -ceq $rightToken
+    if (-not $compatible) { continue }
+
+    $nextLeft = if ($leftToken -ceq '*') { $leftIndex } else { $leftIndex + 1 }
+    $nextRight = if ($rightToken -ceq '*') { $rightIndex } else { $rightIndex + 1 }
+    $next = "$nextLeft`:$nextRight"
+    if ($visited.Add($next)) { $queue.Enqueue($next) }
+  }
+  return $false
+}
+
+function Test-GlobIntersection([string]$left, [string]$right) {
+  $leftSegments = @($left.Replace('\', '/') -split '/')
+  $rightSegments = @($right.Replace('\', '/') -split '/')
+  $queue = [System.Collections.Generic.Queue[string]]::new()
+  $visited = [System.Collections.Generic.HashSet[string]]::new()
+  $queue.Enqueue('0:0')
+  [void]$visited.Add('0:0')
+
+  while ($queue.Count -gt 0) {
+    $state = $queue.Dequeue().Split(':')
+    $leftIndex = [int]$state[0]
+    $rightIndex = [int]$state[1]
+    if ($leftIndex -eq $leftSegments.Count -and $rightIndex -eq $rightSegments.Count) { return $true }
+    if ($visited.Count -gt 4096) { return $true }
+
+    $leftAny = $leftIndex -lt $leftSegments.Count -and $leftSegments[$leftIndex] -ceq '**'
+    $rightAny = $rightIndex -lt $rightSegments.Count -and $rightSegments[$rightIndex] -ceq '**'
+    if ($leftAny) {
+      $next = "$($leftIndex + 1):$rightIndex"
+      if ($visited.Add($next)) { $queue.Enqueue($next) }
+    }
+    if ($rightAny) {
+      $next = "$($leftIndex):$($rightIndex + 1)"
+      if ($visited.Add($next)) { $queue.Enqueue($next) }
+    }
+    if ($leftIndex -ge $leftSegments.Count -or $rightIndex -ge $rightSegments.Count) { continue }
+
+    if ($leftAny -and $rightAny) { continue }
+    if ($leftAny) {
+      $next = "$leftIndex`:$($rightIndex + 1)"
+      if ($visited.Add($next)) { $queue.Enqueue($next) }
+      continue
+    }
+    if ($rightAny) {
+      $next = "$($leftIndex + 1):$rightIndex"
+      if ($visited.Add($next)) { $queue.Enqueue($next) }
+      continue
+    }
+    if (Test-GlobSegmentIntersection $leftSegments[$leftIndex] $rightSegments[$rightIndex]) {
+      $next = "$($leftIndex + 1):$($rightIndex + 1)"
+      if ($visited.Add($next)) { $queue.Enqueue($next) }
+    }
+  }
+  return $false
+}
+
+if ($SelfTest) {
+  $cases = @(
+    @{ Left = 'src/**'; Right = 'src/hub/**'; Expected = $true },
+    @{ Left = 'docs/tasks/active/*.md'; Right = 'docs/tasks/active/21.md'; Expected = $true },
+    @{ Left = 'src/**/audio.cpp'; Right = 'src/hub/audio.cpp'; Expected = $true },
+    @{ Left = 'src/hub/audio.cpp'; Right = 'src/hub/**'; Expected = $true },
+    @{ Left = 'docs/tasks/active/0.md'; Right = 'docs/tasks/active/0.md'; Expected = $true },
+    @{ Left = 'vst-host/**'; Right = 'apps/**'; Expected = $false },
+    @{ Left = 'src/hub/**'; Right = 'src/core/**'; Expected = $false },
+    @{ Left = 'tests/*.cpp'; Right = 'tests/*.hpp'; Expected = $false },
+    @{ Left = 'src/**'; Right = 'src2/**'; Expected = $false }
+  )
+  foreach ($case in $cases) {
+    $actual = Test-GlobIntersection $case.Left $case.Right
+    if ($actual -ne $case.Expected) {
+      throw "Handoff scope overlap self-test failed: '$($case.Left)' vs '$($case.Right)' expected $($case.Expected), got $actual."
+    }
+  }
+  Write-Output "Handoff scope overlap self-test passed ($($cases.Count) cases)."
+  exit 0
+}
+
 $activeRoot = Join-Path $repo 'docs/tasks/active'
 if ($Issue -ge 0) {
   $selectedPath = Join-Path $activeRoot "$Issue.md"
@@ -107,7 +214,7 @@ if (-not $branchContext) { $branchContext = (& git -C $repo branch --show-curren
 if (-not $branchContext) { $branchContext = $env:GITHUB_REF_NAME }
 
 $seenBranches = @{}
-$seenScopes = @{}
+$seenScopes = [System.Collections.Generic.List[object]]::new()
 $checked = @()
 foreach ($file in $handoffFiles) {
   $path = [IO.Path]::GetRelativePath($repo, $file.FullName).Replace('\', '/')
@@ -171,10 +278,12 @@ foreach ($file in $handoffFiles) {
   Assert-UniqueItems $scopeGlobs 'scope_globs' $path
   foreach ($scope in $scopeGlobs) {
     Assert-SafeScopePath $scope 'scope_globs' $path
-    if ($seenScopes.ContainsKey($scope)) {
-      throw "Active handoffs claim the same scope '$scope': Issues $($seenScopes[$scope]) and $issueValue"
+    foreach ($previous in $seenScopes) {
+      if ($previous.Issue -ne $issueValue -and (Test-GlobIntersection $previous.Scope $scope)) {
+        throw "Active handoff scopes overlap: Issue #$($previous.Issue) '$($previous.Scope)' and Issue #$issueValue '$scope' ($path)"
+      }
     }
-    $seenScopes[$scope] = $issueValue
+    $seenScopes.Add([pscustomobject]@{ Issue = $issueValue; Scope = $scope })
   }
 
   $sharedPaths = @(Get-InlineArray $frontMatter 'shared_paths' $path)
