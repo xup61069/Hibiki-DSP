@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "ir-prepare-command-v1",
+  "source_commit": "d73a200",
+  "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/control-model-check.ps1",
+    "pwsh -File tools/engine-preview-smoke.ps1",
+    "pwsh -File tools/control-model-engine-smoke.ps1",
+    "pwsh -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "C++ 288-byte IrPrepareCommand encode/decode",
+        "fixed queue command routing",
+        "C++ contract suite"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "C# payload known behavior",
+        "bounded path and policy round-trip",
+        "Bypass/invalid policy fail-closed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/engine-preview-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "named-pipe IrPrepareCommand",
+        "control-worker WAV file read/decode/phase prepare",
+        "correlated Ack after convolver preparation"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/control-model-engine-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "C# EasyControlViewModel PrepareIrAsync",
+        "real temporary WAV round-trip through Engine Preview",
+        "volume/Scene status regression"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "Desktop Compatibility Preview file-picker UI compile",
+        "three-second self-contained launch liveness"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "SPEC-0010 IR command boundary",
+        "README/apps docs and AI handoff"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "no tracked executable or CI binary artifact"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The command carries a bounded local path; it is intended for same-machine control-plane use.",
+    "Engine Preview prepares a convolver but does not commit it into an audio graph or physical sink.",
+    "The formal WinUI XAML picker/accessibility gate still requires the target toolchain.",
+    "No WaveRT driver, Windows system-volume interception, ISO licensed table or audible conformance is claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00+08:00",
+  "finished_at": "2026-08-21T00:00:00+08:00"
+}
