@@ -3,7 +3,7 @@
   "issue": 30,
   "scope_digest": "doctor-sdk-qfe-detection-v1",
   "source_commit": "68a156ebf1be34a77b89a154e6f4117ece125d40",
-  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.1-sdk-wdk-10.0.28000.2526-cmake-4.4.2-pwsh-7.6.5",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.1-universal-sdk-wdk-10.0.28000.2526-cmake-4.3.1-dotnet-8.0.424-pwsh-7.6.5",
   "commands": [
     "pwsh -NoProfile -File tools/doctor.ps1 -SelfTest",
     "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
@@ -14,6 +14,8 @@
     "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
     "pwsh -NoProfile -File tools/verify.ps1",
     "pwsh -NoProfile -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+    "vswhere -products * -requires Microsoft.VisualStudio.Workload.Universal",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUI",
     "git diff --check"
   ],
   "results": [
@@ -37,6 +39,7 @@
         "Visual Studio 2026 C++ workload",
         "SDK/WDK on-disk 10.0.28000.0 layout and exact 10.1.28000.2526 package metadata"
       ],
+      "note": "CMake was exposed through the installed Visual Studio CMake bin in the process-local PATH; the system PATH was not changed.",
       "compiled_artifacts": false
     },
     {
@@ -64,12 +67,26 @@
       "command": "tools/verify.ps1",
       "status": "pass",
       "coverage": ["Visual Studio 18 2026 C++ configure/build", "CTest contract suite 1/1 passed"],
+      "note": "CMake was exposed through the installed Visual Studio CMake bin in the process-local PATH; the system PATH was not changed.",
       "compiled_artifacts": false
     },
     {
       "command": "tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
       "status": "pass",
       "coverage": [".NET 8 restore and net8.0 build", "self-contained win-x64 publish", "3-second launch smoke"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "vswhere -products * -requires Microsoft.VisualStudio.Workload.Universal",
+      "status": "pass",
+      "coverage": ["Visual Studio 2026 Universal/WinUI workload installation"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target WinUI",
+      "status": "blocked",
+      "coverage": ["formal WinUI target invoked after Universal workload installation"],
+      "failure": "Windows App SDK 1.7.250401001 XamlCompiler.exe version 3.0.0.2503 exited with code 1 without diagnostic output or generated output.json.",
       "compiled_artifacts": false
     },
     {
@@ -82,16 +99,19 @@
   "limitations": [
     "Diagnostic gate only; does not claim a loadable driver, WaveRT, HLK, Microsoft signing or physical audio.",
     "The exact QFE is proven by local installed-package metadata and kit layout, not by a committed registry dump.",
-    "DesktopCompat is self-contained user-space preview evidence only; it is not formal WinUI XAML, accessibility, driver or physical-audio evidence."
+    "DesktopCompat is self-contained user-space preview evidence only; it is not formal WinUI XAML, accessibility, driver or physical-audio evidence.",
+    "Formal WinUI was retried after installing the Visual Studio Universal workload, but the locked Windows App SDK 1.7.250401001 XAML compiler still exited 1 without output.json; no package upgrade or workaround is claimed in this Issue.",
+    "A fresh shell without the installed Visual Studio CMake bin on PATH reports cmake MISSING; verification used a process-local PATH only and did not change system configuration."
   ],
   "logs": [],
   "tool_versions": {
     "visual_studio": "18.9.12112.369",
     "msvc": "19.51.36256.0",
-    "cmake": "4.4.2",
+    "cmake": "4.3.1-msvc1",
     "dotnet_sdk": "8.0.424",
-    "powershell": "pwsh 7.6.5"
+    "powershell": "pwsh 7.6.5",
+    "visual_studio_workload": "Microsoft.VisualStudio.Workload.Universal"
   },
   "started_at": "2026-08-22T04:10:00+08:00",
-  "finished_at": "2026-08-22T04:46:29+08:00"
+  "finished_at": "2026-08-22T04:58:08+08:00"
 }
