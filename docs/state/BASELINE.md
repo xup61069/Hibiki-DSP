@@ -376,6 +376,8 @@ Driver signability source gate 的 source commit 是 `dc1d3b2`；預設只驗證
 Topology-indexed WDK render/capture pin formats 與 Virtual Mic generic format boundary 的
 source commit 是 `741a54b`；文件與 evidence 對應 commit 是 `d2c8717`，仍未宣稱 `.sys`、HLK
 或 Microsoft signing。
+ReleaseManifest custody metadata source commit 是 `b1c64d4`；documentation gate 擴充的 source
+commit 是 `2a6aa8f`，文件與 evidence 對應 commit 是 `015a4eb`。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 72 個必要入口與
 15 份 Spec 通過；`source-policy.ps1` 掃描 293 個路徑且無 blocked binary/secret；
