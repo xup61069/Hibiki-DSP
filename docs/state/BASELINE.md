@@ -76,6 +76,10 @@
 - Windows-only `IMMNotificationClient` watcher with bounded default/add/remove/property event
   snapshots, consumed by a worker-side transactional recovery coordinator with safe-start mute
   after endpoint invalidation or Audio Service restart.
+- `PhysicalDeviceCatalogV1` now provides a bounded 32-entry control-plane render/capture catalog;
+  endpoint identity/format is validated, each flow has one default, event sequence is monotonic,
+  and Disabled/Unplugged/Unknown endpoints cannot be selected. COM enumeration and physical
+  hotplug soak remain external gates.
 - Parameterized ISO 226:2023 SPL-from-phon formula using caller-supplied legal parameters;
   the 1 kHz invariant and phon bounds are covered by CTest without embedding the licensed
   29-point coefficient table.
@@ -285,12 +289,12 @@ Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可
 Windows volume/device、ISO formula、recovery、driver control-core/INF template、persistent SRC、
 VST worker、control pipe/payloads、session volume adapter、sink clock pipeline、optional native
 ASIO transport/ring、tab/Virtual Mic lane adapter、session-route/output-handoff、control-model
-與 VST3 latency graph commit／RT lane latency bank／parameter timeline／Scene automation refs／rollback lifecycle／UI device fade／plugin lane token／VST3 supervisor handshake/process exchange／VST3 worker lane timeline bridge／PluginHostModel worker-lane wiring／VST3 Scene automation scheduler／VST3 private plugin-state store／VST3 bounded SDK IBStream／VST3 state migration registry／VST3 Scene state coordinator／VST3 bus-layout admission validator／ISO formula compensation builder／source-only CI publication gate／WDK property request hardening／multi-sink fan-out、per-sink clock/SRC runtime、AudioEngine fan-out boundary、精確容量 preflight、高倍率 SRC phase guard、portable WaveRT stream ring、WDK pin adapter、driver→engine stream packet bridge、endpoint identity、graph lane binding、WASAPI IAudioClock drift path、雙 worker WASAPI handoff、graph-to-WASAPI adapter、ASIO-to-WASAPI path、driver-to-WASAPI path、tab-to-WASAPI path、virtual-mic-to-WASAPI path、Windows WASAPI fan-out graph adapter、K-weighted program-level proxy、WinUI Expert readonly surface、VST3 Scene state preflight adapter、第三方 state compatibility review checklist、migration output overflow fail-closed coverage、WinUI accessibility source gate、bounded per-App session route rules、64-rule capacity、Windows watcher enumerate 套用、per-output-group volume bank、bounded custom Scene catalog/resolver、grouped volume IPC、C# custom Scene card mirror、custom Scene persistence coverage 的 fail-closed safety baseline `61afa6f`；
+與 VST3 latency graph commit／RT lane latency bank／parameter timeline／Scene automation refs／rollback lifecycle／UI device fade／plugin lane token／VST3 supervisor handshake/process exchange／VST3 worker lane timeline bridge／PluginHostModel worker-lane wiring／VST3 Scene automation scheduler／VST3 private plugin-state store／VST3 bounded SDK IBStream／VST3 state migration registry／VST3 Scene state coordinator／VST3 bus-layout admission validator／physical device catalog／ISO formula compensation builder／source-only CI publication gate／WDK property request hardening／multi-sink fan-out、per-sink clock/SRC runtime、AudioEngine fan-out boundary、精確容量 preflight、高倍率 SRC phase guard、portable WaveRT stream ring、WDK pin adapter、driver→engine stream packet bridge、endpoint identity、graph lane binding、WASAPI IAudioClock drift path、雙 worker WASAPI handoff、graph-to-WASAPI adapter、ASIO-to-WASAPI path、driver-to-WASAPI path、tab-to-WASAPI path、virtual-mic-to-WASAPI path、Windows WASAPI fan-out graph adapter、K-weighted program-level proxy、WinUI Expert readonly surface、VST3 Scene state preflight adapter、第三方 state compatibility review checklist、migration output overflow fail-closed coverage、WinUI accessibility source gate、bounded per-App session route rules、64-rule capacity、Windows watcher enumerate 套用、per-output-group volume bank、bounded custom Scene catalog/resolver、grouped volume IPC、C# custom Scene card mirror、custom Scene persistence coverage 的 fail-closed safety baseline `ac872d6`；
 新 AI 接手時仍必須確認
 working tree 與該 scope 是否一致。
 
-目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 62 個必要入口與
-14 份 Spec 通過；`source-policy.ps1` 掃描 276 個路徑且無 blocked binary/secret；
+目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 64 個必要入口與
+15 份 Spec 通過；`source-policy.ps1` 掃描 279 個路徑且無 blocked binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1` 與 `driver-source-check.ps1` 通過；31 個 repository JSON 檔案均可解析。以本機 pinned ASIO SDK
 另行執行的 optional CMake target `hibiki_asio_native` unsigned build 亦通過；該輸出只在
