@@ -8,7 +8,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <span>
 #include <string_view>
 
@@ -204,28 +203,17 @@ struct ControlCommandV1 {
     IpcMessageType type{IpcMessageType::Error};
     std::uint64_t request_id{0U};
     // Grouped volume commands intentionally carry both the dB/mute value and
-    // the output-group selector, so these two fields cannot alias.
+    // the output-group selector, so these two fields cannot alias. The
+    // remaining fixed payloads are also kept as named fields: queue copies
+    // must not depend on an anonymous union's active-member lifetime.
     VolumeNotificationV1 volume{};
     GroupedVolumeNotificationPayloadV1 volume_target{};
-    union {
-        SceneApplyPayloadV1 scene;
-        DeviceSwitchPayloadV1 device_switch;
-        SessionVolumeCommandV1 session_volume;
-        SessionRouteCommandV1 session_route;
-        SessionRouteRuleCommandV1 session_route_rule;
-    };
+    SceneApplyPayloadV1 scene{};
+    DeviceSwitchPayloadV1 device_switch{};
+    SessionVolumeCommandV1 session_volume{};
+    SessionRouteCommandV1 session_route{};
+    SessionRouteRuleCommandV1 session_route_rule{};
     bool has_volume_target{false};
-
-    ControlCommandV1() noexcept : volume{} {}
-    ControlCommandV1(const ControlCommandV1& other) noexcept {
-        std::memcpy(this, &other, sizeof(*this));
-    }
-    ControlCommandV1& operator=(const ControlCommandV1& other) noexcept {
-        if (this != &other) {
-            std::memcpy(this, &other, sizeof(*this));
-        }
-        return *this;
-    }
 };
 
 [[nodiscard]] bool decode_control_command_v1(const IpcFrameV1& frame,

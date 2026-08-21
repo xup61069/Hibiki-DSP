@@ -8,7 +8,6 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <memory>
 
 namespace hibiki {
@@ -26,22 +25,9 @@ enum class SessionCommandKindV1 : std::uint8_t {
 struct SessionCommandWorkItemV1 {
     SessionCommandKindV1 kind{SessionCommandKindV1::Volume};
     std::uint8_t reserved[7U]{};
-    union {
-        SessionVolumeCommandV1 volume;
-        SessionRouteCommandV1 route;
-        SessionRouteRuleCommandV1 route_rule;
-    };
-
-    SessionCommandWorkItemV1() noexcept : volume{} {}
-    SessionCommandWorkItemV1(const SessionCommandWorkItemV1& other) noexcept {
-        std::memcpy(this, &other, sizeof(*this));
-    }
-    SessionCommandWorkItemV1& operator=(const SessionCommandWorkItemV1& other) noexcept {
-        if (this != &other) {
-            std::memcpy(this, &other, sizeof(*this));
-        }
-        return *this;
-    }
+    SessionVolumeCommandV1 volume{};
+    SessionRouteCommandV1 route{};
+    SessionRouteRuleCommandV1 route_rule{};
 };
 
 // Single-producer (EngineControl worker), single-consumer (Windows COM
