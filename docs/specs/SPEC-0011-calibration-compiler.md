@@ -6,7 +6,7 @@ authority: product-behavior
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["src/hub/include/hibiki/calibration_compiler.hpp", "src/hub/src/calibration_compiler.cpp", "schemas/calibration-response-v1.schema.json"]
+source_globs: ["src/hub/include/hibiki/calibration_compiler.hpp", "src/hub/src/calibration_compiler.cpp", "apps/control-model/CalibrationModel.cs", "schemas/calibration-response-v1.schema.json", "schemas/peq-filter-v1.schema.json"]
 ---
 
 # SPEC-0011：量測頻響到 bounded PEQ 校正
@@ -24,6 +24,11 @@ peaking filters。超出 boost/cut 或 filter capacity 時必須標示 `limited`
 `compile_bounded_peq_correction_v1` 在 control plane 以最大殘差優先、log-frequency
 spacing 選點，輸出 `PeqFilterV1`。結果可直接送至 Equalizer APO、CamillaDSP、REW、
 Hibiki JSON exporter；IR exporter 仍接受另外量測的 caller-owned impulse samples。
+
+C# control model 以 `CalibrationModel.cs` 提供對應的強型別 `CalibrationPointV1`、
+`CalibrationResponseV1`、`PeqFilterV1`、`PeqPresetV1`、`CalibrationCompilePolicyV1` 與
+`CalibrationCompilerV1`，支援 `schemas/calibration-response-v1.schema.json` 與
+`schemas/peq-filter-v1.schema.json` 的原子 JSON 載入／保存及相同演算法的編譯與匯出。
 
 ## 限制與安全
 
