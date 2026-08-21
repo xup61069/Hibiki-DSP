@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "issue": 97,
+  "scope_digest": "live-session-volume-selftest-v1",
+  "source_commit": "1a67c56",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-msvc-14.51.36231-sdk-10.0.28000.0-cmake-path-missing-dotnet-10.0.400-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/probe-environment.ps1",
+    "pwsh -NoProfile -File tools/live-session-volume-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/live-session-volume-check.ps1 -SelfTest -DirectCoordinator",
+    "pwsh -NoProfile -File tools/live-session-volume-check.ps1 -DirectCoordinator (without -WriteTest)",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/doctor.ps1 -CheckOnly",
+      "status": "pass_with_limitations",
+      "coverage": [
+        "Windows 11 build 26200, AMD64, Git, PowerShell 7.6.4, Visual Studio 2026 and .NET 10.0.400 detected",
+        "CMake is not on PATH and the locked SDK/WDK prerequisite is reported missing"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/probe-environment.ps1",
+      "status": "pass",
+      "coverage": [
+        "local environment fingerprint written under ignored .local/context.json"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/live-session-volume-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "Windows-only guard rejection",
+        "WriteTest opt-in rejection and self-test bypass",
+        "direct-coordinator and Engine Preview session-routing plan mappings",
+        "CMake definition and target/executable/argument mapping",
+        "direct/engine mismatch rejection",
+        "unsafe build-root rejection",
+        "no CMake, build, process, IPC, COM, session or volume activity"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/live-session-volume-check.ps1 -SelfTest -DirectCoordinator",
+      "status": "pass",
+      "coverage": [
+        "SelfTest remains independent of the direct coordinator switch"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/live-session-volume-check.ps1 -DirectCoordinator (without -WriteTest)",
+      "status": "pass",
+      "coverage": [
+        "normal opt-in guard rejected the live probe before CMake, session, COM or volume work"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors in the source diff"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The actual -WriteTest live probe was intentionally not run because it creates a silent session and temporarily changes local session volume; no session or volume state was changed by this evidence run.",
+    "This self-test validates wrapper planning and opt-in safety only; it is not physical per-App capture/re-send, DSP delivery, WaveRT, driver, HLK, signing, or endpoint/session identity evidence.",
+    "CMake/SDK/WDK availability is recorded from doctor; no compiled live-probe artifact is committed or treated as release evidence.",
+    "The shared docs/state/BASELINE.md counter remains integrator-owned and was not modified."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.400",
+    "msvc": "14.51.36231",
+    "powershell": "7.6.4",
+    "cmake": "not on PATH"
+  },
+  "started_at": "2026-08-22T09:30:00+08:00",
+  "finished_at": "2026-08-22T09:55:00+08:00"
+}
