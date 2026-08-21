@@ -28,7 +28,8 @@ internal sealed class PreviewForm : Form
     private readonly ComboBox _scenes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly ComboBox _irModes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly TrackBar _irStrength = new() { Minimum = 0, Maximum = 100, TickFrequency = 10, Width = 460 };
-    private readonly Label _irStatus = new() { AutoSize = false, Width = 550, Height = 42 };
+    private readonly Label _irStatus = new() { AutoSize = false, Width = 550, Height = 58 };
+    private readonly Button _loadIr = new() { Text = "載入 IR WAV 並準備", AutoSize = true };
     private readonly TrackBar _volume = new() { Minimum = -60, Maximum = 0, TickFrequency = 5, Width = 460 };
     private readonly Button _enhance = new() { Text = "一鍵改善", AutoSize = true, Margin = new Padding(3, 12, 3, 3) };
     private readonly System.Windows.Forms.Timer _statusTimer = new() { Interval = 1000 };
@@ -67,7 +68,7 @@ internal sealed class PreviewForm : Form
             RefreshView();
         };
         panel.Controls.Add(_scenes);
-        panel.Controls.Add(new Label { Text = "IR 相位（只編輯 policy contract）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        panel.Controls.Add(new Label { Text = "IR 檔案與相位", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
         _irModes.DataSource = _viewModel.IrPhaseModeOptions.ToList();
         _irModes.DisplayMember = "Label";
         _irModes.ValueMember = "Mode";
@@ -84,6 +85,22 @@ internal sealed class PreviewForm : Form
         };
         panel.Controls.Add(_irModes);
         panel.Controls.Add(_irStrength);
+        _loadIr.Click += async (_, _) =>
+        {
+            using var dialog = new OpenFileDialog
+            {
+                Filter = "IR WAV 檔案 (*.wav)|*.wav|所有檔案 (*.*)|*.*",
+                CheckFileExists = true,
+                Multiselect = false,
+                Title = "選擇 IR WAV"
+            };
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+            {
+                await _viewModel.PrepareIrAsync(dialog.FileName);
+                RefreshView();
+            }
+        };
+        panel.Controls.Add(_loadIr);
         panel.Controls.Add(_irStatus);
         _enhance.Click += async (_, _) => { await _viewModel.OneTapEnhanceAsync(); RefreshView(); };
         panel.Controls.Add(_enhance);
@@ -139,6 +156,7 @@ internal sealed class PreviewForm : Form
         _enhance.Enabled = _viewModel.IsConnected;
         _scenes.Enabled = _viewModel.IsConnected;
         _volume.Enabled = _viewModel.IsConnected;
+        _loadIr.Enabled = _viewModel.IsConnected && _viewModel.IrPhaseMode != IrPhaseMode.Bypass;
         _irStrength.Enabled = _viewModel.IrPhaseMode is IrPhaseMode.MixedPhase or IrPhaseMode.LinearPhase;
         _effective.Text = $"實際有效音量：{_viewModel.EffectiveVolumeDb:0.0} dB；{_viewModel.VolumeOriginText}；{_viewModel.VolumeActuatorText}";
         _routes.Text = _viewModel.Expert.RouteHealth.Count == 0
@@ -146,7 +164,7 @@ internal sealed class PreviewForm : Form
             : "路由狀態：" + string.Join("／", _viewModel.Expert.RouteHealth.Select(route =>
                 $"{route.Name} {route.StateLabel}"));
         _status.Text = _viewModel.StatusText;
-        _irStatus.Text = $"{_viewModel.IrPhaseModeText}；實測延遲 {_viewModel.IrAddedDelayMs:0.0} ms。尚未送出 IR／kernel prepare command。";
+        _irStatus.Text = $"{_viewModel.IrPhaseModeText}；實測延遲 {_viewModel.IrAddedDelayMs:0.0} ms。\r\n{_viewModel.IrPrepareStatus}";
         var requested = Math.Clamp((int)Math.Round(_viewModel.RequestedVolumeDb), _volume.Minimum, _volume.Maximum);
         if (_volume.Value != requested) _volume.Value = requested;
         if (_irModes.SelectedValue is not IrPhaseMode currentMode || currentMode != _viewModel.IrPhaseMode)

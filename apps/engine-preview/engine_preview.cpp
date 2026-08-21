@@ -4,18 +4,77 @@
 #include "hibiki/control_status.hpp"
 #include "hibiki/control_service.hpp"
 #include "hibiki/engine_control.hpp"
+#include "hibiki/wav_ir.hpp"
 
 #include <Windows.h>
 
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <limits>
+#include <string>
 #include <string_view>
 #include <thread>
+#include <utility>
+#include <vector>
 
 namespace {
 
 std::atomic_bool g_stop{false};
+
+struct IrPrepareState final {
+    hibiki::IrConvolverV1 convolver{};
+    hibiki::IrPhaseResolutionV1 resolution{};
+    std::string path{};
+    bool prepared{false};
+};
+
+bool prepare_ir_file(const hibiki::IrPrepareCommandV1& request, void* const context) noexcept {
+    auto* state = static_cast<IrPrepareState*>(context);
+    if (state == nullptr || request.path_bytes == 0U || request.path_bytes > request.path.size() ||
+        request.mode > 3U || request.strength_q16_16 < 0 || request.strength_q16_16 > 65536 ||
+        (request.mode == 3U && request.strength_q16_16 != 0)) {
+        return false;
+    }
+    try {
+        const std::string path(request.path.data(), request.path_bytes);
+        std::ifstream file(std::filesystem::u8path(path), std::ios::binary | std::ios::ate);
+        if (!file) return false;
+        const auto end = file.tellg();
+        if (end <= 0 || end > static_cast<std::streamoff>(hibiki::kMaxIrWavBytesV1)) return false;
+        const auto size = static_cast<std::size_t>(end);
+        std::vector<std::uint8_t> bytes(size);
+        file.seekg(0, std::ios::beg);
+        if (!file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(size))) {
+            return false;
+        }
+        const auto decoded = hibiki::decode_ir_wav_v1(bytes);
+        if (!decoded.valid ||
+            (request.expected_sample_rate != 0U &&
+             decoded.data.sample_rate != request.expected_sample_rate) ||
+            (request.expected_channels != 0U && decoded.data.channels != request.expected_channels)) {
+            return false;
+        }
+        const auto policy = hibiki::IrPhasePolicyV1{
+            1U, static_cast<hibiki::IrPhaseMode>(request.mode),
+            static_cast<double>(request.strength_q16_16) / 65536.0};
+        const auto resolution = hibiki::resolve_ir_phase_policy(policy);
+        if (!resolution.valid || resolution.mode == hibiki::IrPhaseMode::Bypass) return false;
+        hibiki::IrConvolverV1 candidate{};
+        if (!hibiki::prepare_ir_convolver_from_wav_v1(candidate, decoded.data, resolution)) {
+            return false;
+        }
+        state->convolver = std::move(candidate);
+        state->resolution = resolution;
+        state->path = path;
+        state->prepared = true;
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
 
 void set_route(hibiki::ControlRouteHealthEntryV1& route,
                const std::string_view id,
@@ -81,6 +140,8 @@ int wmain() {
 
     hibiki::AudioEngineModel engine;
     hibiki::EngineControlWorkerV1 control_worker{engine};
+    IrPrepareState ir_state{};
+    control_worker.set_ir_prepare_handler(prepare_ir_file, &ir_state);
     hibiki::ControlStatusSnapshotStoreV1 status_store;
     auto status = make_initial_status(engine.volume());
     if (!status_store.publish(status)) return 4;

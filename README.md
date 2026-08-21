@@ -82,8 +82,8 @@ pwsh -File tools/build-preview.ps1 -Target DesktopCompat
 Windows App Runtime；但不含 XAML 正式 UI、driver、系統攔截或 accessibility evidence。所有輸出都在
 `.local/preview/`，不可加入 Git。
 預覽也會顯示 IR 相位 policy 的 Game／Balanced／Movie／Bypass 與預估延遲；這只是可驗證的控制
-契約。C++ control-plane 已能將 bounded WAV kernel 轉成 minimum／mixed／linear phase，
-但預覽 UI 尚未送出 IR／kernel prepare command，因此不會假裝已在 graph 或實體輸出套用。
+契約。C++ control-plane 已能將 bounded WAV kernel 轉成 minimum／mixed／linear phase；Desktop
+Compatibility Preview 也能選擇 IR WAV 並取得 prepare Ack，但這仍不是 graph commit 或實體輸出套用。
 加入 `-SmokeTest` 可同時做 3 秒的無視窗啟動檢查；它不會連接音訊引擎。只想重跑控制面可用
 `-Target ControlModel`。
 

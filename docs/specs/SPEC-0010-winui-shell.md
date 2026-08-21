@@ -22,7 +22,7 @@ source_globs: ["apps/control-model/**", "apps/winui-shell/**"]
 In：WinUI 3 視窗、Easy/Expert 顯示、固定輸出群組卡片、場景卡片、實體裝置目錄鏡像與
 DeviceSwitch request、Windows 音量與 IR 相位滑桿、有效音量／安全上限／來源／致動器的
 可讀摘要、Expert 的 Matrix／DSP Graph／VST3 隔離／校正唯讀摘要，以及 Windows session、
-process loopback、瀏覽器單分頁與 direct bypass 的路由健康卡片、版本化 named-pipe Hello／SceneApply／VolumeNotification／DeviceSwitch
+process loopback、瀏覽器單分頁與 direct bypass 的路由健康卡片、版本化 named-pipe Hello／SceneApply／VolumeNotification／DeviceSwitch／IrPrepareCommand
 ／DeviceCatalogRequest／DeviceCatalogSnapshot／ControlStatusRequest／ControlStatusSnapshot 命令、連線失敗回復；音量拖曳使用 40 ms bounded debounce 與 command serialization，
 只送出最新的控制值。
 
@@ -58,6 +58,12 @@ WASAPI Exclusive 說成已受控。`ControlStatusSnapshot` 可透過 `ApplyContr
 `VolumeSafetyStateV1` 同時呈現 `requestedDb`、`safetyCeilingDb`、`effectiveDb`、mute、
 generation、origin 與 actuator。UI 永遠分開顯示使用者要求和實際有效值；安全截頂時說明
 「安全限制已介入」，狀態 generation 倒退或數值不合法則保留上一個狀態，不回寫 Windows。
+
+`PrepareIrAsync` 只接受使用者指定的 bounded local path 與目前 phase policy；ViewModel 先檢查
+檔案存在與 64 MiB 上限，再送出固定 288-byte `IrPrepareCommand`。Engine Preview 的 control
+worker 在 pipe thread 之外讀取 WAV、解碼、phase-transform 並準備 convolver，只有成功才回 Ack。
+Bypass、過期／不存在檔案、格式或 tap 上限錯誤都 fail-closed；這個 Ack 仍不是 graph commit、
+實體 sink 或 audible playback 證據。
 
 Hello 與裝置 catalog 成功後，ViewModel 會以序列化的 `ControlStatusRequest` 取得一次完整
 狀態；status store 未掛載時顯示控制狀態暫不可用，但不把整個音訊連線誤判為失敗。

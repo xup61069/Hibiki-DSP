@@ -32,7 +32,9 @@
 - `build_ir_phase_kernel_v1` now performs the bounded control-plane phase transform: real-cepstrum
   minimum-phase reconstruction and source-magnitude causal linear-phase targeting for mixed/linear
   strength. Tests cover delayed impulses, independent channels, source-strength zero and Bypass
-  fail-closed behavior; UI still has no IR/kernel prepare command or physical sink.
+  fail-closed behavior. `IrPrepareCommand v1` now carries a bounded local path; C# and Desktop
+  Compatibility Preview send it to Engine Preview, which reads/decodes/prepares only on its control
+  worker before ACK. No physical sink is implied.
 - 公開 monorepo 文件、component license map 與 source-only paid-release policy。
 - AI 接手規則、fresh-clone 流程與 source-only policy。
 - `OutputGroupVolumeState` 與 ISO compensation public C++ boundary 的初始骨架。

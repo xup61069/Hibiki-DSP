@@ -2,12 +2,38 @@
 
 using Hibiki.ControlModel;
 
+static string CreateSmokeIrWav()
+{
+    var path = Path.Combine(Path.GetTempPath(), $"hibiki-ir-smoke-{Guid.NewGuid():N}.wav");
+    using var stream = File.Create(path);
+    using var writer = new BinaryWriter(stream, System.Text.Encoding.ASCII, leaveOpen: false);
+    writer.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+    writer.Write(44U);
+    writer.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
+    writer.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
+    writer.Write(16U);
+    writer.Write((ushort)3); // IEEE Float32
+    writer.Write((ushort)1); // mono
+    writer.Write(48000U);
+    writer.Write(192000U);
+    writer.Write((ushort)4);
+    writer.Write((ushort)32);
+    writer.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+    writer.Write(8U);
+    writer.Write(1.0F);
+    writer.Write(0.0F);
+    return path;
+}
+
 var viewModel = new EasyControlViewModel();
 if (!await viewModel.ConnectAsync(TimeSpan.FromSeconds(2)))
     throw new InvalidOperationException("Control model could not connect to Engine Preview.");
 
 try
 {
+    var smokeIrPath = CreateSmokeIrWav();
+    try
+    {
     viewModel.SelectedOutputGroup = "main";
     viewModel.RequestedVolumeDb = -18.0;
     if (!await viewModel.QueueVolumeAsync(TimeSpan.FromMilliseconds(1)))
@@ -23,7 +49,18 @@ try
         throw new InvalidOperationException(
             $"Engine status/scene did not reconcile: sequence={viewModel.StatusSequence}, scene={viewModel.SelectedScene?.Id ?? "none"}.");
 
-    Console.WriteLine($"Control model Engine Preview smoke passed (effective={viewModel.EffectiveVolumeDb:0.00} dB, generation={viewModel.VolumeGeneration}, status_sequence={viewModel.StatusSequence}, scene={viewModel.SelectedScene?.Id}).");
+    viewModel.IrPhaseMode = IrPhaseMode.LinearPhase;
+    viewModel.IrPhaseStrength = 0.5;
+    if (!await viewModel.PrepareIrAsync(smokeIrPath) || !viewModel.HasPreparedIr ||
+        !viewModel.IrPrepareStatus.Contains("已在引擎", StringComparison.Ordinal))
+        throw new InvalidOperationException("Control model IR prepare was not acknowledged.");
+
+    Console.WriteLine($"Control model Engine Preview smoke passed (effective={viewModel.EffectiveVolumeDb:0.00} dB, generation={viewModel.VolumeGeneration}, status_sequence={viewModel.StatusSequence}, scene={viewModel.SelectedScene?.Id}, ir=prepared).");
+    }
+    finally
+    {
+        File.Delete(smokeIrPath);
+    }
 }
 finally
 {

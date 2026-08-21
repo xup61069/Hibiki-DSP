@@ -27,7 +27,8 @@ public enum ControlMessageType : ushort
     SessionCatalogRequest = 15,
     SessionVolumeCommand = 16,
     SessionRouteCommand = 17,
-    SessionRouteRuleCommand = 18
+    SessionRouteRuleCommand = 18,
+    IrPrepareCommand = 19
 }
 
 public enum IpcDecodeError
@@ -155,7 +156,7 @@ public static class IpcCodecV1
         ControlMessageType.ControlStatusSnapshot or ControlMessageType.ControlStatusRequest or
         ControlMessageType.SessionCatalogSnapshot or ControlMessageType.SessionCatalogRequest or
         ControlMessageType.SessionVolumeCommand or ControlMessageType.SessionRouteCommand or
-        ControlMessageType.SessionRouteRuleCommand;
+        ControlMessageType.SessionRouteRuleCommand or ControlMessageType.IrPrepareCommand;
 }
 
 public static class ControlPayloadsV1
@@ -191,6 +192,8 @@ public static class ControlPayloadsV1
     public const int SessionRouteRuleMatchMaxBytes = 128;
     public const int SessionRouteRuleRouteMaxBytes = 64;
     public const int SessionRouteRuleCommandBytes = 480;
+    public const int IrPreparePathMaxBytes = 260;
+    public const int IrPrepareCommandBytes = 288;
     private static readonly System.Text.UTF8Encoding StrictUtf8 =
         new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
@@ -504,6 +507,72 @@ public static class ControlPayloadsV1
         payload[32] = (byte)output.Length;
         output.CopyTo(payload.AsSpan(33));
         return payload;
+    }
+
+    public static byte[] EncodeIrPrepare(string path, IrPhasePolicyV1 policy,
+                                         uint expectedSampleRate = 0U,
+                                         uint expectedChannels = 0U)
+    {
+        var pathBytes = StrictUtf8.GetBytes(path ?? string.Empty);
+        if (!policy.IsValid || policy.Mode == IrPhaseMode.Bypass ||
+            pathBytes.Length is < 1 or > IrPreparePathMaxBytes ||
+            pathBytes.Any(value => value < 0x20) ||
+            (expectedSampleRate != 0U && expectedSampleRate is < 8000U or > 192000U) ||
+            (expectedChannels != 0U && expectedChannels > 8U))
+            throw new ArgumentException("IR prepare request is outside the v1 limit.", nameof(path));
+        var payload = new byte[IrPrepareCommandBytes];
+        BinaryPrimitives.WriteUInt32LittleEndian(payload, 1U);
+        payload[4] = (byte)policy.Mode;
+        var q16 = checked((int)Math.Round(policy.Strength * 65536.0,
+                                          MidpointRounding.AwayFromZero));
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(8), q16);
+        BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(12), expectedSampleRate);
+        BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(16), expectedChannels);
+        BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(20), (ushort)pathBytes.Length);
+        pathBytes.CopyTo(payload.AsSpan(24));
+        return payload;
+    }
+
+    public static bool TryDecodeIrPrepare(ReadOnlySpan<byte> payload,
+                                          out string path,
+                                          out IrPhaseMode mode,
+                                          out double strength,
+                                          out uint expectedSampleRate,
+                                          out uint expectedChannels)
+    {
+        path = string.Empty;
+        mode = IrPhaseMode.Bypass;
+        strength = 0.0;
+        expectedSampleRate = expectedChannels = 0U;
+        if (payload.Length != IrPrepareCommandBytes || payload[5] != 0 || payload[6] != 0 ||
+            payload[7] != 0 || payload[22] != 0 || payload[23] != 0 ||
+            BinaryPrimitives.ReadUInt32LittleEndian(payload) != 1U ||
+            !Enum.IsDefined(typeof(IrPhaseMode), (IrPhaseMode)payload[4]))
+            return false;
+        for (var index = 284; index < payload.Length; index++)
+            if (payload[index] != 0) return false;
+        var pathBytes = BinaryPrimitives.ReadUInt16LittleEndian(payload[20..]);
+        var q16 = BinaryPrimitives.ReadInt32LittleEndian(payload[8..]);
+        expectedSampleRate = BinaryPrimitives.ReadUInt32LittleEndian(payload[12..]);
+        expectedChannels = BinaryPrimitives.ReadUInt32LittleEndian(payload[16..]);
+        if (pathBytes is < 1 or > IrPreparePathMaxBytes || q16 is < 0 or > 65536 ||
+            ((IrPhaseMode)payload[4] == IrPhaseMode.Bypass && q16 != 0) ||
+            (expectedSampleRate != 0U && expectedSampleRate is < 8000U or > 192000U) ||
+            expectedChannels > 8U || !IsZero(payload.Slice(24, IrPreparePathMaxBytes), pathBytes,
+                                               IrPreparePathMaxBytes))
+            return false;
+        try
+        {
+            path = StrictUtf8.GetString(payload.Slice(24, pathBytes));
+            if (path.Any(char.IsControl)) return false;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        mode = (IrPhaseMode)payload[4];
+        strength = q16 / 65536.0;
+        return true;
     }
 
     public static bool TryDecodeSceneApply(ReadOnlySpan<byte> payload,
@@ -1011,6 +1080,13 @@ public sealed class ControlCommandFactoryV1
     public IpcEnvelopeV1 ApplyScene(string sceneId, string outputGroup) =>
         _requests.Create(ControlMessageType.SceneApply,
             ControlPayloadsV1.EncodeSceneApply(sceneId, outputGroup));
+
+    public IpcEnvelopeV1 PrepareIr(string path, IrPhasePolicyV1 policy,
+                                   uint expectedSampleRate = 0U,
+                                   uint expectedChannels = 0U) =>
+        _requests.Create(ControlMessageType.IrPrepareCommand,
+            ControlPayloadsV1.EncodeIrPrepare(path, policy, expectedSampleRate,
+                                               expectedChannels));
 
     public IpcEnvelopeV1 SwitchDevice(PhysicalDeviceCard device) =>
         _requests.Create(ControlMessageType.DeviceSwitch,

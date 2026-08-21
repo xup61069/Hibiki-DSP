@@ -33,6 +33,7 @@ enum class IpcMessageType : std::uint16_t {
     SessionVolumeCommand = 16,
     SessionRouteCommand = 17,
     SessionRouteRuleCommand = 18,
+    IrPrepareCommand = 19,
 };
 
 struct IpcHeaderV1 {

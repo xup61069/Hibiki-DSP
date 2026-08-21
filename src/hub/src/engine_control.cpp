@@ -103,6 +103,11 @@ EngineControlResultV1 EngineControlWorkerV1::consume(
                                                session_route_rule_context_)
                        ? EngineControlResultV1::Applied
                        : EngineControlResultV1::Failed;
+        case IpcMessageType::IrPrepareCommand:
+            if (ir_prepare_handler_ == nullptr) return EngineControlResultV1::Failed;
+            return ir_prepare_handler_(command.ir_prepare, ir_prepare_context_)
+                       ? EngineControlResultV1::Applied
+                       : EngineControlResultV1::Failed;
         case IpcMessageType::VolumeNotification:
             return (command.has_volume_target
                         ? engine_.apply_windows_volume(

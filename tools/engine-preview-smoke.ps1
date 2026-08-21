@@ -50,7 +50,39 @@ function Receive-IpcFrame([System.IO.Stream]$Stream) {
   return ,$frame
 }
 
+function Write-TestIrWav([string]$Path) {
+  $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Create,
+                                   [System.IO.FileAccess]::Write,
+                                   [System.IO.FileShare]::None)
+  try {
+    $writer = [System.IO.BinaryWriter]::new($stream, [System.Text.Encoding]::ASCII, $false)
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('RIFF'))
+    $writer.Write([uint32]44)
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('WAVE'))
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('fmt '))
+    $writer.Write([uint32]16)
+    $writer.Write([uint16]3) # IEEE Float32
+    $writer.Write([uint16]1) # mono
+    $writer.Write([uint32]48000)
+    $writer.Write([uint32]192000)
+    $writer.Write([uint16]4)
+    $writer.Write([uint16]32)
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('data'))
+    $writer.Write([uint32]8)
+    $writer.Write([single]1.0)
+    $writer.Write([single]0.0)
+    $writer.Flush()
+    $writer.Dispose()
+  } finally {
+    $stream.Dispose()
+  }
+}
+
 $engineProcess = Start-Process -FilePath $engine -WorkingDirectory (Split-Path $engine) -WindowStyle Hidden -PassThru
+$irPath = Join-Path $repo '.local/engine-preview-smoke-ir.wav'
+$irDirectory = Split-Path $irPath
+New-Item -ItemType Directory -Force -Path $irDirectory | Out-Null
+Write-TestIrWav $irPath
 $client = $null
 try {
   $deadline = (Get-Date).AddSeconds(5)
@@ -120,8 +152,30 @@ try {
   if (-not $statusMatched) {
     throw 'Engine Preview status did not reflect the queued -12 dB volume command.'
   }
+
+  # IR prepare is a control-worker-only file import. The payload carries a
+  # bounded local path and policy; the engine reads/decode/transforms the WAV
+  # off the pipe and RT threads, then ACKs only after convolver preparation.
+  [byte[]]$irPayload = New-Object byte[] 288
+  [BitConverter]::GetBytes([uint32]1).CopyTo($irPayload, 0)
+  $irPayload[4] = 2 # LinearPhase
+  [BitConverter]::GetBytes([int]32768).CopyTo($irPayload, 8) # strength 0.5
+  [BitConverter]::GetBytes([uint32]48000).CopyTo($irPayload, 12)
+  [BitConverter]::GetBytes([uint32]1).CopyTo($irPayload, 16)
+  $irPathBytes = [System.Text.Encoding]::UTF8.GetBytes($irPath)
+  if ($irPathBytes.Length -gt 260) { throw 'Smoke IR path exceeded the v1 bound.' }
+  [BitConverter]::GetBytes([uint16]$irPathBytes.Length).CopyTo($irPayload, 20)
+  $irPathBytes.CopyTo($irPayload, 24)
+  $irFrame = New-IpcFrame 19 45 $irPayload
+  Send-IpcFrame $client $irFrame
+  $irReply = Receive-IpcFrame $client
+  if ($irReply[6] -ne 6 -or [BitConverter]::ToUInt64($irReply, 12) -ne 45) {
+    throw 'Engine Preview IR prepare command did not receive a correlated Ack.'
+  }
   Write-Output "Engine Preview control Hello/Ack, volume round-trip and status snapshot smoke passed (payload=$statusReplyLength bytes)."
+  Write-Output 'Engine Preview bounded IR WAV prepare and phase-policy ACK smoke passed.'
 } finally {
   if ($null -ne $client) { $client.Dispose() }
   if (-not $engineProcess.HasExited) { Stop-Process -Id $engineProcess.Id; $engineProcess.WaitForExit() }
+  if (Test-Path -LiteralPath $irPath) { Remove-Item -LiteralPath $irPath -Force -ErrorAction SilentlyContinue }
 }

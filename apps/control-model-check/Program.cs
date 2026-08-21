@@ -504,6 +504,18 @@ Check(viewModel.IrPhaseModeOptions.Count == 4 &&
       viewModel.IrPhaseModeOptions.Any(option => option.Mode == IrPhaseMode.LinearPhase &&
                                                  option.Label.Contains("Movie")),
     "IR phase UI options must expose the bounded Game/Balanced/Movie/Bypass contract.");
+viewModel.IrPhaseMode = IrPhaseMode.LinearPhase;
+viewModel.IrPhaseStrength = 0.5;
+var irCommand = new ControlCommandFactoryV1().PrepareIr(
+    "C:/Hibiki/measurements/movie.wav", viewModel.IrPhasePolicy, 48000U, 2U);
+Check(irCommand.Type == ControlMessageType.IrPrepareCommand &&
+      ControlPayloadsV1.TryDecodeIrPrepare(irCommand.Payload.Span, out var irPath,
+                                           out var irMode, out var irStrength,
+                                           out var irRate, out var irChannels) &&
+      irPath.EndsWith("movie.wav", StringComparison.OrdinalIgnoreCase) &&
+      irMode == IrPhaseMode.LinearPhase && Math.Abs(irStrength - 0.5) < 1.0e-5 &&
+      irRate == 48000U && irChannels == 2U,
+    "IR prepare command must round-trip the bounded path and policy payload.");
 var noEngine = new EasyControlViewModel("HibikiDSP_v1_control_model_check_missing");
 var connectedToMissingEngine = await noEngine.ConnectAsync(TimeSpan.FromMilliseconds(50));
 Check(!connectedToMissingEngine && noEngine.ConnectionState == ControlConnectionState.Degraded &&

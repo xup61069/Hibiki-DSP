@@ -45,6 +45,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         SessionRouteRuleGainOwnerV1.WindowsSession;
     private IrPhaseMode _irPhaseMode = IrPhaseMode.MinimumPhase;
     private double _irPhaseStrength;
+    private string _irFilePath = string.Empty;
+    private string _irPrepareStatus = "尚未載入 IR WAV";
     private ControlConnectionState _connectionState = ControlConnectionState.Disconnected;
     private bool _isBusy;
     private CancellationTokenSource? _volumeDebounce;
@@ -340,6 +342,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(IrAddedDelayMs));
             OnPropertyChanged(nameof(IrPhaseUsesFir));
             OnPropertyChanged(nameof(IrPhaseModeText));
+            MarkIrPrepareStale();
         }
     }
 
@@ -356,6 +359,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(IrPhasePolicy));
             OnPropertyChanged(nameof(IrAddedDelayMs));
             OnPropertyChanged(nameof(IrPhaseUsesFir));
+            MarkIrPrepareStale();
         }
     }
 
@@ -370,6 +374,69 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         IrPhaseMode.Bypass => "Bypass／不套用 IR",
         _ => "未知相位模式"
     };
+
+    public string IrFilePath => _irFilePath;
+    public string IrPrepareStatus => _irPrepareStatus;
+    public bool HasPreparedIr => _irFilePath.Length > 0 &&
+                                 !_irPrepareStatus.Contains("需重新載入", StringComparison.Ordinal);
+
+    private void MarkIrPrepareStale()
+    {
+        if (_irFilePath.Length == 0) return;
+        _irPrepareStatus = "相位 policy 已變更；需重新載入 IR WAV";
+        OnPropertyChanged(nameof(IrPrepareStatus));
+        OnPropertyChanged(nameof(HasPreparedIr));
+    }
+
+    public async Task<bool> PrepareIrAsync(string filePath,
+                                            CancellationToken cancellationToken = default)
+    {
+        if (IrPhaseMode == IrPhaseMode.Bypass)
+        {
+            _irPrepareStatus = "Bypass 不會載入 IR；請先選擇相位模式";
+            OnPropertyChanged(nameof(IrPrepareStatus));
+            return false;
+        }
+        if (!IsConnected)
+        {
+            _irPrepareStatus = "引擎未連線；IR 尚未送出";
+            OnPropertyChanged(nameof(IrPrepareStatus));
+            return false;
+        }
+        string fullPath;
+        try
+        {
+            fullPath = Path.GetFullPath(filePath ?? string.Empty);
+            if (!File.Exists(fullPath)) throw new FileNotFoundException();
+            if (new FileInfo(fullPath).Length > 64L * 1024L * 1024L)
+                throw new InvalidDataException("IR WAV 超過 64 MiB 上限");
+            LastCommand = _commands.PrepareIr(fullPath, IrPhasePolicy);
+            OnPropertyChanged(nameof(LastCommand));
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or
+                                           UnauthorizedAccessException or InvalidDataException)
+        {
+            _irPrepareStatus = $"IR 檔案無法準備：{exception.Message}";
+            OnPropertyChanged(nameof(IrPrepareStatus));
+            return false;
+        }
+
+        var sent = await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+        if (sent)
+        {
+            _irFilePath = fullPath;
+            _irPrepareStatus = $"已在引擎 control-plane prepare：{Path.GetFileName(fullPath)}";
+            OnPropertyChanged(nameof(IrFilePath));
+            OnPropertyChanged(nameof(IrPrepareStatus));
+            OnPropertyChanged(nameof(HasPreparedIr));
+        }
+        else
+        {
+            _irPrepareStatus = "引擎拒絕 IR；保留上一個安全 kernel";
+            OnPropertyChanged(nameof(IrPrepareStatus));
+        }
+        return sent;
+    }
 
     public IpcEnvelopeV1? LastCommand { get; private set; }
 

@@ -1222,6 +1222,28 @@ int main() {
                                                decoded_session_route_rule) &&
           decoded_session_route_rule.operation == SessionRouteRuleOperationV1::Clear &&
           is_valid_message_type(IpcMessageType::SessionRouteRuleCommand));
+    IrPrepareCommandV1 ir_prepare_command{};
+    ir_prepare_command.mode = 2U;
+    ir_prepare_command.strength_q16_16 = 32768;
+    ir_prepare_command.expected_sample_rate = 48000U;
+    ir_prepare_command.expected_channels = 2U;
+    constexpr std::string_view ir_prepare_path = "C:/Hibiki/measurements/movie.wav";
+    ir_prepare_command.path_bytes = static_cast<std::uint16_t>(ir_prepare_path.size());
+    std::copy(ir_prepare_path.begin(), ir_prepare_path.end(), ir_prepare_command.path.begin());
+    const auto ir_prepare_payload = encode_ir_prepare_command_v1(ir_prepare_command);
+    IrPrepareCommandV1 decoded_ir_prepare{};
+    CHECK(decode_ir_prepare_command_v1(ir_prepare_payload, decoded_ir_prepare) &&
+          decoded_ir_prepare.mode == 2U && decoded_ir_prepare.strength_q16_16 == 32768 &&
+          decoded_ir_prepare.expected_sample_rate == 48000U &&
+          decoded_ir_prepare.expected_channels == 2U &&
+          std::string_view(decoded_ir_prepare.path.data(), decoded_ir_prepare.path_bytes) ==
+              ir_prepare_path && is_valid_message_type(IpcMessageType::IrPrepareCommand));
+    auto malformed_ir_prepare = ir_prepare_payload;
+    malformed_ir_prepare[22U] = 1U;
+    CHECK(!decode_ir_prepare_command_v1(malformed_ir_prepare, decoded_ir_prepare));
+    ir_prepare_command.mode = 3U;
+    ir_prepare_command.strength_q16_16 = 1;
+    CHECK(encode_ir_prepare_command_v1(ir_prepare_command)[0U] == 0U);
     IpcFrameV1 session_volume_frame;
     session_volume_frame.header.type = IpcMessageType::SessionVolumeCommand;
     session_volume_frame.header.request_id = 780U;
@@ -1245,6 +1267,13 @@ int main() {
     CHECK(decode_control_command_v1(session_route_rule_frame, decoded_command) &&
           decoded_command.type == IpcMessageType::SessionRouteRuleCommand &&
           decoded_command.session_route_rule.rule_id_bytes == 10U);
+    IpcFrameV1 ir_prepare_frame;
+    ir_prepare_frame.header.type = IpcMessageType::IrPrepareCommand;
+    ir_prepare_frame.header.request_id = 783U;
+    ir_prepare_frame.payload.assign(ir_prepare_payload.begin(), ir_prepare_payload.end());
+    CHECK(decode_control_command_v1(ir_prepare_frame, decoded_command) &&
+          decoded_command.type == IpcMessageType::IrPrepareCommand &&
+          decoded_command.ir_prepare.path_bytes == ir_prepare_path.size());
     ControlCommandQueueV1 command_queue;
     ControlCommandV1 queued_command{};
     queued_command.type = IpcMessageType::SceneApply;

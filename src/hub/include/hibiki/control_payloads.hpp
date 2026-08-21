@@ -37,6 +37,8 @@ constexpr std::size_t kSessionRouteRuleIdMaxBytesV1 = 64U;
 constexpr std::size_t kSessionRouteRuleMatchMaxBytesV1 = 128U;
 constexpr std::size_t kSessionRouteRuleRouteMaxBytesV1 = 64U;
 constexpr std::size_t kSessionRouteRuleCommandPayloadBytesV1 = 480U;
+constexpr std::size_t kIrPreparePathMaxBytesV1 = 260U;
+constexpr std::size_t kIrPrepareCommandPayloadBytesV1 = 288U;
 
 struct SessionVolumeCommandV1 {
     std::uint64_t handle{0U};
@@ -59,6 +61,25 @@ struct SessionRouteCommandV1 {
     std::array<char, kSessionRouteCommandLaneMaxBytesV1> lane{};
     std::array<char, kSessionRouteCommandOutputMaxBytesV1> output_group{};
 };
+
+// A bounded path request keeps the queue fixed-size while the control worker
+// performs file I/O and WAV decoding off the pipe and RT threads. The path is
+// UTF-8 and must be resolved on the same machine as the engine.
+struct IrPrepareCommandV1 {
+    std::uint32_t schema_version{1U};
+    std::uint8_t mode{0U};
+    std::int32_t strength_q16_16{0};
+    std::uint32_t expected_sample_rate{0U};
+    std::uint32_t expected_channels{0U};
+    std::uint16_t path_bytes{0U};
+    std::array<char, kIrPreparePathMaxBytesV1> path{};
+};
+
+[[nodiscard]] std::array<std::uint8_t, kIrPrepareCommandPayloadBytesV1>
+encode_ir_prepare_command_v1(const IrPrepareCommandV1& command) noexcept;
+[[nodiscard]] bool decode_ir_prepare_command_v1(
+    std::span<const std::uint8_t> payload,
+    IrPrepareCommandV1& command) noexcept;
 
 [[nodiscard]] std::array<std::uint8_t, kSessionRouteCommandPayloadBytesV1>
 encode_session_route_command_v1(const SessionRouteCommandV1& command) noexcept;
@@ -213,6 +234,7 @@ struct ControlCommandV1 {
     SessionVolumeCommandV1 session_volume{};
     SessionRouteCommandV1 session_route{};
     SessionRouteRuleCommandV1 session_route_rule{};
+    IrPrepareCommandV1 ir_prepare{};
     bool has_volume_target{false};
 };
 

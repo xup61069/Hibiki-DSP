@@ -30,6 +30,8 @@ using SessionRouteHandlerFnV1 = bool (*)(const SessionRouteCommandV1& request,
                                          void* context) noexcept;
 using SessionRouteRuleHandlerFnV1 = bool (*)(const SessionRouteRuleCommandV1& request,
                                              void* context) noexcept;
+using IrPrepareHandlerFnV1 = bool (*)(const IrPrepareCommandV1& request,
+                                     void* context) noexcept;
 
 // Control-worker adapter for the fixed queue. It is intentionally not called
 // by the pipe callback or the RT process function. SceneApply resolves only
@@ -84,6 +86,11 @@ public:
         session_route_rule_context_ = context;
     }
 
+    void set_ir_prepare_handler(IrPrepareHandlerFnV1 handler, void* context) noexcept {
+        ir_prepare_handler_ = handler;
+        ir_prepare_context_ = context;
+    }
+
     [[nodiscard]] EngineControlResultV1 consume(const ControlCommandV1& command) noexcept;
     [[nodiscard]] std::size_t drain(ControlCommandQueueV1& queue,
                                      std::size_t max_commands = ControlCommandQueueV1::kCapacity) noexcept;
@@ -110,6 +117,8 @@ private:
     void* session_route_context_{nullptr};
     SessionRouteRuleHandlerFnV1 session_route_rule_handler_{nullptr};
     void* session_route_rule_context_{nullptr};
+    IrPrepareHandlerFnV1 ir_prepare_handler_{nullptr};
+    void* ir_prepare_context_{nullptr};
 };
 
 }  // namespace hibiki

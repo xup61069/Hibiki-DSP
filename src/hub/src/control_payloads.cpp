@@ -194,6 +194,72 @@ encode_session_route_command_v1(const SessionRouteCommandV1& command) noexcept {
     return payload;
 }
 
+std::array<std::uint8_t, kIrPrepareCommandPayloadBytesV1>
+encode_ir_prepare_command_v1(const IrPrepareCommandV1& command) noexcept {
+    std::array<std::uint8_t, kIrPrepareCommandPayloadBytesV1> payload{};
+    const auto valid_mode = command.mode <= 3U;
+    const auto valid_strength = command.strength_q16_16 >= 0 &&
+                                command.strength_q16_16 <= 65536;
+    const auto valid_bypass = command.mode != 3U || command.strength_q16_16 == 0;
+    const auto valid_rate = command.expected_sample_rate == 0U ||
+                            (command.expected_sample_rate >= 8000U &&
+                             command.expected_sample_rate <= 192000U);
+    const auto valid_channels = command.expected_channels == 0U ||
+                                (command.expected_channels >= 1U &&
+                                 command.expected_channels <= 8U);
+    if (command.schema_version != 1U || !valid_mode || !valid_strength || !valid_bypass ||
+        !valid_rate || !valid_channels || command.path_bytes == 0U ||
+        command.path_bytes > command.path.size() ||
+        !is_printable_utf8(std::string_view(command.path.data(), command.path_bytes))) {
+        return payload;
+    }
+    write_u32(payload.data(), command.schema_version);
+    payload[4U] = command.mode;
+    write_u32(payload.data() + 8U, static_cast<std::uint32_t>(command.strength_q16_16));
+    write_u32(payload.data() + 12U, command.expected_sample_rate);
+    write_u32(payload.data() + 16U, command.expected_channels);
+    write_u16(payload.data() + 20U, command.path_bytes);
+    std::copy_n(command.path.data(), command.path_bytes, payload.data() + 24U);
+    return payload;
+}
+
+bool decode_ir_prepare_command_v1(const std::span<const std::uint8_t> payload,
+                                  IrPrepareCommandV1& command) noexcept {
+    command = {};
+    if (payload.size() != kIrPrepareCommandPayloadBytesV1 || payload[5U] != 0U ||
+        payload[6U] != 0U || payload[7U] != 0U || payload[22U] != 0U || payload[23U] != 0U) {
+        return false;
+    }
+    for (std::size_t index = 284U; index < payload.size(); ++index) {
+        if (payload[index] != 0U) return false;
+    }
+    const auto path_bytes = static_cast<std::size_t>(read_u16(payload.data() + 20U));
+    const auto mode = payload[4U];
+    const auto strength = static_cast<std::int32_t>(read_u32(payload.data() + 8U));
+    const auto sample_rate = read_u32(payload.data() + 12U);
+    const auto channels = read_u32(payload.data() + 16U);
+    if (read_u32(payload.data()) != 1U || mode > 3U || strength < 0 || strength > 65536 ||
+        (mode == 3U && strength != 0) ||
+        (sample_rate != 0U && (sample_rate < 8000U || sample_rate > 192000U)) ||
+        (channels != 0U && (channels < 1U || channels > 8U)) || path_bytes == 0U ||
+        path_bytes > kIrPreparePathMaxBytesV1) {
+        return false;
+    }
+    for (std::size_t index = path_bytes; index < kIrPreparePathMaxBytesV1; ++index) {
+        if (payload[24U + index] != 0U) return false;
+    }
+    const std::string_view path(reinterpret_cast<const char*>(payload.data() + 24U), path_bytes);
+    if (!is_printable_utf8(path)) return false;
+    command.schema_version = 1U;
+    command.mode = mode;
+    command.strength_q16_16 = strength;
+    command.expected_sample_rate = sample_rate;
+    command.expected_channels = channels;
+    command.path_bytes = static_cast<std::uint16_t>(path_bytes);
+    std::copy_n(path.data(), path.size(), command.path.data());
+    return true;
+}
+
 bool decode_session_route_command_v1(
     const std::span<const std::uint8_t> payload,
     SessionRouteCommandV1& command) noexcept {
@@ -666,6 +732,8 @@ bool decode_control_command_v1(const IpcFrameV1& frame,
             return decode_session_route_command_v1(frame.payload, command.session_route);
         case IpcMessageType::SessionRouteRuleCommand:
             return decode_session_route_rule_command_v1(frame.payload, command.session_route_rule);
+        case IpcMessageType::IrPrepareCommand:
+            return decode_ir_prepare_command_v1(frame.payload, command.ir_prepare);
         case IpcMessageType::SceneApply:
             return decode_scene_apply_payload_v1(frame.payload, command.scene);
         case IpcMessageType::DeviceSwitch:
