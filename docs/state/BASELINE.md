@@ -370,6 +370,9 @@ Endpoint-ID-preserving volume rebind 的 source commit 是 `4d9e1d5`。
 WASAPI PCM render conversion 與 silent 30 ms live handoff probe 的 source commit 是 `9d0d426`。
 Driver signability source gate 的 source commit 是 `dc1d3b2`；預設只驗證 INF contract，
 目標 WDK package 才能執行 Inf2Cat。
+Topology-indexed WDK render/capture pin formats 與 Virtual Mic generic format boundary 的
+source commit 是 `741a54b`；文件與 evidence 對應 commit 是 `d2c8717`，仍未宣稱 `.sys`、HLK
+或 Microsoft signing。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 68 個必要入口與
 15 份 Spec 通過；`source-policy.ps1` 掃描 293 個路徑且無 blocked binary/secret；
