@@ -46,6 +46,11 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
 - `driver/inf/HibikiVirtualAudio.inf` 固定 Root\HibikiDSP hardware ID、四個 endpoint GUID
   與 service/package 邊界；它只引用未提交的 SYS/CAT，`Inf2Cat`、HLK、Microsoft signing
   與真正 PortCls/SYSVAD topology 仍是 release gate。
+- `driver/include/hibiki/wavert_stream_v1.h` 與 `src/wavert_stream.c` 提供可由未來 pin
+  callback 掛接的 portable WaveRT data-path core：caller-owned Float32 frame ring、完整
+  block overrun reject、underrun silence fallback 與 dropped/underrun counters；它限制在
+  2/6/8 channels、44.1/48/96/192 kHz、2–16 periods，且不配置、不等待。WDK miniport 仍
+  必須補上 interlocked publication、KS pin wiring、實體 endpoint 與 signed package。
 - `PersistentLinearResampler` 保存跨 block 的 phase 與 boundary frame，要求 caller 提供
   整個 input block 的 output capacity，並拒絕在不足時部分消耗；它是 clock-drift/SRC 的
   無配置 baseline，尚未宣稱 production-quality polyphase filter。
@@ -101,7 +106,8 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
 ## 未解問題（阻擋完整 driver 實作）
 
 1. 已固定 endpoint topology/channel mask；仍需 WaveRT／KS PortCls wiring 與 INF/HLK 測試矩陣。
-2. 多輸出 clock drift、ring buffer 與 adaptive SRC 的上限延遲。
+2. 真實多輸出 endpoint 的 clock drift、ring buffer 與 adaptive SRC soak；portable stream
+   ring 與 user-space per-sink SRC baseline 已存在。
 3. Virtual Mic 的 echo reference、privacy indicator 與卸載行為。
 
 在上述問題由 ADR 與測試 fixture 定案前，本 Spec 保持 draft；可以繼續完成 user-space
