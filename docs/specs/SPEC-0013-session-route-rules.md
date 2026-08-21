@@ -6,7 +6,7 @@ authority: product-behavior
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["src/hub/include/hibiki/session_route_rules.hpp", "src/hub/src/session_route_rules.cpp", "schemas/session-route-rule-v1.schema.json", "tests/**"]
+source_globs: ["src/hub/include/hibiki/session_route_rules.hpp", "src/hub/src/session_route_rules.cpp", "src/hub/include/hibiki/windows_audio_session_route.hpp", "src/hub/src/windows_audio_session_route.cpp", "schemas/session-route-rule-v1.schema.json", "tests/**"]
 ---
 
 # SPEC-0013：每個 App 的自訂路由規則
@@ -37,6 +37,12 @@ caller 先取得 descriptor，再呼叫 `SessionRouteRuleStoreV1::apply`。套�
 
 規則 metadata 可持久化為 `session-route-rule-v1.schema.json`；不得把短暫 PID、完整 Windows
 session instance ID、私人裝置路徑或使用者校正資料寫入公開 repository。
+
+`WindowsAudioSessionRouteCoordinatorV1` 是 control-plane bridge：它讓 watcher 以目前規則
+enumerate session，只有在 active routed session 存在且 `build_session_route_graph` 成功時
+才產生可交給 `AudioEngineModel::prepare_graph` 的候選 graph；enumeration／編譯失敗保留
+上一個 registry/graph 並標記 `Degraded`。`copy_graph` 只複製 immutable candidate，RT thread
+不讀取 watcher、規則或 Windows COM。
 
 ## 失敗／fallback
 
