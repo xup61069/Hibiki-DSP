@@ -142,6 +142,29 @@ int main() {
     CHECK(program_loudness.process_interleaved(silent_program, 128U, 1U));
     CHECK(program_loudness.status().silence_gated);
 
+    ProgramAwareLevelControllerV1 k_weighted_program;
+    CHECK(k_weighted_program.configure(
+        ProgramAwareLevelPolicyV1{1, true, -23.0, 6.0, 12.0, 3000.0, 6.0, -70.0,
+                                  ProgramAwareMeterModeV1::KWeightedProxy, -1},
+        48000U));
+    std::array<float, 4800> k_weighted_tone{};
+    for (std::size_t frame = 0U; frame < k_weighted_tone.size(); ++frame) {
+        k_weighted_tone[frame] = static_cast<float>(
+            0.25 * std::sin(2.0 * 3.14159265358979323846 * 1000.0 *
+                            static_cast<double>(frame) / 48000.0));
+    }
+    CHECK(k_weighted_program.process_interleaved(k_weighted_tone.data(),
+                                                 k_weighted_tone.size(), 1U));
+    CHECK(k_weighted_program.status().meter_mode == ProgramAwareMeterModeV1::KWeightedProxy);
+    CHECK(k_weighted_program.status().valid &&
+          std::isfinite(k_weighted_program.status().measured_dbfs));
+    CHECK(validate_program_aware_policy(ProgramAwareLevelPolicyV1{
+        1, false, -23.0, 6.0, 12.0, 3000.0, 6.0, -70.0,
+        ProgramAwareMeterModeV1::KWeightedProxy, 3}));
+    CHECK(!validate_program_aware_policy(ProgramAwareLevelPolicyV1{
+        1, false, -23.0, 6.0, 12.0, 3000.0, 6.0, -70.0,
+        ProgramAwareMeterModeV1::KWeightedProxy, 8}));
+
     PeqProcessorV1 peq;
     const std::array<PeqFilterV1, 1> peq_filters{{PeqFilterV1{1000.0, 6.0, 1.0}}};
     CHECK(peq.prepare(peq_filters, 48000U, 2U));

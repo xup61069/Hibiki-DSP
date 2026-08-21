@@ -4,7 +4,7 @@
   "title": "Hibiki ProgramAwareLevelPolicy v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "enabled", "target_dbfs", "max_boost_db", "max_cut_db", "analysis_window_ms", "max_rate_db_per_second", "silence_gate_dbfs"],
+  "required": ["schema_version", "enabled", "target_dbfs", "max_boost_db", "max_cut_db", "analysis_window_ms", "max_rate_db_per_second", "silence_gate_dbfs", "meter_mode", "excluded_channel"],
   "properties": {
     "schema_version": {"const": 1},
     "enabled": {"type": "boolean"},
@@ -13,6 +13,8 @@
     "max_cut_db": {"type": "number", "minimum": 0, "maximum": 24},
     "analysis_window_ms": {"type": "number", "minimum": 100, "maximum": 10000},
     "max_rate_db_per_second": {"type": "number", "exclusiveMinimum": 0, "maximum": 60},
-    "silence_gate_dbfs": {"type": "number", "minimum": -144, "exclusiveMaximum": 0}
+    "silence_gate_dbfs": {"type": "number", "minimum": -144, "exclusiveMaximum": 0},
+    "meter_mode": {"enum": ["rms-proxy", "k-weighted-proxy"]},
+    "excluded_channel": {"type": "integer", "minimum": -1, "maximum": 7}
   }
 }

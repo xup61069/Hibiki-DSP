@@ -92,9 +92,9 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   Virtual Mic 或其他已驗證來源共用 Lane／Group Master 行為；平台 bridge 不得在 RT path
   配置、等待或直接操作 Windows COM。
 - `process_tab_capture_lane_v1` 可選接一個已按相同 sample rate 設定的
-  `ProgramAwareLevelControllerV1`；它在進 graph 前對該 tab 套用慢速 RMS 代理音量，速率與
-  boost/cut 都受 policy 限制。這是可選的內容音量，不是靜默擷取，也不是降噪或 BS.1770
-  conformance。
+  `ProgramAwareLevelControllerV1`；它在進 graph 前對該 tab 套用慢速 RMS 或
+  `KWeightedProxy` 內容音量，速率與 boost/cut 都受 policy 限制。K-weighted 路徑仍是
+  bounded proxy，不是靜默擷取、完整 gated LUFS meter、降噪或 BS.1770 conformance。
 - 同一個 tab effects contract 可選套用 `BasicNoiseSuppressorV1`：固定高通＋downward gate，
   只接受 1–8 聲道且要求 sample rate/channel 完全相符。它是可測試的基本抑噪，不宣稱
   RNNoise、頻譜 AI、AEC 或麥克風權限處理；效果順序為 PEQ → IR → basic suppressor → level。

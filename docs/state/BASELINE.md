@@ -121,9 +121,11 @@
   separate output groups without cross-talk.
 - `AudioSessionRegistry::set_makeup_gain_db` now provides the bounded per-session gain mutator;
   metadata refresh keeps that value and rejects values outside −144..+12 dB.
-- `ProgramAwareLevelControllerV1` provides an allocation-free, slow RMS-proxy content level
-  controller with silence gate, bounded boost/cut and dB-per-second rate limiting; it is not a
-  BS.1770/K-weighted conformance implementation.
+- `ProgramAwareLevelControllerV1` provides an allocation-free, slow RMS-proxy default and an
+  optional fixed-state `KWeightedProxy` path (high-pass plus high-frequency shelf), both with
+  silence gate, bounded boost/cut and dB-per-second rate limiting. It is explicitly still a
+  proxy rather than a BS.1770 conformance implementation; full gated LUFS/oracle work remains a
+  release gate.
 - `process_tab_capture_lane_v1` can apply that controller to one user-gesture-gated browser tab
   before graph processing, with a sample-rate match check and fail-closed behavior; no automatic
   microphone capture or denoising model is implied.

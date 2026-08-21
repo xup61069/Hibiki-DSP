@@ -81,10 +81,13 @@ ISO 係數 fit。
 宣告的 delay 仍須由實際量測驗證。
 
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
-`Program-aware` 另有 `ProgramAwareLevelControllerV1` 的慢速內容音量原型：它用無配置的
-RMS 代理、3 秒分析窗、靜音門、增益上限與 dB/s 速率限制，適合由單一 Lane 明確選用。
-它不宣稱 BS.1770/K-weighted conformance，也不會在 `Relative`／`Calibrated` ISO 曲線中
-偷偷改變音色；正式 BS.1770 analyzer 與 oracle 仍是 release gate。
+`Program-aware` 另有 `ProgramAwareLevelControllerV1` 的慢速內容音量控制：預設保留無配置的
+RMS 代理；`KWeightedProxy` 會在固定容量狀態內串接高通與高頻 shelf 兩段 K-weighting，並
+可選排除呼叫端標示的 LFE channel。兩者都使用 3 秒分析窗、靜音門、增益上限與 dB/s
+速率限制，適合由單一 Lane 明確選用。K-weighted 路徑仍不是正式 BS.1770 meter（沒有
+完整 gated loudness、合法 oracle 與 true-peak conformance），UI／文件必須顯示 proxy；它
+也不會在 `Relative`／`Calibrated` ISO 曲線中偷偷改變音色。正式 BS.1770 analyzer 與 oracle
+仍是 release gate。
 
 ## IR 相位／延遲滑桿
 
