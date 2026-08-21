@@ -77,6 +77,11 @@ Shared-mode WASAPI handoff 也是額外的 opt-in live check：
 與 aggregate worker counters；沒有可用 endpoint 時只能記錄 `wasapi=unavailable`，不能
 把 user-space probe 當成已完成的 WaveRT／HLK／Microsoft signing 驗收。
 
+Windows 系統音量的真實讀回／寫入／恢復也是額外的 opt-in live check：
+`pwsh -File tools/live-system-volume-check.ps1 -WriteTest`。只有明確的 `-WriteTest` 才會
+暫時衰減約 3 dB，隨後恢復原值；它不輸出 endpoint identity，但會改變本機音量，無法把
+這個 user-space broker probe 當成 driver、WaveRT 或 HLK evidence。
+
 Windows App/session enumeration 也有 opt-in check：
 `pwsh -File tools/live-audio-session-check.ps1`。只輸出 session／active 數量與固定 identity
 語意，不輸出 PID、session ID、endpoint ID 或顯示名稱；它不等於每個 App 已完成實際

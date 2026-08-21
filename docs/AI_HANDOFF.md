@@ -87,6 +87,10 @@ Issue 0 是 foundation integration handoff，只由 integrator 更新，不是�
 - `evidence/0000-foundation/control-model-engine-ir-clear-v1.json` records three consecutive
   session-routing control-model runs, including IR prepare → Scene IR clear and bounded temporary
   fixture cleanup. It is user-space reliability evidence only; it does not prove physical playback.
+- `pwsh -File tools/live-system-volume-check.ps1 -WriteTest` is the explicit live volume probe:
+  it attenuates the default endpoint by about 3 dB, reads the callback/readback, restores the
+  original value and prints no endpoint identity. It is still user-space broker evidence only;
+  do not run it silently or treat it as driver/WaveRT evidence.
 - The next driver-facing source milestone is now the Apache `driver_control_transport_v1` fixed
   136-byte little-endian endpoint-state/volume-notification packet plus the GPL
   `DriverVolumeLinkV1` adapter. It is contract-tested and ready for a future WDK/SYSVAD project

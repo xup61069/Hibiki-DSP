@@ -2242,6 +2242,19 @@ int main() {
               &decoded_driver_header_type, &decoded_driver_header_request) == 1 &&
           decoded_driver_header_type == HIBIKI_DRIVER_HELLO &&
           decoded_driver_header_request == 456U);
+    for (std::uint16_t message_type = HIBIKI_DRIVER_HELLO;
+         message_type <= HIBIKI_DRIVER_ERROR; ++message_type) {
+        CHECK(hibiki_driver_control_header_packet_encode_v1(
+                  driver_header_packet.data(), driver_header_packet.size(), message_type,
+                  500U + message_type, &driver_header_packet_bytes) == 1 &&
+              hibiki_driver_control_header_packet_validate_v1(
+                  driver_header_packet.data(), driver_header_packet_bytes) == 1 &&
+              hibiki_driver_control_header_packet_decode_v1(
+                  driver_header_packet.data(), driver_header_packet_bytes,
+                  &decoded_driver_header_type, &decoded_driver_header_request) == 1 &&
+              decoded_driver_header_type == message_type &&
+              decoded_driver_header_request == 500U + message_type);
+    }
     driver_header_packet[0U] = 0U;
     CHECK(hibiki_driver_control_header_packet_validate_v1(
               driver_header_packet.data(), driver_header_packet.size()) == 0);
