@@ -44,6 +44,10 @@ bounded guard；它以三個線性 inter-sample probes 作保守估算並採 blo
 Windows build 現在提供 `WindowsVolumeBroker`：control thread 可 bind/unbind
 `IAudioEndpointVolume`、write canonical dB/mute with caller GUID、read-back 實際量化值，
 並以 lock-free atomic snapshot 接收 callback；callback 本身不配置、不等待、不呼叫 COM。
+`WindowsControlRuntimeV1` 會在 control/COM worker 綁定目前 eRender/eConsole default endpoint，
+提供 `refresh_default_volume`、`read_volume`、`write_volume` 與 non-blocking `poll_volume`；
+default endpoint 失效時可獨立 rebind。這些方法只能由 control worker 呼叫，caller 必須把
+snapshot 轉成 Group Master state，audio callback 不得直接碰 COM。
 `WindowsDeviceWatcher` 同樣只把 `IMMNotificationClient` 的 default/add/remove/state/property
 事件複製到 bounded snapshot；實際 rebind 必須由 worker 讀取 snapshot 後執行，避免在 OS
 callback 裡 unregister、release 或建立 COM 物件。

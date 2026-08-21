@@ -80,6 +80,9 @@
   −1 dBTP bounded inter-sample guard；目前仍不宣稱正式 ITU/BS.1770 conformance。
 - Windows-only `IAudioEndpointVolume` broker with non-blocking callback snapshot, dB/mute
   read-back and event-context write path; no physical endpoint was exercised on this machine.
+- `WindowsControlRuntimeV1` now binds the default eRender/eConsole endpoint to that broker and
+  exposes control-thread rebind/read/write/poll methods; the live local probe read the endpoint
+  volume successfully (`volume=pass`) without touching COM from RT.
 - Windows-only `IMMNotificationClient` watcher with bounded default/add/remove/property event
   snapshots, consumed by a worker-side transactional recovery coordinator with safe-start mute
   after endpoint invalidation or Audio Service restart.
@@ -349,6 +352,7 @@ ControlPlaneHost pipe/queue lifecycle 的 source commit 是 `a087e96`。
 WindowsControlRuntime 與 runtime pipe request probe 的 source commit 是 `bc6952d`。
 Driver endpoint state atomic invalid-context guard 的 source commit 是 `6b3f7fb`。
 WDK volume/mute basic-support source gate 的 source commit 是 `1572b5f`。
+WindowsControlRuntime default endpoint volume binding/read/poll 的 source commit 是 `df36929`。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 68 個必要入口與
 15 份 Spec 通過；`source-policy.ps1` 掃描 288 個路徑且無 blocked binary/secret；
