@@ -40,7 +40,7 @@
   ],
   "results": [
     {"command": "tools/verify.ps1", "status": "pass", "tests": 1},
-    {"command": "tools/docs-check.ps1", "status": "pass", "required_paths": 55, "specs": 12},
+    {"command": "tools/docs-check.ps1", "status": "pass", "required_paths": 58, "specs": 12},
     {"command": "tools/source-policy.ps1", "status": "pass", "scanned_paths": 251, "blocked_files": 0},
     {"command": "tools/extension-check.ps1", "status": "pass"},
     {"command": "tools/installer-check.ps1", "status": "pass"},
