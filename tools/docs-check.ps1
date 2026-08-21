@@ -82,4 +82,41 @@ foreach ($adapter in $adapters) {
   }
 }
 
-Write-Output "Documentation checks passed ($($required.Count) required paths, $($specs.Count) specs)."
+function Get-BaselineClaim {
+  param([string]$Text, [string]$Pattern, [string]$Label)
+  $match = [regex]::Match($Text, $Pattern)
+  if (-not $match.Success) {
+    throw ("BASELINE.md is missing the {0} counter expected by docs-check; keep the " +
+           "verification-summary sentence in docs/state/BASELINE.md up to date.") -f $Label
+  }
+  return [int]$match.Groups['count'].Value
+}
+
+$baselineText = Get-Content -LiteralPath (Join-Path $repo 'docs/state/BASELINE.md') -Raw
+$trackedFiles = @(git -C $repo ls-files)
+if ($LASTEXITCODE -ne 0) { throw 'docs-check could not list tracked files.' }
+$jsonFiles = @(git -C $repo ls-files -- '*.json')
+
+$claimedRequired = Get-BaselineClaim $baselineText 'docs-check\.ps1`\s*的\s*(?<count>\d+)\s*個必要入口' 'docs-check required-entry'
+if ($claimedRequired -ne $required.Count) {
+  throw ("BASELINE.md claims {0} docs-check required entries but docs-check defines {1}; " +
+         "update the BASELINE.md verification summary.") -f $claimedRequired, $required.Count
+}
+$claimedSpecs = Get-BaselineClaim $baselineText '個必要入口與\s*(?<count>\d+)\s*份\s*Spec\s*通過' 'spec'
+if ($claimedSpecs -ne $specs.Count) {
+  throw ("BASELINE.md claims {0} specs but the repository tracks {1}; " +
+         "update the BASELINE.md verification summary.") -f $claimedSpecs, $specs.Count
+}
+$claimedTracked = Get-BaselineClaim $baselineText 'source-policy\.ps1`\s*掃描\s*(?<count>\d+)\s*個\s*tracked paths' 'source-policy tracked-path'
+if ($claimedTracked -ne $trackedFiles.Count) {
+  throw ("BASELINE.md claims {0} tracked paths but git reports {1}; " +
+         "update the BASELINE.md verification summary.") -f $claimedTracked, $trackedFiles.Count
+}
+$claimedJson = Get-BaselineClaim $baselineText '(?<count>\d+)\s*個\s*repository JSON\s*檔案均可解析' 'repository-json'
+if ($claimedJson -ne $jsonFiles.Count) {
+  throw ("BASELINE.md claims {0} repository JSON files but git reports {1}; " +
+         "update the BASELINE.md verification summary.") -f $claimedJson, $jsonFiles.Count
+}
+
+$summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; baseline summary verified against {2} tracked paths and {3} repository JSON files.)'
+Write-Output (($summaryTemplate) -f $required.Count, $specs.Count, $trackedFiles.Count, $jsonFiles.Count)

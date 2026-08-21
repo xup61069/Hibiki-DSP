@@ -554,10 +554,10 @@ store、handler 與 atomic ViewModel apply；本機 status probe 通過，但仍
 per-App delivery 或 browser tab capture 已完成。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 85 個必要入口與
-24 份 Spec 通過；`source-policy.ps1` 掃描 387 個 tracked paths 且無 blocked
-binary/secret；
+24 份 Spec 通過；`source-policy.ps1` 掃描 397 個 tracked paths 且無 blocked
+binary/secret；`docs-check.ps1` 亦會把這些摘要計數對照 git 實測值，落後即 fail-closed；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
-`distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；62 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
+`distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；65 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
 288-byte payload、catalog sequence、handler fail-closed、WinUI send-failure rollback、DeviceCatalogSnapshot、ControlStatusSnapshot
 wire/atomic replace、catalog-to-wire publisher、Windows worker unbound/coordinator rollback、
 DeviceCatalogRequest provider response、連線後自動刷新裝置清單、ControlPlaneHost loopback
