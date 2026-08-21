@@ -39,7 +39,7 @@
         "PE header scan",
         "secret-pattern scan"
       ],
-      "tracked_paths": 413,
+      "tracked_paths": 415,
       "compiled_artifacts": false
     },
     {
@@ -57,7 +57,7 @@
       "coverage": [
         "required documentation, Spec IDs, adapters, handoffs, and baseline summary gate"
       ],
-      "limitation": "Integrator-owned docs/state/BASELINE.md tracked-path counter requires refresh after this slice's handoff and evidence files are added."
+      "limitation": "After syncing merged Issue #51, local strict docs-check reports BASELINE.md 413 versus 415 tracked paths; PR merge-mode verification currently falls through to strict assertion because merged docs-check reads multi-line git show output as an array. This is integrator-owned Issue #51 tooling and is not modified in this slice."
     },
     {
       "command": "tools/source-only-ci-check.ps1",
@@ -79,7 +79,7 @@
   "limitations": [
     "Source-only policy self-test and repository scan only; no binary is built, loaded, signed, installed, or executed.",
     "Does not claim driver, WaveRT, HLK, Microsoft signing, installer, or physical audio endpoint behavior.",
-    "docs/state/BASELINE.md is integrator-owned and was not modified; its tracked-path count must be refreshed before CI can pass.",
+    "docs/state/BASELINE.md and docs-check merge-base behavior are integrator-owned; neither is modified in this slice.",
     "Local machine is below the locked target toolchain (Windows 26200, no WDK/Windows App SDK)."
   ],
   "logs": [],
