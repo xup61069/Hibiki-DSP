@@ -114,6 +114,27 @@ try {
     throw 'Engine Preview Hello did not receive the v1 correlated Ack.'
   }
 
+  # The physical catalog is metadata only: inspect bounded wire fields without
+  # printing endpoint IDs or friendly names from the local machine.
+  $catalogFrame = New-IpcFrame 11 46 @()
+  Send-IpcFrame $client $catalogFrame
+  $catalogReply = Receive-IpcFrame $client
+  if ($catalogReply[6] -ne 10 -or [BitConverter]::ToUInt64($catalogReply, 12) -ne 46) {
+    throw 'Engine Preview device catalog request did not receive a correlated snapshot.'
+  }
+  $catalogPayloadBytes = [BitConverter]::ToUInt32($catalogReply, 8)
+  $catalogCount = [BitConverter]::ToUInt16($catalogReply, 20)
+  if ($catalogPayloadBytes -ne ($catalogReply.Length - 20) -or
+      $catalogPayloadBytes -ne (16 + ($catalogCount * 416))) {
+    throw "Engine Preview device catalog payload shape is invalid: bytes=$catalogPayloadBytes count=$catalogCount."
+  }
+  $catalogEntrySummary = @()
+  for ($index = 0; $index -lt $catalogCount; $index++) {
+    $offset = 20 + 16 + ($index * 416)
+    $catalogEntrySummary += "$( [BitConverter]::ToUInt16($catalogReply, $offset) )/$( [BitConverter]::ToUInt16($catalogReply, $offset + 2) )/$( $catalogReply[$offset + 4] )/$( $catalogReply[$offset + 5] )/$( [BitConverter]::ToUInt16($catalogReply, $offset + 6) )/$( [BitConverter]::ToUInt32($catalogReply, $offset + 396) )/$( [BitConverter]::ToUInt32($catalogReply, $offset + 400) )/$( [BitConverter]::ToUInt32($catalogReply, $offset + 404) )"
+  }
+  Write-Output "Engine Preview physical catalog snapshot passed (count=$catalogCount, entries=endpointBytes/displayBytes/flow/availability/flags/channels/rate/frames [$($catalogEntrySummary -join ';')])."
+
   # Drive one real control transaction through the queue. The C++ worker must
   # reconcile it before the following status request reports the new dB and
   # generation; this is the vertical slice used by the Desktop Preview.

@@ -4,9 +4,11 @@
 #include "hibiki/control_status.hpp"
 #include "hibiki/control_service.hpp"
 #include "hibiki/engine_control.hpp"
+#include "hibiki/windows_device_catalog.hpp"
 #include "hibiki/wav_ir.hpp"
 
 #include <Windows.h>
+#include <mmdeviceapi.h>
 
 #include <algorithm>
 #include <atomic>
@@ -95,7 +97,8 @@ void set_route(hibiki::ControlRouteHealthEntryV1& route,
 }
 
 hibiki::ControlStatusSnapshotV1 make_initial_status(
-    const hibiki::OutputGroupVolumeStateV1 volume) noexcept {
+    const hibiki::OutputGroupVolumeStateV1 volume,
+    const std::string_view physical_catalog_detail) noexcept {
     hibiki::ControlStatusSnapshotV1 snapshot{};
     snapshot.sequence = 1U;
     snapshot.volume = volume;
@@ -104,7 +107,7 @@ hibiki::ControlStatusSnapshotV1 make_initial_status(
               "named pipe 已啟動；目前為本機 user-space preview。",
               hibiki::ControlRouteHealthStateV1::Ready);
     set_route(snapshot.routes[1U], "main-output", "主輸出",
-              "尚未連接實體 WASAPI／WaveRT sink。",
+              physical_catalog_detail,
               hibiki::ControlRouteHealthStateV1::Unavailable, 1U);
     set_route(snapshot.routes[2U], "windows-volume", "Windows 音量",
               "尚未綁定虛擬端點 volume node；只展示安全狀態。",
@@ -143,17 +146,51 @@ int wmain() {
     hibiki::EngineControlWorkerV1 control_worker{engine};
     IrPrepareState ir_state{&engine};
     control_worker.set_ir_prepare_handler(prepare_ir_file, &ir_state);
+    const HRESULT com_result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    const bool com_initialized = SUCCEEDED(com_result) || com_result == RPC_E_CHANGED_MODE;
+    IMMDeviceEnumerator* device_enumerator = nullptr;
+    hibiki::WindowsPhysicalDeviceCatalogServiceV1 physical_catalog;
+    bool physical_catalog_ready = false;
+    HRESULT catalog_result = com_result;
+    if (com_initialized) {
+        catalog_result = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+                                          IID_PPV_ARGS(&device_enumerator));
+        if (SUCCEEDED(catalog_result) && device_enumerator != nullptr) {
+            catalog_result = physical_catalog.bind(device_enumerator);
+            if (SUCCEEDED(catalog_result)) {
+                catalog_result = physical_catalog.refresh_now();
+                physical_catalog_ready = SUCCEEDED(catalog_result);
+            }
+        }
+    }
+    if (device_enumerator != nullptr) {
+        device_enumerator->Release();
+        device_enumerator = nullptr;
+    }
+    const std::string catalog_detail = physical_catalog_ready
+        ? "physical catalog ready; Preview sink disabled."
+        : "physical catalog unavailable; safe Preview retained.";
     hibiki::ControlStatusSnapshotStoreV1 status_store;
-    auto status = make_initial_status(engine.volume());
+    auto status = make_initial_status(
+        engine.volume(), catalog_detail);
     if (!status_store.publish(status)) return 4;
     hibiki::ControlPlaneHostV1 host;
     if (!host.start_with_queue(hibiki::IpcNamedPipeConfigV1{kPipeName, 64U * 1024U, 1000U},
-                               nullptr, &status_store, nullptr)) {
+                               physical_catalog_ready ? physical_catalog.snapshot_store() : nullptr,
+                               &status_store, nullptr)) {
+        physical_catalog.unbind();
+        if (com_initialized && com_result != RPC_E_CHANGED_MODE) CoUninitialize();
         return 3;
     }
 
+    auto next_catalog_poll = std::chrono::steady_clock::now() + std::chrono::milliseconds{250};
     while (!g_stop.load(std::memory_order_acquire)) {
         (void)control_worker.drain(host.command_queue());
+        if (physical_catalog_ready && std::chrono::steady_clock::now() >= next_catalog_poll) {
+            (void)physical_catalog.poll_and_refresh();
+            next_catalog_poll = std::chrono::steady_clock::now() +
+                                std::chrono::milliseconds{250};
+        }
         const auto volume = engine.volume();
         if (!same_volume(volume, status.volume)) {
             status.volume = volume;
@@ -163,5 +200,7 @@ int wmain() {
         std::this_thread::sleep_for(std::chrono::milliseconds{2});
     }
     host.stop();
+    physical_catalog.unbind();
+    if (com_initialized && com_result != RPC_E_CHANGED_MODE) CoUninitialize();
     return 0;
 }

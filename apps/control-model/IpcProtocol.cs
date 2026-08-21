@@ -682,7 +682,8 @@ public static class ControlPayloadsV1
                 display.Length is < 1 or > 128 || endpoint.Any(value => value < 0x20) ||
                 display.Any(value => value < 0x20) || !seen.Add(device.EndpointId ?? string.Empty) ||
                 !Enum.IsDefined(device.Flow) || !Enum.IsDefined(device.Availability) ||
-                (device.IsDefault && (!device.IsSelectable || !defaults.Add(device.Flow))) ||
+                (device.IsDefault && (device.Availability != PhysicalDeviceAvailabilityV1.Active ||
+                                      !defaults.Add(device.Flow))) ||
                 device.Channels is not (1 or 2 or 6 or 8) ||
                 device.SampleRate is not (44100 or 48000 or 96000 or 192000) ||
                 device.BufferFrames is < 16 or > 4096)
@@ -774,7 +775,8 @@ public static class ControlPayloadsV1
                                                (int)channels, (int)sampleRate, (int)bufferFrames,
                                                isDefault,
                                                BinaryPrimitives.ReadUInt64LittleEndian(entry[408..]));
-            if (isDefault && (!card.IsSelectable || !defaults.Add(flow))) return false;
+            if (isDefault && (availability != PhysicalDeviceAvailabilityV1.Active ||
+                              !defaults.Add(flow))) return false;
             list.Add(card);
         }
         devices = list;

@@ -357,12 +357,14 @@ Check(ControlPayloadsV1.TryDecodeDeviceSwitch(viewModel.LastCommand!.Payload.Spa
       selectedFrames == 128 && selectedSequence == 10UL,
     "Physical device switch payload did not round-trip.");
 var snapshotSpeaker = speakers with { IsDefault = false };
+var snapshotMicrophone = new PhysicalDeviceCard("endpoint-mic", "麥克風",
+    PhysicalDeviceFlowV1.Capture, PhysicalDeviceAvailabilityV1.Active, 2, 48000, 128, true, 11UL);
 var snapshotBytes = ControlPayloadsV1.EncodeDeviceCatalogSnapshot(
-    [snapshotSpeaker, headphones], 30UL);
+    [snapshotSpeaker, snapshotMicrophone], 30UL);
 Check(ControlPayloadsV1.TryDecodeDeviceCatalogSnapshot(snapshotBytes,
           out var snapshotSequence, out var decodedDevices) && snapshotSequence == 30UL &&
       decodedDevices.Count == 2 && decodedDevices[1].IsDefault,
-    "Physical device catalog snapshot did not round-trip.");
+    "Physical render/capture default catalog snapshot did not round-trip.");
 var snapshotFrame = new IpcEnvelopeV1(ControlMessageType.DeviceCatalogSnapshot, 0UL, snapshotBytes);
 Check(viewModel.ApplyPhysicalDeviceSnapshot(snapshotFrame, out _) &&
       viewModel.PhysicalDevices.Count == 2 && viewModel.PhysicalDevices[1].IsDefault,

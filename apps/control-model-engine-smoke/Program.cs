@@ -59,7 +59,11 @@ try
         !viewModel.IrPrepareStatus.Contains("IR 已清除", StringComparison.Ordinal))
         throw new InvalidOperationException("Scene switch did not clear the prepared IR state.");
 
-    Console.WriteLine($"Control model Engine Preview smoke passed (effective={viewModel.EffectiveVolumeDb:0.00} dB, generation={viewModel.VolumeGeneration}, status_sequence={viewModel.StatusSequence}, scene={viewModel.SelectedScene?.Id}, ir=cleared-on-scene-switch).");
+    var physicalRefresh = await viewModel.RefreshPhysicalDevicesAsync();
+    var physicalRefreshStatus = viewModel.StatusText;
+    var mainOutputRoute = viewModel.Expert.RouteHealth.FirstOrDefault(route =>
+        route.Id == "main-output");
+    Console.WriteLine($"Control model Engine Preview smoke passed (effective={viewModel.EffectiveVolumeDb:0.00} dB, generation={viewModel.VolumeGeneration}, status_sequence={viewModel.StatusSequence}, scene={viewModel.SelectedScene?.Id}, devices={viewModel.PhysicalDevices.Count}, catalog_refresh={physicalRefresh}, catalog_status={physicalRefreshStatus}, main_output={mainOutputRoute?.StateLabel ?? "unknown"}, main_detail={mainOutputRoute?.Detail ?? "missing"}, ir=cleared-on-scene-switch).");
     }
     finally
     {

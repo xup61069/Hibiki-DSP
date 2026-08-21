@@ -214,8 +214,8 @@ public sealed class PhysicalDeviceCatalogV1
             device.SampleRate is not (44100 or 48000 or 96000 or 192000) ||
             device.BufferFrames is < 16 or > 4096)
         { error = "裝置格式不受支援"; return false; }
-        if (device.IsDefault && !device.IsSelectable)
-        { error = "只有 Active render 裝置可以是預設"; return false; }
+        if (device.IsDefault && device.Availability != PhysicalDeviceAvailabilityV1.Active)
+        { error = "只有 Active 裝置可以是預設"; return false; }
         return true;
     }
 }

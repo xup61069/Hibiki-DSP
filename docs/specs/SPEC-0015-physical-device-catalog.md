@@ -24,9 +24,10 @@ buffer 能力、Active／Disabled／Unplugged／Unknown 狀態、每個 flow 唯
 事件 sequence、可選取判定與 bounded remove/upsert、worker-owned Windows COM enumeration，
 以及引擎到 UI 的版本化 catalog snapshot。
 
-Out：PortCls／WaveRT driver、WASAPI worker 啟動、實體硬體能力測量與 UI 顯示。COM
-enumerator 的 source adapter 已存在，但只能在 worker-owned、COM-initialized thread 執行；
-本契約不宣稱已完成可載入 driver、目標 Windows/WDK 驗證或真實裝置 soak test。
+Out：PortCls／WaveRT driver、physical sink 開啟、實體硬體能力測量與正式 UI 顯示。COM
+enumerator 的 source adapter 由 Engine Preview 在 COM-initialized user-space worker 呼叫，
+只能產生 metadata snapshot；本契約不宣稱已完成可載入 driver、目標 Windows/WDK 驗證或
+真實裝置 soak test。
 
 ## 介面與資料流
 
@@ -53,9 +54,10 @@ publisher 驗證失敗，都保留上一份狀態並回傳 HRESULT。通知 call
 快照的 wire validation，再發布到 `DeviceCatalogSnapshotStoreV1`，最後才交換已提交 catalog；
 `device_catalog_snapshot_reply_v1` 只複製最近完整 frame，沒有快照時回 Error，不執行 COM。
 
-只有 `Active` endpoint 才能 `selectable` 或 `mark_default`。進入 Disabled／Unplugged／
-Unknown 時，catalog 清除 default；切換 worker 必須回到上一個已同步 endpoint，或使用
-safe-start／Degraded，而不是重試到 100% 音量。
+只有 `Active` endpoint 才能是 default；只有 `Active render` endpoint 才能
+`selectable` 或由 UI `mark_default`。render 與 capture 各自最多一個 default。進入
+Disabled／Unplugged／Unknown 時，catalog 清除該 flow 的 default；切換 worker 必須回到上一個
+已同步 endpoint，或使用 safe-start／Degraded，而不是重試到 100% 音量。
 
 ## 失敗／安全／相容性
 

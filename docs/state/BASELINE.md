@@ -190,8 +190,9 @@
   previous catalog on stale or malformed snapshots. The pipe client has an unsolicited-frame
   reader for a future engine metadata worker; COM enumeration is still external.
 - `DeviceCatalogSnapshotPublisherV1` now converts a validated C++ `PhysicalDeviceCatalogV1`
-  into one bounded snapshot frame without introducing COM or RT work. The remaining platform
-  step is to feed this publisher from a worker-owned Windows endpoint enumeration.
+  into one bounded snapshot frame without introducing COM or RT work. Engine Preview now feeds
+  it from a COM-initialized, worker-owned Windows endpoint enumeration at startup and polls the
+  watcher for metadata changes; this still does not open a physical sink.
 - `DeviceCatalogSnapshotStoreV1` now serializes complete control-plane snapshot publication and
   replies, rejecting empty or invalid frames while retaining the previous safe snapshot. The
   Windows `PhysicalDeviceCatalogServiceV1` joins this store to worker refresh transactions; it
@@ -201,7 +202,8 @@
   render/capture state, friendly names, mix format and device period into a candidate catalog,
   and commits only after snapshot encoding succeeds. `WindowsPhysicalDeviceCatalogCoordinator`
   bridges watcher notifications to worker polling; `DeviceCatalogRequest` now has an explicit
-  snapshot-reply provider path. Live target/driver enumeration remains unverified here.
+  snapshot-reply provider path. Engine Preview binds this service and exposes the local catalog
+  to the Desktop Compatibility Preview; target 24H2/driver/hotplug soak remains unverified.
 - The opt-in `tools/live-device-catalog-check.ps1` probe now built and ran the worker against the
   local `IMMDeviceEnumerator`: 14 endpoints were enumerated, sequence 1 and a 5,840-byte snapshot
   decoded successfully. It prints counts only; this is local Windows 22631 evidence, not target
@@ -216,6 +218,9 @@
 - `EasyControlViewModel.ConnectAsync` now requests and atomically applies a fresh
   `DeviceCatalogSnapshot` after the Hello handshake; a disconnected or invalid request fails closed,
   preserves the last safe catalog and never claims that a physical endpoint was switched.
+- The C# wire/model boundary now accepts one Active default per flow, including capture; only
+  Active render entries remain selectable. This matches Windows endpoint metadata and prevents a
+  valid default capture endpoint from invalidating the entire snapshot.
 - Parameterized ISO 226:2023 SPL-from-phon formula using caller-supplied legal parameters;
   the 1 kHz invariant and phon bounds are covered by CTest without embedding the licensed
   29-point coefficient table.

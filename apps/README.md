@@ -40,3 +40,11 @@ Those Expert details are explicitly read-only until a versioned edit command is
 implemented; the shell owns no DSP and closes its named-pipe client when the window closes. It is not part of the CMake build and
 requires the locked Windows App SDK on a Windows 11 24H2+ x64 machine; no
 compiled UI output is committed or published.
+
+`apps/engine-preview/` now performs a user-space Windows endpoint catalog pass on
+startup: it enumerates render/capture metadata through `IMMDeviceEnumerator`, keeps
+the bounded snapshot provider alive for control-plane requests, and polls watcher
+changes without touching a physical sink. The Desktop Compatibility Preview can
+therefore show the current local device count and selectable render cards. This is
+metadata only; no endpoint is opened, no Windows system volume is changed, and no
+device switch is claimed until a future physical sink transaction is implemented.

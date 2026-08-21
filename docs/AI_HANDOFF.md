@@ -41,7 +41,9 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
 - C++ Engine Preview 已可由 `tools/build-engine-preview.ps1` 建置；`tools/engine-preview-smoke.ps1`
   會啟動它並驗證 v1 named-pipe Hello/Ack request correlation 與 ControlStatusSnapshot 回覆。
   `tools/control-model-engine-smoke.ps1` 另外以 C# `EasyControlViewModel` 驗證 −18 dB 音量
-  往返、引擎快照讀回與 Game One-Tap SceneApply Ack。
+  往返、引擎快照讀回、Game One-Tap SceneApply Ack，以及本機 Windows render/capture
+  catalog（目前環境 14 筆）的跨程序 snapshot。Engine Preview 只枚舉 metadata、保留
+  bounded snapshot 與 watcher poll；不啟用 physical WASAPI sink，也不改 Windows 音量。
   `tools/run-preview.ps1 -Build` 會把 Engine Preview 與不依賴 Windows App Runtime 的 Desktop
   Compatibility UI 一起啟動；它只提供 user-space control host，不代表 WaveRT、實體輸出或
   Windows session routing 已完成。
@@ -79,6 +81,8 @@ Windows 使用者也可雙擊 repository 根目錄的 `Start-HibikiPreview.cmd`�
 - 不重生 `config/distribution-profile.yml` 的 endpoint GUID、driver hardware ID、ASIO CLSID、IPC namespace。
 - 不把 `.local/`、`bin/`、`obj/`、PE/COFF、簽章檔、金鑰、真實 endpoint/session ID 或私人校正檔加入 Git。
 - 不宣稱 vendor ASIO、WASAPI Exclusive、RAW、Atmos/DTS:X 或未經使用者手勢的 Chrome tab capture 已受 Hibiki 控制。
+- `PhysicalDeviceCatalog` 的 capture default 允許存在，但只有 Active render 才能被 UI 選取；
+  catalog readiness 不等於 physical sink 已開啟。
 - 不把「控制命令已入列」或「預設已保存」寫成「已完成引擎／實體音訊套用」。
 
 ## 交接前最小完成條件
