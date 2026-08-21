@@ -124,7 +124,7 @@ bool PersistentLinearResampler::process(const float* const input,
                                         std::size_t& output_frames) noexcept {
     output_frames = 0;
     if (channels_ == 0 || input == nullptr || output == nullptr || input_frames == 0 ||
-        !std::isfinite(phase_) || phase_ < 0.0 || phase_ >= 2.0 ||
+        !std::isfinite(phase_) || phase_ < 0.0 || phase_ > 4.0 ||
         !std::isfinite(source_step_) || source_step_ <= 0.0) {
         return false;
     }
@@ -174,7 +174,7 @@ bool PersistentLinearResampler::process(const float* const input,
 std::size_t PersistentLinearResampler::required_output_frames(
     const std::size_t input_frames) const noexcept {
     if (channels_ == 0U || input_frames == 0U || !std::isfinite(phase_) || phase_ < 0.0 ||
-        phase_ >= 2.0 || !std::isfinite(source_step_) || source_step_ <= 0.0) {
+        phase_ > 4.0 || !std::isfinite(source_step_) || source_step_ <= 0.0) {
         return 0U;
     }
     const std::size_t virtual_frames = input_frames + (has_previous_ ? 1U : 0U);

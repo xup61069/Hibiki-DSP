@@ -300,6 +300,10 @@ int main() {
     CHECK(sink_model.snapshot().ratio > 1.0 && sink_model.snapshot().source_step < 1.0);
     CHECK(sink_model.process(first_block, 4, resampled, 8, output_frames));
     CHECK(output_frames > 0);
+    OutputSinkModel fast_sink;
+    CHECK(fast_sink.prepare(1U, 4.0));
+    CHECK(fast_sink.process(first_block, 4U, resampled, 8U, output_frames));
+    CHECK(fast_sink.process(first_block, 4U, resampled, 8U, output_frames));
 
     VirtualMicRouteModel virtual_mic;
     CHECK(virtual_mic.prepare(VirtualMicConfigV1{1U, 48000U, true}));
