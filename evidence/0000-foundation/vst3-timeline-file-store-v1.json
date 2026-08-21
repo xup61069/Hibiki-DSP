@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "issue": 63,
+  "scope_digest": "vst3-timeline-file-store-v1",
+  "source_commit": "dbafc4f",
+  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-msvc-19.44-dotnet-10.0.301-pwsh-7.6.5; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 63",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "bounded per-timeline file store over the canonical vst3-parameter-timeline-v1 document format",
+        "strict filename-safe ID subset ([A-Za-z0-9._-], <=64 bytes, alnum-leading, no trailing dot) with Windows reserved-stem rejection",
+        "ID rejections happen before any filesystem side effect; directory stays empty",
+        "save/load round-trip through real temp-directory files including an empty timeline",
+        "load of a missing ID returns not_found; corrupt content returns parse_error and leaves the destination snapshot untouched",
+        "remove deletes exactly the mapped file; double-remove returns not_found",
+        "fixed capacity of 16 enforced; overwriting an existing entry still works when full",
+        "deterministic sorted enumeration excludes foreign or malformed .json files",
+        "close() fails every operation closed; reopening the same root sees persisted documents",
+        "C++ build and CTest contract suite (1/1 passed)"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 63 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope exclusivity and Git ancestry checks"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "required documentation paths and specs; BASELINE counters refreshed for this slice's files"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1 / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "source-only policy, publication gate and whitespace cleanliness"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Store IDs are restricted to the strict filename-safe subset; scheduler timeline IDs outside that subset need a future mapping layer.",
+    "Single-writer control-plane object; concurrent external directory writers are out of scope.",
+    "Enumeration reflects directory contents at scan time only.",
+    "User-space source-contract evidence only; this proves nothing about physical audio, per-App delivery, drivers, HLK or Microsoft signing."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSVC 19.44 (VS 2022 BuildTools 17.14)",
+    "cmake": "4.4.0",
+    "dotnet": "10.0.301",
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}

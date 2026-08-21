@@ -113,7 +113,11 @@ writer 只輸出固定鍵組、全部 256 個 event slot 的唯一文件；reade
 fail-closed tokenizer，僅接受該形式加上無意義空白，未知或重複鍵、缺鍵、非法或越界
 數值、陣列長度與 event_count 不一致、截斷或超過 64 KiB 的輸入都會被拒絕且不改動
 目的地；通過驗證的 snapshot 經 serialize→parse 後逐位元組穩定。檔案寫入先寫暫存再
-取代。這是控制面檔案契約，不是一般 JSON parser。`Vst3TimelineEditorV1` 現在提供
+取代。這是控制面檔案契約，不是一般 JSON parser。
+`Vst3TimelineFileStoreV1` 在此之上提供 bounded per-timeline 檔案儲存：每個
+timeline 一份 canonical 文件，ID 限縮為檔名安全子集（[A-Za-z0-9._-]，最長 64 位元
+組）並與檔名一一對應，容量固定為 16、列舉確定排序；損壞、未知或越界內容一律
+fail-closed，絕不部分載入。`Vst3TimelineEditorV1` 現在提供
 supervisor 端 bounded 編輯交易：draft 變更不影響已發布 snapshot，同一
 (parameter_id, sample_position) 的 upsert 以取代而非重複呈現，commit 只在通過既有
 timeline 驗證後才交換已發布 snapshot，discard 直接還原；這是 headless 控制面契約，
