@@ -88,9 +88,11 @@ Issue 0 是 foundation integration handoff，只由 integrator 更新，不是�
   session-routing control-model runs, including IR prepare → Scene IR clear and bounded temporary
   fixture cleanup. It is user-space reliability evidence only; it does not prove physical playback.
 - `pwsh -File tools/live-system-volume-check.ps1 -WriteTest` is the explicit live volume probe:
-  it attenuates the default endpoint by about 3 dB, reads the callback/readback, restores the
-  original value and prints no endpoint identity. It is still user-space broker evidence only;
-  do not run it silently or treat it as driver/WaveRT evidence.
+  it starts Engine Preview with `--enable-system-volume`, sends a volume notification through the
+  named pipe, verifies the default endpoint moved by about 3 dB via a separate broker readback, and
+  restores the original value. It prints no endpoint identity and remains user-space write-through
+  evidence only; do not run it silently or treat it as driver/WaveRT evidence. `-DirectBroker` is a
+  diagnostic-only bypass.
 - `pwsh -File tools/live-session-volume-check.ps1 -WriteTest` is the explicit per-App/session
   volume probe: it starts Engine Preview with session routing, creates one silent shared-mode
   session, discovers it through the bounded `SessionCatalogSnapshot`, sends the generation-scoped

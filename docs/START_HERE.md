@@ -39,7 +39,8 @@
    worker counters，沒有可用 endpoint 時會回報 `wasapi=unavailable`。
    若要驗證 Windows endpoint volume 的實際讀回、短暫衰減與恢復，可額外執行
    `pwsh -File tools/live-system-volume-check.ps1 -WriteTest`；只有明確旗標才會改變本機音量，
-   probe 結束前會恢復原值，仍不等於 driver/WaveRT/HLK evidence。
+   probe 會啟動 Engine Preview 並經 named pipe 驗證 write-through，結束前恢復原值，仍不等於
+   driver/WaveRT/HLK evidence。`-DirectBroker` 只供隔離 broker 除錯。
    若要驗證單一 App/session volume 的實際 handle 讀回、短暫衰減與恢復，可額外執行
    `pwsh -File tools/live-session-volume-check.ps1 -WriteTest`；它只建立本 probe 的無聲
    shared-mode session，結束前恢復原值，仍不等於實體 per-App capture/re-send 或 DSP delivery。
