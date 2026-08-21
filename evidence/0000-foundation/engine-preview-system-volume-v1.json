@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "engine-preview-system-volume-link-v1",
+  "source_commit": "6a04764",
+  "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/build-engine-preview.ps1",
+    "pwsh -File tools/engine-preview-smoke.ps1",
+    "pwsh -File tools/engine-preview-smoke.ps1 -EnableSystemVolume -StatusOnly",
+    "pwsh -File tools/control-model-engine-smoke.ps1",
+    "pwsh -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/source-policy.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/build-engine-preview.ps1",
+      "status": "pass",
+      "coverage": [
+        "Engine Preview builds with the Windows endpoint-volume broker integration",
+        "default launcher remains user-space and source-only"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/engine-preview-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "normal preview still performs Hello/Ack, volume, status, physical catalog and IR checks",
+        "normal mode does not request or write Windows endpoint volume"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/engine-preview-smoke.ps1 -EnableSystemVolume -StatusOnly",
+      "status": "pass",
+      "coverage": [
+        "explicit opt-in binds the default render endpoint broker",
+        "initial dB/mute/generation state is accepted by Main Group Master",
+        "Windows volume route reports Ready",
+        "status-only path sends no volume command"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/control-model-engine-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "C# control model remains compatible with the new route status",
+        "volume round-trip, SceneApply and IR graph attachment regression path"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "self-contained Desktop Compatibility Preview launches without Windows App Runtime",
+        "driver-free UI/control-plane preview remains available"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1; tools/docs-check.ps1; tools/handoff-check.ps1; tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "C++ contract tests",
+        "documentation and AI handoff consistency",
+        "source-only policy with 360 tracked paths"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The opt-in link currently targets the default physical render endpoint through user-space IAudioEndpointVolume; it is not a Hibiki virtual WaveRT endpoint.",
+    "This does not provide transparent interception for vendor ASIO, WASAPI Exclusive or RAW paths, and it does not prove physical DSP playback.",
+    "The write-through path is intentionally not exercised by smoke to avoid changing the user's volume; target-device hotplug, Audio Service restart and signed-driver tests remain pending.",
+    "The local machine is Windows 22631/Visual Studio 17 with SDK 26100, below the locked Windows 11 24H2/VS 2026/WDK target.",
+    "All build outputs remain under ignored .local paths and are not GitHub artifacts."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00+08:00",
+  "finished_at": "2026-08-21T00:00:00+08:00"
+}

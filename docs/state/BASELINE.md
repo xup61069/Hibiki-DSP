@@ -540,6 +540,7 @@ SessionVolumeCommand handle boundary 的 source commit 是 `6c4a8b7`；
 本次 WinUI App session catalog projection 的 source commit 是 `66f6298`；
 ephemeral App session catalog additions 的 source commit 是 `68cf466`；
 本次 control-status-snapshot additions 的 source commit 是 `e97fb90`；
+Engine Preview opt-in Windows system-volume link、safe default launcher 與 status-only smoke 的 source commit 是 `6a04764`；
 session-route health 接入與避免同端點重綁的最新 source commit 是 `5f8dbcb`；
 volume broker unchanged-endpoint result 修正的最新 source commit 是 `ca8ea40`；
 volume node 與 session-route 獨立重綁的最新 source commit 是 `ef4af32`；
