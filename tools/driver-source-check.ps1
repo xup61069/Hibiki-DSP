@@ -47,6 +47,7 @@ if ($stream -match '(?i)malloc|calloc|realloc|free|CreateThread|KeWaitFor') {
 $adapterSource = Get-Content -LiteralPath $streamAdapter -Raw
 foreach ($required in @('KeAcquireSpinLock', 'KeReleaseSpinLock', 'HibikiWaveRtPinSubmitRenderV1',
     'HibikiWaveRtPinReadRenderV1', 'HibikiWaveRtPinInitializeEndpointV1',
+    'HibikiWaveRtPinInitializeCaptureEndpointV1', 'HibikiWaveRtBuildFormatEndpointV1',
     'HibikiWaveRtBuildFormatV1', 'KSDATAFORMAT_SUBTYPE_IEEE_FLOAT',
     'hibiki_wavert_stream_pop_or_silence_v1')) {
     if (-not $adapterSource.Contains($required)) { throw "WDK stream adapter missing required boundary: $required" }

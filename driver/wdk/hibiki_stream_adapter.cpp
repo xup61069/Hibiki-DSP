@@ -26,6 +26,32 @@ extern "C" NTSTATUS HibikiWaveRtPinInitializeV1(
     _In_ ULONG channels,
     _In_ ULONG sample_rate,
     _In_ ULONG frames_per_period,
+    _In_ ULONG period_count);
+
+static NTSTATUS hibiki_wdk_pin_initialize_endpoint_v1(
+    _Out_ hibiki_wdk_stream_context_v1* context,
+    _In_reads_bytes_(storage_bytes) uint8_t* storage,
+    _In_ SIZE_T storage_bytes,
+    _In_ ULONG endpoint_index,
+    _In_ ULONG period_count,
+    _In_ ULONG expected_direction) {
+    hibiki_endpoint_topology_v1 topology{};
+    if (hibiki_endpoint_topology_get_v1(endpoint_index, &topology) == 0 ||
+        (expected_direction != MAXULONG && topology.direction != expected_direction)) {
+        return STATUS_INVALID_PARAMETER;
+    }
+    return HibikiWaveRtPinInitializeV1(
+        context, storage, storage_bytes, topology.channel_count, topology.sample_rate,
+        topology.frames_per_buffer, period_count);
+}
+
+extern "C" NTSTATUS HibikiWaveRtPinInitializeV1(
+    _Out_ hibiki_wdk_stream_context_v1* context,
+    _In_reads_bytes_(storage_bytes) uint8_t* storage,
+    _In_ SIZE_T storage_bytes,
+    _In_ ULONG channels,
+    _In_ ULONG sample_rate,
+    _In_ ULONG frames_per_period,
     _In_ ULONG period_count) {
     if (context == nullptr || storage == nullptr || storage_bytes > MAXSIZE_T) {
         return STATUS_INVALID_PARAMETER;
@@ -46,23 +72,28 @@ extern "C" NTSTATUS HibikiWaveRtPinInitializeEndpointV1(
     _In_ SIZE_T storage_bytes,
     _In_ ULONG endpoint_index,
     _In_ ULONG period_count) {
-    hibiki_endpoint_topology_v1 topology{};
-    if (hibiki_endpoint_topology_get_v1(endpoint_index, &topology) == 0 ||
-        topology.direction != HIBIKI_ENDPOINT_DIRECTION_RENDER_V1) {
-        return STATUS_INVALID_PARAMETER;
-    }
-    return HibikiWaveRtPinInitializeV1(
-        context, storage, storage_bytes, topology.channel_count, topology.sample_rate,
-        topology.frames_per_buffer, period_count);
+    return hibiki_wdk_pin_initialize_endpoint_v1(
+        context, storage, storage_bytes, endpoint_index, period_count,
+        HIBIKI_ENDPOINT_DIRECTION_RENDER_V1);
 }
 
-extern "C" NTSTATUS HibikiWaveRtBuildFormatV1(
+extern "C" NTSTATUS HibikiWaveRtPinInitializeCaptureEndpointV1(
+    _Out_ hibiki_wdk_stream_context_v1* context,
+    _In_reads_bytes_(storage_bytes) uint8_t* storage,
+    _In_ SIZE_T storage_bytes,
+    _In_ ULONG endpoint_index,
+    _In_ ULONG period_count) {
+    return hibiki_wdk_pin_initialize_endpoint_v1(
+        context, storage, storage_bytes, endpoint_index, period_count,
+        HIBIKI_ENDPOINT_DIRECTION_CAPTURE_V1);
+}
+
+extern "C" NTSTATUS HibikiWaveRtBuildFormatEndpointV1(
     _In_ ULONG endpoint_index,
     _Out_ WAVEFORMATEXTENSIBLE* format) {
     if (format == nullptr) return STATUS_INVALID_PARAMETER;
     hibiki_endpoint_topology_v1 topology{};
     if (hibiki_endpoint_topology_get_v1(endpoint_index, &topology) == 0 ||
-        topology.direction != HIBIKI_ENDPOINT_DIRECTION_RENDER_V1 ||
         topology.channel_mask > MAXULONG) {
         return STATUS_INVALID_PARAMETER;
     }
@@ -78,6 +109,17 @@ extern "C" NTSTATUS HibikiWaveRtBuildFormatV1(
     format->dwChannelMask = static_cast<DWORD>(topology.channel_mask);
     format->SubFormat = KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
     return STATUS_SUCCESS;
+}
+
+extern "C" NTSTATUS HibikiWaveRtBuildFormatV1(
+    _In_ ULONG endpoint_index,
+    _Out_ WAVEFORMATEXTENSIBLE* format) {
+    hibiki_endpoint_topology_v1 topology{};
+    if (hibiki_endpoint_topology_get_v1(endpoint_index, &topology) == 0 ||
+        topology.direction != HIBIKI_ENDPOINT_DIRECTION_RENDER_V1) {
+        return STATUS_INVALID_PARAMETER;
+    }
+    return HibikiWaveRtBuildFormatEndpointV1(endpoint_index, format);
 }
 
 extern "C" NTSTATUS HibikiWaveRtPinSubmitRenderV1(
