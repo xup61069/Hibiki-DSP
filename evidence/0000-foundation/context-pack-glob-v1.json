@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "issue": 66,
+  "scope_digest": "context-pack-glob-v1",
+  "source_commit": "68aed2397f9607a04a445e9784a178eabc9f8eee",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.1-universal-sdk-wdk-10.0.28000.2526-cmake-4.3.1-dotnet-8.0.424-pwsh-7.6.5",
+  "commands": [
+    "pre-change dot-sourced Test-ContextGlob for src/**/*.cpp",
+    "pwsh -NoProfile -File tools/context-pack.ps1 -Issue 66 -SelfTest",
+    "pwsh -NoProfile -File tools/context-pack.ps1 -Issue 66 -NoSource",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 66",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1 (with Visual Studio CMake added to process-local PATH)",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "pre-change src/**/*.cpp behavior",
+      "status": "reproduced_before_fix",
+      "details": "Before the implementation, src/foo.cpp matched false while src/hub/foo.cpp matched true; the pre-change script also rejected -SelfTest as an unknown parameter."
+    },
+    {
+      "command": "tools/context-pack.ps1 -Issue 66 -SelfTest",
+      "status": "pass",
+      "cases": 12,
+      "coverage": [
+        "exact path match and near miss",
+        "single-star file match without directory crossing",
+        "single-question-mark match",
+        "recursive direct and deep descendants",
+        "recursive extension near miss",
+        "recursive suffix direct and deep descendants",
+        "recursive root direct and deep descendants"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/context-pack.ps1 -Issue 66 -NoSource",
+      "status": "pass",
+      "details": "No-source context pack completed successfully with 1029 output lines; self-test uses only in-memory fixtures and writes no repository files."
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "details": "Unsigned local C++ verification completed with 1 of 1 CTest tests passing using process-local Visual Studio CMake."
+    },
+    {
+      "command": "handoff, source-policy, source-only-ci, and git diff --check gates",
+      "status": "pass",
+      "details": "Issue/full handoff checks, source-only policy checks, JSON validation, and whitespace validation passed after all slice files were staged."
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "blocked_integrator_baseline",
+      "details": "The shared BASELINE.md claims 413 tracked paths while the staged branch has 415 after the Issue #66 handoff and evidence files; Issue #0 owns the refresh."
+    }
+  ],
+  "limitations": [
+    "The parser covers the supported context-pack glob subset and is not a full gitignore or filesystem glob implementation.",
+    "This is source-selection/governance tooling evidence only; it does not claim product API, IPC, DSP, RT-thread, driver, HLK, signing, installer, or physical-audio behavior.",
+    "The merge-tree documentation gate depends on the integrator-owned BASELINE.md refresh."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.400",
+    "dotnet_target_sdk": "8.0.424",
+    "powershell": "pwsh 7.6.5",
+    "visual_studio": "18.9.12112.369"
+  },
+  "started_at": "2026-08-22T06:08:00+08:00",
+  "finished_at": "2026-08-22T06:12:53+08:00"
+}
