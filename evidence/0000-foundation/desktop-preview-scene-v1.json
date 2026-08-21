@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "issue": 0,
+  "scope_digest": "desktop-preview-scene-route-v1",
+  "source_commit": "48532b4",
+  "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/build-preview.ps1 -SmokeTest",
+    "pwsh -File tools/control-model-engine-smoke.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/build-preview.ps1 -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "self-contained Desktop Compatibility Preview build",
+        "scene selector and route summary compile",
+        "three-second launch liveness"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/control-model-engine-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "scene command remains disabled until control connection",
+        "Game SceneApply is acknowledged by the Engine Preview",
+        "status refresh leaves the selected Scene visible in the control model"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The Desktop Compatibility Preview is not the formal WinUI/XAML shell and has no accessibility evidence.",
+    "Route summaries are conservative engine status projections; they do not create physical routing.",
+    "No driver, physical sink, Windows system-volume interception or audible DSP is active."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "10.0.301 SDK with net8 targets",
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-21T00:00:00+08:00",
+  "finished_at": "2026-08-21T00:00:00+08:00"
+}
