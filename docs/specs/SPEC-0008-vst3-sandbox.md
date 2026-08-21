@@ -71,6 +71,14 @@ plugin state persistence 仍由更上層規格負責。
 host 的 `Quarantined` 狀態並 detach lane。這仍是 source-level control contract，沒有把
 任何第三方 plugin binary、SDK checkout 或實體 endpoint 納入公開建置。
 
+`vst3_bus_layout.hpp` 定義 optional multi-bus preflight：最多 8 個 input/output audio bus、
+總聲道最多 32，Main input/output 必須各存在且位於 index 0；input 可標示 Auxiliary 或
+Sidechain，output 不得標示 Sidechain，所有未使用槽位必須完全為零。帶有 explicit layout
+的 `PluginDescriptorV1` 必須通過 schema、角色、聲道與 main-layout exact match 才能進入
+`Running`，否則直接 quarantine。這個契約先保護 admission 與未來 worker ABI；目前 pinned
+SDK processor／worker 仍只實作一個 Main input/output bus，因此 side-chain/multi-bus 的
+實際 plugin process 仍是後續 gate，不可由 validator 反推已完成。
+
 `Vst3SceneAutomationSchedulerV1` 提供 Scene reference 到 lane 的 control-plane registry：
 最多 16 條 timeline、16 個 scene/lane binding，啟用時先驗證所有 timeline、lane token 與
 lane state，再套用 snapshot；每個 lane 用 `atomic_flag` 保持最多一個 in-flight block，
@@ -148,9 +156,10 @@ quarantined，不得進入 trusted/certified 或 Low Latency Lane。
 
 ## 尚未完成的邊界
 
-plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter、bounded parameter
-frame、latency alignment primitive、latency graph commit 與 optional worker executable 已有 bridge；仍未完成第三方
-plugin certification、第三方 plugin compatibility review、RT graph lane latency wiring、side-chain/multi-bus、
+plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter、multi-bus/side-chain
+admission validator、bounded parameter frame、latency alignment primitive、latency graph commit
+與 optional worker executable 已有 bridge；仍未完成第三方 plugin certification、第三方 plugin
+compatibility review、RT graph lane latency wiring、side-chain/multi-bus 的實際 worker process、
 crash dump redaction 與 production worker policy。目前
 supervisor、named pipe、passthrough worker、catalog、bounded SDK processor、handshake/process
 exchange、timeline lane 與 Scene automation scheduler 提供可測試的 process

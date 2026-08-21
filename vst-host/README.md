@@ -16,7 +16,11 @@ factory metadata without putting SDK source or binaries in the repository:
 
 `cmake -S . -B .local/vst3-build -DHIBIKI_ENABLE_VST3_SDK=ON -DHIBIKI_VST3_SDK_ROOT=<path>`
 
-The catalog is control-plane only. `vst3_sdk_processor.hpp`/`.cpp` now add an
+The catalog is control-plane only. `vst3_bus_layout.hpp` adds a bounded preflight
+for explicit Main/Auxiliary/Sidechain bus descriptions; invalid order, roles,
+channel totals or unused-slot data quarantine the descriptor. This is an
+admission contract only: the optional SDK processor/worker remains one-main-bus
+until a separate multi-bus worker ABI is completed. `vst3_sdk_processor.hpp`/`.cpp` now add an
 optional worker-side adapter for one main input/output bus: it initializes a
 selected class, accepts 1/2/5.1/7.1 layouts, uses fixed 4096-frame planar
 scratch buffers, exposes plugin-reported latency and fails closed on invalid
