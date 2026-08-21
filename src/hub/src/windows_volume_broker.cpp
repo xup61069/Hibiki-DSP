@@ -111,8 +111,8 @@ HRESULT WindowsVolumeBroker::bind(IMMDevice* const device) noexcept {
     const auto id_result = device->GetId(&endpoint_id);
     if (SUCCEEDED(id_result) && endpoint_id != nullptr) {
         endpoint_id_ = endpoint_id;
-        CoTaskMemFree(endpoint_id);
     }
+    if (endpoint_id != nullptr) CoTaskMemFree(endpoint_id);
     HRESULT result = device->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_ALL, nullptr,
                                      reinterpret_cast<void**>(&endpoint_));
     if (FAILED(result)) {
