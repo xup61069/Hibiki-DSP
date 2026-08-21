@@ -57,6 +57,9 @@
   the C# ViewModel command builder are covered; target-session COM readback remains pending.
 - Active catalog entries now opportunistically expose worker-read `ISimpleAudioVolume` dB/mute
   availability; expired/inactive/unreadable sessions remain visible with volume unavailable.
+- `SessionRouteCommand` v1 now carries only handle/sequence/lane/output labels. The coordinator
+  builds and validates a candidate registry/graph before commit, increments generation on success,
+  and republishes status/catalog; physical process-loopback delivery remains unverified.
 - `CalibrationResponsePointV1` and `compile_bounded_peq_correction_v1` now provide a deterministic
   control-plane measured-response to bounded PEQ compiler (16-filter cap, frequency/spacing/Q and
   boost/cut policy validation, explicit `limited` result) that feeds the existing APO/CamillaDSP/
@@ -441,7 +444,7 @@ store、handler 與 atomic ViewModel apply；本機 status probe 通過，但仍
 per-App delivery 或 browser tab capture 已完成。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 75 個必要入口與
-20 份 Spec 通過；`source-policy.ps1` 掃描 316 個 tracked paths 且無 blocked
+21 份 Spec 通過；`source-policy.ps1` 掃描 317 個 tracked paths 且無 blocked
 binary/secret；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；34 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
@@ -460,6 +463,7 @@ parameter frame 與 `IParameterChanges` bridge）unsigned build 亦通過；輸�
 與 C# grouped-volume payload round-trip、legacy payload compatibility、selected group resolver
 及 custom Scene card mirror 的 JSON save/load、atomic replace、malformed rollback 亦已通過本機
 contract/control-model checks。
+本次 SessionRouteCommand graph boundary 的 source commit 是 `662abbb`；
 本次 session catalog volume availability projection 的 source commit 是 `b1538b1`；
 SessionVolumeCommand handle boundary 的 source commit 是 `6c4a8b7`；
 本次 WinUI App session catalog projection 的 source commit 是 `66f6298`；
