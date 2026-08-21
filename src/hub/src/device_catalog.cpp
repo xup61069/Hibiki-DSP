@@ -3,7 +3,6 @@
 #include "hibiki/device_catalog.hpp"
 
 #include <algorithm>
-#include <cctype>
 
 namespace hibiki {
 namespace {
@@ -44,7 +43,9 @@ bool validate_physical_device_descriptor_v1(
            printable_utf8_bytes(descriptor.display_name, kPhysicalDeviceNameMaxBytesV1) &&
            valid_flow(descriptor.flow) && valid_availability(descriptor.availability) &&
            valid_channels(descriptor.channels) && valid_rate(descriptor.sample_rate) &&
-           descriptor.buffer_frames >= 16U && descriptor.buffer_frames <= 4096U;
+           descriptor.buffer_frames >= 16U && descriptor.buffer_frames <= 4096U &&
+           (!descriptor.is_default ||
+            descriptor.availability == PhysicalDeviceAvailabilityV1::Active);
 }
 
 std::size_t PhysicalDeviceCatalogV1::index_of(const std::string& endpoint_id) const noexcept {
@@ -87,6 +88,10 @@ PhysicalDeviceCatalogResultV1 PhysicalDeviceCatalogV1::upsert(
     try {
         if (existing < size_) {
             const auto old_flow = entries_[existing].flow;
+            if (descriptor.last_sequence != 0U &&
+                descriptor.last_sequence < entries_[existing].last_sequence) {
+                return PhysicalDeviceCatalogResultV1::InvalidState;
+            }
             entries_[existing] = descriptor;
             if (descriptor.is_default) clear_defaults(descriptor.flow, &descriptor.endpoint_id);
             if (old_flow != descriptor.flow) clear_defaults(old_flow, nullptr);
@@ -121,6 +126,9 @@ PhysicalDeviceCatalogResultV1 PhysicalDeviceCatalogV1::set_availability(
     if (!valid_availability(availability)) return PhysicalDeviceCatalogResultV1::InvalidState;
     auto* entry = find(endpoint_id);
     if (entry == nullptr) return PhysicalDeviceCatalogResultV1::NotFound;
+    if (sequence != 0U && sequence < entry->last_sequence) {
+        return PhysicalDeviceCatalogResultV1::InvalidState;
+    }
     entry->availability = availability;
     entry->last_sequence = std::max(entry->last_sequence, sequence);
     if (availability != PhysicalDeviceAvailabilityV1::Active) entry->is_default = false;
@@ -135,6 +143,9 @@ PhysicalDeviceCatalogResultV1 PhysicalDeviceCatalogV1::mark_default(
     auto* entry = find(endpoint_id);
     if (entry == nullptr) return PhysicalDeviceCatalogResultV1::NotFound;
     if (entry->flow != flow || entry->availability != PhysicalDeviceAvailabilityV1::Active) {
+        return PhysicalDeviceCatalogResultV1::InvalidState;
+    }
+    if (sequence != 0U && sequence < entry->last_sequence) {
         return PhysicalDeviceCatalogResultV1::InvalidState;
     }
     clear_defaults(flow, &entry->endpoint_id);

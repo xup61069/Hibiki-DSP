@@ -720,13 +720,21 @@ int main() {
           !devices.selectable("endpoint-b", PhysicalDeviceFlowV1::Render) &&
           devices.default_device(PhysicalDeviceFlowV1::Render) == nullptr);
     CHECK(devices.set_availability("endpoint-b", PhysicalDeviceAvailabilityV1::Active, 9U) ==
-              PhysicalDeviceCatalogResultV1::Accepted &&
+              PhysicalDeviceCatalogResultV1::InvalidState &&
+          devices.find("endpoint-b")->availability == PhysicalDeviceAvailabilityV1::Unplugged &&
           devices.find("endpoint-b")->last_sequence == 12U);
+    CHECK(devices.set_availability("endpoint-b", PhysicalDeviceAvailabilityV1::Active, 13U) ==
+              PhysicalDeviceCatalogResultV1::Accepted);
     CHECK(devices.mark_default("endpoint-b", PhysicalDeviceFlowV1::Render, 13U) ==
               PhysicalDeviceCatalogResultV1::Accepted);
     auto invalid_device = speakers;
     invalid_device.endpoint_id.clear();
     CHECK(devices.upsert(invalid_device) == PhysicalDeviceCatalogResultV1::InvalidDescriptor &&
+          devices.size() == 2U);
+    auto unavailable_default = speakers;
+    unavailable_default.endpoint_id = "endpoint-c";
+    unavailable_default.availability = PhysicalDeviceAvailabilityV1::Unplugged;
+    CHECK(devices.upsert(unavailable_default) == PhysicalDeviceCatalogResultV1::InvalidDescriptor &&
           devices.size() == 2U);
     CHECK(devices.remove("endpoint-a") == PhysicalDeviceCatalogResultV1::Accepted &&
           devices.remove("missing") == PhysicalDeviceCatalogResultV1::NotFound &&

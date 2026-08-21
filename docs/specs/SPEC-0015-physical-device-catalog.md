@@ -33,7 +33,7 @@ Out：COM 枚舉、PortCls／WaveRT driver、WASAPI worker 啟動、實體硬體
 最多 260 bytes、名稱最多 128 bytes，均拒絕控制字元；聲道只接受 1／2／6／8，取樣率只接受
 44.1／48／96／192 kHz，buffer 介於 16–4096 frames。`PhysicalDeviceCatalogV1::upsert`
 以 endpoint ID 做 replace；新 default 會清除同一 flow 的舊 default。Windows watcher 的
-sequence 以 max 規則更新，防止通知亂序回退狀態。
+sequence 以單調規則更新；較舊的 descriptor／狀態事件直接拒絕，防止通知亂序回退狀態。
 
 只有 `Active` endpoint 才能 `selectable` 或 `mark_default`。進入 Disabled／Unplugged／
 Unknown 時，catalog 清除 default；切換 worker 必須回到上一個已同步 endpoint，或使用
@@ -41,7 +41,8 @@ safe-start／Degraded，而不是重試到 100% 音量。
 
 ## 失敗／安全／相容性
 
-- 非法 descriptor、容量超過 32 或 allocation 失敗時，既有 catalog 保持不變。
+- 非法 descriptor、容量超過 32、非 Active default、過期 sequence 或 allocation 失敗時，既有
+  catalog 保持不變。
 - 移除未知 ID 回傳 `NotFound`；狀態／flow 不合法回傳 `InvalidState`。
 - catalog 是 UI／worker snapshot，不得在 audio callback 讀取可變字串或呼叫其 mutator。
 - `DeviceSwitchTransaction` 仍負責 Prepare → crossfade → Commit／Rollback；catalog 只回答
