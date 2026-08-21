@@ -58,9 +58,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   定義 driver→engine 的固定 80-byte header＋interleaved Float32 packet；C ABI 提供
   allocation-free encode/validate/payload view，`decode_driver_stream_packet_v1` 會複製到
   caller-owned lane storage 並拒絕非有限 sample。packet span 必須等於 header 宣告長度。
-- `AudioEngineModel::process_driver_stream_packet` 只接受 render packet，要求 packet sample
-  rate 與 engine、channel count 與 active lane 相同，通過後沿用 `process_lane_block` 的
-  immutable graph／Group Master／limiter 路徑；capture packet、NaN 或格式不符都不會進 graph。
+- `AudioEngineModel::process_driver_stream_packet` 只接受 render packet，要求 packet endpoint
+  GUID、sample rate 與 engine、channel count 與 active lane 全部相同，通過後沿用
+  `process_lane_block` 的 immutable graph／Group Master／limiter 路徑；capture packet、錯誤
+  endpoint、NaN 或格式不符都不會進 graph。
 - `PersistentLinearResampler` 保存跨 block 的 phase 與 boundary frame，要求 caller 提供
   整個 input block 的 output capacity，並拒絕在不足時部分消耗；它是 clock-drift/SRC 的
   無配置 baseline，尚未宣稱 production-quality polyphase filter。
