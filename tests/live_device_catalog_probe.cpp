@@ -8,11 +8,9 @@
 #include <windows.h>
 #include <mmdeviceapi.h>
 
-#include <array>
 #include <cstdio>
 
 #include "hibiki/control_payloads.hpp"
-#include "hibiki/device_catalog.hpp"
 #include "hibiki/windows_device_catalog.hpp"
 
 int main() {
@@ -32,14 +30,10 @@ int main() {
         return 2;
     }
 
-    hibiki::WindowsPhysicalDeviceCatalogCoordinator coordinator;
-    hibiki::PhysicalDeviceCatalogV1 catalog;
-    std::uint64_t sequence = 0U;
-    std::array<std::uint8_t, hibiki::kDeviceCatalogSnapshotPayloadBytesV1> payload{};
-    std::size_t payload_bytes = 0U;
-    result = coordinator.bind(enumerator);
+    hibiki::WindowsPhysicalDeviceCatalogServiceV1 service;
+    result = service.bind(enumerator);
     if (SUCCEEDED(result)) {
-        result = coordinator.refresh_now(catalog, sequence, payload, payload_bytes);
+        result = service.refresh_now();
     }
     if (FAILED(result)) {
         std::fprintf(stderr, "Device catalog refresh failed: 0x%08lx\n",
@@ -48,14 +42,18 @@ int main() {
         if (SUCCEEDED(init)) CoUninitialize();
         return 3;
     }
+    hibiki::IpcFrameV1 response;
+    const bool provider_ok = hibiki::device_catalog_snapshot_reply_v1(
+        response, service.snapshot_store());
     hibiki::DeviceCatalogSnapshotV1 decoded;
-    const bool wire_ok = hibiki::decode_device_catalog_snapshot_v1(
-        std::span<const std::uint8_t>(payload.data(), payload_bytes), decoded);
-    std::printf("catalog_refresh=pass entries=%zu sequence=%llu payload_bytes=%zu wire=%s\n",
-                catalog.size(), static_cast<unsigned long long>(sequence), payload_bytes,
-                wire_ok ? "pass" : "fail");
-    coordinator.unbind();
+    const bool wire_ok = provider_ok && hibiki::decode_device_catalog_snapshot_v1(
+        std::span<const std::uint8_t>(response.payload.data(), response.payload.size()), decoded);
+    std::printf("catalog_refresh=pass entries=%zu sequence=%llu payload_bytes=%zu wire=%s provider=%s\n",
+                service.catalog().size(), static_cast<unsigned long long>(service.sequence()),
+                response.payload.size(), wire_ok ? "pass" : "fail",
+                provider_ok ? "pass" : "fail");
+    service.unbind();
     enumerator->Release();
     if (SUCCEEDED(init)) CoUninitialize();
-    return wire_ok && decoded.entry_count == catalog.size() ? 0 : 4;
+    return wire_ok && decoded.entry_count == service.catalog().size() ? 0 : 4;
 }
