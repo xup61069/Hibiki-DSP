@@ -114,6 +114,9 @@
   local `IMMDeviceEnumerator`: 14 endpoints were enumerated, sequence 1 and a 5,840-byte snapshot
   decoded successfully. It prints counts only; this is local Windows 22631 evidence, not target
   Windows 24H2/WDK or driver/handoff soak evidence.
+- The same live probe now starts `WindowsControlRuntimeV1` and requests the snapshot through the
+  local named pipe; `runtime=pass request=pass` proves service → provider → IPC framing without
+  printing endpoint identity data.
 - `EasyControlViewModel.ConnectAsync` now requests and atomically applies a fresh
   `DeviceCatalogSnapshot` after the Hello handshake; a disconnected or invalid request fails closed,
   preserves the last safe catalog and never claims that a physical endpoint was switched.
@@ -338,6 +341,7 @@ provider 的 source commit 是 `0b2800f`；opt-in live probe 的 source commit �
 commit 是 `a18e785`；live probe service-provider coverage 的 source commit 是 `25bd3a3`；其餘較早
 scope 仍以下方 evidence manifest 的各自 commit 與限制為準。
 ControlPlaneHost pipe/queue lifecycle 的 source commit 是 `a087e96`。
+WindowsControlRuntime 與 runtime pipe request probe 的 source commit 是 `bc6952d`。
 
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 68 個必要入口與
 15 份 Spec 通過；`source-policy.ps1` 掃描 288 個路徑且無 blocked binary/secret；
