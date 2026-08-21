@@ -13,6 +13,15 @@ bool PluginHostModel::start(const PluginDescriptorV1& descriptor) {
         state_ = PluginHostState::Quarantined;
         return false;
     }
+    const bool has_explicit_bus_layout = descriptor.bus_layout.input_bus_count != 0U ||
+                                         descriptor.bus_layout.output_bus_count != 0U;
+    if (has_explicit_bus_layout &&
+        !vst3_bus_layout_matches_main_v1(descriptor.bus_layout,
+                                          descriptor.input_channels,
+                                          descriptor.output_channels)) {
+        state_ = PluginHostState::Quarantined;
+        return false;
+    }
     descriptor_ = descriptor;
     last_heartbeat_ms_ = 0;
     state_ = PluginHostState::Running;

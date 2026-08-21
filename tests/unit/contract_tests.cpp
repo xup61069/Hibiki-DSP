@@ -42,6 +42,7 @@ extern "C" {
 #include "hibiki/ir_phase.hpp"
 #include "hibiki/scene_graph.hpp"
 #include "hibiki/scene_catalog.hpp"
+#include "hibiki/vst3_bus_layout.hpp"
 #include "hibiki/scene_presets.hpp"
 #include "hibiki/scene_safety.hpp"
 #include "hibiki/session_route.hpp"
@@ -1034,11 +1035,42 @@ int main() {
     CHECK(session_registry.remove(chrome_tab_b));
     CHECK(session_registry.find(chrome_tab_b) == nullptr);
 
+    Vst3BusLayoutV1 sidechain_layout{};
+    sidechain_layout.input_bus_count = 2U;
+    sidechain_layout.output_bus_count = 1U;
+    sidechain_layout.inputs[0] = Vst3AudioBusV1{Vst3BusRoleV1::Main, 1U, 0U, 2U};
+    sidechain_layout.inputs[1] = Vst3AudioBusV1{Vst3BusRoleV1::Sidechain, 1U, 0U, 2U};
+    sidechain_layout.outputs[0] = Vst3AudioBusV1{Vst3BusRoleV1::Main, 1U, 0U, 2U};
+    CHECK(validate_vst3_bus_layout_v1(sidechain_layout) == Vst3BusLayoutResultV1::Valid &&
+          vst3_bus_layout_matches_main_v1(sidechain_layout, 2U, 2U) &&
+          vst3_bus_layout_has_sidechain_v1(sidechain_layout));
+    auto invalid_bus_layout = sidechain_layout;
+    invalid_bus_layout.inputs[0].role = Vst3BusRoleV1::Auxiliary;
+    invalid_bus_layout.inputs[1].role = Vst3BusRoleV1::Main;
+    CHECK(validate_vst3_bus_layout_v1(invalid_bus_layout) ==
+              Vst3BusLayoutResultV1::MainNotFirst);
+    invalid_bus_layout = sidechain_layout;
+    invalid_bus_layout.outputs[1].channels = 2U;
+    CHECK(validate_vst3_bus_layout_v1(invalid_bus_layout) ==
+              Vst3BusLayoutResultV1::InvalidInactiveBus);
+    invalid_bus_layout = sidechain_layout;
+    invalid_bus_layout.outputs[0].role = Vst3BusRoleV1::Sidechain;
+    CHECK(validate_vst3_bus_layout_v1(invalid_bus_layout) ==
+              Vst3BusLayoutResultV1::SidechainOutput);
+
     PluginHostModel plugin;
     CHECK(!plugin.start(PluginDescriptorV1{"untrusted", 2, 2, 64, false, 250, true, 41U}));
     CHECK(plugin.state() == PluginHostState::Quarantined);
     CHECK(!plugin.start(PluginDescriptorV1{"missing-token", 2, 2, 64, true, 250, true, 0U}));
     CHECK(plugin.state() == PluginHostState::Quarantined);
+    CHECK(plugin.start(PluginDescriptorV1{"builtin-test", 2, 2, 64, true, 250, true, 42U}));
+    PluginDescriptorV1 sidechain_descriptor{"sidechain-test", 2, 2, 64, true, 250, true, 43U};
+    sidechain_descriptor.bus_layout = sidechain_layout;
+    CHECK(plugin.start(sidechain_descriptor));
+    auto broken_sidechain_descriptor = sidechain_descriptor;
+    broken_sidechain_descriptor.bus_layout.outputs[0].channels = 6U;
+    CHECK(!plugin.start(broken_sidechain_descriptor) &&
+          plugin.state() == PluginHostState::Quarantined);
     CHECK(plugin.start(PluginDescriptorV1{"builtin-test", 2, 2, 64, true, 250, true, 42U}));
     CHECK(plugin.latency_lane_input().lane_token == 42U &&
           plugin.latency_lane_input().active &&

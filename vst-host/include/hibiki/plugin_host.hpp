@@ -11,6 +11,7 @@
 #include "hibiki/latency_graph_commit.hpp"
 #include "hibiki/vst3_plugin_state.hpp"
 #include "hibiki/vst3_worker_lane.hpp"
+#include "hibiki/vst3_bus_layout.hpp"
 
 namespace hibiki {
 
@@ -30,6 +31,9 @@ struct PluginDescriptorV1 {
     std::uint32_t watchdog_timeout_ms{250};
     bool certified{true};
     std::uint64_t lane_token{0U};
+    // Optional multi-bus/side-chain description. Zero counts preserve the
+    // legacy single-main-bus descriptor for existing callers.
+    Vst3BusLayoutV1 bus_layout{};
 };
 
 class PluginHostModel final {

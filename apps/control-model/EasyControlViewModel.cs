@@ -197,16 +197,25 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     {
         var scene = new SceneCard(CustomSceneId.Trim(), CustomSceneName.Trim(),
                                   CustomSceneDescription.Trim(), "平衡", true);
+        var previous = _session.CustomScenes.Scenes.FirstOrDefault(item => item.Id == scene.Id);
         if (!UpsertCustomScene(scene))
         {
             StatusText = "自訂場景無效、重複或已達 32 筆上限";
+            return false;
+        }
+        if (!SaveCustomScenes(out var saveError))
+        {
+            if (previous is null) _session.CustomScenes.Remove(scene.Id);
+            else _session.CustomScenes.Upsert(previous);
+            OnPropertyChanged(nameof(Scenes));
+            StatusText = $"自訂場景未保存：{saveError}";
             return false;
         }
         CustomSceneId = string.Empty;
         CustomSceneName = string.Empty;
         CustomSceneDescription = string.Empty;
         StatusText = $"已加入自訂場景：{scene.Name}";
-        return SaveCustomScenes(out _);
+        return true;
     }
 
     public bool LoadCustomScenes(out string error)
