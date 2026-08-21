@@ -56,7 +56,7 @@
     {
       "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1",
       "status": "pass",
-      "coverage": ["tracked source paths", "no blocked binary, secret or workflow publication"],
+      "coverage": ["402 tracked source paths", "no blocked binary, secret or workflow publication"],
       "compiled_artifacts": false
     },
     {
@@ -85,5 +85,5 @@
     "powershell": "pwsh 7.6.5"
   },
   "started_at": "2026-08-22T04:10:00+08:00",
-  "finished_at": "2026-08-22T04:25:09+08:00"
+  "finished_at": "2026-08-22T04:27:48+08:00"
 }
