@@ -67,6 +67,7 @@ extern "C" {
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -96,6 +97,23 @@ bool accept_control_command(const hibiki::ControlCommandV1& command, void* conte
     auto* accepted = static_cast<bool*>(context);
     *accepted = command.type == hibiki::IpcMessageType::SceneApply;
     return *accepted;
+}
+
+hibiki::Vst3PluginStateResultV1 migrate_test_plugin_state(
+    const std::uint32_t source_version,
+    const std::span<const std::uint8_t> source,
+    const std::uint32_t target_version,
+    const std::span<std::uint8_t> destination,
+    std::size_t& bytes_written,
+    void*) noexcept {
+    bytes_written = 0U;
+    if (source_version != 1U || target_version != 2U || destination.size() < source.size() + 1U) {
+        return hibiki::Vst3PluginStateResultV1::migration_failed;
+    }
+    std::copy(source.begin(), source.end(), destination.begin());
+    destination[source.size()] = 0x42U;
+    bytes_written = source.size() + 1U;
+    return hibiki::Vst3PluginStateResultV1::ok;
 }
 
 int main() {
@@ -888,6 +906,14 @@ int main() {
           Vst3PluginStateResultV1::identity_mismatch);
     CHECK(plugin.restore_plugin_state("movie-state", plugin_identity, 2U, restored_state,
                                       state_bytes_written) == Vst3PluginStateResultV1::version_mismatch);
+    CHECK(plugin.restore_plugin_state_with_migration(
+              "movie-state", plugin_identity, 2U, restored_state, state_bytes_written, nullptr) ==
+          Vst3PluginStateResultV1::migration_unavailable);
+    std::array<std::uint8_t, 4> migrated_state{};
+    CHECK(plugin.restore_plugin_state_with_migration(
+              "movie-state", plugin_identity, 2U, migrated_state, state_bytes_written,
+              migrate_test_plugin_state) == Vst3PluginStateResultV1::ok &&
+          state_bytes_written == 4U && migrated_state[0] == 1U && migrated_state[3] == 0x42U);
     plugin.report_crash();
     CHECK(!plugin.process_passthrough(plugin_input, plugin_output, 2));
 

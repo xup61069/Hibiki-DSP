@@ -119,21 +119,24 @@ public source-only checkout 自動生成，且仍不提供第三方 plugin binar
 `Vst3PluginStateStoreV1` 是私有 state boundary：每筆最多 1 MiB、最多 16 筆，要求 state
 ID、plugin ID、32-hex class UID、非零 module SHA-256 與明確 state version；restore 必須
 完全匹配 identity/version，destination 不足或 mismatch 會 fail-closed。
+`restore_with_migration` 只在 identity 完全匹配且呼叫端明確提供 handler 時處理版本差異；
+沒有 handler、handler 回報錯誤、或輸出超過 1 MiB 都拒絕，Hibiki 不解讀第三方 opaque bytes。
 `schemas/vst3-plugin-state-v1.schema.json` 只描述 metadata，`storage` 固定為
-`private-caller-owned`，實際 opaque bytes 不得進 GitHub、Issue、AI context pack 或 release
-artifact；目前不提供自動 migration，版本升級需明確的人工/版本化 migration policy。
+`private-caller-owned`，`migration_policy` 明示 `identity-exact-or-explicit-handler`；實際
+opaque bytes 不得進 GitHub、Issue、AI context pack 或 release artifact。
 
 在本機提供 pinned VST3 SDK 時，`Vst3SdkProcessorV1::save_state/load_state` 以 bounded
 `IBStream` 呼叫 component `getState/setState`，同樣限制 1 MiB，並將 overflow、plugin
 error、destination 不足與 allocation failure 分開回報。它只建立 worker-side SDK adapter；
-尚未接到正式 Scene state migration、plugin UI editor 或第三方 compatibility certification。
+尚未接到正式 Scene migration registry、plugin UI editor 或第三方 compatibility certification；
+目前的 migration handler 仍由受信任的 control-plane caller 注入，未提供自動探測或遠端下載。
 
 ## 尚未完成的邊界
 
 plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter、bounded parameter
 frame、latency alignment primitive、latency graph commit 與 optional worker executable 已有 bridge；仍未完成第三方
-plugin certification、plugin state blob persistence/compatibility policy、RT graph lane latency
-wiring、side-chain/multi-bus、crash dump redaction 與 production worker policy。目前
+plugin certification、Scene migration registry、RT graph lane latency wiring、side-chain/multi-bus、
+crash dump redaction 與 production worker policy。目前
 supervisor、named pipe、passthrough worker、catalog、bounded SDK processor、handshake/process
 exchange、timeline lane 與 Scene automation scheduler 提供可測試的 process
 containment/metadata/automation boundary，不能宣稱已完成第三方 VST3 host。

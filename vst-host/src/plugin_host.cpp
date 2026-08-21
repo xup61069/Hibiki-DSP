@@ -113,4 +113,17 @@ Vst3PluginStateResultV1 PluginHostModel::restore_plugin_state(
                                  destination, bytes_written);
 }
 
+Vst3PluginStateResultV1 PluginHostModel::restore_plugin_state_with_migration(
+    const std::string_view state_id,
+    const Vst3PluginStateIdentityV1& expected_identity,
+    const std::uint32_t expected_state_version,
+    const std::span<std::uint8_t> destination,
+    std::size_t& bytes_written,
+    const Vst3PluginStateMigrationFnV1 migration,
+    void* const context) const noexcept {
+    return plugin_state_.restore_with_migration(state_id, expected_identity,
+                                                expected_state_version, destination,
+                                                bytes_written, migration, context);
+}
+
 }  // namespace hibiki

@@ -2,6 +2,7 @@
 
 #include "hibiki/vst3_plugin_state.hpp"
 
+#include <algorithm>
 #include <cctype>
 #include <cstring>
 #include <new>
@@ -106,6 +107,48 @@ Vst3PluginStateResultV1 Vst3PluginStateStoreV1::restore(
         std::memcpy(destination.data(), slot.bytes.data(), slot.bytes.size());
     }
     bytes_written = slot.bytes.size();
+    return Vst3PluginStateResultV1::ok;
+}
+
+Vst3PluginStateResultV1 Vst3PluginStateStoreV1::restore_with_migration(
+    const std::string_view state_id,
+    const Vst3PluginStateIdentityV1& expected_identity,
+    const std::uint32_t expected_state_version,
+    const std::span<std::uint8_t> destination,
+    std::size_t& bytes_written,
+    const Vst3PluginStateMigrationFnV1 migration,
+    void* const context) const noexcept {
+    bytes_written = 0U;
+    if (!valid_state_id(state_id) || !validate_vst3_plugin_state_identity_v1(expected_identity) ||
+        expected_state_version == 0U) {
+        return Vst3PluginStateResultV1::invalid_argument;
+    }
+    const auto index = find(state_id);
+    if (index == slots_.size()) return Vst3PluginStateResultV1::missing;
+    const auto& slot = slots_[index];
+    if (slot.identity.plugin_id != expected_identity.plugin_id ||
+        slot.identity.class_id != expected_identity.class_id ||
+        slot.identity.module_sha256 != expected_identity.module_sha256) {
+        return Vst3PluginStateResultV1::identity_mismatch;
+    }
+    if (slot.state_version == expected_state_version) {
+        if (destination.size() < slot.bytes.size()) return Vst3PluginStateResultV1::output_too_small;
+        if (!slot.bytes.empty()) std::memcpy(destination.data(), slot.bytes.data(), slot.bytes.size());
+        bytes_written = slot.bytes.size();
+        return Vst3PluginStateResultV1::ok;
+    }
+    if (migration == nullptr) return Vst3PluginStateResultV1::migration_unavailable;
+
+    const auto bounded_size = std::min(destination.size(), kVst3PluginStateMaxBytesV1);
+    const auto result = migration(slot.state_version,
+                                  std::span<const std::uint8_t>(slot.bytes.data(), slot.bytes.size()),
+                                  expected_state_version,
+                                  destination.first(bounded_size), bytes_written, context);
+    if (result != Vst3PluginStateResultV1::ok) return Vst3PluginStateResultV1::migration_failed;
+    if (bytes_written > bounded_size || bytes_written > kVst3PluginStateMaxBytesV1) {
+        bytes_written = 0U;
+        return Vst3PluginStateResultV1::migration_output_too_large;
+    }
     return Vst3PluginStateResultV1::ok;
 }
 

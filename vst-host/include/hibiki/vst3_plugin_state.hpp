@@ -34,7 +34,22 @@ enum class Vst3PluginStateResultV1 : std::uint8_t {
     identity_mismatch,
     version_mismatch,
     output_too_small,
+    migration_unavailable,
+    migration_failed,
+    migration_output_too_large,
 };
+
+// Migration is deliberately an explicit control-plane callback. Hibiki does
+// not interpret opaque vendor bytes and never auto-migrates across a version
+// mismatch. The handler must validate the source identity/version itself and
+// write no more than kVst3PluginStateMaxBytesV1 to the caller-owned output.
+using Vst3PluginStateMigrationFnV1 = Vst3PluginStateResultV1 (*)(
+    std::uint32_t source_version,
+    std::span<const std::uint8_t> source,
+    std::uint32_t target_version,
+    std::span<std::uint8_t> destination,
+    std::size_t& bytes_written,
+    void* context) noexcept;
 
 // Private control-plane state store. The bytes are copied into caller-owned
 // private storage only; this class has no file/network serializer and must not
@@ -55,6 +70,15 @@ public:
         std::uint32_t expected_state_version,
         std::span<std::uint8_t> destination,
         std::size_t& bytes_written) const noexcept;
+
+    [[nodiscard]] Vst3PluginStateResultV1 restore_with_migration(
+        std::string_view state_id,
+        const Vst3PluginStateIdentityV1& expected_identity,
+        std::uint32_t expected_state_version,
+        std::span<std::uint8_t> destination,
+        std::size_t& bytes_written,
+        Vst3PluginStateMigrationFnV1 migration,
+        void* context = nullptr) const noexcept;
 
     [[nodiscard]] bool remove(std::string_view state_id) noexcept;
     void clear() noexcept;
