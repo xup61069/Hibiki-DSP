@@ -79,10 +79,14 @@ public sealed record EnhanceResult(
 // group is selected.
 public sealed class EasyControlSession
 {
+    public CustomSceneCatalogV1 CustomScenes { get; } = new();
     public UiMode Mode { get; private set; } = UiMode.Easy;
     public SceneCard? ActiveScene { get; private set; }
     public string? ActiveOutputGroup { get; private set; }
     public AudioControlStatus Status { get; private set; } = AudioControlStatus.Degraded;
+
+    public IReadOnlyList<SceneCard> Scenes =>
+        ScenePresetCatalog.EasyDefaults.Concat(CustomScenes.Scenes).ToArray();
 
     public void SetMode(UiMode mode) => Mode = mode;
 
@@ -101,7 +105,7 @@ public sealed class EasyControlSession
 
     public bool SelectScene(string sceneId)
     {
-        var scene = ScenePresetCatalog.EasyDefaults.FirstOrDefault(item => item.Id == sceneId);
+        var scene = Scenes.FirstOrDefault(item => item.Id == sceneId);
         if (scene is null) return false;
         ActiveScene = scene;
         return true;

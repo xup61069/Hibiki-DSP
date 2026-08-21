@@ -38,7 +38,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public IReadOnlyList<SceneCard> Scenes => ScenePresetCatalog.EasyDefaults;
+    public IReadOnlyList<SceneCard> Scenes => _session.Scenes;
     public IReadOnlyList<OutputGroupCard> OutputGroups => OutputGroupCatalog.Fixed;
     public UiMode Mode => _isExpert ? UiMode.Expert : UiMode.Easy;
     public AudioControlStatus Status => _session.Status;
@@ -162,6 +162,22 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         return true;
     }
 
+    public bool UpsertCustomScene(SceneCard scene)
+    {
+        if (!_session.CustomScenes.Upsert(scene)) return false;
+        OnPropertyChanged(nameof(Scenes));
+        return true;
+    }
+
+    public bool RemoveCustomScene(string sceneId)
+    {
+        if (!_session.CustomScenes.Remove(sceneId)) return false;
+        if (_selectedScene?.Id == sceneId) _selectedScene = null;
+        OnPropertyChanged(nameof(Scenes));
+        OnPropertyChanged(nameof(SelectedScene));
+        return true;
+    }
+
     public async Task<bool> ConnectAsync(TimeSpan timeout,
                                           CancellationToken cancellationToken = default)
     {
@@ -265,7 +281,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             StatusText = "找不到這個場景";
             return false;
         }
-        _selectedScene = ScenePresetCatalog.EasyDefaults.First(item => item.Id == sceneId);
+        _selectedScene = _session.Scenes.First(item => item.Id == sceneId);
         StatusText = $"已選擇 {_selectedScene.Name}";
         OnPropertyChanged(nameof(SelectedScene));
         if (_session.ActiveOutputGroup is not null)

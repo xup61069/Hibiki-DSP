@@ -7,6 +7,15 @@ static void Check(bool condition, string message)
 
 Check(ScenePresetCatalog.EasyDefaults.Count == 4, "Expected four Easy defaults.");
 Check(ScenePresetCatalog.EasyDefaults[0].Id == "game", "Game preset missing.");
+var customScenes = new CustomSceneCatalogV1();
+Check(customScenes.Upsert(new SceneCard("quiet-game", "安靜遊戲", "遊戲音量保護",
+                                         "零額外緩衝", true)) && customScenes.Count == 1,
+    "Custom Scene card was not accepted.");
+Check(!customScenes.Upsert(new SceneCard("game", "覆寫遊戲", "", "", true)) &&
+      !customScenes.Upsert(new SceneCard("Bad ID", "錯誤", "", "", true)),
+    "Custom Scene catalog must reject reserved or invalid IDs.");
+Check(customScenes.Remove("quiet-game") && customScenes.Count == 0,
+    "Custom Scene card removal failed.");
 Check(OutputGroupCatalog.Fixed.Count == 3 &&
       OutputGroupCatalog.Fixed.Select(group => group.Id).SequenceEqual(
           ["main", "low-latency", "surround"]),
@@ -92,9 +101,14 @@ Check(viewModel.OneTapEnhance() && viewModel.SelectedScene?.Id == "game" &&
       viewModel.Status == AudioControlStatus.Controlled &&
       viewModel.SelectedOutputGroup == "main" && viewModel.LastCommand?.Type == ControlMessageType.SceneApply,
     "ViewModel One-Tap Enhance should control the selected output.");
+Check(viewModel.UpsertCustomScene(new SceneCard("quiet-game", "安靜遊戲", "遊戲音量保護",
+                                                "零額外緩衝", true)) &&
+      viewModel.Scenes.Count == 5 && viewModel.SelectScene("quiet-game") &&
+      viewModel.SelectedScene?.Id == "quiet-game",
+    "ViewModel custom Scene selection failed.");
 Check(ControlPayloadsV1.TryDecodeSceneApply(viewModel.LastCommand!.Payload.Span,
           out var selectedSceneId, out var selectedOutput) &&
-      selectedSceneId == "game" && selectedOutput == "main",
+      selectedSceneId == "quiet-game" && selectedOutput == "main",
     "ViewModel scene command payload was not valid.");
 var encodedSceneCommand = IpcCodecV1.Encode(viewModel.LastCommand);
 Check(IpcCodecV1.TryDecode(encodedSceneCommand, out var decodedSceneCommand, out _) &&
