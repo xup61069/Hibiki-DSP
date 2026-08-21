@@ -19,6 +19,7 @@
 #include "hibiki/latency_graph_commit.hpp"
 #include "hibiki/vst3_parameter_timeline.hpp"
 #include "hibiki/vst3_timeline_editor.hpp"
+#include "hibiki/vst3_timeline_persistence.hpp"
 #include "hibiki/vst3_worker_lane.hpp"
 #include "hibiki/vst3_scene_automation.hpp"
 #include "hibiki/vst3_scene_state.hpp"
@@ -84,6 +85,8 @@ extern "C" {
 #include <array>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <limits>
 #include <memory>
 #include <new>
@@ -2170,6 +2173,181 @@ int main() {
     CHECK(automation_scheduler->editing_timeline() == nullptr &&
           automation_scheduler->timeline_count() == 0U &&
           automation_scheduler->active_scene().empty());
+    Vst3ParameterTimelineSnapshotV1 persist_source{};
+    persist_source.event_count = 2U;
+    persist_source.events[0] = Vst3ParameterTimelineEventV1{3U, 48000U, 0.25};
+    persist_source.events[1] = Vst3ParameterTimelineEventV1{7U, 48003U, 0.75};
+    std::string persisted_document;
+    CHECK(serialize_vst3_parameter_timeline_v1(persist_source, persisted_document) &&
+          persisted_document.size() > 0U &&
+          persisted_document.size() <= kVst3TimelineMaxSerializedBytesV1);
+    Vst3ParameterTimelineSnapshotV1 persist_roundtrip{};
+    CHECK(parse_vst3_parameter_timeline_v1(persisted_document, persist_roundtrip) ==
+              Vst3TimelineParseErrorV1::none &&
+          persist_roundtrip.event_count == 2U &&
+          persist_roundtrip.events[0].parameter_id == 3U &&
+          persist_roundtrip.events[0].sample_position == 48000U &&
+          std::abs(persist_roundtrip.events[0].normalized_value - 0.25) < 1e-15 &&
+          persist_roundtrip.events[1].parameter_id == 7U &&
+          persist_roundtrip.events[1].normalized_value == 0.75);
+    std::string persisted_again;
+    CHECK(serialize_vst3_parameter_timeline_v1(persist_roundtrip, persisted_again) &&
+          persisted_again == persisted_document);
+    Vst3ParameterTimelineSnapshotV1 persist_spaced{};
+    CHECK(parse_vst3_parameter_timeline_v1(
+              "\n\t " + persisted_document + " \r\n", persist_spaced) ==
+              Vst3TimelineParseErrorV1::none && persist_spaced.event_count == 2U);
+    Vst3ParameterTimelineSnapshotV1 persist_empty{};
+    std::string empty_document;
+    CHECK(serialize_vst3_parameter_timeline_v1(persist_empty, empty_document));
+    Vst3ParameterTimelineSnapshotV1 empty_roundtrip{};
+    CHECK(parse_vst3_parameter_timeline_v1(empty_document, empty_roundtrip) ==
+              Vst3TimelineParseErrorV1::none && empty_roundtrip.event_count == 0U);
+    Vst3ParameterTimelineSnapshotV1 unsorted_source{};
+    unsorted_source.event_count = 2U;
+    unsorted_source.events[0] = Vst3ParameterTimelineEventV1{7U, 48003U, 0.75};
+    unsorted_source.events[1] = Vst3ParameterTimelineEventV1{3U, 48000U, 0.25};
+    std::string rejected_document;
+    CHECK(!serialize_vst3_parameter_timeline_v1(unsorted_source, rejected_document) &&
+          rejected_document.empty());
+    auto parse_expectation = [](std::string_view text,
+                                Vst3TimelineParseErrorV1 expected) {
+        Vst3ParameterTimelineSnapshotV1 sink{};
+        sink.event_count = 1U;
+        sink.events[0] = Vst3ParameterTimelineEventV1{9U, 9U, 0.9};
+        const auto result = parse_vst3_parameter_timeline_v1(text, sink);
+        const bool untouched =
+            sink.event_count == 1U && sink.events[0].parameter_id == 9U &&
+            sink.events[0].normalized_value == 0.9;
+        return result == expected && untouched;
+    };
+    CHECK(parse_expectation("", Vst3TimelineParseErrorV1::unexpected_token));
+    CHECK(parse_expectation(std::string(kVst3TimelineMaxSerializedBytesV1 + 1U, ' '),
+                            Vst3TimelineParseErrorV1::too_large));
+    CHECK(parse_expectation(persisted_document.substr(0U, 30U),
+                            Vst3TimelineParseErrorV1::truncated));
+    {
+        std::string wrong_version = persisted_document;
+        wrong_version.replace(wrong_version.find("\"schema_version\": 1"), 19,
+                              "\"schema_version\": 2");
+        CHECK(parse_expectation(wrong_version,
+                                Vst3TimelineParseErrorV1::unsupported_version));
+    }
+    {
+        std::string unknown_key = persisted_document;
+        unknown_key.replace(unknown_key.find("\"event_count\""), 13,
+                            "\"event_counts\"");
+        CHECK(parse_expectation(unknown_key, Vst3TimelineParseErrorV1::unknown_key));
+    }
+    {
+        std::string duplicate_key = persisted_document;
+        const auto count_anchor = duplicate_key.find("\"event_count\": ") + 15U;
+        duplicate_key.insert(duplicate_key.find(',', count_anchor),
+                             ", \"event_count\": 2");
+        CHECK(parse_expectation(duplicate_key,
+                                Vst3TimelineParseErrorV1::duplicate_key));
+    }
+    {
+        std::string missing_key = persisted_document;
+        const auto start = missing_key.find("\"event_count\": ");
+        const auto end = missing_key.find('\n', start);
+        missing_key.erase(start, end - start + 1U);
+        CHECK(parse_expectation(missing_key, Vst3TimelineParseErrorV1::missing_key));
+    }
+    {
+        std::string bad_number = persisted_document;
+        bad_number.replace(bad_number.find("\"normalized_value\": 0.25"), 23,
+                           "\"normalized_value\": .25");
+        CHECK(parse_expectation(bad_number, Vst3TimelineParseErrorV1::invalid_number));
+    }
+    {
+        std::string nan_literal = persisted_document;
+        nan_literal.replace(nan_literal.find("\"normalized_value\": 0.25"), 23,
+                            "\"normalized_value\": NaN");
+        CHECK(parse_expectation(nan_literal, Vst3TimelineParseErrorV1::invalid_number));
+    }
+    {
+        std::string out_of_range = persisted_document;
+        out_of_range.replace(out_of_range.find("\"normalized_value\": 0.25"), 23,
+                             "\"normalized_value\": 1.25");
+        CHECK(parse_expectation(out_of_range,
+                                Vst3TimelineParseErrorV1::value_out_of_range));
+    }
+    {
+        std::string id_overflow = persisted_document;
+        id_overflow.replace(id_overflow.find("\"parameter_id\": 3,"), 18,
+                            "\"parameter_id\": 4294967296,");
+        CHECK(parse_expectation(id_overflow,
+                                Vst3TimelineParseErrorV1::value_out_of_range));
+    }
+    {
+        std::string position_overflow = persisted_document;
+        position_overflow.replace(position_overflow.find("\"sample_position\": 48000"),
+                                  24, "\"sample_position\": 18446744073709551616");
+        CHECK(parse_expectation(position_overflow,
+                                Vst3TimelineParseErrorV1::value_out_of_range));
+    }
+    {
+        std::string short_array = persisted_document;
+        const auto first_event = short_array.find("{\"parameter_id\": 3,");
+        CHECK(first_event != std::string::npos);
+        const auto comma_after = short_array.find(",\n", first_event);
+        CHECK(comma_after != std::string::npos);
+        short_array.erase(first_event, comma_after - first_event + 2U);
+        CHECK(parse_expectation(short_array,
+                                Vst3TimelineParseErrorV1::unexpected_token));
+    }
+    {
+        const std::string padded_slot =
+            "{\"parameter_id\": 0, \"sample_position\": 0, \"normalized_value\": 0}";
+        std::string hidden_slot = persisted_document;
+        const auto pad_position = hidden_slot.find(padded_slot);
+        CHECK(pad_position != std::string::npos);
+        hidden_slot.replace(pad_position, padded_slot.size(),
+                            "{\"parameter_id\": 1, \"sample_position\": 0, "
+                            "\"normalized_value\": 0}");
+        CHECK(parse_expectation(hidden_slot,
+                                Vst3TimelineParseErrorV1::event_count_mismatch));
+    }
+    CHECK(parse_expectation(persisted_document + "x",
+                            Vst3TimelineParseErrorV1::truncated));
+#if defined(_WIN32)
+    {
+        wchar_t temp_root[MAX_PATH];
+        const DWORD temp_length = GetTempPathW(MAX_PATH, temp_root);
+        CHECK(temp_length > 0U && temp_length < MAX_PATH);
+        const std::filesystem::path file_path =
+            std::filesystem::path(std::wstring(temp_root)) /
+            L"hibiki_timeline_contract_v1.json";
+        const std::wstring file_text = file_path.wstring();
+        CHECK(save_vst3_parameter_timeline_file_v1(persist_source, file_text) ==
+              Vst3TimelineFileErrorV1::none);
+        Vst3ParameterTimelineSnapshotV1 file_loaded{};
+        CHECK(load_vst3_parameter_timeline_file_v1(file_text, file_loaded) ==
+                  Vst3TimelineFileErrorV1::none &&
+              file_loaded.event_count == 2U &&
+              file_loaded.events[1].sample_position == 48003U);
+        CHECK(save_vst3_parameter_timeline_file_v1(persist_roundtrip, file_text) ==
+                  Vst3TimelineFileErrorV1::none &&
+              load_vst3_parameter_timeline_file_v1(file_text, file_loaded) ==
+                  Vst3TimelineFileErrorV1::none &&
+              file_loaded.events[0].normalized_value == 0.25);
+        CHECK(save_vst3_parameter_timeline_file_v1(unsorted_source, file_text) ==
+              Vst3TimelineFileErrorV1::serialize_error);
+        {
+            std::ofstream corrupt_stream(file_path, std::ios::binary | std::ios::trunc);
+            corrupt_stream << "{ broken";
+            corrupt_stream.close();
+        }
+        CHECK(load_vst3_parameter_timeline_file_v1(file_text, file_loaded) ==
+              Vst3TimelineFileErrorV1::parse_error);
+        CHECK(load_vst3_parameter_timeline_file_v1(file_path.wstring() + L".missing",
+                                                   file_loaded) ==
+              Vst3TimelineFileErrorV1::io_error);
+        std::error_code cleanup_error;
+        std::filesystem::remove(file_path, cleanup_error);
+    }
+#endif
     Vst3WorkerPipeV1 worker_pipe;
     CHECK(!worker_pipe.create_server(Vst3WorkerPipeConfigV1{L"", 1024U, 100U}));
     CHECK(!worker_pipe.connect_client(L"", 100U));
