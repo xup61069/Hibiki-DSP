@@ -1376,6 +1376,13 @@ int main() {
         WasapiOutputConfigV1{L"", 2U, 48000U, 20U}, 128U, 30U));
     wasapi_engine.stop_wasapi_output();
     CHECK(wasapi_engine.wasapi_output_snapshot().state == WasapiSinkHandoffStateV1::Unbound);
+    std::array<RtLaneInputV1, 1U> wasapi_lane_inputs{};
+    std::array<float, 256U> wasapi_transport_buffer{};
+    std::array<float, 256U> wasapi_graph_buffer{};
+    AsioTransportBlockV1 wasapi_asio_block{};
+    CHECK(!wasapi_engine.process_asio_transport_to_wasapi(
+        0U, wasapi_transport_buffer.data(), 128U, std::span<RtLaneInputV1>(wasapi_lane_inputs),
+        wasapi_graph_buffer.data(), wasapi_graph_buffer.size(), wasapi_asio_block));
 #endif
 
     return 0;

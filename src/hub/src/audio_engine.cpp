@@ -199,6 +199,27 @@ bool AudioEngineModel::process_asio_transport(
                               lane_inputs, output_interleaved);
 }
 
+bool AudioEngineModel::process_asio_transport_to_wasapi(
+    const std::size_t lane_index,
+    float* const transport_interleaved,
+    const std::uint32_t transport_capacity_frames,
+    const std::span<RtLaneInputV1> lane_inputs,
+    float* const output_interleaved,
+    const std::size_t output_capacity_frames,
+    AsioTransportBlockV1& block) noexcept {
+    if (!process_asio_transport(lane_index, transport_interleaved, transport_capacity_frames,
+                                lane_inputs, output_interleaved, output_capacity_frames, block)) {
+        return false;
+    }
+    if (static_cast<std::uint64_t>(block.frames) >
+            static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max()) ||
+        active_graph_.output_channels == 0U || active_graph_.output_channels > 8U) {
+        return false;
+    }
+    return wasapi_handoff_.process(output_interleaved, block.frames,
+                                   active_graph_.output_channels);
+}
+
 bool AudioEngineModel::process_driver_stream_packet(
     const std::size_t lane_index,
     const std::string_view expected_endpoint_guid,

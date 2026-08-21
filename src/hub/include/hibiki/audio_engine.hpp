@@ -68,6 +68,14 @@ public:
         float* output_interleaved,
         std::size_t output_capacity_frames,
         AsioTransportBlockV1& block) noexcept;
+    [[nodiscard]] bool process_asio_transport_to_wasapi(
+        std::size_t lane_index,
+        float* transport_interleaved,
+        std::uint32_t transport_capacity_frames,
+        std::span<RtLaneInputV1> lane_inputs,
+        float* output_interleaved,
+        std::size_t output_capacity_frames,
+        AsioTransportBlockV1& block) noexcept;
     [[nodiscard]] bool process_driver_stream_packet(
         std::size_t lane_index,
         std::string_view expected_endpoint_guid,
