@@ -26,10 +26,22 @@ static NTSTATUS hibiki_validate_request(
     _In_ PPCPROPERTY_REQUEST request,
     _In_ ULONG value_bytes,
     _In_ ULONG instance_bytes) {
-    if (request == nullptr || request->PropertyItem == nullptr || request->Value == nullptr ||
+    if (request == nullptr || request->PropertyItem == nullptr ||
         (instance_bytes != 0U && request->Instance == nullptr)) {
         return STATUS_INVALID_PARAMETER;
     }
+    if (request->InstanceSize < instance_bytes) {
+        request->ValueSize = value_bytes;
+        return STATUS_BUFFER_TOO_SMALL;
+    }
+    if ((request->Verb & KSPROPERTY_TYPE_BASICSUPPORT) != 0U) {
+        if (request->Value == nullptr || request->ValueSize < sizeof(ULONG)) {
+            request->ValueSize = sizeof(ULONG);
+            return STATUS_BUFFER_TOO_SMALL;
+        }
+        return STATUS_SUCCESS;
+    }
+    if (request->Value == nullptr) return STATUS_INVALID_PARAMETER;
     if (request->ValueSize < value_bytes || request->InstanceSize < instance_bytes) {
         request->ValueSize = value_bytes;
         return STATUS_BUFFER_TOO_SMALL;
@@ -60,7 +72,8 @@ extern "C" NTSTATUS HibikiPropertyHandlerVolumeV1(
         return STATUS_INVALID_PARAMETER;
     }
     if ((request->Verb & KSPROPERTY_TYPE_BASICSUPPORT) != 0U) {
-        request->ValueSize = sizeof(ULONG) * 2U;
+        *static_cast<ULONG*>(request->Value) = KSPROPERTY_TYPE_GET | KSPROPERTY_TYPE_SET;
+        request->ValueSize = sizeof(ULONG);
         return STATUS_SUCCESS;
     }
 
@@ -102,7 +115,8 @@ extern "C" NTSTATUS HibikiPropertyHandlerMuteV1(
         return STATUS_INVALID_PARAMETER;
     }
     if ((request->Verb & KSPROPERTY_TYPE_BASICSUPPORT) != 0U) {
-        request->ValueSize = sizeof(ULONG) * 2U;
+        *static_cast<ULONG*>(request->Value) = KSPROPERTY_TYPE_GET | KSPROPERTY_TYPE_SET;
+        request->ValueSize = sizeof(ULONG);
         return STATUS_SUCCESS;
     }
     ExAcquireFastMutex(&context->property_lock);

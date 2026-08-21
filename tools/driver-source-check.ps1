@@ -23,6 +23,11 @@ if ($source -match 'audio_engine|scene_graph|asio_bridge|plugin_host') {
 if ($source -notmatch 'KSPROPERTY_AUDIO_VOLUMELEVEL' -or $source -notmatch 'KSPROPERTY_AUDIO_MUTE') {
     throw 'WDK adapter volume/mute dispatch is incomplete.'
 }
+if ($source -notmatch 'KSPROPERTY_TYPE_BASICSUPPORT' -or
+    $source -notmatch 'KSPROPERTY_TYPE_GET\s*\|\s*KSPROPERTY_TYPE_SET' -or
+    $source -notmatch 'STATUS_BUFFER_TOO_SMALL') {
+    throw 'WDK adapter must expose GET/SET basic support and bounded buffer negotiation.'
+}
 $topology = (Get-Content -LiteralPath $topologyHeader -Raw) + (Get-Content -LiteralPath $topologySource -Raw)
 if ($topology -notmatch 'HIBIKI_CHANNEL_MASK_71_V1' -or
     $topology -notmatch 'HIBIKI_ENDPOINT_VIRTUAL_MIC_CAPTURE_V1' -or
