@@ -41,7 +41,8 @@ bool WindowsWasapiSinkHandoffV1::start_initial(const WasapiOutputConfigV1& confi
 bool WindowsWasapiSinkHandoffV1::begin(const WasapiOutputConfigV1& candidate,
                                        const std::uint32_t block_frames,
                                        const std::uint32_t fade_ms) noexcept {
-    if (state_ != WasapiSinkHandoffStateV1::Synced ||
+    if ((state_ != WasapiSinkHandoffStateV1::Synced &&
+         state_ != WasapiSinkHandoffStateV1::RolledBack) ||
         !active_worker().snapshot().endpoint_ready || fade_ms == 0U || fade_ms > 200U ||
         candidate.channels != channels_ || candidate.sample_rate == 0U ||
         candidate.sample_rate != active_worker().snapshot().sample_rate) {

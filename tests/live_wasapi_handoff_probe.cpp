@@ -126,14 +126,36 @@ int main() {
 
     std::array<float, 8U * 128U> silence{};
     constexpr std::uint32_t kFadeBlocks = 32U;
+    bool rollback_pass = false;
+    if (handoff.process(silence.data(), 128U, config.channels)) {
+        handoff.rollback();
+        const auto rollback_snapshot = handoff.snapshot();
+        rollback_pass = rollback_snapshot.state == hibiki::WasapiSinkHandoffStateV1::RolledBack &&
+                        rollback_snapshot.primary.running &&
+                        !rollback_snapshot.secondary.running;
+    }
+    const bool retry_began = rollback_pass && handoff.begin(config, 128U, 30U);
+    bool retry_ready = false;
+    for (std::uint32_t attempt = 0U; retry_began && attempt < 200U; ++attempt) {
+        if (handoff.prepare()) {
+            retry_ready = true;
+            break;
+        }
+        const auto snapshot = handoff.snapshot();
+        if (snapshot.state == hibiki::WasapiSinkHandoffStateV1::RolledBack ||
+            snapshot.state == hibiki::WasapiSinkHandoffStateV1::Degraded) {
+            break;
+        }
+        Sleep(10U);
+    }
     bool submitted = true;
-    for (std::uint32_t block = 0U; block < kFadeBlocks; ++block) {
+    for (std::uint32_t block = 0U; retry_ready && block < kFadeBlocks; ++block) {
         if (handoff.snapshot().state != hibiki::WasapiSinkHandoffStateV1::Fading) break;
         if (!handoff.process(silence.data(), 128U, config.channels)) submitted = false;
         Sleep(8U);
     }
     const auto before_commit = handoff.snapshot();
-    const bool committed = submitted &&
+    const bool committed = retry_ready && submitted &&
                            before_commit.state == hibiki::WasapiSinkHandoffStateV1::ReadyToCommit &&
                            handoff.commit();
     const auto final_snapshot = handoff.snapshot();
@@ -141,9 +163,11 @@ int main() {
                           final_snapshot.secondary.rendered_blocks > 0U;
     handoff.stop();
     if (SUCCEEDED(init)) CoUninitialize();
-    std::printf("wasapi=%s initial=pass candidate=pass fade=%s commit=%s rendered=%s state=%u submitted_blocks=%llu/%llu dropped=%u/%u\n",
-                (committed && rendered) ? "pass" : "fail", submitted ? "pass" : "fail",
-                committed ? "pass" : "fail", rendered ? "pass" : "fail",
+    std::printf("wasapi=%s initial=pass candidate=pass rollback=%s retry=%s fade=%s commit=%s rendered=%s state=%u submitted_blocks=%llu/%llu dropped=%u/%u\n",
+                (committed && rendered && rollback_pass) ? "pass" : "fail",
+                rollback_pass ? "pass" : "fail", retry_ready ? "pass" : "fail",
+                submitted ? "pass" : "fail", committed ? "pass" : "fail",
+                rendered ? "pass" : "fail",
                 static_cast<unsigned>(before_commit.state),
                 static_cast<unsigned long long>(before_commit.primary.submitted_blocks),
                 static_cast<unsigned long long>(before_commit.secondary.submitted_blocks),
