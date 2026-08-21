@@ -97,15 +97,16 @@
   ProcessBlock frames, while supervisor launch validation now passes explicit class/rate/channel
   fields. `Vst3SandboxProcess` also exposes bounded HelloAck and ProcessBlock exchange methods
   that verify request IDs, shape, payload and finite output and clear output on failure; Scene
-  scheduling, plugin state persistence and production certification remain pending. The
+  scheduling and private plugin-state persistence are now bounded source contracts, while
+  Scene binding and production certification remain pending. The
   `Vst3WorkerLaneSessionV1` control-plane bridge now binds that exchange to a stable lane token,
   latency projection, bounded parameter timeline and contiguous block-order/degraded state.
   `PluginHostModel` exposes prepare/handshake/process entry points and detaches the lane when its
   trusted/certified host enters `Quarantined`; this remains a source-level worker contract.
 - `Vst3SceneAutomationSchedulerV1` now stores bounded timeline IDs and Scene/lane bindings,
   validates all references before activation, applies snapshots to prepared lanes and rejects
-  concurrent per-lane blocks with explicit back-pressure; opaque plugin state persistence remains
-  a separate compatibility-gated feature.
+  concurrent per-lane blocks with explicit back-pressure; opaque plugin state remains a separate
+  compatibility-gated feature with a fixed migration registry.
 - `Vst3PluginStateStoreV1` now provides a private caller-owned 16-slot/1 MiB state boundary with
   plugin/class/module SHA-256 identity and state-version checks; the public schema is metadata-only
   and restore fails closed on mismatch or insufficient destination.
@@ -165,7 +166,8 @@
   Float32/parameter-point validation and finite sample checks. The optional SDK worker decodes
   those points into the processor's official `IParameterChanges`; named-pipe transport, factory
   catalog and one-main-bus SDK processing build locally, while supervisor UI timeline editing,
-  cross-version plugin state persistence and certification remain pending.
+  Scene-to-migration binding and certification remain pending; private cross-version state is
+  guarded by the explicit identity/version registry.
 - `LatencyAlignmentPlanV1` and `FixedDelayLineV1` provide a fixed 8-channel, 16,384-sample
   bounded delay primitive with active-lane max-latency alignment, impulse and non-finite-input
   tests. `LatencyGraphCommitV1`/`LatencyGraphCommitterV1` now bind that control result to stable

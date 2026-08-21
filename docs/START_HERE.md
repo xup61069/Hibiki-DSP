@@ -39,16 +39,17 @@ branch。真實裝置資料與 calibration 留在 `.local/`，只提交 schema �
 - `driver/`：固定四端點的 SYSVAD-derived WaveRT/KS 虛擬端點與 Windows volume nodes；
   endpoint topology/channel mask catalog 已有 portable MS-PL contract，PortCls wiring 與簽章仍待完成。
 - `src/`：即時 graph、Matrix、per-output-group plugin latency compensation、跨 block lane delay
-  bank、bounded multi-sink fan-out、ISO fit、scene safety、device switch、ASIO/外部 Lane block
-  API 與 WASAPI Float32 output boundary；bounded calibration PEQ compiler 已加入，真實端點 soak
-  仍待目標環境。
+  bank、bounded multi-sink fan-out、ISO fit、program-aware RMS/K-weighted proxy、scene safety、
+  device switch、ASIO/外部 Lane block API 與 WASAPI Float32 output boundary；bounded calibration
+  PEQ compiler 已加入，真實端點 soak 仍待目標環境。
 - `apps/`：已有 UI-independent control model 與 source-only WinUI 3 Easy/Expert shell；
   仍需在鎖定 Windows App SDK 的目標環境編譯、做視覺／無障礙驗證，再接上實體端點狀態。
 - `asio/`：預設為 stream model；需要本機 pinned ASIO SDK 時可開啟 optional native COM
   transport（不進 public CI，也不提交 DLL）。`vst-host/` 已有 supervisor、frame codec、
   named-pipe boundary、source-only passthrough worker、可選的 pinned VST3 SDK factory catalog
   與單一主 bus worker-side SDK processor/optional worker executable；bounded parameter timeline、
-  latency graph commit 與 RT compensation 已接入，supervisor UI timeline 編輯、plugin state
-  persistence 與 certification 仍待完成。`extensions/` 已有 HIBT decoder、loopback bridge、bounded capture queue 與
+  latency graph commit、RT compensation、private identity/version-checked state、explicit
+  migration handler/registry 已接入，Scene binding、supervisor UI timeline 編輯、side-chain/multi-bus
+  與 certification 仍待完成。`extensions/` 已有 HIBT decoder、loopback bridge、bounded capture queue 與
   graph-lane adapter；Virtual Mic 有 bounded normalized-LMS/gate baseline，但正式 AEC/NS model
   provenance 與 signed capture driver 仍待完成。
