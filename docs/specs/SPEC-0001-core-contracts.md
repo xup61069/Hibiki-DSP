@@ -60,6 +60,9 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   sequence。control worker 只能交給明確註冊的 device-switch handler；handler 必須先透過
   `PhysicalDeviceCatalogV1`／`DeviceRecoveryCoordinator` 驗證，再排程 sink handoff。沒有
   handler 或 payload／catalog 驗證失敗時 fail-closed，不會假裝裝置已切換。
+- `DeviceCatalogSnapshot` v1 是 engine → UI 的 bounded response/broadcast：16-byte header、
+  每筆 416-byte entry、最多 32 筆；它不是 audio command，C++ command decoder 不會把它
+  排入 RT queue。UI worker 必須驗證 snapshot 後 atomic replace catalog，過期快照保留舊值。
 - `EngineControlWorkerV1::set_scene_preflight` 可注入一個 control-plane-only gate，讓 VST3
   state coordinator、校正資料或安全策略在 graph Prepare 前驗證；gate 失敗會保留既有
   Scene、revision 與 active graph，不會部分套用。

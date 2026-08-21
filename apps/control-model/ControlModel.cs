@@ -74,8 +74,10 @@ public sealed class PhysicalDeviceCatalogV1
 {
     public const int Capacity = 32;
     private readonly List<PhysicalDeviceCard> _devices = new(Capacity);
+    private ulong _catalogSequence;
 
     public IReadOnlyList<PhysicalDeviceCard> Devices => _devices;
+    public ulong CatalogSequence => _catalogSequence;
     public PhysicalDeviceCard? DefaultRender => _devices.FirstOrDefault(device =>
         device.Flow == PhysicalDeviceFlowV1.Render && device.IsDefault && device.IsSelectable);
 
@@ -108,8 +110,38 @@ public sealed class PhysicalDeviceCatalogV1
             }
             _devices.Add(device);
         }
+        _catalogSequence = Math.Max(_catalogSequence, device.LastSequence);
         if (device.IsDefault)
             ClearDefaults(device.Flow, device.EndpointId);
+        return true;
+    }
+
+    public bool ReplaceSnapshot(IReadOnlyList<PhysicalDeviceCard> devices,
+                                ulong catalogSequence,
+                                out string error)
+    {
+        error = string.Empty;
+        if (devices is null || devices.Count > Capacity)
+        { error = "裝置快照超過容量"; return false; }
+        if (catalogSequence != 0 && catalogSequence < _catalogSequence)
+        { error = "裝置快照已過期"; return false; }
+        var replacement = new List<PhysicalDeviceCard>(devices.Count);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var defaults = new HashSet<PhysicalDeviceFlowV1>();
+        foreach (var device in devices)
+        {
+            if (!Validate(device, out error) || !seen.Add(device.EndpointId))
+            {
+                if (string.IsNullOrEmpty(error)) error = "裝置快照含有重複身份";
+                return false;
+            }
+            if (device.IsDefault && !defaults.Add(device.Flow))
+            { error = "同一方向只能有一個預設裝置"; return false; }
+            replacement.Add(device);
+        }
+        _devices.Clear();
+        _devices.AddRange(replacement);
+        _catalogSequence = Math.Max(_catalogSequence, catalogSequence);
         return true;
     }
 
@@ -135,6 +167,7 @@ public sealed class PhysicalDeviceCatalogV1
         };
         if (availability != PhysicalDeviceAvailabilityV1.Active)
             _devices[index] = _devices[index] with { IsDefault = false };
+        _catalogSequence = Math.Max(_catalogSequence, sequence);
         return true;
     }
 
@@ -150,6 +183,7 @@ public sealed class PhysicalDeviceCatalogV1
         ClearDefaults(device.Flow, endpointId);
         var index = _devices.FindIndex(item => item.EndpointId == endpointId);
         _devices[index] = device with { IsDefault = true, LastSequence = Math.Max(device.LastSequence, sequence) };
+        _catalogSequence = Math.Max(_catalogSequence, sequence);
         return true;
     }
 
@@ -175,7 +209,8 @@ public sealed class PhysicalDeviceCatalogV1
             value.All(character => !char.IsControl(character));
         if (!Printable(device.EndpointId, 260) || !Printable(device.DisplayName, 128))
         { error = "裝置身份或名稱無效"; return false; }
-        if (device.Channels is not (1 or 2 or 6 or 8) ||
+        if (!Enum.IsDefined(device.Flow) || !Enum.IsDefined(device.Availability) ||
+            device.Channels is not (1 or 2 or 6 or 8) ||
             device.SampleRate is not (44100 or 48000 or 96000 or 192000) ||
             device.BufferFrames is < 16 or > 4096)
         { error = "裝置格式不受支援"; return false; }

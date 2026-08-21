@@ -7,7 +7,7 @@
   "required": ["schema_version", "type", "request_id", "payload_bytes"],
   "properties": {
     "schema_version": {"const": 1},
-    "type": {"enum": ["hello", "volume-notification", "graph-prepare", "graph-commit", "graph-rollback", "scene-apply", "device-switch", "ack", "error"]},
+    "type": {"enum": ["hello", "volume-notification", "graph-prepare", "graph-commit", "graph-rollback", "scene-apply", "device-switch", "device-catalog-snapshot", "ack", "error"]},
     "request_id": {"type": "integer", "minimum": 0},
     "payload_bytes": {"type": "integer", "minimum": 0, "maximum": 1048576}
   }

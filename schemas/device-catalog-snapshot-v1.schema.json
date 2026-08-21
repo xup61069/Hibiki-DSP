@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/device-catalog-snapshot-v1.schema.json",
+  "title": "Hibiki Physical Device Catalog Snapshot v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "catalog_sequence", "devices"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "catalog_sequence": {"type": "integer", "minimum": 0},
+    "devices": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {"$ref": "physical-device-catalog-v1.schema.json#/$defs/device"}
+    }
+  }
+}

@@ -28,6 +28,7 @@ $required = @(
   'schemas/graph-config-v1.schema.json', 'schemas/scene-definition-v1.schema.json',
   'schemas/custom-scene-cards-v1.schema.json',
   'schemas/physical-device-catalog-v1.schema.json',
+  'schemas/device-catalog-snapshot-v1.schema.json',
   'schemas/device-switch-request-v1.schema.json',
   'schemas/peq-filter-v1.schema.json',
   'schemas/calibration-response-v1.schema.json',

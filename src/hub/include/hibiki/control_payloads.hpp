@@ -18,6 +18,12 @@ constexpr std::size_t kGroupedVolumeNotificationPayloadBytesV1 = 48U;
 constexpr std::size_t kSceneApplyPayloadBytesV1 = 64U;
 constexpr std::size_t kDeviceSwitchEndpointMaxBytesV1 = 260U;
 constexpr std::size_t kDeviceSwitchPayloadBytesV1 = 288U;
+constexpr std::size_t kDeviceCatalogSnapshotHeaderBytesV1 = 16U;
+constexpr std::size_t kDeviceCatalogSnapshotEntryBytesV1 = 416U;
+constexpr std::size_t kDeviceCatalogSnapshotCapacityV1 = 32U;
+constexpr std::size_t kDeviceCatalogSnapshotPayloadBytesV1 =
+    kDeviceCatalogSnapshotHeaderBytesV1 +
+    (kDeviceCatalogSnapshotEntryBytesV1 * kDeviceCatalogSnapshotCapacityV1);
 
 // Fixed little-endian control payload shared with apps/control-model. The
 // legacy 16-byte form stores dB Q16.16 at offset 0, mute at offset 4, reserved
@@ -78,6 +84,38 @@ encode_device_switch_payload_v1(std::string_view endpoint_id,
 [[nodiscard]] bool decode_device_switch_payload_v1(
     std::span<const std::uint8_t> payload,
     DeviceSwitchPayloadV1& command) noexcept;
+
+// Snapshot wire records are integer/byte-only so this Apache control contract
+// does not include the GPL catalog implementation. The engine worker converts
+// its descriptors before publishing a DeviceCatalogSnapshot frame.
+struct DeviceCatalogSnapshotEntryV1 {
+    std::uint16_t endpoint_id_bytes{0U};
+    std::array<char, kDeviceSwitchEndpointMaxBytesV1> endpoint_id{};
+    std::uint16_t display_name_bytes{0U};
+    std::array<char, 128U> display_name{};
+    std::uint8_t flow{0U};
+    std::uint8_t availability{3U};
+    std::uint16_t flags{0U};
+    std::uint32_t channels{0U};
+    std::uint32_t sample_rate{0U};
+    std::uint32_t buffer_frames{0U};
+    std::uint64_t last_sequence{0U};
+};
+
+struct DeviceCatalogSnapshotV1 {
+    std::uint16_t entry_count{0U};
+    std::uint64_t catalog_sequence{0U};
+    std::array<DeviceCatalogSnapshotEntryV1, kDeviceCatalogSnapshotCapacityV1> entries{};
+};
+
+[[nodiscard]] bool encode_device_catalog_snapshot_v1(
+    std::span<const DeviceCatalogSnapshotEntryV1> entries,
+    std::uint64_t catalog_sequence,
+    std::array<std::uint8_t, kDeviceCatalogSnapshotPayloadBytesV1>& payload,
+    std::size_t& payload_bytes) noexcept;
+[[nodiscard]] bool decode_device_catalog_snapshot_v1(
+    std::span<const std::uint8_t> payload,
+    DeviceCatalogSnapshotV1& snapshot) noexcept;
 
 struct ControlCommandV1 {
     IpcMessageType type{IpcMessageType::Error};

@@ -278,6 +278,30 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         return accepted;
     }
 
+    // A control-worker reader may forward unsolicited DeviceCatalogSnapshot
+    // frames here. The snapshot is validated and atomically swapped; it never
+    // implies that a physical endpoint is bound or that a switch was ACKed.
+    public bool ApplyPhysicalDeviceSnapshot(IpcEnvelopeV1 frame, out string error)
+    {
+        error = string.Empty;
+        if (frame.Type != ControlMessageType.DeviceCatalogSnapshot ||
+            !ControlPayloadsV1.TryDecodeDeviceCatalogSnapshot(frame.Payload.Span,
+                                                               out var sequence,
+                                                               out var devices))
+        {
+            error = "裝置快照格式無效";
+            return false;
+        }
+        if (!_session.PhysicalDevices.ReplaceSnapshot(devices, sequence, out error))
+            return false;
+        if (_selectedPhysicalDeviceId is not null && SelectedPhysicalDevice is null)
+            SelectedPhysicalDeviceId = null;
+        OnPropertyChanged(nameof(PhysicalDevices));
+        OnPropertyChanged(nameof(SelectedPhysicalDevice));
+        StatusText = "裝置清單已更新；可選擇輸出裝置";
+        return true;
+    }
+
     public bool SelectPhysicalDevice(string endpointId)
     {
         if (!_session.PhysicalDevices.TryGet(endpointId, out var device) || device is null ||

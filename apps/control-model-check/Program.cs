@@ -173,6 +173,27 @@ Check(ControlPayloadsV1.TryDecodeDeviceSwitch(viewModel.LastCommand!.Payload.Spa
       selectedEndpoint == "endpoint-a" && selectedChannels == 8 && selectedRate == 48000 &&
       selectedFrames == 128 && selectedSequence == 10UL,
     "Physical device switch payload did not round-trip.");
+var snapshotSpeaker = speakers with { IsDefault = false };
+var snapshotBytes = ControlPayloadsV1.EncodeDeviceCatalogSnapshot(
+    [snapshotSpeaker, headphones], 30UL);
+Check(ControlPayloadsV1.TryDecodeDeviceCatalogSnapshot(snapshotBytes,
+          out var snapshotSequence, out var decodedDevices) && snapshotSequence == 30UL &&
+      decodedDevices.Count == 2 && decodedDevices[1].IsDefault,
+    "Physical device catalog snapshot did not round-trip.");
+var snapshotFrame = new IpcEnvelopeV1(ControlMessageType.DeviceCatalogSnapshot, 0UL, snapshotBytes);
+Check(viewModel.ApplyPhysicalDeviceSnapshot(snapshotFrame, out _) &&
+      viewModel.PhysicalDevices.Count == 2 && viewModel.PhysicalDevices[1].IsDefault,
+    "ViewModel did not atomically apply the device catalog snapshot.");
+var staleSnapshot = new IpcEnvelopeV1(
+    ControlMessageType.DeviceCatalogSnapshot, 0UL,
+    ControlPayloadsV1.EncodeDeviceCatalogSnapshot([snapshotSpeaker], 29UL));
+Check(!viewModel.ApplyPhysicalDeviceSnapshot(staleSnapshot, out var staleSnapshotError) &&
+      staleSnapshotError.Contains("過期") && viewModel.PhysicalDevices.Count == 2,
+    "Stale device catalog snapshot must preserve the previous catalog.");
+var malformedSnapshot = snapshotBytes.ToArray();
+malformedSnapshot[2] = 1;
+Check(!ControlPayloadsV1.TryDecodeDeviceCatalogSnapshot(malformedSnapshot, out _, out _),
+    "Device catalog snapshot decoder must reject reserved bytes.");
 viewModel.IsExpert = true;
 Check(viewModel.Mode == UiMode.Expert && viewModel.SelectScene("movie"),
     "ViewModel Expert scene selection failed.");

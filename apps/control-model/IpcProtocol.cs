@@ -18,7 +18,8 @@ public enum ControlMessageType : ushort
     Ack = 6,
     Error = 7,
     SceneApply = 8,
-    DeviceSwitch = 9
+    DeviceSwitch = 9,
+    DeviceCatalogSnapshot = 10
 }
 
 public enum IpcDecodeError
@@ -114,7 +115,8 @@ public static class IpcCodecV1
         type is ControlMessageType.Hello or ControlMessageType.VolumeNotification or
         ControlMessageType.GraphPrepare or ControlMessageType.GraphCommit or
         ControlMessageType.GraphRollback or ControlMessageType.Ack or ControlMessageType.Error or
-        ControlMessageType.SceneApply or ControlMessageType.DeviceSwitch;
+        ControlMessageType.SceneApply or ControlMessageType.DeviceSwitch or
+        ControlMessageType.DeviceCatalogSnapshot;
 }
 
 public static class ControlPayloadsV1
@@ -124,6 +126,12 @@ public static class ControlPayloadsV1
     public const int SceneApplyBytes = 64;
     public const int DeviceSwitchEndpointMaxBytes = 260;
     public const int DeviceSwitchBytes = 288;
+    public const int DeviceCatalogSnapshotHeaderBytes = 16;
+    public const int DeviceCatalogSnapshotEntryBytes = 416;
+    public const int DeviceCatalogSnapshotCapacity = 32;
+    public const int DeviceCatalogSnapshotMaxBytes = DeviceCatalogSnapshotHeaderBytes +
+                                                      (DeviceCatalogSnapshotEntryBytes *
+                                                       DeviceCatalogSnapshotCapacity);
     private static readonly System.Text.UTF8Encoding StrictUtf8 =
         new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
@@ -305,6 +313,126 @@ public static class ControlPayloadsV1
                sampleRate is 44100 or 48000 or 96000 or 192000 &&
                bufferFrames is >= 16 and <= 4096;
     }
+
+    public static byte[] EncodeDeviceCatalogSnapshot(IReadOnlyList<PhysicalDeviceCard> devices,
+                                                      ulong catalogSequence)
+    {
+        if (devices is null || devices.Count > DeviceCatalogSnapshotCapacity)
+            throw new ArgumentException("Physical device snapshot exceeds the v1 limit.",
+                                        nameof(devices));
+        var payload = new byte[DeviceCatalogSnapshotHeaderBytes +
+                               (devices.Count * DeviceCatalogSnapshotEntryBytes)];
+        BinaryPrimitives.WriteUInt16LittleEndian(payload, (ushort)devices.Count);
+        BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(4), catalogSequence);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var defaults = new HashSet<PhysicalDeviceFlowV1>();
+        for (var index = 0; index < devices.Count; index++)
+        {
+            var device = devices[index];
+            var endpoint = StrictUtf8.GetBytes(device.EndpointId ?? string.Empty);
+            var display = StrictUtf8.GetBytes(device.DisplayName ?? string.Empty);
+            if (endpoint.Length is < 1 or > DeviceSwitchEndpointMaxBytes ||
+                display.Length is < 1 or > 128 || endpoint.Any(value => value < 0x20) ||
+                display.Any(value => value < 0x20) || !seen.Add(device.EndpointId ?? string.Empty) ||
+                !Enum.IsDefined(device.Flow) || !Enum.IsDefined(device.Availability) ||
+                (device.IsDefault && (!device.IsSelectable || !defaults.Add(device.Flow))) ||
+                device.Channels is not (1 or 2 or 6 or 8) ||
+                device.SampleRate is not (44100 or 48000 or 96000 or 192000) ||
+                device.BufferFrames is < 16 or > 4096)
+                throw new ArgumentException("Physical device snapshot contains an invalid entry.",
+                                            nameof(devices));
+            var offset = DeviceCatalogSnapshotHeaderBytes +
+                         (index * DeviceCatalogSnapshotEntryBytes);
+            BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(offset), (ushort)endpoint.Length);
+            BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(offset + 2), (ushort)display.Length);
+            payload[offset + 4] = (byte)device.Flow;
+            payload[offset + 5] = (byte)device.Availability;
+            BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(offset + 6),
+                                                     device.IsDefault ? (ushort)1 : (ushort)0);
+            endpoint.CopyTo(payload.AsSpan(offset + 8));
+            display.CopyTo(payload.AsSpan(offset + 268));
+            BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(offset + 396),
+                                                     (uint)device.Channels);
+            BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(offset + 400),
+                                                     (uint)device.SampleRate);
+            BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(offset + 404),
+                                                     (uint)device.BufferFrames);
+            BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(offset + 408),
+                                                     device.LastSequence);
+        }
+        return payload;
+    }
+
+    public static bool TryDecodeDeviceCatalogSnapshot(ReadOnlySpan<byte> payload,
+                                                       out ulong catalogSequence,
+                                                       out IReadOnlyList<PhysicalDeviceCard> devices)
+    {
+        catalogSequence = 0UL;
+        devices = Array.Empty<PhysicalDeviceCard>();
+        if (payload.Length < DeviceCatalogSnapshotHeaderBytes ||
+            payload.Length > DeviceCatalogSnapshotMaxBytes || payload[2] != 0 || payload[3] != 0 ||
+            payload[12] != 0 || payload[13] != 0 || payload[14] != 0 || payload[15] != 0)
+            return false;
+        var count = BinaryPrimitives.ReadUInt16LittleEndian(payload);
+        var expected = DeviceCatalogSnapshotHeaderBytes +
+                       (count * DeviceCatalogSnapshotEntryBytes);
+        if (count > DeviceCatalogSnapshotCapacity || payload.Length != expected) return false;
+        catalogSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[4..]);
+        var list = new List<PhysicalDeviceCard>(count);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var defaults = new HashSet<PhysicalDeviceFlowV1>();
+        for (var index = 0; index < count; index++)
+        {
+            var offset = DeviceCatalogSnapshotHeaderBytes +
+                         (index * DeviceCatalogSnapshotEntryBytes);
+            var entry = payload.Slice(offset, DeviceCatalogSnapshotEntryBytes);
+            var endpointBytes = BinaryPrimitives.ReadUInt16LittleEndian(entry);
+            var displayBytes = BinaryPrimitives.ReadUInt16LittleEndian(entry[2..]);
+            var rawFlow = entry[4];
+            var rawAvailability = entry[5];
+            var flags = BinaryPrimitives.ReadUInt16LittleEndian(entry[6..]);
+            if (endpointBytes is < 1 or > DeviceSwitchEndpointMaxBytes ||
+                displayBytes is < 1 or > 128 || rawFlow > 1 || rawAvailability > 3 ||
+                (flags & 0xfffe) != 0)
+                return false;
+            for (var pad = endpointBytes; pad < DeviceSwitchEndpointMaxBytes; pad++)
+                if (entry[8 + pad] != 0) return false;
+            for (var pad = displayBytes; pad < 128; pad++)
+                if (entry[268 + pad] != 0) return false;
+            string endpoint;
+            string display;
+            try
+            {
+                endpoint = StrictUtf8.GetString(entry.Slice(8, endpointBytes));
+                display = StrictUtf8.GetString(entry.Slice(268, displayBytes));
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+            if (endpoint.Any(value => char.IsControl(value)) ||
+                display.Any(value => char.IsControl(value)) || !seen.Add(endpoint))
+                return false;
+            var channels = BinaryPrimitives.ReadUInt32LittleEndian(entry[396..]);
+            var sampleRate = BinaryPrimitives.ReadUInt32LittleEndian(entry[400..]);
+            var bufferFrames = BinaryPrimitives.ReadUInt32LittleEndian(entry[404..]);
+            if (channels is not (1U or 2U or 6U or 8U) ||
+                sampleRate is not (44100U or 48000U or 96000U or 192000U) ||
+                bufferFrames is < 16U or > 4096U)
+                return false;
+            var flow = (PhysicalDeviceFlowV1)rawFlow;
+            var availability = (PhysicalDeviceAvailabilityV1)rawAvailability;
+            var isDefault = (flags & 1) != 0;
+            var card = new PhysicalDeviceCard(endpoint, display, flow, availability,
+                                               (int)channels, (int)sampleRate, (int)bufferFrames,
+                                               isDefault,
+                                               BinaryPrimitives.ReadUInt64LittleEndian(entry[408..]));
+            if (isDefault && (!card.IsSelectable || !defaults.Add(flow))) return false;
+            list.Add(card);
+        }
+        devices = list;
+        return true;
+    }
 }
 
 // The UI/control plane owns request IDs; the audio thread never creates or
@@ -405,6 +533,18 @@ public sealed class NamedPipeControlClientV1 : IAsyncDisposable
         await stream.WriteAsync(encoded, cancellationToken).ConfigureAwait(false);
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
 
+        var response = await ReadFrameAsync(cancellationToken).ConfigureAwait(false);
+        if (response.RequestId != request.RequestId)
+            throw new InvalidDataException("Control worker response request ID does not match.");
+        return response;
+    }
+
+    // Reads an unsolicited engine frame, such as DeviceCatalogSnapshot. A
+    // caller-owned worker decides whether to apply it to the ViewModel.
+    public async Task<IpcEnvelopeV1> ReadFrameAsync(CancellationToken cancellationToken = default)
+    {
+        var stream = _stream ?? throw new InvalidOperationException("Control pipe is not connected.");
+        var length = new byte[sizeof(uint)];
         await ReadExactAsync(stream, length, cancellationToken).ConfigureAwait(false);
         var responseLength = BinaryPrimitives.ReadUInt32LittleEndian(length);
         if (responseLength < IpcCodecV1.HeaderBytes ||
@@ -414,8 +554,6 @@ public sealed class NamedPipeControlClientV1 : IAsyncDisposable
         await ReadExactAsync(stream, responseBytes, cancellationToken).ConfigureAwait(false);
         if (!IpcCodecV1.TryDecode(responseBytes, out var response, out var error) || response is null)
             throw new InvalidDataException($"Control worker returned an invalid frame: {error}.");
-        if (response.RequestId != request.RequestId)
-            throw new InvalidDataException("Control worker response request ID does not match.");
         return response;
     }
 

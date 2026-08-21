@@ -858,6 +858,45 @@ int main() {
     auto malformed_device_payload = device_payload;
     malformed_device_payload[262U] = 1U;
     CHECK(!decode_device_switch_payload_v1(malformed_device_payload, decoded_device));
+    DeviceCatalogSnapshotEntryV1 snapshot_entry{};
+    const std::string_view snapshot_endpoint = "recovery-render";
+    const std::string_view snapshot_name = "Recovery render";
+    snapshot_entry.endpoint_id_bytes = static_cast<std::uint16_t>(snapshot_endpoint.size());
+    snapshot_entry.display_name_bytes = static_cast<std::uint16_t>(snapshot_name.size());
+    std::copy(snapshot_endpoint.begin(), snapshot_endpoint.end(), snapshot_entry.endpoint_id.begin());
+    std::copy(snapshot_name.begin(), snapshot_name.end(), snapshot_entry.display_name.begin());
+    snapshot_entry.flow = 0U;
+    snapshot_entry.availability = 0U;
+    snapshot_entry.flags = 1U;
+    snapshot_entry.channels = 2U;
+    snapshot_entry.sample_rate = 48000U;
+    snapshot_entry.buffer_frames = 128U;
+    snapshot_entry.last_sequence = 21U;
+    std::array<std::uint8_t, kDeviceCatalogSnapshotPayloadBytesV1> snapshot_payload{};
+    std::size_t snapshot_bytes = 0U;
+    CHECK(is_valid_message_type(IpcMessageType::DeviceCatalogSnapshot) &&
+          encode_device_catalog_snapshot_v1(std::span<const DeviceCatalogSnapshotEntryV1>(
+                                                 &snapshot_entry, 1U),
+                                             21U, snapshot_payload, snapshot_bytes) &&
+          snapshot_bytes == kDeviceCatalogSnapshotHeaderBytesV1 +
+                                kDeviceCatalogSnapshotEntryBytesV1);
+    DeviceCatalogSnapshotV1 decoded_snapshot{};
+    CHECK(decode_device_catalog_snapshot_v1(
+              std::span<const std::uint8_t>(snapshot_payload.data(), snapshot_bytes),
+              decoded_snapshot) &&
+          decoded_snapshot.entry_count == 1U && decoded_snapshot.catalog_sequence == 21U &&
+          decoded_snapshot.entries[0].endpoint_id_bytes == snapshot_endpoint.size() &&
+          decoded_snapshot.entries[0].flags == 1U);
+    auto malformed_snapshot = snapshot_payload;
+    malformed_snapshot[2U] = 1U;
+    CHECK(!decode_device_catalog_snapshot_v1(
+        std::span<const std::uint8_t>(malformed_snapshot.data(), snapshot_bytes),
+        decoded_snapshot));
+    IpcFrameV1 snapshot_frame;
+    snapshot_frame.header.type = IpcMessageType::DeviceCatalogSnapshot;
+    snapshot_frame.payload.assign(snapshot_payload.begin(), snapshot_payload.begin() +
+                                                        static_cast<std::ptrdiff_t>(snapshot_bytes));
+    CHECK(!decode_control_command_v1(snapshot_frame, decoded_command));
     ControlCommandQueueV1 command_queue;
     ControlCommandV1 queued_command{};
     queued_command.type = IpcMessageType::SceneApply;

@@ -8,6 +8,16 @@
 namespace hibiki {
 namespace {
 
+void write_u16(std::uint8_t* bytes, const std::uint16_t value) noexcept {
+    bytes[0] = static_cast<std::uint8_t>(value & 0xffU);
+    bytes[1] = static_cast<std::uint8_t>((value >> 8U) & 0xffU);
+}
+
+std::uint16_t read_u16(const std::uint8_t* bytes) noexcept {
+    return static_cast<std::uint16_t>(bytes[0]) |
+           static_cast<std::uint16_t>(static_cast<std::uint16_t>(bytes[1]) << 8U);
+}
+
 void write_u32(std::uint8_t* bytes, const std::uint32_t value) noexcept {
     bytes[0] = static_cast<std::uint8_t>(value & 0xffU);
     bytes[1] = static_cast<std::uint8_t>((value >> 8U) & 0xffU);
@@ -252,6 +262,145 @@ bool decode_device_switch_payload_v1(const std::span<const std::uint8_t> payload
     command.sample_rate = sample_rate;
     command.buffer_frames = buffer_frames;
     command.catalog_sequence = read_u64(payload.data() + 280U);
+    return true;
+}
+
+bool encode_device_catalog_snapshot_v1(
+    const std::span<const DeviceCatalogSnapshotEntryV1> entries,
+    const std::uint64_t catalog_sequence,
+    std::array<std::uint8_t, kDeviceCatalogSnapshotPayloadBytesV1>& payload,
+    std::size_t& payload_bytes) noexcept {
+    payload.fill(0U);
+    payload_bytes = 0U;
+    if (entries.size() > kDeviceCatalogSnapshotCapacityV1) return false;
+    for (std::size_t index = 0U; index < entries.size(); ++index) {
+        const auto& entry = entries[index];
+        if (entry.endpoint_id_bytes == 0U ||
+            entry.endpoint_id_bytes > kDeviceSwitchEndpointMaxBytesV1 ||
+            entry.display_name_bytes == 0U || entry.display_name_bytes > 128U ||
+            (entry.flow != 0U && entry.flow != 1U) || entry.availability > 3U ||
+            (entry.flags & static_cast<std::uint16_t>(~1U)) != 0U ||
+            ((entry.flags & 1U) != 0U && entry.availability != 0U) ||
+            !is_printable_utf8(std::string_view(entry.endpoint_id.data(),
+                                                entry.endpoint_id_bytes)) ||
+            !is_printable_utf8(std::string_view(entry.display_name.data(),
+                                                entry.display_name_bytes)) ||
+            (entry.channels != 1U && entry.channels != 2U && entry.channels != 6U &&
+             entry.channels != 8U) ||
+            (entry.sample_rate != 44100U && entry.sample_rate != 48000U &&
+             entry.sample_rate != 96000U && entry.sample_rate != 192000U) ||
+            entry.buffer_frames < 16U || entry.buffer_frames > 4096U) {
+            return false;
+        }
+        const std::string_view endpoint(entry.endpoint_id.data(), entry.endpoint_id_bytes);
+        for (std::size_t previous = 0U; previous < index; ++previous) {
+            const auto& prior = entries[previous];
+            if (endpoint == std::string_view(prior.endpoint_id.data(), prior.endpoint_id_bytes)) {
+                return false;
+            }
+            if ((entry.flags & 1U) != 0U && (prior.flags & 1U) != 0U &&
+                entry.flow == prior.flow) {
+                return false;
+            }
+        }
+    }
+    write_u16(payload.data(), static_cast<std::uint16_t>(entries.size()));
+    write_u64(payload.data() + 4U, catalog_sequence);
+    for (std::size_t index = 0U; index < entries.size(); ++index) {
+        const auto& entry = entries[index];
+        const auto offset = kDeviceCatalogSnapshotHeaderBytesV1 +
+                             (index * kDeviceCatalogSnapshotEntryBytesV1);
+        auto* bytes = payload.data() + offset;
+        write_u16(bytes, entry.endpoint_id_bytes);
+        write_u16(bytes + 2U, entry.display_name_bytes);
+        bytes[4U] = entry.flow;
+        bytes[5U] = entry.availability;
+        write_u16(bytes + 6U, entry.flags);
+        std::copy_n(entry.endpoint_id.data(), entry.endpoint_id_bytes,
+                    bytes + 8U);
+        std::copy_n(entry.display_name.data(), entry.display_name_bytes,
+                    bytes + 268U);
+        write_u32(bytes + 396U, entry.channels);
+        write_u32(bytes + 400U, entry.sample_rate);
+        write_u32(bytes + 404U, entry.buffer_frames);
+        write_u64(bytes + 408U, entry.last_sequence);
+    }
+    payload_bytes = kDeviceCatalogSnapshotHeaderBytesV1 +
+                    (entries.size() * kDeviceCatalogSnapshotEntryBytesV1);
+    return true;
+}
+
+bool decode_device_catalog_snapshot_v1(
+    const std::span<const std::uint8_t> payload,
+    DeviceCatalogSnapshotV1& snapshot) noexcept {
+    snapshot = {};
+    if (payload.size() < kDeviceCatalogSnapshotHeaderBytesV1 ||
+        payload.size() > kDeviceCatalogSnapshotPayloadBytesV1 || payload[2U] != 0U ||
+        payload[3U] != 0U || payload[12U] != 0U || payload[13U] != 0U ||
+        payload[14U] != 0U || payload[15U] != 0U) {
+        return false;
+    }
+    const auto entry_count = static_cast<std::size_t>(read_u16(payload.data()));
+    const auto expected_bytes = kDeviceCatalogSnapshotHeaderBytesV1 +
+                                (entry_count * kDeviceCatalogSnapshotEntryBytesV1);
+    if (entry_count > kDeviceCatalogSnapshotCapacityV1 || payload.size() != expected_bytes) {
+        return false;
+    }
+    for (std::size_t index = 0U; index < entry_count; ++index) {
+        const auto offset = kDeviceCatalogSnapshotHeaderBytesV1 +
+                            (index * kDeviceCatalogSnapshotEntryBytesV1);
+        const auto* bytes = payload.data() + offset;
+        const auto endpoint_bytes = static_cast<std::size_t>(read_u16(bytes));
+        const auto display_bytes = static_cast<std::size_t>(read_u16(bytes + 2U));
+        const auto flow = bytes[4U];
+        const auto availability = bytes[5U];
+        const auto flags = read_u16(bytes + 6U);
+        if (endpoint_bytes == 0U || endpoint_bytes > kDeviceSwitchEndpointMaxBytesV1 ||
+            display_bytes == 0U || display_bytes > 128U || (flow != 0U && flow != 1U) ||
+            availability > 3U || (flags & static_cast<std::uint16_t>(~1U)) != 0U ||
+            ((flags & 1U) != 0U && availability != 0U)) {
+            return false;
+        }
+        for (std::size_t pad = endpoint_bytes; pad < kDeviceSwitchEndpointMaxBytesV1; ++pad) {
+            if (bytes[8U + pad] != 0U) return false;
+        }
+        for (std::size_t pad = display_bytes; pad < 128U; ++pad) {
+            if (bytes[268U + pad] != 0U) return false;
+        }
+        const std::string_view endpoint(reinterpret_cast<const char*>(bytes + 8U), endpoint_bytes);
+        const std::string_view display(reinterpret_cast<const char*>(bytes + 268U), display_bytes);
+        const auto channels = read_u32(bytes + 396U);
+        const auto sample_rate = read_u32(bytes + 400U);
+        const auto buffer_frames = read_u32(bytes + 404U);
+        if (!is_printable_utf8(endpoint) || !is_printable_utf8(display) ||
+            (channels != 1U && channels != 2U && channels != 6U && channels != 8U) ||
+            (sample_rate != 44100U && sample_rate != 48000U && sample_rate != 96000U &&
+             sample_rate != 192000U) ||
+            buffer_frames < 16U || buffer_frames > 4096U) {
+            return false;
+        }
+        for (std::size_t previous = 0U; previous < index; ++previous) {
+            const auto& prior = snapshot.entries[previous];
+            if (endpoint == std::string_view(prior.endpoint_id.data(), prior.endpoint_id_bytes) ||
+                ((flags & 1U) != 0U && (prior.flags & 1U) != 0U && flow == prior.flow)) {
+                return false;
+            }
+        }
+        auto& entry = snapshot.entries[index];
+        entry.endpoint_id_bytes = static_cast<std::uint16_t>(endpoint_bytes);
+        entry.display_name_bytes = static_cast<std::uint16_t>(display_bytes);
+        std::copy_n(bytes + 8U, endpoint_bytes, entry.endpoint_id.data());
+        std::copy_n(bytes + 268U, display_bytes, entry.display_name.data());
+        entry.flow = flow;
+        entry.availability = availability;
+        entry.flags = flags;
+        entry.channels = channels;
+        entry.sample_rate = sample_rate;
+        entry.buffer_frames = buffer_frames;
+        entry.last_sequence = read_u64(bytes + 408U);
+    }
+    snapshot.entry_count = static_cast<std::uint16_t>(entry_count);
+    snapshot.catalog_sequence = read_u64(payload.data() + 4U);
     return true;
 }
 
