@@ -55,6 +55,10 @@ Windows App/session enumeration 也有 opt-in check：
 `pwsh -File tools/live-audio-session-check.ps1`。只輸出 session／active 數量與固定 identity
 語意，不輸出 PID、session ID、endpoint ID 或顯示名稱；它不等於每個 App 已完成實際
 Lane routing 或 DSP delivery。
+Process-level loopback source 也有 opt-in check：
+`pwsh -File tools/live-process-loopback-check.ps1`。它只輸出匿名格式與 frame aggregate；
+若本機 Audio Service 不提供 process-loopback，`loopback=unavailable` 仍只能算 source
+compile evidence，不得當成 Chrome tabCapture、實體 per-App routing 或 signed driver evidence。
 
 遇到環境差異先記錄 fingerprint 並更新 handoff，不要自行重生
 `config/distribution-profile.yml` 裡的 endpoint、ASIO、IPC GUID。

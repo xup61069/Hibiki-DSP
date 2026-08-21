@@ -59,8 +59,11 @@ buffer period 與累計 frame；停止、timeout、格式不符或 WASAPI 失效
 
 1. contract test 驗證零 process ID fail-closed、Degraded snapshot、stop 不恢復成 Ready，
    且無效 source 不可讀取 block。
-2. 目標 Windows 11 24H2 clean machine 以有音訊的測試程序啟動 source，驗證 include／exclude
+2. `pwsh -File tools/live-process-loopback-check.ps1` 會在本機建立短暫 render tone，嘗試以
+   current process 作為 include-tree target，只輸出匿名格式／frame aggregate；沒有可用的
+   process-loopback runtime 時回報 `loopback=unavailable` 並保留 source-only 結果。
+3. 目標 Windows 11 24H2 clean machine 以有音訊的測試程序啟動 source，驗證 include／exclude
    process tree、實際 Float32 frame、buffer overflow drop、停止與 Audio Service restart
    recovery；本機沒有注入的 process-loopback fixture 時只能記錄 source compile，不得宣稱完成。
-3. process-loopback block 進入 Lane 後，使用既有 graph／Group Master／safety／WASAPI handoff
+4. process-loopback block 進入 Lane 後，使用既有 graph／Group Master／safety／WASAPI handoff
    驗證單次增益、錯誤聲道 fail-closed 與與其他來源不串音。

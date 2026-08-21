@@ -25,6 +25,9 @@
    若要驗證實際 shared-mode sink 與 30 ms 無聲 handoff，可額外執行
    `pwsh -File tools/live-wasapi-handoff-check.ps1`；它只輸出 mix format 與 aggregate
    worker counters，沒有可用 endpoint 時會回報 `wasapi=unavailable`。
+   若要驗證 process-level loopback source，可額外執行
+   `pwsh -File tools/live-process-loopback-check.ps1`；它只輸出匿名格式與 frame aggregate，
+   沒有可用 runtime 時會回報 `loopback=unavailable`，不等於 tabCapture 或實體 per-App routing。
    任何 identity/config 變更都必須再執行 `tools/distribution-check.ps1`；改動 driver source
    boundary 時也執行 `tools/driver-source-check.ps1` 與
    `tools/driver-signability-check.ps1`。若有目標 WDK 編出的 package，可用
