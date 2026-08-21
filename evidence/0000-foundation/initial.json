@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "issue": 0,
-  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-output-fanout-runtime-exact-capacity-high-ratio-wavert-stream-wdk-adapter-driver-stream-bridge-endpoint-identity-graph-lane-wasapi-clock-handoff-graph-adapter-expert-surface-asio-wasapi-driver-wasapi-tab-vmic-fanout-engine-v35-vst-supervisor-exchange-v36-vst-worker-lane-v37-plugin-host-wire-v38-iso-formula-builder-v39-source-only-ci-v40-wdk-property-hardening-v41-vst-scene-automation-v42-vst-private-state-v43-vst-sdk-state-v44-program-kweighted-proxy-v45-vst-state-migration-v46-vst-state-registry-v47-vst-scene-state-coordinator-v48-scene-preflight-gate-v49-scene-preflight-adapter-v50-vst-state-bounds-v51-winui-accessibility-v52-session-route-rules-v53-session-route-capacity-v54-watcher-route-rules-v55-output-group-volume-bank-v56-custom-scene-catalog-v57",
-  "source_commit": "ea92d2b",
+  "scope_digest": "committed-foundation-windows-broker-iso-formula-recovery-driver-core-inf-control-pipe-payload-scene-vst-worker-session-volume-sink-clock-native-asio-tab-virtual-mic-ui-ir-phase-atomic-volume-control-queue-winui-vst-parameter-calibration-latency-graph-commit-rt-bank-vst-timeline-scene-ref-rollback-ui-device-fade-plugin-output-fanout-runtime-exact-capacity-high-ratio-wavert-stream-wdk-adapter-driver-stream-bridge-endpoint-identity-graph-lane-wasapi-clock-handoff-graph-adapter-expert-surface-asio-wasapi-driver-wasapi-tab-vmic-fanout-engine-v35-vst-supervisor-exchange-v36-vst-worker-lane-v37-plugin-host-wire-v38-iso-formula-builder-v39-source-only-ci-v40-wdk-property-hardening-v41-vst-scene-automation-v42-vst-private-state-v43-vst-sdk-state-v44-program-kweighted-proxy-v45-vst-state-migration-v46-vst-state-registry-v47-vst-scene-state-coordinator-v48-scene-preflight-gate-v49-scene-preflight-adapter-v50-vst-state-bounds-v51-winui-accessibility-v52-session-route-rules-v53-session-route-capacity-v54-watcher-route-rules-v55-output-group-volume-bank-v56-custom-scene-catalog-v57-grouped-volume-ipc-v58",
+  "source_commit": "0158f8d",
   "environment_fingerprint": "local-only-run-tools-probe",
   "commands": [
     "pwsh -File tools/verify.ps1",
@@ -38,7 +38,8 @@
     "cmake --build .local/vst3-build --config RelWithDebInfo --target hibiki_vst3_sdk_catalog",
     "cmake --build .local/vst3-build --config RelWithDebInfo --target hibiki_vst3_sdk_worker",
     "scene-safety-controller coverage in hibiki_contract_tests",
-    "output-crossfade coverage in hibiki_contract_tests"
+    "output-crossfade coverage in hibiki_contract_tests",
+    "grouped-volume IPC C++/C# contract coverage in hibiki_contract_tests and control-model-check"
   ],
   "results": [
     {"command": "tools/verify.ps1", "status": "pass", "tests": 1},
@@ -105,10 +106,11 @@
     {"command": "multi-sink-output-fanout", "status": "pass", "coverage": ["up to 8 sink plan", "same-layout block copy", "disabled sink isolation", "capacity preflight", "exact phase/step capacity preflight", "duplicate sink rejection", "finite-input preflight", "all-disabled plan rejection", "per-sink persistent SRC", "clock observation", "transactional scratch publish", "SRC state rollback", "AudioEngine graph-to-fanout boundary", "layout mismatch rejection", "high-ratio persistent SRC phase guard"], "compiled_artifacts": false},
     {"command": "installer-source-hardening", "status": "pass", "coverage": ["relative manifest paths", "path traversal rejection", "64-character SHA-256 validation"]},
     {"command": "ir-phase-policy", "status": "pass", "coverage": ["minimum-phase 0 ms", "mixed-phase 80 ms budget", "linear-phase 160 ms budget", "bypass validation", "C++/C# slider parity"]},
-    {"command": "audio-engine-volume-snapshot", "status": "pass", "coverage": ["per-group 64-bit dB/mute atomics", "independent Main/Movie group targets", "mute transition", "Group Master applied once per selected group", "8 ms gain ramp", "5 ms mute", "15 ms unmute", "Strict Direct Group Master bypass", "-1 dBTP output guard"]},
+    {"command": "audio-engine-volume-snapshot", "status": "pass", "coverage": ["per-group 64-bit dB/mute atomics", "independent Main/Movie group targets", "mute transition", "Group Master applied once per selected group", "8 ms gain ramp", "5 ms mute", "15 ms unmute", "Strict Direct Group Master bypass", "-1 dBTP output guard", "custom output-group target"]},
+    {"command": "grouped-volume-ipc", "status": "pass", "coverage": ["legacy 16-byte Main payload compatibility", "48-byte grouped payload", "strict UTF-8 and zero-padding validation", "C++ encode/decode", "C# encode/decode", "selected UI output-group target", "unknown group fail-closed"]},
     {"command": "custom-scene-catalog", "status": "pass", "coverage": ["SceneDefinition schema validation", "bounded 32-entry catalog", "replacement swap", "remove/clear", "SceneApply custom ID resolver", "output-group exact match", "Strict Direct mismatch rejection", "unknown custom ID fail-closed"]},
     {"command": "control-command-queue", "status": "pass", "coverage": ["64-slot SPSC", "full-queue dropped counter", "pipe-to-control handoff"]},
-    {"command": "engine-control-worker", "status": "pass", "coverage": ["SceneApply to Easy presets", "Validate-Prepare-Commit", "preflight gate before Prepare", "VST3 Scene coordinator adapter", "bound Scene accepted only after state preflight", "unbound Easy Scene compatibility", "failed preflight preserves Scene/revision/graph", "volume through Group Master", "invalid scene preserves revision"]},
+    {"command": "engine-control-worker", "status": "pass", "coverage": ["SceneApply to Easy presets", "Validate-Prepare-Commit", "preflight gate before Prepare", "VST3 Scene coordinator adapter", "bound Scene accepted only after state preflight", "unbound Easy Scene compatibility", "failed preflight preserves Scene/revision/graph", "volume through Group Master", "grouped volume target resolver", "invalid scene preserves revision"]},
     {"command": "output-group-routing", "status": "pass", "coverage": ["fixed-size RT group identity", "four-lane isolation", "missing-group fail-closed", "AudioEngine process_output_group"]},
     {"command": "session-route-graph-builder", "status": "pass", "coverage": ["active bound session compilation", "WindowsSession/HibikiInternal gain ownership", "two Chrome session groups", "Strict Direct gain rejection", "bounded makeup gain mutator", "case-insensitive app rule matching", "priority selection", "equal-priority ambiguity fail-closed", "PID-independent routing", "64-rule capacity boundary", "Windows watcher worker-enumerate rule application"]},
     {"command": "program-aware-level-controller", "status": "pass", "coverage": ["bounded RMS proxy", "fixed-state K-weighted proxy", "optional LFE exclusion", "3 second analysis window", "silence gate", "boost/cut caps", "dB-per-second rate limit", "nonfinite sample guard", "optional tab-lane integration", "sample-rate mismatch fail-closed"], "formal_bs1770_conformance": false},
@@ -121,7 +123,7 @@
   "started_at": "2026-08-21T00:00:00Z",
   "finished_at": "2026-08-21T00:00:00Z",
   "limitations": [
-    "Evidence corresponds to commit ea92d2b and the current environment only; no real endpoint handoff or UI Automation run was exercised. WinUI SDK build was attempted after restore but XamlCompiler exited 1 on the local toolchain.",
+    "Evidence corresponds to commit 0158f8d and the current environment only; no real endpoint handoff or UI Automation run was exercised. WinUI SDK build was attempted after restore but XamlCompiler exited 1 on the local toolchain.",
     "The native ASIO build is an unsigned local developer verification; no DLL or SDK checkout is committed or published.",
     "Current machine is Windows 22631 with VS 17/SDK 10.0.26100.0; it cannot provide driver-target evidence for the locked Windows 26100+/VS 2026/SDK-WDK 10.0.28000.2526 environment."
   ],
