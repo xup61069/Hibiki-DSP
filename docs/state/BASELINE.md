@@ -19,7 +19,9 @@
   origin/actuator text; scene selection is disabled until the engine is connected and remains
   command/Ack/status-refresh based. While connected it polls the bounded ControlStatusSnapshot once
   per second (coalesced while a command is busy) so external engine/Windows-volume changes can be
-  reflected without touching the audio thread.
+  reflected without touching the audio thread. It also displays the local render/capture catalog
+  counts and default-render metadata, while keeping physical sink activation and switching out of
+  scope.
 - Both the formal WinUI source shell and Desktop Compatibility Preview now expose the bounded IR
   phase policy: Game minimum-phase/0 ms, Balanced mixed-phase/80 ms maximum, Movie linear-phase/
   160 ms maximum and Bypass. The fixed command now reaches Engine Preview and attaches the prepared

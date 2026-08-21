@@ -27,6 +27,8 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   啟動 smoke；它和正式 shell 共用 `EasyControlViewModel`，自帶 .NET runtime、不依賴 Windows App Runtime，
   現在包含場景選擇、路由健康摘要與音量來源／致動器顯示，但不是 XAML、無障礙、driver 或
   release evidence；連線後每秒輪詢一次 bounded ControlStatusSnapshot，命令忙碌時會合併輪詢。
+  目前也顯示本機 physical catalog 的 render/capture 數量與預設輸出 metadata，但不提供實體
+  sink 啟用或切換。
 - WinUI 與 Desktop Preview 都有 IR phase policy controls（Game/Balanced/Movie/Bypass）與明確的
   0/80/160 ms delay semantics；控制面會把 bounded IR WAV 送入 Engine Preview。
 - C++ control-plane 已有 bounded RIFF/WAVE IR importer，支援 Float32/PCM16/24/32、finite/tap/file
