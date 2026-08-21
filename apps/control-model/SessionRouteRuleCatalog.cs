@@ -60,16 +60,12 @@ public sealed class SessionRouteRuleCatalogV1
         if (index >= 0)
         {
             _rules[index] = rule;
+            SortRules();
             return true;
         }
         if (_rules.Count >= MaxRules) return false;
         _rules.Add(rule);
-        _rules.Sort(static (left, right) =>
-        {
-            var priority = right.Priority.CompareTo(left.Priority);
-            return priority != 0 ? priority :
-                string.CompareOrdinal(left.RuleId, right.RuleId);
-        });
+        SortRules();
         return true;
     }
 
@@ -187,12 +183,7 @@ public sealed class SessionRouteRuleCatalogV1
                 }
                 candidate.Add(rule);
             }
-            candidate.Sort(static (left, right) =>
-            {
-                var priority = right.Priority.CompareTo(left.Priority);
-                return priority != 0 ? priority :
-                    string.CompareOrdinal(left.RuleId, right.RuleId);
-            });
+            candidate.Sort(CompareRules);
             _rules.Clear();
             _rules.AddRange(candidate);
             return true;
@@ -218,6 +209,14 @@ public sealed class SessionRouteRuleCatalogV1
         LaneId = rule.LaneId,
         OutputGroup = rule.OutputGroup
     };
+
+    private void SortRules() => _rules.Sort(CompareRules);
+
+    private static int CompareRules(SessionRouteRuleCard left, SessionRouteRuleCard right)
+    {
+        var priority = right.Priority.CompareTo(left.Priority);
+        return priority != 0 ? priority : string.CompareOrdinal(left.RuleId, right.RuleId);
+    }
 
     private static bool IsValid(SessionRouteRuleCard rule)
     {

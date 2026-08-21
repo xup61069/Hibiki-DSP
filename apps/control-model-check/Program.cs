@@ -70,10 +70,16 @@ Check(routeRules.Upsert(quietRule) && routeRules.Count == 1 &&
     "Session route rule catalog insert failed.");
 Check(routeRules.Upsert(quietRule with { Priority = 40 }) && routeRules.Count == 1 &&
       routeRules.Rules[0].Priority == 40 &&
+      routeRules.Upsert(quietRule with { RuleId = "music", Priority = 10 }) &&
+      routeRules.Rules[0].RuleId == "quiet-game" &&
+      routeRules.Upsert(quietRule with { RuleId = "music", Priority = 50 }) &&
+      routeRules.Rules[0].RuleId == "music" &&
       !routeRules.Upsert(quietRule with { RuleId = "Bad ID" }) &&
       !routeRules.Upsert(quietRule with { AppId = "", DisplayName = "" }) &&
       !routeRules.Upsert(quietRule with { LaneId = "" }),
     "Session route rule catalog validation/update failed.");
+Check(routeRules.Remove("music") && routeRules.Count == 1,
+    "Session route rule catalog cleanup failed.");
 var routeRulePath = Path.Combine(Path.GetTempPath(),
     $"hibiki-route-rule-check-{Guid.NewGuid():N}.json");
 try
