@@ -6,6 +6,23 @@
 handoff、Spec、ADR、source 與 tests。聊天紀錄、AI memory、個人 IDE 規則
 都不是專案真值。
 
+## 多 AI 並行（必遵守）
+
+- 完整協定見 `docs/ai/MULTI_AGENT.md`。每個 AI 工作切片必須各自使用一個 GitHub Issue、
+  一個獨立 clone/worktree、一個 branch、一份 `docs/tasks/active/<issue>.md` 與一個 draft PR。
+- GitHub Issue assignee／linked PR 是即時認領真值；handoff 是可重建的分支交接真值。沒有認領、
+  handoff 或明確 write scope 時只能唯讀偵察，不得開始修改。
+- 禁止兩個仍在執行的 AI 共用 working tree、index、branch 或同一 Issue。需要並行時拆 child Issue；
+  交接同一 branch 時必須先由前一個 AI commit、push、停止寫入並更新 owner。
+- handoff 的 `scope_globs` 是該工作切片的獨占 write scope。開始前必須檢查 open Issue、draft PR
+  與 active handoff；scope 重疊、跨 lane 或會碰共享整合檔時，先由 integration coordinator
+  指定 owner 與合併順序，不得自行同時修改。
+- `docs/AI_HANDOFF.md`、`docs/state/BASELINE.md`、`docs/PROJECT_MAP.md`、root `README.md` 與
+  `docs/tasks/active/0.md` 是整合快照，由 integrator 單寫。feature AI 更新自己的 handoff、
+  Spec、tests 與 evidence，不在未合併分支宣稱全域完成狀態。
+- 不直接 push `main`，不 force-push 或改寫已發布／被依賴的 branch。每個 PR 只處理一個 Issue；
+  跨 lane 先合併 contract/schema，再讓相依工作從新 base 開始或明列 stacked dependency。
+
 ## 專案硬限制
 
 - 目標：Windows 11 24H2+ x64；C++20 即時核心、C# WinUI 3 UI。
@@ -66,9 +83,10 @@ Windows 系統音量的真實讀回／寫入／恢復也是額外的 opt-in live
 這個 user-space broker probe 當成 driver、WaveRT 或 HLK evidence。
 
 Windows 單一 App/session 音量的真實讀回／寫入／恢復也是額外的 opt-in live check：
-`pwsh -File tools/live-session-volume-check.ps1 -WriteTest`。它只建立本 probe 的無聲 shared-mode
-session，以 generation-scoped catalog handle 暫時衰減約 3 dB、讀回並恢復原值；不輸出
-session/endpoint identity，也不等於實體 per-App capture、重送或 DSP delivery evidence。
+`pwsh -File tools/live-session-volume-check.ps1 -WriteTest`。預設會啟動 Engine Preview，建立本
+probe 的無聲 shared-mode session，以 generation-scoped catalog handle 經 IPC/control queue/COM
+worker 暫時衰減約 3 dB、讀回並恢復原值；不輸出 session/endpoint identity，也不等於實體
+per-App capture、重送或 DSP delivery evidence。只有除錯 coordinator 時才加 `-DirectCoordinator`。
 
 Windows App/session enumeration 也有 opt-in check：
 `pwsh -File tools/live-audio-session-check.ps1`。只輸出 session／active 數量與固定 identity

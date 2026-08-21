@@ -3,17 +3,31 @@
 這一頁是交接摘要，不取代 Spec、ADR、source 或 evidence。遇到衝突時，以
 `docs/START_HERE.md` 所列權威順序處理，不要依聊天紀錄猜測。
 
-## 先做這四件事
+## 先做這七件事
 
 ```powershell
-git status --short
+git fetch --all --prune
+git status --short --branch
+gh issue view <issue>
+gh pr list --state open
 pwsh -File tools/doctor.ps1 -CheckOnly
-pwsh -File tools/handoff-check.ps1
-pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
+pwsh -File tools/handoff-check.ps1 -Issue <issue>
+pwsh -File tools/context-pack.ps1 -Issue <issue> -NoSource
 ```
 
 工作樹不是乾淨狀態、handoff check 失敗，或 target toolchain 不符合時，先在
-`docs/tasks/active/0.md` 記錄事實；不要直接改 DSP、driver、永久 ID 或 release 設定。
+`docs/tasks/active/<issue>.md` 記錄事實；不要直接改 DSP、driver、永久 ID 或 release 設定。
+Issue 0 是 foundation integration handoff，只由 integrator 更新，不是所有 AI 共用的工作單。
+
+## 多 AI 並行入口
+
+- 完整規則見 `docs/ai/MULTI_AGENT.md`：一個 AI 工作切片對應一個 Issue、獨立 worktree、
+  branch、handoff 與 draft PR。同一 Issue／branch 同時只能有一個 writer。
+- 修改前以 Issue assignee／linked draft PR 完成 live claim，並在 handoff v2 宣告
+  `scope_globs`、`shared_paths` 與 `depends_on`。scope 重疊時先停止，由 integrator 指定 owner。
+- feature AI 只更新自己的 handoff、目標 Spec、tests 與 evidence；全域摘要與 Issue 0 由
+  integrator 在整合時單次更新。每份 active handoff 各自只有一個 `Next safe action`，但不同
+  Issue 可以在不重疊的 scope 內並行。
 
 ## 現在的真實位置
 
@@ -78,12 +92,14 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   original value and prints no endpoint identity. It is still user-space broker evidence only;
   do not run it silently or treat it as driver/WaveRT evidence.
 - `pwsh -File tools/live-session-volume-check.ps1 -WriteTest` is the explicit per-App/session
-  volume probe: it creates one silent shared-mode session, discovers it through the bounded
-  `SessionCatalogSnapshot`, uses the generation-scoped handle to attenuate about 3 dB, reads the
-  same `ISimpleAudioVolume` value back through `WindowsAudioSessionRouteCoordinatorV1`, and restores
-  the original dB/mute before exit. It does not print endpoint/session identity and remains
-  user-space control-plane evidence; physical per-App capture/re-send and DSP delivery are still
-  unverified.
+  volume probe: it starts Engine Preview with session routing, creates one silent shared-mode
+  session, discovers it through the bounded `SessionCatalogSnapshot`, sends the generation-scoped
+  handle through the IPC/control queue, reads the same `ISimpleAudioVolume` value back after the COM
+  worker applies it, and restores the original dB/mute before exit. It does not print endpoint/session
+  identity and remains user-space control-plane evidence; physical per-App capture/re-send and DSP
+  delivery are still unverified. `-DirectCoordinator` is a diagnostic-only bypass. The same probe
+  then sends a bounded `SessionRouteCommand` and requires the route catalog to read back `Ready`;
+  this verifies candidate graph commit in the worker, not physical audio rerouting.
 - The next driver-facing source milestone is now the Apache `driver_control_transport_v1` fixed
   136-byte little-endian endpoint-state/volume-notification packet plus the GPL
   `DriverVolumeLinkV1` adapter. It is contract-tested and ready for a future WDK/SYSVAD project
@@ -92,7 +108,7 @@ pwsh -File tools/context-pack.ps1 -Issue 0 -NoSource
   it intentionally has no unbounded error payload. Evidence for this increment is
   `evidence/0000-foundation/driver-control-handshake-v1.json`.
 
-## 唯一下一步
+## 目前整合主線
 
 在 Windows 11 24H2+ x64、Visual Studio 2026、SDK/WDK 10.0.28000.2526 的乾淨機器上，先完成
 source-only WinUI XAML build 與 accessibility smoke evidence；成功後才進行第一個 loadable
@@ -133,6 +149,7 @@ user-space opt-in，不代表 driver 或完整播放驗收。
 
 ## 交接前最小完成條件
 
-每一個後續 AI 在換機前必須：更新 active handoff 的 base commit/驗證/限制/下一步、建立 WIP
-commit、push branch，並跑與改動範圍相符的 gate。所有 public contract 變更都要同步更新
-Spec、tests、evidence 與 `docs/state/BASELINE.md`。
+每一個後續 AI 在換機前必須：只更新自己 active handoff 的 owner、base commit、驗證、限制與
+下一步，建立 WIP commit、push 自己的 branch，並跑與改動範圍相符的 gate。所有 public contract
+變更都要同步更新 Spec、tests 與 evidence；`docs/state/BASELINE.md` 等全域整合快照由 integrator
+在合併時更新。
