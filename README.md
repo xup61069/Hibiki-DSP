@@ -6,6 +6,15 @@ Hibiki DSP 是公開開發中的 Windows 音訊平台，不是已可供一般使
 「一鍵變好聽」的 Easy 模式，加上可選的 Expert Matrix、per-App 路由、校正、IR、VST3 與
 Hibiki ASIO；所有自有原始碼、規格、建置腳本與驗證證據都以本 repository 為唯一真值。
 
+## 公開 repository
+
+[github.com/xup61069/Hibiki-DSP](https://github.com/xup61069/Hibiki-DSP) 是唯一官方公開 source
+入口。可用下列方式在新電腦取得同一份交接資料：
+
+```powershell
+git clone https://github.com/xup61069/Hibiki-DSP.git
+```
+
 ## 現在可以相信什麼
 
 | 區域 | 已有可重跑證據 | 尚未可對外承諾 |
