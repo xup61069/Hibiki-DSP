@@ -482,7 +482,7 @@ HRESULT WindowsControlRuntimeV1::refresh_default_volume(
     if (FAILED(result) || device == nullptr) return FAILED(result) ? result : E_FAIL;
     const auto bind_result = volume_broker_.bind(device);
     device->Release();
-    if (SUCCEEDED(bind_result)) (void)refresh_default_session_routes(enumerator);
+    if (bind_result == S_OK) (void)refresh_default_session_routes(enumerator);
     return bind_result;
 }
 
@@ -494,7 +494,7 @@ HRESULT WindowsControlRuntimeV1::refresh_default_volume_if_changed(
     if (FAILED(result) || device == nullptr) return FAILED(result) ? result : E_FAIL;
     const auto bind_result = volume_broker_.bind_if_changed(device);
     device->Release();
-    if (SUCCEEDED(bind_result)) (void)refresh_default_session_routes(enumerator);
+    if (bind_result == S_OK) (void)refresh_default_session_routes(enumerator);
     return bind_result;
 }
 
