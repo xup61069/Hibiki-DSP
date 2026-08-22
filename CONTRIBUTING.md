@@ -14,9 +14,11 @@ points at them instead of restating them so it cannot drift.
 ## Claiming work
 
 - One GitHub Issue equals one isolated worktree, one branch named `codex/<issue>-<slug>`,
-  one schema-v2 handoff at `docs/tasks/active/<issue>.md`, and one draft PR.
-- Live ownership is the Issue assignee plus linked draft PR. Declare `scope_globs` and
-  `shared_paths` in the handoff before editing anything, and stay inside that scope.
+  one handoff block embedded in the Issue body, and one draft PR. Lifecycle is expressed
+  by labels (`claimed` = in progress, `in-review` = ready for review) and issue state.
+- Live ownership is the Issue assignee plus lifecycle label plus linked draft PR.
+  Declare `scope_globs` and `shared_paths` in the Issue body handoff block before
+  editing anything, and stay inside that scope.
 - Never push to `main`, never force-push published branches, and never modify another lane's
   branch or worktree.
 

@@ -11,7 +11,7 @@
 1. 一個 GitHub Issue；需要兩個 writer 就拆成兩個 child Issue。
 2. 一個位於其他 AI working tree 之外的 clone 或 `git worktree`。
 3. 一個 `<agent>/<issue>-<slug>` branch；不得直接在 `main` 開發。
-4. 一份 `docs/tasks/active/<issue>.md` schema v2 handoff。
+4. Issue body 內的 `<!-- hibiki:handoff-v1 -->` handoff block（取代舊 handoff 檔案）。
 5. 一個 draft PR；除非有明確 dependency，base 一律是 `main`。
 
 同一時間不得有兩個 writer 共用 Issue、working tree、index、branch 或 handoff。若要把同一 branch
@@ -20,7 +20,7 @@
 
 ## 開始工作：claim protocol
 
-1. `git fetch --all --prune`，讀 open Issue、open/draft PR 與相關 active handoff。
+1. `git fetch --all --prune`，讀 open Issue、open/draft PR 與其他 Issue 的 handoff block。
 2. 確認 Issue 沒有 active owner，且預計的 `scope_globs` 不和其他 active claim 重疊。同時
    檢查 `git ls-remote --heads origin` 是否已有同名/相鄰 branch 佔位——branch 存在但沒有
    PR 也算已被認領。Issue 與 PR 共用編號計數器：先建 Issue 取得確定號碼，再命名 branch；
@@ -34,9 +34,11 @@
    git worktree add ..\Hibiki-DSP-<issue>-<slug> -b codex/<issue>-<slug> origin/main
    ```
 
-5. 由 `docs/tasks/active/TEMPLATE.md` 建立 handoff，執行
-   `pwsh -File tools/handoff-check.ps1 -Issue <issue>`，push claim commit，立即開 draft PR。
-6. claim 在 GitHub 可見後才開始修改產品檔案。沒有 Issue／handoff／scope 時只能做唯讀偵察。
+5. 在 Issue body 加入 handoff block（branch、base_commit、owner、scope_globs、shared_paths、
+   depends_on 與 resume_commands），執行 `pwsh -File tools/handoff-check.ps1 -Issue <issue>`，
+   push claim commit，立即開 draft PR。Lifecycle label 使用 `claimed`（進行中）或 `in-review`
+   （待審）；Issue 關閉即代表 done，不需要額外 label。
+6. claim 在 GitHub 可見後才開始修改產品檔案。沒有 Issue／handoff block／scope 時只能做唯讀偵察。
 
 worktree 的實際本機路徑屬環境資訊，不寫入 repository。禁止在別的 AI 正在使用的 worktree 執行
 `checkout`、`switch`、branch rename、reset、clean 或 rebase。
@@ -50,7 +52,7 @@ worktree 的實際本機路徑屬環境資訊，不寫入 repository。禁止在
   即使看起來「只是幫忙」。
 - 認領前除了 GitHub 檢查，也要 `git ls-remote --heads` 確認 branch 未被佔位——另一個
   session 可能已推了 claim commit 但還沒開 PR。
-- 回到先前中斷的 slice 時：先 fetch，以遠端 HEAD 與 handoff status 為唯一真值重新確認；
+- 回到先前中斷的 slice 時：先 fetch，以遠端 HEAD 與 Issue body handoff block 為唯一真值重新確認；
   本機未 push 的 edits 若已被遠端接手完成，接受遠端版本、獨立重跑全部 gates 驗證，
   不重寫歷史。
 - 工作被另一 session 接手完成時，在 PR body 誠實記錄接手事件與後續驗證
@@ -65,8 +67,8 @@ worktree 的實際本機路徑屬環境資訊，不寫入 repository。禁止在
 
 ## Scope 與 ownership
 
-handoff v2 的 `scope_globs` 是該 Issue 的獨占預告 write-set；`shared_paths` 是預期需要 integrator
-或其他 lane 配合的檔案，不代表 worker 已取得寫入權。工作範圍擴張前，先更新 Issue/handoff 並重新
+handoff block 的 `scope_globs` 是該 Issue 的獨占預告 write-set；`shared_paths` 是預期需要 integrator
+或其他 lane 配合的檔案，不代表 worker 已取得寫入權。工作範圍擴張前，先更新 Issue body 並重新
 檢查 overlap。
 
 建議 lane：
@@ -87,9 +89,9 @@ handoff v2 的 `scope_globs` 是該 Issue 的獨占預告 write-set；`shared_pa
 - `docs/state/BASELINE.md`
 - `docs/PROJECT_MAP.md`
 - root `README.md`
-- `docs/tasks/active/0.md`
+- foundation integration Issue body
 
-以下是高衝突 registry/聚合檔，必須在 Issue/handoff 的 `shared_paths` 宣告並由 integrator 指定單一
+以下是高衝突 registry/聚合檔，必須在 Issue body handoff block 的 `shared_paths` 宣告並由 integrator 指定單一
 writer：root/subsystem `CMakeLists.txt`、`tests/unit/contract_tests.cpp`、
 `apps/control-model-check/Program.cs`、workflow、dependency lock、distribution identity 與 Spec index。
 
@@ -104,10 +106,10 @@ docs-check 即時量測（`git ls-files`），不再與 committed 數字比對�
 ## Contract-first 與 dependency
 
 跨 lane 功能先拆出最小 contract/schema/Spec Issue 並合併，再讓實作 Issue 從新 `main` 開始。
-不能等待時可以使用 stacked draft PR，但 handoff 必須以 `target_branch` 與 `depends_on` 明列依賴，
+不能等待時可以使用 stacked draft PR，但 handoff block 必須以 `target_branch` 與 `depends_on` 明列依賴，
 上游不得 force-push。上游變更後，下游先同步、重跑 baseline，再繼續工作。
 
-一個 PR 只完成一個 Issue與一組 acceptance。feature AI 更新自己的 handoff、目標 Spec、tests、匿名
+一個 PR 只完成一個 Issue與一組 acceptance。feature AI 更新自己的 handoff block、目標 Spec、tests、匿名
 evidence；integrator 在合併階段單次更新全域快照。未合併 branch 不得把局部 smoke 寫成 main 已完成
 能力。
 
@@ -117,10 +119,10 @@ evidence；integrator 在合併階段單次更新全域快照。未合併 branch
 - 發布後的 branch 不 force-push、不 rewrite history；需要同步 target branch 時採可審查的 merge，
   或由唯一 owner 在未被依賴前 rebase。
 - push 前比較 `git diff --name-only <target>...HEAD` 與 `scope_globs`；超出 scope 先停下協調。
-- PR 轉 ready 前執行 handoff 指定 gates、更新 `Last verification`、限制、唯一 `Next safe action` 與
-  最多五個 resume commands。
+- PR 轉 ready 前執行 handoff block 指定 gates、把 lifecycle label 從 `claimed` 改為 `in-review`、更新
+  handoff block 的驗證紀錄、限制與唯一 `Next safe action`。
 - 交接時原 owner commit + push + 停寫，新 owner readback 遠端 HEAD、更新 owner 後再修改。
-- 合併後 integrator 把 handoff 移到 `docs/tasks/completed/<year>/`，記錄 merge SHA 與 evidence。
+- 合併後 integrator 關閉 Issue 並記錄 merge SHA 與 evidence；lifecycle 由 issue state 表示，不再歸檔 handoff 檔案。
 
 ## 衝突處理
 
