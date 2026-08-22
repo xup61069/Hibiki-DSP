@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "issue": 121,
+  "scope_digest": "verify-selftest-v1",
+  "source_commit": "c20a4f1",
+  "environment_fingerprint": "windows-11-26200-x64-preview",
+  "commands": [
+    "pwsh -NoProfile -File tools/verify.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 121",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "ignored output root derivation and cleanup bounds",
+        "CMake configure argument sequence",
+        "CMake build argument sequence and RelWithDebInfo config",
+        "CTest argument sequence",
+        "invalid plan rejection"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 5
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 121 / tools/handoff-check.ps1 / source-policy / source-only-ci / verify / docs-check / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership and scope",
+        "446 tracked paths source policy",
+        "one workflow source-only publication boundary",
+        "CMake/CTest 1 of 1",
+        "documentation and baseline counters verified",
+        "no whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "The self-test is aggregate build-dispatch/source evidence only; it does not prove CMake configure, compilation, CTest execution, physical audio delivery, driver, WaveRT, HLK, signing, or release behavior.",
+    "Release build outputs remain ignored local artifacts and are not submitted to GitHub."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.301",
+    "msvc": "19.44.35228.0",
+    "powershell": "7.6.5",
+    "cmake": "4.4.0"
+  },
+  "started_at": "2026-08-22T09:55:00+08:00",
+  "finished_at": "2026-08-22T09:56:00+08:00"
+}
