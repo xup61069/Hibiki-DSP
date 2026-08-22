@@ -3,7 +3,7 @@
   "issue": 244,
   "scope_digest": "issue-244-distribution-selftest-crlf-v1",
   "source_commit": "4f5e2c6f975970fcaf1aa371dca0907d433d04c5",
-  "implementation_commit": "pending",
+  "implementation_commit": "cf845d7",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; vs2026-sdk-wdk-on-disk; target-24h2-machine-missing",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 244",
