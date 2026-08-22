@@ -243,6 +243,16 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   claim commit only (documented race event); docs-check now fails closed on missing relative
   link targets across tracked markdown, skips URLs/anchors/fenced blocks, reports the checked
   count and gained six offline -SelfTest cases (Issue #496 / PR #501).
+- Live WASAPI handoff probe hardening merged: live-wasapi-handoff-check.ps1 fails closed
+  on fixed build-root and probe-path validation, rejecting outside-root paths, existing
+  reparse-point ancestors/targets and non-directory/non-file shapes while preserving
+  missing build-root creation; wrapper self-test grew without CMake, probe execution or
+  repository writes (Issue #506 / PR #508).
+- Live volume probe hardening merged: live-system-volume-check.ps1 and
+  live-session-volume-check.ps1 now follow the established live-probe path-guard pattern,
+  validating build roots and the engine executable (under-root, reparse-point scan and
+  kind checks) before any build, write or process launch; -SelfTest gained offline
+  synthetic-attribute cases (Issue #505 / PR #511).
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe

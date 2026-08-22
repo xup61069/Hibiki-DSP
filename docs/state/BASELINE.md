@@ -676,6 +676,15 @@ CMake、不執行 probe、不寫 repo 檔案（Issue #500 / PR #502）；docs-ch
 檢查數量並新增六個離線 self-test 案例（Issue #496 / PR #501）。皆為 tooling/source
 evidence。
 
+第十二波 tooling 增量已合併：live-wasapi-handoff-check.ps1 對固定 build root 與
+probe path 新增 fail-closed 驗證，拒絕 root 外路徑、既有 reparse point 祖先／target 與
+非目錄／非檔案形狀，保留 missing build root 建立行為，wrapper self-test 擴充且不呼叫
+CMake、不執行 probe、不寫 repo 檔案（Issue #506 / PR #508）；
+live-system-volume-check.ps1 與 live-session-volume-check.ps1 移植既有 live-probe
+path-guard 模式，在任何 build、寫入或啟動程序前 fail-closed 驗證 build roots 與
+engine executable（root 內、reparse point 掃描與形狀檢查），self-test 加入離線
+合成屬性案例（Issue #505 / PR #511）。皆為 tooling/source evidence。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；
