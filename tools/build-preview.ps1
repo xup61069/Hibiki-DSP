@@ -128,6 +128,52 @@ function Assert-PreviewBuildOutputRoot {
   }
 }
 
+function Assert-PreviewLaunchTarget {
+  param(
+    [Parameter(Mandatory)][string]$LocalRoot,
+    [Parameter(Mandatory)][string]$ExecutablePath,
+    [hashtable]$SyntheticAttributes
+  )
+
+  $resolvedRoot = [IO.Path]::GetFullPath($LocalRoot).TrimEnd('\', '/')
+  $resolvedExecutable = [IO.Path]::GetFullPath($ExecutablePath).TrimEnd('\', '/')
+  if (-not (Test-PreviewPathUnderRoot -Path $resolvedExecutable -Root $resolvedRoot)) {
+    throw "Preview launch target must remain under the repository .local root: $resolvedExecutable"
+  }
+
+  $targetAttributes = Get-PreviewExistingAttributes -Path $resolvedExecutable -SyntheticAttributes $SyntheticAttributes
+  if ($null -eq $targetAttributes) {
+    throw "Preview launch target does not exist: $resolvedExecutable"
+  }
+  if (($targetAttributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+    throw "Preview launch target must not be a reparse point: $resolvedExecutable"
+  }
+  if (($targetAttributes -band [System.IO.FileAttributes]::Directory) -ne 0) {
+    throw "Preview launch target must be a file: $resolvedExecutable"
+  }
+
+  $cursor = [IO.Path]::GetFullPath((Split-Path -Parent $resolvedExecutable)).TrimEnd('\', '/')
+  while ($true) {
+    $attributes = Get-PreviewExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    if ($null -eq $attributes) {
+      throw "Preview launch target parent does not exist: $cursor"
+    }
+    if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+      throw "Preview launch path contains a reparse-point parent: $resolvedExecutable"
+    }
+    if (($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+      throw "Preview launch target parent is not a directory: $cursor"
+    }
+    if ($cursor -eq $resolvedRoot) { break }
+    $parent = [IO.Path]::GetFullPath((Split-Path -Parent $cursor)).TrimEnd('\', '/')
+    if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor -or
+        -not (Test-PreviewPathUnderRoot -Path $cursor -Root $resolvedRoot)) {
+      throw "Preview launch path could not reach the repository .local root: $resolvedExecutable"
+    }
+    $cursor = $parent
+  }
+}
+
 if ($SelfTest) {
   $expected = [ordered]@{
     WinUI = @{ ProjectRelativePath = 'apps/winui-shell/Hibiki.WinUI.csproj'; OutputProperty = 'OutputPath'; SmokeExecutable = $null }
@@ -204,7 +250,71 @@ if ($SelfTest) {
   }
   if (-not $nonDirectoryCaught) { throw 'Preview dispatch self-test expected a non-directory rejection.' }
 
-  Write-Output 'Preview target dispatch self-test passed (11 cases).'
+  $selfTestLocalRoot = [IO.Path]::GetFullPath((Join-Path $repo '.local')).TrimEnd('\', '/')
+  $selfTestOutputRoot = [IO.Path]::GetFullPath((Join-Path $repo '.local/preview/Synthetic')).TrimEnd('\', '/')
+  $selfTestOutputParent = [IO.Path]::GetFullPath((Split-Path -Parent $selfTestOutputRoot)).TrimEnd('\', '/')
+  $selfTestExecutable = [IO.Path]::GetFullPath((Join-Path $selfTestOutputRoot 'Hibiki.WinUI.exe')).TrimEnd('\', '/')
+  $directory = [System.IO.FileAttributes]::Directory
+  $file = [System.IO.FileAttributes]::Archive
+
+  Assert-PreviewLaunchTarget -LocalRoot $selfTestLocalRoot -ExecutablePath $selfTestExecutable -SyntheticAttributes @{
+    $selfTestLocalRoot = $directory
+    $selfTestOutputParent = $directory
+    $selfTestOutputRoot = $directory
+    $selfTestExecutable = $file
+  }
+
+  $outsideLaunchCaught = $false
+  try {
+    Assert-PreviewLaunchTarget -LocalRoot $selfTestLocalRoot -ExecutablePath (Join-Path $repo 'outside-preview.exe') `
+      -SyntheticAttributes @{ $selfTestLocalRoot = $directory }
+  } catch { $outsideLaunchCaught = $_.Exception.Message -match 'under the repository \.local root' }
+  if (-not $outsideLaunchCaught) { throw 'Preview dispatch self-test expected an outside launch-target rejection.' }
+
+  $reparseLaunchTargetCaught = $false
+  try {
+    Assert-PreviewLaunchTarget -LocalRoot $selfTestLocalRoot -ExecutablePath $selfTestExecutable -SyntheticAttributes @{
+      $selfTestLocalRoot = $directory
+      $selfTestOutputParent = $directory
+      $selfTestOutputRoot = $directory
+      $selfTestExecutable = $file -bor [System.IO.FileAttributes]::ReparsePoint
+    }
+  } catch { $reparseLaunchTargetCaught = $_.Exception.Message -match 'target must not be a reparse point' }
+  if (-not $reparseLaunchTargetCaught) { throw 'Preview dispatch self-test expected a reparse launch-target rejection.' }
+
+  $reparseLaunchParentCaught = $false
+  try {
+    Assert-PreviewLaunchTarget -LocalRoot $selfTestLocalRoot -ExecutablePath $selfTestExecutable -SyntheticAttributes @{
+      $selfTestLocalRoot = $directory
+      $selfTestOutputParent = $directory
+      $selfTestOutputRoot = $directory -bor [System.IO.FileAttributes]::ReparsePoint
+      $selfTestExecutable = $file
+    }
+  } catch { $reparseLaunchParentCaught = $_.Exception.Message -match 'reparse-point parent' }
+  if (-not $reparseLaunchParentCaught) { throw 'Preview dispatch self-test expected a reparse launch-parent rejection.' }
+
+  $directoryLaunchTargetCaught = $false
+  try {
+    Assert-PreviewLaunchTarget -LocalRoot $selfTestLocalRoot -ExecutablePath $selfTestExecutable -SyntheticAttributes @{
+      $selfTestLocalRoot = $directory
+      $selfTestOutputParent = $directory
+      $selfTestOutputRoot = $directory
+      $selfTestExecutable = $directory
+    }
+  } catch { $directoryLaunchTargetCaught = $_.Exception.Message -match 'target must be a file' }
+  if (-not $directoryLaunchTargetCaught) { throw 'Preview dispatch self-test expected a directory launch-target rejection.' }
+
+  $missingLaunchTargetCaught = $false
+  try {
+    Assert-PreviewLaunchTarget -LocalRoot $selfTestLocalRoot -ExecutablePath $selfTestExecutable -SyntheticAttributes @{
+      $selfTestLocalRoot = $directory
+      $selfTestOutputParent = $directory
+      $selfTestOutputRoot = $directory
+    }
+  } catch { $missingLaunchTargetCaught = $_.Exception.Message -match 'target does not exist' }
+  if (-not $missingLaunchTargetCaught) { throw 'Preview dispatch self-test expected a missing launch-target rejection.' }
+
+  Write-Output 'Preview target dispatch self-test passed (17 cases).'
 
   exit 0
 }
@@ -234,6 +344,7 @@ if ($Target -eq 'WinUICompat') {
     Assert-PreviewBuildOutputRoot -OutputRoot $previewRoot -RepositoryRoot $repo
     $executable = Join-Path $previewRoot 'Hibiki.WinUI.exe'
     if (-not (Test-Path -LiteralPath $executable)) { throw "Compatibility preview executable was not produced: $executable" }
+    Assert-PreviewLaunchTarget -LocalRoot (Join-Path $repo '.local') -ExecutablePath $executable
     $process = Start-Process -FilePath $executable -WorkingDirectory $previewRoot -PassThru
     Start-Sleep -Seconds 3
     $process.Refresh()
@@ -256,6 +367,7 @@ if ($Target -eq 'DesktopCompat') {
     Assert-PreviewBuildOutputRoot -OutputRoot $previewRoot -RepositoryRoot $repo
     $executable = Join-Path $previewRoot 'Hibiki.DesktopPreview.exe'
     if (-not (Test-Path -LiteralPath $executable)) { throw "Desktop preview executable was not produced: $executable" }
+    Assert-PreviewLaunchTarget -LocalRoot (Join-Path $repo '.local') -ExecutablePath $executable
     $process = Start-Process -FilePath $executable -WorkingDirectory $previewRoot -WindowStyle Hidden -PassThru
     Start-Sleep -Seconds 3
     if ($process.HasExited) { throw "Desktop compatibility preview exited during smoke test: $($process.ExitCode)" }
@@ -296,6 +408,7 @@ if ($SmokeTest) {
   Assert-PreviewBuildOutputRoot -OutputRoot $previewRoot -RepositoryRoot $repo
   $executable = Join-Path $previewRoot 'Hibiki.WinUI.exe'
   if (-not (Test-Path -LiteralPath $executable)) { throw "Formal WinUI preview executable was not produced: $executable" }
+  Assert-PreviewLaunchTarget -LocalRoot (Join-Path $repo '.local') -ExecutablePath $executable
   $process = Start-Process -FilePath $executable -WorkingDirectory $previewRoot -PassThru
   try {
     $rootElement = $null
