@@ -67,6 +67,175 @@ function New-LiveWasapiHandoffPlan {
   }
 }
 
+function Test-LiveWasapiHandoffPathUnderRoot {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Root
+  )
+
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  return $fullPath -eq $fullRoot -or $fullPath.StartsWith(
+    $fullRoot + [IO.Path]::DirectorySeparatorChar,
+    [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-LiveWasapiHandoffExistingAttributes {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [hashtable]$SyntheticAttributes
+  )
+
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
+    return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
+  }
+  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
+  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+}
+
+function Assert-LiveWasapiHandoffPath {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Root,
+    [Parameter(Mandatory = $true)][ValidateSet('File', 'Directory')][string]$Kind,
+    [switch]$AllowMissingLeaf,
+    [hashtable]$SyntheticAttributes
+  )
+
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  if (-not (Test-LiveWasapiHandoffPathUnderRoot -Path $fullPath -Root $fullRoot)) {
+    throw "Live WASAPI handoff path must remain under the expected root: $fullPath"
+  }
+
+  $leafAttributes = Get-LiveWasapiHandoffExistingAttributes -Path $fullPath -SyntheticAttributes $SyntheticAttributes
+  if ($null -eq $leafAttributes -and -not $AllowMissingLeaf) {
+    throw "Live WASAPI handoff $Kind does not exist: $fullPath"
+  }
+
+  $cursor = $fullPath
+  while ($true) {
+    $attributes = Get-LiveWasapiHandoffExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    if ($null -ne $attributes) {
+      if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Live WASAPI handoff path or parent is a reparse point: $cursor"
+      }
+      if ($cursor -eq $fullPath) {
+        if ($Kind -eq 'Directory' -and ($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+          throw "Live WASAPI handoff path is not a directory: $fullPath"
+        }
+        if ($Kind -eq 'File' -and ($attributes -band [System.IO.FileAttributes]::Directory) -ne 0) {
+          throw "Live WASAPI handoff path is not a file: $fullPath"
+        }
+      } elseif (($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+        throw "Live WASAPI handoff path parent is not a directory: $cursor"
+      }
+    }
+
+    if ($cursor -eq $fullRoot) { break }
+    $parent = [IO.Path]::GetFullPath((Split-Path -Parent $cursor)).TrimEnd('\', '/')
+    if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) {
+      throw "Live WASAPI handoff path could not reach the expected root: $fullPath"
+    }
+    $cursor = $parent
+  }
+}
+
+function Invoke-LiveWasapiHandoffPathSelfTest {
+  $repositoryRoot = [IO.Path]::GetFullPath('C:\hibiki-live-wasapi-handoff-selftest').TrimEnd('\', '/')
+  $fixture = New-LiveWasapiHandoffPlan -RepoRoot $repositoryRoot
+  $localRoot = [IO.Path]::GetFullPath((Join-Path $repositoryRoot '.local')).TrimEnd('\', '/')
+  $buildRoot = [IO.Path]::GetFullPath([string]$fixture.build_root).TrimEnd('\', '/')
+  $probePath = [IO.Path]::GetFullPath([string]$fixture.probe_path).TrimEnd('\', '/')
+  $directory = [System.IO.FileAttributes]::Directory
+  $file = [System.IO.FileAttributes]::Archive
+  $cases = 0
+
+  Assert-LiveWasapiHandoffPath -Path $fixture.build_root -Root $localRoot -Kind Directory -AllowMissingLeaf -SyntheticAttributes @{}
+  $cases++
+  Assert-LiveWasapiHandoffPath -Path $fixture.probe_path -Root $fixture.build_root -Kind File -AllowMissingLeaf -SyntheticAttributes @{}
+  $cases++
+  Assert-LiveWasapiHandoffPath -Path $fixture.build_root -Root $localRoot -Kind Directory -SyntheticAttributes @{
+    $localRoot = $directory
+    $buildRoot = $directory
+  }
+  $cases++
+  Assert-LiveWasapiHandoffPath -Path $fixture.probe_path -Root $fixture.build_root -Kind File -SyntheticAttributes @{
+    $buildRoot = $directory
+    $probePath = $file
+  }
+  $cases++
+
+  $outsideCaught = $false
+  $outsidePath = Join-Path $repositoryRoot 'outside-live-wasapi-handoff'
+  try { Assert-LiveWasapiHandoffPath -Path $outsidePath -Root $localRoot -Kind Directory -AllowMissingLeaf -SyntheticAttributes @{} }
+  catch { $outsideCaught = $_.Exception.Message -match 'under the expected root' }
+  if (-not $outsideCaught) { throw 'Live WASAPI handoff self-test expected an outside-root rejection.' }
+  $cases++
+
+  $reparseParentCaught = $false
+  try {
+    Assert-LiveWasapiHandoffPath -Path $fixture.build_root -Root $localRoot -Kind Directory -SyntheticAttributes @{
+      $localRoot = $directory -bor [System.IO.FileAttributes]::ReparsePoint
+      $buildRoot = $directory
+    }
+  } catch { $reparseParentCaught = $_.Exception.Message -match 'reparse point' }
+  if (-not $reparseParentCaught) { throw 'Live WASAPI handoff self-test expected a reparse-parent rejection.' }
+  $cases++
+
+  $reparseTargetCaught = $false
+  try {
+    Assert-LiveWasapiHandoffPath -Path $fixture.probe_path -Root $fixture.build_root -Kind File -SyntheticAttributes @{
+      $buildRoot = $directory
+      $probePath = $file -bor [System.IO.FileAttributes]::ReparsePoint
+    }
+  } catch { $reparseTargetCaught = $_.Exception.Message -match 'reparse point' }
+  if (-not $reparseTargetCaught) { throw 'Live WASAPI handoff self-test expected a reparse-target rejection.' }
+  $cases++
+
+  $nonDirectoryCaught = $false
+  try {
+    Assert-LiveWasapiHandoffPath -Path $fixture.build_root -Root $localRoot -Kind Directory -SyntheticAttributes @{
+      $localRoot = $directory
+      $buildRoot = $file
+    }
+  } catch { $nonDirectoryCaught = $_.Exception.Message -match 'not a directory' }
+  if (-not $nonDirectoryCaught) { throw 'Live WASAPI handoff self-test expected a non-directory rejection.' }
+  $cases++
+
+  $nonFileCaught = $false
+  try {
+    Assert-LiveWasapiHandoffPath -Path $fixture.probe_path -Root $fixture.build_root -Kind File -SyntheticAttributes @{
+      $buildRoot = $directory
+      $probePath = $directory
+    }
+  } catch { $nonFileCaught = $_.Exception.Message -match 'not a file' }
+  if (-not $nonFileCaught) { throw 'Live WASAPI handoff self-test expected a non-file rejection.' }
+  $cases++
+
+  $nonDirectoryParentCaught = $false
+  try {
+    Assert-LiveWasapiHandoffPath -Path $fixture.probe_path -Root $fixture.build_root -Kind File -SyntheticAttributes @{
+      $buildRoot = $file
+      $probePath = $file
+    }
+  } catch { $nonDirectoryParentCaught = $_.Exception.Message -match 'parent is not a directory' }
+  if (-not $nonDirectoryParentCaught) { throw 'Live WASAPI handoff self-test expected a non-directory-parent rejection.' }
+  $cases++
+
+  $missingProbeCaught = $false
+  try {
+    Assert-LiveWasapiHandoffPath -Path $fixture.probe_path -Root $fixture.build_root -Kind File -SyntheticAttributes @{
+      $buildRoot = $directory
+    }
+  } catch { $missingProbeCaught = $_.Exception.Message -match 'does not exist' }
+  if (-not $missingProbeCaught) { throw 'Live WASAPI handoff self-test expected a missing-probe rejection.' }
+  $cases++
+
+  return $cases
+}
+
 function Assert-LiveWasapiHandoffPlan {
   param(
     [Parameter(Mandatory = $true)]$Plan
@@ -173,6 +342,8 @@ function Invoke-LiveWasapiHandoffSelfTest {
   }
 
   Write-Output ("Live WASAPI handoff self-test: {0}/{1} cases passed." -f $passed, $cases.Count)
+  $pathCases = Invoke-LiveWasapiHandoffPathSelfTest
+  Write-Output "Live WASAPI handoff path self-test: $pathCases cases passed (offline/no-cmake/no-probe/no-file-write)."
 }
 
 if ($SelfTest) {
@@ -185,12 +356,15 @@ if (-not $IsWindows) { throw 'Live WASAPI handoff probe is Windows-only.' }
 $plan = New-LiveWasapiHandoffPlan -RepoRoot $repo
 Assert-LiveWasapiHandoffPlan -Plan $plan
 $build = [string](Get-LiveWasapiHandoffProperty -Object $plan -Name 'build_root')
+Assert-LiveWasapiHandoffPath -Path $build -Root (Join-Path $repo '.local') -Kind Directory -AllowMissingLeaf
+$probe = [string](Get-LiveWasapiHandoffProperty -Object $plan -Name 'probe_path')
+Assert-LiveWasapiHandoffPath -Path $probe -Root $build -Kind File -AllowMissingLeaf
 New-Item -ItemType Directory -Path $build -Force | Out-Null
 & cmake @((Get-LiveWasapiHandoffProperty -Object $plan -Name 'cmake_args'))
 if ($LASTEXITCODE -ne 0) { throw "CMake configure failed with exit code $LASTEXITCODE" }
 & cmake --build $build --config RelWithDebInfo --target $LiveWasapiHandoffTarget --parallel
 if ($LASTEXITCODE -ne 0) { throw "Probe build failed with exit code $LASTEXITCODE" }
-$probe = [string](Get-LiveWasapiHandoffProperty -Object $plan -Name 'probe_path')
-if (-not (Test-Path -LiteralPath $probe)) { throw "Probe executable missing: $probe" }
+Assert-LiveWasapiHandoffPath -Path $build -Root (Join-Path $repo '.local') -Kind Directory
+Assert-LiveWasapiHandoffPath -Path $probe -Root $build -Kind File
 & $probe
 if ($LASTEXITCODE -ne 0) { throw "Live WASAPI handoff probe failed with exit code $LASTEXITCODE" }
