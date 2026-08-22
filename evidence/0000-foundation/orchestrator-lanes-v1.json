@@ -4,7 +4,7 @@
   "title": "Adopt single-orchestrator assignment and directory lanes in MULTI_AGENT.md",
   "date": "2026-08-22",
   "branch": "codex/199-orchestrator-lanes",
-  "base_commit": "00c0c1a",
+  "base_commit": "e5a4b32",
   "owner": "xup61069",
   "scope_globs": [
     "docs/ai/MULTI_AGENT.md",
@@ -21,7 +21,13 @@
   ],
   "limitations": [
     "Documentation/workflow-only change; no product API, IPC/schema, DSP order, RT-thread, driver boundary or release behavior change.",
-    "Entry documents outside this slice still contain legacy self-claim wording; follow-up slice required for docs/START_HERE.md, SPEC-0004, README.md, CONTRIBUTING.md and templates.",
-    "The #199 issue-body handoff block is intentionally deferred until stacked dependency #198 merges, because #198 currently owns overlapping documentation scopes in its open handoff block."
+    "Entry documents outside this slice still contain legacy self-claim wording; follow-up slice required for docs/START_HERE.md, SPEC-0004, README.md, CONTRIBUTING.md and templates."
+  ],
+  "gates_run": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 199",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
   ]
 }
