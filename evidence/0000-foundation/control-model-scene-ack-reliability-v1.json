@@ -53,6 +53,20 @@
     "pwsh -NoProfile -File tools/control-model-engine-smoke.ps1 -SelfTest",
     "cdb -lines -cf crash.cmds -logo crash.log hibiki_engine_preview.exe"
   ],
+  "ci_runs": [
+    {
+      "pull_request": 326,
+      "run": 32574378663,
+      "head": "a4b6406427faed6c2572e57b8e4c8d0ab62cdb1d",
+      "result": "success"
+    },
+    {
+      "pull_request": 326,
+      "run": 32577053600,
+      "head": "d9ae2cb",
+      "result": "success"
+    }
+  ],
   "limitations": [
     "User-space Windows 26200 verification only; no physical audio, loadable driver, WaveRT, HLK or Microsoft signing evidence.",
     "The RT audio thread rules are untouched: all changed code paths are control-plane transactions or link configuration.",
