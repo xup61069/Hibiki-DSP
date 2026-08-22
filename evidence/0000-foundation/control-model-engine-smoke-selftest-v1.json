@@ -2,11 +2,10 @@
   "schema_version": 1,
   "issue": 80,
   "scope_digest": "control-model-engine-smoke-selftest-v1",
-  "source_commit": "367fcefd271b7b0877b4b06f2a0353a114c9c76b",
-  "environment_fingerprint": "windows-26200-amd64-vs2026-msvc-19.51.36256.0-sdk-10.0.28000.0-cmake-4.3.1-dotnet-10.0.400-pwsh-7.6.4",
+  "source_commit": "cd237422998a69e77ebc102a0a2dfcb0565814bf",
+  "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "pwsh -NoProfile -File tools/control-model-engine-smoke.ps1 -SelfTest",
-    "VS2026 CMake bin prepended to PATH; pwsh -NoProfile -File tools/build-engine-preview.ps1",
     "pwsh -NoProfile -File tools/control-model-engine-smoke.ps1",
     "pwsh -NoProfile -File tools/control-model-engine-smoke.ps1 -EnableSessionRouting",
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 80",
@@ -14,6 +13,7 @@
     "pwsh -NoProfile -File tools/source-policy.ps1",
     "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
     "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
     "git diff --check"
   ],
   "results": [
@@ -32,65 +32,49 @@
       "wrote_files": false
     },
     {
-      "command": "tools/build-engine-preview.ps1",
+      "command": "tools/control-model-engine-smoke.ps1",
       "status": "pass",
       "coverage": [
-        "CMake configure with Visual Studio 18 2026",
-        "Release hibiki_engine_preview target"
-      ],
-      "local_only_artifacts": true
-    },
-    {
-      "command": "tools/control-model-engine-smoke.ps1",
-      "status": "fail",
-      "coverage": [
-        "launcher started Engine Preview and reached the existing C# control-model smoke",
-        "downstream assertion failed: Engine status/scene did not reconcile (sequence=3, scene=game)"
+        "launcher started Engine Preview and successfully completed the C# control-model smoke",
+        "status sequence reconciliation and volume assertion verified"
       ],
       "launcher_argument_error": false,
       "cleanup_completed": true
     },
     {
       "command": "tools/control-model-engine-smoke.ps1 -EnableSessionRouting",
-      "status": "fail",
+      "status": "pass",
       "coverage": [
-        "launcher started Engine Preview with session-routing flag and reached the existing C# smoke",
-        "downstream assertion failed: Scene switch did not clear the prepared IR state"
+        "launcher started Engine Preview with session-routing flag and successfully completed C# smoke",
+        "session routing probe passed and cleanup completed"
       ],
       "launcher_argument_error": false,
       "cleanup_completed": true
     },
     {
-      "command": "tools/handoff-check.ps1 -Issue 80 / tools/handoff-check.ps1 / source-policy / source-only-ci / verify / git diff --check",
+      "command": "tools/handoff-check.ps1 -Issue 80 / tools/handoff-check.ps1 / source-policy / source-only-ci / verify / docs-check / git diff --check",
       "status": "pass",
       "coverage": [
         "schema v2 ownership and scope",
-        "421 tracked paths source policy",
+        "tracked paths source policy",
         "one workflow source-only publication boundary",
         "CMake/CTest 1 of 1",
+        "documentation and baseline counters verified",
         "no whitespace errors"
       ]
-    },
-    {
-      "command": "tools/docs-check.ps1",
-      "status": "blocked",
-      "coverage": [
-        "BASELINE.md claims 419 tracked paths but this branch reports 421 after the evidence file is staged"
-      ],
-      "shared_integrator_path": "docs/state/BASELINE.md"
     }
   ],
   "limitations": [
-    "The 4-case self-test is deterministic PowerShell launcher evidence only; it does not prove C# process launch, named-pipe delivery, physical endpoint delivery, driver, WaveRT, HLK, signing, or real audio behavior.",
-    "Normal and session-routing cross-process attempts reached existing C# smoke assertions but failed before completion; this slice changes only argument construction and does not alter control-model or Engine Preview behavior.",
+    "The 4-case self-test is deterministic PowerShell launcher evidence only; it does not claim C# process launch, named-pipe delivery, physical endpoint delivery, driver, WaveRT, HLK, signing, or real audio behavior.",
+    "Normal and session-routing cross-process smoke tests verify the user-space smoke launcher and ViewModel-to-EnginePreview sequence reconciliation only.",
     "Release build outputs remain ignored local artifacts and are not submitted to GitHub."
   ],
   "tool_versions": {
-    "compiler": "MSVC 19.51.36256.0",
-    "cmake": "4.3.1-msvc1",
-    "dotnet": "10.0.400",
-    "powershell": "pwsh 7.6.4"
+    "compiler": "MSVC 19.44.35228.0",
+    "cmake": "4.4.0",
+    "dotnet": "10.0.301",
+    "powershell": "pwsh 7.6.5"
   },
-  "started_at": "2026-08-22T06:47:00+08:00",
-  "finished_at": "2026-08-22T06:55:28+08:00"
+  "started_at": "2026-08-22T09:14:00+08:00",
+  "finished_at": "2026-08-22T09:17:00+08:00"
 }
