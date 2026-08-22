@@ -26,6 +26,10 @@ if(WIN32 AND HIBIKI_BUILD_ENGINE_PREVIEW)
   add_executable(hibiki_engine_preview apps/engine-preview/engine_preview.cpp)
   target_link_libraries(hibiki_engine_preview PRIVATE hibiki_hub)
   target_compile_features(hibiki_engine_preview PRIVATE cxx_std_20)
+  # The preview main loop drains IR prepare/scene transactions inline; keep the
+  # Windows default 1 MiB stack from overflowing on heavy kernels the same way
+  # the contract-test harness already does.
+  target_link_options(hibiki_engine_preview PRIVATE /STACK:16777216)
 endif()
 
 if(HIBIKI_BUILD_TESTS)
