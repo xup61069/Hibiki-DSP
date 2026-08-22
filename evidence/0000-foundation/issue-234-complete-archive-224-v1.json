@@ -3,7 +3,7 @@
   "issue": 234,
   "scope_digest": "issue-234-complete-archive-224-v1",
   "source_commit": "16eecfe6facf8a7297f37557151b3c5dc5f6bf49",
-  "archive_commit": "pending",
+  "archive_commit": "6abf972",
   "main_sync_commit": "16eecfe6facf8a7297f37557151b3c5dc5f6bf49",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; vs2026-sdk-wdk-on-disk; target-24h2-machine-missing",
   "commands": [
