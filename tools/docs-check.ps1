@@ -149,6 +149,64 @@ function Assert-AdrFrontmatter {
   }
 }
 
+function ConvertFrom-SpecFrontmatter([string]$RawText) {
+  # Parse the YAML-style frontmatter block used by all Spec files.
+  # Returns a hashtable of key -> string value, or throws on structural errors.
+  $lines = @($RawText -split "`r?`n")
+  if ($lines.Count -lt 3) { throw 'Spec file is too short to contain frontmatter.' }
+  if ($lines[0] -ne '---') { throw 'Spec frontmatter must start with "---" on line 1.' }
+  $endIndex = -1
+  for ($i = 1; $i -lt $lines.Count; $i++) {
+    if ($lines[$i] -eq '---') { $endIndex = $i; break }
+  }
+  if ($endIndex -lt 2) { throw 'Spec frontmatter closing "---" not found or block is empty.' }
+
+  $fields = @{}
+  for ($i = 1; $i -lt $endIndex; $i++) {
+    $line = $lines[$i]
+    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+    $colonIdx = $line.IndexOf(':')
+    if ($colonIdx -lt 1) { throw "Spec frontmatter line $($i + 1) lacks a key:value separator: $line" }
+    $key = $line.Substring(0, $colonIdx).Trim()
+    $value = $line.Substring($colonIdx + 1).Trim()
+    if ($fields.ContainsKey($key)) { throw "Duplicate Spec frontmatter key: $key" }
+    $fields[$key] = $value
+  }
+  return $fields
+}
+
+function Assert-SpecFrontmatter {
+  param(
+    [Parameter(Mandatory = $true)]$Fields,
+    [Parameter(Mandatory = $true)][string]$FileName
+  )
+  foreach ($key in @('id', 'status', 'owner', 'authority', 'last_reviewed', 'review_after_days', 'related_adrs', 'source_globs')) {
+    if (-not $Fields.ContainsKey($key) -or [string]::IsNullOrWhiteSpace([string]$Fields[$key])) {
+      throw "$FileName is missing required Spec frontmatter field: $key"
+    }
+  }
+
+  $allowedStatus = @('accepted', 'draft')
+  if ($allowedStatus -notcontains $Fields['status']) {
+    throw "$FileName status '$($Fields['status'])' is not in the allowed set."
+  }
+
+  $allowedAuthority = @('product-behavior', 'repository-process', 'release-policy', 'architecture', 'platform-boundary', 'control-plane', 'control-model')
+  if ($allowedAuthority -notcontains $Fields['authority']) {
+    throw "$FileName authority '$($Fields['authority'])' is not in the allowed set."
+  }
+
+  $days = 0
+  if (-not [int]::TryParse([string]$Fields['review_after_days'], [ref]$days) -or $days -lt 1) {
+    throw "$FileName review_after_days must be a positive integer."
+  }
+
+  $parsedDate = [datetime]::MinValue
+  if (-not [datetime]::TryParseExact([string]$Fields['last_reviewed'], 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$parsedDate)) {
+    throw "$FileName last_reviewed must be formatted as yyyy-MM-dd."
+  }
+}
+
 if ($SelfTest) {
   $caseCount = 0
 
@@ -253,10 +311,39 @@ if ($SelfTest) {
   if (-not $caughtBadAuth) { throw 'docs-check self-test failed: invalid authority should fail.' }
   $caseCount++
 
+  # Spec frontmatter: valid block parses correctly.
+  $validSpec = "---`nid: SPEC-0001`nstatus: accepted`nowner: hibiki-maintainers`nauthority: product-behavior`nlast_reviewed: 2026-08-21`nreview_after_days: 30`nrelated_adrs: [ADR-0001]`nsource_globs: [`"src/**`"]`n---`n`n# SPEC-0001`n`nBody."
+  $parsedSpec = ConvertFrom-SpecFrontmatter -RawText $validSpec
+  if ($parsedSpec['id'] -ne 'SPEC-0001' -or $parsedSpec['authority'] -ne 'product-behavior') {
+    throw 'docs-check self-test failed: valid Spec frontmatter did not parse to expected fields.'
+  }
+  Assert-SpecFrontmatter -Fields $parsedSpec -FileName 'selftest-spec-valid.md'
+  $caseCount++
+
+  # Spec frontmatter: missing opening marker must fail.
+  try { ConvertFrom-SpecFrontmatter -RawText "no frontmatter here\njust text" | Out-Null } catch { $caseCount++; continue }
+  throw 'docs-check self-test failed: missing Spec frontmatter opener should fail.'
+
+  # Spec frontmatter: missing required field must fail.
+  $missingSpecField = "---`nid: SPEC-0002`nstatus: accepted`n---`ntext"
+  $parsedMissingSpec = ConvertFrom-SpecFrontmatter -RawText $missingSpecField
+  $caughtMissingSpec = $false
+  try { Assert-SpecFrontmatter -Fields $parsedMissingSpec -FileName 'selftest-spec-missing.md' | Out-Null } catch { $caughtMissingSpec = $true }
+  if (-not $caughtMissingSpec) { throw 'docs-check self-test failed: missing required Spec field should fail.' }
+  $caseCount++
+
+  # Spec frontmatter: bad authority must fail.
+  $badSpecAuth = "---`nid: SPEC-0003`nstatus: accepted`nowner: x`nauthority: nonsense`nlast_reviewed: 2026-08-21`nreview_after_days: 30`nrelated_adrs: []`nsource_globs: []`n---`nbody"
+  $parsedBadSpecAuth = ConvertFrom-SpecFrontmatter -RawText $badSpecAuth
+  $caughtBadSpecAuth = $false
+  try { Assert-SpecFrontmatter -Fields $parsedBadSpecAuth -FileName 'selftest-spec-badauth.md' | Out-Null } catch { $caughtBadSpecAuth = $true }
+  if (-not $caughtBadSpecAuth) { throw 'docs-check self-test failed: invalid Spec authority should fail.' }
+  $caseCount++
+
   if ($caseCount -lt 12) {
     throw "docs-check self-test failed: expected at least 12 passing cases, saw $caseCount."
   }
-  Write-Output "docs-check self-test passed ($caseCount cases; structural parser, multiline normalization, branch mode detection, BASELINE edit detection, live measurement, ADR frontmatter)."
+  Write-Output "docs-check self-test passed ($caseCount cases; structural parser, multiline normalization, branch mode detection, BASELINE edit detection, live measurement, ADR frontmatter, Spec frontmatter)."
   exit 0
 }
 
@@ -342,6 +429,25 @@ $adrIds = @($adrs | ForEach-Object {
   (ConvertFrom-AdrFrontmatter -RawText $raw)['id']
 })
 if (($adrIds | Sort-Object -Unique).Count -ne $adrIds.Count) { throw 'Duplicate ADR IDs detected.' }
+
+$specIds = @()
+foreach ($spec in ($specs | Sort-Object Name)) {
+  $rawSpec = Get-Content -LiteralPath $spec.FullName -Raw -Encoding UTF8
+  try {
+    $specFields = ConvertFrom-SpecFrontmatter -RawText $rawSpec
+    Assert-SpecFrontmatter -Fields $specFields -FileName $spec.Name
+    if ($specFields['id'] -notmatch '^SPEC-[0-9]{4}$') { throw ($spec.Name + ' id must match SPEC-NNNN pattern.') }
+    if (-not $rawSpec.Contains(('# ' + $specFields['id']))) { throw ($spec.Name + ' heading does not contain the declared ID ' + $specFields['id'] + '.') }
+    # Cross-check id against filename stem (e.g. SPEC-0001-core-contracts.md -> SPEC-0001)
+    $stem = [System.IO.Path]::GetFileNameWithoutExtension($spec.Name)
+    $expectedId = ($stem -split '-')[0..1] -join '-'
+    if ($expectedId -ne $specFields['id']) { throw ($spec.Name + ' filename stem ID mismatch: expected ' + $expectedId + ' but got ' + $specFields['id'] + '.') }
+  } catch {
+    throw ('Spec frontmatter validation failed for ' + $spec.Name + ': ' + $_.Exception.Message)
+  }
+  $specIds += $specFields['id']
+}
+if (($specIds | Sort-Object -Unique).Count -ne $specIds.Count) { throw 'Duplicate Spec IDs detected.' }
 
 & (Join-Path $repo 'tools/handoff-check.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'AI handoff check failed.' }
