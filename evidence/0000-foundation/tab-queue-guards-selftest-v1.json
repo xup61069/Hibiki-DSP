@@ -2,9 +2,9 @@
   "schema_version": 1,
   "issue": 375,
   "scope_digest": "tab-queue-guards-selftest-v1",
-  "source_commit": "pending",
+  "source_commit": "edf41861306730eb057596704c2b772d387f9604",
   "base_commit": "8a4d064009f616c7d1130294822bab83c6521a46",
-  "environment_fingerprint": "pending-local-run",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.12112.369-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526-cmake-4.4.2-pwsh-7.6.4",
   "target": "hibiki_tab_bridge_selftest",
   "cases_added": [
     "null sample pointer rejected",
