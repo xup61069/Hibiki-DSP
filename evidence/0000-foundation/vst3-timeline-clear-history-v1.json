@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "issue": 403,
+  "scope_digest": "vst3-timeline-clear-history-v1",
+  "source_commit": "8029c11288f185945baec1349ca0ed0db419a3bd",
+  "environment_fingerprint": "windows-26200-amd64-msvc-19.51.36256-dotnet-10.0.400-pwsh-7.6.5-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526",
+  "commands": [
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 403",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Vst3TimelineSurfaceModelV1.ClearHistory clears undo and redo stacks and emits only history property notifications when stacks change",
+        "published snapshot, dirty baseline and open draft remain unchanged by model clear-history",
+        "Vst3TimelineEditorViewModel.ClearHistory exposes status/history notifications and preserves rows, dirty state and an open draft",
+        "empty-history model and ViewModel calls remain safe"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly",
+      "status": "pass",
+      "coverage": [
+        "Windows 11 build 26200, AMD64, Visual Studio 2026, SDK QFE 10.1.28000.2526 and WDK QFE 10.1.28000.2526 detected"
+      ]
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "CMake/MSVC RelWithDebInfo verification build completed for repository targets"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 403",
+      "status": "pass",
+      "coverage": [
+        "Issue-based owner, branch identity and exclusive scope"
+      ]
+    },
+    {
+      "command": "tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Active #403 and #394 handoffs have valid non-overlapping scopes"
+      ]
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "80 required paths and 24 accepted Specs; live measurement passed at 515 tracked paths and 174 repository JSON files after this evidence was staged"
+      ]
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "Source-only policy over 515 tracked paths"
+      ]
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Source-only workflow policy passed"
+      ]
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "No whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "This slice changes managed control-model behavior and headless checks only; it adds no IPC, engine, worker, RT-thread, driver or signing behavior.",
+    "The evidence does not prove physical audio, WaveRT, HLK, signing, third-party VST3 certification or production WinUI integration.",
+    "No driver build or signability command was run in this slice; those acceptance claims remain exclusively owned by Issue #394 despite WDK being detected locally."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.400",
+    "powershell": "pwsh 7.6.5",
+    "msvc": "19.51.36256"
+  }
+}
