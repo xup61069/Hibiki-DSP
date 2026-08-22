@@ -85,6 +85,34 @@ function Assert-VerifyBuildPlan {
   }
 }
 
+function Assert-VerifyCleanTarget {
+  param(
+    [Parameter(Mandatory)]
+    [pscustomobject]$Plan,
+    [Parameter(Mandatory)]
+    [System.IO.FileAttributes]$TargetAttributes,
+    [Parameter(Mandatory)]
+    [System.IO.FileAttributes]$ParentAttributes,
+    [Parameter(Mandatory)]
+    [bool]$TargetIsContainer
+  )
+
+  $expectedBuildRoot = [System.IO.Path]::GetFullPath((Join-Path $Plan.RepositoryRoot $Plan.RelativeBuildRoot))
+  $actualBuildRoot = [System.IO.Path]::GetFullPath($Plan.BuildRoot)
+  if ($actualBuildRoot -ne $expectedBuildRoot) {
+    throw "Verify clean target does not match the repository-local build root: $actualBuildRoot"
+  }
+  if (-not $TargetIsContainer) {
+    throw 'Verify clean target must be a directory.'
+  }
+  if (($TargetAttributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+    throw 'Verify clean target must not be a reparse point.'
+  }
+  if (($ParentAttributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+    throw 'Verify clean target parent must not be a reparse point.'
+  }
+}
+
 function Invoke-MockVerifyExecution {
   param(
     [hashtable]$Mocks
@@ -101,6 +129,57 @@ function Invoke-MockVerifyExecution {
 function Invoke-VerifySelfTest {
   $plan = Get-VerifyBuildPlan -RepositoryRoot $repo
   Assert-VerifyBuildPlan -Plan $plan
+
+  Assert-VerifyCleanTarget -Plan $plan `
+    -TargetAttributes ([System.IO.FileAttributes]::Directory) `
+    -ParentAttributes ([System.IO.FileAttributes]::Directory) `
+    -TargetIsContainer $true
+
+  $outsideCleanTarget = $plan.PSObject.Copy()
+  $outsideCleanTarget.BuildRoot = Join-Path $repo 'outside-verify-build'
+  try {
+    Assert-VerifyCleanTarget -Plan $outsideCleanTarget `
+      -TargetAttributes ([System.IO.FileAttributes]::Directory) `
+      -ParentAttributes ([System.IO.FileAttributes]::Directory) `
+      -TargetIsContainer $true
+    throw 'Outside clean target was accepted.'
+  }
+  catch {
+    if ($_.Exception.Message -notmatch 'does not match the repository-local build root') { throw }
+  }
+
+  try {
+    Assert-VerifyCleanTarget -Plan $plan `
+      -TargetAttributes ([System.IO.FileAttributes]::Directory -bor [System.IO.FileAttributes]::ReparsePoint) `
+      -ParentAttributes ([System.IO.FileAttributes]::Directory) `
+      -TargetIsContainer $true
+    throw 'Reparse-point clean target was accepted.'
+  }
+  catch {
+    if ($_.Exception.Message -notmatch 'target must not be a reparse point') { throw }
+  }
+
+  try {
+    Assert-VerifyCleanTarget -Plan $plan `
+      -TargetAttributes ([System.IO.FileAttributes]::Directory) `
+      -ParentAttributes ([System.IO.FileAttributes]::Directory -bor [System.IO.FileAttributes]::ReparsePoint) `
+      -TargetIsContainer $true
+    throw 'Reparse-point clean parent was accepted.'
+  }
+  catch {
+    if ($_.Exception.Message -notmatch 'parent must not be a reparse point') { throw }
+  }
+
+  try {
+    Assert-VerifyCleanTarget -Plan $plan `
+      -TargetAttributes ([System.IO.FileAttributes]::Normal) `
+      -ParentAttributes ([System.IO.FileAttributes]::Directory) `
+      -TargetIsContainer $false
+    throw 'File clean target was accepted.'
+  }
+  catch {
+    if ($_.Exception.Message -notmatch 'target must be a directory') { throw }
+  }
 
   $invalidRoot = $plan.PSObject.Copy()
   $invalidRoot.RelativeBuildRoot = '.local/build-output'
@@ -178,7 +257,7 @@ function Invoke-VerifySelfTest {
   $ok = Invoke-MockVerifyExecution -Mocks @{ GetCommand = { param($n) [pscustomobject]@{Name=$n} }; ConfigureExitCode = 0; BuildExitCode = 0; TestExitCode = 0 }
   if (-not $ok) { throw 'Mocked success did not return true.' }
 
-  Write-Output 'Aggregate verification self-test passed (10 cases; offline/no-build/no-process/no-CMake/no-CTest/no-delete/no-file-write).'
+  Write-Output 'Aggregate verification self-test passed (14 cases; offline/no-build/no-process/no-CMake/no-CTest/no-delete/no-file-write).'
 }
 
 if ($SelfTest) {
@@ -188,7 +267,15 @@ if ($SelfTest) {
 
 $plan = Get-VerifyBuildPlan -RepositoryRoot $repo
 $build = $plan.BuildRoot
-if ($Clean -and (Test-Path $build)) { Remove-Item -LiteralPath $build -Recurse -Force }
+if ($Clean -and (Test-Path -LiteralPath $build)) {
+  $cleanTarget = Get-Item -LiteralPath $build -Force
+  $cleanParent = Get-Item -LiteralPath (Split-Path -Parent $build) -Force
+  Assert-VerifyCleanTarget -Plan $plan `
+    -TargetAttributes $cleanTarget.Attributes `
+    -ParentAttributes $cleanParent.Attributes `
+    -TargetIsContainer $cleanTarget.PSIsContainer
+  Remove-Item -LiteralPath $build -Recurse -Force
+}
 New-Item -ItemType Directory -Path $build -Force | Out-Null
 
 cmake @($plan.ConfigureArguments)
