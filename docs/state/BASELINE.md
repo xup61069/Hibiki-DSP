@@ -638,6 +638,12 @@ parent 安全，Hibiki.WinUI.exe 必須位於該輸出目錄之下、為真實�
 reparse point；-SelfTest 從 4 個案例擴充至 11 個離線案例，不寫檔、不載入
 UI Automation、不啟動程序（Issue #470 / PR #472）。皆為 tooling/source evidence。
 
+第七波 tooling 增量已合併：build-engine-preview.ps1 在 CMake configure 前與 build
+命令前雙重驗證固定 .local/engine-preview build root，拒絕 root 外路徑、既有
+reparse point 祖先／target 與非目錄 build root，同時保留正常 missing-root 行為；
+-SelfTest 從 5 個案例擴充至 7 個離線案例，不呼叫 CMake 也不寫檔（Issue #474 /
+PR #477）。皆為 tooling/source evidence。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；
