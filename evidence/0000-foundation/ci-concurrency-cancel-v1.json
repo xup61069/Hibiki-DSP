@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "issue": 427,
+  "scope_digest": "ci-concurrency-cancel-v1",
+  "source_commit": "6b59816",
+  "environment_fingerprint": "windows-26200-amd64-dotnet-10.0.301-pwsh-7.6.4; target-24h2-wdk-missing",
+  "commands": [
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 427",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": ".github/workflows/verify.yml concurrency block",
+      "status": "pass",
+      "coverage": [
+        "concurrency group verify-${{ github.workflow }}-${{ github.ref }} with cancel-in-progress true added after triggers and before permissions",
+        "pinned action SHAs, permissions and all existing steps unchanged",
+        "superseded in-progress runs on the same branch or pull-request merge ref are cancelled automatically",
+        "no production source, driver, SDK or document snapshot change"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Cancellation behavior itself is observable only on GitHub-hosted runners after merge; local gates prove workflow parse policy and source-only constraints.",
+    "No runtime, driver or physical-audio implication."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.301",
+    "powershell": "pwsh 7.6.4 local"
+  }
+}
