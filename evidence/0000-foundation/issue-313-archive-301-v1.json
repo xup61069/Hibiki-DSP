@@ -3,7 +3,7 @@
   "issue": 318,
   "scope_digest": "issue-313-archive-301-v1",
   "source_commit": "20b6bc152ffe9fc837f824b857daacbf44aa0e68",
-  "archive_commit": "PENDING",
+  "archive_commit": "cf8b81f36f673268f56a51d78c5a9b771755d7ba",
   "main_sync_commit": "20b6bc152ffe9fc837f824b857daacbf44aa0e68",
   "archived_issue": 301,
   "merged_pr": 302,
@@ -49,6 +49,24 @@
         "docs-check -WriteCounters was attempted but the current gate rejects that parameter"
       ],
       "compiled_artifacts": false
+    },
+    {
+      "command": "post-archive documentation/source gates",
+      "status": "pass",
+      "coverage": [
+        "scoped/full handoff, docs self-test/docs-check, source-policy, source-only CI, and diff checks",
+        "live measurement after archive is 570 tracked paths and 135 repository JSON files"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly / tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "Windows 26200 AMD64, Visual Studio 2026, SDK and WDK prerequisites detected",
+        "Visual Studio 2026/CMake build, CTest 2 of 2, and unsigned local verification"
+      ],
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
@@ -67,5 +85,5 @@
     "wdk_qfe": "10.1.28000.2526"
   },
   "started_at": "2026-08-22T21:57:00+08:00",
-  "finished_at": "PENDING"
+  "finished_at": "2026-08-22T22:12:00+08:00"
 }
