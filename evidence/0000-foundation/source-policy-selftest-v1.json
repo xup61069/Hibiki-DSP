@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "issue": 243,
+  "scope_digest": "source-policy-selftest-v1",
+  "source_commit": "4f5e2c6",
+  "environment_fingerprint": "windows-amd64-pwsh-7.6.5",
+  "commands": [
+    "pwsh -File tools/source-policy.ps1 -SelfTest",
+    "pwsh -File tools/source-policy.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/source-policy.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "clean directory passes with scanned scope",
+        "blocked extension (.exe) fails closed with policy-violation message",
+        "secret pattern (GUMROAD_ACCESS_TOKEN) fails closed",
+        "PE executable header (MZ) on a non-blocked extension fails closed",
+        "clean git-tracked repository passes with tracked scope",
+        "nested-directory files are counted by the fallback scan"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "main gate keeps its existing success/failure contract on 524 tracked paths"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Self-test validates gate logic only; it is not physical artifact signing, driver, or delivery evidence.",
+    "Synthetic cases run in a temp directory outside the repository and write no repository files, compiled artifacts, endpoint identity, or private paths.",
+    "If git is unavailable, the tracked-scope case falls back to the scanned path, which is still exercised by other cases."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}
