@@ -147,6 +147,13 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   committed counter file — #197 retired `build/baseline-counters.json` and the
   `-WriteCounters` chore, and the #25 scope-overlap gate rejects overlapping active
   `scope_globs` across handoffs.
+- Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
+  ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
+  published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe
+  (`vst3-timeline-clear-history-v1.json`, Issue #403 / PR #404). A redacted sandbox incident
+  diagnostic (`Vst3SandboxDiagnosticV1`) records initial/invalid-launch/reset/Windows-setup-failure
+  assertions as a sanitized summary without private payload
+  (`vst3-sandbox-redacted-diagnostic-v1.json`, Issue #408 / PR #409).
 
 ## 目前整合主線
 
