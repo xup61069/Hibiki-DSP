@@ -553,11 +553,29 @@ route-health cards 接到 Easy／Expert control-model；它只顯示保守的 se
 store、handler 與 atomic ViewModel apply；本機 status probe 通過，但仍不宣稱 physical
 per-App delivery 或 browser tab capture 已完成。
 
+VST3 自動化時間軸資料鏈已合併（皆為 user-space source contract）：
+`9f5f02e` 加入 supervisor 端 bounded `Vst3TimelineEditorV1` 編輯交易（draft/commit/
+discard，upsert 以同一 (parameter, position) 取代）；`8a041a2` 把編輯交易綁進
+`Vst3SceneAutomationSchedulerV1`（begin/commit/cancel + `timeline_snapshot` 讀回，
+編輯中拒刪 slot）；`ff46e15` 提供 canonical fail-closed JSON 持久化
+（`vst3-parameter-timeline-v1.schema.json`，64 KiB 上限、逐位元組穩定 round-trip）；
+`dbafc4f` 加入 fixed-capacity per-timeline 檔案儲存 `Vst3TimelineFileStoreV1`
+（嚴格檔名安全 ID、Windows 保留名拒絕、temp-write-then-replace）；
+`9cca03d` 加入 store→scheduler 的 `sync_timeline_store_to_scheduler_v1`
+（單項失敗計 skipped 不中斷）；`b7e2ea8` 加入唯讀內省
+（排序 `timeline_ids` 與不可變 binding views）。UI 編輯介面、side-chain/multi-bus
+worker process 與第三方 certification 仍待完成；以上不宣稱任何實體音訊或 driver 能力。
+
+流程 gate 本週新增：#21 讓 BASELINE 摘要計數 fail-closed 對照 git 實測；
+#51 把 docs-check 改成 merge-ref 感知（PR 未動 BASELINE 時容忍自身 tracked/JSON
+漂移、push-to-main 與本機維持嚴格），並附 `-SelfTest`；#25 讓 active handoff 的
+scope_globs 重疊直接 fail-closed。gate 腳本需要 PowerShell 7（PS 5.1 無法執行）。
+
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 85 個必要入口與
-24 份 Spec 通過；`source-policy.ps1` 掃描 422 個 tracked paths 且無 blocked
+24 份 Spec 通過；`source-policy.ps1` 掃描 426 個 tracked paths 且無 blocked
 binary/secret；`docs-check.ps1` 亦會把這些摘要計數對照 git 實測值，落後即 fail-closed；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
-`distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；75 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
+`distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；77 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
 288-byte payload、catalog sequence、handler fail-closed、WinUI send-failure rollback、DeviceCatalogSnapshot、ControlStatusSnapshot
 wire/atomic replace、catalog-to-wire publisher、Windows worker unbound/coordinator rollback、
 DeviceCatalogRequest provider response、連線後自動刷新裝置清單、ControlPlaneHost loopback
