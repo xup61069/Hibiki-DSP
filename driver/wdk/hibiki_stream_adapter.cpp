@@ -9,6 +9,7 @@
 #endif
 
 #include <ntddk.h>
+#include <ks.h>
 #include <ksmedia.h>
 
 #include "hibiki/endpoint_topology_v1.h"

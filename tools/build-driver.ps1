@@ -47,13 +47,13 @@ $clDir = Split-Path -Parent $cl
 $msvcInc = Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $clDir))) 'include'
 $env:INCLUDE = "$incRoot\km;$incRoot\km\crt;$incRoot\shared;$msvcInc;$repo\driver\include;$repo\sdk\include"
 $defines = @(
-  '/D_NTDDK_', '/D_AMD64_', '/DAMD64', '/D_WIN64', '/DWINNT=1',
+  '/D_AMD64_', '/DAMD64', '/D_WIN64', '/DWINNT=1',
   '/D_WIN32_WINNT=0x0A00', '/DWINVER=0x0A00', '/DNTDDI_VERSION=0x0A000000',
   '/DPOOL_NX_OPTIN=1'
 )
 # The WDK headers also define _NTDDK_; the duplicate-definition notice is
 # expected when the guard is provided by the build environment instead.
-$flags = @('/nologo', '/W4', '/wd4005', '/kernel', '/c', '/Zp8', '/GR-', '/GS', '/EHs-c-')
+$flags = @('/nologo', "/FI$incRoot\km\ntddk.h", '/W4', '/wd4005', '/kernel', '/c', '/Zp8', '/GR-', '/GS', '/EHs-c-')
 $objs = @()
 foreach ($cpp in (Get-ChildItem (Join-Path $repo 'driver/wdk') -Filter *.cpp)) {
   $obj = Join-Path $objDir ($cpp.BaseName + '.obj')

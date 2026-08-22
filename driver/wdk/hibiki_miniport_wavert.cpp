@@ -202,7 +202,7 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferWithNotification(
 
     // Allocate continuous memory through port stream
     PMDL mdl = m_PortStream->AllocatePagesForMdl(PHYSICAL_ADDRESS{0}, actual_size);
-    if (!NT_SUCCESS(ntStatus) || mdl == nullptr) {
+    if (mdl == nullptr) {
         return STATUS_INSUFFICIENT_RESOURCES;
     }
 
@@ -223,7 +223,7 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferWithNotification(
         : HibikiWaveRtPinInitializeEndpointV1(&m_StreamContext, static_cast<uint8_t*>(buffer), actual_size, m_EndpointIndex, period_count);
 
     if (!NT_SUCCESS(ntStatus)) {
-        m_PortStream->UnmapAllocatedPages(m_DmaBuffer);
+        m_PortStream->UnmapAllocatedPages(m_DmaBuffer, m_DmaBufferMdl);
         m_PortStream->FreePagesFromMdl(m_DmaBufferMdl);
         m_DmaBuffer = nullptr;
         m_DmaBufferMdl = nullptr;
@@ -246,7 +246,7 @@ VOID HibikiMiniportWaveRtStreamV1::FreeBufferWithNotification(
 
     if (m_DmaBuffer != nullptr) {
         HibikiWaveRtPinResetV1(&m_StreamContext);
-        m_PortStream->UnmapAllocatedPages(m_DmaBuffer);
+        m_PortStream->UnmapAllocatedPages(m_DmaBuffer, m_DmaBufferMdl);
         m_DmaBuffer = nullptr;
     }
 
@@ -278,7 +278,7 @@ VOID HibikiMiniportWaveRtStreamV1::GetHWLatency(
     hibiki_endpoint_topology_v1 topology{};
     if (hibiki_endpoint_topology_get_v1(m_EndpointIndex, &topology) != 0) {
         HWLatency->FifoSize = 0;
-        HWLatency->ChipDelay = 0;
+    
         HWLatency->CodecDelay = 0;
         return;
     }
