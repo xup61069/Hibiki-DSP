@@ -254,6 +254,19 @@ int main() {
     scene.automation_timeline_ids.push_back(std::string(65, 'x'));
     CHECK(!validate_scene(scene));
     scene.automation_timeline_ids.pop_back();
+    scene.ir_reference = "calibration-a";
+    CHECK(validate_scene(scene) && scene.ir_reference.size() == 13U);
+    scene.ir_reference = "short";
+    CHECK(!validate_scene(scene));
+    scene.ir_reference = std::string(65, 'x');
+    CHECK(!validate_scene(scene));
+    scene.ir_reference.clear();
+    scene.ir_reference.push_back('a');
+    scene.ir_reference.push_back('\0');
+    scene.ir_reference.append("calibration");
+    CHECK(!validate_scene(scene));
+    scene.ir_reference.clear();
+    CHECK(validate_scene(scene));
 
     const auto game_ir = resolve_ir_phase_policy(
         IrPhasePolicyV1{1, IrPhaseMode::MinimumPhase, 1.0});
@@ -3576,6 +3589,68 @@ int main() {
         "main", decoded_ir.data,
         resolve_ir_phase_policy(IrPhasePolicyV1{1U, IrPhaseMode::Bypass, 0.0})));
     ir_graph_engine.rollback_ir();
+
+    AudioEngineModel ir_keep_engine;
+    GraphConfigV1 ir_keep_graph;
+    ir_keep_graph.lanes.push_back(LaneConfigV1{"ir-keep-lane", "main", 2, 0.0, true});
+    CHECK(ir_keep_engine.prepare_graph(ir_keep_graph, 1U) && ir_keep_engine.commit_graph());
+    EngineControlWorkerV1 ir_keep_worker(ir_keep_engine);
+    ControlCommandV1 ir_keep_command{};
+    ir_keep_command.type = IpcMessageType::SceneApply;
+    std::array<std::uint8_t, kSceneApplyPayloadBytesV1> ir_keep_payload{};
+    CHECK(encode_scene_apply_payload_v1("movie", "main", ir_keep_payload));
+    CHECK(decode_scene_apply_payload_v1(ir_keep_payload, ir_keep_command.scene));
+    CHECK(ir_keep_worker.consume(ir_keep_command) == EngineControlResultV1::Applied &&
+          !ir_keep_engine.has_active_ir("main") &&
+          ir_keep_engine.ir_transaction_idle());
+    auto referenced_movie = make_easy_scene(EasySceneKind::Movie, "main");
+    referenced_movie.scene.ir_reference = "studio-calibration-a";
+    CHECK(validate_scene(referenced_movie.scene));
+    SceneCatalogV1 ir_keep_catalog;
+    SceneDefinitionV1 referenced_definition;
+    referenced_definition.scene = referenced_movie.scene;
+    referenced_definition.scene.id = "movie-ref-a";
+    referenced_definition.scene.name = "Referenced Movie";
+    referenced_definition.graph = std::move(referenced_movie.graph);
+    referenced_definition.loudness = std::move(referenced_movie.loudness);
+    CHECK(ir_keep_catalog.upsert(referenced_definition) == SceneCatalogResultV1::Applied);
+    ir_keep_worker.set_scene_catalog(&ir_keep_catalog);
+    CHECK(encode_scene_apply_payload_v1("movie-ref-a", "main", ir_keep_payload));
+    CHECK(decode_scene_apply_payload_v1(ir_keep_payload, ir_keep_command.scene));
+    const auto referenced_apply = ir_keep_worker.consume(ir_keep_command);
+    CHECK(referenced_apply == EngineControlResultV1::Applied);
+    CHECK(!ir_keep_engine.has_active_ir("main"));
+    CHECK(ir_keep_worker.active_scene().id == "movie-ref-a");
+    CHECK(ir_keep_worker.active_scene().ir_reference == "studio-calibration-a");
+    CHECK(ir_keep_engine.prepare_ir("main", decoded_ir.data, ir_phase_resolution));
+    CHECK(ir_keep_engine.commit_ir() && ir_keep_engine.has_active_ir("main"));
+    CHECK(encode_scene_apply_payload_v1("movie-ref-a", "main", ir_keep_payload));
+    CHECK(decode_scene_apply_payload_v1(ir_keep_payload, ir_keep_command.scene));
+    const auto referenced_reapply = ir_keep_worker.consume(ir_keep_command);
+    CHECK(referenced_reapply == EngineControlResultV1::Applied);
+    CHECK(ir_keep_engine.has_active_ir("main"));
+    CHECK(ir_keep_engine.ir_transaction_idle());
+    CHECK(ir_keep_worker.active_scene().ir_reference == "studio-calibration-a");
+    CHECK(encode_scene_apply_payload_v1("game", "main", ir_keep_payload));
+    CHECK(decode_scene_apply_payload_v1(ir_keep_payload, ir_keep_command.scene));
+    const auto game_apply = ir_keep_worker.consume(ir_keep_command);
+    CHECK(game_apply == EngineControlResultV1::Applied);
+    CHECK(ir_keep_engine.ir_transaction_idle());
+    CHECK(!ir_keep_engine.has_active_ir("main"));
+    auto second_referenced = referenced_definition;
+    second_referenced.scene.id = "quiet-movie-b";
+    second_referenced.scene.ir_reference = "studio-calibration-b";
+    CHECK(validate_scene(second_referenced.scene) &&
+          ir_keep_catalog.upsert(second_referenced) == SceneCatalogResultV1::Applied);
+    CHECK(ir_keep_engine.prepare_ir("main", decoded_ir.data, ir_phase_resolution));
+    CHECK(ir_keep_engine.commit_ir() && ir_keep_engine.has_active_ir("main"));
+    CHECK(encode_scene_apply_payload_v1("quiet-movie-b", "main", ir_keep_payload));
+    CHECK(decode_scene_apply_payload_v1(ir_keep_payload, ir_keep_command.scene));
+    CHECK(ir_keep_worker.consume(ir_keep_command) == EngineControlResultV1::Applied &&
+          !ir_keep_engine.has_active_ir("main"));
+    CHECK(encode_scene_apply_payload_v1("quiet-game", "custom-output", ir_keep_payload));
+    CHECK(decode_scene_apply_payload_v1(ir_keep_payload, ir_keep_command.scene));
+    CHECK(ir_keep_worker.consume(ir_keep_command) == EngineControlResultV1::Invalid);
 
     AudioEngineModel engine;
     GraphConfigV1 engine_graph;
