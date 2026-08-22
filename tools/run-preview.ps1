@@ -6,7 +6,8 @@ param(
   [switch]$SmokeTest,
   [switch]$EnableSystemVolume,
   [switch]$EnableSessionRouting,
-  [switch]$EnableWasapiOutput
+  [switch]$EnableWasapiOutput,
+  [switch]$SelfTest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,28 +16,152 @@ $engine = Join-Path $repo '.local/engine-preview/Release/hibiki_engine_preview.e
 $desktop = Join-Path $repo '.local/preview/DesktopCompat/Hibiki.DesktopPreview.exe'
 $winui = Join-Path $repo '.local/preview/WinUICompat/Hibiki.WinUI.exe'
 
-function Test-WindowsAppRuntime17X64 {
-  try {
-    $minimum = [version]'7000.456.1632.0'
-    foreach ($package in @(Get-AppxPackage -Name Microsoft.WindowsAppRuntime.1.7 -ErrorAction Stop)) {
-      if ($package.Architecture -eq 'X64' -and $package.Status -eq 'Ok' -and
-          ([version]$package.Version) -ge $minimum) {
-        return $true
-      }
+function Test-WindowsAppRuntimePackages {
+  param([AllowNull()][object[]]$Packages)
+  $minimum = [version]'7000.456.1632.0'
+  foreach ($package in @($Packages)) {
+    if ($null -ne $package -and $package.Architecture -eq 'X64' -and $package.Status -eq 'Ok' -and
+        ([version]$package.Version) -ge $minimum) {
+      return $true
     }
-  } catch {
-    return $false
   }
   return $false
 }
 
-$selectedUi = $Ui
-if ($Ui -eq 'Auto') {
-  $selectedUi = if (Test-WindowsAppRuntime17X64) { 'WinUICompat' } else { 'DesktopCompat' }
-  Write-Output "Auto-selected preview UI: $selectedUi"
+function Test-WindowsAppRuntime17X64 {
+  try {
+    return Test-WindowsAppRuntimePackages @(Get-AppxPackage -Name Microsoft.WindowsAppRuntime.1.7 -ErrorAction Stop)
+  } catch {
+    return $false
+  }
 }
-if ($selectedUi -eq 'WinUICompat' -and -not (Test-WindowsAppRuntime17X64)) {
-  throw 'WinUICompat needs Windows App Runtime 1.7 x64 (>= 7000.456.1632.0). Use -Ui DesktopCompat or install the runtime.'
+
+function Resolve-SelectedUi {
+  param([string]$RequestedUi, [bool]$RuntimePresent)
+  $selected = $RequestedUi
+  if ($RequestedUi -eq 'Auto') {
+    $selected = if ($RuntimePresent) { 'WinUICompat' } else { 'DesktopCompat' }
+  }
+  if ($selected -eq 'WinUICompat' -and -not $RuntimePresent) {
+    throw 'WinUICompat needs Windows App Runtime 1.7 x64 (>= 7000.456.1632.0). Use -Ui DesktopCompat or install the runtime.'
+  }
+  return $selected
+}
+
+function Get-EngineArguments {
+  param([bool]$SystemVolume, [bool]$SessionRouting, [bool]$WasapiOutput)
+  $engineArguments = @()
+  if ($SystemVolume) { $engineArguments += '--enable-system-volume' }
+  if ($SessionRouting) { $engineArguments += '--enable-session-routing' }
+  if ($WasapiOutput) { $engineArguments += '--enable-wasapi-output' }
+  return , $engineArguments
+}
+
+if ($SelfTest) {
+  function Assert-GateRejection {
+    param([scriptblock]$Action, [string]$ExpectedPattern, [string]$Label)
+    try { & $Action } catch {
+      if ("$($_.Exception.Message)" -notmatch $ExpectedPattern) {
+        throw ("run-preview self-test case '{0}' failed with an unexpected message: {1}") -f $Label, $_.Exception.Message
+      }
+      return
+    }
+    throw ("run-preview self-test case '{0}' expected a rejection matching '{1}' but the launcher passed.") -f $Label, $ExpectedPattern
+  }
+
+  function New-RuntimePackage {
+    param([string]$Architecture = 'X64', [string]$Status = 'Ok', [string]$Version = '7000.456.1632.0')
+    return [pscustomobject]@{ Architecture = $Architecture; Status = $Status; Version = $Version }
+  }
+
+  $caseCount = 0
+
+  # Cases 1..3: UI resolution matrix.
+  $resolved = Resolve-SelectedUi -RequestedUi 'Auto' -RuntimePresent $true
+  if ($resolved -ne 'WinUICompat') { throw "run-preview self-test case 'auto-with-runtime' expected WinUICompat, got $resolved." }
+  $caseCount++
+  $resolved = Resolve-SelectedUi -RequestedUi 'Auto' -RuntimePresent $false
+  if ($resolved -ne 'DesktopCompat') { throw "run-preview self-test case 'auto-without-runtime' expected DesktopCompat, got $resolved." }
+  $caseCount++
+  foreach ($runtime in @($true, $false)) {
+    $resolved = Resolve-SelectedUi -RequestedUi 'DesktopCompat' -RuntimePresent $runtime
+    if ($resolved -ne 'DesktopCompat') { throw "run-preview self-test case 'explicit-desktopcompat' expected DesktopCompat, got $resolved." }
+    $caseCount++
+  }
+
+  # Case 4: explicit WinUICompat with the runtime present passes.
+  $resolved = Resolve-SelectedUi -RequestedUi 'WinUICompat' -RuntimePresent $true
+  if ($resolved -ne 'WinUICompat') { throw "run-preview self-test case 'explicit-winuicompat-with-runtime' expected WinUICompat, got $resolved." }
+  $caseCount++
+
+  # Case 5: explicit WinUICompat without the runtime fails closed with the actionable message.
+  Assert-GateRejection -Label 'winuicompat-without-runtime' -ExpectedPattern 'WinUICompat needs Windows App Runtime 1\.7 x64 \(>= 7000\.456\.1632\.0\)' `
+    -Action { Resolve-SelectedUi -RequestedUi 'WinUICompat' -RuntimePresent $false }
+  $caseCount++
+
+  # Cases 6..10: runtime package qualification boundary and filtering.
+  $qualifying = @('7000.456.1632.0', '7000.500.1000.0', '8000.0.0.0')
+  foreach ($version in $qualifying) {
+    $present = Test-WindowsAppRuntimePackages @((New-RuntimePackage -Version $version))
+    if (-not $present) { throw "run-preview self-test case 'runtime-boundary' expected version $version to qualify." }
+    $caseCount++
+  }
+  foreach ($version in @('7000.456.1631.0', '6999.999.9999.999')) {
+    $present = Test-WindowsAppRuntimePackages @((New-RuntimePackage -Version $version))
+    if ($present) { throw "run-preview self-test case 'runtime-boundary' expected version $version to be rejected." }
+    $caseCount++
+  }
+  $present = Test-WindowsAppRuntimePackages @((New-RuntimePackage -Architecture 'X86'))
+  if ($present) { throw "run-preview self-test case 'architecture-filter' expected an X86 package to be rejected." }
+  $caseCount++
+  $present = Test-WindowsAppRuntimePackages @((New-RuntimePackage -Status 'NeedsRemediation'))
+  if ($present) { throw "run-preview self-test case 'status-filter' expected a non-Ok package to be rejected." }
+  $caseCount++
+  $present = Test-WindowsAppRuntimePackages @(
+    (New-RuntimePackage -Architecture 'X86'),
+    (New-RuntimePackage -Version '6000.0.0.0'),
+    (New-RuntimePackage -Version '7100.0.0.0'))
+  if (-not $present) { throw "run-preview self-test case 'multi-package-fallback' expected the last qualifying package to be found." }
+  $caseCount++
+  $present = Test-WindowsAppRuntimePackages $null
+  if ($present) { throw "run-preview self-test case 'empty-package-list' expected no packages to fail qualification." }
+  $caseCount++
+
+  # Case 11: all engine flags off produce no arguments.
+  $arguments = Get-EngineArguments -SystemVolume:$false -SessionRouting:$false -WasapiOutput:$false
+  if (@($arguments).Count -ne 0) { throw "run-preview self-test case 'engine-args-none' expected zero arguments, got: $($arguments -join ' ')." }
+  $caseCount++
+
+  # Cases 12..14: each single flag produces exactly its token.
+  $singleCases = @(
+    @{ SystemVolume = $true;  SessionRouting = $false; WasapiOutput = $false; Expected = '--enable-system-volume' },
+    @{ SystemVolume = $false; SessionRouting = $true;  WasapiOutput = $false; Expected = '--enable-session-routing' },
+    @{ SystemVolume = $false; SessionRouting = $false; WasapiOutput = $true;  Expected = '--enable-wasapi-output' }
+  )
+  foreach ($entry in $singleCases) {
+    $arguments = Get-EngineArguments -SystemVolume:$entry.SystemVolume -SessionRouting:$entry.SessionRouting -WasapiOutput:$entry.WasapiOutput
+    if (@($arguments).Count -ne 1 -or $arguments[0] -ne $entry.Expected) {
+      throw ("run-preview self-test case 'engine-args-single' expected [{0}], got: {1}.") -f $entry.Expected, ($arguments -join ' ')
+    }
+    $caseCount++
+  }
+
+  # Case 15: all flags on produce the exact ordered tokens.
+  $arguments = Get-EngineArguments -SystemVolume:$true -SessionRouting:$true -WasapiOutput:$true
+  $expectedAll = @('--enable-system-volume', '--enable-session-routing', '--enable-wasapi-output')
+  if (($arguments -join ' ') -ne ($expectedAll -join ' ')) {
+    throw "run-preview self-test case 'engine-args-all' expected [$($expectedAll -join ' ')], got: $($arguments -join ' ')."
+  }
+  $caseCount++
+
+  Write-Output "Preview launcher self-test passed ($caseCount cases)."
+  exit 0
+}
+
+$runtimePresent = Test-WindowsAppRuntime17X64
+$selectedUi = Resolve-SelectedUi -RequestedUi $Ui -RuntimePresent $runtimePresent
+if ($Ui -eq 'Auto') {
+  Write-Output "Auto-selected preview UI: $selectedUi"
 }
 $uiExecutable = if ($selectedUi -eq 'WinUICompat') { $winui } else { $desktop }
 

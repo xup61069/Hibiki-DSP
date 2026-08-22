@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "issue": 87,
+  "scope_digest": "live-wasapi-handoff-selftest-v1",
+  "source_commit": "9fab093",
+  "environment_fingerprint": "windows-11-26200-x64-preview",
+  "commands": [
+    "pwsh -NoProfile -File tools/live-wasapi-handoff-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 87",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/live-wasapi-handoff-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "valid WASAPI handoff build and dispatch plan",
+        "wrong target rejection",
+        "missing CMake build definition rejection",
+        "unsafe output root rejection",
+        "probe path mismatch rejection"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 5
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 87 / tools/handoff-check.ps1 / source-policy / source-only-ci / verify / docs-check / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership and scope",
+        "452 tracked paths source policy",
+        "one workflow source-only publication boundary",
+        "CMake/CTest 1 of 1",
+        "documentation and baseline counters verified",
+        "no whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "The self-test validates wrapper planning and source dispatch only; it does not prove physical WASAPI audio delivery, virtual endpoint routing, driver, WaveRT, HLK, signing, or endpoint identity.",
+    "No endpoint ID, friendly name, PID, session ID, serial, private path or compiled artifact was recorded in repository evidence.",
+    "Release build outputs remain ignored local artifacts and are not submitted to GitHub."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.301",
+    "msvc": "19.44.35228.0",
+    "powershell": "7.6.5",
+    "cmake": "4.4.0"
+  },
+  "started_at": "2026-08-22T10:11:00+08:00",
+  "finished_at": "2026-08-22T10:12:00+08:00"
+}
