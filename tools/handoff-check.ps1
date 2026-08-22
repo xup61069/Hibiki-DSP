@@ -6,6 +6,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 $repo = Split-Path -Parent $PSScriptRoot
 
 function Test-GlobSegmentIntersection([string]$left, [string]$right) {
