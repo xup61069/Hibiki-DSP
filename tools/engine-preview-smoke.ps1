@@ -10,6 +10,212 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 
+function Get-EnginePreviewSmokePlan {
+  param(
+    [Parameter(Mandatory)][string]$RepositoryRoot
+  )
+
+  $localRoot = Join-Path $RepositoryRoot '.local'
+  $engineWorkingDirectory = Join-Path $localRoot 'engine-preview/Release'
+  [pscustomobject]@{
+    RepositoryRoot = $RepositoryRoot
+    LocalRoot = $localRoot
+    EngineWorkingDirectory = $engineWorkingDirectory
+    EnginePath = Join-Path $engineWorkingDirectory 'hibiki_engine_preview.exe'
+    IrDirectory = $localRoot
+    IrPath = Join-Path $localRoot 'engine-preview-smoke-ir.wav'
+  }
+}
+
+function Test-EnginePreviewSmokePathUnderRoot {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$Root
+  )
+
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  return $fullPath -eq $fullRoot -or
+    $fullPath.StartsWith($fullRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-EnginePreviewSmokeExistingAttributes {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [hashtable]$SyntheticAttributes
+  )
+
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
+    return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
+  }
+  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
+  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+}
+
+function Assert-EnginePreviewSmokePath {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$Root,
+    [Parameter(Mandatory)][ValidateSet('File', 'Directory')][string]$Kind,
+    [switch]$AllowMissingLeaf,
+    [hashtable]$SyntheticAttributes
+  )
+
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  if (-not (Test-EnginePreviewSmokePathUnderRoot -Path $fullPath -Root $fullRoot)) {
+    throw "Engine Preview smoke path must remain under the expected root: $fullPath"
+  }
+
+  $leafAttributes = Get-EnginePreviewSmokeExistingAttributes -Path $fullPath -SyntheticAttributes $SyntheticAttributes
+  if ($null -eq $leafAttributes -and -not $AllowMissingLeaf) {
+    throw "Engine Preview smoke $Kind does not exist: $fullPath"
+  }
+
+  $cursor = $fullPath
+  while ($true) {
+    $attributes = Get-EnginePreviewSmokeExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    if ($null -ne $attributes) {
+      if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Engine Preview smoke path or parent is a reparse point: $cursor"
+      }
+      if ($cursor -eq $fullPath) {
+        if ($Kind -eq 'Directory' -and ($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+          throw "Engine Preview smoke path is not a directory: $fullPath"
+        }
+        if ($Kind -eq 'File' -and ($attributes -band [System.IO.FileAttributes]::Directory) -ne 0) {
+          throw "Engine Preview smoke path is not a file: $fullPath"
+        }
+      }
+    }
+
+    if ($cursor -eq $fullRoot) { break }
+    $parent = [IO.Path]::GetFullPath((Split-Path -Parent $cursor)).TrimEnd('\', '/')
+    if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) {
+      throw "Engine Preview smoke path could not reach the expected root: $fullPath"
+    }
+    $cursor = $parent
+  }
+}
+
+function Invoke-EnginePreviewSmokePathSelfTest {
+  $fixture = Get-EnginePreviewSmokePlan -RepositoryRoot 'C:\hibiki-engine-preview-smoke-selftest'
+  $localRoot = [IO.Path]::GetFullPath($fixture.LocalRoot).TrimEnd('\', '/')
+  $workingDirectory = [IO.Path]::GetFullPath($fixture.EngineWorkingDirectory).TrimEnd('\', '/')
+  $enginePath = [IO.Path]::GetFullPath($fixture.EnginePath).TrimEnd('\', '/')
+  $irPath = [IO.Path]::GetFullPath($fixture.IrPath).TrimEnd('\', '/')
+  $directory = [System.IO.FileAttributes]::Directory
+  $file = [System.IO.FileAttributes]::Archive
+  $cases = 0
+
+  Assert-EnginePreviewSmokePath -Path $fixture.EnginePath -Root $fixture.LocalRoot -Kind File -SyntheticAttributes @{
+    $localRoot = $directory
+    $workingDirectory = $directory
+    $enginePath = $file
+  }
+  $cases++
+  Assert-EnginePreviewSmokePath -Path $fixture.EngineWorkingDirectory -Root $fixture.LocalRoot -Kind Directory -SyntheticAttributes @{
+    $localRoot = $directory
+    $workingDirectory = $directory
+  }
+  $cases++
+  Assert-EnginePreviewSmokePath -Path $fixture.IrDirectory -Root $fixture.RepositoryRoot -Kind Directory -AllowMissingLeaf -SyntheticAttributes @{}
+  $cases++
+  Assert-EnginePreviewSmokePath -Path $fixture.IrPath -Root $fixture.RepositoryRoot -Kind File -AllowMissingLeaf -SyntheticAttributes @{}
+  $cases++
+
+  $outsideCaught = $false
+  $outsidePath = Join-Path (Split-Path -Parent $fixture.RepositoryRoot) 'outside-engine-preview.exe'
+  try { Assert-EnginePreviewSmokePath -Path $outsidePath -Root $fixture.LocalRoot -Kind File -AllowMissingLeaf -SyntheticAttributes @{} }
+  catch { $outsideCaught = $_.Exception.Message -match 'under the expected root' }
+  if (-not $outsideCaught) { throw 'Engine Preview smoke self-test expected an outside-root rejection.' }
+  $cases++
+
+  $reparseParentCaught = $false
+  try {
+    Assert-EnginePreviewSmokePath -Path $fixture.EnginePath -Root $fixture.LocalRoot -Kind File -SyntheticAttributes @{
+      $localRoot = $directory -bor [System.IO.FileAttributes]::ReparsePoint
+      $workingDirectory = $directory
+      $enginePath = $file
+    }
+  } catch { $reparseParentCaught = $_.Exception.Message -match 'reparse point' }
+  if (-not $reparseParentCaught) { throw 'Engine Preview smoke self-test expected a reparse-parent rejection.' }
+  $cases++
+
+  $reparseTargetCaught = $false
+  try {
+    Assert-EnginePreviewSmokePath -Path $fixture.EnginePath -Root $fixture.LocalRoot -Kind File -SyntheticAttributes @{
+      $localRoot = $directory
+      $workingDirectory = $directory
+      $enginePath = $file -bor [System.IO.FileAttributes]::ReparsePoint
+    }
+  } catch { $reparseTargetCaught = $_.Exception.Message -match 'reparse point' }
+  if (-not $reparseTargetCaught) { throw 'Engine Preview smoke self-test expected a reparse-target rejection.' }
+  $cases++
+
+  $nonDirectoryCaught = $false
+  try {
+    Assert-EnginePreviewSmokePath -Path $fixture.EngineWorkingDirectory -Root $fixture.LocalRoot -Kind Directory -SyntheticAttributes @{
+      $localRoot = $directory
+      $workingDirectory = $file
+    }
+  } catch { $nonDirectoryCaught = $_.Exception.Message -match 'not a directory' }
+  if (-not $nonDirectoryCaught) { throw 'Engine Preview smoke self-test expected a non-directory rejection.' }
+  $cases++
+
+  $nonFileCaught = $false
+  try {
+    Assert-EnginePreviewSmokePath -Path $fixture.EnginePath -Root $fixture.LocalRoot -Kind File -SyntheticAttributes @{
+      $localRoot = $directory
+      $workingDirectory = $directory
+      $enginePath = $directory
+    }
+  } catch { $nonFileCaught = $_.Exception.Message -match 'not a file' }
+  if (-not $nonFileCaught) { throw 'Engine Preview smoke self-test expected a non-file rejection.' }
+  $cases++
+
+  $missingEngineCaught = $false
+  try {
+    Assert-EnginePreviewSmokePath -Path $fixture.EnginePath -Root $fixture.LocalRoot -Kind File -SyntheticAttributes @{
+      $localRoot = $directory
+      $workingDirectory = $directory
+    }
+  } catch { $missingEngineCaught = $_.Exception.Message -match 'does not exist' }
+  if (-not $missingEngineCaught) { throw 'Engine Preview smoke self-test expected a missing executable rejection.' }
+  $cases++
+
+  $irReparseCaught = $false
+  try {
+    Assert-EnginePreviewSmokePath -Path $fixture.IrDirectory -Root $fixture.RepositoryRoot -Kind Directory -AllowMissingLeaf -SyntheticAttributes @{
+      $localRoot = $directory -bor [System.IO.FileAttributes]::ReparsePoint
+    }
+  } catch { $irReparseCaught = $_.Exception.Message -match 'reparse point' }
+  if (-not $irReparseCaught) { throw 'Engine Preview smoke self-test expected an IR-directory reparse rejection.' }
+  $cases++
+
+  $irDirectoryTargetCaught = $false
+  try {
+    Assert-EnginePreviewSmokePath -Path $fixture.IrPath -Root $fixture.RepositoryRoot -Kind File -AllowMissingLeaf -SyntheticAttributes @{
+      $localRoot = $directory
+      $irPath = $directory
+    }
+  } catch { $irDirectoryTargetCaught = $_.Exception.Message -match 'not a file' }
+  if (-not $irDirectoryTargetCaught) { throw 'Engine Preview smoke self-test expected an IR-target directory rejection.' }
+  $cases++
+
+  $irDirectoryTypeCaught = $false
+  try {
+    Assert-EnginePreviewSmokePath -Path $fixture.IrDirectory -Root $fixture.RepositoryRoot -Kind Directory -SyntheticAttributes @{
+      $localRoot = $file
+    }
+  } catch { $irDirectoryTypeCaught = $_.Exception.Message -match 'not a directory' }
+  if (-not $irDirectoryTypeCaught) { throw 'Engine Preview smoke self-test expected a non-directory IR root rejection.' }
+  $cases++
+
+  return $cases
+}
+
 function Read-Exactly([System.IO.Stream]$Stream, [byte[]]$Buffer) {
   $offset = 0
   while ($offset -lt $Buffer.Length) {
@@ -92,7 +298,7 @@ function Receive-IpcFrame([System.IO.Stream]$Stream) {
 }
 
 if ($SelfTest) {
-  $cases = 0
+  $cases = Invoke-EnginePreviewSmokePathSelfTest
 
   $emptyFrame = New-IpcFrame 1 42 @()
   Assert-IpcFrameShape -Frame $emptyFrame -ExpectedType 1 -ExpectedRequestId 42 -ExpectedPayloadLength 0
@@ -140,14 +346,16 @@ if ($SelfTest) {
   if (-not $constructionCaught) { throw 'IPC frame self-test expected constructor bound rejection.' }
   $cases++
 
-  Write-Output "Engine Preview IPC frame self-test passed ($cases cases)."
+  Write-Output "Engine Preview path and IPC self-test passed ($cases cases; offline/no-process/no-file-write)."
   exit 0
 }
 
-$engine = Join-Path $repo '.local/engine-preview/Release/hibiki_engine_preview.exe'
-if (-not (Test-Path -LiteralPath $engine)) {
-  throw "Build Engine Preview first: pwsh -File tools/build-engine-preview.ps1"
-}
+$smokePlan = Get-EnginePreviewSmokePlan -RepositoryRoot $repo
+Assert-EnginePreviewSmokePath -Path $smokePlan.EnginePath -Root $smokePlan.LocalRoot -Kind File
+Assert-EnginePreviewSmokePath -Path $smokePlan.EngineWorkingDirectory -Root $smokePlan.LocalRoot -Kind Directory
+Assert-EnginePreviewSmokePath -Path $smokePlan.IrDirectory -Root $smokePlan.RepositoryRoot -Kind Directory -AllowMissingLeaf
+Assert-EnginePreviewSmokePath -Path $smokePlan.IrPath -Root $smokePlan.RepositoryRoot -Kind File -AllowMissingLeaf
+$engine = $smokePlan.EnginePath
 if (@(Get-Process -Name hibiki_engine_preview -ErrorAction SilentlyContinue).Count -gt 0) {
   throw 'Another Engine Preview process is already running; stop it before running this smoke.'
 }
@@ -185,9 +393,9 @@ if ($EnableSystemVolume) { $engineArguments += '--enable-system-volume' }
 if ($EnableSessionRouting) { $engineArguments += '--enable-session-routing' }
 if ($EnableWasapiOutput) { $engineArguments += '--enable-wasapi-output' }
 $engineProcess = Start-Process -FilePath $engine -ArgumentList $engineArguments `
-  -WorkingDirectory (Split-Path $engine) -WindowStyle Hidden -PassThru
-$irPath = Join-Path $repo '.local/engine-preview-smoke-ir.wav'
-$irDirectory = Split-Path $irPath
+  -WorkingDirectory $smokePlan.EngineWorkingDirectory -WindowStyle Hidden -PassThru
+$irPath = $smokePlan.IrPath
+$irDirectory = $smokePlan.IrDirectory
 New-Item -ItemType Directory -Force -Path $irDirectory | Out-Null
 Write-TestIrWav $irPath
 $client = $null
