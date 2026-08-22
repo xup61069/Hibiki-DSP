@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 184,
   "scope_digest": "counter-doc-sync-v1",
-  "source_commit": "PENDING",
+  "source_commit": "13e15d3570f5ef6550ed9d071110b497d2159761",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; cmake-missing-wdk-missing-portable-user-space",
   "commands": [
     "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
