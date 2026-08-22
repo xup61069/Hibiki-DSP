@@ -1,18 +1,19 @@
 [CmdletBinding()]
 param(
-  [switch]$SelfTest
+  [switch]$SelfTest,
+  [switch]$WriteCounters
 )
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 
 function Get-CounterClaims([string]$Text) {
-  $claims = [pscustomobject]@{ Required = 0; Specs = 0; Tracked = 0; Json = 0 }
+  # Parse only structural counters (required entries, specs) from BASELINE prose.
+  # Volatile tracked-path / repository-JSON counts live in build/baseline-counters.json.
+  $claims = [pscustomobject]@{ Required = 0; Specs = 0 }
   $patterns = [ordered]@{
     Required = @('docs-check\.ps1`\s*的\s*(?<count>\d+)\s*個必要入口', 'docs-check required-entry')
     Specs    = @('個必要入口與\s*(?<count>\d+)\s*份\s*Spec\s*通過', 'spec')
-    Tracked  = @('source-policy\.ps1`\s*掃描\s*(?<count>\d+)\s*個\s*tracked paths', 'source-policy tracked-path')
-    Json     = @('(?<count>\d+)\s*個\s*repository JSON\s*檔案均可解析', 'repository-json')
   }
   foreach ($key in $patterns.Keys) {
     $match = [regex]::Match($Text, [string]$patterns[$key][0])
@@ -23,6 +24,43 @@ function Get-CounterClaims([string]$Text) {
     $claims.$key = [int]$match.Groups['count'].Value
   }
   return $claims
+}
+
+function Read-BaselineCountersJson {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  if (-not (Test-Path -LiteralPath $Path)) {
+    throw "build/baseline-counters.json is missing; run: pwsh -File tools/docs-check.ps1 -WriteCounters"
+  }
+  try {
+    $json = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+  } catch {
+    throw "build/baseline-counters.json is not valid JSON: $($_.Exception.Message)"
+  }
+  if ($json.schema_version -ne 1) {
+    throw "build/baseline-counters.json has schema_version '$($json.schema_version)' but this gate requires '1'."
+  }
+  foreach ($key in @('tracked_paths', 'repository_json_files')) {
+    if ($null -eq $json.$key -or -not ($json.$key -is [int] -or $json.$key -is [long]) -or $json.$key -lt 0) {
+      throw "build/baseline-counters.json is missing or has an invalid non-negative integer '$key'."
+    }
+  }
+  return [pscustomobject]@{ Tracked = [int]$json.tracked_paths; Json = [int]$json.repository_json_files }
+}
+
+function Write-BaselineCountersJson {
+  param(
+    [Parameter(Mandatory = $true)][int]$Tracked,
+    [Parameter(Mandatory = $true)][int]$Json
+  )
+  $path = Join-Path $repo 'build/baseline-counters.json'
+  $content = @{
+    schema_version        = 1
+    tracked_paths         = $Tracked
+    repository_json_files = $Json
+  } | ConvertTo-Json
+  [System.IO.File]::WriteAllText($path, $content + [Environment]::NewLine,
+    [System.Text.UTF8Encoding]::new($false))
+  Write-Output "Updated build/baseline-counters.json (tracked_paths=$Tracked repository_json_files=$Json)."
 }
 
 function Assert-CounterClaims {
@@ -41,13 +79,13 @@ function Assert-CounterClaims {
     throw ("BASELINE.md claims {0} specs but the repository tracks {1}; " +
            "update the BASELINE.md verification summary.") -f $Claims.Specs, $Specs
   }
-  if ($Claims.Tracked -ne $Tracked) {
-    throw ("BASELINE.md claims {0} tracked paths but git reports {1}; " +
-           "update the BASELINE.md verification summary.") -f $Claims.Tracked, $Tracked
+  if ($Tracked -ne $trackedFiles.Count) {
+    throw ("build/baseline-counters.json claims {0} tracked paths but git reports {1}; " +
+           "run: pwsh -File tools/docs-check.ps1 -WriteCounters") -f $Tracked, $trackedFiles.Count
   }
-  if ($Claims.Json -ne $Json) {
-    throw ("BASELINE.md claims {0} repository JSON files but git reports {1}; " +
-           "update the BASELINE.md verification summary.") -f $Claims.Json, $Json
+  if ($Json -ne $jsonFiles.Count) {
+    throw ("build/baseline-counters.json claims {0} repository JSON files but git reports {1}; " +
+           "run: pwsh -File tools/docs-check.ps1 -WriteCounters") -f $Json, $jsonFiles.Count
   }
 }
 
@@ -182,9 +220,8 @@ foreach ($adapter in $adapters) {
 if ($SelfTest) {
   $summaryOk = @'
 目前驗證摘要：`docs-check.ps1` 的 85 個必要入口與
-24 份 Spec 通過；`source-policy.ps1` 掃描 411 個 tracked paths 且無 blocked
-binary/secret；
-`distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過了71 個 repository JSON 檔案均可解析。
+24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked binary/secret；
+`distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過了 repository JSON 檔案均可解析。
 '@
   $caseCount = 0
   $multilineLines = @('line-one', 'line-two', 'line-three')
@@ -232,28 +269,66 @@ binary/secret；
     throw 'docs-check self-test failed: direct main push must remain strict.'
   }
   $caseCount++
+
+  # Prose parser: Required and Specs still parse from BASELINE.md.
   $ok = Get-CounterClaims $summaryOk
-  if ($ok.Required -ne 85 -or $ok.Specs -ne 24 -or $ok.Tracked -ne 411 -or $ok.Json -ne 71) {
-    throw 'docs-check self-test failed: canonical summary did not parse to expected counters.'
+  if ($ok.Required -ne 85 -or $ok.Specs -ne 24) {
+    throw 'docs-check self-test failed: canonical summary did not parse to expected structural counters.'
   }
   $caseCount++
-  Assert-CounterClaims -Claims $ok -Required 85 -Specs 24 -Tracked 411 -Json 71
-  $caseCount++
-  foreach ($fragment in @('個必要入口', '份 Spec 通過', '掃描 411 個', 'repository JSON')) {
+
+  # Removing required-entry or spec markers must still fail closed.
+  foreach ($fragment in @('個必要入口', '份 Spec 通過')) {
     $broken = $summaryOk.Replace($fragment, 'removed-marker')
     try { Get-CounterClaims $broken | Out-Null } catch { $caseCount++; continue }
     throw "docs-check self-test failed: removing '$fragment' should fail the counter parser."
   }
+
+  # JSON counter source-of-truth fixtures.
+  $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("hibiki-selftest-" + [guid]::NewGuid().ToString("N").Substring(0,8))
+  New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
   try {
-    $drift = Get-CounterClaims $summaryOk
-    Assert-CounterClaims -Claims $drift -Required 85 -Specs 24 -Tracked 409 -Json 71
-  } catch {
+    $countersPath = Join-Path $tempDir 'baseline-counters.json'
+
+    # Case: missing JSON file fails closed.
+    try { Read-BaselineCountersJson -Path $countersPath | Out-Null } catch { $caseCount++ }
+
+    # Case: malformed JSON fails closed.
+    Set-Content -LiteralPath $countersPath -Value '{ broken' -Encoding UTF8NoBOM
+    try { Read-BaselineCountersJson -Path $countersPath | Out-Null } catch { $caseCount++ }
+
+    # Case: schema_version drift fails closed.
+    Set-Content -LiteralPath $countersPath -Value '{"schema_version":2,"tracked_paths":10,"repository_json_files":5}' -Encoding UTF8NoBOM
+    try { Read-BaselineCountersJson -Path $countersPath | Out-Null } catch { $caseCount++ }
+
+    # Case: matching counters parse correctly.
+    Set-Content -LiteralPath $countersPath -Value '{"schema_version":1,"tracked_paths":468,"repository_json_files":98}' -Encoding UTF8NoBOM
+    $readOk = Read-BaselineCountersJson -Path $countersPath
+    if ($readOk.Tracked -ne 468 -or $readOk.Json -ne 98) {
+      throw 'docs-check self-test failed: matching JSON counters did not round-trip.'
+    }
     $caseCount++
+
+    # Case: negative integer fails closed.
+    Set-Content -LiteralPath $countersPath -Value '{"schema_version":1,"tracked_paths":-1,"repository_json_files":5}' -Encoding UTF8NoBOM
+    try { Read-BaselineCountersJson -Path $countersPath | Out-Null } catch { $caseCount++ }
+  } finally {
+    Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
   }
-  if ($caseCount -lt 13) {
-    throw "docs-check self-test failed: expected at least 13 passing cases, saw $caseCount."
+
+  if ($caseCount -lt 18) {
+    throw "docs-check self-test failed: expected at least 18 passing cases, saw $caseCount."
   }
-  Write-Output "docs-check self-test passed ($caseCount cases; parser markers, multiline normalization, branch mode and drift detection)."
+  Write-Output "docs-check self-test passed ($caseCount cases; prose parser, multiline normalization, branch mode and JSON counter fixtures)."
+  exit 0
+}
+
+# Handle -WriteCounters: mechanically refresh the JSON from git and exit.
+if ($WriteCounters) {
+  $trackedFilesNow = @(git -C $repo ls-files)
+  if ($LASTEXITCODE -ne 0) { throw 'docs-check could not list tracked files.' }
+  $jsonFilesNow = @(git -C $repo ls-files -- '*.json')
+  Write-BaselineCountersJson -Tracked $trackedFilesNow.Count -Json $jsonFilesNow.Count
   exit 0
 }
 
@@ -263,6 +338,9 @@ if ($LASTEXITCODE -ne 0) { throw 'docs-check could not list tracked files.' }
 $jsonFiles = @(git -C $repo ls-files -- '*.json')
 
 $claims = Get-CounterClaims $baselineText
+
+# Volatile counters come exclusively from build/baseline-counters.json.
+$fileCounters = Read-BaselineCountersJson -Path (Join-Path $repo 'build/baseline-counters.json')
 
 # Structural counters (required entries and specs) are always verified against
 # the tree being tested; they change rarely, so keeping them strict costs
@@ -288,8 +366,14 @@ $pullRequestMode = -not [string]::IsNullOrWhiteSpace($baseRef)
 $mergeBaseMode = Test-MergeBaseMode -BaseRef $baseRef -RefName $refName
 if (-not $mergeBaseMode) {
   # Push-to-main and local runs stay fully strict so main cannot drift silently.
-  Assert-CounterClaims -Claims $claims -Required $required.Count -Specs $specs.Count `
-    -Tracked $trackedFiles.Count -Json $jsonFiles.Count
+  if ($fileCounters.Tracked -ne $trackedFiles.Count) {
+    throw ("build/baseline-counters.json claims {0} tracked paths but git reports {1}; " +
+           "run: pwsh -File tools/docs-check.ps1 -WriteCounters") -f $fileCounters.Tracked, $trackedFiles.Count
+  }
+  if ($fileCounters.Json -ne $jsonFiles.Count) {
+    throw ("build/baseline-counters.json claims {0} repository JSON files but git reports {1}; " +
+           "run: pwsh -File tools/docs-check.ps1 -WriteCounters") -f $fileCounters.Json, $jsonFiles.Count
+  }
   $summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; baseline summary verified against {2} tracked paths and {3} repository JSON files.)'
   Write-Output (($summaryTemplate) -f $required.Count, $specs.Count, $trackedFiles.Count, $jsonFiles.Count)
   exit 0
@@ -309,42 +393,64 @@ if ($LASTEXITCODE -ne 0) {
   throw "docs-check could not determine whether this head edits docs/state/BASELINE.md."
 }
 $baselineChangedByHead = Test-BaselineChangedByHead -ChangedPaths $headBaselineChanges
+
+$headCountersChanges = @(git -C $repo diff --name-only $mergeBase HEAD -- build/baseline-counters.json)
+if ($LASTEXITCODE -ne 0) {
+  throw "docs-check could not determine whether this head edits build/baseline-counters.json."
+}
+$countersChangedByHead = @($headCountersChanges | Where-Object { $_ -eq 'build/baseline-counters.json' }).Count -gt 0
+
 $baseTracked = @(git -C $repo ls-tree -r --name-only $baseRefName)
 if ($LASTEXITCODE -ne 0) { throw "docs-check could not list the merge base tree '$baseRefName'." }
 # git ls-tree does not expand a bare '*.json' pathspec across directories the way
 # git ls-files does; filter the full listing instead of trusting a pathspec.
 $baseJson = @($baseTracked | Where-Object { $_.ToLowerInvariant().EndsWith('.json') })
-$baseBaselineLines = @(git -C $repo show ('{0}:docs/state/BASELINE.md' -f $baseRefName))
-if ($LASTEXITCODE -ne 0) { throw "docs-check could not read BASELINE.md from '$baseRefName'." }
-$baseBaselineText = Convert-CommandOutputToText -Lines $baseBaselineLines
 
-# The merge base itself must be internally consistent: a stale summary on main
-# is an integrator problem and fails closed here instead of blaming the PR.
-$baseClaims = Get-CounterClaims $baseBaselineText
-if ($baseClaims.Tracked -ne $baseTracked.Count) {
-  throw ("BASELINE.md on '{0}' claims {1} tracked paths but that tree has {2}; " +
-         "refresh docs/state/BASELINE.md on the target branch.") -f $baseRefName, $baseClaims.Tracked, $baseTracked.Count
+# The merge base itself must be internally consistent: stale counters on main
+# are an integrator problem and fail closed here instead of blaming the PR.
+$baseCountersLines = @(git -C $repo show ('{0}:build/baseline-counters.json' -f $baseRefName))
+if ($LASTEXITCODE -ne 0) { throw "docs-check could not read baseline-counters.json from '$baseRefName'." }
+$baseCountersText = Convert-CommandOutputToText -Lines $baseCountersLines
+$tempBasePath = Join-Path ([System.IO.Path]::GetTempPath()) ("hibiki-base-counters-" + [guid]::NewGuid().ToString("N").Substring(0,8) + ".json")
+try {
+  Set-Content -LiteralPath $tempBasePath -Value $baseCountersText -Encoding UTF8NoBOM
+  $baseFileCounters = Read-BaselineCountersJson -Path $tempBasePath
+} finally {
+  Remove-Item -LiteralPath $tempBasePath -Force -ErrorAction SilentlyContinue
 }
-if ($baseClaims.Json -ne $baseJson.Count) {
-  throw ("BASELINE.md on '{0}' claims {1} repository JSON files but that tree has {2}; " +
-         "refresh docs/state/BASELINE.md on the target branch.") -f $baseRefName, $baseClaims.Json, $baseJson.Count
+if ($baseFileCounters.Tracked -ne $baseTracked.Count) {
+  throw ("build/baseline-counters.json on '{0}' claims {1} tracked paths but that tree has {2}; " +
+         "refresh build/baseline-counters.json on the target branch.") -f $baseRefName, $baseFileCounters.Tracked, $baseTracked.Count
 }
+if ($baseFileCounters.Json -ne $baseJson.Count) {
+  throw ("build/baseline-counters.json on '{0}' claims {1} repository JSON files but that tree has {2}; " +
+         "refresh build/baseline-counters.json on the target branch.") -f $baseRefName, $baseFileCounters.Json, $baseJson.Count
+}
+
+$baselineLines = @(git -C $repo show ('{0}:docs/state/BASELINE.md' -f $baseRefName))
+if ($LASTEXITCODE -ne 0) { throw "docs-check could not read BASELINE.md from '$baseRefName'." }
+$baseBaselineText = Convert-CommandOutputToText -Lines $baselineLines
 
 $headNormalized = $baselineText -replace "`r", ''
 $baseNormalized = $baseBaselineText -replace "`r", ''
-if (-not $baselineChangedByHead) {
-  # Compare normalized text for the multiline regression, but use the actual
-  # merge-base diff to determine ownership. Main may have refreshed BASELINE.md
-  # after this branch forked; a handoff-only head must not become its owner.
+if (-not $baselineChangedByHead -and -not $countersChangedByHead) {
+  # Neither BASELINE prose nor counters were touched by this PR. The merge base's
+  # internal consistency was already verified above; this head inherits it.
   $normalizationState = if ($headNormalized.Trim() -eq $baseNormalized.Trim()) { 'equal' } else { 'parallel-main-drift' }
   $summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; BASELINE.md untouched by this pull request, normalized comparison={2}, verified against merge base {3}: {4} tracked paths and {5} repository JSON files.)'
   Write-Output (($summaryTemplate) -f $required.Count, $specs.Count, $normalizationState, $baseRefName, $baseTracked.Count, $baseJson.Count)
   exit 0
 }
 
-# A PR that edits BASELINE.md owns its numbers end to end.
-Assert-CounterClaims -Claims $claims -Required $required.Count -Specs $specs.Count `
-  -Tracked $trackedFiles.Count -Json $jsonFiles.Count
+# A PR that edits counters owns its numbers end to end against its own head tree.
+if ($fileCounters.Tracked -ne $trackedFiles.Count) {
+  throw ("build/baseline-counters.json claims {0} tracked paths but git reports {1}; " +
+         "run: pwsh -File tools/docs-check.ps1 -WriteCounters") -f $fileCounters.Tracked, $trackedFiles.Count
+}
+if ($fileCounters.Json -ne $jsonFiles.Count) {
+  throw ("build/baseline-counters.json claims {0} repository JSON files but git reports {1}; " +
+         "run: pwsh -File tools/docs-check.ps1 -WriteCounters") -f $fileCounters.Json, $jsonFiles.Count
+}
 
-$summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; BASELINE.md updated by this pull request, verified against head: {2} tracked paths and {3} repository JSON files.)'
+$summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; baseline-counters.json updated by this pull request, verified against head: {2} tracked paths and {3} repository JSON files.)'
 Write-Output (($summaryTemplate) -f $required.Count, $specs.Count, $trackedFiles.Count, $jsonFiles.Count)
