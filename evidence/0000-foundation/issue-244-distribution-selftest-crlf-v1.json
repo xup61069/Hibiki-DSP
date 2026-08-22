@@ -5,7 +5,7 @@
   "source_commit": "4f5e2c6f975970fcaf1aa371dca0907d433d04c5",
   "implementation_commit": "cf845d7",
   "merge_commit": "1fd76a74906d95ae65d5ece08410ab45b70a1b82",
-  "corrective_archive_commit": "pending",
+  "corrective_archive_commit": "f3db88f",
   "post_merge_metadata_commits": ["db3e3c7", "58ab51f"],
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; vs2026-sdk-wdk-on-disk; target-24h2-machine-missing",
   "commands": [
