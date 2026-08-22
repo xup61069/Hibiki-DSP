@@ -13,7 +13,9 @@ validator and payload view are allocation-free and fixed-layout; the GPL
 engine consumes them through `driver_stream_bridge.hpp`, while a future
 MS-PL/WaveRT miniport may produce the same packet from its pin callback. The
 packet span passed to validation must be exactly `header.size_bytes`; a larger
-caller-owned slot is not silently accepted.
+caller-owned slot is not silently accepted. `sequence` and `generation` are
+non-zero freshness and lifecycle fields; the encoder and validator reject zero
+for either field before accepting the payload, while `UINT64_MAX` remains valid.
 
 `include/hibiki/driver_control_transport_v1.h` adds the corresponding fixed
 136-byte little-endian control packet for `endpoint-state` and
