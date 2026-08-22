@@ -3,7 +3,7 @@
   "issue": 213,
   "scope_digest": "issue-213-archive-187-v1",
   "source_commit": "1adf947a50f836ee6371050ff5db58a09485df0e",
-  "archive_commit": "pending",
+  "archive_commit": "daf3c8041a2fcf176dcf2f9a939da9e9300e27e6",
   "main_sync_commit": "ee1a3ac255ceb4d20223b9ac838fc8d9d6ef3dd2",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; vs2026-sdk-wdk-on-disk; target-24h2-machine-missing",
   "commands": [
@@ -38,6 +38,19 @@
         "https://github.com/xup61069/Hibiki-DSP/actions/runs/32564506657/job/97011055593"
       ],
       "compiled_artifacts": false
+    },
+    {
+      "command": "Local archive-lane verification after daf3c80",
+      "status": "pass",
+      "coverage": [
+        "doctor and anonymous probe environment",
+        "handoff-check Issue 213 and full run",
+        "docs-check live measurement 509 tracked paths / 111 repository JSON files",
+        "source-policy and source-only-ci-check",
+        "verify user-space build and 1/1 CTest",
+        "git diff --check"
+      ],
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
@@ -51,5 +64,5 @@
     "powershell": "7.6.5"
   },
   "started_at": "2026-08-22T17:32:00+08:00",
-  "finished_at": "pending"
+  "finished_at": "2026-08-22T17:40:03+08:00"
 }
