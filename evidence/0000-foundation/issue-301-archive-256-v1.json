@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "issue": 301,
+  "scope_digest": "issue-301-archive-256-v1",
+  "source_commit": "900410917893bcb2a656f8cd203ed9929784eec7",
+  "archive_commit": "900410917893bcb2a656f8cd203ed9929784eec7",
+  "main_sync_commit": "b89a284c8e6dad0bdb7a3768b6265b985e51c954",
+  "archived_issue": 256,
+  "merged_pr": 258,
+  "merged_pr_commit": "d31c820ec3fe51003788c644401ec91162996793",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-10.0.28000.2526-wdk-10.0.28000.2526-cmake-4.4.2-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 301",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 301 archive implementation",
+      "status": "pass",
+      "coverage": [
+        "moved docs/tasks/active/256.md to docs/tasks/completed/2026/256.md",
+        "preserved Issue 256 scope and recorded PR #258 merge commit",
+        "recorded corrective archive commit 900410917893bcb2a656f8cd203ed9929784eec7"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "PR #258 post-merge review",
+      "status": "pass",
+      "coverage": [
+        "PR #258 merged at d31c820ec3fe51003788c644401ec91162996793",
+        "final push verify run 32568436753 / job 97020358389 passed",
+        "final merge-ref verify run 32568450110 / job 97020388212 passed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 301 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Issue 301 schema-v2 ownership, scope and Git ancestry",
+        "full active handoff validation"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 -SelfTest / tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "13 bounded docs-check self-test cases",
+        "85 required documentation paths and 24 specs",
+        "live measurement of 554 tracked paths and 128 repository JSON files"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "554 tracked paths with no blocked binary or secret",
+        "one workflow with source-only CI policy satisfied"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly / tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "Windows 26200 AMD64, Visual Studio 2026, CMake, SDK and WDK prerequisites detected",
+        "Visual Studio 2026/CMake build, CTest 1 of 1, and unsigned local verification"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "PR #302 initial head CI",
+      "status": "pass",
+      "coverage": [
+        "push verify run 32574686260 / job 97035170552 passed",
+        "merge-ref verify run 32574688987 / job 97035177020 passed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "PR #302 metadata head final CI",
+      "status": "pass",
+      "coverage": [
+        "push verify run 32574874479 / job 97035618755 passed",
+        "merge-ref verify run 32574872309 / job 97035613244 passed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP, RT audio, driver, HLK or signing behavior is changed.",
+    "Archive and user-space gates do not provide physical audio, loadable-driver, HLK or Microsoft-signing evidence.",
+    "Local verify outputs are ignored .local artifacts and are not part of the archive PR."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369",
+    "cmake": "4.4.2",
+    "sdk_qfe": "10.1.28000.2526",
+    "wdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T20:58:00+08:00",
+  "finished_at": "2026-08-22T21:02:00+08:00"
+}
