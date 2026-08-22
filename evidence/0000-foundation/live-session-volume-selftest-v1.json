@@ -2,128 +2,57 @@
   "schema_version": 1,
   "issue": 97,
   "scope_digest": "live-session-volume-selftest-v1",
-  "source_commit": "1a67c56",
-  "environment_fingerprint": "windows-26200-amd64-vs2026-msvc-14.51.36231-sdk-10.0.28000.0-cmake-path-missing-dotnet-10.0.400-pwsh-7.6.4",
+  "source_commit": "da4faf6",
+  "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
-    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
-    "pwsh -NoProfile -File tools/probe-environment.ps1",
     "pwsh -NoProfile -File tools/live-session-volume-check.ps1 -SelfTest",
     "pwsh -NoProfile -File tools/live-session-volume-check.ps1 -SelfTest -DirectCoordinator",
-    "pwsh -NoProfile -File tools/live-session-volume-check.ps1 -DirectCoordinator (without -WriteTest)",
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 97",
     "pwsh -NoProfile -File tools/handoff-check.ps1",
-    "pwsh -NoProfile -File tools/docs-check.ps1",
     "pwsh -NoProfile -File tools/source-policy.ps1",
     "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
-    "pwsh -NoProfile -File tools/verify.ps1 (with VS2026 CMake directory prepended process-locally)",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
     "git diff --check"
   ],
   "results": [
     {
-      "command": "tools/doctor.ps1 -CheckOnly",
-      "status": "pass_with_limitations",
-      "coverage": [
-        "Windows 11 build 26200, AMD64, Git, PowerShell 7.6.4, Visual Studio 2026 and .NET 10.0.400 detected",
-        "CMake is not on PATH and the locked SDK/WDK prerequisite is reported missing"
-      ],
-      "compiled_artifacts": false
-    },
-    {
-      "command": "tools/probe-environment.ps1",
-      "status": "pass",
-      "coverage": [
-        "local environment fingerprint written under ignored .local/context.json"
-      ],
-      "compiled_artifacts": false
-    },
-    {
       "command": "tools/live-session-volume-check.ps1 -SelfTest",
       "status": "pass",
       "coverage": [
-        "Windows-only guard rejection",
-        "WriteTest opt-in rejection and self-test bypass",
-        "direct-coordinator and Engine Preview session-routing plan mappings",
-        "CMake definition and target/executable/argument mapping",
-        "direct/engine mismatch rejection",
-        "unsafe build-root rejection",
-        "no CMake, build, process, IPC, COM, session or volume activity"
+        "Windows-only and WriteTest guard rejection",
+        "default Engine Preview session-routing plan mapping",
+        "DirectCoordinator plan mapping",
+        "unsafe build-root, wrong target, and extra CMake arguments rejection"
       ],
-      "compiled_artifacts": false
+      "compiled_artifacts": false,
+      "case_count": 7
     },
     {
-      "command": "tools/live-session-volume-check.ps1 -SelfTest -DirectCoordinator",
+      "command": "tools/handoff-check.ps1 -Issue 97 / tools/handoff-check.ps1 / source-policy / source-only-ci / verify / docs-check / git diff --check",
       "status": "pass",
       "coverage": [
-        "SelfTest remains independent of the direct coordinator switch"
-      ],
-      "compiled_artifacts": false
-    },
-    {
-      "command": "tools/live-session-volume-check.ps1 -DirectCoordinator (without -WriteTest)",
-      "status": "pass",
-      "coverage": [
-        "normal opt-in guard rejected the live probe before CMake, session, COM or volume work"
-      ],
-      "compiled_artifacts": false
-    },
-    {
-      "command": "tools/handoff-check.ps1 -Issue 97; tools/handoff-check.ps1",
-      "status": "pass",
-      "coverage": [
-        "Issue 97 schema-v2 ownership and full active-handoff scope checks passed"
-      ],
-      "compiled_artifacts": false
-    },
-    {
-      "command": "tools/docs-check.ps1",
-      "status": "blocked_by_shared_baseline",
-      "coverage": [
-        "handoff checks passed before the shared baseline count check",
-        "BASELINE.md claims 423 tracked paths while this branch reports 425"
-      ],
-      "compiled_artifacts": false
-    },
-    {
-      "command": "tools/source-policy.ps1; tools/source-only-ci-check.ps1",
-      "status": "pass",
-      "coverage": [
-        "source-only policy passed for 425 tracked paths",
-        "source-only CI policy passed for 1 workflow and 425 tracked paths"
-      ],
-      "compiled_artifacts": false
-    },
-    {
-      "command": "tools/verify.ps1 (with VS2026 CMake directory prepended process-locally)",
-      "status": "pass",
-      "coverage": [
-        "unsigned CMake configure/build completed",
-        "CTest passed 1/1"
-      ],
-      "compiled_artifacts": true
-    },
-    {
-      "command": "git diff --check",
-      "status": "pass",
-      "coverage": [
-        "no whitespace errors in the source diff"
-      ],
-      "compiled_artifacts": false
+        "schema v2 ownership and scope",
+        "448 tracked paths source policy",
+        "one workflow source-only publication boundary",
+        "CMake/CTest 1 of 1",
+        "documentation and baseline counters verified",
+        "no whitespace errors"
+      ]
     }
   ],
   "limitations": [
-    "The actual -WriteTest live probe was intentionally not run because it creates a silent session and temporarily changes local session volume; no session or volume state was changed by this evidence run.",
-    "This self-test validates wrapper planning and opt-in safety only; it is not physical per-App capture/re-send, DSP delivery, WaveRT, driver, HLK, signing, or endpoint/session identity evidence.",
-    "CMake/SDK/WDK availability is recorded from doctor; no compiled live-probe artifact is committed or treated as release evidence.",
-    "The shared docs/state/BASELINE.md counter remains integrator-owned and was not modified.",
-    "The direct verify.ps1 invocation could not find CMake on PATH; the successful verification used only the existing VS2026 CMake directory for that process."
+    "The self-test validates wrapper planning and opt-in safety only; it does not prove physical per-App capture/re-send, DSP delivery, driver, WaveRT, HLK, signing, or endpoint/session identity.",
+    "No endpoint ID, friendly name, PID, session ID, serial, private path or compiled artifact was recorded in repository evidence.",
+    "Release build outputs remain ignored local artifacts and are not submitted to GitHub."
   ],
   "logs": [],
   "tool_versions": {
-    "dotnet": "10.0.400",
-    "msvc": "14.51.36231",
-    "powershell": "7.6.4",
-    "cmake": "not on PATH"
+    "dotnet": "10.0.301",
+    "msvc": "19.44.35228.0",
+    "powershell": "7.6.5",
+    "cmake": "4.4.0"
   },
-  "started_at": "2026-08-22T09:30:00+08:00",
-  "finished_at": "2026-08-22T09:55:00+08:00"
+  "started_at": "2026-08-22T10:00:00+08:00",
+  "finished_at": "2026-08-22T10:01:00+08:00"
 }
