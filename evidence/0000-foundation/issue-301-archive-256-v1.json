@@ -79,6 +79,15 @@
       "compiled_artifacts": false
     },
     {
+      "command": "PR #302 initial head CI",
+      "status": "pass",
+      "coverage": [
+        "push verify run 32574686260 / job 97035170552 passed",
+        "merge-ref verify run 32574688987 / job 97035177020 passed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
       "command": "git diff --check",
       "status": "pass",
       "coverage": [
