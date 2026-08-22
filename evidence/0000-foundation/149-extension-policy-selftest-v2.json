@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "issue": 149,
+  "scope_digest": "extension-policy-selftest-v2",
+  "source_commit": "pending",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5; target-vs2026-sdk-wdk-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/extension-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/extension-check.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 149",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/extension-check.ps1 -SelfTest",
+      "status": "pending",
+      "cases": 10,
+      "coverage": [
+        "valid MV3 manifest acceptance",
+        "missing required permission rejection",
+        "disallowed or broad permission rejection",
+        "wildcard host permission rejection",
+        "unsafe-eval and dangerous CSP rejection",
+        "external non-loopback connect-src CSP rejection",
+        "missing extension_pages CSP rejection",
+        "invalid object-src rejection",
+        "wrong loopback endpoint rejection",
+        "multiline CSP with bounded whitespace acceptance"
+      ],
+      "repository_reads": false,
+      "process_started": false,
+      "files_written": false
+    }
+  ],
+  "limitations": [
+    "Source-only static manifest and CSP validation; no browser runtime, permission prompt, user gesture, WebSocket, or tab capture claim.",
+    "No physical audio, driver, WaveRT, HLK, Microsoft signing, or endpoint delivery claim.",
+    "The target Visual Studio, Windows App SDK, SDK/WDK toolchain is not installed on this machine."
+  ],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5"
+  },
+  "started_at": "2026-08-22T11:00:00+08:00",
+  "finished_at": "pending"
+}
