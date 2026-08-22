@@ -145,8 +145,18 @@ if ($propertySource -match '(?i)audio_engine|scene_graph|asio_bridge|malloc|call
 $miniportSrc = (Get-Content -LiteralPath $miniportHeader -Raw) + (Get-Content -LiteralPath $miniportSource -Raw)
 if ($miniportSrc -notmatch 'SPDX-License-Identifier: MS-PL') { throw 'PortCls miniport adapter must retain MS-PL.' }
 if ($miniportSrc -match 'audio_engine|scene_graph|asio_bridge|plugin_host') { throw 'PortCls miniport adapter must not link GPL user-space implementation.' }
-foreach ($required in @('IMiniportWaveRT', 'IMiniportWaveRTStreamNotification', 'HibikiMiniportWaveRtV1', 'HibikiMiniportWaveRtStreamV1', 'AllocateAudioBufferWithNotification', 'FreeAudioBufferWithNotification', 'RegisterNotificationEvent', 'UnregisterNotificationEvent', 'GetHWLatency', 'GetPosition', 'SetState', 'NewStream', 'InitEndpoint')) {
+foreach ($required in @('IMiniportWaveRT', 'IMiniportWaveRTStreamNotification', 'HibikiMiniportWaveRtV1', 'HibikiMiniportWaveRtStreamV1', 'RegisterNotificationEvent', 'UnregisterNotificationEvent', 'GetHWLatency', 'GetPosition', 'SetState', 'NewStream', 'InitEndpoint')) {
     if (-not $miniportSrc.Contains($required)) { throw "PortCls miniport missing required method: $required" }
+}
+# Notification-buffer pair: accept either WDK naming generation (Issue #426).
+# Legacy kits name them AllocateAudioBufferWithNotification/FreeAudioBufferWithNotification;
+# WDK 10.0.26100+ (and Issue #394 ports) name them AllocateBufferWithNotification/FreeBufferWithNotification.
+$hasLegacyNotificationPair = $miniportSrc.Contains('AllocateAudioBufferWithNotification') -and
+                             $miniportSrc.Contains('FreeAudioBufferWithNotification')
+$hasCurrentNotificationPair = $miniportSrc.Contains('AllocateBufferWithNotification') -and
+                              $miniportSrc.Contains('FreeBufferWithNotification')
+if (-not ($hasLegacyNotificationPair -or $hasCurrentNotificationPair)) {
+    throw 'PortCls miniport missing notification-buffer pair (legacy Allocate/FreeAudioBufferWithNotification or current Allocate/FreeBufferWithNotification).'
 }
 if ($miniportSrc -match '(?i)CreateThread|KeWaitFor') { throw 'PortCls miniport must remain non-blocking.' }
 $filterSrc = (Get-Content -LiteralPath $filterHeader -Raw) + (Get-Content -LiteralPath $filterSource -Raw)
