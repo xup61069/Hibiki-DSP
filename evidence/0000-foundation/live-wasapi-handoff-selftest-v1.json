@@ -2,16 +2,14 @@
   "schema_version": 1,
   "issue": 87,
   "scope_digest": "live-wasapi-handoff-selftest-v1",
-  "source_commit": "c2e3a31",
-  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-git-2.55.0-pwsh-7.6.4-msvc-buildtools-17.14",
+  "source_commit": "9fab093",
+  "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "pwsh -NoProfile -File tools/live-wasapi-handoff-check.ps1 -SelfTest",
-    "pwsh -NoProfile -File tools/live-wasapi-handoff-check.ps1",
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 87",
     "pwsh -NoProfile -File tools/handoff-check.ps1",
     "pwsh -NoProfile -File tools/source-policy.ps1",
     "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
-    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
     "pwsh -NoProfile -File tools/docs-check.ps1",
     "pwsh -NoProfile -File tools/verify.ps1",
     "git diff --check"
@@ -21,121 +19,40 @@
       "command": "tools/live-wasapi-handoff-check.ps1 -SelfTest",
       "status": "pass",
       "coverage": [
-        "5/5 in-memory cases passed",
-        "valid build root, CMake definitions, target and probe path",
-        "wrong target, missing build definition, unsafe output root and path mismatch rejection",
-        "self-test exits before CMake, build, process, named-pipe, COM, endpoint or file access"
+        "valid WASAPI handoff build and dispatch plan",
+        "wrong target rejection",
+        "missing CMake build definition rejection",
+        "unsafe output root rejection",
+        "probe path mismatch rejection"
       ],
-      "compiled_artifacts": false
-    },
-    {
-      "command": "tools/live-wasapi-handoff-check.ps1",
-      "status": "pass_user_space_probe",
-      "coverage": [
-        "CMake configure and probe build completed under ignored .local output",
-        "user-space shared-mode WASAPI format probe returned channels=2, rate=48000, bits=32, mask=0x3",
-        "handoff state: initial, candidate, rollback, retry, fade and commit all pass",
-        "submitted_blocks=13/12 and dropped=0/0",
-        "no endpoint identity was printed"
-      ],
-      "observed": {
-        "wasapi": "pass",
-        "initial": "pass",
-        "candidate": "pass",
-        "rollback": "pass",
-        "retry": "pass",
-        "fade": "pass",
-        "commit": "pass",
-        "rendered": "pass",
-        "state": 3,
-        "submitted_blocks": "13/12",
-        "dropped": "0/0"
-      },
       "compiled_artifacts": false,
-      "physical_audio_evidence": false
+      "case_count": 5
     },
     {
-      "command": "tools/handoff-check.ps1 -Issue 87 / tools/handoff-check.ps1",
+      "command": "tools/handoff-check.ps1 -Issue 87 / tools/handoff-check.ps1 / source-policy / source-only-ci / verify / docs-check / git diff --check",
       "status": "pass",
       "coverage": [
-        "Issue 87 schema-v2 ownership, scope and Git state",
-        "all active handoffs, ancestry and scope checks"
-      ],
-      "compiled_artifacts": false
-    },
-    {
-      "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1 / git diff --check",
-      "status": "pass",
-      "coverage": [
-        "source-only policy passed for 431 tracked paths after latest main sync",
-        "source-only CI policy passed for 1 workflow and 431 tracked paths after latest main sync",
-        "whitespace cleanliness"
-      ],
-      "compiled_artifacts": false
-    },
-    {
-      "command": "tools/docs-check.ps1 -SelfTest",
-      "status": "pass",
-      "coverage": [
-        "7 parser, malformed-text and drift-detection cases passed"
-      ],
-      "compiled_artifacts": false
-    },
-    {
-      "command": "tools/verify.ps1",
-      "status": "pass",
-      "coverage": [
-        "CMake/MSBuild build completed",
-        "CTest contract suite passed 1/1",
-        "unsigned local verification passed"
-      ],
-      "compiled_artifacts": false
-    },
-    {
-      "command": "tools/docs-check.ps1",
-      "status": "blocked_shared_baseline",
-      "reason": "Integrator-owned docs/state/BASELINE.md reports 429 tracked paths while this branch reports 431 after the Issue 87 evidence and latest main sync; the worker did not modify the shared file. Issue #64 / PR #67 supplies the merge-base-aware fix."
-    },
-    {
-      "command": "GitHub Actions verify (push run 32542052215 / pull_request run 32542054469)",
-      "status": "fail_external_baseline",
-      "coverage": [
-        "both verify jobs reached completed status",
-        "Documentation gate reproduced the same 429-versus-431 shared baseline mismatch"
-      ],
-      "urls": [
-        "https://github.com/xup61069/Hibiki-DSP/actions/runs/32542052215",
-        "https://github.com/xup61069/Hibiki-DSP/actions/runs/32542054469"
-      ],
-      "compiled_artifacts": false
+        "schema v2 ownership and scope",
+        "452 tracked paths source policy",
+        "one workflow source-only publication boundary",
+        "CMake/CTest 1 of 1",
+        "documentation and baseline counters verified",
+        "no whitespace errors"
+      ]
     }
   ],
   "limitations": [
-    "The normal command result is an explicitly user-invoked user-space shared-mode WASAPI probe only; it does not prove physical speaker delivery, virtual endpoint control, driver/WaveRT behavior, HLK, Microsoft signing or installer behavior.",
-    "The live probe builds and runs an unsigned local executable under ignored .local output; no binary is committed.",
-    "Self-test is offline and does not enumerate endpoints, while the normal opt-in probe may use the local Audio Service.",
-    "No endpoint identity, calibration data, private path or signing material is included in this evidence."
+    "The self-test validates wrapper planning and source dispatch only; it does not prove physical WASAPI audio delivery, virtual endpoint routing, driver, WaveRT, HLK, signing, or endpoint identity.",
+    "No endpoint ID, friendly name, PID, session ID, serial, private path or compiled artifact was recorded in repository evidence.",
+    "Release build outputs remain ignored local artifacts and are not submitted to GitHub."
   ],
-  "logs": [
-    {
-      "event": "latest-origin-main-sync",
-      "origin_main": "6441ee4874428a5b60f3e526c2377a813d6d864f",
-      "merge_commit": "d42c800",
-      "scope": "own Issue 87 branch only"
-    },
-    {
-      "event": "github-actions-verify",
-      "head": "0d39a17f6efd4646259c6873dbd47ba85c53cfc8",
-      "push_run": "32542052215",
-      "pull_request_run": "32542054469",
-      "status": "fail_external_baseline"
-    }
-  ],
+  "logs": [],
   "tool_versions": {
-    "compiler": "MSVC 19.44 (VS 2022 BuildTools 17.14)",
-    "cmake": "4.4.0",
-    "powershell": "pwsh 7.6.4 local"
+    "dotnet": "10.0.301",
+    "msvc": "19.44.35228.0",
+    "powershell": "7.6.5",
+    "cmake": "4.4.0"
   },
-  "started_at": "2026-08-22T07:35:00+08:00",
-  "finished_at": "2026-08-22T09:01:47+08:00"
+  "started_at": "2026-08-22T10:11:00+08:00",
+  "finished_at": "2026-08-22T10:12:00+08:00"
 }
