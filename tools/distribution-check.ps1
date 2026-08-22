@@ -162,6 +162,8 @@ identities:
   asio_transport_shared_memory: Local\\HibikiDSP_v1_asio
   schema_version: 1
 '@
+  # Keep fixture replacements independent of the host checkout's CRLF/LF policy.
+  $valid = $valid -replace "`r`n", "`n"
   $validValues = Read-DistributionProfile $valid 'selftest-valid.yml'
   Assert-DistributionProfile $validValues 'selftest-valid.yml'
 
