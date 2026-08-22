@@ -47,6 +47,100 @@ function New-EvidenceObject {
   return [pscustomobject]$ev
 }
 
+function Test-A11yPathUnderRoot {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$Root
+  )
+
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  return $fullPath.StartsWith($fullRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-A11yExistingAttributes {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [hashtable]$SyntheticAttributes
+  )
+
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
+    return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
+  }
+  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
+  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+}
+
+function Assert-A11ySafePath {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$Root,
+    [Parameter(Mandatory)][ValidateSet('Directory', 'File')][string]$Kind,
+    [hashtable]$SyntheticAttributes
+  )
+
+  $expectedRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  $candidate = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  if (-not (Test-A11yPathUnderRoot -Path $candidate -Root $expectedRoot)) {
+    throw "WinUI accessibility path must remain under the repository .local root: $candidate"
+  }
+
+  $cursor = $candidate
+  while ($true) {
+    $attributes = Get-A11yExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    if ($null -eq $attributes -and $cursor -eq $candidate) {
+      throw "WinUI accessibility $Kind does not exist: $candidate"
+    }
+    if ($null -ne $attributes) {
+      if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "WinUI accessibility path or parent is a reparse point: $cursor"
+      }
+      if ($cursor -eq $candidate) {
+        if ($Kind -eq 'Directory' -and ($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+          throw "WinUI accessibility output is not a directory: $candidate"
+        }
+        if ($Kind -eq 'File' -and ($attributes -band [System.IO.FileAttributes]::Directory) -ne 0) {
+          throw "WinUI accessibility executable is a directory: $candidate"
+        }
+      }
+    }
+
+    if ($cursor -eq $expectedRoot) { break }
+    $parent = [IO.Path]::GetFullPath((Split-Path -Parent $cursor)).TrimEnd('\', '/')
+    if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) {
+      throw "WinUI accessibility path could not reach the repository .local root: $candidate"
+    }
+    $cursor = $parent
+  }
+}
+
+function Assert-A11yOutputDirectory {
+  param(
+    [Parameter(Mandatory)][string]$OutputDir,
+    [Parameter(Mandatory)][string]$RepositoryRoot,
+    [hashtable]$SyntheticAttributes
+  )
+
+  Assert-A11ySafePath -Path $OutputDir -Root (Join-Path $RepositoryRoot '.local') `
+    -Kind Directory -SyntheticAttributes $SyntheticAttributes
+}
+
+function Assert-A11yLaunchTarget {
+  param(
+    [Parameter(Mandatory)][string]$Executable,
+    [Parameter(Mandatory)][string]$OutputDir,
+    [Parameter(Mandatory)][string]$RepositoryRoot,
+    [hashtable]$SyntheticAttributes
+  )
+
+  if (-not (Test-A11yPathUnderRoot -Path $Executable -Root $OutputDir)) {
+    throw "WinUI accessibility executable must remain under the selected output directory: $Executable"
+  }
+  Assert-A11ySafePath -Path $Executable -Root (Join-Path $RepositoryRoot '.local') `
+    -Kind File -SyntheticAttributes $SyntheticAttributes
+}
+
 if ($SelfTest) {
   $caseCount = 0
 
@@ -90,7 +184,79 @@ if ($SelfTest) {
   }
   $caseCount++
 
-  if ($caseCount -lt 4) { throw "winui a11y self-test failed: expected at least 4 passing cases, saw $caseCount." }
+  $localRoot = [IO.Path]::GetFullPath((Join-Path $repo '.local')).TrimEnd('\', '/')
+  $syntheticOutput = [IO.Path]::GetFullPath((Join-Path $repo '.local/a11y-selftest')).TrimEnd('\', '/')
+  $syntheticExecutable = [IO.Path]::GetFullPath((Join-Path $repo '.local/a11y-selftest/Hibiki.WinUI.exe')).TrimEnd('\', '/')
+  $validAttributes = @{
+    $localRoot = [System.IO.FileAttributes]::Directory
+    $syntheticOutput = [System.IO.FileAttributes]::Directory
+    $syntheticExecutable = [System.IO.FileAttributes]::Archive
+  }
+  Assert-A11yOutputDirectory -OutputDir $syntheticOutput -RepositoryRoot $repo -SyntheticAttributes $validAttributes
+  Assert-A11yLaunchTarget -Executable $syntheticExecutable -OutputDir $syntheticOutput `
+    -RepositoryRoot $repo -SyntheticAttributes $validAttributes
+  $caseCount++
+
+  $outsideCaught = $false
+  try { Assert-A11yOutputDirectory -OutputDir (Join-Path $repo 'build') -RepositoryRoot $repo } catch { $outsideCaught = $true }
+  if (-not $outsideCaught) { throw 'winui a11y self-test expected an outside-root output rejection.' }
+  $caseCount++
+
+  $reparseParentCaught = $false
+  try {
+    Assert-A11yOutputDirectory -OutputDir $syntheticOutput -RepositoryRoot $repo `
+      -SyntheticAttributes @{
+        $localRoot = [System.IO.FileAttributes]::Directory -bor [System.IO.FileAttributes]::ReparsePoint
+        $syntheticOutput = [System.IO.FileAttributes]::Directory
+      }
+  } catch { $reparseParentCaught = $_.Exception.Message -match 'reparse point' }
+  if (-not $reparseParentCaught) { throw 'winui a11y self-test expected a reparse-parent rejection.' }
+  $caseCount++
+
+  $reparseTargetCaught = $false
+  try {
+    Assert-A11yOutputDirectory -OutputDir $syntheticOutput -RepositoryRoot $repo `
+      -SyntheticAttributes @{
+        $localRoot = [System.IO.FileAttributes]::Directory
+        $syntheticOutput = [System.IO.FileAttributes]::Directory -bor [System.IO.FileAttributes]::ReparsePoint
+      }
+  } catch { $reparseTargetCaught = $_.Exception.Message -match 'reparse point' }
+  if (-not $reparseTargetCaught) { throw 'winui a11y self-test expected a reparse-target rejection.' }
+  $caseCount++
+
+  $nonDirectoryCaught = $false
+  try {
+    Assert-A11yOutputDirectory -OutputDir $syntheticOutput -RepositoryRoot $repo `
+      -SyntheticAttributes @{
+        $localRoot = [System.IO.FileAttributes]::Directory
+        $syntheticOutput = [System.IO.FileAttributes]::Archive
+      }
+  } catch { $nonDirectoryCaught = $_.Exception.Message -match 'not a directory' }
+  if (-not $nonDirectoryCaught) { throw 'winui a11y self-test expected a non-directory rejection.' }
+  $caseCount++
+
+  $outsideExecutableCaught = $false
+  $outsideExecutable = [IO.Path]::GetFullPath((Join-Path $repo '.local/other/Hibiki.WinUI.exe')).TrimEnd('\', '/')
+  try {
+    Assert-A11yLaunchTarget -Executable $outsideExecutable -OutputDir $syntheticOutput `
+      -RepositoryRoot $repo -SyntheticAttributes $validAttributes
+  } catch { $outsideExecutableCaught = $_.Exception.Message -match 'selected output directory' }
+  if (-not $outsideExecutableCaught) { throw 'winui a11y self-test expected an executable-outside-output rejection.' }
+  $caseCount++
+
+  $reparseExecutableCaught = $false
+  try {
+    Assert-A11yLaunchTarget -Executable $syntheticExecutable -OutputDir $syntheticOutput `
+      -RepositoryRoot $repo -SyntheticAttributes @{
+        $localRoot = [System.IO.FileAttributes]::Directory
+        $syntheticOutput = [System.IO.FileAttributes]::Directory
+        $syntheticExecutable = [System.IO.FileAttributes]::ReparsePoint
+      }
+  } catch { $reparseExecutableCaught = $_.Exception.Message -match 'reparse point' }
+  if (-not $reparseExecutableCaught) { throw 'winui a11y self-test expected a reparse-executable rejection.' }
+  $caseCount++
+
+  if ($caseCount -lt 11) { throw "winui a11y self-test failed: expected at least 11 passing cases, saw $caseCount." }
   Write-Output "WinUI accessibility smoke self-test passed ($caseCount cases; expectation thresholds, empty/sparse rejection, evidence JSON shape)."
   exit 0
 }
@@ -99,13 +265,17 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
   throw 'Usage: tools/winui-a11y-smoke.ps1 [-OutputDir <formal-build-dir>] or -SelfTest.'
 }
 
+Assert-A11yOutputDirectory -OutputDir $OutputDir -RepositoryRoot $repo
 $exe = Join-Path $OutputDir 'Hibiki.WinUI.exe'
 if (-not (Test-Path -LiteralPath $exe)) { throw "Hibiki.WinUI.exe not found under '$OutputDir'." }
+Assert-A11yLaunchTarget -Executable $exe -OutputDir $OutputDir -RepositoryRoot $repo
 
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 
 $clock = [Diagnostics.Stopwatch]::StartNew()
+Assert-A11yOutputDirectory -OutputDir $OutputDir -RepositoryRoot $repo
+Assert-A11yLaunchTarget -Executable $exe -OutputDir $OutputDir -RepositoryRoot $repo
 $proc = Start-Process -FilePath $exe -WorkingDirectory $OutputDir -PassThru
 try {
   $root = [System.Windows.Automation.AutomationElement]::RootElement
