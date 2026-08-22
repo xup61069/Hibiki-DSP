@@ -48,9 +48,27 @@ if(HIBIKI_ENABLE_NATIVE_ASIO)
     OUTPUT_NAME "HibikiDSPASIO"
     PREFIX ""
   )
+if(MSVC)
+  target_compile_options(hibiki_asio_native PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_asio_native PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+endif()
+
+# Bounded offline self-test for the Apache hibiki_asio_transport_v1 SPSC ring.
+# Registered from this directory scope so ctest picks it up without touching
+# the root CMakeLists or tests/ registry; no COM, vendor SDK, or file output.
+if(HIBIKI_BUILD_TESTS)
+  enable_testing()
+  add_executable(hibiki_asio_transport_selftest
+    src/asio_transport_selftest.cpp
+  )
+  target_link_libraries(hibiki_asio_transport_selftest PRIVATE hibiki_sdk)
+  target_compile_features(hibiki_asio_transport_selftest PRIVATE cxx_std_20)
   if(MSVC)
-    target_compile_options(hibiki_asio_native PRIVATE /W4 /permissive- /EHsc)
+    target_compile_options(hibiki_asio_transport_selftest PRIVATE /W4 /permissive- /EHsc)
   else()
-    target_compile_options(hibiki_asio_native PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+    target_compile_options(hibiki_asio_transport_selftest PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
   endif()
+  add_test(NAME hibiki_asio_transport_selftest COMMAND hibiki_asio_transport_selftest)
 endif()
