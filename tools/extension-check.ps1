@@ -90,7 +90,11 @@ function Assert-ExtensionSourcePolicy(
       'chrome\.runtime\.onMessage\.addListener',
       'new\s+AudioContext',
       'audio-worklet\.js',
-      'new\s+AudioWorkletNode'
+      'new\s+AudioWorkletNode',
+      'navigator\.mediaDevices\.getUserMedia',
+      'chromeMediaSource\s*:\s*(?:\x27|\x22)tab(?:\x27|\x22)',
+      'chromeMediaSourceId\s*:\s*message\.streamId',
+      'video\s*:\s*false'
     )) {
     if ($offscreenSource -notmatch $pattern) {
       throw "Offscreen source is missing required source boundary '$pattern' in $sourceName."
@@ -270,7 +274,7 @@ if ($SelfTest) {
   $sourceFixture = @{
     popup = "button.addEventListener('click', async () => { await chrome.runtime.sendMessage({type: 'capture-active-tab', tabId: tab.id}); });"
     serviceWorker = "chrome.runtime.onMessage.addListener(async (message) => { await chrome.offscreen.createDocument({url: 'offscreen.html'}); const streamId = await chrome.tabCapture.getMediaStreamId({targetTabId: message.tabId}); });"
-    offscreen = "chrome.runtime.onMessage.addListener(async () => { const context = new AudioContext(); await context.audioWorklet.addModule('audio-worklet.js'); const node = new AudioWorkletNode(context, 'hibiki-tab-packetizer'); const bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab'); });"
+    offscreen = "chrome.runtime.onMessage.addListener(async (message) => { const context = new AudioContext(); await context.audioWorklet.addModule('audio-worklet.js'); const node = new AudioWorkletNode(context, 'hibiki-tab-packetizer'); const constraints = {audio: {mandatory: {chromeMediaSource: 'tab', chromeMediaSourceId: message.streamId}}, video: false}; await navigator.mediaDevices.getUserMedia(constraints); const bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab'); });"
     worklet = "const packet = new ArrayBuffer(16 + 4); const view = new DataView(packet); view.setUint8(0, 0x48); view.setUint8(1, 0x49); view.setUint8(2, 0x42); view.setUint8(3, 0x54); view.setUint16(4, 1, true); this.port.postMessage(packet, [packet]); registerProcessor('hibiki-tab-packetizer', HibikiTabPacketizer);"
   }
   Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-source-valid'
@@ -295,6 +299,21 @@ if ($SelfTest) {
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $offscreenDirectCapture $sourceFixture.worklet 'selftest-offscreen-direct-capture' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected offscreen direct tabCapture failure.' }
 
+  $wrongMediaSource = $sourceFixture.offscreen -replace "chromeMediaSource: 'tab'", "chromeMediaSource: 'microphone'"
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $wrongMediaSource $sourceFixture.worklet 'selftest-microphone-source' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected non-tab media source failure.' }
+
+  $missingStreamId = $sourceFixture.offscreen -replace 'chromeMediaSourceId: message\.streamId', "deviceId: 'default'"
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $missingStreamId $sourceFixture.worklet 'selftest-device-source' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected device media source failure.' }
+
+  $videoCapture = $sourceFixture.offscreen -replace 'video: false', 'video: true'
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $videoCapture $sourceFixture.worklet 'selftest-video-source' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected video capture failure.' }
+
   $missingPacketizer = $sourceFixture.worklet -replace 'registerProcessor\(\x27hibiki-tab-packetizer\x27, HibikiTabPacketizer\);', ''
   $caught = $false
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $sourceFixture.offscreen $missingPacketizer 'selftest-missing-packetizer' } catch { $caught = $true }
@@ -308,7 +327,7 @@ connect-src   ws://127.0.0.1:17842
 "@
   Assert-ExtensionManifestPolicy $multilineCsp 'selftest-multiline-csp'
 
-  Write-Output 'Browser extension policy self-test passed (21 cases).'
+  Write-Output 'Browser extension policy self-test passed (24 cases).'
   exit 0
 }
 
