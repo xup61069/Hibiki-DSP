@@ -1,31 +1,11 @@
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory = $true)][int]$Issue,
+  [int]$Issue,
   [switch]$NoSource,
   [switch]$SelfTest
 )
 
 $repo = Split-Path -Parent $PSScriptRoot
-$handoff = Join-Path $repo "docs/tasks/active/$Issue.md"
-if (-not (Test-Path $handoff)) {
-  throw "No handoff exists for Issue $Issue. Create docs/tasks/active/$Issue.md before editing."
-}
-
-$handoffText = Get-Content -LiteralPath $handoff -Raw
-$specIds = @([regex]::Matches($handoffText, 'SPEC-[0-9]{4}') | ForEach-Object Value | Sort-Object -Unique)
-$adrIds = @([regex]::Matches($handoffText, 'ADR-[0-9]{4}') | ForEach-Object Value | Sort-Object -Unique)
-$seenFiles = [System.Collections.Generic.HashSet[string]]::new(
-  [System.StringComparer]::OrdinalIgnoreCase)
-$sourceGlobs = [System.Collections.Generic.HashSet[string]]::new(
-  [System.StringComparer]::OrdinalIgnoreCase)
-
-function Write-ContextFile([string]$label, [string]$path) {
-  if (-not (Test-Path $path)) { throw "Context file missing: $path" }
-  $resolved = (Resolve-Path -LiteralPath $path).Path
-  if (-not $seenFiles.Add($resolved)) { return }
-  Write-Output "=== $label :: $path ==="
-  Get-Content -LiteralPath $path
-}
 
 function Convert-ContextGlobToRegex([string]$glob) {
   $normalized = $glob.Replace('\', '/')
@@ -86,6 +66,31 @@ if ($SelfTest) {
 
   Write-Output "Context-pack glob self-test passed ($($cases.Count) cases)."
   exit 0
+}
+
+if (-not $PSBoundParameters.ContainsKey('Issue')) {
+  throw "No Issue specified. Pass -Issue <number>."
+}
+
+$handoff = Join-Path $repo "docs/tasks/active/$Issue.md"
+if (-not (Test-Path $handoff)) {
+  throw "No handoff exists for Issue $Issue. Create docs/tasks/active/$Issue.md before editing."
+}
+
+$handoffText = Get-Content -LiteralPath $handoff -Raw
+$specIds = @([regex]::Matches($handoffText, 'SPEC-[0-9]{4}') | ForEach-Object Value | Sort-Object -Unique)
+$adrIds = @([regex]::Matches($handoffText, 'ADR-[0-9]{4}') | ForEach-Object Value | Sort-Object -Unique)
+$seenFiles = [System.Collections.Generic.HashSet[string]]::new(
+  [System.StringComparer]::OrdinalIgnoreCase)
+$sourceGlobs = [System.Collections.Generic.HashSet[string]]::new(
+  [System.StringComparer]::OrdinalIgnoreCase)
+
+function Write-ContextFile([string]$label, [string]$path) {
+  if (-not (Test-Path $path)) { throw "Context file missing: $path" }
+  $resolved = (Resolve-Path -LiteralPath $path).Path
+  if (-not $seenFiles.Add($resolved)) { return }
+  Write-Output "=== $label :: $path ==="
+  Get-Content -LiteralPath $path
 }
 
 Write-Output "=== Hibiki context pack: Issue #$Issue ==="
