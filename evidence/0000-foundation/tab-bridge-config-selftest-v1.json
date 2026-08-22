@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "issue": 372,
+  "scope_digest": "tab-bridge-config-selftest-v1",
+  "source_commit": "pending",
+  "base_commit": "06cbd1e174b2cc56b71768da8277fb6ed47cf7d8",
+  "environment_fingerprint": "pending-local-run",
+  "target": "hibiki_tab_bridge_selftest",
+  "cases_added": [
+    "null callback rejected before socket setup",
+    "zero port rejected before socket setup",
+    "payload below 16-byte HIBT header rejected",
+    "payload above one MiB ceiling rejected",
+    "every rejected configuration leaves running false"
+  ],
+  "commands": [
+    "cmake --build .local/build --config RelWithDebInfo --target hibiki_tab_bridge_selftest",
+    "ctest --test-dir .local/build -C RelWithDebInfo -R hibiki_tab_bridge_selftest --output-on-failure"
+  ],
+  "limitations": [
+    "Offline configuration-boundary coverage only; no listener, socket, browser, WebSocket, COM, filesystem, endpoint or real audio access.",
+    "Does not prove browser tab capture, physical playback, driver, WaveRT, HLK, signing or release behavior."
+  ]
+}

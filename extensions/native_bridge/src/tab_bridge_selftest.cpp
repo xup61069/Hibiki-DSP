@@ -168,10 +168,42 @@ bool test_queue_boundaries() {
     return expect(!full_queue->pop(drain.data(), 2U, block), "drained queue is empty");
 }
 
+void noop_callback(const TabCapturePacketViewV1&, void*) noexcept {}
+
+bool expect_rejected_server_config(const hibiki::TabBridgeServerConfigV1 config,
+                                   const hibiki::TabCapturePacketCallbackV1 callback,
+                                   const char* label) {
+    hibiki::TabBridgeServer server;
+    if (!expect(!server.start(config, callback, nullptr), label)) return false;
+    return expect(!server.running(), "rejected server config does not start a listener");
+}
+
+bool test_server_config_boundaries() {
+    constexpr std::uint16_t kNominalPort = 17842U;
+    constexpr std::size_t kNominalPayload = 256U * 1024U;
+    if (!expect_rejected_server_config(
+            hibiki::TabBridgeServerConfigV1{kNominalPort, kNominalPayload}, nullptr,
+            "null callback is rejected before socket setup") ||
+        !expect_rejected_server_config(
+            hibiki::TabBridgeServerConfigV1{0U, kNominalPayload}, &noop_callback,
+            "zero port is rejected before socket setup") ||
+        !expect_rejected_server_config(
+            hibiki::TabBridgeServerConfigV1{kNominalPort, 15U}, &noop_callback,
+            "payload below the HIBT header is rejected") ||
+        !expect_rejected_server_config(
+            hibiki::TabBridgeServerConfigV1{kNominalPort, 1024U * 1024U + 1U}, &noop_callback,
+            "payload above the one MiB ceiling is rejected")) {
+        return false;
+    }
+    return true;
+}
+
 }  // namespace
 
 int main() {
-    if (!test_packet_boundaries() || !test_queue_boundaries()) return 1;
-    std::cout << "hibiki_tab_bridge_selftest passed (packet boundaries, FIFO queue, capacity and drops).\n";
+    if (!test_packet_boundaries() || !test_queue_boundaries() || !test_server_config_boundaries()) {
+        return 1;
+    }
+    std::cout << "hibiki_tab_bridge_selftest passed (packet boundaries, FIFO queue, capacity, drops and server guards).\n";
     return 0;
 }
