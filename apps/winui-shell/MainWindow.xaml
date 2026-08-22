@@ -167,14 +167,20 @@
                     </Grid>
                 </Border>
 
-                <Border Padding="20" CornerRadius="8"
+                <Border Padding="24" CornerRadius="12"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1">
                     <StackPanel Spacing="12">
-                        <TextBlock Text="場景"
-                                   Style="{ThemeResource SubtitleTextBlockStyle}"
-                                   Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE7F4;" FontSize="16"
+                                      Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                      VerticalAlignment="Center" />
+                            <TextBlock Text="場景"
+                                       Style="{ThemeResource SubtitleTextBlockStyle}"
+                                       VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                        </StackPanel>
                         <controls:ItemsRepeater ItemsSource="{Binding Scenes}">
                             <controls:ItemsRepeater.Layout>
                                 <controls:UniformGridLayout MaximumRowsOrColumns="2" MinItemWidth="260" MinItemHeight="84" />
@@ -216,14 +222,20 @@
                     </StackPanel>
                 </Border>
 
-                <Border Padding="20" CornerRadius="8"
+                <Border Padding="24" CornerRadius="12"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1">
                     <StackPanel Spacing="12">
-                        <TextBlock Text="自訂預設"
-                                   Style="{ThemeResource TitleTextBlockStyle}"
-                                   Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE8EC;" FontSize="16"
+                                      Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                      VerticalAlignment="Center" />
+                            <TextBlock Text="自訂預設"
+                                       Style="{ThemeResource TitleTextBlockStyle}"
+                                       VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                        </StackPanel>
                         <TextBlock Text="建立最多 32 個自訂卡片；完整 DSP graph 由引擎端 Scene catalog 驗證。"
                                    TextWrapping="Wrap"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -243,7 +255,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Padding="20" CornerRadius="8"
+                <Border Padding="24" CornerRadius="12"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1">
@@ -253,9 +265,15 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="音量保護"
-                                       Style="{ThemeResource TitleTextBlockStyle}"
-                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xEA3A;" FontSize="16"
+                                          Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                          VerticalAlignment="Center" />
+                                <TextBlock Text="音量保護"
+                                           Style="{ThemeResource TitleTextBlockStyle}"
+                                           VerticalAlignment="Center"
+                                           Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            </StackPanel>
                             <ToggleSwitch Grid.Column="1" Header="Expert" IsOn="{Binding IsExpert, Mode=TwoWay}"
                                           AutomationProperties.Name="Expert 詳細模式"
                                           AutomationProperties.HelpText="顯示 Matrix、DSP Graph、VST3 與校正狀態" />
@@ -263,13 +281,35 @@
                         <Slider Minimum="-60" Maximum="0" Value="{Binding RequestedVolumeDb, Mode=TwoWay}" ValueChanged="OnVolumeChanged"
                                 AutomationProperties.Name="系統音量"
                                 AutomationProperties.HelpText="以 dB 調整音量；安全限制會優先套用" />
-                        <TextBlock Text="{Binding RequestedVolumeDisplayText}" />
-                        <TextBlock Text="{Binding EffectiveVolumeDisplayText}"
-                                   AutomationProperties.Name="實際有效音量"
-                                   AutomationProperties.HelpText="{Binding EffectiveVolumeDb}" />
-                        <TextBlock Text="{Binding SafetyStatusText}" TextWrapping="Wrap"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                   AutomationProperties.LiveSetting="Polite" />
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border CornerRadius="999" Padding="12,5"
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1">
+                                <TextBlock Text="{Binding RequestedVolumeDisplayText}"
+                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </Border>
+                            <Border CornerRadius="999" Padding="12,5"
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1">
+                                <TextBlock Text="{Binding EffectiveVolumeDisplayText}"
+                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                           AutomationProperties.Name="實際有效音量"
+                                           AutomationProperties.HelpText="{Binding EffectiveVolumeDb}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </Border>
+                        </StackPanel>
+                        <Border CornerRadius="999" Padding="12,5" HorizontalAlignment="Left"
+                                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1">
+                            <TextBlock Text="{Binding SafetyStatusText}" TextWrapping="Wrap" MaxWidth="520"
+                                       Style="{ThemeResource CaptionTextBlockStyle}"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       AutomationProperties.LiveSetting="Polite" />
+                        </Border>
                         <TextBlock Text="{Binding VolumeOriginText}"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         <TextBlock Text="{Binding VolumeActuatorText}"
@@ -277,26 +317,52 @@
                         <ToggleSwitch Header="靜音" IsOn="{Binding Muted, Mode=TwoWay}"
                                       AutomationProperties.Name="靜音"
                                       AutomationProperties.HelpText="淡出目前輸出並保留音量設定" />
-                        <ComboBox Header="IR 相位模式"
-                                  ItemsSource="{Binding IrPhaseModeOptions}"
-                                  DisplayMemberPath="Label"
-                                  SelectedValuePath="Mode"
-                                  SelectedValue="{Binding IrPhaseMode, Mode=TwoWay}"
-                                  AutomationProperties.Name="IR 相位模式"
-                                  AutomationProperties.HelpText="Game 低延遲、Balanced 混合相位、Movie 線性相位或 Bypass" />
-                        <Slider Minimum="0" Maximum="1" StepFrequency="0.05"
-                                Value="{Binding IrPhaseStrength, Mode=TwoWay}"
-                                IsEnabled="{Binding IrPhaseUsesFir}"
-                                AutomationProperties.Name="IR 相位強度"
-                                AutomationProperties.HelpText="調整 mixed-phase 或 linear-phase 的延遲與相位折衷" />
-                        <TextBlock Text="{Binding IrPhaseModeText}"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock Text="{Binding IrAddedDelayDisplayText}"
-                                   AutomationProperties.HelpText="{Binding IrAddedDelayMs}"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock Text="IR WAV 會在 Engine Preview 的 control-plane prepare/commit；尚無實體 sink。"
-                                   TextWrapping="Wrap"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <Border Padding="14,12,14,14" CornerRadius="8" Margin="0,4,0,0"
+                                Background="{ThemeResource SubtleFillColorTertiaryBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="IR 相位塑形"
+                                           Style="{ThemeResource BodyStrongTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                <ComboBox Header="IR 相位模式"
+                                          ItemsSource="{Binding IrPhaseModeOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Mode"
+                                          SelectedValue="{Binding IrPhaseMode, Mode=TwoWay}"
+                                          AutomationProperties.Name="IR 相位模式"
+                                          AutomationProperties.HelpText="Game 低延遲、Balanced 混合相位、Movie 線性相位或 Bypass"
+                                          HorizontalAlignment="Stretch" MaxWidth="360" />
+                                <Slider Minimum="0" Maximum="1" StepFrequency="0.05"
+                                        Value="{Binding IrPhaseStrength, Mode=TwoWay}"
+                                        IsEnabled="{Binding IrPhaseUsesFir}"
+                                        AutomationProperties.Name="IR 相位強度"
+                                        AutomationProperties.HelpText="調整 mixed-phase 或 linear-phase 的延遲與相位折衷" />
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <Border CornerRadius="999" Padding="12,5"
+                                            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1">
+                                        <TextBlock Text="{Binding IrPhaseModeText}"
+                                                   Style="{ThemeResource CaptionTextBlockStyle}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </Border>
+                                    <Border CornerRadius="999" Padding="12,5"
+                                            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1">
+                                        <TextBlock Text="{Binding IrAddedDelayDisplayText}"
+                                                   Style="{ThemeResource CaptionTextBlockStyle}"
+                                                   AutomationProperties.HelpText="{Binding IrAddedDelayMs}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock Text="IR WAV 會在 Engine Preview 的 control-plane prepare/commit；尚無實體 sink。"
+                                           TextWrapping="Wrap"
+                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </Border>
 
