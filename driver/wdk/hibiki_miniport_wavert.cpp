@@ -10,6 +10,7 @@
 #endif
 
 #include "hibiki_miniport_wavert.h"
+#include "hibiki_filter_tables.h"
 
 // Forward declaration from hibiki_stream_adapter.cpp
 extern "C" NTSTATUS HibikiWaveRtPinInitializeV1(
@@ -448,9 +449,18 @@ NTSTATUS HibikiMiniportWaveRtV1::InitEndpoint(
 STDMETHODIMP HibikiMiniportWaveRtV1::GetDescription(
     _Out_ PPCFILTER_DESCRIPTOR*    Description) {
     if (Description == nullptr) return STATUS_INVALID_PARAMETER;
-    // Handled by SYSVAD filter table registration
-    *Description = nullptr;
-    return STATUS_NOT_IMPLEMENTED;
+    if (!m_Initialized) return STATUS_INVALID_DEVICE_STATE;
+
+    const PCFILTER_DESCRIPTOR* filterDescriptor = nullptr;
+    const NTSTATUS ntStatus = HibikiGetFilterDescriptorEndpointV1(
+        m_EndpointIndex, &filterDescriptor);
+    if (!NT_SUCCESS(ntStatus)) {
+        *Description = nullptr;
+        return ntStatus;
+    }
+
+    *Description = const_cast<PPCFILTER_DESCRIPTOR>(filterDescriptor);
+    return STATUS_SUCCESS;
 }
 
 STDMETHODIMP HibikiMiniportWaveRtV1::DataRangeIntersection(
@@ -461,14 +471,11 @@ STDMETHODIMP HibikiMiniportWaveRtV1::DataRangeIntersection(
     _Out_writes_bytes_to_opt_(OutputBufferLength, *ResultantFormatLength)
                 PVOID              ResultantFormat,
     _Out_       PULONG             ResultantFormatLength) {
-    UNREFERENCED_PARAMETER(PinId);
-    UNREFERENCED_PARAMETER(DataRange);
-    UNREFERENCED_PARAMETER(MatchingDataRange);
-    UNREFERENCED_PARAMETER(OutputBufferLength);
-    UNREFERENCED_PARAMETER(ResultantFormat);
-    if (ResultantFormatLength == nullptr) return STATUS_INVALID_PARAMETER;
-    *ResultantFormatLength = 0;
-    return STATUS_NOT_IMPLEMENTED;
+    if (!m_Initialized) return STATUS_INVALID_DEVICE_STATE;
+
+    return HibikiDataRangeIntersectionEndpointV1(
+        m_EndpointIndex, PinId, DataRange, MatchingDataRange,
+        OutputBufferLength, ResultantFormat, ResultantFormatLength);
 }
 
 STDMETHODIMP HibikiMiniportWaveRtV1::NewStream(

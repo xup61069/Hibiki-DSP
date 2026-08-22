@@ -19,6 +19,14 @@ transitions (`SetState`) and property context binding into the portable
 cores. They retain strict MS-PL licensing, zero GPL linkage, and non-allocating
 real-time audio paths.
 
+`hibiki_filter_tables.h` and `hibiki_filter_tables.cpp` provide the
+PortCls filter descriptor tables (`PCFILTER_DESCRIPTOR`), KS pin descriptors
+(`PCPIN_DESCRIPTOR`), KS node descriptors (`PCNODE_DESCRIPTOR` for volume
+and mute), connection descriptors (`PCCONNECTION_DESCRIPTOR`), and KS property
+automation tables for all four endpoints (Main, Low Latency, Surround 7.1,
+and Virtual Mic). They wire `GetDescription` and `DataRangeIntersection` to
+static, allocation-free filter topologies matching `endpoint_topology_v1`.
+
 It is deliberately not part of the default CMake target: this machine does
 not have the locked WDK 10.0.28000.2526 and no `.sys` is produced. A future WDK
 adapter must provide one context per endpoint, wire the functions into the
