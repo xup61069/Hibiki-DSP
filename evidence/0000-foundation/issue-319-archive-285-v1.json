@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "issue": 319,
+  "scope_digest": "issue-319-archive-285-v1",
+  "source_commit": "b10d11dc6a1ec70391a3bd17d91f3a0b4e8625a1",
+  "base_commit": "ce70aec49751055b2248e90935a9881b93655ac9",
+  "archived_issue": 285,
+  "merged_pr": {
+    "number": 298,
+    "merge_commit": "c0682736548c5fcc2f210113fd16577533377c10"
+  },
+  "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-10.0.28000.2526-wdk-10.0.28000.2526-cmake-4.4.2-pwsh-7.6.5",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 319",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 319 archive implementation",
+      "status": "pass",
+      "coverage": [
+        "moved docs/tasks/active/285.md to docs/tasks/completed/2026/285.md via git mv",
+        "front-matter bookkeeping only: status completed, PR #298 merge_commit recorded, closed-out next_safe_action",
+        "body content of the archived handoff preserved verbatim"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 319 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Issue 319 schema-v2 ownership, scope and Git ancestry",
+        "full active handoff validation including no scope overlap"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 -SelfTest / tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "13 bounded docs-check self-test cases",
+        "85 required documentation paths and 24 specs with live tracked-path and repository-JSON measurement"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "no blocked binary or secret among tracked paths",
+        "one workflow with source-only CI policy satisfied"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly / tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "Windows 26200 AMD64, Visual Studio 2026, CMake, SDK and WDK prerequisites detected",
+        "Visual Studio 2026/CMake build, ctest all green including hibiki_asio_transport_selftest, unsigned local verification"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP order, RT audio, driver, HLK or signing behavior is changed.",
+    "Archive and user-space gates do not provide loadable-driver, physical-audio, HLK or Microsoft-signing evidence."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369",
+    "cmake": "4.4.2",
+    "sdk_qfe": "10.1.28000.2526",
+    "wdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T22:12:00+08:00",
+  "finished_at": "2026-08-22T22:25:00+08:00"
+}
