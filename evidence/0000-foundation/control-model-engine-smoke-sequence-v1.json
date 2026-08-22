@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "issue": 116,
+  "scope_digest": "control-model-engine-smoke-sequence-v1",
+  "source_commit": "6441ee4",
+  "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/control-model-engine-smoke.ps1",
+    "pwsh -File tools/control-model-engine-smoke.ps1 -EnableSessionRouting"
+  ],
+  "results": [
+    {
+      "command": "tools/control-model-engine-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "C# EasyControlViewModel connects through named pipe",
+        "-18 dB volume/generation reconciliation and status sequence synchronization",
+        "One-Tap SceneApply and IR clear on scene switch",
+        "Physical device catalog refresh"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/control-model-engine-smoke.ps1 -EnableSessionRouting",
+      "status": "pass",
+      "coverage": [
+        "Session routing probe connects and receives App session catalog",
+        "Route health card reconciliation under active session routing"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "This is a user-space smoke reconciliation proof; it does not claim physical playback, driver, WaveRT, HLK or Microsoft signing."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "dotnet": "net8.0 with MSVC 19.44",
+    "powershell": "pwsh 7.6.5"
+  },
+  "started_at": "2026-08-22T09:00:00+08:00",
+  "finished_at": "2026-08-22T09:01:00+08:00"
+}
