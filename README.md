@@ -230,6 +230,8 @@ Windows 使用者也可以直接雙擊 repository 根目錄的 `Start-HibikiPrev
 若要明確啟用 shared-mode WASAPI sink，可雙擊同一層的
 `Start-HibikiPreview-Wasapi.cmd`；它等同於加入 `-EnableWasapiOutput`，不會安裝 driver 或
 改變正式系統路徑。
+若要啟動正式 XAML 殼（需 Windows App Runtime 1.7 x64），可雙擊同一層的
+`Start-HibikiPreview-FormalWinUI.cmd`；它等同於加入 `-Build -Ui FormalWinUI -SmokeTest`。
 
 DesktopCompat 視窗開啟後會自動嘗試連接本機引擎；WinUICompat 則按「連接預覽引擎」。若沒有
 連線，兩者都會安全顯示「尚未連接」，不會改動 Windows 音量或任何實體裝置。要固定使用
