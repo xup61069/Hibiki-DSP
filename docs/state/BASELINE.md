@@ -574,7 +574,7 @@ scope_globs 重疊直接 fail-closed。gate 腳本需要 PowerShell 7（PS 5.1 �
 目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 85 個必要入口與
 <<<<<<< HEAD
 <<<<<<< HEAD
-24 份 Spec 通過；`source-policy.ps1` 掃描 453 個 tracked paths 且無 blocked
+24 份 Spec 通過；`source-policy.ps1` 掃描 451 個 tracked paths 且無 blocked
 binary/secret；`docs-check.ps1` 亦會把這些摘要計數對照 git 實測值，落後即 fail-closed；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；94 個 repository JSON 檔案均可解析。C++/C# DeviceSwitch
