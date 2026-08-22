@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "issue": 341,
+  "branch": "codex/341-retention-policy",
+  "base_commit": "cc44be11536a917cc3f0986c35e743cab5d27ea0",
+  "action": "retire-stale-handoff-files",
+  "retention_policy": "git-history-only",
+  "removed_completed_files": [
+    "docs/tasks/completed/2026/149.md",
+    "docs/tasks/completed/2026/187.md",
+    "docs/tasks/completed/2026/211.md",
+    "docs/tasks/completed/2026/250.md",
+    "docs/tasks/completed/2026/265.md",
+    "docs/tasks/completed/2026/268.md",
+    "docs/tasks/completed/2026/272.md",
+    "docs/tasks/completed/2026/273.md",
+    "docs/tasks/completed/2026/277.md",
+    "docs/tasks/completed/2026/278.md",
+    "docs/tasks/completed/2026/279.md",
+    "docs/tasks/completed/2026/284.md",
+    "docs/tasks/completed/2026/285.md",
+    "docs/tasks/completed/2026/290.md",
+    "docs/tasks/completed/2026/301.md",
+    "docs/tasks/completed/2026/303.md",
+    "docs/tasks/completed/2026/304.md",
+    "docs/tasks/completed/2026/309.md",
+    "docs/tasks/completed/2026/310.md",
+    "docs/tasks/completed/2026/318.md",
+    "docs/tasks/completed/2026/330.md",
+    "docs/tasks/completed/2026/60.md"
+  ],
+  "removed_stale_active_files": [
+    "docs/tasks/active/307.md",
+    "docs/tasks/active/319.md",
+    "docs/tasks/active/320.md",
+    "docs/tasks/active/325.md",
+    "docs/tasks/active/328.md"
+  ],
+  "preserved_active_files": [
+    "docs/tasks/active/337.md"
+  ],
+  "reason": "Issue #198 retired file-based handoffs; subsequent archive PRs re-introduced tracked copies. Git history is the authoritative record.",
+  "timestamp_utc": "2026-08-22T15:17:14.121Z"
+}
+
