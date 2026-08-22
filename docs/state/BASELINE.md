@@ -685,6 +685,15 @@ path-guard 模式，在任何 build、寫入或啟動程序前 fail-closed 驗�
 engine executable（root 內、reparse point 掃描與形狀檢查），self-test 加入離線
 合成屬性案例（Issue #505 / PR #511）。皆為 tooling/source evidence。
 
+第十三波 tooling 與 UI 增量已合併：live-device-catalog-check.ps1 在建立 build tree
+與執行 probe 前，對固定 .local root 新增 fail-closed 驗證（root 內、reparse point
+掃描與目錄／檔案形狀檢查），self-test 擴充十一個離線合成路徑案例，且不呼叫 CMake、
+不執行 probe、不存取 endpoint 或音訊狀態、不寫 repo 檔案（Issue #512 / PR #513）；
+WinUI hero card 重構為自適應雙欄 Grid——Quick Start 面板整合連線按鈕、busy
+ProgressRing、一鍵增強動作與狀態 chip，視窗寬度 840px 以下自動收合回單欄，
+狀態文字改用膠囊 chip，連線按鈕從標題列移入 hero 面板，32 個互動控制項的
+automation names 全數保留（Issue #495 / PR #514）。皆為 tooling/source evidence。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；
