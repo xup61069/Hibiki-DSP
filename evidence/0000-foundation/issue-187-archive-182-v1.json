@@ -113,13 +113,27 @@
       "coverage": ["merge-ref verify workflow gates on final merge-synced head"],
       "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562024525/job/97004970219",
       "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 evidence-finalized push)",
+      "status": "pass",
+      "coverage": ["push verify workflow gates on evidence-finalized head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562180979/job/97005369367",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 evidence-finalized merge-ref)",
+      "status": "pass",
+      "coverage": ["merge-ref verify workflow gates on evidence-finalized head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562177789/job/97005361669",
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
     "Documentation/governance archive only; no product API, IPC/schema, DSP ordering, RT-thread, driver, HLK or signing behavior is changed.",
     "The local environment lacks CMake and WDK, so full CTest/driver coverage is delegated to GitHub Actions Windows runners.",
     "The first PR run exposed a stale target-main counter; main maintenance commit 929752f corrected it before the successful rerun.",
-    "The target branch advanced twice after earlier green checks; this lane used ordinary merge commits and recorded final green verification for the resulting head.",
+    "The target branch advanced twice after earlier green checks; this lane used ordinary merge commits and recorded final green verification for the evidence-finalized head.",
     "No physical audio, per-App delivery, loadable driver, HLK or Microsoft signing evidence is claimed."
   ],
   "logs": [],
@@ -127,5 +141,5 @@
     "powershell": "7.6.5"
   },
   "started_at": "2026-08-22T15:57:32+08:00",
-  "finished_at": "2026-08-22T16:23:25+08:00"
+  "finished_at": "2026-08-22T16:26:59+08:00"
 }
