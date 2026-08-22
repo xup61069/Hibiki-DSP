@@ -31,6 +31,16 @@
         "distribution self-test sweep and unsigned local verification"
       ],
       "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #336)",
+      "status": "pass",
+      "coverage": [
+        "pull_request verify run 32579041147 passed on bfd631b",
+        "first push run 32579013496 failed in the shared handoff gate on a foreign legacy status key (issue #199) that its owner removed minutes later; full local handoff-check passes after that removal",
+        "final head re-runs recorded here"
+      ],
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
