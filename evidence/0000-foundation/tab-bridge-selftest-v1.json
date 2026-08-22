@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "issue": 366,
+  "scope_digest": "tab-bridge-selftest-v1",
+  "source_commit": "pending",
+  "base_commit": "7a9b241d1e2b2f79d4cee345ebb7501ad03bda95",
+  "environment_fingerprint": "pending-local-run",
+  "target": "hibiki_tab_bridge_selftest",
+  "case_groups": [
+    "valid HIBT metadata and bounded sample view",
+    "truncated, magic, version, channel, rate, length, frame and non-finite rejection",
+    "fixed-capacity FIFO copy and empty-pop fail-closed behavior",
+    "output-capacity rejection without consumption",
+    "four-slot overflow and dropped-block accounting"
+  ],
+  "commands": [
+    "cmake --build .local/build --config RelWithDebInfo --target hibiki_tab_bridge_selftest",
+    "ctest --test-dir .local/build -C RelWithDebInfo -R hibiki_tab_bridge_selftest --output-on-failure"
+  ],
+  "limitations": [
+    "Offline source-level contract coverage only; no browser, WebSocket, COM, filesystem, endpoint or real audio access.",
+    "Does not prove browser tab capture, physical playback, driver, WaveRT, HLK, signing or release behavior."
+  ]
+}
