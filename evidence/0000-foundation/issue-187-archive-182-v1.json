@@ -79,6 +79,20 @@
       "coverage": ["target-main counter consistency after main maintenance refresh"],
       "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32561388210/job/97003358401",
       "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 new-head push)",
+      "status": "pass",
+      "coverage": ["all verify workflow gates on merge-synced head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32561632030/job/97003992252",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 new-head merge-ref)",
+      "status": "pass",
+      "coverage": ["merge-ref verify workflow gates on merge-synced head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32561630380/job/97003988189",
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
@@ -92,5 +106,5 @@
     "powershell": "7.6.5"
   },
   "started_at": "2026-08-22T15:57:32+08:00",
-  "finished_at": "2026-08-22T16:10:49+08:00"
+  "finished_at": "2026-08-22T16:14:45+08:00"
 }
