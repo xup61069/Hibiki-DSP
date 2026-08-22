@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "issue": 74,
+  "scope_digest": "preview-launcher-selftest-v1",
+  "source_commit": "64748eb",
+  "environment_fingerprint": "windows-11-26200-x64-preview",
+  "commands": [
+    "pwsh -NoProfile -File tools/run-preview.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 74",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/run-preview.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "runtime-package qualification x64 + Ok status + >= 7000.456.1632.0 boundary",
+        "UI resolution Auto/DesktopCompat/WinUICompat",
+        "fail-closed WinUICompat without runtime",
+        "engine argument construction (8 flag combinations)"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 20
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 74 / tools/handoff-check.ps1 / source-policy / source-only-ci / verify / docs-check / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership and scope",
+        "458 tracked paths source policy",
+        "one workflow source-only publication boundary",
+        "CMake/CTest 1 of 1",
+        "documentation and baseline counters verified",
+        "no whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "The self-test validates pure runtime qualification, UI resolution, and argument construction logic; it does not launch processes or mutate files.",
+    "Preview build outputs remain ignored local artifacts and are not submitted to GitHub."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.301",
+    "msvc": "19.44.35228.0",
+    "powershell": "7.6.5",
+    "cmake": "4.4.0"
+  },
+  "started_at": "2026-08-22T10:27:00+08:00",
+  "finished_at": "2026-08-22T10:28:00+08:00"
+}
