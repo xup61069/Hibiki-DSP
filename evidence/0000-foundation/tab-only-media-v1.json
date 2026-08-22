@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "issue": 391,
+  "scope_digest": "tab-only-media-v1",
+  "source_commit": "8dedc2168a631881ca505d0c02503833560a2192",
+  "base_commit": "93d3a4cf3d9a1854212b0c5bf9c4fcce4799d65d",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.12112.369-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526-cmake-4.4.2-pwsh-7.6.4",
+  "target": "tools/extension-check.ps1",
+  "cases_added": [
+    "tab media source and message stream ID accepted",
+    "missing navigator media getUserMedia boundary rejected",
+    "microphone/non-tab media source rejected",
+    "device media source without message stream ID rejected",
+    "video capture drift rejected"
+  ],
+  "commands": [
+    "pwsh -NoProfile -File tools/extension-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/extension-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 391",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/extension-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "24 bounded policy cases",
+        "tab-only chromeMediaSource",
+        "message stream ID binding",
+        "video false",
+        "microphone/device/video drift rejection"
+      ]
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "CMake configure and RelWithDebInfo build",
+        "CTest 3 of 3: ASIO self-test, tab bridge self-test and contract tests"
+      ],
+      "compiled_artifacts": true,
+      "artifacts_ignored": true
+    },
+    {
+      "command": "repository gates",
+      "status": "pass",
+      "coverage": [
+        "doctor target fingerprint",
+        "Issue 391 and full handoff ownership/scope/ancestry",
+        "documentation structural checks",
+        "source-policy and source-only publication checks",
+        "extension source checks",
+        "whitespace validation"
+      ]
+    }
+  ],
+  "limitations": [
+    "Static source-policy evidence only; no browser launch, MV3 runtime, user gesture, tabCapture, WebSocket, audio, endpoint, driver, WaveRT, HLK, signing or release evidence.",
+    "No extension production source or manifest behavior was changed; only the policy gate and offline fixtures were updated."
+  ]
+}
