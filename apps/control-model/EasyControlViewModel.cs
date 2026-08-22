@@ -259,6 +259,9 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         _ => "尚未選擇實體輸出裝置"
     };
 
+    // #278: last swallowed send-failure exception, exposed for diagnostics.
+    public string LastSendDiagnostics { get; private set; } = string.Empty;
+
     public string StatusText
     {
         get => _statusText;
@@ -1347,17 +1350,23 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             if (reply.Type != ControlMessageType.Ack)
                 throw new InvalidDataException("Hibiki engine rejected the command.");
             StatusText = _selectedScene is null
-                ? "命令已套用"
-                : $"已套用 {_selectedScene.Name} 到 {_selectedOutputGroup}";
+                ? "命令已完成"
+                : $"已完成 {_selectedScene.Name} 於 {_selectedOutputGroup}";
+            LastSendDiagnostics = string.Empty;
             return true;
         }
         catch (OperationCanceledException)
         {
+            LastSendDiagnostics = "operation-canceled";
             StatusText = "命令已取消；保留上一個安全狀態";
             return false;
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            // #278: transient ack failures surface only as `false` today; keep the
+            // swallowed exception observable so the intermittent scene-switch flake
+            // can be root-caused instead of guessed at.
+            LastSendDiagnostics = $"{exception.GetType().Name}: {exception.Message}";
             _session.MarkDegraded();
             SetConnectionState(ControlConnectionState.Degraded);
             StatusText = "引擎連線中斷；已回到安全狀態";
