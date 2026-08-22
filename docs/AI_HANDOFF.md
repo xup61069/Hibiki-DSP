@@ -147,6 +147,25 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   committed counter file — #197 retired `build/baseline-counters.json` and the
   `-WriteCounters` chore, and the #25 scope-overlap gate rejects overlapping active
   `scope_globs` across handoffs.
+- Kernel-mode driver milestone merged: the local 26100-family WDK toolchain produced the first
+  kernel-mode WaveRT PortCls adapter .sys — tools/build-driver.ps1 discovers the newest
+  km-enabled kit, links HibikiVirtualAudio.sys, then genuine Inf2Cat packaging passes the
+  signability re-check (driver-sys-build-v1.json, Issue #394 / PR #410). Artifacts stay under
+  ignored .local/; there is still no install/load/runtime-audio/HLK/Microsoft-signing claim.
+- Toolchain minimum baseline: ADR-0005 relaxes the SDK/WDK lock to >= 10.0.26100 with on-disk
+  directory floors and 10.1.26100.* package-family metadata checks (Issue #430 / PR #432);
+  doctor self-tests cover family-match, missing-metadata, wrong-family and below-minimum cases
+  and accept newer-than-floor kits (Issue #434 / PR #441).
+- SDK transports fail closed on malformed correlation fields: ASIO shared memory rejects non-zero
+  reserved bytes (asio-transport-reserved-zero-v1.json, Issue #420 / PR #425), driver-stream
+  packets reject zero sequence/generation (driver-stream-freshness-v1.json, Issue #411 /
+  PR #414), and driver-control rejects zero request IDs (driver-control-request-id-v1.json,
+  Issue #417 / PR #418).
+- Tooling/gate increments: handoff-check runs with UTF-8 encoding (#386), extension checks add a
+  tabCapture owner guard (#388) and tab-only media constraints (#391), driver-source-check accepts
+  either PortCls notification-buffer naming generation (#426 / PR #428), RemoveSelectedRow has
+  undo-after-remove coverage (#419 / PR #422), and the verify workflow cancels superseded runs
+  through concurrency groups (#427 / PR #431). Evidence files live under evidence/0000-foundation/.
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe
@@ -157,10 +176,10 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
 
 ## 目前整合主線
 
-在 Windows 11 24H2+ x64、Visual Studio 2026、SDK/WDK 10.0.28000.2526 的乾淨機器上，先完成
-source-only WinUI XAML build 與 accessibility smoke evidence；成功後才進行第一個 loadable
-WaveRT endpoint 的 WDK build/signability 工作。不要先做 Microsoft signing、Gumroad 上傳、
-發佈 binary 或宣稱 consumer preview。
+在 Windows 11 24H2+ x64、Visual Studio 2026、SDK/WDK >= 10.0.26100（ADR-0005 最低基線）的
+乾淨機器上，先完成 source-only WinUI XAML build 與 accessibility smoke evidence；成功後才進行
+第一個 loadable WaveRT endpoint 的 WDK build/signability 工作。不要先做 Microsoft signing、
+Gumroad 上傳、發佈 binary 或宣稱 consumer preview。
 
 目標機器可用 `pwsh -File tools/build-preview.ps1 -Target WinUI` 產生不追蹤的本機 UI preview；
 這不是 installer，也不代表虛擬 driver 已完成。

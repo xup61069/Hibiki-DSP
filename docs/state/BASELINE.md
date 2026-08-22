@@ -428,6 +428,13 @@
   render/capture geometry, channel mask and endpoint identity; the Virtual Mic capture entry uses
   the same format contract. This is still only a source boundary and has no target WDK, HLK or
   Microsoft-signing evidence.
+- Issue #394 已在本機 26100 家族 WDK 工具鏈完成第一次 kernel-mode WaveRT PortCls adapter 建置：
+  tools/build-driver.ps1 動態選擇最新含 km headers 的 kit、以核心模式編譯 portable C cores
+  與 driver/wdk/**、連結 HibikiVirtualAudio.sys，INF 複製後由 genuine Inf2Cat 產生 .cat，
+  並以 driver-signability-check.ps1 -PackageRoot .local/driver-package -RequireInf2Cat 重驗
+  封裝（evidence/0000-foundation/driver-sys-build-v1.json）。輸出全部留在 ignored .local/；
+  這是 build/package/signability evidence，仍無安裝、載入、runtime audio、HLK 或 Microsoft
+  signing 宣稱。
 - Apache-2.0 `hibiki_asio_transport_v1` now provides a fixed-layout SPSC shared-memory ring. The
   optional native ASIO DLL writes eight-channel Float32 blocks after callbacks, and
   `AsioTransportConsumerV1` creates/owns `Local\\HibikiDSP_v1_asio` for an allocation-free pop;
@@ -492,9 +499,9 @@
   授權／法務確認）。
 - Microsoft driver signing、Gumroad release artifact 與 production installer。
 
-目前開發機是 Windows build 26200、VS 17／SDK 10.0.26100.0，低於鎖定的 driver 目標
-Windows 26100+、VS 2026／SDK-WDK 10.0.28000.2526；因此 user-space tests 可通過，但
-不能把本機結果當成 driver-target evidence。
+toolchain lock 已依 ADR-0005 對 SDK/WDK 改採最低基線 >= 10.0.26100：目前開發機是
+Windows build 26200、VS 2026／SDK-WDK 26100 家族，符合基線。user-space tests 可通過，
+但本機結果仍不是 driver 安裝、載入、runtime audio、HLK 或簽章的 target evidence。
 
 ## 最近驗證
 
@@ -581,6 +588,20 @@ select(id)、編輯轉發與 save_selected() 在未 attach 或未選取時一律
 漂移、push-to-main 與本機維持嚴格），並附 `-SelfTest`；#25 讓 active handoff 的
 scope_globs 重疊直接 fail-closed。gate 腳本需要 PowerShell 7（PS 5.1 無法執行）。
 
+SDK／tooling 增量已合併：C# control model 加入 Vst3TimelineSurfaceModelV1 surface model、
+binding-state notifications 與 observable timeline editor view model（含 RemoveSelectedRow
+與 undo-after-remove coverage）；supervisor surface 轉發 bounded history introspection 與
+ClearHistory()；sandbox 啟動失敗以 redacted diagnostic reason codes／incident summary 記錄。
+對應 evidence 有 vst3-timeline-surface-model-v1.json、vst3-timeline-binding-state-v1.json、
+vst3-timeline-editor-viewmodel-v1.json、vst3-timeline-editor-remove-selected-row-v1.json、
+vst3-timeline-remove-selected-row-undo-v1.json、vst3-supervisor-history-introspection-v1.json、
+vst3-timeline-clear-history-v1.json 與 vst3-sandbox-redacted-diagnostic-v1.json。SDK 邊界同步
+fail-closed 收緊：ASIO shared-memory transport 拒絕非零 reserved bytes；driver-stream packet
+拒絕零 sequence/generation；driver-control 拒絕零 request ID。工具面增量：handoff-check 改用
+UTF-8 編碼、extension gate 加入 tabCapture owner guard 與 tab-only media constraints、
+driver-source-check 接受兩代 PortCls notification-buffer naming、verify workflow 以 concurrency
+group 取消被取代的 run。以上皆為 user-space/source evidence，不新增實體音訊或 driver 載入宣稱。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；
@@ -596,8 +617,9 @@ ViewModel atomic apply 與 WDK basic-support source gate 亦通過。以本機 p
 `.local/`，未提交或發布。以本機 pinned VST3 SDK 另行執行的 optional target
 `hibiki_vst3_sdk_catalog` 與 `hibiki_vst3_sdk_worker`（含 bounded one-main-bus processor、
 parameter frame 與 `IParameterChanges` bridge）unsigned build 亦通過；輸出同樣
-只在 `.local/`。`doctor.ps1 -CheckOnly` 明確顯示本機低於鎖定的 Windows/VS/WDK 版本，因此
-沒有把 driver、HLK、簽章、真實 endpoint 或第三方 plugin certification 結果誇大為已驗收。C++
+只在 `.local/`。ADR-0005 改採 >= 10.0.26100 最低基線後，本機 `doctor.ps1 -CheckOnly` 已通過；
+本機結果仍不把 driver 安裝／載入、HLK、簽章、真實 endpoint 或第三方 plugin certification
+結果誇大為已驗收。C++
 與 C# grouped-volume payload round-trip、legacy payload compatibility、selected group resolver、
 VST3 timeline editor 交易、C# CalibrationModel 資料契約／PEQ 編譯器
 及 custom Scene card mirror 的 JSON save/load、atomic replace、malformed rollback 亦已通過本機
