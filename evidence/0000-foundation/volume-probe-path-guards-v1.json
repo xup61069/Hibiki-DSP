@@ -1,0 +1,28 @@
+{
+  "schema_version": 2,
+  "issue": 505,
+  "title": "volume probe path guards",
+  "base_commit": "9ea68b9a4739e29a78b078c9dd6169dde26db0d0",
+  "summary": {
+    "tools": [
+      "tools/live-system-volume-check.ps1",
+      "tools/live-session-volume-check.ps1"
+    ],
+    "behavior": "Before any CMake configure/build or engine process launch, both probes fail closed unless the build root, probe executable, and engine executable are real directories/files beneath the repository .local root with no reparse-point target or ancestor. Missing leaves are allowed only where the tool legitimately creates them.",
+    "precedent": "Issue #500 guard pattern; sibling hardening wave #470/#474/#482/#489/#492",
+    "selftest_cases_added": {
+      "live-system-volume-check": 4,
+      "live-session-volume-check": 4
+    }
+  },
+  "validation": [
+    { "command": "pwsh -NoProfile -File tools/live-system-volume-check.ps1 -SelfTest", "result": "pass", "notes": "10 offline cases" },
+    { "command": "pwsh -NoProfile -File tools/live-session-volume-check.ps1 -SelfTest", "result": "pass", "notes": "11 offline cases" },
+    { "command": "pwsh -NoProfile -File tools/docs-check.ps1", "result": "pass" },
+    { "command": "pwsh -NoProfile -File tools/source-policy.ps1", "result": "pass" },
+    { "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1", "result": "pass" },
+    { "command": "git diff --check", "result": "pass" }
+  ],
+  "scope": "tools-only live probe hardening; no product/API/schema/DSP/driver change; no live volume mutation performed",
+  "date": "2026-08-23"
+}

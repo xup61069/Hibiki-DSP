@@ -73,6 +73,77 @@ function Assert-LiveSessionVolumePlan([pscustomobject]$plan, [string]$repoRoot, 
     }
 }
 
+function Test-LiveSessionVolumePathUnderRoot {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Root
+    )
+    $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+    $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+    return $fullPath -eq $fullRoot -or $fullPath.StartsWith(
+        $fullRoot + [IO.Path]::DirectorySeparatorChar,
+        [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-LiveSessionVolumeExistingAttributes {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [hashtable]$SyntheticAttributes
+    )
+    $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+    if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
+        return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
+    }
+    if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
+    return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+}
+
+function Assert-LiveSessionVolumePath {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Root,
+        [Parameter(Mandatory = $true)][ValidateSet('File', 'Directory')][string]$Kind,
+        [switch]$AllowMissingLeaf,
+        [hashtable]$SyntheticAttributes
+    )
+    $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+    $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+    if (-not (Test-LiveSessionVolumePathUnderRoot -Path $fullPath -Root $fullRoot)) {
+        throw "Live session-volume path must remain under the expected root: $fullPath"
+    }
+
+    $leafAttributes = Get-LiveSessionVolumeExistingAttributes -Path $fullPath -SyntheticAttributes $SyntheticAttributes
+    if ($null -eq $leafAttributes -and -not $AllowMissingLeaf) {
+        throw "Live session-volume $Kind does not exist: $fullPath"
+    }
+
+    $cursor = $fullPath
+    while ($true) {
+        $attributes = Get-LiveSessionVolumeExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+        if ($null -ne $attributes) {
+            if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Live session-volume path or parent is a reparse point: $cursor"
+            }
+            if ($cursor -eq $fullPath) {
+                if ($Kind -eq 'Directory' -and ($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+                    throw "Live session-volume path is not a directory: $fullPath"
+                }
+                if ($Kind -eq 'File' -and ($attributes -band [System.IO.FileAttributes]::Directory) -ne 0) {
+                    throw "Live session-volume path is not a file: $fullPath"
+                }
+            } elseif (($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+                throw "Live session-volume path parent is not a directory: $cursor"
+            }
+        }
+        if ($cursor -eq $fullRoot) { break }
+        $parent = [IO.Path]::GetFullPath((Split-Path -Parent $cursor)).TrimEnd('\', '/')
+        if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) {
+            throw "Live session-volume path could not reach the expected root: $fullPath"
+        }
+        $cursor = $parent
+    }
+}
+
 $repo = Split-Path -Parent $PSScriptRoot
 if ($SelfTest) {
     $windowsCaught = $false
@@ -115,13 +186,50 @@ if ($SelfTest) {
     }
     if (-not $unsafeCaught) { throw 'Live session-volume self-test expected unsafe build-root rejection.' }
 
-    Write-Output 'Live session-volume wrapper self-test passed (7 cases).'
+    $synthetic = @{}
+    Assert-LiveSessionVolumePath -Path (Join-Path $repo '.local/missing-leaf') -Root (Join-Path $repo '.local') -Kind Directory -AllowMissingLeaf -SyntheticAttributes $synthetic
+    $caseCount = 8
+
+    $outsideCaught = $false
+    try {
+        Assert-LiveSessionVolumePath -Path 'C:/hibiki-outside-session-volume' -Root (Join-Path $repo '.local') -Kind Directory -AllowMissingLeaf -SyntheticAttributes @{}
+    } catch {
+        $outsideCaught = $_.Exception.Message -match 'must remain under the expected root'
+    }
+    if (-not $outsideCaught) { throw 'Live session-volume self-test expected outside-root rejection.' }
+    $caseCount++
+
+    $reparseCaught = $false
+    try {
+        Assert-LiveSessionVolumePath -Path (Join-Path $repo '.local/reparse-child') -Root (Join-Path $repo '.local') -Kind Directory -AllowMissingLeaf -SyntheticAttributes @{ ([IO.Path]::GetFullPath((Join-Path $repo '.local/reparse-child')).TrimEnd('\', '/')) = [System.IO.FileAttributes]([System.IO.FileAttributes]::Directory -bor [System.IO.FileAttributes]::ReparsePoint) }
+    } catch {
+        $reparseCaught = $_.Exception.Message -match 'reparse point'
+    }
+    if (-not $reparseCaught) { throw 'Live session-volume self-test expected reparse-point rejection.' }
+    $caseCount++
+
+    $wrongKindCaught = $false
+    try {
+        Assert-LiveSessionVolumePath -Path (Join-Path $repo '.local/file-as-dir') -Root (Join-Path $repo '.local') -Kind Directory -SyntheticAttributes @{ ([IO.Path]::GetFullPath((Join-Path $repo '.local/file-as-dir')).TrimEnd('\', '/')) = [System.IO.FileAttributes]::Archive }
+    } catch {
+        $wrongKindCaught = $_.Exception.Message -match 'is not a directory'
+    }
+    if (-not $wrongKindCaught) { throw 'Live session-volume self-test expected wrong-kind rejection.' }
+    $caseCount++
+
+    Write-Output "Live session-volume wrapper self-test passed ($caseCount cases)."
     exit 0
 }
 
 Assert-LiveSessionVolumeOptIn $IsWindows $WriteTest.IsPresent $false
 
 $plan = Get-LiveSessionVolumePlan $repo $DirectCoordinator.IsPresent
+$localRoot = Join-Path $repo '.local'
+Assert-LiveSessionVolumePath -Path $plan.BuildRoot -Root $localRoot -Kind Directory -AllowMissingLeaf
+Assert-LiveSessionVolumePath -Path $plan.ProbePath -Root $localRoot -Kind File -AllowMissingLeaf
+if (-not $DirectCoordinator.IsPresent) {
+    Assert-LiveSessionVolumePath -Path $plan.EnginePath -Root $localRoot -Kind File -AllowMissingLeaf
+}
 $build = $plan.BuildRoot
 New-Item -ItemType Directory -Path $build -Force | Out-Null
 cmake @($plan.ConfigureArgs)

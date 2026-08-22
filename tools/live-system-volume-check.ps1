@@ -70,6 +70,77 @@ function Assert-LiveSystemVolumePlan([pscustomobject]$plan, [string]$repoRoot, [
   }
 }
 
+function Test-LiveSystemVolumePathUnderRoot {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Root
+  )
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  return $fullPath -eq $fullRoot -or $fullPath.StartsWith(
+    $fullRoot + [IO.Path]::DirectorySeparatorChar,
+    [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-LiveSystemVolumeExistingAttributes {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [hashtable]$SyntheticAttributes
+  )
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
+    return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
+  }
+  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
+  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+}
+
+function Assert-LiveSystemVolumePath {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Root,
+    [Parameter(Mandatory = $true)][ValidateSet('File', 'Directory')][string]$Kind,
+    [switch]$AllowMissingLeaf,
+    [hashtable]$SyntheticAttributes
+  )
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  if (-not (Test-LiveSystemVolumePathUnderRoot -Path $fullPath -Root $fullRoot)) {
+    throw "Live system-volume path must remain under the expected root: $fullPath"
+  }
+
+  $leafAttributes = Get-LiveSystemVolumeExistingAttributes -Path $fullPath -SyntheticAttributes $SyntheticAttributes
+  if ($null -eq $leafAttributes -and -not $AllowMissingLeaf) {
+    throw "Live system-volume $Kind does not exist: $fullPath"
+  }
+
+  $cursor = $fullPath
+  while ($true) {
+    $attributes = Get-LiveSystemVolumeExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    if ($null -ne $attributes) {
+      if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Live system-volume path or parent is a reparse point: $cursor"
+      }
+      if ($cursor -eq $fullPath) {
+        if ($Kind -eq 'Directory' -and ($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+          throw "Live system-volume path is not a directory: $fullPath"
+        }
+        if ($Kind -eq 'File' -and ($attributes -band [System.IO.FileAttributes]::Directory) -ne 0) {
+          throw "Live system-volume path is not a file: $fullPath"
+        }
+      } elseif (($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+        throw "Live system-volume path parent is not a directory: $cursor"
+      }
+    }
+    if ($cursor -eq $fullRoot) { break }
+    $parent = [IO.Path]::GetFullPath((Split-Path -Parent $cursor)).TrimEnd('\', '/')
+    if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) {
+      throw "Live system-volume path could not reach the expected root: $fullPath"
+    }
+    $cursor = $parent
+  }
+}
+
 $repo = Split-Path -Parent $PSScriptRoot
 if ($SelfTest) {
   $guardCaught = $false
@@ -104,13 +175,50 @@ if ($SelfTest) {
   }
   if (-not $unsafeCaught) { throw 'Live system-volume self-test expected unsafe build-root rejection.' }
 
-  Write-Output 'Live system-volume wrapper self-test passed (6 cases).'
+  $synthetic = @{}
+  Assert-LiveSystemVolumePath -Path (Join-Path $repo '.local/missing-leaf') -Root (Join-Path $repo '.local') -Kind Directory -AllowMissingLeaf -SyntheticAttributes $synthetic
+  $caseCount = 7
+
+  $outsideCaught = $false
+  try {
+    Assert-LiveSystemVolumePath -Path 'C:/hibiki-outside-system-volume' -Root (Join-Path $repo '.local') -Kind Directory -AllowMissingLeaf -SyntheticAttributes @{}
+  } catch {
+    $outsideCaught = $_.Exception.Message -match 'must remain under the expected root'
+  }
+  if (-not $outsideCaught) { throw 'Live system-volume self-test expected outside-root rejection.' }
+  $caseCount++
+
+  $reparseCaught = $false
+  try {
+    Assert-LiveSystemVolumePath -Path (Join-Path $repo '.local/reparse-child') -Root (Join-Path $repo '.local') -Kind Directory -AllowMissingLeaf -SyntheticAttributes @{ ([IO.Path]::GetFullPath((Join-Path $repo '.local/reparse-child')).TrimEnd('\', '/')) = [System.IO.FileAttributes]([System.IO.FileAttributes]::Directory -bor [System.IO.FileAttributes]::ReparsePoint) }
+  } catch {
+    $reparseCaught = $_.Exception.Message -match 'reparse point'
+  }
+  if (-not $reparseCaught) { throw 'Live system-volume self-test expected reparse-point rejection.' }
+  $caseCount++
+
+  $wrongKindCaught = $false
+  try {
+    Assert-LiveSystemVolumePath -Path (Join-Path $repo '.local/file-as-dir') -Root (Join-Path $repo '.local') -Kind Directory -SyntheticAttributes @{ ([IO.Path]::GetFullPath((Join-Path $repo '.local/file-as-dir')).TrimEnd('\', '/')) = [System.IO.FileAttributes]::Archive }
+  } catch {
+    $wrongKindCaught = $_.Exception.Message -match 'is not a directory'
+  }
+  if (-not $wrongKindCaught) { throw 'Live system-volume self-test expected wrong-kind rejection.' }
+  $caseCount++
+
+  Write-Output "Live system-volume wrapper self-test passed ($caseCount cases)."
   exit 0
 }
 
 Assert-LiveSystemVolumeWriteTestOptIn $WriteTest.IsPresent $false
 
 $plan = Get-LiveSystemVolumePlan $repo $DirectBroker.IsPresent
+$localRoot = Join-Path $repo '.local'
+Assert-LiveSystemVolumePath -Path $plan.BuildRoot -Root $localRoot -Kind Directory -AllowMissingLeaf
+Assert-LiveSystemVolumePath -Path $plan.ProbePath -Root $localRoot -Kind File -AllowMissingLeaf
+if (-not $DirectBroker.IsPresent) {
+  Assert-LiveSystemVolumePath -Path $plan.EnginePath -Root $localRoot -Kind File -AllowMissingLeaf
+}
 $build = $plan.BuildRoot
 $configureArgs = @($plan.ConfigureArgs)
 & cmake @configureArgs
