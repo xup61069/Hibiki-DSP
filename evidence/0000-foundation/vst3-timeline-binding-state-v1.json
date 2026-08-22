@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "issue": 396,
+  "scope_digest": "vst3-timeline-binding-state-v1",
+  "source_commit": "b4d38cf9335bdd0588ff7d01b49a0705e521e460",
+  "environment_fingerprint": "windows-26200-amd64-msvc-19.51.36256-dotnet-10.0.400-pwsh-7.6.5; target-24h2-wdk-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 396",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Vst3TimelineSurfaceModelV1 implements INotifyPropertyChanged for binding-safe catalog, selection, draft, published, history and dirty-state projections",
+        "accepted register/select/begin/insert-or-replace/remove/commit/save/undo/redo/discard transitions notify the expected property names",
+        "rejected invalid registration, concurrent edit and edit-without-draft transitions emit no notification",
+        "IsDirtyState remains a read-only projection of published-vs-baseline state"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "CMake/MSVC RelWithDebInfo verification build completed for the repository targets"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 396",
+      "status": "pass",
+      "coverage": [
+        "Issue-based ownership, branch identity and exclusive scope"
+      ]
+    },
+    {
+      "command": "tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "All active issue handoffs (#394, #395 and #396) have valid non-overlapping scopes"
+      ]
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "80 required paths and 24 accepted Specs; live repository measurements passed with 510 tracked paths and 170 repository JSON files"
+      ]
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "Source-only policy over 510 tracked paths"
+      ]
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Source-only workflow policy passed"
+      ]
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "No whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "This is a managed control-model binding seam only; it adds no IPC payload, native VST3, engine, worker, WinUI XAML, RT-thread, driver, signing or physical-audio behavior.",
+    "The native Vst3TimelineSupervisorSurfaceV1 remains the persistence authority; the managed mirror does not own a file store.",
+    "tools/docs-check.ps1 -WriteCounters was not applicable because current main retired that parameter and build/baseline-counters.json; current docs-check measures tracked paths live.",
+    "The local environment does not provide the WDK needed for driver .sys/signability evidence; that lane is owned by Issue #394."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.400",
+    "powershell": "pwsh 7.6.5",
+    "msvc": "19.51.36256"
+  }
+}
