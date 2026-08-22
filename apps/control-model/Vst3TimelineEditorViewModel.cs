@@ -167,6 +167,20 @@ public sealed class Vst3TimelineEditorViewModel : INotifyPropertyChanged
         return true;
     }
 
+    // Surface-level history reset mirrors the native supervisor facade. It is
+    // valid with or without a selection and never changes rows, dirty state or
+    // an open draft.
+    public bool ClearHistory()
+    {
+        _model.ClearHistory();
+        OnPropertyChanged(nameof(UndoDepth));
+        OnPropertyChanged(nameof(RedoDepth));
+        OnPropertyChanged(nameof(CanUndo));
+        OnPropertyChanged(nameof(CanRedo));
+        SetStatus("編輯歷史已清除");
+        return true;
+    }
+
     // Parses the three bound text fields with invariant culture and forwards
     // a validated upsert into the open draft. Any parse failure is refused
     // without touching draft state.
