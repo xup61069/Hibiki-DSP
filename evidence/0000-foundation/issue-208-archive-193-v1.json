@@ -75,15 +75,15 @@
     {
       "command": "GitHub Actions verify (PR #209 push)",
       "status": "pass",
-      "coverage": ["all verify workflow gates on head 619e63b"],
-      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32564751093/job/97011644091",
+      "coverage": ["all verify workflow gates on metadata head 2df65cd"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32564927597/job/97012075726",
       "compiled_artifacts": false
     },
     {
       "command": "GitHub Actions verify (PR #209 merge-ref)",
       "status": "pass",
-      "coverage": ["all verify workflow gates on head 619e63b against origin/main 1adf947"],
-      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32564752238/job/97011646897",
+      "coverage": ["all verify workflow gates on metadata head 2df65cd against origin/main 1adf947"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32564930454/job/97012082539",
       "compiled_artifacts": false
     }
   ],
