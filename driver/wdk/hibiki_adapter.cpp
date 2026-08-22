@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MS-PL
+// SPDX-License-Identifier: MS-PL
 //
 // Hibiki WaveRT PortCls Adapter Implementation.
 // Implements DriverEntry, AddDevice, StartDevice, and subdevice registration
@@ -9,6 +9,7 @@
 #error "Compile this file only inside a WDK PortCls driver project"
 #endif
 
+#include <initguid.h>
 #include "hibiki_adapter.h"
 #include "hibiki_miniport_wavert.h"
 #include "hibiki_filter_tables.h"

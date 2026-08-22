@@ -6,10 +6,18 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = (Get-Location).Path
 $kits = 'C:\Program Files (x86)\Windows Kits\10'
-$kver = '10.0.28000.0'
+$kver = Get-ChildItem (Join-Path $kits 'Include') -Directory |
+  Where-Object { Test-Path (Join-Path $_.FullName 'km') } |
+  Sort-Object Name -Descending |
+  Select-Object -First 1 -ExpandProperty Name
+if (-not $kver) { throw 'No Windows Kits include directory with km headers found.' }
 $incRoot = Join-Path $kits "Include\$kver"
 $libRoot = Join-Path $kits "Lib\$kver"
-$inf2cat = Join-Path $kits "bin\$kver\x86\Inf2Cat.exe"
+# Some WDK releases place Inf2Cat outside the matching version folder;
+# discover it under the kits bin tree instead of assuming a fixed path.
+$inf2cat = Get-ChildItem (Join-Path $kits 'bin') -Recurse -Filter Inf2Cat.exe -ErrorAction SilentlyContinue |
+  Sort-Object FullName -Descending |
+  Select-Object -First 1 -ExpandProperty FullName
 
 function Assert-Tool {
   param([string]$Path, [string]$Label)
@@ -53,7 +61,7 @@ $defines = @(
 )
 # The WDK headers also define _NTDDK_; the duplicate-definition notice is
 # expected when the guard is provided by the build environment instead.
-$flags = @('/nologo', "/FI$incRoot\km\ntddk.h", '/W4', '/wd4005', '/kernel', '/c', '/Zp8', '/GR-', '/GS', '/EHs-c-')
+$flags = @('/nologo', "/FI$incRoot\km\ntddk.h", '/W4', '/wd4005', '/kernel', '/c', '/Zp8', '/GR-', '/GS', '/EHs-c-', '/Zl')
 $objs = @()
 foreach ($cpp in (Get-ChildItem (Join-Path $repo 'driver/wdk') -Filter *.cpp)) {
   $obj = Join-Path $objDir ($cpp.BaseName + '.obj')
@@ -63,10 +71,19 @@ foreach ($cpp in (Get-ChildItem (Join-Path $repo 'driver/wdk') -Filter *.cpp)) {
   Write-Output "compiled $($cpp.Name)"
 }
 
+# --- Compile portable C core ----------------------------------------------
+foreach ($c in (Get-ChildItem (Join-Path $repo 'driver/src') -Filter *.c)) {
+  $obj = Join-Path $objDir ($c.BaseName + '.obj')
+   & $cl @flags @defines "/Fo$obj" $c.FullName
+   if ($LASTEXITCODE -ne 0) { throw "cl.exe failed for $($c.Name)." }
+   $objs += $obj
+   Write-Output "compiled $($c.Name)"
+ }
+
 # --- Link .sys ------------------------------------------------------------
 $sysPath = Join-Path $pkgDir 'HibikiVirtualAudio.sys'
 $env:LIB = "$kmLib"
-& $link /nologo /DRIVER /SUBSYSTEM:NATIVE,10.00 /ENTRY:DriverEntry `
+& $link /nologo /DRIVER /SUBSYSTEM:NATIVE,10.00 /ENTRY:DriverEntry /NODEFAULTLIB:LIBCMT `
   "/OUT:$sysPath" `
   $objs ntoskrnl.lib hal.lib ks.lib portcls.lib stdunk.lib libcntpr.lib bufferoverflowK.lib
 if ($LASTEXITCODE -ne 0) { throw 'link.exe failed producing HibikiVirtualAudio.sys.' }

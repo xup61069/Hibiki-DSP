@@ -9,6 +9,7 @@
 #endif
 
 #include <ntddk.h>
+#include <portcls.h>
 #include <ks.h>
 #include <ksmedia.h>
 

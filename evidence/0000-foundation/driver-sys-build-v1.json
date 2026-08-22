@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "issue": 394,
+  "scope_digest": "driver-sys-build-v1",
+  "source_commit": "7948efebb99e33439234a101d4b6e08b018e279a",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-msvc-19.51.36256-wdk-10.0.26100.0-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/build-driver.ps1",
+    "pwsh -NoProfile -File tools/driver-signability-check.ps1 -PackageRoot .local/driver-package -RequireInf2Cat"
+  ],
+  "results": [
+    {
+      "command": "tools/build-driver.ps1",
+      "status": "pass",
+      "coverage": [
+        "dynamic WDK version discovery (km headers present under Include)",
+        "recursive Inf2Cat discovery (version-independent bin layout)",
+        "5 kernel-mode x64 C++ TUs (driver/wdk) compiled with /kernel /GS /EHs-c- /Zl",
+        "4 portable C core TUs (driver/src) compiled into the same .sys link",
+        "HibikiVirtualAudio.sys linked: SUBSYSTEM:NATIVE /DRIVER /ENTRY:DriverEntry, no default CRT",
+        "INF copied; Inf2Cat produced HibikiVirtualAudio.cat"
+      ],
+      "compiled_artifacts": true,
+      "artifacts_ignored": true
+    },
+    {
+      "command": "tools/driver-signability-check.ps1 -PackageRoot .local/driver-package -RequireInf2Cat",
+      "status": "pass",
+      "coverage": [
+        "INF source-policy assertions against the packaged INF",
+        "genuine Inf2Cat run against the packaged directory (os:10_GE_X64,10_25H2_X64)",
+        "signability errors: none; warnings: none",
+        "catalog regenerated at .local/driver-package/HibikiVirtualAudio.cat"
+      ],
+      "compiled_artifacts": true,
+      "artifacts_ignored": true
+    }
+  ],
+  "limitations": [
+    "No driver installation, loading, or device-start claim on this machine.",
+    "No signing-certificate, HLK, WHQL, or Microsoft co-signing claim.",
+    "No RT-thread behavior, latency, or audio-quality claim beyond compile/link/package.",
+    "Build machine WDK is 10.0.26100.0 (not the issue's original 28000 reference); the build script now discovers the newest installed km-enabled kit."
+  ],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4",
+    "msvc": "19.51.36256",
+    "wdk": "10.0.26100.0"
+  },
+  "started_at": "2026-08-23T01:20:00+08:00",
+  "finished_at": "2026-08-23T03:10:31+08:00"
+}
