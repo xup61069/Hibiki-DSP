@@ -203,6 +203,11 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   with safe parents and Hibiki.WinUI.exe stays beneath it as a real file without reparse-
   point target or ancestor; -SelfTest grew from 4 to 11 offline cases with no file writes,
   UI Automation loads or process launches (Issue #470 / PR #472).
+- Engine preview build-root guard merged: build-engine-preview.ps1 validates the fixed
+  .local/engine-preview build root before CMake configure and again before the build,
+  rejecting outside-root paths, existing reparse-point ancestors/targets and non-directory
+  roots while keeping normal missing-root behavior; -SelfTest grew from 5 to 7 offline
+  cases with no CMake invocation or file writes (Issue #474 / PR #477).
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe
