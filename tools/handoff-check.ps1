@@ -290,8 +290,35 @@ function Test-HandoffFrontMatter {
   return @{ Issue = $issueValue; Branch = $branch; BaseCommit = $base }
 }
 
+function Resolve-BranchContext {
+  param(
+    [AllowNull()][string]$HeadRef,
+    [AllowNull()][string]$CurrentBranch,
+    [AllowNull()][string]$RefName
+  )
+
+  foreach ($candidate in @($HeadRef, $CurrentBranch, $RefName)) {
+    if (-not [string]::IsNullOrWhiteSpace($candidate)) { return $candidate.Trim() }
+  }
+  return $null
+}
+
 if ($SelfTest) {
   $caseCount = 0
+  $branchContextCases = @(
+    @{ HeadRef = 'codex/from-head-ref'; CurrentBranch = 'codex/from-branch'; RefName = 'main'; Expected = 'codex/from-head-ref' },
+    @{ HeadRef = ''; CurrentBranch = ' codex/from-branch '; RefName = 'main'; Expected = 'codex/from-branch' },
+    @{ HeadRef = ''; CurrentBranch = ''; RefName = ' main '; Expected = 'main' },
+    @{ HeadRef = ''; CurrentBranch = ''; RefName = ''; Expected = $null }
+  )
+  foreach ($case in $branchContextCases) {
+    $actual = Resolve-BranchContext $case.HeadRef $case.CurrentBranch $case.RefName
+    if ($actual -ne $case.Expected) {
+      throw "Branch context self-test failed: expected '$($case.Expected)', got '$actual'."
+    }
+    $caseCount++
+  }
+
   $cases = @(
     @{ Left = 'src/**'; Right = 'src/hub/**'; Expected = $true },
     @{ Left = 'docs/tasks/active/*.md'; Right = 'docs/tasks/active/21.md'; Expected = $true },
@@ -488,7 +515,7 @@ if ($SelfTest) {
   if ($caseCount -lt 25) {
     throw "handoff-check self-test failed: expected at least 25 passing cases, saw $caseCount."
   }
-  Write-Output "handoff-check self-test passed ($caseCount cases; glob overlap, pipeline parsing, validation and resume consistency)."
+  Write-Output "handoff-check self-test passed ($caseCount cases; branch context, glob overlap, pipeline parsing, validation and resume consistency)."
   exit 0
 }
 
@@ -503,9 +530,8 @@ if ($Issue -ge 0) {
 }
 if ($handoffFiles.Count -eq 0) { throw 'No numeric active handoffs were found.' }
 
-$branchContext = $env:GITHUB_HEAD_REF
-if (-not $branchContext) { $branchContext = (& git -C $repo branch --show-current).Trim() }
-if (-not $branchContext) { $branchContext = $env:GITHUB_REF_NAME }
+$currentBranch = (& git -C $repo branch --show-current 2>$null | Select-Object -First 1)
+$branchContext = Resolve-BranchContext $env:GITHUB_HEAD_REF $currentBranch $env:GITHUB_REF_NAME
 
 $seenBranches = @{}
 $seenScopes = [System.Collections.Generic.List[object]]::new()
