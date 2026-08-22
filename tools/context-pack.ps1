@@ -72,12 +72,11 @@ if (-not $PSBoundParameters.ContainsKey('Issue')) {
   throw "No Issue specified. Pass -Issue <number>."
 }
 
-$handoff = Join-Path $repo "docs/tasks/active/$Issue.md"
-if (-not (Test-Path $handoff)) {
-  throw "No handoff exists for Issue $Issue. Create docs/tasks/active/$Issue.md before editing."
+$ghOutput = & gh issue view $Issue --json body --jq '.body' 2>$null
+if ($LASTEXITCODE -ne 0 -or -not $ghOutput) {
+  throw "Cannot read Issue $Issue via gh. Run 'gh issue view $Issue' manually and confirm the handoff block."
 }
-
-$handoffText = Get-Content -LiteralPath $handoff -Raw
+$handoffText = $ghOutput | Out-String
 $specIds = @([regex]::Matches($handoffText, 'SPEC-[0-9]{4}') | ForEach-Object Value | Sort-Object -Unique)
 $adrIds = @([regex]::Matches($handoffText, 'ADR-[0-9]{4}') | ForEach-Object Value | Sort-Object -Unique)
 $seenFiles = [System.Collections.Generic.HashSet[string]]::new(
@@ -99,8 +98,8 @@ Write-ContextFile 'MULTI_AGENT' (Join-Path $repo 'docs/ai/MULTI_AGENT.md')
 Write-ContextFile 'START' (Join-Path $repo 'docs/START_HERE.md')
 Write-ContextFile 'MAP' (Join-Path $repo 'docs/PROJECT_MAP.md')
 Write-ContextFile 'BASELINE' (Join-Path $repo 'docs/state/BASELINE.md')
-Write-Output '=== HANDOFF ==='
-Get-Content -LiteralPath $handoff
+Write-Output '=== ISSUE BODY (handoff source) ==='
+Write-Output $handoffText
 
 foreach ($id in $specIds) {
   $file = Get-ChildItem -LiteralPath (Join-Path $repo 'docs/specs') -Filter "$id-*.md" -File | Select-Object -First 1

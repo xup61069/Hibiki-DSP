@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "issue": 265,
+  "scope_digest": "sweep-threshold-26-v1",
+  "source_commit": "62e94633bc093c8ef5cdcaf34397a8206984132d",
+  "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 265",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "gate self-test sweep (discovery via Get-Command, -SelfTest on all tools/*.ps1)",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/handoff-check.ps1 -Issue 265 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 265 (workflow lane, no overlap)"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "13 cases: structural parser, multiline normalization, branch mode, BASELINE edit detection, live measurement"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "85 required paths, 24 specs, live 530/118"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "gate self-test sweep",
+      "status": "pass",
+      "coverage": [
+        "26 modes discovered and all passed: build-engine-preview.ps1, build-preview.ps1, context-pack.ps1, control-model-check.ps1, control-model-engine-smoke.ps1, distribution-check.ps1, docs-check.ps1, doctor.ps1, driver-signability-check.ps1, driver-source-check.ps1, engine-preview-smoke.ps1, extension-check.ps1, handoff-check.ps1, installer-check.ps1, live-audio-session-check.ps1, live-device-catalog-check.ps1, live-process-loopback-check.ps1, live-session-volume-check.ps1, live-system-volume-check.ps1, live-wasapi-handoff-check.ps1, probe-environment.ps1, run-preview.ps1, source-only-ci-check.ps1, source-policy.ps1, verify.ps1, winui-shell-check.ps1",
+        "minimumModes raised from 5 to 26, fail-closed on deletion"
+      ],
+      "case_count": 26,
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "source-only policy 530 tracked, no blocked binary or secret",
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Workflow/governance only; does not change product code.",
+    "Threshold is minimum, not exact; future additions will still pass but should bump threshold in their own PRs.",
+    "Local machine is below locked target toolchain (Windows 26200, cmake missing)."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200",
+    "vs": "18.9.12112.369",
+    "sdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T19:30:00+08:00",
+  "finished_at": "2026-08-22T19:45:00+08:00"
+}

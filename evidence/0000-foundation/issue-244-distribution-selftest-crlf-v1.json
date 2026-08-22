@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "issue": 244,
+  "scope_digest": "issue-244-distribution-selftest-crlf-v1",
+  "source_commit": "4f5e2c6f975970fcaf1aa371dca0907d433d04c5",
+  "implementation_commit": "cf845d7",
+  "merge_commit": "1fd76a74906d95ae65d5ece08410ab45b70a1b82",
+  "corrective_archive_commit": "f3db88f",
+  "post_merge_metadata_commits": ["db3e3c7", "58ab51f"],
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; vs2026-sdk-wdk-on-disk; target-24h2-machine-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 244",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/distribution-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/distribution-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 244 claim handoff check",
+      "status": "pass",
+      "coverage": ["schema v2 ownership, scope and Git state"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/distribution-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": ["11 bounded valid/rejection cases including duplicate-root-key"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/distribution-check.ps1",
+      "status": "pass",
+      "coverage": ["repository distribution-profile contract"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": ["5 aggregate verification plan cases"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local required repository gates",
+      "status": "pass",
+      "coverage": [
+        "handoff-check Issue 244 and full ownership checks",
+        "docs-check 85 required paths / 24 specs / 525 tracked paths / 115 repository JSON files",
+        "source-policy and source-only-ci-check",
+        "git diff --check"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": ["Gate self-test sweep including distribution-check", "Visual Studio 2026/CMake build", "1/1 CTest contract test"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly",
+      "status": "pass",
+      "coverage": ["Windows build 26200", "VS 2026", "Windows SDK/WDK QFE fingerprint"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/probe-environment.ps1",
+      "status": "pass",
+      "coverage": ["anonymous .local/context.json fingerprint"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "PR #248 merge history",
+      "status": "pass",
+      "coverage": [
+        "implementation head 2a797e47c892cf5652fad07807ac3d5c2c84d72b merged at 1fd76a74906d95ae65d5ece08410ab45b70a1b82",
+        "push verify run 32567445909",
+        "merge-ref verify run 32567458470",
+        "post-merge metadata commits db3e3c7 and 58ab51f remain outside main"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "root_cause": "The Issue #39 self-test fixture used a LF-only Replace token while the Windows CRLF script text produced CRLF fixture lines, so duplicate-root-key was not injected.",
+  "fix_boundary": "Normalize only the in-memory self-test fixture to LF before its bounded replacement cases; repository profile parsing and identity values are unchanged.",
+  "limitations": [
+    "Gate/test tooling only; no product API, IPC/schema, DSP ordering, RT-thread, driver, HLK or signing behavior is changed.",
+    "The target machine is unavailable; this evidence does not claim physical audio, loadable driver, HLK or Microsoft signing validation."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.5"
+  },
+  "started_at": "2026-08-22T22:10:00+08:00",
+  "finished_at": "2026-08-22T23:42:00+08:00"
+}

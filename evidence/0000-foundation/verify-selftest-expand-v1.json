@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "issue": 279,
+  "scope_digest": "verify-selftest-expand-v1",
+  "source_commit": "c6516e1262ad65a8483ef9bc8295281ad9914572",
+  "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/verify.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 279",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "valid build plan passes",
+        "invalid output root rejected",
+        "invalid configure flag rejected",
+        "invalid build configuration rejected",
+        "invalid test configuration rejected",
+        "missing cmake binary mocked and rejected",
+        "cmake configure failure mocked and rejected",
+        "cmake build failure mocked and rejected",
+        "ctest failure mocked and rejected",
+        "mocked success returns true"
+      ],
+      "case_count": 10,
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 279 / tools/handoff-check.ps1 / tools/docs-check.ps1 -SelfTest / tools/docs-check.ps1 / tools/source-policy.ps1 / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 279 (verify lane, no overlap)",
+        "docs-check self-test 13 cases and live measurement 547 tracked / 126 JSON",
+        "source-only policy 547 tracked, no blocked binary or secret",
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Tooling/governance only; does not run real cmake/ctest and does not claim driver signing.",
+    "Self-test is offline and mocked via in-memory stubs; real verification still requires locked target toolchain and cmake.",
+    "Local machine is below locked target toolchain (Windows 26200, cmake missing)."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200",
+    "vs": "18.9.12112.369",
+    "sdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T21:00:00+08:00",
+  "finished_at": "2026-08-22T21:20:00+08:00"
+}

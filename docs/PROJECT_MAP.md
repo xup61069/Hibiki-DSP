@@ -1,7 +1,7 @@
 # Hibiki DSP 專案地圖
 
 新 AI 先讀 `docs/AI_HANDOFF.md`，再用本檔定位子系統；本檔描述結構，不取代
-`docs/state/BASELINE.md` 的已驗證狀態或 `docs/tasks/active/0.md` 的下一步。
+`docs/state/BASELINE.md` 的已驗證狀態或 foundation integration Issue 的下一步。
 
 | 子系統 | 目的 | 目前狀態 | 主要契約 |
 | --- | --- | --- | --- |

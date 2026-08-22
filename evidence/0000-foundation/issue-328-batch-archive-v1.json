@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "evidence_id": "issue-328-batch-archive",
+  "issue": 328,
+  "title": "Batch archive merged Issues 277, 279, 284, 303, 304, 310 handoffs",
+  "created_at_utc": "2026-08-22T14:45:00Z",
+  "worker_identity": "ox-alpha",
+  "environment_fingerprint": "windows-11-26200-x64-pwsh-7.6.5; target-vs2026-sdk-wdk-missing",
+  "changes": [
+    {
+      "action": "move",
+      "from": "docs/tasks/active/277.md",
+      "to": "docs/tasks/completed/2026/277.md",
+      "source_issue": 277,
+      "source_pr": 323,
+      "merge_commit": "e576aeb397211998598a1eb0082964ad60e4d3e8"
+    },
+    {
+      "action": "move",
+      "from": "docs/tasks/active/279.md",
+      "to": "docs/tasks/completed/2026/279.md",
+      "source_issue": 279,
+      "source_pr": 283,
+      "merge_commit": "677d92e1483815842ccad0a0e1347b60805667c1"
+    },
+    {
+      "action": "move",
+      "from": "docs/tasks/active/284.md",
+      "to": "docs/tasks/completed/2026/284.md",
+      "source_issue": 284,
+      "source_pr": 289,
+      "merge_commit": "aeda75fadfda31159e78caac0e9f84b187a8077a"
+    },
+    {
+      "action": "move",
+      "from": "docs/tasks/active/303.md",
+      "to": "docs/tasks/completed/2026/303.md",
+      "source_issue": 303,
+      "source_pr": 314,
+      "merge_commit": "78f02ee41fadcba00a73219e5c7275abb45fab1c"
+    },
+    {
+      "action": "move",
+      "from": "docs/tasks/active/304.md",
+      "to": "docs/tasks/completed/2026/304.md",
+      "source_issue": 304,
+      "source_pr": 308,
+      "merge_commit": "fd7a7add587d2d6326cef29b1301e4a78779044a"
+    },
+    {
+      "action": "move",
+      "from": "docs/tasks/active/310.md",
+      "to": "docs/tasks/completed/2026/310.md",
+      "source_issue": 310,
+      "source_pr": 316,
+      "merge_commit": "ce70aec49751055b2248e90935a9881b93655ac9"
+    }
+  ],
+  "added_files": [
+    "docs/tasks/active/328.md",
+    "evidence/0000-foundation/issue-328-batch-archive-v1.json"
+  ],
+  "limitations": [
+    "Documentation-only archive; no product source change.",
+    "No browser runtime evidence.",
+    "No physical audio evidence.",
+    "No driver or WaveRT evidence.",
+    "No HLK evidence.",
+    "No Microsoft signing evidence."
+  ]
+}

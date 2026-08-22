@@ -429,6 +429,50 @@ int main() {
     auto unsorted_response = calibration_response;
     std::swap(unsorted_response[0], unsorted_response[1]);
     CHECK(!validate_calibration_response_v1(unsorted_response, calibration_policy));
+
+    CalibrationCompilePolicyV1 calibration_cap_policy;
+    calibration_cap_policy.max_filters = 16U;
+    calibration_cap_policy.min_frequency_hz = 20.0;
+    calibration_cap_policy.max_frequency_hz = 20000.0;
+    calibration_cap_policy.min_q = 0.3;
+    calibration_cap_policy.max_q = 12.0;
+    calibration_cap_policy.min_spacing_octaves = 1.0 / 12.0;
+    calibration_cap_policy.ignore_error_db = 0.25;
+    std::vector<CalibrationResponsePointV1> calibration_candidates;
+    for (std::uint32_t candidate_index = 0U; candidate_index < 17U; ++candidate_index) {
+        const double frequency = 100.0 * std::pow(2.0, static_cast<double>(candidate_index) / 3.0);
+        calibration_candidates.push_back(CalibrationResponsePointV1{frequency, -6.0, 0.0});
+    }
+    const auto calibration_cap_result = compile_bounded_peq_correction_v1(
+        calibration_candidates, calibration_cap_policy);
+    CHECK(calibration_cap_result.filters.size() == 16U && calibration_cap_result.limited);
+    CHECK(calibration_cap_result.diagnostic.find("clipped or unrepresented residuals") !=
+          std::string::npos);
+    double cap_previous_frequency = 20.0;
+    double cap_minimum_spacing = std::numeric_limits<double>::infinity();
+    for (const auto& filter : calibration_cap_result.filters) {
+        CHECK(filter.frequency_hz >= 20.0 && filter.frequency_hz <= 20000.0);
+        CHECK(filter.q >= calibration_cap_policy.min_q &&
+              filter.q <= calibration_cap_policy.max_q);
+        CHECK(filter.frequency_hz > cap_previous_frequency);
+        cap_minimum_spacing = (std::min)(
+            cap_minimum_spacing,
+            std::abs(std::log2(filter.frequency_hz / cap_previous_frequency)));
+        cap_previous_frequency = filter.frequency_hz;
+    }
+    CHECK(cap_minimum_spacing >= calibration_cap_policy.min_spacing_octaves);
+    CalibrationCompilePolicyV1 over_cap_policy = calibration_cap_policy;
+    over_cap_policy.max_filters = 17U;
+    CHECK(!validate_calibration_compile_policy_v1(over_cap_policy));
+    CalibrationCompilePolicyV1 above_default_q_policy = calibration_cap_policy;
+    above_default_q_policy.max_q = 12.5;
+    CHECK(validate_calibration_compile_policy_v1(above_default_q_policy));
+    CalibrationCompilePolicyV1 invalid_q_policy = calibration_cap_policy;
+    invalid_q_policy.max_q = 100.1;
+    CHECK(!validate_calibration_compile_policy_v1(invalid_q_policy));
+    CalibrationCompilePolicyV1 invalid_spacing_policy = calibration_cap_policy;
+    invalid_spacing_policy.min_spacing_octaves = 0.008;
+    CHECK(!validate_calibration_compile_policy_v1(invalid_spacing_policy));
     calibrated.anchor_id = "speaker-anchor";
     CHECK(!validate_policy(calibrated));
     calibrated.standard = "iso-226-2023-calibrated";
@@ -1978,6 +2022,72 @@ int main() {
         parameter_packet, decoded_worker, std::span<Vst3WorkerParameterPointV1>(decoded_parameters),
         decoded_parameter_count, decoded_parameter_samples, worker_error) &&
           worker_error == Vst3WorkerProtocolErrorV1::InvalidFormat);
+
+    // Issue 284: bounded offline fixtures for the v1 worker frame codec. Each case
+    // is deterministic, in-memory, and exercises one fail-closed boundary without
+    // launching a process or touching the filesystem.
+    {
+        std::array<std::uint8_t, kVst3WorkerHeaderBytesV1 + 2U * sizeof(float)>
+            selftest_packet{};
+        const Vst3WorkerFrameV1 selftest_frame{
+            Vst3WorkerMessageTypeV1::ProcessBlockResponse, 284U, 2U, 1U,
+            2U * sizeof(float), 0U};
+        std::size_t selftest_header_bytes = 0U;
+
+        // 1) Valid little-endian round-trip: encode → decode → validate finite payload.
+        CHECK(encode_vst3_worker_frame_v1(
+            selftest_frame,
+            std::span<std::uint8_t>(selftest_packet).first(kVst3WorkerHeaderBytesV1),
+            selftest_header_bytes));
+        const float selftest_samples[2] = {0.5F, -0.5F};
+        std::memcpy(selftest_packet.data() + kVst3WorkerHeaderBytesV1, selftest_samples,
+                    sizeof(selftest_samples));
+        Vst3WorkerFrameV1 selftest_decoded{};
+        Vst3WorkerProtocolErrorV1 selftest_error{Vst3WorkerProtocolErrorV1::None};
+        std::span<const float> selftest_payload;
+        CHECK(validate_vst3_worker_audio_frame_v1(selftest_packet, selftest_decoded,
+                                                   selftest_payload, selftest_error));
+        CHECK(selftest_decoded.request_id == 284U && selftest_payload.size() == 2U);
+        // Explicit little-endian byte order on the wire.
+        CHECK(selftest_packet[0] == 0x48U && selftest_packet[1] == 0x49U &&
+              selftest_packet[2] == 0x56U && selftest_packet[3] == 0x53U);
+
+        // 2) Truncated header: below the fixed 36-byte minimum must fail closed.
+        Vst3WorkerFrameV1 truncated_frame{};
+        Vst3WorkerProtocolErrorV1 truncated_error{Vst3WorkerProtocolErrorV1::None};
+        CHECK(!decode_vst3_worker_frame_v1(
+            std::span<const std::uint8_t>(selftest_packet).first(kVst3WorkerHeaderBytesV1 - 1U),
+            truncated_frame, truncated_error));
+        CHECK(truncated_error == Vst3WorkerProtocolErrorV1::Truncated);
+
+        // 3) Non-finite sample: NaN in an otherwise valid audio frame is rejected.
+        float selftest_nan = std::numeric_limits<float>::quiet_NaN();
+        std::memcpy(selftest_packet.data() + kVst3WorkerHeaderBytesV1, &selftest_nan,
+                    sizeof(selftest_nan));
+        Vst3WorkerProtocolErrorV1 nan_error{Vst3WorkerProtocolErrorV1::None};
+        CHECK(!validate_vst3_worker_audio_frame_v1(selftest_packet, selftest_decoded,
+                                                    selftest_payload, nan_error));
+        CHECK(nan_error == Vst3WorkerProtocolErrorV1::NonFiniteSample);
+        std::memcpy(selftest_packet.data() + kVst3WorkerHeaderBytesV1, selftest_samples,
+                    sizeof(selftest_samples));
+
+        // 4) Wrong-endian rejection: big-endian byte order of the same magic fails closed.
+        std::array<std::uint8_t, kVst3WorkerHeaderBytesV1 + 2U * sizeof(float)>
+            wrong_endian_packet{};
+        std::memcpy(wrong_endian_packet.data(), selftest_packet.data(), wrong_endian_packet.size());
+        std::swap(wrong_endian_packet[0], wrong_endian_packet[3]);
+        std::swap(wrong_endian_packet[1], wrong_endian_packet[2]);
+        Vst3WorkerFrameV1 endian_frame{};
+        Vst3WorkerProtocolErrorV1 endian_error{Vst3WorkerProtocolErrorV1::None};
+        CHECK(!decode_vst3_worker_frame_v1(wrong_endian_packet, endian_frame, endian_error));
+        CHECK(endian_error == Vst3WorkerProtocolErrorV1::InvalidMagic);
+    }
+    // Issue 284 regression guard: the pre-existing parameter-frame boundary must
+    // still fail closed on a reserved-byte violation after the new fixtures.
+    CHECK(!validate_vst3_worker_parameter_frame_v1(
+        parameter_packet, decoded_worker, std::span<Vst3WorkerParameterPointV1>(decoded_parameters),
+        decoded_parameter_count, decoded_parameter_samples, worker_error) &&
+          worker_error == Vst3WorkerProtocolErrorV1::InvalidFormat);
     Vst3ParameterTimelineV1 parameter_timeline;
     CHECK(parameter_timeline.append(Vst3ParameterTimelineEventV1{7U, 48003U, 0.75}) &&
           parameter_timeline.append(Vst3ParameterTimelineEventV1{3U, 48000U, 0.25}) &&
@@ -2805,6 +2915,46 @@ int main() {
     tab_packet.pop_back();
     CHECK(!decode_tab_capture_packet_v1(tab_packet, tab_view, tab_error) &&
           tab_error == TabPacketError::LengthMismatch);
+
+    // Rebuild a valid 2ch x 2fr @48k packet for bounded negative-path coverage.
+    auto valid_packet = std::vector<std::uint8_t>(16U + 2U * 2U * sizeof(float), 0U);
+    valid_packet[0] = 'H'; valid_packet[1] = 'I'; valid_packet[2] = 'B'; valid_packet[3] = 'T';
+    valid_packet[4] = 1U;
+    valid_packet[6] = 2U;
+    valid_packet[8] = 2U;
+    valid_packet[12] = 0x80U; valid_packet[13] = 0xBBU; valid_packet[14] = 0U; valid_packet[15] = 0U;
+    const float valid_samples[4] = {0.25F, -0.25F, 0.5F, -0.5F};
+    std::memcpy(valid_packet.data() + 16U, valid_samples, sizeof(valid_samples));
+
+    const auto truncated_header = std::vector<std::uint8_t>(
+        valid_packet.begin(), valid_packet.begin() + static_cast<std::ptrdiff_t>(15U));
+    CHECK(!decode_tab_capture_packet_v1(truncated_header, tab_view, tab_error) &&
+          tab_error == TabPacketError::Truncated);
+
+    auto truncated_payload = valid_packet;
+    truncated_payload.pop_back();
+    CHECK(!decode_tab_capture_packet_v1(truncated_payload, tab_view, tab_error) &&
+          tab_error == TabPacketError::LengthMismatch);
+
+    auto nan_packet = valid_packet;
+    const float nan_sample = std::numeric_limits<float>::quiet_NaN();
+    std::memcpy(nan_packet.data() + 16U, &nan_sample, sizeof(nan_sample));
+    CHECK(!decode_tab_capture_packet_v1(nan_packet, tab_view, tab_error) &&
+          tab_error == TabPacketError::NonFiniteSample);
+
+    auto bad_channels = valid_packet;
+    bad_channels[6U] = 3U;
+    CHECK(!decode_tab_capture_packet_v1(bad_channels, tab_view, tab_error) &&
+          tab_error == TabPacketError::InvalidChannels);
+
+    auto bad_rate = valid_packet;
+    bad_rate[12U] = (22222U >> 0U) & 0xFFU;
+    bad_rate[13U] = (22222U >> 8U) & 0xFFU;
+    bad_rate[14U] = (22222U >> 16U) & 0xFFU;
+    bad_rate[15U] = (22222U >> 24U) & 0xFFU;
+    CHECK(!decode_tab_capture_packet_v1(bad_rate, tab_view, tab_error) &&
+          tab_error == TabPacketError::InvalidSampleRate);
+
     TabBridgeServer tab_server;
     CHECK(!tab_server.start(TabBridgeServerConfigV1{17842U, 256U * 1024U}, nullptr, nullptr));
     CHECK(!tab_server.running());

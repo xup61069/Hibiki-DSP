@@ -16,6 +16,19 @@ $allowedHostPermissions = [System.Collections.Generic.HashSet[string]]::new(
 )
 $requiredHostPermissions = @('http://127.0.0.1/*')
 
+function Get-CspDirectiveSources([string]$csp, [string]$directive, [string]$sourceName) {
+  $matches = @()
+  foreach ($segment in ($csp -split ';')) {
+    $tokens = @($segment.Trim() -split '\s+' | Where-Object { $_ })
+    if ($tokens.Count -eq 0 -or $tokens[0] -ine $directive) { continue }
+    $matches += ,@($tokens | Select-Object -Skip 1)
+  }
+  if ($matches.Count -ne 1) {
+    throw "CSP must contain exactly one $directive directive in $sourceName."
+  }
+  return ,@($matches[0])
+}
+
 function Assert-ExtensionManifestPolicy($manifest, [string]$sourceName) {
   if ($null -eq $manifest) {
     throw "Extension manifest cannot be null in $sourceName"
@@ -63,14 +76,17 @@ function Assert-ExtensionManifestPolicy($manifest, [string]$sourceName) {
   if ($csp -match 'unsafe-inline') {
     throw "CSP contains unsafe-inline in $sourceName."
   }
-  if ($csp -notmatch "script-src\s+'self'") {
-    throw "CSP script-src must be strictly 'self' in $sourceName."
+  $scriptSources = @(Get-CspDirectiveSources $csp 'script-src' $sourceName)
+  if ($scriptSources.Count -ne 1 -or $scriptSources[0] -cne "'self'") {
+    throw "CSP script-src must contain only 'self' in $sourceName."
   }
-  if ($csp -notmatch "object-src\s+('self'|'none')") {
-    throw "CSP object-src must be 'self' or 'none' in $sourceName."
+  $objectSources = @(Get-CspDirectiveSources $csp 'object-src' $sourceName)
+  if ($objectSources.Count -ne 1 -or $objectSources[0] -cnotin @("'self'", "'none'")) {
+    throw "CSP object-src must contain only 'self' or 'none' in $sourceName."
   }
-  if ($csp -notmatch "connect-src\s+ws:\/\/127\.0\.0\.1:17842(?:\s*;|\s*$)") {
-    throw "CSP connect-src must be strictly ws://127.0.0.1:17842 without wildcard origins in $sourceName."
+  $connectSources = @(Get-CspDirectiveSources $csp 'connect-src' $sourceName)
+  if ($connectSources.Count -ne 1 -or $connectSources[0] -cne 'ws://127.0.0.1:17842') {
+    throw "CSP connect-src must contain only ws://127.0.0.1:17842 without wildcard origins in $sourceName."
   }
 }
 
@@ -110,7 +126,45 @@ if ($SelfTest) {
   try { Assert-ExtensionManifestPolicy $externalConnect 'selftest-external-connect' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected external connect-src failure.' }
 
-  Write-Output 'Browser extension policy self-test passed (6 cases).'
+  $externalScript = $validJson | ConvertFrom-Json
+  $externalScript.content_security_policy.extension_pages = "script-src 'self' https://cdn.example; object-src 'self'; connect-src ws://127.0.0.1:17842"
+  $caught = $false
+  try { Assert-ExtensionManifestPolicy $externalScript 'selftest-external-script' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected external script-src failure.' }
+
+  $externalObject = $validJson | ConvertFrom-Json
+  $externalObject.content_security_policy.extension_pages = "script-src 'self'; object-src 'self' https://cdn.example; connect-src ws://127.0.0.1:17842"
+  $caught = $false
+  try { Assert-ExtensionManifestPolicy $externalObject 'selftest-external-object' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected external object-src failure.' }
+
+  $missingCsp = $validJson | ConvertFrom-Json
+  $missingCsp.content_security_policy = [pscustomobject]@{}
+  $caught = $false
+  try { Assert-ExtensionManifestPolicy $missingCsp 'selftest-missing-csp' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected missing extension_pages CSP failure.' }
+
+  $invalidObjectSource = $validJson | ConvertFrom-Json
+  $invalidObjectSource.content_security_policy.extension_pages = "script-src 'self'; object-src 'script'; connect-src ws://127.0.0.1:17842"
+  $caught = $false
+  try { Assert-ExtensionManifestPolicy $invalidObjectSource 'selftest-invalid-object-src' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected invalid object-src failure.' }
+
+  $wrongLoopback = $validJson | ConvertFrom-Json
+  $wrongLoopback.content_security_policy.extension_pages = "script-src 'self'; object-src 'self'; connect-src ws://127.0.0.1:17843"
+  $caught = $false
+  try { Assert-ExtensionManifestPolicy $wrongLoopback 'selftest-wrong-loopback' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected wrong loopback endpoint failure.' }
+
+  $multilineCsp = $validJson | ConvertFrom-Json
+  $multilineCsp.content_security_policy.extension_pages = @"
+script-src    'self' ;
+object-src    'none' ;
+connect-src   ws://127.0.0.1:17842
+"@
+  Assert-ExtensionManifestPolicy $multilineCsp 'selftest-multiline-csp'
+
+  Write-Output 'Browser extension policy self-test passed (12 cases).'
   exit 0
 }
 

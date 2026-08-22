@@ -1,0 +1,234 @@
+{
+  "schema_version": 1,
+  "issue": 187,
+  "scope_digest": "issue-187-archive-182-v1",
+  "source_commit": "7892245618bedc57062e5bd26b1d4d271939b5ca",
+  "archive_commit": "cb3a511",
+  "main_sync_commit": "c66ea9523e0c3b3a362f1569352347abac0adadc",
+  "counter_refresh_commit": "cd413517a40c9841410c4d03e531fbbef1aec351",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; cmake-missing-wdk-missing-portable-user-space",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 187",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/handoff-check.ps1 -Issue 187",
+      "status": "pass",
+      "coverage": ["schema v2 ownership, scope and Git state"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": ["all active handoffs and overlap checks"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": ["85 required paths", "24 specs", "483 tracked paths", "103 repository JSON files"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": ["483 tracked paths", "no blocked binary or secret content"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": ["1 workflow", "483 tracked paths"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "blocked",
+      "coverage": ["cmake unavailable in local environment"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": ["no whitespace errors"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 push)",
+      "status": "fail",
+      "coverage": ["docs-check target-base consistency"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32561182704/job/97002836976",
+      "failure": "origin/main=741fbc3 build/baseline-counters.json claims 481 tracked paths and 102 repository JSON files, while that tree contains 483 tracked paths and 103 repository JSON files",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local gates after merge-sync to origin/main e53fa42",
+      "status": "pass",
+      "coverage": ["handoff-check issue/full", "docs-check 85 required paths and 24 specs", "487 tracked paths", "105 repository JSON files", "source-policy", "source-only-ci-check", "git diff --check"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 rerun before merge-sync)",
+      "status": "pass",
+      "coverage": ["target-main counter consistency after main maintenance refresh"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32561388210/job/97003358401",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 new-head push)",
+      "status": "pass",
+      "coverage": ["all verify workflow gates on merge-synced head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32561632030/job/97003992252",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 new-head merge-ref)",
+      "status": "pass",
+      "coverage": ["merge-ref verify workflow gates on merge-synced head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32561630380/job/97003988189",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local gates after second merge-sync to origin/main ad4e419",
+      "status": "pass",
+      "coverage": ["handoff-check issue/full", "docs-check 85 required paths and 24 specs", "486 tracked paths", "104 repository JSON files", "source-policy", "source-only-ci-check", "git diff --check"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 final push)",
+      "status": "pass",
+      "coverage": ["push verify workflow gates on final merge-synced head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562026182/job/97004975129",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 final merge-ref)",
+      "status": "pass",
+      "coverage": ["merge-ref verify workflow gates on final merge-synced head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562024525/job/97004970219",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 evidence-finalized push)",
+      "status": "pass",
+      "coverage": ["push verify workflow gates on evidence-finalized head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562180979/job/97005369367",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 evidence-finalized merge-ref)",
+      "status": "pass",
+      "coverage": ["merge-ref verify workflow gates on evidence-finalized head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562177789/job/97005361669",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local gates after third merge-sync to origin/main 986b145",
+      "status": "pass",
+      "coverage": ["handoff-check issue/full", "docs-check 85 required paths and 24 specs", "490 tracked paths", "105 repository JSON files", "source-policy", "source-only-ci-check", "git diff --check"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 third-sync final push)",
+      "status": "pass",
+      "coverage": ["push verify workflow gates on third merge-synced head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562613745/job/97006437076",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 third-sync final merge-ref)",
+      "status": "pass",
+      "coverage": ["merge-ref verify workflow gates on third merge-synced head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562610786/job/97006429337",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 final handoff push)",
+      "status": "pass",
+      "coverage": ["push verify workflow gates on final handoff head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562776670/job/97006834753",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 final handoff merge-ref)",
+      "status": "pass",
+      "coverage": ["merge-ref verify workflow gates on final handoff head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562774103/job/97006828963",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local gates after fourth merge-sync to origin/main 036b846",
+      "status": "pass",
+      "coverage": ["handoff-check issue/full", "docs-check 85 required paths and 24 specs", "496 tracked paths", "107 repository JSON files", "source-policy", "source-only-ci-check", "git diff --check"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 fourth-sync final push)",
+      "status": "pass",
+      "coverage": ["push verify workflow gates on fourth merge-synced head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32563155690/job/97007760103",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 fourth-sync final merge-ref)",
+      "status": "pass",
+      "coverage": ["merge-ref verify workflow gates on fourth merge-synced head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32563152714/job/97007751964",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local gates after fifth merge-sync to origin/main a2d9df2",
+      "status": "pass",
+      "coverage": ["handoff-check issue/full", "docs-check 85 required paths and 24 specs", "498 tracked paths", "108 repository JSON files", "source-policy", "source-only-ci-check", "git diff --check"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local docs-check -WriteCounters after sixth merge-sync to origin/main c66ea95",
+      "status": "pass",
+      "coverage": ["501 tracked paths", "109 repository JSON files", "baseline counters refreshed by cd41351"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local merge-sync to origin/main c66ea95",
+      "status": "pass",
+      "coverage": ["ordinary merge commit 937b5ec", "no product source changes"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 sixth-sync push)",
+      "status": "fail",
+      "coverage": ["target-base counter consistency"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32563829553/job/97009400862",
+      "failure": "origin/main build/baseline-counters.json claims 501 tracked paths but that target tree has 500; target-main counter repair is owned by the integrator lane (#206/#207)",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 sixth-sync merge-ref)",
+      "status": "fail",
+      "coverage": ["target-base counter consistency"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32563830981/job/97009404503",
+      "failure": "origin/main build/baseline-counters.json claims 501 tracked paths but that target tree has 500; target-main counter repair is owned by the integrator lane (#206/#207)",
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP ordering, RT-thread, driver, HLK or signing behavior is changed.",
+    "The local environment lacks CMake and WDK, so full CTest/driver coverage is delegated to GitHub Actions Windows runners.",
+    "The first PR run exposed a stale target-main counter; main maintenance commit 929752f corrected it before the successful rerun.",
+    "The target branch advanced six times after earlier green checks; this lane used ordinary merge commits and is awaiting verification for the sixth merge-synced head.",
+    "The sixth-sync PR checks failed because origin/main counters claim 501 tracked paths while the target tree contains 500; the repair belongs to integrator-owned #206/#207 and this lane does not modify those branches.",
+    "No physical audio, per-App delivery, loadable driver, HLK or Microsoft signing evidence is claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.5"
+  },
+  "started_at": "2026-08-22T15:57:32+08:00",
+  "finished_at": "2026-08-22T16:54:13+08:00"
+}

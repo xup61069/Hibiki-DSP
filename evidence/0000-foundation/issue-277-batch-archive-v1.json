@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "issue": 277,
+  "scope_digest": "issue-277-batch-archive-v1",
+  "source_commit": "d135a32",
+  "archive_commit": "d135a32",
+  "main_sync_commit": "20b6bc1",
+  "archived_issues": [149, 187, 211, 250],
+  "merged_prs": {
+    "149": {"pr": 150, "commit": "8a153ffa1cc3fdea292527d31695550b7db4ff2e"},
+    "187": {"pr": 189, "commit": "1adf947a50f836ee6371050ff5db58a09485df0e"},
+    "211": {"pr": 212, "commit": "444f95c336301a96834ddc22787a2c7ab5da580e"},
+    "250": {"pr": 254, "commit": "5a2b55da55219da2682311cfa61e4fd9353f208b"}
+  },
+  "note": "Issue #266 (the fifth in this batch) was already archived by Issue #294 / PR #296.",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-cmake-4.4.0-vs2026; wdk-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 277",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 277 batch archive implementation",
+      "status": "pass",
+      "coverage": [
+        "moved docs/tasks/active/149.md to docs/tasks/completed/2026/149.md with merge commit from PR #150",
+        "moved docs/tasks/active/187.md to docs/tasks/completed/2026/187.md with merge commit from PR #189",
+        "moved docs/tasks/active/211.md to docs/tasks/completed/2026/211.md with merge commit from PR #212",
+        "moved docs/tasks/active/250.md to docs/tasks/completed/2026/250.md with merge commit from PR #254",
+        "recorded archive commit d135a32"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP, RT audio, driver, HLK or signing behavior is changed.",
+    "Archive preserves historical verification; does not claim new product delivery."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4",
+    "windows_build": "26200",
+    "cmake": "4.4.0"
+  },
+  "started_at": "2026-08-22T21:30:00+08:00",
+  "finished_at": "2026-08-22T21:50:00+08:00"
+}

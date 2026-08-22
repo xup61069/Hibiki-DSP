@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "issue": 232,
+  "scope_digest": "source-policy-selftest-v1",
+  "source_commit": "bf9e38b17be01f124e4ec0f490784211bff7e755",
+  "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/source-policy.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 232",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/extension-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/distribution-check.ps1",
+    "pwsh -NoProfile -File tools/winui-shell-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/source-policy.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "allowed text paths produce zero blocked results",
+        "single blocked extension .exe flagged",
+        "multiple blocked extensions flagged preserving input order",
+        "case-insensitive extension match (.EXE, .Dll, .so) flagged",
+        "every blocked extension class (19 types) flagged",
+        "private-key header pattern detected",
+        "github personal token pattern detected",
+        "generic token pattern detected",
+        "clean text produces no secret violation",
+        "PE header MZ detection positive and negative"
+      ],
+      "case_count": 10,
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "real repository tracked paths via git ls-files (515) scanned",
+        "blocked extensions and PE header rejected fail-closed",
+        "secret patterns scanned per file with source-policy.ps1 self-exclusion"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 232 / tools/handoff-check.ps1 / tools/docs-check.ps1 -SelfTest / tools/docs-check.ps1 / tools/source-only-ci-check.ps1 / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 232",
+        "docs-check self-test 13 cases and live measurement 515 tracked / 111 JSON",
+        "source-only CI 16-case self-test and 1 workflow policy pass",
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/extension-check.ps1 -SelfTest / tools/distribution-check.ps1 / tools/winui-shell-check.ps1 -SelfTest / tools/doctor.ps1 -CheckOnly",
+      "status": "pass",
+      "coverage": [
+        "extension MV3 least-privilege and CSP self-test 6 cases",
+        "distribution profile stable GUID and identity checks",
+        "WinUI shell source and accessibility self-test 4 cases, 32 controls",
+        "doctor Windows 26200 / VS2026 18.9 / SDK-WDK 28000.2526 present, cmake missing as expected"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Tooling and governance gate coverage only; does not produce artifacts, signing, or physical device evidence.",
+    "SelfTest fixtures are in-memory helpers sharing the blocked-extension and secret-pattern constants with the production gate; policy expansion must update both together by design.",
+    "Local machine is below the locked target toolchain (Windows 26200, cmake missing, VS BuildTools 18.9); full Windows build and signing evidence require the locked 24H2/VS2026/SDK-WDK 28000.2526 host and are explicitly not claimed.",
+    "Does not claim private paths, endpoint IDs, or signing material; evidence is anonymous and reproducible."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200",
+    "vs": "18.9.12112.369",
+    "sdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T17:30:00+08:00",
+  "finished_at": "2026-08-22T17:45:00+08:00"
+}

@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "issue": 251,
+  "scope_digest": "issue-251-archive-244-v1",
+  "source_commit": "1fd76a74906d95ae65d5ece08410ab45b70a1b82",
+  "archive_commit": "f3db88f",
+  "main_sync_commit": "1fd76a74906d95ae65d5ece08410ab45b70a1b82",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; vs2026-sdk-wdk-on-disk; target-24h2-machine-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 251",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/probe-environment.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 251 claim handoff check before scope expansion",
+      "status": "pass",
+      "coverage": ["schema v2 ownership, scope and Git state"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "PR #248 post-merge review",
+      "status": "pass",
+      "coverage": [
+        "merged implementation is present at main commit 1fd76a7",
+        "push and merge-ref verify runs 32567445909 and 32567458470 passed",
+        "metadata takeover commits db3e3c7 and 58ab51f are not main history"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Issue 251 archive implementation",
+      "status": "in_progress",
+      "coverage": [
+        "move docs/tasks/active/244.md to docs/tasks/completed/2026/244.md",
+        "update paired Issue 244 evidence",
+        "add this anonymous post-merge evidence"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local archive gates after moving Issue 244 handoff",
+      "status": "pass",
+      "coverage": [
+        "handoff-check Issue 251 and full ownership checks",
+        "docs-check 85 required paths / 24 specs / 530 tracked paths / 118 repository JSON files",
+        "source-policy and source-only-ci-check",
+        "git diff --check"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": ["distribution self-test sweep", "Visual Studio 2026/CMake user-space build", "1/1 CTest contract test"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly",
+      "status": "pass",
+      "coverage": ["Windows build 26200", "VS 2026", "Windows SDK/WDK QFE fingerprint"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/probe-environment.ps1",
+      "status": "pass",
+      "coverage": ["anonymous .local/context.json fingerprint"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #253 push)",
+      "status": "pass",
+      "coverage": ["all verify workflow gates on complete Issue 251 archive head 03d1bab"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32567869924/job/97019043216",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #253 merge-ref)",
+      "status": "pass",
+      "coverage": ["all verify workflow gates against the then-current main base"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32567882278/job/97019073872",
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP ordering, RT-thread, driver, HLK or signing behavior is changed.",
+    "The target machine is unavailable; local documentation and user-space gates do not provide Windows hardware, physical audio, loadable-driver, HLK or Microsoft-signing evidence.",
+    "PR #248 merged before the ready/evidence-count metadata commits; this lane records that takeover and does not continue the merged branch.",
+    "No physical audio, per-App delivery, loadable driver, HLK or Microsoft signing evidence is claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.5"
+  },
+  "started_at": "2026-08-23T00:10:00+08:00",
+  "finished_at": "2026-08-23T01:42:00+08:00"
+}

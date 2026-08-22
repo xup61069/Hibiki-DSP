@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "issue": 290,
+  "scope_digest": "issue-290-complete-archive-226-245-v1",
+  "source_commit": "9df2f800db2c45c0018b474ad82f0f7a22636d9d",
+  "base_commit": "b89a284c8e6dad0bdb7a3768b6265b985e51c954",
+  "archived_issues": [226, 245],
+  "merged_prs": [
+    {
+      "issue": 226,
+      "pr": 231,
+      "merge_commit": "40cef330dbae616928d9268fedca8fa6098928fd",
+      "merged_at": "2026-08-22T10:09:39Z"
+    },
+    {
+      "issue": 245,
+      "pr": 247,
+      "merge_commit": "5e5573f78653c87d36229979ad4c95aaa3cb2cda",
+      "merged_at": "2026-08-22T10:38:32Z"
+    }
+  ],
+  "batch_archive_commit": "eb96bdbf161df35f8a148db624986bb5c0aa14d0",
+  "claim_only_pr": {
+    "number": 281,
+    "merge_commit": "b89a284c8e6dad0bdb7a3768b6265b985e51c954",
+    "closed_issue": 268,
+    "note": "PR #281 merged only docs/tasks/active/268.md; the merge-reference edits and evidence remained uncommitted in a local worktree after a two-writer collision under the shared identity."
+  },
+  "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-10.0.28000.2526-wdk-10.0.28000.2526-cmake-4.4.2-pwsh-7.6.5",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 290",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 290 complete-archive implementation",
+      "status": "pass",
+      "coverage": [
+        "recorded PR #231 merge commit 40cef330dbae616928d9268fedca8fa6098928fd in docs/tasks/completed/2026/226.md",
+        "recorded PR #247 merge commit 5e5573f78653c87d36229979ad4c95aaa3cb2cda in docs/tasks/completed/2026/245.md",
+        "recorded batch archive commit eb96bdbf161df35f8a148db624986bb5c0aa14d0 and claim-only PR #281 (b89a284) context in both handoffs"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 290 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Issue 290 schema-v2 ownership, scope and Git ancestry",
+        "full active handoff validation including no scope overlap"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 -SelfTest / tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "13 bounded docs-check self-test cases",
+        "85 required documentation paths and 24 specs",
+        "live tracked-path and repository-JSON measurement recorded in the handoff"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "no blocked binary or secret among tracked paths",
+        "one workflow with source-only CI policy satisfied"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly / tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "Windows 26200 AMD64, Visual Studio 2026, CMake, SDK and WDK prerequisites detected",
+        "Visual Studio 2026/CMake build, CTest 1 of 1, and unsigned local verification"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; records merge/archive references that PR #281 left unlanded.",
+    "The already-merged docs/tasks/active/268.md is preserved as-is; this slice does not rewrite merged history.",
+    "No product API, IPC/schema, DSP order, RT audio, driver, HLK or signing behavior is changed.",
+    "Archive and user-space gates do not provide loadable-driver, physical-audio, HLK or Microsoft-signing evidence."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369",
+    "cmake": "4.4.2",
+    "sdk_qfe": "10.1.28000.2526",
+    "wdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T20:15:00+08:00",
+  "finished_at": "2026-08-22T20:35:00+08:00"
+}

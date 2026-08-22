@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <utility>
 
 namespace hibiki {
@@ -88,9 +89,19 @@ bool AudioEngineModel::prepare_ir(const std::string_view output_group,
         return false;
     }
 
-    IrConvolverV1 candidate{};
+    // IrConvolverV1 is a fixed ~256 KB structure; keep the candidate off the
+    // stack so control-plane transactions cannot exhaust a default-size
+    // thread stack (see Issue #278's measured 0xC00000FD overflow). Fail
+    // closed on allocation failure like every other prepare step.
+    std::unique_ptr<IrConvolverV1> candidate;
+    try {
+        candidate = std::make_unique<IrConvolverV1>();
+    } catch (...) {
+        has_pending_ir_ = false;
+        return false;
+    }
     const auto render_channels = has_active_graph_ ? active_graph_.output_channels : data.channels;
-    if (!prepare_ir_convolver_from_wav_v1(candidate, data, phase, render_channels)) {
+    if (!prepare_ir_convolver_from_wav_v1(*candidate, data, phase, render_channels)) {
         has_pending_ir_ = false;
         return false;
     }
@@ -99,7 +110,7 @@ bool AudioEngineModel::prepare_ir(const std::string_view output_group,
     pending_ir_.output_group_bytes = static_cast<std::uint8_t>(output_group.size());
     std::copy(output_group.begin(), output_group.end(), pending_ir_.output_group.begin());
     pending_ir_.phase = phase;
-    pending_ir_.convolver = std::move(candidate);
+    pending_ir_.convolver = std::move(*candidate);
     has_pending_ir_ = true;
     return true;
 }

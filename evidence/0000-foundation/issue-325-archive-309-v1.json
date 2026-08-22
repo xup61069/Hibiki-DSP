@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "issue": 325,
+  "scope_digest": "issue-325-archive-309-v1",
+  "source_commit": "e576aeb397211998598a1eb0082964ad60e4d3e8",
+  "archive_commit": "727c5fe767cfb8a0a752a90aab1025f72c149d05",
+  "main_sync_commit": "e576aeb397211998598a1eb0082964ad60e4d3e8",
+  "archived_issue": 309,
+  "merged_pr": 312,
+  "merged_pr_commit": "0413436041c6c849ff5cc10c642c74d0728e24ce",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 325",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -WriteCounters",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 325 archive move",
+      "status": "pass",
+      "coverage": [
+        "moved docs/tasks/active/309.md to docs/tasks/completed/2026/309.md",
+        "preserved SPEC-0009, static CSP policy scope, evidence, limitations, and PR references",
+        "corrective archive commit is recorded after the archive commit is created"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "PR #312 merged-head review",
+      "status": "pass",
+      "coverage": [
+        "PR #312 merged at 0413436041c6c849ff5cc10c642c74d0728e24ce",
+        "final push verify run 32576024204 / job 97038398135 passed",
+        "final merge-ref verify run 32576021965 / job 97038392692 passed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "documentation/source gates",
+      "status": "pass",
+      "coverage": [
+        "Issue-based scoped/full handoff, docs self-test/docs-check, source-policy, source-only CI, doctor, and diff checks passed",
+        "baseline before archive work was 489 tracked paths and 139 repository JSON files",
+        "docs-check -WriteCounters was attempted but the current gate rejects that parameter"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "post-archive documentation/source gates",
+      "status": "pass",
+      "coverage": [
+        "Issue-based scoped/full handoff, docs self-test/docs-check, source-policy, source-only CI, doctor, and diff checks passed",
+        "live measurement after archive is 491 tracked paths and 140 repository JSON files"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "Visual Studio 2026/CMake build, CTest 2 of 2, and unsigned local verification"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP, RT audio, driver, HLK, signing, or hardware behavior changes.",
+    "Static CSP policy evidence is not browser runtime, physical audio, endpoint, driver, WaveRT, HLK, or Microsoft-signing evidence.",
+    "The current main branch has no build/baseline-counters.json and tools/docs-check.ps1 exposes no -WriteCounters parameter; no uncontracted counter file was added.",
+    "Local build outputs remain ignored under .local/ and are not part of the archive PR."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369",
+    "cmake": "4.4.2",
+    "sdk_qfe": "10.1.28000.2526",
+    "wdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T22:28:00+08:00",
+  "finished_at": "2026-08-22T22:38:00+08:00"
+}
