@@ -48,7 +48,7 @@ Hibiki DSP 是一個公開開發中的 Windows 音訊平台。長期目標是「
 | DSP／控制面 | C++ contract tests、RT graph、Scene、per-output volume、limiter、ISO 226-derived formula boundary、PEQ／IR 基礎 | 真實喇叭／耳機聲學效果或 ISO 認證 |
 | Windows 音量 | `IAudioEndpointVolume` dB/mute bridge、safety state 與 Group Master 單次增益 contract | target 24H2 的長時間實機／服務重啟 soak |
 | per-App | session catalog、暫時 handle、volume／route／route-rule command、Expert 預設與歧義 fail-closed | 所有 App 的實體 capture/re-send、Chrome 單分頁自動攔截 |
-| UX | UI-independent control model、source-only WinUI Easy/Expert shell | 此機器上的 WinUI 可執行 preview、完整無障礙實測 |
+| UX | UI-independent control model、source-only WinUI shell、本機 formal XAML build／UIA smoke | target 環境完整無障礙實測與長時間 preview 驗收 |
 | Driver／發行 | MS-PL SYSVAD-derived source boundary、INF source、installer/manifest policy | 可載入 WaveRT driver、Microsoft 簽章、Gumroad 正式交付 |
 
 詳細已完成項目、證據與限制看 [baseline](docs/state/BASELINE.md)。不要把 contract test 或
@@ -98,8 +98,8 @@ Authenticode 簽章 installer，經 Gumroad 交付。
 
 | # | 里程碑 | 目前狀態 | 主要卡點 |
 | --- | --- | --- | --- |
-| M0 | 目標機器 toolchain 就位（`doctor.ps1` 全綠） | 未開始 | **環境：機器尚未出現** |
-| M1 | WinUI XAML 正式建置＋無障礙 smoke | 原始殼已寫好，從未編譯 | 工程（小）＋M0 |
+| M0 | 目標機器 toolchain 就位（`doctor.ps1` 全綠） | 本機部分就緒；正式 target 機器未出現 | **環境：鎖定 target 機器尚未出現** |
+| M1 | WinUI XAML 正式建置＋無障礙 smoke | 本機 VS2026 已可建置並記錄 UIA smoke；target 環境複驗待 M0 | 工程（小）：target 複驗＋M0 |
 | M2 | 第一個可安裝的簽章 WaveRT 虛擬端點 | WaveRT ring／WDK adapter／INF 等 source boundary 已就緒；PortCls 接線未寫 | **工程（大）：PortCls 接線** ＋ 簽章帳號（行政） |
 | M3 | 引擎 → 虛擬端點實際出聲＋長時間 soak | user-space 邊界全部已證；實機一次都沒跑過 | M2 ＋ 環境 |
 | M4 | 簽章 installer＋Gumroad 正式交付 | ReleaseManifest 政策與 installer 來源已定義 | M3 ＋ 憑證／帳號（行政） |
