@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "issue": 201,
+  "scope_digest": "driver-portcls-adapter-entry-v1",
+  "source_commit": "9efb211",
+  "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/driver-source-check.ps1",
+    "pwsh -File tools/driver-signability-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/control-model-check.ps1",
+    "pwsh -File tools/installer-check.ps1",
+    "pwsh -File tools/extension-check.ps1",
+    "pwsh -File tools/distribution-check.ps1",
+    "pwsh -File tools/winui-shell-check.ps1",
+    "pwsh -File tools/build-engine-preview.ps1",
+    "pwsh -File tools/engine-preview-smoke.ps1",
+    "pwsh -File tools/control-model-engine-smoke.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 201"
+  ],
+  "results": [
+    {
+      "command": "tools/driver-source-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "DriverEntry implementation initializing PortCls driver object and registering AddDevice",
+        "HibikiAddDevice creating audio adapter device extension via PcAddAdapterDevice",
+        "HibikiStartDevice and HibikiRegisterSubdevicesV1 registering subdevices via PcRegisterSubdevice with unique endpoint names",
+        "Subdevice instantiation for Main, LowLatency, Surround, and VirtualMic endpoints",
+        "PNP and Power dispatch handlers (HibikiPnpDispatchV1, HibikiPowerDispatchV1)",
+        "MS-PL license retention and zero GPL user-space linkage",
+        "Non-allocating and non-blocking real-time audio paths"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "C++20 core, hub, SDK, VST host, and contract unit tests pass"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 201",
+      "status": "pass",
+      "coverage": [
+        "Schema v2 handoff validation, ownership, and scope integrity"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "This is source-only WDK PortCls adapter driver entry scaffolding; no .sys binary, HLK test or Microsoft signature is produced.",
+    "Target environment (Windows 11 24H2, VS 2026, WDK 10.0.28000.2526) remains required for driver build and signability verification."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSBuild 17.14.51",
+    "powershell": "pwsh 7.6.5"
+  },
+  "started_at": "2026-08-22T16:45:00+08:00",
+  "finished_at": "2026-08-22T16:51:00+08:00"
+}
