@@ -71,6 +71,9 @@ function Assert-ExtensionSourcePolicy(
   if ($popupSource -match 'chrome\.tabCapture\.') {
     throw "Popup must not access tabCapture directly in $sourceName."
   }
+  if ($offscreenSource -match 'chrome\.tabCapture\.' -or $workletSource -match 'chrome\.tabCapture\.') {
+    throw "Only the service worker may access tabCapture in $sourceName."
+  }
 
   foreach ($pattern in @(
       'chrome\.runtime\.onMessage\.addListener',
@@ -287,6 +290,11 @@ if ($SelfTest) {
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $externalBridge $sourceFixture.worklet 'selftest-external-bridge' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected external bridge failure.' }
 
+  $offscreenDirectCapture = $sourceFixture.offscreen + " chrome.tabCapture.getMediaStreamId({targetTabId: 1});"
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $offscreenDirectCapture $sourceFixture.worklet 'selftest-offscreen-direct-capture' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected offscreen direct tabCapture failure.' }
+
   $missingPacketizer = $sourceFixture.worklet -replace 'registerProcessor\(\x27hibiki-tab-packetizer\x27, HibikiTabPacketizer\);', ''
   $caught = $false
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $sourceFixture.offscreen $missingPacketizer 'selftest-missing-packetizer' } catch { $caught = $true }
@@ -300,7 +308,7 @@ connect-src   ws://127.0.0.1:17842
 "@
   Assert-ExtensionManifestPolicy $multilineCsp 'selftest-multiline-csp'
 
-  Write-Output 'Browser extension policy self-test passed (20 cases).'
+  Write-Output 'Browser extension policy self-test passed (21 cases).'
   exit 0
 }
 
