@@ -914,4 +914,67 @@ editorViewModel.SelectedRowIndex = 99;
 Check(!editorViewModel.SetSelectedRowValue("0.2") &&
       editorViewModel.StatusText.Contains("數值修改被拒絕"),
     "Editor ViewModel must refuse an out-of-range selected row.");
+var historyMirror = new Vst3TimelineSurfaceModelV1();
+var historyNotifications = new List<string>();
+historyMirror.PropertyChanged += (_, args) =>
+    historyNotifications.Add(args.PropertyName ?? string.Empty);
+Check(historyMirror.RegisterTimeline("history") && historyMirror.Select("history") &&
+      historyMirror.BeginEdit() &&
+      historyMirror.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(1, 10, 0.2)) &&
+      historyMirror.Commit() && historyMirror.SaveSelected() &&
+      historyMirror.BeginEdit() &&
+      historyMirror.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(2, 20, 0.4)) &&
+      historyMirror.Commit() && historyMirror.Undo() && historyMirror.CanRedo,
+    "Managed history-clear fixture failed.");
+var publishedBeforeHistoryClear = historyMirror.Published.ToArray();
+var dirtyBeforeHistoryClear = historyMirror.IsDirtyState;
+historyNotifications.Clear();
+historyMirror.ClearHistory();
+Check(!historyMirror.CanUndo && !historyMirror.CanRedo && historyMirror.UndoDepth == 0 &&
+      historyMirror.RedoDepth == 0 &&
+      historyMirror.Published.SequenceEqual(publishedBeforeHistoryClear) &&
+      historyMirror.IsDirtyState == dirtyBeforeHistoryClear &&
+      historyNotifications.SequenceEqual([
+          nameof(Vst3TimelineSurfaceModelV1.CanUndo),
+          nameof(Vst3TimelineSurfaceModelV1.UndoDepth),
+          nameof(Vst3TimelineSurfaceModelV1.CanRedo),
+          nameof(Vst3TimelineSurfaceModelV1.RedoDepth)]),
+    "Managed clear-history must clear both stacks without changing published or dirty state.");
+Check(historyMirror.BeginEdit() &&
+      historyMirror.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(3, 30, 0.6)),
+    "Managed open-draft history-clear fixture failed.");
+var draftBeforeHistoryClear = historyMirror.Draft!.ToArray();
+historyNotifications.Clear();
+historyMirror.ClearHistory();
+Check(historyMirror.HasEditSession && historyMirror.Draft!.SequenceEqual(draftBeforeHistoryClear) &&
+      historyMirror.UndoDepth == 0 && historyMirror.RedoDepth == 0 &&
+      historyNotifications.Count == 0,
+    "Managed clear-history must preserve an open draft and stay quiet for empty history.");
+Check(historyMirror.Discard(), "Managed history-clear draft cleanup failed.");
+var rowsBeforeViewModelHistoryClear = editorViewModel.Rows.ToArray();
+var dirtyBeforeViewModelHistoryClear = editorViewModel.IsDirty;
+editorNotifications.Clear();
+Check(editorViewModel.ClearHistory() && !editorViewModel.CanUndo &&
+      !editorViewModel.CanRedo && editorViewModel.UndoDepth == 0 &&
+      editorViewModel.RedoDepth == 0 &&
+      editorViewModel.Rows.SequenceEqual(rowsBeforeViewModelHistoryClear) &&
+      editorViewModel.IsDirty == dirtyBeforeViewModelHistoryClear &&
+      !editorViewModel.HasEditSession &&
+      editorViewModel.StatusText.Contains("編輯歷史已清除") &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.UndoDepth)) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.RedoDepth)) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.StatusText)),
+    "Editor ViewModel clear-history must preserve rows/dirty state and notify history bindings.");
+editorNotifications.Clear();
+Check(editorViewModel.ClearHistory() && !editorViewModel.CanUndo &&
+      !editorViewModel.CanRedo &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.StatusText)),
+    "Editor ViewModel clear-history must remain safe with empty history.");
+Check(editorViewModel.BeginEdit(), "Editor ViewModel open-draft clear-history fixture failed.");
+var viewModelDraftBeforeHistoryClear = editorViewModel.Rows.ToArray();
+Check(editorViewModel.ClearHistory() && editorViewModel.HasEditSession &&
+      editorViewModel.Rows.SequenceEqual(viewModelDraftBeforeHistoryClear) &&
+      editorViewModel.UndoDepth == 0 && editorViewModel.RedoDepth == 0 &&
+      editorViewModel.Discard(),
+    "Editor ViewModel clear-history must preserve an open draft.");
 Console.WriteLine("Control model checks passed.");

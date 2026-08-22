@@ -212,6 +212,16 @@ public sealed class Vst3TimelineSurfaceModelV1 : INotifyPropertyChanged
         return true;
     }
 
+    // Surface-level history reset mirrors the native supervisor facade. It
+    // never changes the published snapshot, dirty baseline or an open draft.
+    public void ClearHistory()
+    {
+        if (_undo.Count == 0 && _redo.Count == 0) return;
+        _undo.Clear();
+        _redo.Clear();
+        Notify(nameof(CanUndo), nameof(UndoDepth), nameof(CanRedo), nameof(RedoDepth));
+    }
+
     // Persists the published snapshot into the selected timeline's storage
     // slot and re-baselines dirty tracking.
     public bool SaveSelected()

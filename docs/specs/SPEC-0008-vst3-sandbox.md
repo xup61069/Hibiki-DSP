@@ -149,7 +149,10 @@ control-model mirror：它維持相同的 bounded ID、排序、draft、publishe
 edit、commit、undo/redo、save transition 後通知 binding。`IsDirtyState` 是唯讀
 projection；拒絕的操作不發通知。這只提供 future WinUI UI 的本地 binding seam，
 不增加 IPC payload、不擁有 native file store、不執行 worker/DSP，也不在 RT thread
-執行；native supervisor surface 仍是 persistence authority。
+執行；native supervisor surface 仍是 persistence authority。它也 mirror
+`Vst3TimelineSupervisorSurfaceV1::clear_history()`：清除 managed undo/redo stacks
+但保留 published snapshot、dirty baseline 與進行中的 draft，並更新 binding 的
+history projections。
 
 supervisor 的 UI 編輯器、跨版本 plugin state persistence 與完整自動化排程仍未接入，
 因此不能宣稱完整 host automation。
