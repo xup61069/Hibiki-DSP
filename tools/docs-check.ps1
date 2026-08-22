@@ -207,6 +207,49 @@ function Assert-SpecFrontmatter {
   }
 }
 
+function Test-MarkdownRelativeLinks {
+  param(
+    [Parameter(Mandatory)] [AllowEmptyCollection()] [AllowEmptyString()] [string[]] $Lines,
+    [Parameter(Mandatory)] [string] $BaseDir
+  )
+  $broken = @()
+  $checked = 0
+  $inFence = $false
+  foreach ($line in $lines) {
+    if ($line -match '^\s*(```|~~~)') { $inFence = -not $inFence; continue }
+    if ($inFence) { continue }
+    $pos = 0
+    while ($true) {
+      $idx = $line.IndexOf('](', $pos)
+      if ($idx -lt 0) { break }
+      $open = $line.LastIndexOf('[', $idx)
+      if ($open -ge 0) {
+        $rest = $line.Substring($idx + 2)
+        $end = $rest.IndexOf(')')
+        if ($end -gt 0) {
+          $target = $rest.Substring(0, $end).Trim().Trim('<>').Split(' ')[0]
+          $checked++
+          $isExternal = $target.StartsWith('http://') -or $target.StartsWith('https://') -or $target.StartsWith('mailto:') -or $target.StartsWith('#')
+          if (-not $isExternal) {
+            $pathPart = $target.Split('#')[0]
+            if ($pathPart) {
+              try {
+                $decoded = [System.Uri]::UnescapeDataString($pathPart)
+                $resolved = Join-Path $BaseDir $decoded
+                if (-not (Test-Path -LiteralPath $resolved)) { $broken += $target }
+              } catch {
+                $broken += $target
+              }
+            }
+          }
+        }
+      }
+      $pos = $idx + 2
+    }
+  }
+  return @{ Broken = $broken; Checked = $checked }
+}
+
 if ($SelfTest) {
   $caseCount = 0
 
@@ -340,10 +383,53 @@ if ($SelfTest) {
   if (-not $caughtBadSpecAuth) { throw 'docs-check self-test failed: invalid Spec authority should fail.' }
   $caseCount++
 
+  # Markdown relative links: valid target passes and is counted.
+  $linkResult = Test-MarkdownRelativeLinks -Lines @('see [handoff](docs/AI_HANDOFF.md)') -BaseDir $repo
+  if ($linkResult.Checked -ne 1 -or $linkResult.Broken.Count -ne 0) {
+    throw 'docs-check self-test failed: valid relative link was not resolved.'
+  }
+  $caseCount++
+
+  # Markdown relative links: missing target must be reported.
+  $linkResult = Test-MarkdownRelativeLinks -Lines @('see [ghost](docs/does-not-exist.md)') -BaseDir $repo
+  if ($linkResult.Broken.Count -ne 1) {
+    throw 'docs-check self-test failed: missing link target should be reported.'
+  }
+  $caseCount++
+
+  # Markdown relative links: absolute URLs and anchors are skipped.
+  $linkResult = Test-MarkdownRelativeLinks -Lines @('[site](https://example.com/a) [mail](mailto:x@y.z) [anchor](#section)') -BaseDir $repo
+  if ($linkResult.Checked -ne 3 -or $linkResult.Broken.Count -ne 0) {
+    throw 'docs-check self-test failed: external targets should be skipped without breakage.'
+  }
+  $caseCount++
+
+  # Markdown relative links: fenced code blocks are ignored.
+  $fence = [char]96 + [char]96 + [char]96
+  $linkResult = Test-MarkdownRelativeLinks -Lines @($fence, '[ghost](docs/missing-example.md)', $fence, '[real](AGENTS.md)') -BaseDir $repo
+  if ($linkResult.Checked -ne 1 -or $linkResult.Broken.Count -ne 0) {
+    throw 'docs-check self-test failed: fenced code block links should be ignored.'
+  }
+  $caseCount++
+
+  # Markdown relative links: fragment-only resolution against an existing file.
+  $linkResult = Test-MarkdownRelativeLinks -Lines @('[baseline with anchor](docs/state/BASELINE.md#summary)') -BaseDir $repo
+  if ($linkResult.Broken.Count -ne 0) {
+    throw 'docs-check self-test failed: fragment on existing file should resolve.'
+  }
+  $caseCount++
+
+  # Markdown relative links: empty input is accepted.
+  $linkResult = Test-MarkdownRelativeLinks -Lines @() -BaseDir $repo
+  if ($linkResult.Checked -ne 0 -or $linkResult.Broken.Count -ne 0) {
+    throw 'docs-check self-test failed: empty input should produce no results.'
+  }
+  $caseCount++
+
   if ($caseCount -lt 12) {
     throw "docs-check self-test failed: expected at least 12 passing cases, saw $caseCount."
   }
-  Write-Output "docs-check self-test passed ($caseCount cases; structural parser, multiline normalization, branch mode detection, BASELINE edit detection, live measurement, ADR frontmatter, Spec frontmatter)."
+  Write-Output "docs-check self-test passed ($caseCount cases; structural parser, multiline normalization, branch mode detection, BASELINE edit detection, live measurement, ADR frontmatter, Spec frontmatter, markdown relative links)."
   exit 0
 }
 
@@ -449,6 +535,24 @@ foreach ($spec in ($specs | Sort-Object Name)) {
 }
 if (($specIds | Sort-Object -Unique).Count -ne $specIds.Count) { throw 'Duplicate Spec IDs detected.' }
 
+# Markdown relative links: every tracked markdown file must reference files
+# that exist in the repository. External URLs, anchors, and fenced examples
+# are intentionally out of scope.
+$mdFiles = @(git -C $repo ls-files -- '*.md')
+if ($LASTEXITCODE -ne 0) { throw 'docs-check could not list tracked markdown files.' }
+$linkCheckedTotal = 0
+$brokenLinks = @()
+foreach ($mdFile in $mdFiles) {
+  $mdDir = Split-Path (Join-Path $repo $mdFile) -Parent
+  $mdLines = Get-Content -LiteralPath (Join-Path $repo $mdFile)
+  $result = Test-MarkdownRelativeLinks -Lines $mdLines -BaseDir $mdDir
+  $linkCheckedTotal += $result.Checked
+  foreach ($broken in $result.Broken) { $brokenLinks += ($mdFile + ' -> ' + $broken) }
+}
+if ($brokenLinks.Count -gt 0) {
+  throw ('Broken relative markdown links detected: ' + ($brokenLinks -join '; '))
+}
+
 & (Join-Path $repo 'tools/handoff-check.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'AI handoff check failed.' }
 
@@ -479,5 +583,5 @@ Assert-StructuralClaims -Claims $claims -Required $required.Count -Specs $specs.
 $baseRef = $env:GITHUB_BASE_REF
 $pullRequestMode = -not [string]::IsNullOrWhiteSpace($baseRef)
 
-$summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; live measurement: {2} tracked paths, {3} repository JSON files.)'
-Write-Output (($summaryTemplate) -f $required.Count, $specs.Count, $trackedFiles.Count, $jsonFiles.Count)
+$summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; live measurement: {2} tracked paths, {3} repository JSON files, {4} markdown links.)'
+Write-Output (($summaryTemplate) -f $required.Count, $specs.Count, $trackedFiles.Count, $jsonFiles.Count, $linkCheckedTotal)
