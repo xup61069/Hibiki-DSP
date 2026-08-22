@@ -9,6 +9,7 @@ add_library(hibiki_vst_host STATIC
   src/vst3_timeline_editor.cpp
   src/vst3_timeline_persistence.cpp
   src/vst3_timeline_file_store.cpp
+  src/vst3_supervisor_surface.cpp
   src/vst3_worker_lane.cpp
   src/vst3_scene_automation.cpp
   src/vst3_plugin_state.cpp
