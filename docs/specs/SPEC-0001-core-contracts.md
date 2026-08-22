@@ -32,6 +32,10 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   owner 與 per-session makeup dB；JSON schema 是跨語言／跨 AI 的欄位真值。
 - `OutputGroupVolumeState v1`：requested/effective/safety dB、mute、generation、origin、actuator。
 - `DistributionProfile v1`：driver hardware ID、endpoint GUID、ASIO CLSID、IPC namespace、schema version。
+  `config/distribution-profile.yml` 是唯一 canonical source；`tools/distribution-check.ps1` 以
+  bounded YAML subset 解析並對 root/platform/identities 做 duplicate、unknown-key、indentation、
+  schema/platform、GUID uniqueness 與 stable-identity fail-closed 檢查。這個 source-only gate
+  不會重生 identity，也不是 runtime consumer、installer、driver 或 signing evidence。
 - Easy Scene factory：Game／Movie／Voice／Studio 先生成合法的 Scene、Graph 與 loudness
   defaults；Expert UI 可在此基礎上修改並重新走 Validate → Prepare → Commit。
 - UI/engine/driver control plane 使用 versioned named-pipe framing；目前 user-space 提供

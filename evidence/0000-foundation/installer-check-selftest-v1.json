@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "issue": 226,
+  "scope_digest": "installer-check-selftest-v1",
+  "source_commit": "1345618edb43faa47cf00f20e09f6a1ace311b67",
+  "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/installer-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/installer-check.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 226",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/extension-check.ps1",
+    "pwsh -NoProfile -File tools/distribution-check.ps1",
+    "pwsh -NoProfile -File tools/winui-shell-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/installer-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "valid installer source with all 12 required boundaries parses and passes policy",
+        "missing Read-ReleaseManifest rejected and names the boundary",
+        "missing sha256 rejected",
+        "missing pnputil.exe rejected",
+        "missing IsPathRooted traversal guard rejected",
+        "missing microsoft_signature_thumbprint rejected",
+        "PowerShell parse error rejected via ParseInput error reporting",
+        "missing rfc3161_timestamp rejected"
+      ],
+      "case_count": 8,
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/installer-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "real installer/HibikiSetup.ps1 parsed via Parser.ParseFile with zero errors",
+        "all 12 required source boundaries present (Read-ReleaseManifest, Test-ManifestFiles, Invoke-HibikiInstall, -Apply, pnputil.exe, IsPathRooted, sha256, dependency_lock_digest, driver_package, microsoft_signature_thumbprint, rfc3161_timestamp, sbom_digest)"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 226 / tools/handoff-check.ps1 / tools/docs-check.ps1 -SelfTest / tools/docs-check.ps1 / tools/source-policy.ps1 / tools/source-only-ci-check.ps1 / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 226 (no overlap with active handoffs 0,30,55,82,92,120,169,171,175,177,179,184,187,188,208,211,213,215,217,219)",
+        "docs-check self-test 13 cases and live measurement 514 tracked / 111 JSON",
+        "source-only policy 514 tracked paths, no blocked binary or secret",
+        "source-only CI 16-case self-test and 1 workflow policy pass",
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/extension-check.ps1 / tools/distribution-check.ps1 / tools/winui-shell-check.ps1 / tools/doctor.ps1 -CheckOnly",
+      "status": "pass",
+      "coverage": [
+        "extension MV3 least-privilege and CSP self-test 6 cases",
+        "distribution profile stable GUID and identity checks",
+        "WinUI shell source and accessibility self-test 4 cases, 32 controls",
+        "doctor Windows 26200 / VS2026 18.9 / SDK-WDK 28000.2526 present, cmake missing as expected on portable host"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Tooling and governance gate coverage only; does not produce installer artifacts (EXE/MSI/MSIX), driver binaries, HLK, Microsoft signing, or physical device evidence.",
+    "SelfTest fixtures are in-memory strings sharing the 12 required-boundary constants with the production gate; policy expansion must update both together by design.",
+    "Local machine is below the locked target toolchain (Windows 26200, cmake missing, VS BuildTools 18.9); full Windows build and signing evidence require the locked 24H2/VS2026/SDK-WDK 28000.2526 host and are explicitly not claimed.",
+    "Does not claim private paths, endpoint IDs, or signing material; evidence is anonymous and reproducible."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200",
+    "vs": "18.9.12112.369",
+    "sdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T17:00:00+08:00",
+  "finished_at": "2026-08-22T17:15:00+08:00"
+}

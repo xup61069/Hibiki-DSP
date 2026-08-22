@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "issue": 208,
+  "scope_digest": "issue-208-archive-193-v1",
+  "source_commit": "c66ea9523e0c3b3a362f1569352347abac0adadc",
+  "archive_commit": "f33f5784507e663d23f58ac134fc5fbead9ea495",
+  "main_sync_commit": "1adf947a50f836ee6371050ff5db58a09485df0e",
+  "counter_refresh_commit": "641adc2d7d6cf0b6c02e6d19ab322c46453282b4",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; vs2026-sdk-wdk-on-disk; target-24h2-machine-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 208",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/probe-environment.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 193 source and PR 194 review",
+      "status": "pass",
+      "coverage": [
+        "Issue 193 is closed",
+        "PR 194 is merged at c66ea9523e0c3b3a362f1569352347abac0adadc",
+        "SPEC-0005 is accepted",
+        "target-machine checklist evidence is documentation-only and preserves non-claims"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local handoff/docs/source verification after archive commit",
+      "status": "pass",
+      "coverage": [
+        "handoff-check Issue 208 and full active ownership checks",
+        "docs-check strict baseline 502 tracked paths / 109 repository JSON files",
+        "source-policy and source-only-ci-check",
+        "git diff --check"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local tools/verify.ps1",
+      "status": "pass",
+      "coverage": ["Visual Studio 2026/CMake user-space build", "1/1 CTest contract test"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local doctor/probe environment",
+      "status": "pass",
+      "coverage": ["Windows build 26200", "VS 2026", "Windows SDK/WDK on disk", "anonymous .local fingerprint"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local merge-sync to latest origin/main 1adf947",
+      "status": "pass",
+      "coverage": ["ordinary merge commit 641adc2d", "counter refresh to 508 tracked paths / 111 repository JSON files", "no changes to Issue 208 product scope"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local gates after latest main sync",
+      "status": "pass",
+      "coverage": [
+        "handoff-check Issue 208 and full run",
+        "docs-check 508 tracked paths / 111 repository JSON files",
+        "source-policy",
+        "source-only-ci-check",
+        "verify user-space build and 1/1 CTest",
+        "git diff --check"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #209 push)",
+      "status": "pass",
+      "coverage": ["all verify workflow gates on metadata head 2df65cd"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32564927597/job/97012075726",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #209 merge-ref)",
+      "status": "pass",
+      "coverage": ["all verify workflow gates on metadata head 2df65cd against origin/main 1adf947"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32564930454/job/97012082539",
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP ordering, RT-thread, driver, HLK or signing behavior is changed.",
+    "Local CMake/VS/SDK/WDK checks and user-space CTest pass; actual target-machine, loadable-driver, HLK and signing validation remain unavailable.",
+    "The archived TARGET_MACHINE_CHECKLIST was not validated on an actual target machine; archiving it does not add target-machine evidence.",
+    "PR 194 merged while its historical verify runs failed on the then-stale target-main counters; Issue 208 records only the later archive-lane verification as current evidence.",
+    "No physical audio, per-App delivery, loadable driver, HLK or Microsoft signing evidence is claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.5"
+  },
+  "started_at": "2026-08-22T17:10:00+08:00",
+  "finished_at": "2026-08-22T17:21:32+08:00"
+}

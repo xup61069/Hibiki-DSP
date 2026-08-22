@@ -33,6 +33,24 @@ jobs:
         shell: pwsh
         run: ./tools/source-only-ci-check.ps1
 
+      - name: Gate self-test sweep
+        shell: pwsh
+        run: |
+          $modes = @()
+          foreach ($script in @(Get-ChildItem -LiteralPath tools -Filter '*.ps1' -File | Sort-Object Name)) {
+            $command = Get-Command -Name $script.FullName -ErrorAction SilentlyContinue
+            if ($null -eq $command -or -not $command.Parameters.ContainsKey('SelfTest')) { continue }
+            $global:LASTEXITCODE = 0
+            & $script.FullName -SelfTest
+            if ($LASTEXITCODE -ne 0) { throw "Gate self-test failed for $($script.Name): exit $LASTEXITCODE" }
+            $modes += $script.Name
+          }
+          $minimumModes = 5
+          if ($modes.Count -lt $minimumModes) {
+            throw "Expected at least $minimumModes gate self-test modes, found $($modes.Count): $($modes -join ', ')"
+          }
+          Write-Output "Gate self-test sweep passed ($($modes.Count) modes): $($modes -join ', ')"
+
       - name: Browser extension source gate
         shell: pwsh
         run: ./tools/extension-check.ps1
