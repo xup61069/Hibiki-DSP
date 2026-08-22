@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "issue": 330,
+  "scope_digest": "issue-330-archive-318-v1",
+  "source_commit": "PENDING",
+  "archive_commit": "PENDING",
+  "main_sync_commit": "fab13599a0a96cbca90d071d20a2eebb3b1cb450",
+  "archived_issue": 318,
+  "merged_pr": 324,
+  "merged_pr_commit": "dbcbef2e8b4b35ce2d04007e46449c46af6b6c51",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-10.0.28000.2526-wdk-10.0.28000.2526-cmake-4.4.2-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 330",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -WriteCounters",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 330 archive implementation",
+      "status": "pass",
+      "coverage": [
+        "moved docs/tasks/active/318.md to docs/tasks/completed/2026/318.md",
+        "preserved Issue 318 scope and recorded PR #324 merge commit",
+        "added this anonymous archive evidence"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 330",
+      "status": "pass",
+      "coverage": [
+        "Issue 330 schema-v2 ownership, scope and Git ancestry"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 / tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "full repository handoff validation for Issues #330, #329 and #199",
+        "full documentation validation with 500 tracked paths and 143 repository JSON files"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "13 bounded docs-check self-test cases"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 -WriteCounters",
+      "status": "unavailable",
+      "coverage": [
+        "current gate rejects the parameter; no uncontracted counters JSON was created"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "500 tracked paths with no blocked binary or secret",
+        "one workflow with source-only CI policy satisfied"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly / tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "Windows 26200 AMD64, Visual Studio 2026, CMake, SDK and WDK prerequisites detected",
+        "Visual Studio 2026/CMake build, CTest 2 of 2, and unsigned local verification"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "PR #324 post-merge review",
+      "status": "pass",
+      "coverage": [
+        "PR #324 merged at dbcbef2e8b4b35ce2d04007e46449c46af6b6c51",
+        "final push verify run 32576754848 / job 97040107021 passed",
+        "final merge-ref verify run 32576752787 / job 97040102060 passed"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP, RT audio, driver, HLK or signing behavior is changed.",
+    "Archive and user-space gates do not provide physical audio, loadable-driver, HLK or Microsoft-signing evidence.",
+    "Full repository handoff/docs checks initially exposed unrelated Issue #329 and #199 handoff prerequisites; they were rerun successfully after their owners/integrator repaired them.",
+    "The current tools/docs-check.ps1 has no -WriteCounters parameter and current main has no build/baseline-counters.json; no invented counter file is included.",
+    "Local verify outputs are ignored .local artifacts and are not part of the archive PR."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369",
+    "cmake": "4.4.2",
+    "sdk_qfe": "10.1.28000.2526",
+    "wdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T21:58:00+08:00",
+  "finished_at": "2026-08-22T22:15:15+08:00"
+}
