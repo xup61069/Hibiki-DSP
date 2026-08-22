@@ -2,9 +2,9 @@
   "schema_version": 1,
   "issue": 372,
   "scope_digest": "tab-bridge-config-selftest-v1",
-  "source_commit": "pending",
+  "source_commit": "14f443f3da5bdfa1f06ec6f9a156c1bd0432c915",
   "base_commit": "06cbd1e174b2cc56b71768da8277fb6ed47cf7d8",
-  "environment_fingerprint": "pending-local-run",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.12112.369-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526-cmake-4.4.2-pwsh-7.6.4",
   "target": "hibiki_tab_bridge_selftest",
   "cases_added": [
     "null callback rejected before socket setup",
