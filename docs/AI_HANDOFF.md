@@ -198,6 +198,11 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   targets stay inside the repository .local root, rejecting outside-root paths, reparse-
   point files or parents and non-file launch targets; -SelfTest covers five launch-target
   safety cases (Issue #455 / PR #457).
+- WinUI accessibility smoke launch safety merged: winui-a11y-smoke.ps1 fails closed unless
+  the smoke output directory stays under the repository .local root as a real directory
+  with safe parents and Hibiki.WinUI.exe stays beneath it as a real file without reparse-
+  point target or ancestor; -SelfTest grew from 4 to 11 offline cases with no file writes,
+  UI Automation loads or process launches (Issue #470 / PR #472).
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe
