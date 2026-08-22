@@ -110,7 +110,33 @@ if ($SelfTest) {
   try { Assert-ExtensionManifestPolicy $externalConnect 'selftest-external-connect' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected external connect-src failure.' }
 
-  Write-Output 'Browser extension policy self-test passed (6 cases).'
+  $missingCsp = $validJson | ConvertFrom-Json
+  $missingCsp.content_security_policy = [pscustomobject]@{}
+  $caught = $false
+  try { Assert-ExtensionManifestPolicy $missingCsp 'selftest-missing-csp' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected missing extension_pages CSP failure.' }
+
+  $invalidObjectSource = $validJson | ConvertFrom-Json
+  $invalidObjectSource.content_security_policy.extension_pages = "script-src 'self'; object-src 'script'; connect-src ws://127.0.0.1:17842"
+  $caught = $false
+  try { Assert-ExtensionManifestPolicy $invalidObjectSource 'selftest-invalid-object-src' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected invalid object-src failure.' }
+
+  $wrongLoopback = $validJson | ConvertFrom-Json
+  $wrongLoopback.content_security_policy.extension_pages = "script-src 'self'; object-src 'self'; connect-src ws://127.0.0.1:17843"
+  $caught = $false
+  try { Assert-ExtensionManifestPolicy $wrongLoopback 'selftest-wrong-loopback' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected wrong loopback endpoint failure.' }
+
+  $multilineCsp = $validJson | ConvertFrom-Json
+  $multilineCsp.content_security_policy.extension_pages = @"
+script-src    'self' ;
+object-src    'none' ;
+connect-src   ws://127.0.0.1:17842
+"@
+  Assert-ExtensionManifestPolicy $multilineCsp 'selftest-multiline-csp'
+
+  Write-Output 'Browser extension policy self-test passed (10 cases).'
   exit 0
 }
 
