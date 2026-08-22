@@ -5,6 +5,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$repo = Split-Path -Parent $PSScriptRoot
+$local = Join-Path $repo '.local'
+
 $ExpectedProbeFormats = @('LPCM 2.0', 'LPCM 5.1', 'LPCM 7.1')
 $ForbiddenProbeKeys = @(
   'endpoint',
@@ -154,6 +157,153 @@ function Copy-EnvironmentProbeDocument {
   )
 
   return Copy-EnvironmentProbeValue -Value $Document
+}
+
+function Test-EnvironmentProbePathUnderRoot {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Root
+  )
+
+  $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  $fullRoot = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  return $fullPath -eq $fullRoot -or $fullPath.StartsWith(
+    $fullRoot + [System.IO.Path]::DirectorySeparatorChar,
+    [System.StringComparison]::OrdinalIgnoreCase
+  )
+}
+
+function Get-EnvironmentProbeExistingAttributes {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [hashtable]$SyntheticAttributes
+  )
+
+  $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
+    return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
+  }
+  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
+  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+}
+
+function Assert-EnvironmentProbePath {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Root,
+    [Parameter(Mandatory = $true)][ValidateSet('File', 'Directory')][string]$Kind,
+    [switch]$AllowMissingLeaf,
+    [hashtable]$SyntheticAttributes
+  )
+
+  $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  $fullRoot = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  if (-not (Test-EnvironmentProbePathUnderRoot -Path $fullPath -Root $fullRoot)) {
+    throw "Environment probe path must remain under the expected root: $fullPath"
+  }
+
+  $leafAttributes = Get-EnvironmentProbeExistingAttributes -Path $fullPath -SyntheticAttributes $SyntheticAttributes
+  if ($null -eq $leafAttributes -and -not $AllowMissingLeaf) {
+    throw "Environment probe $Kind does not exist: $fullPath"
+  }
+
+  $cursor = $fullPath
+  while ($true) {
+    $attributes = Get-EnvironmentProbeExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    if ($null -ne $attributes) {
+      if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Environment probe path or parent is a reparse point: $cursor"
+      }
+      if ($cursor -eq $fullPath) {
+        if ($Kind -eq 'Directory' -and ($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+          throw "Environment probe path is not a directory: $fullPath"
+        }
+        if ($Kind -eq 'File' -and ($attributes -band [System.IO.FileAttributes]::Directory) -ne 0) {
+          throw "Environment probe path is not a file: $fullPath"
+        }
+      } elseif (($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+        throw "Environment probe path parent is not a directory: $cursor"
+      }
+    }
+
+    if ($cursor -eq $fullRoot) { break }
+    $parent = [System.IO.Path]::GetFullPath((Split-Path -Parent $cursor)).TrimEnd('\', '/')
+    if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) {
+      throw "Environment probe path could not reach the expected root: $fullPath"
+    }
+    $cursor = $parent
+  }
+}
+
+function Invoke-EnvironmentProbePathSelfTest {
+  $repositoryRoot = [System.IO.Path]::GetFullPath('C:\hibiki-environment-probe-selftest').TrimEnd('\', '/')
+  $localRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot '.local')).TrimEnd('\', '/')
+  $contextPath = [System.IO.Path]::GetFullPath((Join-Path $localRoot 'context.json')).TrimEnd('\', '/')
+  $outsidePath = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'outside-context')).TrimEnd('\', '/')
+  $directory = [System.IO.FileAttributes]::Directory
+  $file = [System.IO.FileAttributes]::Archive
+  $cases = 0
+
+  Assert-EnvironmentProbePath -Path $localRoot -Root $repositoryRoot -Kind Directory -AllowMissingLeaf -SyntheticAttributes @{}
+  $cases++
+  Assert-EnvironmentProbePath -Path $contextPath -Root $localRoot -Kind File -AllowMissingLeaf -SyntheticAttributes @{}
+  $cases++
+  Assert-EnvironmentProbePath -Path $contextPath -Root $localRoot -Kind File -SyntheticAttributes @{
+    $repositoryRoot = $directory
+    $localRoot = $directory
+    $contextPath = $file
+  }
+  $cases++
+
+  $outsideCaught = $false
+  try { Assert-EnvironmentProbePath -Path $outsidePath -Root $localRoot -Kind Directory -AllowMissingLeaf -SyntheticAttributes @{} }
+  catch { $outsideCaught = $_.Exception.Message -match 'under the expected root' }
+  if (-not $outsideCaught) { throw 'Environment probe self-test expected an outside-root rejection.' }
+  $cases++
+
+  $reparseParentCaught = $false
+  try {
+    Assert-EnvironmentProbePath -Path $contextPath -Root $localRoot -Kind File -AllowMissingLeaf -SyntheticAttributes @{
+      $repositoryRoot = $directory
+      $localRoot = $directory -bor [System.IO.FileAttributes]::ReparsePoint
+    }
+  } catch { $reparseParentCaught = $_.Exception.Message -match 'reparse point' }
+  if (-not $reparseParentCaught) { throw 'Environment probe self-test expected a reparse-parent rejection.' }
+  $cases++
+
+  $reparseLeafCaught = $false
+  try {
+    Assert-EnvironmentProbePath -Path $contextPath -Root $localRoot -Kind File -AllowMissingLeaf -SyntheticAttributes @{
+      $repositoryRoot = $directory
+      $localRoot = $directory
+      $contextPath = $file -bor [System.IO.FileAttributes]::ReparsePoint
+    }
+  } catch { $reparseLeafCaught = $_.Exception.Message -match 'reparse point' }
+  if (-not $reparseLeafCaught) { throw 'Environment probe self-test expected a reparse-leaf rejection.' }
+  $cases++
+
+  $wrongKindCaught = $false
+  try {
+    Assert-EnvironmentProbePath -Path $contextPath -Root $localRoot -Kind File -SyntheticAttributes @{
+      $repositoryRoot = $directory
+      $localRoot = $directory
+      $contextPath = $directory
+    }
+  } catch { $wrongKindCaught = $_.Exception.Message -match 'is not a file' }
+  if (-not $wrongKindCaught) { throw 'Environment probe self-test expected a wrong-kind rejection.' }
+  $cases++
+
+  $fileParentCaught = $false
+  try {
+    Assert-EnvironmentProbePath -Path $contextPath -Root $localRoot -Kind File -AllowMissingLeaf -SyntheticAttributes @{
+      $repositoryRoot = $directory
+      $localRoot = $file
+    }
+  } catch { $fileParentCaught = $_.Exception.Message -match 'parent is not a directory' }
+  if (-not $fileParentCaught) { throw 'Environment probe self-test expected a file-parent rejection.' }
+  $cases++
+
+  Write-Output ("Environment probe path self-test: {0} cases passed." -f $cases)
 }
 
 function Assert-EnvironmentProbeDocument {
@@ -354,11 +504,13 @@ function Invoke-EnvironmentProbeSelfTest {
 
 if ($SelfTest) {
   Invoke-EnvironmentProbeSelfTest
+  Invoke-EnvironmentProbePathSelfTest
   exit 0
 }
 
-$repo = Split-Path -Parent $PSScriptRoot
-$local = Join-Path $repo '.local'
+Assert-EnvironmentProbePath -Path $local -Root $repo -Kind Directory -AllowMissingLeaf
+$contextPath = Join-Path $local 'context.json'
+Assert-EnvironmentProbePath -Path $contextPath -Root $local -Kind File -AllowMissingLeaf
 New-Item -ItemType Directory -Path $local -Force | Out-Null
 $os = Get-CimInstance Win32_OperatingSystem
 $cmake = Get-Command cmake -ErrorAction SilentlyContinue
@@ -374,5 +526,5 @@ $probe = New-EnvironmentProbeDocument `
   -CapturedAtUtc ([DateTime]::UtcNow.ToString('o'))
 Assert-EnvironmentProbeDocument -Document $probe
 
-$probe | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $local 'context.json') -Encoding utf8
-Write-Output "Wrote local environment fingerprint: $local/context.json"
+$probe | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $contextPath -Encoding utf8
+Write-Output "Wrote local environment fingerprint: $contextPath"
