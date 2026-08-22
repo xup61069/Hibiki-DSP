@@ -2,8 +2,8 @@
 
 ## 先讀什麼
 
-每次開始工作先讀本檔、`docs/START_HERE.md` 與 `docs/AI_HANDOFF.md`，再讀 GitHub Issue 指定的
-handoff、Spec、ADR、source 與 tests。聊天紀錄、AI memory、個人 IDE 規則
+每次開始工作先讀本檔、`docs/START_HERE.md` 與 `docs/AI_HANDOFF.md`，再讀 GitHub Issue body 內的
+handoff block、Spec、ADR、source 與 tests。聊天紀錄、AI memory、個人 IDE 規則
 都不是專案真值。
 
 ## 執行環境（先確認）
@@ -20,21 +20,21 @@ handoff、Spec、ADR、source 與 tests。聊天紀錄、AI memory、個人 IDE 
 ## 多 AI 並行（必遵守）
 
 - 完整協定見 `docs/ai/MULTI_AGENT.md`。每個 AI 工作切片必須各自使用一個 GitHub Issue、
-  一個獨立 clone/worktree、一個 branch、一份 `docs/tasks/active/<issue>.md` 與一個 draft PR。
-- GitHub Issue assignee／linked PR 是即時認領真值；handoff 是可重建的分支交接真值。沒有認領、
-  handoff 或明確 write scope 時只能唯讀偵察，不得開始修改。
-- 認領前必須同時檢查三件事：open Issue／linked PR、`git ls-remote --heads origin` 上的
-  branch 佔位（先有 branch 不代表有 PR）、以及 `docs/tasks/active/*.md`。Issue 與 PR 共用
+  一個獨立 clone/worktree、一個 branch、Issue body 內的 handoff block 與一個 draft PR。
+- GitHub Issue assignee／lifecycle label／linked PR 是即時認領真值；Issue body 的 handoff block 是可重建的分支交接真值。沒有認領、
+  handoff block 或明確 write scope 時只能唯讀偵察，不得開始修改。
+- 認領前必須同時檢查兩件事：open Issue／linked PR、`git ls-remote --heads origin` 上的
+  branch 佔位（先有 branch 不代表有 PR）。Issue 與 PR 共用
   編號計數器：先建 Issue 取得號碼，再命名 branch；不要預估號碼。
 - 同一台機器可能同時跑多個 AI session（同一 Git 身分）。身分相同不等於有權進入別的
   session 的 worktree 或 branch；worktree 隔離是絕對的。回到先前中斷的 slice 時，先
-  fetch 並以遠端 HEAD 與 handoff status 為真值重新確認，不得假設本機工作樹仍是最新；
+  fetch 並以遠端 HEAD 與 Issue body 的 handoff block 為真值重新確認，不得假設本機工作樹仍是最新；
   發現工作被另一 session 接手完成時，接受遠端 HEAD、獨立重驗，並在 PR body 誠實記錄
   接手事件（先例：PR #24）。
 - 禁止兩個仍在執行的 AI 共用 working tree、index、branch 或同一 Issue。需要並行時拆 child Issue；
   交接同一 branch 時必須先由前一個 AI commit、push、停止寫入並更新 owner。
-- handoff 的 `scope_globs` 是該工作切片的獨占 write scope。開始前必須檢查 open Issue、draft PR
-  與 active handoff；scope 重疊、跨 lane 或會碰共享整合檔時，先由 integration coordinator
+- Issue handoff block 的 `scope_globs` 是該工作切片的獨占 write scope。開始前必須檢查 open Issue、draft PR
+  與其他 active claim；scope 重疊、跨 lane 或會碰共享整合檔時，先由 integration coordinator
   指定 owner 與合併順序，不得自行同時修改。
 - 會新增/刪除 tracked 檔案的切片，在同一 slice 內執行
   `pwsh -File tools/docs-check.ps1 -WriteCounters` 重生 `build/baseline-counters.json`，
@@ -44,7 +44,7 @@ handoff、Spec、ADR、source 與 tests。聊天紀錄、AI memory、個人 IDE 
   的 handoff-only head 在 PR CI 容忍漂移，push/local 保持 strict。
   數字以 `tools/docs-check.ps1` 的錯誤訊息為準。
 - `docs/AI_HANDOFF.md`、`docs/state/BASELINE.md`、`docs/PROJECT_MAP.md`、root `README.md` 與
-  `docs/tasks/active/0.md` 是整合快照，由 integrator 單寫。feature AI 更新自己的 handoff、
+  foundation integration Issue 是整合快照，由 integrator 單寫。feature AI 更新自己的 handoff、
   Spec、tests 與 evidence，不在未合併分支宣稱全域完成狀態。
 - 不直接 push `main`，不 force-push 或改寫已發布／被依賴的 branch。每個 PR 只處理一個 Issue；
   跨 lane 先合併 contract/schema，再讓相依工作從新 base 開始或明列 stacked dependency。
@@ -57,15 +57,15 @@ handoff、Spec、ADR、source 與 tests。聊天紀錄、AI memory、個人 IDE 
 - 廠商 ASIO、WASAPI Exclusive、RAW 路徑不可宣稱受 Hibiki 控制。
 - 不提交 EXE、DLL、SYS、MSI、MSIX、VST3、PE/COFF、簽章憑證或私密金鑰。
 - 真實裝置 ID、校正檔、序號、私人路徑放 `.local/`，不得進 Git。
-- 不反編譯或繞過閉源軟體保護；只用開源程式、官方文件與合法 black-box 觀察。
+- 不反編譯或繞過閉源軟體保護；只用開源程式、官方文件與只有合法 black-box 觀察。
 - ISO 226 授權文件、掃描、完整表格與受限資料不可放入 repo、Issue、prompt 或 RAG。
 
 ## 真值與文件契約
 
 - 產品行為看 accepted Spec；架構取捨看 accepted ADR；已完成能力看 source、tests、evidence 與 `docs/state/BASELINE.md`。
-- 修改 public API、schema、DSP 順序、安全規則或建置方式時，同一 PR 必須更新對應文件與 evidence。
+- 修改 public API、schema、DSP 需序、安全規則或建置方式時，同一 PR 必須更新對應文件與 evidence。
 - Accepted ADR 不可改寫；新決策建立新 ADR 並標示 supersedes。
-- 每個 Issue 使用一份 `docs/tasks/active/<issue>.md` handoff；換 AI 或電腦前建立 WIP commit、push branch、更新下一個安全動作。
+- 每個 Issue 在 body 中維護 `<!-- hibiki:handoff-v1 -->` handoff block；換 AI 或電腦前建立 WIP commit、push branch、更新下一個安全動作。
 
 ## 必跑命令
 
@@ -126,3 +126,4 @@ compile evidence，不得當成 Chrome tabCapture、實體 per-App routing 或 s
 
 遇到環境差異先記錄 fingerprint 並更新 handoff，不要自行重生
 `config/distribution-profile.yml` 裡的 endpoint、ASIO、IPC GUID。
+

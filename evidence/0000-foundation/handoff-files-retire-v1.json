@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "issue": 198,
+  "title": "Retire per-issue handoff files in favor of issue bodies and labels",
+  "date": "2026-08-22",
+  "branch": "codex/198-handoff-files-retire",
+  "base_commit": "444f95c",
+  "owner": "xup61069",
+  "scope_globs": [
+    "tools/handoff-check.ps1",
+    "tools/context-pack.ps1",
+    "tools/docs-check.ps1",
+    "AGENTS.md",
+    "CONTRIBUTING.md",
+    "docs/AI_HANDOFF.md",
+    "docs/START_HERE.md",
+    "docs/PROJECT_MAP.md",
+    "docs/ai/**",
+    "docs/specs/SPEC-0004*",
+    "docs/state/BASELINE.md",
+    "docs/tasks/**",
+    ".github/ISSUE_TEMPLATE/ai-task.yml",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    "schemas/task-handoff-v2.schema.json"
+  ],
+  "changes_summary": [
+    "Rewrote handoff-check.ps1 to parse hibiki:handoff-v1 blocks from GitHub issue bodies; lifecycle labels replace status enum (claimed=in_progress, in-review=ready_for_review, closed=done).",
+    "Updated AGENTS.md, CONTRIBUTING.md, docs/AI_HANDOFF.md, docs/START_HERE.md, docs/PROJECT_MAP.md, docs/ai/MULTI_AGENT.md, docs/ai/CHANGE_CONTRACT.yml, docs/ai/HANDOFF_SCHEMA.json, and docs/specs/SPEC-0004 to reference issue-body handoff blocks instead of docs/tasks/active/<issue>.md files.",
+    "Rewrote .github/ISSUE_TEMPLATE/ai-task.yml to instruct embedding the handoff block in the issue body; updated PULL_REQUEST_TEMPLATE.md accordingly.",
+    "Deleted schemas/task-handoff-v2.schema.json and all docs/tasks/ content (66 tracked files).",
+    "Updated tools/context-pack.ps1 to read handoff data via gh issue view instead of a local file.",
+    "Updated tools/docs-check.ps1 required list and self-test paths to remove docs/tasks references.",
+    "Updated BASELINE.md verification summary from 85 to 80 required entries."
+  ],
+  "gates_run": [
+    {
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1 -SelfTest",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 198",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+      "result": "pass (13 cases)"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1",
+      "result": "pass (80 required, 24 specs, live measurement)"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/context-pack.ps1 -SelfTest",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-policy.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/verify.ps1",
+      "result": "pass (CTest 1/1)"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/probe-environment.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/extension-check.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/installer-check.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/control-model-check.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/winui-shell-check.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/distribution-check.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/driver-source-check.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/driver-signability-check.ps1",
+      "result": "pass"
+    }
+  ],
+  "limitations": [
+    "This is a process/documentation change only; no product code or DSP behavior was modified.",
+    "The new protocol depends on gh CLI access for handoff parsing; offline environments cannot run handoff-check against real issues.",
+    "Existing open issues that still use the old file-based protocol must migrate before their next handoff update."
+  ]
+}
+

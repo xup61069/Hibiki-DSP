@@ -1,5 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Handoff data now lives in GitHub Issue body blocks (hibiki:handoff-v1). This file is retained as a stable entry point.",
   "$id": "https://hibiki.example/docs/ai/current-handoff-schema.json",
-  "$ref": "../../schemas/task-handoff-v2.schema.json"
+  "type": "object",
+  "properties": {
+    "protocol": { "const": "issue-body-hibiki:handoff-v1" }
+  }
 }
+
