@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "issue": 64,
+  "scope_digest": "docs-check-merge-base-regression-v1",
+  "source_commit": "97072f5",
+  "environment_fingerprint": "windows-11-26200-x64-preview",
+  "commands": [
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 64",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/docs-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "multiline command output normalization",
+        "equal multiline baseline text recognition",
+        "changed multiline baseline text distinction",
+        "pull-request mode detection",
+        "feature branch push mode detection",
+        "checkout branch fallback on push event",
+        "head BASELINE change detection",
+        "strict verification on direct main push"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 17
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 64 / tools/handoff-check.ps1 / source-policy / source-only-ci / verify / docs-check / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership and scope",
+        "464 tracked paths source policy",
+        "one workflow source-only publication boundary",
+        "CMake/CTest 1 of 1",
+        "documentation and baseline counters verified",
+        "no whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "This is documentation-counter tooling evidence only; it does not claim product audio, driver, HLK, signing, installer, or physical-audio behavior."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.301",
+    "msvc": "19.44.35228.0",
+    "powershell": "7.6.5",
+    "cmake": "4.4.0"
+  },
+  "started_at": "2026-08-22T10:42:00+08:00",
+  "finished_at": "2026-08-22T10:43:00+08:00"
+}

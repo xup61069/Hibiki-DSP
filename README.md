@@ -18,6 +18,7 @@ Hibiki DSP 是一個公開開發中的 Windows 音訊平台。長期目標是「
 
 - [給一般訪客](#給一般訪客)：這是什麼、目前狀態、怎麼試
 - [給 AI 協作者](#給-ai-協作者)：接手入口與必跑命令
+- [邁向 V1](#邁向-v1還差什麼)：距離第一個正式版的誠實評估
 - [預覽與驗證詳情](#預覽與驗證詳情)：所有 preview 與 probe 的完整說明
 - [來源公開與正式版本](#來源公開與正式版本)／[授權與貢獻](#授權與貢獻)
 
@@ -76,6 +77,43 @@ pwsh -File tools/run-preview.ps1 -Build
 會啟動 user-space Engine Preview 加上一個桌面 UI；關閉 UI 後引擎一併停止。更多
 選項（WASAPI sink、session routing、系統音量聯動）全部是明確旗標，詳見
 [預覽與驗證詳情](#預覽與驗證詳情)。
+
+---
+
+## 邁向 V1：還差什麼？
+
+**V1 的定義**（依 [SPEC-0005](docs/specs/SPEC-0005-source-only-paid-release.md)）：
+第一個可安裝的正式版——包含 Microsoft 簽章的虛擬音訊端點、Easy/Expert 控制面、
+Authenticode 簽章 installer，經 Gumroad 交付。
+
+距離 V1 的缺口分三類，性質完全不同：
+
+| 類型 | 內容 | 能不能靠寫程式解決？ |
+| --- | --- | --- |
+| **工程** | PortCls miniport 接線（把現有 WaveRT 來源邊界接成可編譯的 `.sys` 本體——最大的一塊未寫程式）；WinUI XAML 建置與無障礙修整；實機 soak 工具；installer 打包整合 | ✅ 可以，已在進行 |
+| **環境** | 一台鎖定規格的目標機器（Windows 11 24H2+ x64、VS 2026、SDK/WDK 10.0.28000.2526）；測試用實體音訊裝置 | ❌ 要準備機器 |
+| **行政／法務** | Microsoft 硬體開發者帳號與驅動簽章流程；Authenticode 憑證；Gumroad 帳號；ISO 226 係數授權確認 | ❌ 要申請與等待 |
+
+### 里程碑（相依順序）
+
+| # | 里程碑 | 目前狀態 | 主要卡點 |
+| --- | --- | --- | --- |
+| M0 | 目標機器 toolchain 就位（`doctor.ps1` 全綠） | 未開始 | **環境：機器尚未出現** |
+| M1 | WinUI XAML 正式建置＋無障礙 smoke | 原始殼已寫好，從未編譯 | 工程（小）＋M0 |
+| M2 | 第一個可安裝的簽章 WaveRT 虛擬端點 | WaveRT ring／WDK adapter／INF 等 source boundary 已就緒；PortCls 接線未寫 | **工程（大）：PortCls 接線** ＋ 簽章帳號（行政） |
+| M3 | 引擎 → 虛擬端點實際出聲＋長時間 soak | user-space 邊界全部已證；實機一次都沒跑過 | M2 ＋ 環境 |
+| M4 | 簽章 installer＋Gumroad 正式交付 | ReleaseManifest 政策與 installer 來源已定義 | M3 ＋ 憑證／帳號（行政） |
+
+### 白話評估
+
+- **控制面與 DSP 的程式大致就緒**：今天為止已有數十個 fail-closed 合約切片與
+  user-space live probe（音量聯動、per-App 控制、裝置目錄、自動化時間軸鏈）。
+- **最大的單一工程缺口是 driver 的 PortCls 接線**——這是把「一堆通過測試的原始碼」
+  變成「真的能載入的 `.sys`」的本體工作，屬於核心級 C++，需要 M0 的 WDK 環境才能開工。
+- **最硬的非工程前置是 M0 那台機器與微軟簽章體系**——沒有它們，M1 以後全部排不了隊。
+- 所以誠實的答案是：**V1 沒有日期**。瓶頸不在程式量，而在 M0 的環境到位與簽章/
+  發行帳號的行政流程。M0 到位後，M1 屬於小工程；M2 是主要工程衝刺；M3/M4 再疊上
+  實機 soak 與簽章等待期。
 
 ---
 

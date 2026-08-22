@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "issue": 137,
+  "scope_digest": "baseline-counters-json-v1",
+  "source_commit": "dc5a6ab3d90f59fc32fc19b190418d0931289537",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-dotnet10-no-vs2026-no-wdk; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -File tools/docs-check.ps1 -WriteCounters",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 137",
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/source-policy.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/docs-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "prose parser still validates required entries and specs from BASELINE.md",
+        "missing build/baseline-counters.json fails closed",
+        "malformed JSON fails closed",
+        "schema_version drift (v2 vs required v1) fails closed",
+        "matching counters round-trip through Read-BaselineCountersJson",
+        "negative integer values fail closed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 -WriteCounters",
+      "status": "pass",
+      "coverage": [
+        "mechanically writes schema_version, tracked_paths, repository_json_files to the JSON file",
+        "UTF-8 no BOM output consistent with other repository files"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "strict head verification reads volatile counters exclusively from build/baseline-counters.json",
+        "BASELINE.md prose no longer carries tracked-path or repository-JSON digits",
+        "merge-base mode reads base-tree counters from git show and verifies internal consistency",
+        "PRs that edit baseline-counters.json own their numbers against head tree",
+        "PRs that edit neither BASELINE.md nor counters inherit merge base consistency",
+        "strict head verification passed with 472 tracked paths and 100 repository JSON files"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 137",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership and scope verified for Issue 137"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "C++ build completed",
+        "CTest hibiki_contract_tests passed (100%)"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "472 tracked paths scanned; no blocked binary or secret"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "1 workflow and 472 tracked paths checked"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Tooling-only change; proves nothing about product audio behavior, drivers, HLK or signing.",
+    "The -SelfTest fixtures use temp directories and never modify repository state.",
+    "BASELINE.md prose edit is a mechanical counter removal covered by shared_paths declaration."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5 local"
+  }
+}

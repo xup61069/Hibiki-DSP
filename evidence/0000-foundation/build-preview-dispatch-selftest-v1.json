@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "issue": 86,
+  "scope_digest": "build-preview-dispatch-selftest-v1",
+  "source_commit": "40c8f24",
+  "environment_fingerprint": "windows-11-26200-x64-preview",
+  "commands": [
+    "pwsh -NoProfile -File tools/build-preview.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 86",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/build-preview.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "WinUI target dispatch metadata and AppxManifest mapping",
+        "WinUICompat target dispatch and entrypoint mapping",
+        "DesktopCompat target dispatch and entrypoint mapping",
+        "ControlModel target dispatch and entrypoint mapping",
+        "unsupported target rejection"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 5
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 86 / tools/handoff-check.ps1 / source-policy / source-only-ci / verify / docs-check / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership and scope",
+        "454 tracked paths source policy",
+        "one workflow source-only publication boundary",
+        "CMake/CTest 1 of 1",
+        "documentation and baseline counters verified",
+        "no whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "The self-test validates PowerShell dispatch metadata only; it does not prove a WinUI XAML build, Windows App Runtime availability, audio output, driver behavior, HLK, or signing.",
+    "Preview build outputs remain ignored local artifacts and are not submitted to GitHub."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.301",
+    "msvc": "19.44.35228.0",
+    "powershell": "7.6.5",
+    "cmake": "4.4.0"
+  },
+  "started_at": "2026-08-22T10:16:00+08:00",
+  "finished_at": "2026-08-22T10:17:00+08:00"
+}

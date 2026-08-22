@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "issue": 70,
+  "scope_digest": "engine-preview-ipc-selftest-v1",
+  "source_commit": "b9407f4",
+  "environment_fingerprint": "windows-11-26200-x64-preview",
+  "commands": [
+    "pwsh -NoProfile -File tools/engine-preview-smoke.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 70",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/engine-preview-smoke.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "empty and payload v1 frame construction",
+        "little-endian type/length/request correlation",
+        "short frame rejection",
+        "oversized frame rejection",
+        "payload length mismatch rejection"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 7
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 70 / tools/handoff-check.ps1 / source-policy / source-only-ci / verify / docs-check / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership and scope",
+        "460 tracked paths source policy",
+        "one workflow source-only publication boundary",
+        "CMake/CTest 1 of 1",
+        "documentation and baseline counters verified",
+        "no whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "The self-test is deterministic PowerShell helper evidence; normal smoke is user-space cross-process evidence only.",
+    "No claim is made for physical audio delivery, per-App DSP reroute, WaveRT, driver, HLK, Microsoft signing, or real endpoint identity."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.301",
+    "msvc": "19.44.35228.0",
+    "powershell": "7.6.5",
+    "cmake": "4.4.0"
+  },
+  "started_at": "2026-08-22T10:31:00+08:00",
+  "finished_at": "2026-08-22T10:32:00+08:00"
+}
