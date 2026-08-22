@@ -2,8 +2,8 @@
   "schema_version": 1,
   "issue": 351,
   "scope_digest": "vst3-supervisor-surface-v1",
-  "source_commit": "TBD",
-  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-msvc-vs2026-18.9-pwsh-7.6.5; target-24h2-wdk-missing",
+  "source_commit": "9f5591d841e2095478c4d07e708398dcf584b8d6",
+  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-msvc-vs2026-18.9-pwsh-7.6.4; target-24h2-wdk-missing",
   "commands": [
     "pwsh -File tools/verify.ps1",
     "pwsh -File tools/docs-check.ps1",
@@ -34,6 +34,6 @@
   "logs": [],
   "tool_versions": {
     "cmake": "4.4.0",
-    "powershell": "pwsh 7.6.5 local"
+    "powershell": "pwsh 7.6.4 local"
   }
 }
