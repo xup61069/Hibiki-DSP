@@ -63,6 +63,18 @@ $defines = @(
 # expected when the guard is provided by the build environment instead.
 $flags = @('/nologo', "/FI$incRoot\km\ntddk.h", '/W4', '/wd4005', '/kernel', '/c', '/Zp8', '/GR-', '/GS', '/EHs-c-', '/Zl')
 $objs = @()
+foreach ($cfile in (Get-ChildItem (Join-Path $repo 'driver/src') -Filter *.c)) {
+  $obj = Join-Path $objDir ($cfile.BaseName + '.obj')
+  & $cl @flags @defines "/Fo$obj" $cfile.FullName
+  if ($LASTEXITCODE -ne 0) { throw "cl.exe failed for $($cfile.Name)." }
+  $objs += $obj
+}
+$guidsCpp = Join-Path $objDir 'guids.cpp'
+Copy-Item (Join-Path $repo 'driver/wdk/guids.cpp') $guidsCpp -Force
+$obj = Join-Path $objDir 'guids.obj'
+& $cl @flags @defines "/Fo$obj" $guidsCpp
+if ($LASTEXITCODE -ne 0) { throw 'cl.exe failed for guids.cpp.' }
+$objs += $obj
 foreach ($cpp in (Get-ChildItem (Join-Path $repo 'driver/wdk') -Filter *.cpp)) {
   $obj = Join-Path $objDir ($cpp.BaseName + '.obj')
   & $cl @flags @defines "/Fo$obj" $cpp.FullName
@@ -71,21 +83,13 @@ foreach ($cpp in (Get-ChildItem (Join-Path $repo 'driver/wdk') -Filter *.cpp)) {
   Write-Output "compiled $($cpp.Name)"
 }
 
-# --- Compile portable C core ----------------------------------------------
-foreach ($c in (Get-ChildItem (Join-Path $repo 'driver/src') -Filter *.c)) {
-  $obj = Join-Path $objDir ($c.BaseName + '.obj')
-   & $cl @flags @defines "/Fo$obj" $c.FullName
-   if ($LASTEXITCODE -ne 0) { throw "cl.exe failed for $($c.Name)." }
-   $objs += $obj
-   Write-Output "compiled $($c.Name)"
- }
-
 # --- Link .sys ------------------------------------------------------------
 $sysPath = Join-Path $pkgDir 'HibikiVirtualAudio.sys'
 $env:LIB = "$kmLib"
-& $link /nologo /DRIVER /SUBSYSTEM:NATIVE,10.00 /ENTRY:DriverEntry /NODEFAULTLIB:LIBCMT `
+$env:WDK_BIN = Split-Path -Parent $inf2cat
+& $link /nologo /DRIVER /SUBSYSTEM:NATIVE,10.00 /ENTRY:GsDriverEntry /NODEFAULTLIB /INTEGRITYCHECK `
   "/OUT:$sysPath" `
-  $objs ntoskrnl.lib hal.lib ks.lib portcls.lib stdunk.lib libcntpr.lib bufferoverflowK.lib
+  $objs ntoskrnl.lib hal.lib ks.lib portcls.lib stdunk.lib libcntpr.lib ksguid.lib bufferoverflowK.lib
 if ($LASTEXITCODE -ne 0) { throw 'link.exe failed producing HibikiVirtualAudio.sys.' }
 if (-not (Test-Path $sysPath)) { throw 'HibikiVirtualAudio.sys was not produced.' }
 Write-Output "linked $sysPath"

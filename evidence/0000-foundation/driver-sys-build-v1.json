@@ -2,7 +2,8 @@
   "schema_version": 1,
   "issue": 394,
   "scope_digest": "driver-sys-build-v1",
-  "source_commit": "7948efebb99e33439234a101d4b6e08b018e279a",
+  "base_commit": "248f819",
+  "source_commit": "8871d54 (superseded by merge with origin/codex/394-driver-sys-build 936c7b6; final evidence re-run recorded below)",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-msvc-19.51.36256-wdk-10.0.26100.0-pwsh-7.6.4",
   "commands": [
     "pwsh -NoProfile -File tools/build-driver.ps1",
@@ -13,12 +14,13 @@
       "command": "tools/build-driver.ps1",
       "status": "pass",
       "coverage": [
-        "dynamic WDK version discovery (km headers present under Include)",
-        "recursive Inf2Cat discovery (version-independent bin layout)",
-        "5 kernel-mode x64 C++ TUs (driver/wdk) compiled with /kernel /GS /EHs-c- /Zl",
-        "4 portable C core TUs (driver/src) compiled into the same .sys link",
-        "HibikiVirtualAudio.sys linked: SUBSYSTEM:NATIVE /DRIVER /ENTRY:DriverEntry, no default CRT",
-        "INF copied; Inf2Cat produced HibikiVirtualAudio.cat"
+        "dynamic WDK version discovery: newest installed kit with km headers selected (this machine resolved 10.0.26100.0)",
+        "recursive Inf2Cat discovery under Windows Kits bin (version-independent layout)",
+        "4 portable C core TUs (driver/src/*.c) compiled first into the same link set",
+        "single-TU GUID storage compiled from driver/wdk/guids.cpp (#define INITGUID)",
+        "5 kernel-mode x64 C++ TUs (driver/wdk/*.cpp) compiled with /kernel /GS /EHs-c- /Zl",
+        "HibikiVirtualAudio.sys linked: /DRIVER /SUBSYSTEM:NATIVE /ENTRY:GsDriverEntry /NODEFAULTLIB /INTEGRITYCHECK, WDK km libs only",
+        "INF copied; Inf2Cat produced HibikiVirtualAudio.cat with zero errors"
       ],
       "compiled_artifacts": true,
       "artifacts_ignored": true
@@ -27,26 +29,25 @@
       "command": "tools/driver-signability-check.ps1 -PackageRoot .local/driver-package -RequireInf2Cat",
       "status": "pass",
       "coverage": [
-        "INF source-policy assertions against the packaged INF",
-        "genuine Inf2Cat run against the packaged directory (os:10_GE_X64,10_25H2_X64)",
+        "package INF passes full source-policy assertions",
+        "genuine Inf2Cat output accepted (os:10_GE_X64,10_25H2_X64)",
         "signability errors: none; warnings: none",
         "catalog regenerated at .local/driver-package/HibikiVirtualAudio.cat"
       ],
-      "compiled_artifacts": true,
-      "artifacts_ignored": true
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
-    "No driver installation, loading, or device-start claim on this machine.",
-    "No signing-certificate, HLK, WHQL, or Microsoft co-signing claim.",
-    "No RT-thread behavior, latency, or audio-quality claim beyond compile/link/package.",
-    "Build machine WDK is 10.0.26100.0 (not the issue's original 28000 reference); the build script now discovers the newest installed km-enabled kit."
+    "Build/package/signability evidence only: no driver installation, loading, runtime audio behavior, HLK, WHQL, or Microsoft signing claim on this machine.",
+    "Artifacts stay under ignored .local/ and are not committed.",
+    "This machine has no WDK 28000 kit installed; the build script now discovers the newest installed km-enabled kit instead of assuming a fixed version."
   ],
   "tool_versions": {
     "powershell": "pwsh 7.6.4",
+    "windows_build": "26200",
     "msvc": "19.51.36256",
     "wdk": "10.0.26100.0"
   },
   "started_at": "2026-08-23T01:20:00+08:00",
-  "finished_at": "2026-08-23T03:10:31+08:00"
+  "finished_at": "2026-08-23T03:20:00+08:00"
 }
