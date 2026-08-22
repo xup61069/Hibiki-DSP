@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "issue": 35,
+  "scope_digest": "vst3-timeline-persistence-v1",
+  "source_commit": "ff46e15",
+  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-msvc-19.44-dotnet-10.0.301-pwsh-7.6.5; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 35",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "canonical serialize emits the single documented shape with all 256 schema-mandated event slots",
+        "byte-stable serialize/parse round-trip for validator-passing snapshots including empty timelines",
+        "insignificant leading/trailing whitespace tolerated without changing the parsed snapshot",
+        "fail-closed rejection of empty input, oversized input over the 64 KiB cap and mid-key truncation",
+        "unsupported schema_version rejected",
+        "unknown key, duplicate key and missing required key rejected with distinct codes",
+        "invalid numbers rejected: leading-dot fraction, NaN literal, malformed mantissa",
+        "out-of-range rejections: normalized_value outside [0,1], parameter_id above uint32, sample_position above uint64",
+        "event array shorter than 256 slots fails closed",
+        "non-default content hidden beyond the declared event_count rejected as event_count_mismatch",
+        "trailing bytes after the closing brace rejected",
+        "failed parses leave the destination snapshot untouched",
+        "Windows file save/load round-trip via temp-write-then-replace; corrupt and missing files fail closed; invalid snapshots refuse to save",
+        "C++ build and CTest contract suite (1/1 passed)"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 35 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope exclusivity and Git ancestry checks"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "required documentation paths and specs",
+        "baseline summary counters verified against git-tracked reality after this slice"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "source-only tracked path policy, no blocked binary or secret"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "no compiled artifact or binary upload policy violation"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The reader accepts only the writer-canonical document shape plus insignificant whitespace; it is not a general JSON parser by design.",
+    "No UI, IPC or engine consumer is wired yet; persistence is a callable control-plane API only.",
+    "File helpers were exercised on Windows via the contract suite; non-Windows remove+rename fallback compiles but has no local execution evidence.",
+    "User-space source-contract evidence only; this proves nothing about physical audio, per-App delivery, drivers, HLK or Microsoft signing."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSVC 19.44 (VS 2022 BuildTools 17.14)",
+    "cmake": "4.4.0",
+    "dotnet": "10.0.301",
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}

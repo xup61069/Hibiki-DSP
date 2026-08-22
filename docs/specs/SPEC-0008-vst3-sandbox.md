@@ -108,10 +108,32 @@ points，將 normalized `[0,1]` 值轉成官方 `IParameterChanges`；非法 off
 會在交給 plugin 前拒絕。`ProcessBlockWithParameters` 已由 frame codec 與 optional SDK
 worker 解碼並交給 adapter。`Vst3ParameterTimelineV1` 現在提供最多 256 個已排序事件的
 control-plane snapshot、穩定 sample-position block extraction 與 worker point conversion；
-它可持久化為 `vst3-parameter-timeline-v1.schema.json`。`Vst3TimelineEditorV1` 現在提供
+它現在以 bounded canonical JSON 持久化為 `vst3-parameter-timeline-v1.schema.json`：
+writer 只輸出固定鍵組、全部 256 個 event slot 的唯一文件；reader 是嚴格的
+fail-closed tokenizer，僅接受該形式加上無意義空白，未知或重複鍵、缺鍵、非法或越界
+數值、陣列長度與 event_count 不一致、截斷或超過 64 KiB 的輸入都會被拒絕且不改動
+目的地；通過驗證的 snapshot 經 serialize→parse 後逐位元組穩定。檔案寫入先寫暫存再
+取代。這是控制面檔案契約，不是一般 JSON parser。
+`Vst3TimelineFileStoreV1` 在此之上提供 bounded per-timeline 檔案儲存：每個
+timeline 一份 canonical 文件，ID 限縮為檔名安全子集（[A-Za-z0-9._-]，最長 64 位元
+組）並與檔名一一對應，容量固定為 16、列舉確定排序；損壞、未知或越界內容一律
+fail-closed，絕不部分載入。
+`sync_timeline_store_to_scheduler_v1` 則把整個 store 以確定順序載入 Scene
+automation scheduler：任何單一項目失敗只計入 skipped，不中斷同步、也不改變
+scheduler 既有項目。
+`sync_scheduler_to_timeline_store_v1` 提供反方向匯出：排程器內所有 timeline 依
+確定順序原子寫回 store，並把 store 中已不存在於排程器的 ID 回報為 stale 候選；
+stale 僅回報、不刪除，是否清除由呼叫端決定；目的地容量不足時整體失敗並回報
+真實總數。
+排程器另提供唯讀內省：`timeline_ids` 以確定排序列舉已儲存 ID，
+`binding_views` 回傳每個 Scene/lane/timeline 綁定的不可變複本；目的地容量
+不足時整體失敗且計數歸零，絕不部分輸出。`Vst3TimelineEditorV1` 現在提供
 supervisor 端 bounded 編輯交易：draft 變更不影響已發布 snapshot，同一
 (parameter_id, sample_position) 的 upsert 以取代而非重複呈現，commit 只在通過既有
-timeline 驗證後才交換已發布 snapshot，discard 直接還原；這是 headless 控制面契約，
+timeline 驗證後才交換已發布 snapshot，discard 直接還原。editor 另保留最多 8 組
+已發布 snapshot 的 bounded undo/redo 歷史：commit 推入前一個狀態並清空 redo、
+容量滿時淘汰最舊、undo/redo 在編輯 session 進行中一律拒絕、reset 清空雙 stack；
+歷史僅存在於單一 editor 範圍內。這是 headless 控制面契約，
 supervisor 的 UI 編輯器、跨版本 plugin state persistence 與完整自動化排程仍未接入，
 因此不能宣稱完整 host automation。
 
