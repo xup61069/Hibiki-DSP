@@ -12,10 +12,12 @@ $streamAdapter = Join-Path $repo 'driver/wdk/hibiki_stream_adapter.cpp'
 $propertyAdapter = Join-Path $repo 'driver/wdk/hibiki_property_adapter.cpp'
 $miniportHeader = Join-Path $repo 'driver/wdk/hibiki_miniport_wavert.h'
 $miniportSource = Join-Path $repo 'driver/wdk/hibiki_miniport_wavert.cpp'
+$filterHeader = Join-Path $repo 'driver/wdk/hibiki_filter_tables.h'
+$filterSource = Join-Path $repo 'driver/wdk/hibiki_filter_tables.cpp'
 $readme = Join-Path $repo 'driver/wdk/README.md'
 $inf = Join-Path $repo 'driver/inf/HibikiVirtualAudio.inf'
 $infReadme = Join-Path $repo 'driver/inf/README.md'
-foreach ($path in @($adapter, $topologyHeader, $topologySource, $streamHeader, $streamSource, $streamAdapter, $propertyAdapter, $miniportHeader, $miniportSource, $readme, $inf, $infReadme)) {
+foreach ($path in @($adapter, $topologyHeader, $topologySource, $streamHeader, $streamSource, $streamAdapter, $propertyAdapter, $miniportHeader, $miniportSource, $filterHeader, $filterSource, $readme, $inf, $infReadme)) {
     if (-not (Test-Path -LiteralPath $path)) { throw "Missing WDK source boundary: $path" }
 }
 $source = Get-Content -LiteralPath $adapter -Raw
@@ -79,6 +81,17 @@ foreach ($required in @('IMiniportWaveRT', 'IMiniportWaveRTStreamNotification',
 }
 if ($miniportSrc -match '(?i)CreateThread|KeWaitFor') {
     throw 'PortCls miniport must remain non-blocking.'
+}
+$filterSrc = (Get-Content -LiteralPath $filterHeader -Raw) + (Get-Content -LiteralPath $filterSource -Raw)
+if ($filterSrc -notmatch 'SPDX-License-Identifier: MS-PL') { throw 'PortCls filter tables must retain MS-PL.' }
+if ($filterSrc -match 'audio_engine|scene_graph|asio_bridge|plugin_host') {
+    throw 'PortCls filter tables must not link GPL user-space implementation.'
+}
+foreach ($required in @('HibikiGetFilterDescriptorEndpointV1', 'HibikiDataRangeIntersectionEndpointV1',
+    'PCFILTER_DESCRIPTOR', 'PCPIN_DESCRIPTOR', 'PCNODE_DESCRIPTOR', 'PCCONNECTION_DESCRIPTOR',
+    'KSNODETYPE_VOLUME', 'KSNODETYPE_MUTE', 'KSPROPERTY_AUDIO_VOLUMELEVEL', 'KSPROPERTY_AUDIO_MUTE',
+    'FilterDescriptor_Main', 'FilterDescriptor_LowLatency', 'FilterDescriptor_Surround', 'FilterDescriptor_VirtualMic')) {
+    if (-not $filterSrc.Contains($required)) { throw "PortCls filter tables missing required symbol: $required" }
 }
 $infSource = Get-Content -LiteralPath $inf -Raw
 foreach ($required in @('Root\HibikiDSP', 'HibikiVirtualAudio.sys', 'EndpointMainGuid', 'EndpointVirtualMicGuid', 'PnpLockdown=1')) {
