@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "issue": 224,
+  "scope_digest": "issue-224-complete-archive-217-v1",
+  "source_commit": "1345618edb43faa47cf00f20e09f6a1ace311b67",
+  "archive_commit": "d9982ca",
+  "metadata_commit": "077ab9e",
+  "main_sync_commit": "1345618edb43faa47cf00f20e09f6a1ace311b67",
+  "claim_only_merge_commit": "6a87a20d9f3444af670174ff6cbec72489caa6ba",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; vs2026-sdk-wdk-on-disk; target-24h2-machine-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 224",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/probe-environment.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 224 archive local gates on its original branch",
+      "status": "pass",
+      "coverage": [
+        "handoff-check Issue 224 and full ownership checks",
+        "docs-check live measurement 515 tracked paths / 111 repository JSON files",
+        "source-policy and source-only-ci-check",
+        "Visual Studio 2026/CMake build and 1/1 CTest",
+        "doctor/probe environment fingerprint",
+        "git diff --check"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Issue 224 original PR claim-only history",
+      "status": "pass",
+      "coverage": [
+        "PR #227 merged claim-only head 39388a511f7d8a09bd9c83d5edc923de6d578322",
+        "merge commit 6a87a20d9f3444af670174ff6cbec72489caa6ba",
+        "archive commit d9982ca and metadata commit 077ab9e are outside main"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #227 claim-only push)",
+      "status": "pass",
+      "coverage": ["claim handoff checks on the merged claim-only head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32566346282/job/97015409476",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #227 claim-only merge-ref)",
+      "status": "pass",
+      "coverage": ["claim handoff checks on the merge reference"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32566362255/job/97015442994",
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance correction only; no product API, IPC/schema, DSP ordering, RT-thread, driver, HLK or signing behavior is changed.",
+    "The target machine is unavailable; documentation and user-space gates do not provide Windows hardware, loadable-driver, HLK or Microsoft-signing evidence.",
+    "PR #227 was merged claim-only before the archive implementation; this evidence preserves that boundary and does not treat the old branch as main history.",
+    "No physical audio, per-App delivery, loadable driver, HLK or Microsoft signing evidence is claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.5"
+  },
+  "started_at": "2026-08-22T19:00:00+08:00",
+  "finished_at": "2026-08-22T19:55:00+08:00"
+}

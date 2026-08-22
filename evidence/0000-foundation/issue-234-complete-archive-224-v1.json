@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "issue": 234,
+  "scope_digest": "issue-234-complete-archive-224-v1",
+  "source_commit": "16eecfe6facf8a7297f37557151b3c5dc5f6bf49",
+  "archive_commit": "pending",
+  "main_sync_commit": "16eecfe6facf8a7297f37557151b3c5dc5f6bf49",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; vs2026-sdk-wdk-on-disk; target-24h2-machine-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 234",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/probe-environment.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 234 claim handoff check before scope expansion",
+      "status": "pass",
+      "coverage": ["schema v2 ownership, scope and Git state"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Corrective history review",
+      "status": "pass",
+      "coverage": [
+        "PR #227 merged claim-only at 6a87a20d9f3444af670174ff6cbec72489caa6ba",
+        "old archive commits d9982ca and 077ab9e are not in origin/main",
+        "Issue #234 uses a fresh worktree from origin/main 16eecfe"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Issue 234 archive implementation",
+      "status": "in_progress",
+      "coverage": [
+        "move docs/tasks/active/224.md to docs/tasks/completed/2026/224.md",
+        "recover paired Issue 217 and Issue 224 evidence",
+        "add this anonymous corrective evidence"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local archive gates after moving Issue 224 handoff",
+      "status": "pass",
+      "coverage": [
+        "handoff-check Issue 234 and full ownership checks",
+        "docs-check 85 required paths / 24 specs / 519 tracked paths / 112 repository JSON files",
+        "source-policy and source-only-ci-check",
+        "git diff --check"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": ["Visual Studio 2026/CMake user-space build", "1/1 CTest contract test"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly",
+      "status": "pass",
+      "coverage": ["Windows build 26200", "VS 2026", "Windows SDK/WDK QFE fingerprint"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/probe-environment.ps1",
+      "status": "pass",
+      "coverage": ["anonymous .local/context.json fingerprint"],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance correction only; no product API, IPC/schema, DSP ordering, RT-thread, driver, HLK or signing behavior is changed.",
+    "The target machine is unavailable; local documentation and user-space gates do not provide Windows hardware, loadable-driver, HLK or Microsoft-signing evidence.",
+    "PR #227 was merged claim-only before the archive implementation; the corrective lane preserves that boundary and does not continue the already-merged codex/224-complete-archive-217 branch.",
+    "No physical audio, per-App delivery, loadable driver, HLK or Microsoft signing evidence is claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.5"
+  },
+  "started_at": "2026-08-22T20:15:00+08:00",
+  "finished_at": "pending_ci"
+}
