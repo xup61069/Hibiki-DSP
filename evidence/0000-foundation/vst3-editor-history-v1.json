@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "issue": 103,
+  "scope_digest": "vst3-editor-history-v1",
+  "source_commit": "6c79971",
+  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-msvc-19.44-dotnet-10.0.301-pwsh-7.6.5; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 103",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "bounded undo/redo history on Vst3TimelineEditorV1 with fixed 8-entry stacks and oldest-eviction when full",
+        "successful commit pushes the pre-commit published state and clears the redo stack",
+        "undo restores the exact prior published snapshot; redo re-applies it",
+        "a new commit after an undo clears the redo stack (branching history)",
+        "undo/redo refuse while an edit session is active and leave the draft untouched",
+        "discard leaves history intact; reset clears both stacks",
+        "capacity verified with twelve sequential commits: depth capped at eight, eight undos drain to the deterministic mid-state",
+        "C++ build and CTest contract suite (1/1 passed)"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 103 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope exclusivity and Git ancestry checks"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 / tools/source-policy.ps1 / tools/source-only-ci-check.ps1 / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "documentation gates with refreshed BASELINE counters, source-only policy and whitespace cleanliness"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "History is per-editor-instance in memory only; persistence across process restarts is out of scope.",
+    "Scheduler-bound sessions refuse undo/redo by design because the wrapped editor has an active draft.",
+    "User-space source-contract evidence only; this proves nothing about physical audio, per-App delivery, drivers, HLK or Microsoft signing."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSVC 19.44 (VS 2022 BuildTools 17.14)",
+    "cmake": "4.4.0",
+    "dotnet": "10.0.301",
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}

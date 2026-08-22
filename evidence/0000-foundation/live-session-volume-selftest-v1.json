@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "issue": 97,
+  "scope_digest": "live-session-volume-selftest-v1",
+  "source_commit": "da4faf6",
+  "environment_fingerprint": "windows-11-26200-x64-preview",
+  "commands": [
+    "pwsh -NoProfile -File tools/live-session-volume-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/live-session-volume-check.ps1 -SelfTest -DirectCoordinator",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 97",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/live-session-volume-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "Windows-only and WriteTest guard rejection",
+        "default Engine Preview session-routing plan mapping",
+        "DirectCoordinator plan mapping",
+        "unsafe build-root, wrong target, and extra CMake arguments rejection"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 7
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 97 / tools/handoff-check.ps1 / source-policy / source-only-ci / verify / docs-check / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership and scope",
+        "448 tracked paths source policy",
+        "one workflow source-only publication boundary",
+        "CMake/CTest 1 of 1",
+        "documentation and baseline counters verified",
+        "no whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "The self-test validates wrapper planning and opt-in safety only; it does not prove physical per-App capture/re-send, DSP delivery, driver, WaveRT, HLK, signing, or endpoint/session identity.",
+    "No endpoint ID, friendly name, PID, session ID, serial, private path or compiled artifact was recorded in repository evidence.",
+    "Release build outputs remain ignored local artifacts and are not submitted to GitHub."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.301",
+    "msvc": "19.44.35228.0",
+    "powershell": "7.6.5",
+    "cmake": "4.4.0"
+  },
+  "started_at": "2026-08-22T10:00:00+08:00",
+  "finished_at": "2026-08-22T10:01:00+08:00"
+}

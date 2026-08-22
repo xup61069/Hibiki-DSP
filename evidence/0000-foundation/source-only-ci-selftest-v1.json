@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "issue": 55,
+  "scope_digest": "source-only-ci-selftest-v1",
+  "source_commit": "537f6f470b7118ab7dff6a4bce71525dff0f7eeb",
+  "environment_fingerprint": "windows-26200-amd64-powershell-5.1-dotnet-only-portable-pwsh-7.6.5-no-cmake-no-vs; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/source-only-ci-check.ps1 -SelfTest",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 55",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/source-only-ci-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "clean workflow with a tools/source-policy.ps1 reference passes and is detected as satisfying the requirement",
+        "artifact upload usage rejected and named via the upload-artifact pattern class",
+        "gh release upload rejected by release-upload pattern class",
+        "softprops action-gh-release usage rejected",
+        "docker push rejected by docker-push pattern class",
+        "npm publish rejected",
+        "nuget push rejected",
+        "packages: write permission rejected",
+        "id-token: write permission rejected",
+        "GUMROAD credential reference rejected",
+        "PARTNER_CENTER reference rejected",
+        "repository whose workflows never reference source-policy rejected",
+        "at least one referencing workflow satisfies the cross-workflow requirement",
+        "every blocked binary extension class flagged case-insensitively including upper-case names",
+        "multiple violations reported together preserving input order",
+        "allowed text paths produce zero rejections"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "real repository workflow scanned through the refactored Test-WorkflowText function",
+        "cross-workflow source-policy reference assertion via Assert-WorkflowPolicyReferencePresent",
+        "tracked paths measured through the refactored Get-BlockedTrackedPaths function"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 55 / tools/handoff-check.ps1 / tools/docs-check.ps1 / tools/source-policy.ps1 / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 55",
+        "documentation gate with baseline summary counters refreshed after staging all slice files",
+        "tracked paths with no blocked binary or secret",
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Tooling and governance gate coverage only; does not alter RT-DSP, driver audio behavior, or any product API.",
+    "The 'actions/upload-artifact' list entry is always shadowed by the earlier 'upload-artifact' entry on substring match; both remain enforced and the sample asserts the first-named pattern.",
+    "SelfTest fixtures share pattern and extension constants with the production gate; policy changes must update both together by design.",
+    "Does not claim physical audio, per-App delivery, a loadable driver, HLK, Microsoft signing, or any release artifact."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5 portable"
+  },
+  "started_at": "2026-08-22T05:40:00+08:00",
+  "finished_at": "2026-08-22T05:50:00+08:00"
+}

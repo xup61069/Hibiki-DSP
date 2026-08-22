@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "issue": 124,
+  "scope_digest": "takeover-worktree-guard-v1",
+  "source_commit": "039cb34",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-git-2.x; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/handoff-check.ps1 -Issue 124",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "documentation review",
+      "status": "pass",
+      "coverage": [
+        "MULTI_AGENT single-machine multi-session section now requires two checks before pushing to or taking over any branch this session did not start:",
+        "1) git worktree list must show no local worktree holding the branch checked out (a held worktree implies possible unpushed work)",
+        "2) takeover intent announced in a comment on the owning Issue before touching the branch",
+        "Issue #22 near-miss recorded as the motivating precedent"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation-only change; rules are social contract enforced at review time.",
+    "No product source, schema or gate behavior is modified."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}

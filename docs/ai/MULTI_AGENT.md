@@ -21,7 +21,10 @@
 ## 開始工作：claim protocol
 
 1. `git fetch --all --prune`，讀 open Issue、open/draft PR 與相關 active handoff。
-2. 確認 Issue 沒有 active owner，且預計的 `scope_globs` 不和其他 active claim 重疊。
+2. 確認 Issue 沒有 active owner，且預計的 `scope_globs` 不和其他 active claim 重疊。同時
+   檢查 `git ls-remote --heads origin` 是否已有同名/相鄰 branch 佔位——branch 存在但沒有
+   PR 也算已被認領。Issue 與 PR 共用編號計數器：先建 Issue 取得確定號碼，再命名 branch；
+   不要預估號碼後才建 Issue。
 3. 在 Issue 記錄 acceptance、owner、branch、target branch、scope、dependencies、contract 影響與
    required gates。
 4. 從 target branch 的最新遠端 HEAD 建立獨立 worktree/branch。例如：
@@ -37,6 +40,28 @@
 
 worktree 的實際本機路徑屬環境資訊，不寫入 repository。禁止在別的 AI 正在使用的 worktree 執行
 `checkout`、`switch`、branch rename、reset、clean 或 rebase。
+
+## 同一台機器、多個 session
+
+同一台機器上常有多個 AI session 以同一 Git 身分（甚至同一 GitHub 帳號）並行工作。
+身分相同不等於有權進入彼此的工作區：
+
+- worktree 隔離是絕對的；不得讀寫、build、commit 或 cleanup 別的 session 的 worktree，
+  即使看起來「只是幫忙」。
+- 認領前除了 GitHub 檢查，也要 `git ls-remote --heads` 確認 branch 未被佔位——另一個
+  session 可能已推了 claim commit 但還沒開 PR。
+- 回到先前中斷的 slice 時：先 fetch，以遠端 HEAD 與 handoff status 為唯一真值重新確認；
+  本機未 push 的 edits 若已被遠端接手完成，接受遠端版本、獨立重跑全部 gates 驗證，
+  不重寫歷史。
+- 工作被另一 session 接手完成時，在 PR body 誠實記錄接手事件與後續驗證
+  （先例：PR #24 / Issue #22）。
+- **接手或推送任何不是自己開始的 branch 前，必須先做兩件事**：
+  1. 執行 `git worktree list` 確認該 branch 沒有被本機任何 worktree 佔用中——
+     被佔用代表那個 session 可能還有未 push 的 edits，直接推會踩掉別人的工作；
+  2. 在該 Issue 留言宣告接手意圖，等一個輪詢週期沒有異議再動手。
+  先例：Issue #22 曾發生外部 session 對持有未 push 變更的 worktree 直接 commit，
+  事後雖依遠端 HEAD 重驗收尾，但此類碰撞應從源頭避免。
+- 收尾時只清理自己的 worktree 與本地 branch；遠端 branch 留給 integrator 決定。
 
 ## Scope 與 ownership
 
@@ -67,6 +92,11 @@ handoff v2 的 `scope_globs` 是該 Issue 的獨占預告 write-set；`shared_pa
 以下是高衝突 registry/聚合檔，必須在 Issue/handoff 的 `shared_paths` 宣告並由 integrator 指定單一
 writer：root/subsystem `CMakeLists.txt`、`tests/unit/contract_tests.cpp`、
 `apps/control-model-check/Program.cs`、workflow、dependency lock、distribution identity 與 Spec index。
+
+`docs/state/BASELINE.md` 的 volatile 計數（tracked paths／repository JSON）由
+docs-check 即時量測（`git ls-files`），不再與 committed 數字比對；新增/刪除 tracked
+檔案的切片不需要任何 counter-refresh chore。#197 之後，`build/baseline-counters.json`
+已廢除。
 
 永久 ID、public IPC/schema、DSP 順序、安全規則與 license boundary 同時只能有一個 active owner；
 即使檔案不重疊，也不得由不同 AI 各自修改同一契約語意。

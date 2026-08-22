@@ -1,8 +1,181 @@
 [CmdletBinding()]
-param()
+param(
+  [switch]$SelfTest
+)
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
+
+function Get-CounterClaims([string]$Text) {
+  # Parse structural counters (required entries, specs) from BASELINE prose.
+  # Volatile tracked-path / repository-JSON counts are measured live via git ls-files
+  # and reported as informational output only; they are never compared against
+  # committed numbers.
+  $claims = [pscustomobject]@{ Required = 0; Specs = 0 }
+  $patterns = [ordered]@{
+    Required = @('docs-check\.ps1`\s*的\s*(?<count>\d+)\s*個必要入口', 'docs-check required-entry')
+    Specs    = @('個必要入口與\s*(?<count>\d+)\s*份\s*Spec\s*通過', 'spec')
+  }
+  foreach ($key in $patterns.Keys) {
+    $match = [regex]::Match($Text, [string]$patterns[$key][0])
+    if (-not $match.Success) {
+      throw ("BASELINE.md is missing the {0} counter expected by docs-check; keep the " +
+             "verification-summary sentence in docs/state/BASELINE.md up to date.") -f $patterns[$key][1]
+    }
+    $claims.$key = [int]$match.Groups['count'].Value
+  }
+  return $claims
+}
+
+function Assert-StructuralClaims {
+  param(
+    [Parameter(Mandatory = $true)]$Claims,
+    [Parameter(Mandatory = $true)][int]$Required,
+    [Parameter(Mandatory = $true)][int]$Specs
+  )
+  if ($Claims.Required -ne $Required) {
+    throw ("BASELINE.md claims {0} docs-check required entries but docs-check defines {1}; " +
+           "update the BASELINE.md verification summary.") -f $Claims.Required, $Required
+  }
+  if ($Claims.Specs -ne $Specs) {
+    throw ("BASELINE.md claims {0} specs but the repository tracks {1}; " +
+           "update the BASELINE.md verification summary.") -f $Claims.Specs, $Specs
+  }
+}
+
+function Convert-CommandOutputToText {
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Lines
+  )
+  if ($null -eq $Lines -or $Lines.Count -eq 0) { return '' }
+  $strings = @($Lines | ForEach-Object { [string]$_ })
+  return [string]::Join("`n", $strings)
+}
+
+function Test-MergeBaseMode {
+  param(
+    [string]$BaseRef,
+    [string]$RefName
+  )
+  if (-not [string]::IsNullOrWhiteSpace($BaseRef)) { return $true }
+  if ([string]::IsNullOrWhiteSpace($RefName)) { return $false }
+  if ($RefName -eq 'main' -or $RefName -eq 'refs/heads/main' -or $RefName.EndsWith('/main')) {
+    return $false
+  }
+  return $true
+}
+
+function Resolve-CiRefName {
+  param(
+    [string]$RefName,
+    [string]$Ref,
+    [string]$EventName,
+    [string]$CurrentBranch
+  )
+  $resolved = ''
+  if (-not [string]::IsNullOrWhiteSpace($RefName)) {
+    $resolved = $RefName
+  }
+  elseif (-not [string]::IsNullOrWhiteSpace($Ref)) {
+    $resolved = $Ref -replace '^refs/heads/', ''
+  }
+  if ($EventName -eq 'push' -and -not [string]::IsNullOrWhiteSpace($CurrentBranch)) {
+    $resolved = $CurrentBranch
+  }
+  return $resolved
+}
+
+function Test-BaselineChangedByHead {
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$ChangedPaths
+  )
+  return @($ChangedPaths | Where-Object { $_ -eq 'docs/state/BASELINE.md' }).Count -gt 0
+}
+
+if ($SelfTest) {
+  $caseCount = 0
+
+  # Multiline normalization.
+  $multilineLines = @('line-one', 'line-two', 'line-three')
+  $multilineText = Convert-CommandOutputToText -Lines $multilineLines
+  if ($multilineText -ne "line-one`nline-two`nline-three") {
+    throw 'docs-check self-test failed: multiline command output did not normalize to text.'
+  }
+  $caseCount++
+
+  # Merge-base mode detection.
+  if (-not (Test-MergeBaseMode -BaseRef 'main' -RefName '')) {
+    throw 'docs-check self-test failed: pull-request mode was not recognized.'
+  }
+  $caseCount++
+  if (Test-MergeBaseMode -BaseRef '' -RefName 'main') {
+    throw 'docs-check self-test failed: direct main push must remain strict.'
+  }
+  $caseCount++
+  if (-not (Test-MergeBaseMode -BaseRef '' -RefName 'codex/feature')) {
+    throw 'docs-check self-test failed: feature-branch push mode was not recognized.'
+  }
+  $caseCount++
+
+  # CI ref resolution.
+  if ((Resolve-CiRefName -RefName '' -Ref '' -EventName 'push' -CurrentBranch 'codex/feature') -ne 'codex/feature') {
+    throw 'docs-check self-test failed: push-event checkout branch fallback was not recognized.'
+  }
+  $caseCount++
+
+  # BASELINE edit detection.
+  if (Test-BaselineChangedByHead -ChangedPaths @('docs/tasks/active/64.md')) {
+    throw 'docs-check self-test failed: a handoff-only head was treated as a BASELINE owner.'
+  }
+  $caseCount++
+  if (-not (Test-BaselineChangedByHead -ChangedPaths @('docs/state/BASELINE.md'))) {
+    throw 'docs-check self-test failed: a head BASELINE edit was not detected.'
+  }
+  $caseCount++
+
+  # Structural counter parser: valid summary parses correctly.
+  $summaryOk = @'
+目前驗證摘要：`docs-check.ps1` 的 85 個必要入口與
+24 份 Spec 通過。
+'@
+  $ok = Get-CounterClaims $summaryOk
+  if ($ok.Required -ne 85 -or $ok.Specs -ne 24) {
+    throw 'docs-check self-test failed: canonical summary did not parse to expected structural counters.'
+  }
+  $caseCount++
+
+  # Removing required-entry or spec markers must fail closed.
+  foreach ($fragment in @('個必要入口', '份 Spec 通過')) {
+    $broken = $summaryOk.Replace($fragment, 'removed-marker')
+    try { Get-CounterClaims $broken | Out-Null } catch { $caseCount++; continue }
+    throw "docs-check self-test failed: removing '$fragment' should fail the counter parser."
+  }
+
+  # Structural assertion passes with matching values.
+  Assert-StructuralClaims -Claims $ok -Required 85 -Specs 24
+  $caseCount++
+
+  # Live measurement: git ls-files returns at least some files in a real repo.
+  $liveTracked = @(git ls-files)
+  if ($liveTracked.Count -lt 1) {
+    throw 'docs-check self-test failed: live git ls-files returned zero files in a real repository.'
+  }
+  $caseCount++
+  $liveJson = @($liveTracked | Where-Object { $_.ToLowerInvariant().EndsWith('.json') })
+  if ($liveJson.Count -lt 1) {
+    throw 'docs-check self-test failed: live git ls-files returned zero JSON files in a real repository.'
+  }
+  $caseCount++
+
+  if ($caseCount -lt 12) {
+    throw "docs-check self-test failed: expected at least 12 passing cases, saw $caseCount."
+  }
+  Write-Output "docs-check self-test passed ($caseCount cases; structural parser, multiline normalization, branch mode detection, BASELINE edit detection, live measurement)."
+  exit 0
+}
+
+# --- Main gate logic ---
+
 $required = @(
   'AGENTS.md', 'CLAUDE.md', 'README.md', 'CONTRIBUTING.md', 'SECURITY.md',
   '.github/PULL_REQUEST_TEMPLATE.md', '.github/ISSUE_TEMPLATE/ai-task.yml',
@@ -82,41 +255,22 @@ foreach ($adapter in $adapters) {
   }
 }
 
-function Get-BaselineClaim {
-  param([string]$Text, [string]$Pattern, [string]$Label)
-  $match = [regex]::Match($Text, $Pattern)
-  if (-not $match.Success) {
-    throw ("BASELINE.md is missing the {0} counter expected by docs-check; keep the " +
-           "verification-summary sentence in docs/state/BASELINE.md up to date.") -f $Label
-  }
-  return [int]$match.Groups['count'].Value
-}
-
 $baselineText = Get-Content -LiteralPath (Join-Path $repo 'docs/state/BASELINE.md') -Raw
 $trackedFiles = @(git -C $repo ls-files)
 if ($LASTEXITCODE -ne 0) { throw 'docs-check could not list tracked files.' }
 $jsonFiles = @(git -C $repo ls-files -- '*.json')
 
-$claimedRequired = Get-BaselineClaim $baselineText 'docs-check\.ps1`\s*的\s*(?<count>\d+)\s*個必要入口' 'docs-check required-entry'
-if ($claimedRequired -ne $required.Count) {
-  throw ("BASELINE.md claims {0} docs-check required entries but docs-check defines {1}; " +
-         "update the BASELINE.md verification summary.") -f $claimedRequired, $required.Count
-}
-$claimedSpecs = Get-BaselineClaim $baselineText '個必要入口與\s*(?<count>\d+)\s*份\s*Spec\s*通過' 'spec'
-if ($claimedSpecs -ne $specs.Count) {
-  throw ("BASELINE.md claims {0} specs but the repository tracks {1}; " +
-         "update the BASELINE.md verification summary.") -f $claimedSpecs, $specs.Count
-}
-$claimedTracked = Get-BaselineClaim $baselineText 'source-policy\.ps1`\s*掃描\s*(?<count>\d+)\s*個\s*tracked paths' 'source-policy tracked-path'
-if ($claimedTracked -ne $trackedFiles.Count) {
-  throw ("BASELINE.md claims {0} tracked paths but git reports {1}; " +
-         "update the BASELINE.md verification summary.") -f $claimedTracked, $trackedFiles.Count
-}
-$claimedJson = Get-BaselineClaim $baselineText '(?<count>\d+)\s*個\s*repository JSON\s*檔案均可解析' 'repository-json'
-if ($claimedJson -ne $jsonFiles.Count) {
-  throw ("BASELINE.md claims {0} repository JSON files but git reports {1}; " +
-         "update the BASELINE.md verification summary.") -f $claimedJson, $jsonFiles.Count
-}
+$claims = Get-CounterClaims $baselineText
 
-$summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; baseline summary verified against {2} tracked paths and {3} repository JSON files.)'
+# Structural counters (required entries and specs) are always verified against
+# the tree being tested; they change rarely, so keeping them strict costs
+# parallel lanes nothing.
+Assert-StructuralClaims -Claims $claims -Required $required.Count -Specs $specs.Count
+
+# Volatile volatile volatile — NO, these are measured LIVE and reported as
+# informational output only. No committed counter numbers are read or compared.
+$baseRef = $env:GITHUB_BASE_REF
+$pullRequestMode = -not [string]::IsNullOrWhiteSpace($baseRef)
+
+$summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; live measurement: {2} tracked paths, {3} repository JSON files.)'
 Write-Output (($summaryTemplate) -f $required.Count, $specs.Count, $trackedFiles.Count, $jsonFiles.Count)
