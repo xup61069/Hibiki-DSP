@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "issue": 423,
+  "scope_digest": "scene-ir-reference-v1",
+  "source_commit": "79f3f97",
+  "environment_fingerprint": "windows-26200-amd64-msvc-19.51.36256-cmake-4.4.0-dotnet-10.0.400-pwsh-7.6.5-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526",
+  "commands": [
+    "cmake --build .local/build --config RelWithDebInfo --target hibiki_contract_tests",
+    ".local/build/tests/RelWithDebInfo/hibiki_contract_tests.exe",
+    "pwsh -File tools/handoff-check.ps1 -Issue 423",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "pwsh -File tools/verify.ps1"
+  ],
+  "results": [
+    {
+      "command": "hibiki_contract_tests.exe",
+      "status": "pass",
+      "coverage": [
+        "SceneProfileV1.ir_reference validation bounds (empty or 8..64 bytes, no NUL) via validate_scene contract tests",
+        "SceneApply with matching non-empty ir_reference keeps committed IR across same-reference scene switches",
+        "SceneApply without a reference, with a different label, or from built-in presets still detaches IR in the same control transaction",
+        "IR transaction stays idle after keep and clear paths; cross-output-group apply remains Invalid"
+      ],
+      "compiled_artifacts": true
+    }
+  ],
+  "limitations": [
+    "Model-level hub contract evidence only; no RT audio thread, driver, WaveRT, HLK or Microsoft signing claims.",
+    "ir_reference is an opaque comparison token; no IR samples, file paths or ISO 226 coefficients are stored or claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "cmake": "4.4.0",
+    "msvc": "19.51.36256"
+  },
+  "started_at": "2026-08-23T04:30:00+08:00",
+  "finished_at": "2026-08-23T06:10:00+08:00"
+}

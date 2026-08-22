@@ -140,6 +140,8 @@ bool AudioEngineModel::has_active_ir(const std::string_view output_group) const 
            std::equal(output_group.begin(), output_group.end(), active_ir_.output_group.begin());
 }
 
+bool AudioEngineModel::ir_transaction_idle() const noexcept { return !has_pending_ir_; }
+
 IrConvolverStatusV1 AudioEngineModel::ir_status(const std::string_view output_group) const noexcept {
     return has_active_ir(output_group) ? active_ir_.convolver.status() : IrConvolverStatusV1{};
 }

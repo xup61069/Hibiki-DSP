@@ -47,6 +47,10 @@ public:
     [[nodiscard]] bool prepare_ir_clear() noexcept;
     [[nodiscard]] bool commit_ir() noexcept;
     void rollback_ir() noexcept;
+    // True when no IR prepare/clear transaction is pending. SceneApply uses
+    // this to decide whether an unchanged calibration reference can keep the
+    // current attachment untouched instead of running a clear transaction.
+    [[nodiscard]] bool ir_transaction_idle() const noexcept;
     [[nodiscard]] bool has_active_ir(std::string_view output_group = "main") const noexcept;
     [[nodiscard]] IrConvolverStatusV1 ir_status(
         std::string_view output_group = "main") const noexcept;
