@@ -13,43 +13,54 @@
         <MicaBackdrop Kind="BaseAlt" />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="RootGrid" Padding="32,24,32,20"
+    <Grid x:Name="RootGrid" Padding="36,0,16,0"
           AutomationProperties.Name="Hibiki DSP 音訊場景控制">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="48" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid ColumnSpacing="18">
+        <!-- Title-bar row: drag region on the left, interactive controls pinned right -->
+        <Grid ColumnSpacing="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel Spacing="2">
-                <TextBlock Text="Hibiki DSP" FontSize="28" FontWeight="SemiBold"
-                           Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-                <TextBlock Text="Audio Scene OS"
-                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-            </StackPanel>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
-                <TextBlock Text="{Binding ConnectionStatusText}" VerticalAlignment="Center"
+            <StackPanel x:Name="TitleBarDragRegion" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <Border Width="18" Height="18" CornerRadius="5"
+                        Background="{ThemeResource AccentFillColorDefaultBrush}">
+                    <FontIcon Glyph="&#xE9D9;" FontSize="11"
+                              Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+                </Border>
+                <TextBlock Text="Hibiki DSP" VerticalAlignment="Center"
                            Style="{ThemeResource CaptionTextBlockStyle}"
-                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                           FontWeight="SemiBold" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <Border CornerRadius="999" Padding="10,3"
+                        Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1">
+                    <TextBlock Text="{Binding ConnectionStatusText}"
+                               Style="{ThemeResource CaptionTextBlockStyle}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </Border>
                 <Button Content="連接引擎" Click="OnConnectClick" Style="{StaticResource AccentButtonStyle}"
                         AutomationProperties.Name="連接 Hibiki 音訊引擎"
                         AutomationProperties.HelpText="連接後才能套用場景與音量控制" />
             </StackPanel>
         </Grid>
 
-        <ScrollViewer Grid.Row="1" Margin="0,20,0,20">
+        <ScrollViewer Grid.Row="1" Margin="0,12,0,0">
             <StackPanel Spacing="14" MaxWidth="760">
                 <Border Padding="20" CornerRadius="8"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1">
                     <StackPanel Spacing="12">
-                        <TextBlock Text="先選輸出，再一鍵變好聽" FontSize="20" FontWeight="SemiBold"
+                        <TextBlock Text="先選輸出，再一鍵變好聽"
+                                   Style="{ThemeResource TitleTextBlockStyle}"
                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                         <ComboBox Header="輸出群組"
                                   AutomationProperties.Name="輸出群組"
@@ -85,7 +96,8 @@
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1">
                     <StackPanel Spacing="12">
-                        <TextBlock Text="場景" FontSize="18" FontWeight="SemiBold"
+                        <TextBlock Text="場景"
+                                   Style="{ThemeResource SubtitleTextBlockStyle}"
                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                         <controls:ItemsRepeater ItemsSource="{Binding Scenes}">
                             <controls:ItemsRepeater.Layout>
@@ -112,7 +124,8 @@
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1">
                     <StackPanel Spacing="12">
-                        <TextBlock Text="自訂預設" FontSize="20" FontWeight="SemiBold"
+                        <TextBlock Text="自訂預設"
+                                   Style="{ThemeResource TitleTextBlockStyle}"
                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                         <TextBlock Text="建立最多 32 個自訂卡片；完整 DSP graph 由引擎端 Scene catalog 驗證。"
                                    TextWrapping="Wrap"
@@ -143,7 +156,8 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="音量保護" FontSize="20" FontWeight="SemiBold"
+                            <TextBlock Text="音量保護"
+                                       Style="{ThemeResource TitleTextBlockStyle}"
                                        Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             <ToggleSwitch Grid.Column="1" Header="Expert" IsOn="{Binding IsExpert, Mode=TwoWay}"
                                           AutomationProperties.Name="Expert 詳細模式"
@@ -197,7 +211,7 @@
                         <TextBlock Text="{Binding Expert.StatusText}" TextWrapping="Wrap" />
 
                         <StackPanel Spacing="6">
-                            <TextBlock Text="來源與路由狀態" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <TextBlock Text="來源與路由狀態" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             <TextBlock Text="{Binding Expert.RouteSummary}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                             <controls:ItemsRepeater ItemsSource="{Binding Expert.RouteHealth}">
                                 <controls:ItemsRepeater.ItemTemplate>
@@ -213,7 +227,7 @@
                         </StackPanel>
 
                         <StackPanel Spacing="6">
-                            <TextBlock Text="App 工作階段（暫時選取清單）" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <TextBlock Text="App 工作階段（暫時選取清單）" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             <TextBlock Text="{Binding SessionCatalogSequenceDisplayText}"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                             <controls:ItemsRepeater ItemsSource="{Binding SessionCatalog}">
@@ -264,7 +278,7 @@
                         </StackPanel>
 
                         <StackPanel Spacing="8">
-                            <TextBlock Text="App 路由預設（Expert）" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <TextBlock Text="App 路由預設（Expert）" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             <TextBlock Text="建立後會保存到本機；只有 App 清單已同步且引擎回覆 Ack，才會顯示為已套用。App ID 或顯示名稱至少填一項。"
                                        TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             <controls:ItemsRepeater ItemsSource="{Binding RouteRules}">
@@ -327,7 +341,7 @@
                         </StackPanel>
 
                         <StackPanel Spacing="6">
-                            <TextBlock Text="Matrix" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <TextBlock Text="Matrix" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             <TextBlock Text="{Binding Expert.MatrixSummary}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             <controls:ItemsRepeater ItemsSource="{Binding Expert.MatrixRoutes}">
                                 <controls:ItemsRepeater.ItemTemplate>
@@ -348,7 +362,7 @@
                         </StackPanel>
 
                         <StackPanel Spacing="6">
-                            <TextBlock Text="DSP Graph" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <TextBlock Text="DSP Graph" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             <TextBlock Text="{Binding Expert.DspSummary}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             <controls:ItemsRepeater ItemsSource="{Binding Expert.DspGraph}">
                                 <controls:ItemsRepeater.ItemTemplate>
@@ -363,7 +377,7 @@
                         </StackPanel>
 
                         <StackPanel Spacing="6">
-                            <TextBlock Text="VST3 隔離 Lane" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <TextBlock Text="VST3 隔離 Lane" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             <TextBlock Text="{Binding Expert.Vst3Summary}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                             <controls:ItemsRepeater ItemsSource="{Binding Expert.Vst3Lanes}">
                                 <controls:ItemsRepeater.ItemTemplate>
@@ -382,7 +396,7 @@
                         </StackPanel>
 
                         <StackPanel Spacing="4">
-                            <TextBlock Text="校正狀態" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <TextBlock Text="校正狀態" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             <TextBlock Text="{Binding Expert.Calibration.Mode}" />
                             <TextBlock Text="{Binding Expert.Calibration.Status}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             <TextBlock Text="{Binding Expert.Calibration.Detail}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -393,6 +407,7 @@
         </ScrollViewer>
 
         <TextBlock Grid.Row="2" Text="Easy 模式只顯示安全操作；切換 Expert 才會顯示 Matrix、DSP Graph、IR 與 VST3。"
+                   Margin="0,10,0,14"
                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
     </Grid>
 </Window>
