@@ -8,7 +8,12 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
     Title="Hibiki DSP">
-    <Grid x:Name="RootGrid" Padding="28" Background="#111217"
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop Kind="BaseAlt" />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="RootGrid" Padding="32,24,32,20"
           AutomationProperties.Name="Hibiki DSP 音訊場景控制">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -21,23 +26,31 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel Spacing="4">
-                <TextBlock Text="Hibiki DSP" FontSize="30" FontWeight="SemiBold" />
-                <TextBlock Text="Audio Scene OS" Opacity="0.72" />
+            <StackPanel Spacing="2">
+                <TextBlock Text="Hibiki DSP" FontSize="28" FontWeight="SemiBold"
+                           Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                <TextBlock Text="Audio Scene OS"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                <TextBlock Text="{Binding ConnectionStatusText}" VerticalAlignment="Center" />
-                <Button Content="連接引擎" Click="OnConnectClick"
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="{Binding ConnectionStatusText}" VerticalAlignment="Center"
+                           Style="{ThemeResource CaptionTextBlockStyle}"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Button Content="連接引擎" Click="OnConnectClick" Style="{StaticResource AccentButtonStyle}"
                         AutomationProperties.Name="連接 Hibiki 音訊引擎"
                         AutomationProperties.HelpText="連接後才能套用場景與音量控制" />
             </StackPanel>
         </Grid>
 
-        <ScrollViewer Grid.Row="1" Margin="0,24,0,24">
-            <StackPanel Spacing="18" MaxWidth="760">
-                <Border Padding="20" CornerRadius="12" Background="#1D2028">
+        <ScrollViewer Grid.Row="1" Margin="0,20,0,20">
+            <StackPanel Spacing="14" MaxWidth="760">
+                <Border Padding="20" CornerRadius="8"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1">
                     <StackPanel Spacing="12">
-                        <TextBlock Text="先選輸出，再一鍵變好聽" FontSize="22" FontWeight="SemiBold" />
+                        <TextBlock Text="先選輸出，再一鍵變好聽" FontSize="20" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                         <ComboBox Header="輸出群組"
                                   AutomationProperties.Name="輸出群組"
                                   AutomationProperties.HelpText="選擇 Main、Low Latency 或 Surround 輸出"
@@ -56,19 +69,24 @@
                                 IsEnabled="{Binding IsConnected}"
                                 AutomationProperties.Name="切換實體輸出裝置"
                                 AutomationProperties.HelpText="先預熱新裝置，再以 30 ms 交叉淡化；失敗會回復上一個裝置" />
-                        <TextBlock Text="{Binding DeviceSwitchStatusText}" TextWrapping="Wrap" Opacity="0.72"
+                        <TextBlock Text="{Binding DeviceSwitchStatusText}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                    AutomationProperties.LiveSetting="Polite" />
                         <Button Content="一鍵改善" Click="OnEnhanceClick" IsEnabled="{Binding IsConnected}"
+                                Style="{StaticResource AccentButtonStyle}"
                                 AutomationProperties.Name="一鍵改善聲音"
                                 AutomationProperties.HelpText="套用遊戲場景、校正與音量保護" />
-                        <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" Opacity="0.82"
+                        <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                    AutomationProperties.LiveSetting="Polite" />
                     </StackPanel>
                 </Border>
 
-                <Border Padding="20" CornerRadius="12" Background="#1D2028">
+                <Border Padding="20" CornerRadius="8"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1">
                     <StackPanel Spacing="12">
-                        <TextBlock Text="場景" FontSize="20" FontWeight="SemiBold" />
+                        <TextBlock Text="場景" FontSize="18" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                         <controls:ItemsRepeater ItemsSource="{Binding Scenes}">
                             <controls:ItemsRepeater.Layout>
                                 <controls:UniformGridLayout MaximumRowsOrColumns="2" MinItemWidth="260" MinItemHeight="84" />
@@ -80,7 +98,7 @@
                                             AutomationProperties.HelpText="{Binding Description}">
                                         <StackPanel Spacing="3">
                                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                            <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Opacity="0.72" />
+                                            <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                         </StackPanel>
                                     </Button>
                                 </DataTemplate>
@@ -89,11 +107,16 @@
                     </StackPanel>
                 </Border>
 
-                <Border Padding="20" CornerRadius="12" Background="#1D2028">
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="自訂預設" FontSize="20" FontWeight="SemiBold" />
+                <Border Padding="20" CornerRadius="8"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="自訂預設" FontSize="20" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                         <TextBlock Text="建立最多 32 個自訂卡片；完整 DSP graph 由引擎端 Scene catalog 驗證。"
-                                   TextWrapping="Wrap" Opacity="0.72" />
+                                   TextWrapping="Wrap"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         <TextBox Header="Scene ID（英文小寫）"
                                  Text="{Binding CustomSceneId, Mode=TwoWay}"
                                  AutomationProperties.Name="自訂場景 ID"
@@ -110,14 +133,18 @@
                     </StackPanel>
                 </Border>
 
-                <Border Padding="20" CornerRadius="12" Background="#1D2028">
+                <Border Padding="20" CornerRadius="8"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1">
                     <StackPanel Spacing="12">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="音量保護" FontSize="20" FontWeight="SemiBold" />
+                            <TextBlock Text="音量保護" FontSize="20" FontWeight="SemiBold"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             <ToggleSwitch Grid.Column="1" Header="Expert" IsOn="{Binding IsExpert, Mode=TwoWay}"
                                           AutomationProperties.Name="Expert 詳細模式"
                                           AutomationProperties.HelpText="顯示 Matrix、DSP Graph、VST3 與校正狀態" />
@@ -129,10 +156,13 @@
                         <TextBlock Text="{Binding EffectiveVolumeDisplayText}"
                                    AutomationProperties.Name="實際有效音量"
                                    AutomationProperties.HelpText="{Binding EffectiveVolumeDb}" />
-                        <TextBlock Text="{Binding SafetyStatusText}" TextWrapping="Wrap" Opacity="0.82"
+                        <TextBlock Text="{Binding SafetyStatusText}" TextWrapping="Wrap"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                    AutomationProperties.LiveSetting="Polite" />
-                        <TextBlock Text="{Binding VolumeOriginText}" Opacity="0.72" />
-                        <TextBlock Text="{Binding VolumeActuatorText}" Opacity="0.72" />
+                        <TextBlock Text="{Binding VolumeOriginText}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="{Binding VolumeActuatorText}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         <ToggleSwitch Header="靜音" IsOn="{Binding Muted, Mode=TwoWay}"
                                       AutomationProperties.Name="靜音"
                                       AutomationProperties.HelpText="淡出目前輸出並保留音量設定" />
@@ -148,12 +178,14 @@
                                 IsEnabled="{Binding IrPhaseUsesFir}"
                                 AutomationProperties.Name="IR 相位強度"
                                 AutomationProperties.HelpText="調整 mixed-phase 或 linear-phase 的延遲與相位折衷" />
-                        <TextBlock Text="{Binding IrPhaseModeText}" Opacity="0.72" />
+                        <TextBlock Text="{Binding IrPhaseModeText}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         <TextBlock Text="{Binding IrAddedDelayDisplayText}"
                                    AutomationProperties.HelpText="{Binding IrAddedDelayMs}"
-                                   Opacity="0.72" />
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         <TextBlock Text="IR WAV 會在 Engine Preview 的 control-plane prepare/commit；尚無實體 sink。"
-                                   TextWrapping="Wrap" Opacity="0.72" />
+                                   TextWrapping="Wrap"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </Border>
 
@@ -165,15 +197,15 @@
                         <TextBlock Text="{Binding Expert.StatusText}" TextWrapping="Wrap" />
 
                         <StackPanel Spacing="6">
-                            <TextBlock Text="來源與路由狀態" FontSize="18" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding Expert.RouteSummary}" Opacity="0.72" TextWrapping="Wrap" />
+                            <TextBlock Text="來源與路由狀態" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <TextBlock Text="{Binding Expert.RouteSummary}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                             <controls:ItemsRepeater ItemsSource="{Binding Expert.RouteHealth}">
                                 <controls:ItemsRepeater.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Padding="4" Spacing="2">
                                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
                                             <TextBlock Text="{Binding StateLabel}" />
-                                            <TextBlock Text="{Binding Detail}" TextWrapping="Wrap" Opacity="0.72" />
+                                            <TextBlock Text="{Binding Detail}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                         </StackPanel>
                                     </DataTemplate>
                                 </controls:ItemsRepeater.ItemTemplate>
@@ -181,9 +213,9 @@
                         </StackPanel>
 
                         <StackPanel Spacing="6">
-                            <TextBlock Text="App 工作階段（暫時選取清單）" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock Text="App 工作階段（暫時選取清單）" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             <TextBlock Text="{Binding SessionCatalogSequenceDisplayText}"
-                                       Opacity="0.72" TextWrapping="Wrap" />
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                             <controls:ItemsRepeater ItemsSource="{Binding SessionCatalog}">
                                 <controls:ItemsRepeater.ItemTemplate>
                                     <DataTemplate>
@@ -194,7 +226,7 @@
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Spacing="2">
                                                 <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
-                                                <TextBlock Text="{Binding AccessibleSummary}" Opacity="0.72" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding AccessibleSummary}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Spacing="4">
                                                 <TextBlock Text="{Binding RouteStateLabel}" />
@@ -207,9 +239,9 @@
                                 </controls:ItemsRepeater.ItemTemplate>
                             </controls:ItemsRepeater>
                             <TextBlock Text="{Binding SelectedSessionDisplayText}"
-                                       Opacity="0.72" />
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             <TextBlock Text="{Binding SessionVolumeDisplayText}"
-                                       Opacity="0.72" />
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             <TextBlock Text="{Binding SelectedRouteRuleSummary}" TextWrapping="Wrap"
                                        AutomationProperties.Name="目前 App 路由預設預覽" />
                             <Slider Minimum="-60" Maximum="6" StepFrequency="0.5"
@@ -232,9 +264,9 @@
                         </StackPanel>
 
                         <StackPanel Spacing="8">
-                            <TextBlock Text="App 路由預設（Expert）" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock Text="App 路由預設（Expert）" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             <TextBlock Text="建立後會保存到本機；只有 App 清單已同步且引擎回覆 Ack，才會顯示為已套用。App ID 或顯示名稱至少填一項。"
-                                       TextWrapping="Wrap" Opacity="0.72" />
+                                       TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             <controls:ItemsRepeater ItemsSource="{Binding RouteRules}">
                                 <controls:ItemsRepeater.ItemTemplate>
                                     <DataTemplate>
@@ -295,8 +327,8 @@
                         </StackPanel>
 
                         <StackPanel Spacing="6">
-                            <TextBlock Text="Matrix" FontSize="18" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding Expert.MatrixSummary}" Opacity="0.72" />
+                            <TextBlock Text="Matrix" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <TextBlock Text="{Binding Expert.MatrixSummary}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             <controls:ItemsRepeater ItemsSource="{Binding Expert.MatrixRoutes}">
                                 <controls:ItemsRepeater.ItemTemplate>
                                     <DataTemplate>
@@ -316,14 +348,14 @@
                         </StackPanel>
 
                         <StackPanel Spacing="6">
-                            <TextBlock Text="DSP Graph" FontSize="18" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding Expert.DspSummary}" Opacity="0.72" />
+                            <TextBlock Text="DSP Graph" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <TextBlock Text="{Binding Expert.DspSummary}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             <controls:ItemsRepeater ItemsSource="{Binding Expert.DspGraph}">
                                 <controls:ItemsRepeater.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Padding="4" Spacing="2">
                                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                            <TextBlock Text="{Binding Detail}" Opacity="0.72" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Detail}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                         </StackPanel>
                                     </DataTemplate>
                                 </controls:ItemsRepeater.ItemTemplate>
@@ -331,8 +363,8 @@
                         </StackPanel>
 
                         <StackPanel Spacing="6">
-                            <TextBlock Text="VST3 隔離 Lane" FontSize="18" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding Expert.Vst3Summary}" Opacity="0.72" TextWrapping="Wrap" />
+                            <TextBlock Text="VST3 隔離 Lane" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <TextBlock Text="{Binding Expert.Vst3Summary}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                             <controls:ItemsRepeater ItemsSource="{Binding Expert.Vst3Lanes}">
                                 <controls:ItemsRepeater.ItemTemplate>
                                     <DataTemplate>
@@ -342,7 +374,7 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding Name}" />
-                                            <TextBlock Grid.Column="1" Text="{Binding Status}" Opacity="0.72" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Status}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                         </Grid>
                                     </DataTemplate>
                                 </controls:ItemsRepeater.ItemTemplate>
@@ -350,16 +382,17 @@
                         </StackPanel>
 
                         <StackPanel Spacing="4">
-                            <TextBlock Text="校正狀態" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock Text="校正狀態" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             <TextBlock Text="{Binding Expert.Calibration.Mode}" />
-                            <TextBlock Text="{Binding Expert.Calibration.Status}" Opacity="0.72" />
-                            <TextBlock Text="{Binding Expert.Calibration.Detail}" TextWrapping="Wrap" Opacity="0.72" />
+                            <TextBlock Text="{Binding Expert.Calibration.Status}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="{Binding Expert.Calibration.Detail}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
                     </StackPanel>
                 </controls:Expander>
             </StackPanel>
         </ScrollViewer>
 
-        <TextBlock Grid.Row="2" Text="Easy 模式只顯示安全操作；切換 Expert 才會顯示 Matrix、DSP Graph、IR 與 VST3。" Opacity="0.64" TextWrapping="Wrap" />
+        <TextBlock Grid.Row="2" Text="Easy 模式只顯示安全操作；切換 Expert 才會顯示 Matrix、DSP Graph、IR 與 VST3。"
+                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
     </Grid>
 </Window>
