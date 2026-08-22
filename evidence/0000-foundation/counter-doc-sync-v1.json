@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "issue": 184,
+  "scope_digest": "counter-doc-sync-v1",
+  "source_commit": "PENDING",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; cmake-missing-wdk-missing-portable-user-space",
+  "commands": [
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 184",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/docs-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "regression guard: self-test suite still green after documentation-only edits"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 21
+    },
+    {
+      "command": "AGENTS.md / docs/AI_HANDOFF.md content review",
+      "status": "pass",
+      "coverage": [
+        "AGENTS.md counter paragraph now instructs -WriteCounters regeneration of build/baseline-counters.json instead of prose-digit updates",
+        "AGENTS.md paragraph states the #183 strict semantics for counters-editing PRs and the first-introduction tolerance",
+        "AI_HANDOFF.md process-gates bullet describes the JSON source of truth and same-slice regeneration"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation-contract sync only; does not alter gate code, RT-DSP, driver audio behavior, or any product API.",
+    "Does not claim physical audio, per-App delivery, a loadable driver, HLK or Microsoft signing."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.5"
+  },
+  "started_at": "2026-08-22T16:02:00+08:00",
+  "finished_at": "2026-08-22T16:08:00+08:00"
+}
