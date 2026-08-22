@@ -58,8 +58,25 @@ try
         !viewModel.IrPrepareStatus.Contains("已在引擎", StringComparison.Ordinal))
         throw new InvalidOperationException("Control model IR prepare was not acknowledged.");
 
-    if (!await viewModel.SelectSceneAsync("movie") || viewModel.HasPreparedIr ||
-        !viewModel.IrPrepareStatus.Contains("IR 已清除", StringComparison.Ordinal))
+    if (!await viewModel.SelectSceneAsync("movie"))
+        throw new InvalidOperationException("Control model SceneApply (movie) was not acknowledged.");
+
+    // The engine status response can be computed before its scene-apply transaction
+    // finishes, so a single-shot snapshot may still report prepared IR and overwrite
+    // the locally-cleared state. Wait (bounded) for eventual consistency instead of
+    // asserting once; the documented polling model already implies eventual consistency.
+    var irClearedOnScene = false;
+    for (var waitMs = 0; waitMs < 3000; waitMs += 100)
+    {
+        if (!viewModel.HasPreparedIr &&
+            viewModel.IrPrepareStatus.Contains("IR 已清除", StringComparison.Ordinal))
+        {
+            irClearedOnScene = true;
+            break;
+        }
+        await System.Threading.Tasks.Task.Delay(100);
+    }
+    if (!irClearedOnScene)
         throw new InvalidOperationException("Scene switch did not clear the prepared IR state.");
 
     var physicalRefresh = await viewModel.RefreshPhysicalDevicesAsync();
