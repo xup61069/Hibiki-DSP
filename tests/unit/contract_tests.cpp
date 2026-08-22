@@ -2552,6 +2552,67 @@ int main() {
 #endif
 #if defined(_WIN32)
     {
+        wchar_t export_temp_root[MAX_PATH];
+        const DWORD export_temp_length = GetTempPathW(MAX_PATH, export_temp_root);
+        CHECK(export_temp_length > 0U && export_temp_length < MAX_PATH);
+        const std::filesystem::path export_root =
+            std::filesystem::path(std::wstring(export_temp_root)) /
+            (L"hibiki_timeline_export_" + std::to_wstring(GetTickCount()));
+        Vst3TimelineFileStoreV1 export_store;
+        auto export_scheduler = std::make_unique<Vst3SceneAutomationSchedulerV1>();
+        Vst3SchedulerStoreExportResultV1 export_result{};
+        std::array<std::string, kVst3TimelineStoreMaxEntriesV1> stale_listing{};
+        std::size_t stale_listing_count = 99U;
+        CHECK(sync_scheduler_to_timeline_store_v1(
+                  *export_scheduler, export_store, stale_listing,
+                  stale_listing_count, export_result) ==
+                  Vst3TimelineStoreStatusV1::invalid_argument &&
+              export_result.saved == 0U && export_result.skipped == 0U &&
+              stale_listing_count == 0U);
+        CHECK(export_store.open(export_root.wstring()) && export_store.is_open());
+        CHECK(export_store.save("ghost", persist_empty) ==
+              Vst3TimelineStoreStatusV1::ok);
+        {
+            std::ofstream corrupt_stream(export_root / L"alpha.json",
+                                         std::ios::binary | std::ios::trunc);
+            corrupt_stream << "{ broken";
+            corrupt_stream.close();
+        }
+        CHECK(sync_scheduler_to_timeline_store_v1(
+                  *export_scheduler, export_store, stale_listing,
+                  stale_listing_count, export_result) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              export_result.saved == 0U && export_result.skipped == 0U &&
+              stale_listing_count == 2U && stale_listing[0] == "alpha" &&
+              stale_listing[1] == "ghost");
+        CHECK(export_scheduler->upsert_timeline("alpha", persist_source) &&
+              export_scheduler->upsert_timeline("beta-9", persist_empty));
+        CHECK(sync_scheduler_to_timeline_store_v1(
+                  *export_scheduler, export_store, stale_listing,
+                  stale_listing_count, export_result) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              export_result.saved == 2U && export_result.skipped == 0U &&
+              stale_listing_count == 1U && stale_listing[0] == "ghost");
+        Vst3ParameterTimelineSnapshotV1 exported_reload{};
+        CHECK(export_store.load("alpha", exported_reload) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              exported_reload.event_count == 2U &&
+              exported_reload.events[1].parameter_id == 7U);
+        CHECK(export_store.save("stale-one", persist_empty) ==
+              Vst3TimelineStoreStatusV1::ok);
+        std::array<std::string, 0> zero_stale{};
+        stale_listing_count = 0U;
+        CHECK(sync_scheduler_to_timeline_store_v1(
+                  *export_scheduler, export_store, zero_stale,
+                  stale_listing_count, export_result) ==
+                  Vst3TimelineStoreStatusV1::capacity_exhausted &&
+              stale_listing_count == 2U);
+        std::error_code export_cleanup_error;
+        std::filesystem::remove_all(export_root, export_cleanup_error);
+    }
+#endif
+#if defined(_WIN32)
+    {
         wchar_t temp_root[MAX_PATH];
         const DWORD temp_length = GetTempPathW(MAX_PATH, temp_root);
         CHECK(temp_length > 0U && temp_length < MAX_PATH);

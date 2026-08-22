@@ -1,0 +1,62 @@
+﻿{
+  "schema_version": 1,
+  "issue": 110,
+  "scope_digest": "vst3-scheduler-store-export-v1",
+  "source_commit": "pending",
+  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-msvc-19.44-dotnet-10.0.301-pwsh-7.6.5; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 110",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "sync_scheduler_to_timeline_store_v1 exports every scheduler timeline into the store in deterministic sorted order via the atomic save path",
+        "closed store returns invalid_argument with zeroed result and stale count",
+        "empty scheduler over a pre-seeded store exports nothing and reports both pre-existing IDs as stale candidates in sorted order",
+        "exporting replaces a corrupt pre-existing document under an exported ID; store.load then round-trips the snapshot",
+        "store entries absent from the scheduler are reported stale exactly once each",
+        "undersized stale destination fails closed with capacity_exhausted and the true total count, no partial listing",
+        "C++ build and CTest contract suite (1/1 passed)"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 110 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope exclusivity and Git ancestry checks"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 / tools/source-policy.ps1 / tools/source-only-ci-check.ps1 / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "documentation gates with refreshed BASELINE counters, source-only policy and whitespace cleanliness"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Stale candidates are reported only; pruning is an explicit caller decision.",
+    "Single-writer control-plane adapter; no new locking or threading model.",
+    "User-space source-contract evidence only; this proves nothing about physical audio, per-App delivery, drivers, HLK or Microsoft signing."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSVC 19.44 (VS 2022 BuildTools 17.14)",
+    "cmake": "4.4.0",
+    "dotnet": "10.0.301",
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}
