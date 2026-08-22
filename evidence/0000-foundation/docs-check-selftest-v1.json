@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "issue": 41,
+  "scope_digest": "docs-check-selftest-v1",
+  "source_commit": "0944a8e73a08d8e9a7616bcda313bead1eebb445",
+  "environment_fingerprint": "windows-26200-amd64-powershell-5.1-dotnet-only-portable-pwsh-7.6.5-no-cmake-no-vs; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 41",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/docs-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "valid BASELINE verification-summary text passes with matching measured counters",
+        "parametrized pass with shifted counter values proves no hard-coded expectations",
+        "required-entry count mismatch rejected with claimed-versus-measured message",
+        "spec count mismatch rejected with claimed-versus-measured message",
+        "tracked-path count mismatch rejected with claimed-versus-measured message",
+        "repository JSON count mismatch rejected with claimed-versus-measured message",
+        "fully missing summary text rejected on the first missing marker",
+        "summary with only the tracked-path marker removed rejected on that specific marker"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "85 required documentation paths and 24 specs unchanged",
+        "baseline summary gate verified against live git measurements via the refactored function"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 41 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 41",
+        "multi-agent active handoff validation across all active lanes"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1 / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "tracked paths with no blocked binary or secret",
+        "source-only CI publication policy intact",
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Tooling and governance gate coverage only; does not alter RT-DSP, driver audio behavior, or any product API.",
+    "SelfTest fixtures are in-memory strings sharing pattern constants with the production gate; rewording the BASELINE summary sentence requires updating both together by design.",
+    "Does not claim physical audio, per-App delivery, a loadable driver, HLK or Microsoft signing.",
+    "Local machine is below the locked target toolchain; no C++ build evidence is produced by this slice."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5 portable"
+  },
+  "started_at": "2026-08-22T04:45:00+08:00",
+  "finished_at": "2026-08-22T04:55:00+08:00"
+}

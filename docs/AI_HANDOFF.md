@@ -116,6 +116,24 @@ Issue 0 是 foundation integration handoff，只由 integrator 更新，不是�
 - The same transport now has a 16-byte header-only Hello/Ack/Error request-correlation contract;
   it intentionally has no unbounded error payload. Evidence for this increment is
   `evidence/0000-foundation/driver-control-handshake-v1.json`.
+- The vst-host supervisor timeline chain is merged end to end (all user-space source
+  contracts): bounded editing transactions `Vst3TimelineEditorV1` (`9f5f02e`, Issue #14),
+  scheduler-bound edit sessions with `timeline_snapshot` readback (`8a041a2`/`5c15b8e`,
+  Issue #22), canonical fail-closed JSON persistence for
+  `vst3-parameter-timeline-v1.schema.json` (`ff46e15`, Issue #35), a fixed-capacity
+  per-timeline file store with strict filename-safe IDs (`dbafc4f`, Issue #63),
+  store→scheduler sync via `sync_timeline_store_to_scheduler_v1` (`9cca03d`, Issue #72)
+  and sorted timeline-ID plus immutable binding-view introspection (`b7e2ea8`, Issue #78).
+  The supervisor UI editing surface, side-chain/multi-bus worker process and third-party
+  certification remain open; none of this proves physical audio or driver delivery.
+- Process gates learned this week: gate scripts require PowerShell 7 (PS 5.1 cannot run
+  the UTF-8-no-BOM tooling; install via winget), multiple gates expose `-SelfTest`
+  (`tools/docs-check.ps1 -SelfTest` is merged), the volatile BASELINE summary counters live
+  in `build/baseline-counters.json` and fail closed — file-adding slices regenerate them with
+  `tools/docs-check.ps1 -WriteCounters` in the same slice, counters-editing PRs are verified
+  against their own head tree (#182/#183), the merge-ref-aware gate tolerates only
+  untouched-BASELINE handoff-only PR drift in CI while keeping push/local strict, and the
+  #25 scope-overlap gate rejects overlapping active `scope_globs` across handoffs.
 
 ## 目前整合主線
 

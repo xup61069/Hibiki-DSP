@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "issue": 80,
+  "scope_digest": "control-model-engine-smoke-selftest-v1",
+  "source_commit": "cd237422998a69e77ebc102a0a2dfcb0565814bf",
+  "environment_fingerprint": "windows-11-26200-x64-preview",
+  "commands": [
+    "pwsh -NoProfile -File tools/control-model-engine-smoke.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/control-model-engine-smoke.ps1",
+    "pwsh -NoProfile -File tools/control-model-engine-smoke.ps1 -EnableSessionRouting",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 80",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/control-model-engine-smoke.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "default ordered dotnet run arguments",
+        "session-routing flag appended only when enabled",
+        "release configuration and nologo arguments",
+        "project and output-root isolation"
+      ],
+      "cases": 4,
+      "dotnet_invoked": false,
+      "engine_process_started": false,
+      "wrote_files": false
+    },
+    {
+      "command": "tools/control-model-engine-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "launcher started Engine Preview and successfully completed the C# control-model smoke",
+        "status sequence reconciliation and volume assertion verified"
+      ],
+      "launcher_argument_error": false,
+      "cleanup_completed": true
+    },
+    {
+      "command": "tools/control-model-engine-smoke.ps1 -EnableSessionRouting",
+      "status": "pass",
+      "coverage": [
+        "launcher started Engine Preview with session-routing flag and successfully completed C# smoke",
+        "session routing probe passed and cleanup completed"
+      ],
+      "launcher_argument_error": false,
+      "cleanup_completed": true
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 80 / tools/handoff-check.ps1 / source-policy / source-only-ci / verify / docs-check / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership and scope",
+        "tracked paths source policy",
+        "one workflow source-only publication boundary",
+        "CMake/CTest 1 of 1",
+        "documentation and baseline counters verified",
+        "no whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "The 4-case self-test is deterministic PowerShell launcher evidence only; it does not claim C# process launch, named-pipe delivery, physical endpoint delivery, driver, WaveRT, HLK, signing, or real audio behavior.",
+    "Normal and session-routing cross-process smoke tests verify the user-space smoke launcher and ViewModel-to-EnginePreview sequence reconciliation only.",
+    "Release build outputs remain ignored local artifacts and are not submitted to GitHub."
+  ],
+  "tool_versions": {
+    "compiler": "MSVC 19.44.35228.0",
+    "cmake": "4.4.0",
+    "dotnet": "10.0.301",
+    "powershell": "pwsh 7.6.5"
+  },
+  "started_at": "2026-08-22T09:14:00+08:00",
+  "finished_at": "2026-08-22T09:17:00+08:00"
+}

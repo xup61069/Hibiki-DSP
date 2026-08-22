@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "issue": 66,
+  "scope_digest": "context-pack-glob-v1",
+  "source_commit": "68aed23",
+  "environment_fingerprint": "windows-11-26200-x64-preview",
+  "commands": [
+    "pwsh -NoProfile -File tools/context-pack.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 66",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/context-pack.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "exact match and near miss rejection",
+        "single-star wildcard without directory crossing",
+        "single question mark wildcard",
+        "recursive glob direct child and deep child match",
+        "recursive extension near miss rejection",
+        "recursive suffix and root match"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 12
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 66 / tools/handoff-check.ps1 / source-policy / source-only-ci / verify / docs-check / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership and scope",
+        "462 tracked paths source policy",
+        "one workflow source-only publication boundary",
+        "CMake/CTest 1 of 1",
+        "documentation and baseline counters verified",
+        "no whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "This slice changes only context selection tooling; it does not change product behavior, IPC, DSP, RT-thread, driver, signing, installer, or physical-audio capabilities.",
+    "Self-test fixtures cover the supported glob subset used by context-pack; they do not claim full gitignore or filesystem glob compatibility."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.301",
+    "msvc": "19.44.35228.0",
+    "powershell": "7.6.5",
+    "cmake": "4.4.0"
+  },
+  "started_at": "2026-08-22T10:37:00+08:00",
+  "finished_at": "2026-08-22T10:38:00+08:00"
+}
