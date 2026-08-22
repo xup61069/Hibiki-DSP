@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "issue": 114,
+  "scope_digest": "engine-preview-build-selftest-v1",
+  "source_commit": "c7b87fa",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-28000-dotnet10; target-wdk-28000-missing; cmake-vs-bundled",
+  "commands": [
+    "pwsh -NoProfile -File tools/build-engine-preview.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/build-engine-preview.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/build-engine-preview.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "Engine Preview target hibiki_engine_preview and Release configuration",
+        "ignored relative output root .local/engine-preview derived from repository root",
+        "CMake configure source/build ordering and required feature/test flags",
+        "CMake build target/configuration dispatch",
+        "invalid target rejection"
+      ],
+      "compiled_artifacts": false,
+      "processes_started": false,
+      "files_written": false
+    },
+    {
+      "command": "tools/build-engine-preview.ps1",
+      "status": "pass",
+      "coverage": [
+        "CMake configure with HIBIKI_BUILD_ENGINE_PREVIEW=ON and HIBIKI_BUILD_TESTS=OFF",
+        "Release hibiki_engine_preview target build",
+        "all generated output remained under ignored .local/engine-preview"
+      ],
+      "compiled_artifacts": false,
+      "processes_started": true,
+      "files_written": true
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "unsigned local CMake configure/build",
+        "CTest 1/1 contract test"
+      ],
+      "compiled_artifacts": false,
+      "processes_started": true,
+      "files_written": true
+    }
+  ],
+  "limitations": [
+    "This is deterministic source-only build-dispatch evidence; it does not prove CMake configure, compilation, Engine Preview launch, IPC delivery, physical audio delivery, driver, WaveRT, HLK, signing, or release behavior.",
+    "The offline self-test does not replace the normal build path; the normal build and verify results depend on the local CMake/toolchain environment.",
+    "Formal WDK/WinUI verification is unavailable on this machine."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4",
+    "cmake": "Visual Studio 2026 bundled CMake; not on default PATH"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}
