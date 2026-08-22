@@ -20,9 +20,21 @@ public sealed partial class MainWindow : Window
 #else
         InitializeComponent();
         RootGrid.DataContext = ViewModel;
+        ConfigureTitleBar();
 #endif
         Closed += OnClosed;
     }
+
+#if !HIBIKI_COMPATIBILITY_PREVIEW
+    private void ConfigureTitleBar()
+    {
+        ExtendsContentIntoTitleBar = true;
+        if (RootGrid.FindName("TitleBarDragRegion") is UIElement dragRegion)
+        {
+            SetTitleBar(dragRegion);
+        }
+    }
+#endif
 
     private async void OnConnectClick(object sender, RoutedEventArgs e)
     {
