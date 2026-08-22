@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "issue": 343,
+  "scope_digest": "control-pipe-idle-drop-v1",
+  "source_commit": "1ff8d1c",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-qfe-10.1.28000.2526-pwsh-7.6.5-dotnet-10.0.400",
+  "root_cause": {
+    "summary": "IpcNamedPipeServerV1::run used the single configured io_timeout_ms (1000 ms in the engine preview) as a hard deadline for every frame read; a connected client that sent nothing for just over one second had its session torn down.",
+    "empirical_signature": ".local/diagnostics/idle-drop: connect ok, first refresh ok, after_idle_ms=1500 refresh FAILED with connected=False (pre-fix)",
+    "impact": "the control model polls at ~1 Hz, so any load-induced poll delay (GC pause, busy engine loop) randomly degraded long-lived UI sessions; this matches the load-sensitive intermittent failure class reported around Issue #278"
+  },
+  "fix": {
+    "file": "src/hub/src/ipc_pipe.cpp",
+    "change": "added read_exact_idle_tolerant for the frame length-prefix read: a wait that expires before any byte of the current read arrives is retried while the server is not stopping; once any byte arrives further stalls stay fatal because partial frame state cannot be resumed safely; payload reads and response writes remain strict fail-closed transfers; accept-phase cycling and stop() cancellation behavior are unchanged"
+  },
+  "verification": [
+    {
+      "command": ".local/diagnostics/idle-drop probe (post-fix)",
+      "status": "pass",
+      "coverage": [
+        "connect + first refresh pass",
+        "idle 1500 ms then refresh: ok",
+        "idle 3000 ms then refresh: ok",
+        "idle 4500 ms then refresh: ok",
+        "RESULT=idle-tolerated"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/control-model-engine-smoke.ps1",
+      "status": "pass",
+      "coverage": ["full control-model sequence on the patched engine"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/engine-preview-smoke.ps1",
+      "status": "pass",
+      "coverage": ["bounded IR WAV prepare and phase-policy ACK smoke on the patched engine"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": ["Visual Studio/CMake build incl. modified ipc_pipe.cpp", "CTest pass", "distribution self-test sweep", "unsigned local verification"],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "User-space Windows verification only; no physical audio, WaveRT, HLK or Microsoft signing evidence.",
+    "Control-pipe thread only; RT audio thread rules are untouched.",
+    "Writes and payload reads remain fail-closed by design; only inter-frame idle waits became non-fatal."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369"
+  },
+  "started_at": "2026-08-22T22:41:00+08:00",
+  "finished_at": "2026-08-22T23:02:00+08:00"
+}
