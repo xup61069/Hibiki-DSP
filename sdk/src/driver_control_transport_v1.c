@@ -81,7 +81,8 @@ static int valid_header_packet(const uint8_t* const packet, const size_t packet_
     return packet != NULL && packet_bytes == HIBIKI_DRIVER_CONTROL_HEADER_BYTES_V1 &&
            read_u32_le(packet) == HIBIKI_DRIVER_CONTROL_HEADER_BYTES_V1 &&
            read_u16_le(packet + 4U) == HIBIKI_DRIVER_CONTROL_ABI_V1 &&
-           valid_control_message_type(read_u16_le(packet + 6U));
+           valid_control_message_type(read_u16_le(packet + 6U)) &&
+           read_u64_le(packet + 8U) != 0U;
 }
 
 int hibiki_driver_control_header_packet_validate_v1(
@@ -98,7 +99,8 @@ int hibiki_driver_control_header_packet_encode_v1(
     size_t* const written_bytes) {
     if (written_bytes != NULL) *written_bytes = 0U;
     if (packet == NULL || packet_capacity < HIBIKI_DRIVER_CONTROL_HEADER_BYTES_V1 ||
-        written_bytes == NULL || !valid_control_message_type(message_type)) {
+        written_bytes == NULL || !valid_control_message_type(message_type) ||
+        request_id == 0U) {
         return 0;
     }
     memset(packet, 0, HIBIKI_DRIVER_CONTROL_HEADER_BYTES_V1);
@@ -130,6 +132,7 @@ static int valid_packet_header(const uint8_t* const packet,
         read_u32_le(packet) != HIBIKI_DRIVER_CONTROL_ENDPOINT_STATE_PACKET_BYTES_V1 ||
         read_u16_le(packet + 4U) != HIBIKI_DRIVER_CONTROL_ABI_V1 ||
         !valid_message_type(read_u16_le(packet + 6U)) ||
+        read_u64_le(packet + 8U) == 0U ||
         !valid_guid(packet + HIBIKI_DRIVER_CONTROL_ENDPOINT_GUID_OFFSET_V1) ||
         !valid_guid(packet + HIBIKI_DRIVER_CONTROL_EVENT_CONTEXT_GUID_OFFSET_V1)) {
         return 0;
@@ -170,6 +173,7 @@ int hibiki_driver_endpoint_state_packet_encode_v1(
     if (written_bytes != NULL) *written_bytes = 0U;
     if (packet == NULL || packet_capacity < HIBIKI_DRIVER_CONTROL_ENDPOINT_STATE_PACKET_BYTES_V1 ||
         written_bytes == NULL || state == NULL || !valid_message_type(message_type) ||
+        request_id == 0U ||
         !valid_guid((const uint8_t*)state->endpoint_guid) ||
         !valid_guid((const uint8_t*)state->event_context_guid) ||
         !valid_channels(state->channel_count) || !valid_rate(state->sample_rate) ||

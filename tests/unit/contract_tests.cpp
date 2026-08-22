@@ -3245,8 +3245,43 @@ int main() {
           driver_control_packet_bytes == HIBIKI_DRIVER_CONTROL_ENDPOINT_STATE_PACKET_BYTES_V1);
     CHECK(hibiki_driver_endpoint_state_packet_validate_v1(
               driver_control_packet.data(), driver_control_packet_bytes) == 1);
+    const std::uint64_t zero_request_id = 0U;
+    const auto max_request_id = (std::numeric_limits<std::uint64_t>::max)();
+    std::array<std::uint8_t, HIBIKI_DRIVER_CONTROL_ENDPOINT_STATE_PACKET_BYTES_V1>
+        zero_request_packet{};
+    zero_request_packet.fill(0xA5U);
+    std::size_t zero_request_bytes = 123U;
+    CHECK(hibiki_driver_endpoint_state_packet_encode_v1(
+              zero_request_packet.data(), zero_request_packet.size(),
+              HIBIKI_DRIVER_VOLUME_NOTIFICATION, zero_request_id, &driver_state,
+              &zero_request_bytes) == 0 &&
+          zero_request_bytes == 0U);
+    CHECK(std::all_of(zero_request_packet.begin(), zero_request_packet.end(),
+                      [](const std::uint8_t value) { return value == 0xA5U; }));
     std::array<std::uint8_t, HIBIKI_DRIVER_CONTROL_ENDPOINT_STATE_PACKET_BYTES_V1>
         driver_control_packet_copy = driver_control_packet;
+    std::memcpy(driver_control_packet_copy.data() + 8U, &zero_request_id,
+                sizeof(zero_request_id));
+    CHECK(hibiki_driver_endpoint_state_packet_validate_v1(
+              driver_control_packet_copy.data(), driver_control_packet_copy.size()) == 0);
+    hibiki_driver_endpoint_state_v1 max_driver_state{};
+    std::uint16_t max_driver_message_type = 0U;
+    std::uint64_t max_driver_request_id = 0U;
+    CHECK(hibiki_driver_endpoint_state_packet_encode_v1(
+              driver_control_packet.data(), driver_control_packet.size(),
+              HIBIKI_DRIVER_VOLUME_NOTIFICATION, max_request_id, &driver_state,
+              &driver_control_packet_bytes) == 1 &&
+          hibiki_driver_endpoint_state_packet_validate_v1(
+              driver_control_packet.data(), driver_control_packet_bytes) == 1 &&
+          hibiki_driver_endpoint_state_packet_decode_v1(
+              driver_control_packet.data(), driver_control_packet_bytes, &max_driver_state,
+              &max_driver_message_type, &max_driver_request_id) == 1 &&
+          max_driver_request_id == max_request_id);
+    CHECK(hibiki_driver_endpoint_state_packet_encode_v1(
+              driver_control_packet.data(), driver_control_packet.size(),
+              HIBIKI_DRIVER_VOLUME_NOTIFICATION, 123U, &driver_state,
+              &driver_control_packet_bytes) == 1);
+    driver_control_packet_copy = driver_control_packet;
     driver_control_packet_copy[6U] = 0U;
     CHECK(hibiki_driver_endpoint_state_packet_validate_v1(
               driver_control_packet_copy.data(), driver_control_packet_copy.size()) == 0);
@@ -3277,6 +3312,27 @@ int main() {
               &decoded_driver_header_type, &decoded_driver_header_request) == 1 &&
           decoded_driver_header_type == HIBIKI_DRIVER_HELLO &&
           decoded_driver_header_request == 456U);
+    std::array<std::uint8_t, HIBIKI_DRIVER_CONTROL_HEADER_BYTES_V1> zero_header_packet{};
+    zero_header_packet.fill(0xA5U);
+    std::size_t zero_header_bytes = 123U;
+    CHECK(hibiki_driver_control_header_packet_encode_v1(
+              zero_header_packet.data(), zero_header_packet.size(), HIBIKI_DRIVER_HELLO,
+              zero_request_id, &zero_header_bytes) == 0 && zero_header_bytes == 0U);
+    CHECK(std::all_of(zero_header_packet.begin(), zero_header_packet.end(),
+                      [](const std::uint8_t value) { return value == 0xA5U; }));
+    auto zero_header_copy = driver_header_packet;
+    std::memcpy(zero_header_copy.data() + 8U, &zero_request_id, sizeof(zero_request_id));
+    CHECK(hibiki_driver_control_header_packet_validate_v1(
+              zero_header_copy.data(), zero_header_copy.size()) == 0);
+    CHECK(hibiki_driver_control_header_packet_encode_v1(
+              driver_header_packet.data(), driver_header_packet.size(), HIBIKI_DRIVER_HELLO,
+              max_request_id, &driver_header_packet_bytes) == 1 &&
+          hibiki_driver_control_header_packet_validate_v1(
+              driver_header_packet.data(), driver_header_packet_bytes) == 1 &&
+          hibiki_driver_control_header_packet_decode_v1(
+              driver_header_packet.data(), driver_header_packet_bytes,
+              &decoded_driver_header_type, &decoded_driver_header_request) == 1 &&
+          decoded_driver_header_request == max_request_id);
     for (std::uint16_t message_type = HIBIKI_DRIVER_HELLO;
          message_type <= HIBIKI_DRIVER_ERROR; ++message_type) {
         CHECK(hibiki_driver_control_header_packet_encode_v1(
