@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MS-PL
+﻿// SPDX-License-Identifier: MS-PL
 //
 // Hibiki WaveRT PortCls Miniport Header.
 // Defines the IMiniportWaveRT and IMiniportWaveRTStreamNotification COM adapter
@@ -45,8 +45,7 @@ struct hibiki_wdk_stream_context_v1 {
 // Implements IMiniportWaveRTStream + IMiniportWaveRTStreamNotification
 // (vtable order matches WDK 10.0.28000.0 portcls.h exactly)
 //=============================================================================
-class HibikiMiniportWaveRtStreamV1 : public IMiniportWaveRTStream,
-                                     public IMiniportWaveRTStreamNotification {
+class HibikiMiniportWaveRtStreamV1 : public IMiniportWaveRTStreamNotification {
 private:
     LONG                            m_RefCount;
     HibikiMiniportWaveRtV1*         m_Miniport;
@@ -196,3 +195,4 @@ extern "C" NTSTATUS CreateHibikiMiniportWaveRtV1(
     _In_     REFCLSID                  ClassId,
     _In_opt_ PUNKNOWN                  UnknownOuter,
     _In_     POOL_FLAGS                PoolFlags);
+

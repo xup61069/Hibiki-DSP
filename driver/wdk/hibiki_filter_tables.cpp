@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MS-PL
+﻿// SPDX-License-Identifier: MS-PL
 //
 // Hibiki WaveRT PortCls Filter and Topology Tables Implementation.
 // Constructs static PortCls PCFILTER_DESCRIPTOR, PCPIN_DESCRIPTOR, PCNODE_DESCRIPTOR,
@@ -84,7 +84,7 @@ static const PCNODE_DESCRIPTOR EndpointNodes[] = {
         0,                      // Flags
         &AutomationMute,        // AutomationTable
         &KSNODETYPE_MUTE,       // Type
-        &KSAUDFNAME_MUTE        // Name
+        nullptr        // Name
     },
     // NODE_VOLUME
     {
@@ -214,6 +214,13 @@ static const KSDATARANGE PinInterfacesStream[] = {
     }
 };
 
+#ifndef KSAUDFNAME_MUTE
+#define KSAUDFNAME_MUTE KSAUDFNAME_MUTE_CONTROL
+#endif
+#ifndef KSAUDFNAME_VOLUME
+#define KSAUDFNAME_VOLUME KSAUDFNAME_VOLUME_CONTROL
+#endif
+
 static const KSDATARANGE PinMediumsDontCare[] = {
     {
         sizeof(KSDATARANGE),
@@ -221,7 +228,7 @@ static const KSDATARANGE PinMediumsDontCare[] = {
         0,
         0,
         STATICGUIDOF(KSMEDIUMSETID_Standard),
-        KSMEDIUM_TYPE_DONT_CARE,
+        KSMEDIUM_STANDARD_DEVIO,
         STATICGUIDOF(KSDATAFORMAT_SPECIFIER_NONE)
     }
 };
@@ -431,3 +438,5 @@ extern "C" NTSTATUS HibikiDataRangeIntersectionEndpointV1(
 
     return STATUS_SUCCESS;
 }
+
+

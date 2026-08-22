@@ -82,17 +82,9 @@ STDMETHODIMP HibikiMiniportWaveRtStreamV1::QueryInterface(
     _Out_ PVOID* Object) {
     if (Object == nullptr) return STATUS_INVALID_PARAMETER;
 
-    if (IsEqualGUIDAligned(Interface, IID_IUnknown)) {
-        *Object = static_cast<IMiniportWaveRTStreamNotification*>(this);
-        AddRef();
-        return STATUS_SUCCESS;
-    }
-    if (IsEqualGUIDAligned(Interface, IID_IMiniportWaveRTStream)) {
-        *Object = static_cast<IMiniportWaveRTStream*>(this);
-        AddRef();
-        return STATUS_SUCCESS;
-    }
-    if (IsEqualGUIDAligned(Interface, IID_IMiniportWaveRTStreamNotification)) {
+    if (IsEqualGUIDAligned(Interface, IID_IUnknown) ||
+        IsEqualGUIDAligned(Interface, IID_IMiniportWaveRTStream) ||
+        IsEqualGUIDAligned(Interface, IID_IMiniportWaveRTStreamNotification)) {
         *Object = static_cast<IMiniportWaveRTStreamNotification*>(this);
         AddRef();
         return STATUS_SUCCESS;
@@ -549,4 +541,5 @@ STDMETHODIMP HibikiMiniportWaveRtV1::GetDeviceDescription(
     DeviceDescription->MaximumLength = 0xFFFFFFFF;
     return STATUS_SUCCESS;
 }
+
 
