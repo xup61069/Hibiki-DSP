@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "issue": 466,
+  "scope_digest": "unique-ipc-pipe-name",
+  "base_commit": "e7755e97294e920e1e8ff12d31f6f1043eb5b8c4",
+  "commands": ["pwsh -NoProfile -File tools/build-driver.ps1", "pwsh -NoProfile -File tools/verify.ps1", "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 466", "pwsh -NoProfile -File tools/handoff-check.ps1", "pwsh -NoProfile -File tools/docs-check.ps1", "pwsh -NoProfile -File tools/source-policy.ps1", "git diff --check"],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "ctest 3 of 3 including hibiki_contract_tests with per-process unique control-pipe names",
+        "idle-gap and host-queue pipe flows exercise the renamed endpoints"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "pipe-name uniqueness",
+      "status": "pass",
+      "coverage": [
+        "control and host pipe names carry GetCurrentProcessId() suffix",
+        "concurrent test processes no longer contend for the same fixed name"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Test-infrastructure reliability change only; production IPC names and semantics unchanged.",
+    "Does not provide driver, physical-audio, HLK or signing evidence."
+  ],
+  "tool_versions": { "powershell": "pwsh 7.6.5" }
+}

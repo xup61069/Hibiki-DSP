@@ -1636,15 +1636,18 @@ int main() {
           !control_host.running() &&
           !control_host.start_with_queue(IpcNamedPipeConfigV1{L"", 1024U, 100U}));
 #if defined(_WIN32)
-    constexpr wchar_t kControlPipe[] = L"\\\\.\\pipe\\HibikiDSP_contract_control";
+        // Unique per-process pipe name avoids collisions when several test or
+    // preview processes run concurrently on one machine (Issue #343/#466).
+    const std::wstring kControlPipe =
+        L"\\\\.\\pipe\\HibikiDSP_contract_control_" + std::to_wstring(GetCurrentProcessId());
     CHECK(ipc_server.start(IpcNamedPipeConfigV1{kControlPipe, 1024U, 1000U},
                            acknowledge_ipc_request, nullptr));
     HANDLE ipc_client = INVALID_HANDLE_VALUE;
     for (int attempt = 0; attempt < 30 && ipc_client == INVALID_HANDLE_VALUE; ++attempt) {
-        ipc_client = CreateFileW(kControlPipe, GENERIC_READ | GENERIC_WRITE, 0U, nullptr,
+        ipc_client = CreateFileW(kControlPipe.c_str(), GENERIC_READ | GENERIC_WRITE, 0U, nullptr,
                                  OPEN_EXISTING, 0U, nullptr);
         if (ipc_client == INVALID_HANDLE_VALUE) {
-            if (GetLastError() == ERROR_PIPE_BUSY) (void)WaitNamedPipeW(kControlPipe, 100U);
+            if (GetLastError() == ERROR_PIPE_BUSY) (void)WaitNamedPipeW(kControlPipe.c_str(), 100U);
             Sleep(10U);
         }
     }
@@ -1688,15 +1691,15 @@ int main() {
     ipc_server.stop();
     CHECK(!ipc_server.running());
 
-    constexpr wchar_t kHostControlPipe[] = L"\\\\.\\pipe\\HibikiDSP_contract_host";
-    ControlPlaneHostV1 host;
+    const std::wstring kHostControlPipe =
+    L"\\\\.\\pipe\\HibikiDSP_contract_host_" + std::to_wstring(GetCurrentProcessId());    ControlPlaneHostV1 host;
     CHECK(host.start_with_queue(IpcNamedPipeConfigV1{kHostControlPipe, 1024U, 1000U}));
     HANDLE host_client = INVALID_HANDLE_VALUE;
     for (int attempt = 0; attempt < 30 && host_client == INVALID_HANDLE_VALUE; ++attempt) {
-        host_client = CreateFileW(kHostControlPipe, GENERIC_READ | GENERIC_WRITE, 0U, nullptr,
+        host_client = CreateFileW(kHostControlPipe.c_str(), GENERIC_READ | GENERIC_WRITE, 0U, nullptr,
                                   OPEN_EXISTING, 0U, nullptr);
         if (host_client == INVALID_HANDLE_VALUE) {
-            if (GetLastError() == ERROR_PIPE_BUSY) (void)WaitNamedPipeW(kHostControlPipe, 100U);
+            if (GetLastError() == ERROR_PIPE_BUSY) (void)WaitNamedPipeW(kHostControlPipe.c_str(), 100U);
             Sleep(10U);
         }
     }
