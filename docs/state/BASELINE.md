@@ -644,6 +644,14 @@ reparse point 祖先／target 與非目錄 build root，同時保留正常 missi
 -SelfTest 從 5 個案例擴充至 7 個離線案例，不呼叫 CMake 也不寫檔（Issue #474 /
 PR #477）。皆為 tooling/source evidence。
 
+第八波 docs／tooling 增量已合併：engine-preview-smoke.ps1 在啟動 Engine Preview
+執行檔或寫入暫存 IR WAV 前新增離線 path-safety 驗證，wrapper self-test 擴充且不啟動
+程序、不呼叫 CMake、不寫 repo 輸出（Issue #482 / PR #483）；README 工具鏈文字對齊
+accepted ADR-0005（SDK/WDK >= 10.0.26100 最低基線），並把 V1 gap/milestone 快照更新為
+已合併的本地 kernel-mode PortCls adapter .sys build、Inf2Cat packaging 與 self-signed
+test-sign evidence，同時明確保留未宣稱的安裝／載入、runtime audio、HLK、Microsoft
+signing 與 consumer release 界限（Issue #478 / PR #480）。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；

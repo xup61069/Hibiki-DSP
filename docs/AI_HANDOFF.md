@@ -208,6 +208,15 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   rejecting outside-root paths, existing reparse-point ancestors/targets and non-directory
   roots while keeping normal missing-root behavior; -SelfTest grew from 5 to 7 offline
   cases with no CMake invocation or file writes (Issue #474 / PR #477).
+- Engine preview smoke path hardening merged: engine-preview-smoke.ps1 validates output
+  paths offline before launching the Engine Preview executable or writing the temporary
+  IR WAV; the wrapper self-test grew without starting a process, invoking CMake or
+  writing repository output (Issue #482 / PR #483).
+- README driver/toolchain milestones refreshed: toolchain wording aligns with accepted
+  ADR-0005 (SDK/WDK >= 10.0.26100 floor) and the V1 gap snapshot records the merged local
+  kernel-mode PortCls adapter build, Inf2Cat packaging and self-signed test-sign evidence
+  while keeping install/load, runtime audio, HLK, Microsoft signing and consumer release
+  limits explicit (Issue #478 / PR #480).
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe
