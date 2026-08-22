@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "issue": 311,
+  "scope_digest": "issue-311-batch-archive-149-250-v1",
+  "source_commit": "fce0eb284c22c46241a2d922ded496f7ef0bbf40",
+  "archive_commit": "fce0eb284c22c46241a2d922ded496f7ef0bbf40",
+  "main_sync_commit": "20b6bc152ffe9fc837f824b857daacbf44aa0e68",
+  "archived_issues": [149, 187, 211, 250],
+  "merged_prs": {
+    "149": {"pr": 150, "merge_commit": "8a153ffa1cc3fdea292527d31695550b7db4ff2e", "merged_at": "2026-08-22T10:44:31Z"},
+    "187": {"pr": 189, "merge_commit": "1adf947a50f836ee6371050ff5db58a09485df0e", "merged_at": "2026-08-22T09:19:28Z"},
+    "211": {"pr": 212, "merge_commit": "444f95c336301a96834ddc22787a2c7ab5da580e", "merged_at": "2026-08-22T09:38:09Z"},
+    "250": {"pr": 254, "merge_commit": "5a2b55da55219da2682311cfa61e4fd9353f208b", "merged_at": "2026-08-22T11:22:55Z"}
+  },
+  "parent_issue": 277,
+  "excluded_sibling": {
+    "issue": 266,
+    "reason": "already archived by corrective Issue #294 via merged PR #296"
+  },
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.1-msvc-19.51.36256-cmake-4.4.0-pwsh-7.6.4-sdk-26100; locked-wdk-28000-missing-on-host",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 311",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 311 batch archive implementation",
+      "status": "pass",
+      "coverage": [
+        "moved docs/tasks/active/149.md to docs/tasks/completed/2026/149.md",
+        "moved docs/tasks/active/187.md to docs/tasks/completed/2026/187.md",
+        "moved docs/tasks/active/211.md to docs/tasks/completed/2026/211.md",
+        "moved docs/tasks/active/250.md to docs/tasks/completed/2026/250.md",
+        "recorded each merged PR commit and set status completed on all four handoffs",
+        "preserved original history, scopes, and limitations without rewriting implementation records"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 311 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": ["schema v2 ownership, exclusive scope, and Git state"]
+    },
+    {
+      "command": "docs/source/source-only/diff gates",
+      "status": "pass",
+      "coverage": [
+        "85 required paths / 24 specs verified against live measurement 569 tracked paths / 134 repository JSON files",
+        "single workflow publication boundary",
+        "no whitespace errors"
+      ]
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": ["CMake configure/build clean; CTest 2 of 2 passed (contract tests plus HIBT packet decoder fixtures from merged main)"]
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP order, RT audio thread, driver, WaveRT, HLK, or Microsoft signing behavior changes or claims.",
+    "The host has Windows SDK 26100 but lacks the locked WDK 28000 package; user-space CMake/CTest evidence only.",
+    "Issue #266 was excluded because its handoff was already moved by corrective Issue #294 / merged PR #296 before this slice claimed the parent's remaining scope."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.301",
+    "msvc": "19.51.36256",
+    "cmake": "4.4.0",
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-22T21:12:00+08:00",
+  "finished_at": "2026-08-22T21:38:00+08:00"
+}
