@@ -147,6 +147,20 @@
       "coverage": ["merge-ref verify workflow gates on third merge-synced head"],
       "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562610786/job/97006429337",
       "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 final handoff push)",
+      "status": "pass",
+      "coverage": ["push verify workflow gates on final handoff head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562776670/job/97006834753",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 final handoff merge-ref)",
+      "status": "pass",
+      "coverage": ["merge-ref verify workflow gates on final handoff head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562774103/job/97006828963",
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
@@ -161,5 +175,5 @@
     "powershell": "7.6.5"
   },
   "started_at": "2026-08-22T15:57:32+08:00",
-  "finished_at": "2026-08-22T16:36:59+08:00"
+  "finished_at": "2026-08-22T16:40:14+08:00"
 }
