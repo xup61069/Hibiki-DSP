@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "issue": 106,
+  "scope_digest": "live-device-catalog-selftest-v1",
+  "source_commit": "e17df3a",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-msvc-14.51.36231-sdk-10.0.28000.0-cmake-path-missing-dotnet-10.0.400-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/probe-environment.ps1",
+    "pwsh -NoProfile -File tools/context-pack.ps1 -Issue 106 -NoSource",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 106",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/live-device-catalog-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/live-device-catalog-check.ps1 (with VS2026 CMake directory prepended process-locally)",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/doctor.ps1 -CheckOnly",
+      "status": "pass_with_limitations",
+      "coverage": [
+        "Windows 11 build 26200, AMD64, Git, PowerShell 7.6.4, Visual Studio 2026 and .NET 10.0.400 detected",
+        "CMake is not on PATH and the locked SDK/WDK prerequisite is reported missing"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/probe-environment.ps1",
+      "status": "pass",
+      "coverage": [
+        "local environment fingerprint written under ignored .local/context.json"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/context-pack.ps1 -Issue 106 -NoSource",
+      "status": "pass",
+      "coverage": [
+        "issue handoff and repository rules packed without unrelated source context"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 106",
+      "status": "pass",
+      "coverage": [
+        "schema-v2 issue handoff and ownership contract validated"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "all active handoffs and repository ownership contracts validated"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/live-device-catalog-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "Windows-only guard rejection",
+        "exact CMake definitions, build root, target, executable name and anonymous probe path",
+        "target mismatch, unsafe build-root and CMake argument rejection",
+        "no CMake, build, process, COM, Audio Service, endpoint or audio activity"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 5
+    },
+    {
+      "command": "tools/live-device-catalog-check.ps1 (with VS2026 CMake directory prepended process-locally)",
+      "status": "pass",
+      "coverage": [
+        "unsigned live device-catalog probe configured and built",
+        "anonymous output: catalog_refresh=pass entries=4 sequence=1 payload_bytes=1680 wire=pass runtime=pass request=pass",
+        "anonymous output: volume=pass status=pass route_status=pass routes=4 status_sequence=4 session_state=1 process_state=4",
+        "anonymous output: session_catalog=pass entries=1 generation=2 bound=yes observed=1 active=0 volume_available=0"
+      ],
+      "compiled_artifacts": true
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors in the source diff"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "blocked_by_integrator_baseline",
+      "coverage": [
+        "documentation validation reached the shared baseline counter",
+        "BASELINE.md claims 427 tracked paths while this branch has 428"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "source-only policy passed for 428 tracked paths"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "one workflow and 428 tracked paths satisfy source-only CI policy"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1 (with VS2026 CMake directory prepended process-locally)",
+      "status": "pass",
+      "coverage": [
+        "unsigned local verification passed",
+        "CTest passed 1 of 1 contract test"
+      ],
+      "compiled_artifacts": true
+    },
+    {
+      "command": "tools/verify.ps1 (without process-local CMake PATH adjustment)",
+      "status": "environment_limited",
+      "coverage": [
+        "direct invocation cannot locate cmake because CMake is not on PATH"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The self-test validates wrapper planning only; it does not prove endpoint hardware, physical playback, per-App delivery, driver, WaveRT, HLK, or Microsoft signing.",
+    "The live probe output is anonymous catalog/status/session aggregate evidence only; no endpoint ID, friendly name, serial, PID, session ID or private identity was recorded.",
+    "CMake/SDK/WDK availability is recorded from doctor; compiled outputs remain under ignored .local and are not release artifacts.",
+    "The shared docs/state/BASELINE.md counter remains integrator-owned and was not modified."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.400",
+    "msvc": "14.51.36231",
+    "powershell": "7.6.4",
+    "cmake": "VS2026 bundled CMake used process-locally"
+  },
+  "started_at": "2026-08-22T07:40:00+08:00",
+  "finished_at": "2026-08-22T08:18:00+08:00"
+}
