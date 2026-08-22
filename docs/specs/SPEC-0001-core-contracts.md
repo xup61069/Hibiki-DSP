@@ -24,6 +24,12 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   執行與 plugin state 不內嵌於 Scene JSON。需要跨版本的 plugin state 時，只能以
   `scene-vst3-state-binding-v1` metadata reference 經 identity／version／migration preflight，
   opaque bytes 仍留在 private caller-owned store。
+  `ir_reference` 是 bounded UTF-8 calibration label（空值或 8..64 bytes，不含 NUL），
+  用來比對「同一份已準備的 IR」。它只是 opaque 比對 token：不內嵌 IR samples、檔案路徑或
+  ISO 226 係數，也不代表任何實體播放或 driver 證據。SceneApply 在新場景帶有與 active scene
+  完全相同的非空 `ir_reference` 且 output group 不變時，可保留已 commit 的 IR attachment；
+  其他情況（不同 label、空 label、無 active attachment 或 IR 交易進行中）維持原本在同一個
+  control transaction 內 detach 的 fail-closed 行為。
 - `output_group` 在 graph compile 時進入 fixed-size RT snapshot；physical sink worker 可按
   群組呼叫指定 render，不得在 audio thread 以 `std::string` 或 map 查路由。
 - `IrPhasePolicy v1`：minimum/mixed/linear/bypass 模式與 0..1 strength；只描述可驗證的
