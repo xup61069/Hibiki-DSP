@@ -42,6 +42,15 @@
       "compiled_artifacts": false
     },
     {
+      "command": "PR #280 initial final-head CI",
+      "status": "pass",
+      "coverage": [
+        "push verify run 32571767697 / job 97028098616 passed",
+        "merge-ref verify run 32571770056 / job 97028103984 passed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
       "command": "tools/handoff-check.ps1 -Issue 274 / tools/handoff-check.ps1",
       "status": "pass",
       "coverage": [
