@@ -113,6 +113,13 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
 - C++ VST host supervisor now includes `Vst3TimelineEditorV1` (`vst-host/include/hibiki/vst3_timeline_editor.hpp`),
   providing fail-closed parameter point upsert, bounded remove/set-value, and validated commit against
   `validate_vst3_parameter_timeline_v1`.
+- The supervisor timeline chain now has a selection-aware editing facade:
+  `Vst3TimelineSupervisorSurfaceV1` (`vst-host/include/hibiki/vst3_supervisor_surface.hpp`,
+  Issue #351 / PR #377) composes the editor with a non-owned `Vst3TimelineFileStoreV1`
+  handle; all operations fail closed while detached or unselected, and dirty state is derived
+  by comparing the published snapshot to the loaded/saved baseline. Evidence:
+  `evidence/0000-foundation/vst3-supervisor-surface-v1.json`. This is a headless control-plane
+  contract and proves nothing about UI editors, physical audio, or driver delivery.
 - C# control model now includes `CalibrationModel.cs` (`apps/control-model/`), providing strongly-typed
   calibration response data contracts, deterministic bounded PEQ correction compiler matching SPEC-0011,
   atomic JSON persistence, and Equalizer APO/CamillaDSP/REW/Hibiki profile exporters.

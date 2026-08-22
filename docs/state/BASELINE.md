@@ -568,6 +568,14 @@ discard，upsert 以同一 (parameter, position) 取代）；`8a041a2` 把編輯
 （排序 `timeline_ids` 與不可變 binding views）。UI 編輯介面、side-chain/multi-bus
 worker process 與第三方 certification 仍待完成；以上不宣稱任何實體音訊或 driver 能力。
 
+VST3 supervisor 端 selection-aware 編輯 surface 已合併（Issue #351 / PR #377）：
+`Vst3TimelineSupervisorSurfaceV1` 把 `Vst3TimelineEditorV1` 和非擁有的
+`Vst3TimelineFileStoreV1` handle 組合成單一 fail-closed facade；attach/detach、
+select(id)、編輯轉發與 save_selected() 在未 attach 或未選取時一律拒絕，dirty
+狀態由已發布 snapshot 與載入/儲存 baseline 比較推導。證據為
+`evidence/0000-foundation/vst3-supervisor-surface-v1.json`；SPEC-0008 已加入對應小節。
+這是 headless 控制面契約，不宣稱 UI 編輯器或實體音訊能力。
+
 流程 gate 本週新增：#21 讓 BASELINE 摘要計數 fail-closed 對照 git 實測；
 #51 把 docs-check 改成 merge-ref 感知（PR 未動 BASELINE 時容忍自身 tracked/JSON
 漂移、push-to-main 與本機維持嚴格），並附 `-SelfTest`；#25 讓 active handoff 的
