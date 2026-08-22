@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 329,
   "scope_digest": "asio-ring-wrap-selftest-v1",
-  "source_commit": "PENDING",
+  "source_commit": "e95a9436deb0976c3501ab84d9e0902efd3bc4a0",
   "base_commit": "fab13599a0a96cbca90d071d20a2eebb3b1cb450",
   "depends_on_issue": 285,
   "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-10.0.28000.2526-wdk-10.0.28000.2526-cmake-4.4.2-pwsh-7.6.5",
