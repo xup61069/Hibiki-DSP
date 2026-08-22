@@ -183,3 +183,53 @@ if ($LASTEXITCODE -ne 0) {
   throw "WinUI preview build failed via $buildTool for project $($preview.ProjectRelativePath). Check tools/doctor.ps1 and the locked Windows 11 24H2, VS 2026 and SDK/WDK toolchain before treating any output as evidence."
 }
 Write-Output "WinUI local preview build succeeded via $buildTool. It remains unsigned, driver-free and excluded from Git."
+
+if ($SmokeTest) {
+  # Formal WinUI launch + accessibility smoke: the built XAML shell must come
+  # up, expose a named top-level window and a populated UI Automation tree.
+  # The summary stays under .local; nothing here is release evidence.
+  if ($buildTool -eq 'dotnet-fallback') {
+    throw 'WinUI smoke test requires the Visual Studio MSBuild formal build; the dotnet fallback cannot be promoted to launch/accessibility evidence.'
+  }
+  Add-Type -AssemblyName UIAutomationClient
+  Add-Type -AssemblyName UIAutomationTypes
+  $executable = Join-Path $previewRoot 'Hibiki.WinUI.exe'
+  if (-not (Test-Path -LiteralPath $executable)) { throw "Formal WinUI preview executable was not produced: $executable" }
+  $process = Start-Process -FilePath $executable -WorkingDirectory $previewRoot -PassThru
+  try {
+    $rootElement = $null
+    for ($attempt = 0; $attempt -lt 10 -and -not $rootElement; $attempt++) {
+      Start-Sleep -Seconds 1
+      $process.Refresh()
+      if ($process.HasExited) { throw "Formal WinUI preview exited during smoke test: $($process.ExitCode)" }
+      if ($process.MainWindowHandle -eq [IntPtr]::Zero) { continue }
+      try { $rootElement = [System.Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle) } catch { $rootElement = $null }
+    }
+    if (-not $rootElement) { throw 'Formal WinUI preview did not expose an automation window within the bounded wait.' }
+    $windowName = $rootElement.Current.Name
+    $windowClass = $rootElement.Current.ClassName
+    if ([string]::IsNullOrWhiteSpace($windowName)) { throw 'Formal WinUI preview window has no automation Name.' }
+    $controls = $rootElement.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+                                     [System.Windows.Automation.Condition]::TrueCondition)
+    if ($controls.Count -lt 10) {
+      throw "Formal WinUI preview accessibility tree looks empty: controls=$($controls.Count)"
+    }
+    $summary = [ordered]@{
+      schema_version = 1
+      window_name    = $windowName
+      window_class   = $windowClass
+      control_count  = $controls.Count
+      captured_at    = (Get-Date).ToUniversalTime().ToString('o')
+      limitations    = @('unsigned local preview', 'user-space only', 'not driver, HLK or signing evidence')
+    }
+    $summaryPath = Join-Path $previewRoot 'winui-launch-a11y-smoke.json'
+    $summary | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $summaryPath -Encoding utf8NoBOM
+    Write-Output "Formal WinUI preview launch/accessibility smoke passed (window='$windowName' class=$windowClass controls=$($controls.Count); summary=$summaryPath)."
+  }
+  finally {
+    if (-not $process.HasExited) {
+      Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
+      $process.WaitForExit()
+    }
+  }
+}
