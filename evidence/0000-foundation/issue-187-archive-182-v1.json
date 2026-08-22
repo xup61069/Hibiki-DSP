@@ -56,6 +56,14 @@
       "status": "pass",
       "coverage": ["no whitespace errors"],
       "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 push)",
+      "status": "fail",
+      "coverage": ["docs-check target-base consistency"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32561182704/job/97002836976",
+      "failure": "origin/main=741fbc3 build/baseline-counters.json claims 481 tracked paths and 102 repository JSON files, while that tree contains 483 tracked paths and 103 repository JSON files",
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
@@ -68,5 +76,5 @@
     "powershell": "7.6.5"
   },
   "started_at": "2026-08-22T15:57:32+08:00",
-  "finished_at": "2026-08-22T16:00:11+08:00"
+  "finished_at": "2026-08-22T16:05:32+08:00"
 }
