@@ -38,6 +38,7 @@ static int valid_header(const struct hibiki_driver_stream_packet_header_v1* cons
         header->abi_version != HIBIKI_DRIVER_STREAM_TRANSPORT_ABI_V1 ||
         (header->packet_type != HIBIKI_DRIVER_STREAM_RENDER_V1 &&
          header->packet_type != HIBIKI_DRIVER_STREAM_CAPTURE_V1) ||
+        header->sequence == 0U || header->generation == 0U ||
         !valid_guid(header->endpoint_guid) || !valid_channels(header->channels) ||
         !valid_rate(header->sample_rate) || header->frames == 0U ||
         header->frames > HIBIKI_DRIVER_STREAM_MAX_FRAMES_V1 || !valid_flags(header->flags)) {
@@ -73,6 +74,7 @@ int hibiki_driver_stream_packet_encode_v1(
     if (packet == NULL || written_bytes == NULL || interleaved_samples == NULL ||
         !valid_guid(endpoint_guid) || !valid_channels(channels) || !valid_rate(sample_rate) ||
         frames == 0U || frames > HIBIKI_DRIVER_STREAM_MAX_FRAMES_V1 || !valid_flags(flags) ||
+        sequence == 0U || generation == 0U ||
         (packet_type != HIBIKI_DRIVER_STREAM_RENDER_V1 &&
          packet_type != HIBIKI_DRIVER_STREAM_CAPTURE_V1)) {
         return 0;

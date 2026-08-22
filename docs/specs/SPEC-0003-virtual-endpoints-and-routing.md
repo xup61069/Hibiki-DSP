@@ -87,7 +87,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
 - `sdk/include/hibiki/driver_stream_transport_v1.h` 與 `sdk/src/driver_stream_transport_v1.c`
   定義 driver→engine 的固定 80-byte header＋interleaved Float32 packet；C ABI 提供
   allocation-free encode/validate/payload view，`decode_driver_stream_packet_v1` 會複製到
-  caller-owned lane storage 並拒絕非有限 sample。packet span 必須等於 header 宣告長度。
+  caller-owned lane storage 並拒絕非有限 sample。`sequence` 與 `generation` 是 freshness／
+  lifecycle 欄位，兩者必須非零；encode 與 validate 在接受 payload 前拒絕零值，但保留
+  `UINT64_MAX` 為有效值。packet span 必須等於 header 宣告長度。這是 user-space packet
+  boundary 的 stale-state 防護，不是實體 driver、WaveRT、HLK 或 signing evidence。
 - `AudioEngineModel::process_driver_stream_packet` 只接受 render packet，要求 packet endpoint
   GUID、sample rate 與 engine、channel count 與 active lane 全部相同，通過後沿用
   `process_lane_block` 的 immutable graph／Group Master／limiter 路徑；capture packet、錯誤

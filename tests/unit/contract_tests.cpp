@@ -576,6 +576,60 @@ int main() {
               HIBIKI_DRIVER_STREAM_FLAG_DISCONTINUITY_V1, 9U, driver_samples,
               &driver_packet_bytes) == 1 && driver_packet_bytes == 96U);
     CHECK(hibiki_driver_stream_packet_validate_v1(driver_packet.data(), driver_packet_bytes) == 1);
+    std::array<std::uint8_t, 128> zero_freshness_packet{};
+    zero_freshness_packet.fill(0xA5U);
+    std::size_t zero_freshness_bytes = 123U;
+    CHECK(hibiki_driver_stream_packet_encode_v1(
+              zero_freshness_packet.data(), zero_freshness_packet.size(),
+              HIBIKI_DRIVER_STREAM_RENDER_V1, 0U,
+              "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 2U, 48000U, 2U,
+              HIBIKI_DRIVER_STREAM_FLAG_DISCONTINUITY_V1, 9U, driver_samples,
+              &zero_freshness_bytes) == 0 &&
+          zero_freshness_bytes == 0U);
+    CHECK(std::all_of(zero_freshness_packet.begin(), zero_freshness_packet.end(),
+                      [](const std::uint8_t value) { return value == 0xA5U; }));
+    zero_freshness_packet.fill(0xA5U);
+    zero_freshness_bytes = 123U;
+    CHECK(hibiki_driver_stream_packet_encode_v1(
+              zero_freshness_packet.data(), zero_freshness_packet.size(),
+              HIBIKI_DRIVER_STREAM_RENDER_V1, 42U,
+              "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 2U, 48000U, 2U,
+              HIBIKI_DRIVER_STREAM_FLAG_DISCONTINUITY_V1, 0U, driver_samples,
+              &zero_freshness_bytes) == 0 &&
+          zero_freshness_bytes == 0U);
+    CHECK(std::all_of(zero_freshness_packet.begin(), zero_freshness_packet.end(),
+                      [](const std::uint8_t value) { return value == 0xA5U; }));
+    auto zero_sequence_header_packet = driver_packet;
+    const std::uint64_t zero_freshness = 0U;
+    std::memcpy(zero_sequence_header_packet.data() +
+                    offsetof(hibiki_driver_stream_packet_header_v1, sequence),
+                &zero_freshness, sizeof(zero_freshness));
+    CHECK(hibiki_driver_stream_packet_validate_v1(zero_sequence_header_packet.data(),
+                                                  driver_packet_bytes) == 0);
+    auto zero_generation_header_packet = driver_packet;
+    std::memcpy(zero_generation_header_packet.data() +
+                    offsetof(hibiki_driver_stream_packet_header_v1, generation),
+                &zero_freshness, sizeof(zero_freshness));
+    CHECK(hibiki_driver_stream_packet_validate_v1(zero_generation_header_packet.data(),
+                                                  driver_packet_bytes) == 0);
+    std::array<std::uint8_t, 128> max_freshness_packet{};
+    std::size_t max_freshness_bytes = 0U;
+    const auto max_freshness = (std::numeric_limits<std::uint64_t>::max)();
+    CHECK(hibiki_driver_stream_packet_encode_v1(
+              max_freshness_packet.data(), max_freshness_packet.size(),
+              HIBIKI_DRIVER_STREAM_RENDER_V1, max_freshness,
+              "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 2U, 48000U, 2U,
+              HIBIKI_DRIVER_STREAM_FLAG_DISCONTINUITY_V1, max_freshness, driver_samples,
+              &max_freshness_bytes) == 1 && max_freshness_bytes == driver_packet_bytes &&
+          hibiki_driver_stream_packet_validate_v1(max_freshness_packet.data(),
+                                                  max_freshness_bytes) == 1);
+    std::array<float, 4> max_freshness_samples{};
+    DriverStreamLaneBlockV1 max_freshness_block{};
+    CHECK(decode_driver_stream_packet_v1(
+              std::span<const std::uint8_t>(max_freshness_packet.data(), max_freshness_bytes),
+              max_freshness_samples, max_freshness_block) &&
+          max_freshness_block.sequence == max_freshness &&
+          max_freshness_block.generation == max_freshness);
     std::array<float, 4> decoded_driver_samples{};
     DriverStreamLaneBlockV1 decoded_driver_block{};
     const auto driver_packet_view = std::span<const std::uint8_t>(driver_packet.data(),
