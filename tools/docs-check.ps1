@@ -408,8 +408,15 @@ $baseJson = @($baseTracked | Where-Object { $_.ToLowerInvariant().EndsWith('.jso
 
 # The merge base itself must be internally consistent: stale counters on main
 # are an integrator problem and fail closed here instead of blaming the PR.
+if ($countersChangedByHead) {
+  # This PR introduces build/baseline-counters.json for the first time; the merge
+  # base predates the file, so there are no base counters to verify.
+  $summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; baseline-counters.json introduced by this pull request and verified against head: {2} tracked paths and {3} repository JSON files.)'
+  Write-Output (($summaryTemplate) -f $required.Count, $specs.Count, $trackedFiles.Count, $jsonFiles.Count)
+  exit 0
+}
 $baseCountersLines = @(git -C $repo show ('{0}:build/baseline-counters.json' -f $baseRefName))
-if ($LASTEXITCODE -ne 0) { throw "docs-check could not read baseline-counters.json from '$baseRefName'." }
+if ($LASTEXITCODE -ne 0) { throw "docs-check could not read baseline-counters.json from '$baseRefName'; this file must exist on main before other PRs can rely on it." }
 $baseCountersText = Convert-CommandOutputToText -Lines $baseCountersLines
 $tempBasePath = Join-Path ([System.IO.Path]::GetTempPath()) ("hibiki-base-counters-" + [guid]::NewGuid().ToString("N").Substring(0,8) + ".json")
 try {
