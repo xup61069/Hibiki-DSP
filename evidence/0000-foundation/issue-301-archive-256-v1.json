@@ -56,7 +56,7 @@
       "coverage": [
         "13 bounded docs-check self-test cases",
         "85 required documentation paths and 24 specs",
-        "live measurement of 553 tracked paths and 127 repository JSON files"
+        "live measurement of 554 tracked paths and 128 repository JSON files"
       ],
       "compiled_artifacts": false
     },
@@ -64,7 +64,7 @@
       "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1",
       "status": "pass",
       "coverage": [
-        "553 tracked paths with no blocked binary or secret",
+        "554 tracked paths with no blocked binary or secret",
         "one workflow with source-only CI policy satisfied"
       ],
       "compiled_artifacts": false
@@ -84,6 +84,15 @@
       "coverage": [
         "push verify run 32574686260 / job 97035170552 passed",
         "merge-ref verify run 32574688987 / job 97035177020 passed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "PR #302 metadata head final CI",
+      "status": "pass",
+      "coverage": [
+        "push verify run 32574874479 / job 97035618755 passed",
+        "merge-ref verify run 32574872309 / job 97035613244 passed"
       ],
       "compiled_artifacts": false
     },
