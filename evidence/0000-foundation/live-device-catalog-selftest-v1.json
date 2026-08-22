@@ -92,7 +92,7 @@
       "status": "blocked_by_integrator_baseline",
       "coverage": [
         "documentation validation reached the shared baseline counter",
-        "BASELINE.md claims 427 tracked paths while this branch has 428"
+        "BASELINE.md claims 427 tracked paths while this branch has 429"
       ],
       "compiled_artifacts": false
     },
@@ -100,7 +100,7 @@
       "command": "tools/source-policy.ps1",
       "status": "pass",
       "coverage": [
-        "source-only policy passed for 428 tracked paths"
+        "source-only policy passed for 429 tracked paths"
       ],
       "compiled_artifacts": false
     },
@@ -108,7 +108,7 @@
       "command": "tools/source-only-ci-check.ps1",
       "status": "pass",
       "coverage": [
-        "one workflow and 428 tracked paths satisfy source-only CI policy"
+        "one workflow and 429 tracked paths satisfy source-only CI policy"
       ],
       "compiled_artifacts": false
     },
@@ -128,6 +128,26 @@
         "direct invocation cannot locate cmake because CMake is not on PATH"
       ],
       "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions push verify run 32539894536 (job 96947718407) at 6a0bef1",
+      "status": "blocked_by_integrator_baseline",
+      "coverage": [
+        "Configure and test unsigned source passed",
+        "Documentation gate failed because BASELINE.md claims 427 tracked paths while git reports 429",
+        "later gates were skipped by workflow dependency"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions pull_request verify run 32539896827 (job 96947725717) at 6a0bef1",
+      "status": "blocked_by_integrator_baseline",
+      "coverage": [
+        "Configure and test unsigned source passed",
+        "Documentation gate failed because BASELINE.md claims 427 tracked paths while git reports 429",
+        "later gates were skipped by workflow dependency"
+      ],
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
@@ -144,5 +164,5 @@
     "cmake": "VS2026 bundled CMake used process-locally"
   },
   "started_at": "2026-08-22T07:40:00+08:00",
-  "finished_at": "2026-08-22T08:18:00+08:00"
+  "finished_at": "2026-08-22T08:22:00+08:00"
 }
