@@ -211,6 +211,26 @@ function Get-BodyBlock {
   return ("---`n" + $match.Groups['body'].Value + "`n---")
 }
 
+function Get-TbdHandoffFields {
+  param(
+    [Parameter(Mandatory)] [string]$Body
+  )
+  $match = [regex]::Match($Body, '(?s)<!-- hibiki:handoff-v1\s*(?<body>.*?)\s*-->')
+  if (-not $match.Success) { return @() }
+  $fields = [System.Collections.Generic.List[string]]::new()
+  foreach ($key in @('issue', 'branch')) {
+    $line = [regex]::Match($match.Groups['body'].Value, "(?im)^\s*$key\s*:\s*(?<value>[^\r\n]+)$")
+    if (-not $line.Success) { continue }
+    $value = $line.Groups['value'].Value.Trim()
+    if (($value.StartsWith('"') -and $value.EndsWith('"') -and $value.Length -ge 2) -or
+        ($value.StartsWith("'") -and $value.EndsWith("'") -and $value.Length -ge 2)) {
+      $value = $value.Substring(1, $value.Length - 2)
+    }
+    if ($value.Contains('TBD')) { [void]$fields.Add($key) }
+  }
+  return @($fields)
+}
+
 function Test-IssueState {
   param(
     [Parameter(Mandatory)] $IssueData,
@@ -352,8 +372,27 @@ if ($SelfTest) {
   }
   $caseCount++
 
+  $tbdBlockLines = @(
+    '<!-- hibiki:handoff-v1',
+    'schema_version: 2',
+    'issue: TBD',
+    'branch: codex/TBD-placeholder',
+    'target_branch: main',
+    '-->'
+  )
+  $tbdDraftBody = "# Objective`n`n" + ($tbdBlockLines -join "`n")
+  $tbdFields = @(Get-TbdHandoffFields -Body $tbdDraftBody)
+  if ($tbdFields.Count -ne 2 -or $tbdFields -notcontains 'issue' -or $tbdFields -notcontains 'branch') {
+    throw "handoff-check self-test failed: TBD draft fields were not detected."
+  }
+  $caseCount++
+  if (@(Get-TbdHandoffFields -Body $mock.body).Count -ne 0) {
+    throw "handoff-check self-test failed: filled handoff was treated as TBD draft."
+  }
+  $caseCount++
+
   if ($caseCount -lt 5) { throw "handoff-check self-test failed: expected at least 5 passing cases, saw $caseCount." }
-  Write-Output "handoff-check self-test passed (issue-block parsing, state/labels, owner mismatch, glob overlap, safe paths and arrays)."
+  Write-Output "handoff-check self-test passed (issue-block parsing, TBD draft skip, state/labels, owner mismatch, glob overlap, safe paths and arrays)."
   exit 0
 }
 # Main path: enumerate open issues and validate their hibiki:handoff-v1 blocks.
@@ -373,10 +412,17 @@ if ($withHandoff.Count -eq 0) {
 $seenBranches = @{}
 $seenScopes = [System.Collections.Generic.List[object]]::new()
 $checked = @()
+$skippedTbdDrafts = [System.Collections.Generic.List[string]]::new()
 foreach ($issueData in $withHandoff) {
   $issueNumber = $issueData.number
   if ($Issue -ge 0 -and $issueNumber -ne $Issue) { continue }
   $path = "issue/$issueNumber"
+
+  $tbdFields = @(Get-TbdHandoffFields -Body $issueData.body)
+  if ($tbdFields.Count -gt 0) {
+    [void]$skippedTbdDrafts.Add("$path ($($tbdFields -join ', '))")
+    continue
+  }
 
   $block = Get-BodyBlock -Body $issueData.body -Path $path
   $frontMatter = Get-FrontMatter $block $path
@@ -456,7 +502,19 @@ foreach ($issueData in $withHandoff) {
   $checked += "#$issueNumber@$branch"
 }
 
-if ($Issue -ge 0 -and -not ($checked | Where-Object { $_.StartsWith("#$Issue@") })) {
+if ($skippedTbdDrafts.Count -gt 0) {
+  $warningEntries = @($skippedTbdDrafts | Select-Object -First 8)
+  if ($skippedTbdDrafts.Count -gt $warningEntries.Count) {
+    $warningEntries += "(+ $($skippedTbdDrafts.Count - $warningEntries.Count) more)"
+  }
+  Write-Warning ("Skipping pre-claim draft handoff(s): " + ($warningEntries -join ', '))
+}
+
+$issueWasSkipped = $false
+if ($Issue -ge 0) {
+  $issueWasSkipped = @($skippedTbdDrafts | Where-Object { $_.StartsWith("issue/$Issue ") }).Count -gt 0
+}
+if ($Issue -ge 0 -and -not ($checked | Where-Object { $_.StartsWith("#$Issue@") }) -and -not $issueWasSkipped) {
   throw "No active handoff block exists for Issue $Issue (or it is closed)."
 }
 
