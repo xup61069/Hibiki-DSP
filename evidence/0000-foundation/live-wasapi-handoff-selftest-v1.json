@@ -67,8 +67,8 @@
       "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1 / git diff --check",
       "status": "pass",
       "coverage": [
-        "source-only policy passed for 425 tracked paths after latest main sync",
-        "source-only CI policy passed for 1 workflow and 425 tracked paths after latest main sync",
+        "source-only policy passed for 431 tracked paths after latest main sync",
+        "source-only CI policy passed for 1 workflow and 431 tracked paths after latest main sync",
         "whitespace cleanliness"
       ],
       "compiled_artifacts": false
@@ -94,7 +94,7 @@
     {
       "command": "tools/docs-check.ps1",
       "status": "blocked_shared_baseline",
-      "reason": "Integrator-owned docs/state/BASELINE.md reports 423 tracked paths while this branch reports 425 after the Issue 87 evidence and latest main sync; the worker did not modify the shared file."
+      "reason": "Integrator-owned docs/state/BASELINE.md reports 429 tracked paths while this branch reports 431 after the Issue 87 evidence and latest main sync; the worker did not modify the shared file. Issue #64 / PR #67 supplies the merge-base-aware fix."
     }
   ],
   "limitations": [
@@ -106,8 +106,8 @@
   "logs": [
     {
       "event": "latest-origin-main-sync",
-      "origin_main": "4810de2afe053e9549ee91295582247845e6ace7",
-      "merge_commit": "e9979ee",
+      "origin_main": "6441ee4874428a5b60f3e526c2377a813d6d864f",
+      "merge_commit": "d42c800",
       "scope": "own Issue 87 branch only"
     }
   ],
@@ -117,5 +117,5 @@
     "powershell": "pwsh 7.6.4 local"
   },
   "started_at": "2026-08-22T07:35:00+08:00",
-  "finished_at": "2026-08-22T07:48:00+08:00"
+  "finished_at": "2026-08-22T08:58:01+08:00"
 }
