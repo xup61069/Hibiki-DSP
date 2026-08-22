@@ -138,6 +138,17 @@ function Test-BaselineChangedByHead {
   return @($ChangedPaths | Where-Object { $_ -eq 'docs/state/BASELINE.md' }).Count -gt 0
 }
 
+function Test-CountersIntroductionCase {
+  # Only a genuine first-time introduction (head adds build/baseline-counters.json
+  # while the merge base predates the file) may skip verification; any other
+  # counters edit must fall through to the strict ownership path.
+  param(
+    [Parameter(Mandatory = $true)][bool]$CountersChangedByHead,
+    [Parameter(Mandatory = $true)][bool]$BaseHasCounters
+  )
+  return ($CountersChangedByHead -and -not $BaseHasCounters)
+}
+
 $required = @(
   'AGENTS.md', 'CLAUDE.md', 'README.md', 'CONTRIBUTING.md', 'SECURITY.md',
   '.github/PULL_REQUEST_TEMPLATE.md', '.github/ISSUE_TEMPLATE/ai-task.yml',
@@ -270,6 +281,20 @@ if ($SelfTest) {
   }
   $caseCount++
 
+  # Counters first-introduction tolerance must be scoped to a base without the file.
+  if (-not (Test-CountersIntroductionCase -CountersChangedByHead $true -BaseHasCounters $false)) {
+    throw 'docs-check self-test failed: a genuine first-time counters introduction was not tolerated.'
+  }
+  $caseCount++
+  if (Test-CountersIntroductionCase -CountersChangedByHead $true -BaseHasCounters $true) {
+    throw 'docs-check self-test failed: a counters edit on an existing base escaped verification.'
+  }
+  $caseCount++
+  if (Test-CountersIntroductionCase -CountersChangedByHead $false -BaseHasCounters $false) {
+    throw 'docs-check self-test failed: untouched counters were treated as a first-time introduction.'
+  }
+  $caseCount++
+
   # Prose parser: Required and Specs still parse from BASELINE.md.
   $ok = Get-CounterClaims $summaryOk
   if ($ok.Required -ne 85 -or $ok.Specs -ne 24) {
@@ -316,10 +341,10 @@ if ($SelfTest) {
     Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
   }
 
-  if ($caseCount -lt 18) {
-    throw "docs-check self-test failed: expected at least 18 passing cases, saw $caseCount."
+  if ($caseCount -lt 21) {
+    throw "docs-check self-test failed: expected at least 21 passing cases, saw $caseCount."
   }
-  Write-Output "docs-check self-test passed ($caseCount cases; prose parser, multiline normalization, branch mode and JSON counter fixtures)."
+  Write-Output "docs-check self-test passed ($caseCount cases; prose parser, multiline normalization, branch mode, counters introduction guard and JSON counter fixtures)."
   exit 0
 }
 
@@ -408,7 +433,12 @@ $baseJson = @($baseTracked | Where-Object { $_.ToLowerInvariant().EndsWith('.jso
 
 # The merge base itself must be internally consistent: stale counters on main
 # are an integrator problem and fail closed here instead of blaming the PR.
-if ($countersChangedByHead) {
+# Only a genuine first-time introduction (the file is absent from the merge
+# base) may skip verification; any other counters edit falls through to the
+# base-consistency check and the strict head-side ownership assertion below.
+git -C $repo cat-file -e ("{0}:build/baseline-counters.json" -f $baseRefName) 2>$null
+$baseHasCounters = ($LASTEXITCODE -eq 0)
+if (Test-CountersIntroductionCase -CountersChangedByHead $countersChangedByHead -BaseHasCounters $baseHasCounters) {
   # This PR introduces build/baseline-counters.json for the first time; the merge
   # base predates the file, so there are no base counters to verify.
   $summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; baseline-counters.json introduced by this pull request and verified against head: {2} tracked paths and {3} repository JSON files.)'
