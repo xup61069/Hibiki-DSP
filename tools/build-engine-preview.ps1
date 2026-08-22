@@ -34,6 +34,64 @@ function Get-EnginePreviewBuildPlan {
   }
 }
 
+function Test-EnginePreviewPathUnderRoot {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$Root
+  )
+
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  return $fullPath.StartsWith($fullRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-EnginePreviewExistingAttributes {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [hashtable]$SyntheticAttributes
+  )
+
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
+    return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
+  }
+  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
+  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+}
+
+function Assert-EnginePreviewBuildRoot {
+  param(
+    [Parameter(Mandatory)][pscustomobject]$Plan,
+    [hashtable]$SyntheticAttributes
+  )
+
+  $expectedRoot = [IO.Path]::GetFullPath((Join-Path $Plan.RepositoryRoot '.local')).TrimEnd('\', '/')
+  $candidate = [IO.Path]::GetFullPath($Plan.BuildRoot).TrimEnd('\', '/')
+  if (-not (Test-EnginePreviewPathUnderRoot -Path $candidate -Root $expectedRoot)) {
+    throw "Engine Preview build root must remain under the repository .local root: $candidate"
+  }
+
+  $cursor = $candidate
+  while ($true) {
+    $attributes = Get-EnginePreviewExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    if ($null -ne $attributes) {
+      if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Engine Preview build root or parent is a reparse point: $cursor"
+      }
+      if ($cursor -eq $candidate -and ($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+        throw "Engine Preview build root is not a directory: $candidate"
+      }
+    }
+
+    if ($cursor -eq $expectedRoot) { break }
+    $parent = [IO.Path]::GetFullPath((Split-Path -Parent $cursor)).TrimEnd('\', '/')
+    if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) {
+      throw "Engine Preview build root could not reach the repository .local root: $candidate"
+    }
+    $cursor = $parent
+  }
+}
+
 function Assert-EnginePreviewBuildPlan {
   param(
     [Parameter(Mandatory)]
@@ -79,6 +137,7 @@ function Assert-EnginePreviewBuildPlan {
 function Invoke-EnginePreviewBuildSelfTest {
   $plan = Get-EnginePreviewBuildPlan -RepositoryRoot $repo
   Assert-EnginePreviewBuildPlan -Plan $plan
+  $caseCount = 1
 
   $invalidTarget = $plan.PSObject.Copy()
   $invalidTarget.Target = 'unexpected-target'
@@ -91,8 +150,54 @@ function Invoke-EnginePreviewBuildSelfTest {
       throw
     }
   }
+  $caseCount++
 
-  Write-Output 'Engine Preview build self-test passed (5 cases; offline/no-build/no-process/no-file-write).'
+  $localRoot = [IO.Path]::GetFullPath((Join-Path $repo '.local')).TrimEnd('\', '/')
+  $buildRoot = [IO.Path]::GetFullPath($plan.BuildRoot).TrimEnd('\', '/')
+  Assert-EnginePreviewBuildRoot -Plan $plan -SyntheticAttributes @{
+    $localRoot = [System.IO.FileAttributes]::Directory
+    $buildRoot = [System.IO.FileAttributes]::Directory
+  }
+  $caseCount++
+
+  $outsideRoot = $plan.PSObject.Copy()
+  $outsideRoot.BuildRoot = Join-Path $repo 'build'
+  $outsideCaught = $false
+  try { Assert-EnginePreviewBuildRoot -Plan $outsideRoot } catch { $outsideCaught = $_.Exception.Message -match 'under the repository .local root' }
+  if (-not $outsideCaught) { throw 'Engine Preview build self-test expected an outside-root rejection.' }
+  $caseCount++
+
+  $reparseParentCaught = $false
+  try {
+    Assert-EnginePreviewBuildRoot -Plan $plan -SyntheticAttributes @{
+      $localRoot = [System.IO.FileAttributes]::Directory -bor [System.IO.FileAttributes]::ReparsePoint
+      $buildRoot = [System.IO.FileAttributes]::Directory
+    }
+  } catch { $reparseParentCaught = $_.Exception.Message -match 'reparse point' }
+  if (-not $reparseParentCaught) { throw 'Engine Preview build self-test expected a reparse-parent rejection.' }
+  $caseCount++
+
+  $reparseTargetCaught = $false
+  try {
+    Assert-EnginePreviewBuildRoot -Plan $plan -SyntheticAttributes @{
+      $localRoot = [System.IO.FileAttributes]::Directory
+      $buildRoot = [System.IO.FileAttributes]::Directory -bor [System.IO.FileAttributes]::ReparsePoint
+    }
+  } catch { $reparseTargetCaught = $_.Exception.Message -match 'reparse point' }
+  if (-not $reparseTargetCaught) { throw 'Engine Preview build self-test expected a reparse-target rejection.' }
+  $caseCount++
+
+  $nonDirectoryCaught = $false
+  try {
+    Assert-EnginePreviewBuildRoot -Plan $plan -SyntheticAttributes @{
+      $localRoot = [System.IO.FileAttributes]::Directory
+      $buildRoot = [System.IO.FileAttributes]::Archive
+    }
+  } catch { $nonDirectoryCaught = $_.Exception.Message -match 'not a directory' }
+  if (-not $nonDirectoryCaught) { throw 'Engine Preview build self-test expected a non-directory rejection.' }
+  $caseCount++
+
+  Write-Output "Engine Preview build self-test passed ($caseCount cases; offline/no-build/no-process/no-file-write)."
 }
 
 if ($SelfTest) {
@@ -101,9 +206,11 @@ if ($SelfTest) {
 }
 
 $plan = Get-EnginePreviewBuildPlan -RepositoryRoot $repo
+Assert-EnginePreviewBuildRoot -Plan $plan
 
 cmake @($plan.ConfigureArguments)
 if ($LASTEXITCODE -ne 0) { throw "Engine preview configure failed: $LASTEXITCODE" }
+Assert-EnginePreviewBuildRoot -Plan $plan
 cmake @($plan.BuildArguments)
 if ($LASTEXITCODE -ne 0) { throw "Engine preview build failed: $LASTEXITCODE" }
 Write-Output "Engine Preview build succeeded. Start the executable from $($plan.BuildRoot) before connecting DesktopCompat."
