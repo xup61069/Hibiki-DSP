@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "issue": 307,
+  "scope_digest": "issue-307-archive-273-v1",
+  "source_commit": "a5ae8abd8c536316c88632bf9a8b4267d934e806",
+  "archive_commit": "a5ae8abd8c536316c88632bf9a8b4267d934e806",
+  "main_sync_commit": "f18e57d",
+  "archived_issue": 273,
+  "merged_pr": 275,
+  "merged_pr_commit": "c1b8722d1efd5668e6e4a9d6b203c3410a6218d6",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-cmake-4.4.0-vs2026; wdk-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 307",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 307 archive implementation",
+      "status": "pass",
+      "coverage": [
+        "moved docs/tasks/active/273.md to docs/tasks/completed/2026/273.md",
+        "preserved Issue 273 scope and recorded PR #275 merge commit c1b8722d1efd5668e6e4a9d6b203c3410a6218d6",
+        "recorded archive commit a5ae8abd8c536316c88632bf9a8b4267d934e806"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP, RT audio, driver, HLK or signing behavior is changed.",
+    "Archive preserves historical verification; does not claim new product delivery."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4",
+    "windows_build": "26200",
+    "cmake": "4.4.0"
+  },
+  "started_at": "2026-08-22T20:50:00+08:00",
+  "finished_at": "2026-08-22T21:05:00+08:00"
+}

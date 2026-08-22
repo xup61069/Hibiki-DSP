@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "issue": 304,
+  "scope_digest": "issue-304-archive-268-v1",
+  "source_commit": "564de44a73060d80f8790c1848a06a50370e17eb",
+  "base_commit": "adf8b491df471401ffe226d6be22aa32560d7106",
+  "archived_issue": 268,
+  "merged_pr": {
+    "number": 281,
+    "merge_commit": "b89a284c8e6dad0bdb7a3768b6265b985e51c954"
+  },
+  "follow_up_relationship": {
+    "issue": 290,
+    "pr": 293,
+    "note": "PR #281 landed only docs/tasks/active/268.md; the residual acceptance (merge references for completed/2026/226.md and 245.md plus evidence) is tracked by open Issue #290 / PR #293, whose handoff supersedes the incomplete verification bullets inside the archived 268.md. The moved body is preserved as-is."
+  },
+  "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-10.0.28000.2526-wdk-10.0.28000.2526-cmake-4.4.2-pwsh-7.6.5",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 304",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 304 archive implementation",
+      "status": "pass",
+      "coverage": [
+        "moved docs/tasks/active/268.md to docs/tasks/completed/2026/268.md via git mv",
+        "front-matter bookkeeping only: status completed, PR #281 merge_commit recorded, closed-out next_safe_action pointing at the #290/#293 follow-up",
+        "body content of the archived handoff preserved verbatim"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 304 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Issue 304 schema-v2 ownership, scope and Git ancestry",
+        "full active handoff validation including no scope overlap"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 -SelfTest / tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "13 bounded docs-check self-test cases",
+        "85 required documentation paths and 24 specs with live tracked-path and repository-JSON measurement"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "no blocked binary or secret among tracked paths",
+        "one workflow with source-only CI policy satisfied"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly / tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "Windows 26200 AMD64, Visual Studio 2026, CMake, SDK and WDK prerequisites detected",
+        "Visual Studio 2026/CMake build, ctest all green including hibiki_asio_transport_selftest, unsigned local verification"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP order, RT audio, driver, HLK or signing behavior is changed.",
+    "The archived 268.md body retains its claim-time verification gaps by design; open Issue #290 / PR #293 is the authoritative follow-up record.",
+    "Archive and user-space gates do not provide loadable-driver, physical-audio, HLK or Microsoft-signing evidence."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369",
+    "cmake": "4.4.2",
+    "sdk_qfe": "10.1.28000.2526",
+    "wdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T21:28:00+08:00",
+  "finished_at": "2026-08-22T21:45:00+08:00"
+}

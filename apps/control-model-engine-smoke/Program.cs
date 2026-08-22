@@ -40,8 +40,24 @@ try
     viewModel.RequestedVolumeDb = -18.0;
     if (!await viewModel.QueueVolumeAsync(TimeSpan.FromMilliseconds(1)))
         throw new InvalidOperationException("Control model volume command was not acknowledged.");
-    if (Math.Abs(viewModel.EffectiveVolumeDb - (-18.0)) > 0.01 ||
-        viewModel.VolumeGeneration != 1UL)
+
+    // Same eventual-consistency contract as the IR check below: the ack means
+    // "queued", and the reconciled snapshot can trail the command under load.
+    // Poll bounded instead of asserting on one sample.
+    var volumeReconciled = false;
+    for (var attempt = 0; attempt < 30 && !volumeReconciled; attempt++)
+    {
+        volumeReconciled = Math.Abs(viewModel.EffectiveVolumeDb - (-18.0)) <= 0.01 &&
+                           viewModel.VolumeGeneration == 1UL;
+        if (!volumeReconciled)
+        {
+            await Task.Delay(100).ConfigureAwait(true);
+            if (viewModel.IsConnected)
+                _ = await viewModel.RefreshControlStatusAsync().ConfigureAwait(true);
+        }
+    }
+
+    if (!volumeReconciled)
         throw new InvalidOperationException(
             $"Engine status did not reconcile volume: effective={viewModel.EffectiveVolumeDb:0.00}, generation={viewModel.VolumeGeneration}.");
 
@@ -58,8 +74,28 @@ try
         !viewModel.IrPrepareStatus.Contains("已在引擎", StringComparison.Ordinal))
         throw new InvalidOperationException("Control model IR prepare was not acknowledged.");
 
-    if (!await viewModel.SelectSceneAsync("movie") || viewModel.HasPreparedIr ||
-        !viewModel.IrPrepareStatus.Contains("IR 已清除", StringComparison.Ordinal))
+    if (!await viewModel.SelectSceneAsync("movie"))
+        throw new InvalidOperationException(
+            $"Control model scene switch was not acknowledged. status=\"{viewModel.StatusText}\" connection={viewModel.ConnectionState} diag=\"{viewModel.LastSendDiagnostics}\"");
+
+    // Scene-apply ack and status snapshots are eventually consistent: a refresh
+    // computed before the engine finishes its scene transaction can still report
+    // prepared IR and overwrite the locally-cleared state. Poll bounded instead
+    // of asserting on one sample.
+    var irCleared = false;
+    for (var attempt = 0; attempt < 30 && !irCleared; attempt++)
+    {
+        irCleared = !viewModel.HasPreparedIr &&
+                    viewModel.IrPrepareStatus.Contains("IR 已清除", StringComparison.Ordinal);
+        if (!irCleared)
+        {
+            await Task.Delay(100).ConfigureAwait(true);
+            if (viewModel.IsConnected)
+                _ = await viewModel.RefreshControlStatusAsync().ConfigureAwait(true);
+        }
+    }
+
+    if (!irCleared)
         throw new InvalidOperationException("Scene switch did not clear the prepared IR state.");
 
     var physicalRefresh = await viewModel.RefreshPhysicalDevicesAsync();

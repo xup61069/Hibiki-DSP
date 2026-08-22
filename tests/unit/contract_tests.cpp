@@ -2805,6 +2805,46 @@ int main() {
     tab_packet.pop_back();
     CHECK(!decode_tab_capture_packet_v1(tab_packet, tab_view, tab_error) &&
           tab_error == TabPacketError::LengthMismatch);
+
+    // Rebuild a valid 2ch x 2fr @48k packet for bounded negative-path coverage.
+    auto valid_packet = std::vector<std::uint8_t>(16U + 2U * 2U * sizeof(float), 0U);
+    valid_packet[0] = 'H'; valid_packet[1] = 'I'; valid_packet[2] = 'B'; valid_packet[3] = 'T';
+    valid_packet[4] = 1U;
+    valid_packet[6] = 2U;
+    valid_packet[8] = 2U;
+    valid_packet[12] = 0x80U; valid_packet[13] = 0xBBU; valid_packet[14] = 0U; valid_packet[15] = 0U;
+    const float valid_samples[4] = {0.25F, -0.25F, 0.5F, -0.5F};
+    std::memcpy(valid_packet.data() + 16U, valid_samples, sizeof(valid_samples));
+
+    const auto truncated_header = std::vector<std::uint8_t>(
+        valid_packet.begin(), valid_packet.begin() + static_cast<std::ptrdiff_t>(15U));
+    CHECK(!decode_tab_capture_packet_v1(truncated_header, tab_view, tab_error) &&
+          tab_error == TabPacketError::Truncated);
+
+    auto truncated_payload = valid_packet;
+    truncated_payload.pop_back();
+    CHECK(!decode_tab_capture_packet_v1(truncated_payload, tab_view, tab_error) &&
+          tab_error == TabPacketError::LengthMismatch);
+
+    auto nan_packet = valid_packet;
+    const float nan_sample = std::numeric_limits<float>::quiet_NaN();
+    std::memcpy(nan_packet.data() + 16U, &nan_sample, sizeof(nan_sample));
+    CHECK(!decode_tab_capture_packet_v1(nan_packet, tab_view, tab_error) &&
+          tab_error == TabPacketError::NonFiniteSample);
+
+    auto bad_channels = valid_packet;
+    bad_channels[6U] = 3U;
+    CHECK(!decode_tab_capture_packet_v1(bad_channels, tab_view, tab_error) &&
+          tab_error == TabPacketError::InvalidChannels);
+
+    auto bad_rate = valid_packet;
+    bad_rate[12U] = (22222U >> 0U) & 0xFFU;
+    bad_rate[13U] = (22222U >> 8U) & 0xFFU;
+    bad_rate[14U] = (22222U >> 16U) & 0xFFU;
+    bad_rate[15U] = (22222U >> 24U) & 0xFFU;
+    CHECK(!decode_tab_capture_packet_v1(bad_rate, tab_view, tab_error) &&
+          tab_error == TabPacketError::InvalidSampleRate);
+
     TabBridgeServer tab_server;
     CHECK(!tab_server.start(TabBridgeServerConfigV1{17842U, 256U * 1024U}, nullptr, nullptr));
     CHECK(!tab_server.running());
