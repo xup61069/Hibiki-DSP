@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "issue": 193,
+  "scope_digest": "target-machine-checklist-v1",
+  "source_commit": "pending",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/handoff-check.ps1 -Issue 193",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "documentation review",
+      "status": "pass",
+      "coverage": [
+        "TARGET_MACHINE_CHECKLIST.md created with executable step-by-step provisioning guide",
+        "hardware/OS prerequisites with verification commands and expected outputs",
+        "PowerShell 7 installation with winget command and version check",
+        "Visual Studio 2026 C++ workload with vswhere verification",
+        "Windows SDK/WDK 10.0.28000.2526 directory layout verification including QFE naming pitfall",
+        "known pitfalls table covering PS 5.1, Execution Policy, QFE directory, VS BuildTools-only gap",
+        "explicit non-claims: toolchain readiness does not equal driver/audio/signing capability"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The checklist is written from source-code analysis and BASELINE documentation; it has not been validated on an actual target machine (which does not exist yet).",
+    "Documentation only; no product source or gate behavior is modified."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}
