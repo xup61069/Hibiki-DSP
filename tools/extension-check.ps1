@@ -29,6 +29,32 @@ function Get-CspDirectiveSources([string]$csp, [string]$directive, [string]$sour
   return ,@($matches[0])
 }
 
+function Assert-ExactCspDirectiveSet([string]$csp, [string]$sourceName) {
+  $allowedDirectives = [System.Collections.Generic.HashSet[string]]::new(
+    [string[]]@('script-src', 'object-src', 'connect-src'),
+    [System.StringComparer]::OrdinalIgnoreCase
+  )
+  $seenDirectives = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase
+  )
+  foreach ($segment in ($csp -split ';')) {
+    $tokens = @($segment.Trim() -split '\s+' | Where-Object { $_ })
+    if ($tokens.Count -eq 0) {
+      throw "CSP contains an empty directive in $sourceName."
+    }
+    $directive = [string]$tokens[0]
+    if (-not $allowedDirectives.Contains($directive)) {
+      throw "CSP directive '$directive' is not allowed in $sourceName."
+    }
+    if (-not $seenDirectives.Add($directive)) {
+      throw "CSP contains duplicate directive '$directive' in $sourceName."
+    }
+  }
+  if ($seenDirectives.Count -ne $allowedDirectives.Count) {
+    throw "CSP must contain exactly the script-src, object-src, and connect-src directives in $sourceName."
+  }
+}
+
 function Assert-ExtensionManifestPolicy($manifest, [string]$sourceName) {
   if ($null -eq $manifest) {
     throw "Extension manifest cannot be null in $sourceName"
@@ -70,6 +96,7 @@ function Assert-ExtensionManifestPolicy($manifest, [string]$sourceName) {
   }
 
   $csp = [string]$manifest.content_security_policy.extension_pages
+  Assert-ExactCspDirectiveSet $csp $sourceName
   if ($csp -match 'unsafe-eval') {
     throw "CSP contains unsafe-eval in $sourceName."
   }
@@ -156,6 +183,24 @@ if ($SelfTest) {
   try { Assert-ExtensionManifestPolicy $wrongLoopback 'selftest-wrong-loopback' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected wrong loopback endpoint failure.' }
 
+  $extraDirective = $validJson | ConvertFrom-Json
+  $extraDirective.content_security_policy.extension_pages = "script-src 'self'; object-src 'self'; connect-src ws://127.0.0.1:17842; default-src *"
+  $caught = $false
+  try { Assert-ExtensionManifestPolicy $extraDirective 'selftest-extra-directive' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected an extra CSP directive failure.' }
+
+  $duplicateDirective = $validJson | ConvertFrom-Json
+  $duplicateDirective.content_security_policy.extension_pages = "script-src 'self'; object-src 'self'; connect-src ws://127.0.0.1:17842; script-src 'self'"
+  $caught = $false
+  try { Assert-ExtensionManifestPolicy $duplicateDirective 'selftest-duplicate-directive' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected a duplicate CSP directive failure.' }
+
+  $emptyDirective = $validJson | ConvertFrom-Json
+  $emptyDirective.content_security_policy.extension_pages = "script-src 'self'; ; object-src 'self'; connect-src ws://127.0.0.1:17842"
+  $caught = $false
+  try { Assert-ExtensionManifestPolicy $emptyDirective 'selftest-empty-directive' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected an empty CSP directive failure.' }
+
   $multilineCsp = $validJson | ConvertFrom-Json
   $multilineCsp.content_security_policy.extension_pages = @"
 script-src    'self' ;
@@ -164,7 +209,7 @@ connect-src   ws://127.0.0.1:17842
 "@
   Assert-ExtensionManifestPolicy $multilineCsp 'selftest-multiline-csp'
 
-  Write-Output 'Browser extension policy self-test passed (12 cases).'
+  Write-Output 'Browser extension policy self-test passed (15 cases).'
   exit 0
 }
 
