@@ -217,6 +217,15 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   kernel-mode PortCls adapter build, Inf2Cat packaging and self-signed test-sign evidence
   while keeping install/load, runtime audio, HLK, Microsoft signing and consumer release
   limits explicit (Issue #478 / PR #480).
+- Control-model smoke path hardening merged: control-model-engine-smoke.ps1 fails closed
+  on the fixed Engine Preview executable, working directory, project path and the
+  .local/control-model-engine-smoke output root, validating before build/launch and
+  revalidating before dotnet run while keeping existing missing-output-root creation;
+  launcher self-test grew with offline synthetic path cases (Issue #489 / PR #490).
+- Handoff retention cleanup merged: residual per-slice files docs/tasks/active/423.md and
+  docs/tasks/active/466.md were removed after their slices merged, with
+  retention-final-v2.json evidence following the Issue #341/#346 precedent
+  (Issue #485 / PR #487).
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe
