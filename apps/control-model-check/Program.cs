@@ -870,6 +870,13 @@ Check(!editorViewModel.UpsertFromFields() &&
       editorViewModel.Rows.SequenceEqual(rowsBeforeInvalidInput) &&
       editorViewModel.StatusText.Contains("事件超出限制"),
     "Out-of-range normalized value must be refused by the bounded model.");
+editorViewModel.NewValueText = "0.15";
+Check(editorViewModel.UpsertFromFields() && editorViewModel.Rows.Count == 3 &&
+      editorViewModel.Rows[2].Index == 2 &&
+      editorViewModel.Rows[2].ParameterId == 8U &&
+      editorViewModel.Rows[2].SamplePosition == 720UL &&
+      Math.Abs(editorViewModel.Rows[2].NormalizedValue - 0.15) < 1e-12,
+    "Editor ViewModel must accept the repaired in-range event.");
 editorViewModel.SelectedRowIndex = 0;
 var firstRowBeforeValueEdit = editorViewModel.Rows[0];
 Check(!editorViewModel.SetSelectedRowValue("NaN") &&
@@ -896,7 +903,7 @@ Check(editorViewModel.SaveSelected() && !editorViewModel.IsDirty &&
 Check(editorViewModel.Undo() && editorViewModel.Rows.Count == 0 &&
       editorViewModel.IsDirty && editorViewModel.CanRedo,
     "Editor ViewModel undo must restore the previous published snapshot.");
-Check(editorViewModel.Redo() && editorViewModel.Rows.Count == 2 &&
+Check(editorViewModel.Redo() && editorViewModel.Rows.Count == 3 &&
       !editorViewModel.IsDirty && !editorViewModel.CanRedo,
     "Editor ViewModel redo must restore the saved snapshot.");
 Check(editorViewModel.BeginEdit(), "Second editor ViewModel draft fixture failed.");
@@ -977,4 +984,40 @@ Check(editorViewModel.ClearHistory() && editorViewModel.HasEditSession &&
       editorViewModel.UndoDepth == 0 && editorViewModel.RedoDepth == 0 &&
       editorViewModel.Discard(),
     "Editor ViewModel clear-history must preserve an open draft.");
+Check(!editorViewModel.RemoveSelectedRow() &&
+      editorViewModel.StatusText.Contains("無法刪除"),
+    "Editor ViewModel row removal must require an open draft.");
+editorViewModel.SelectedRowIndex = -1;
+Check(editorViewModel.BeginEdit(), "Editor ViewModel removal draft fixture failed.");
+Check(!editorViewModel.RemoveSelectedRow() &&
+      editorViewModel.StatusText.Contains("無法刪除"),
+    "Editor ViewModel row removal must require a selected row.");
+editorViewModel.SelectedRowIndex = 1;
+var rowsBeforeRemoval = editorViewModel.Rows.ToArray();
+editorNotifications.Clear();
+Check(editorViewModel.RemoveSelectedRow(), "Editor ViewModel removal fixture failed.");
+Check(editorViewModel.SelectedRowIndex == -1,
+    "Editor ViewModel removal must clear the selected index.");
+Check(editorViewModel.Rows.Count == 2,
+    "Editor ViewModel removal must leave two rows.");
+Check(editorViewModel.Rows[0] == rowsBeforeRemoval[0],
+    "Editor ViewModel removal must keep the leading row.");
+Check(editorViewModel.Rows[1] == new Vst3TimelineEditorViewModel.TimelineEventRow(
+          1, 8U, 720UL, 0.15),
+    "Editor ViewModel removal must renumber the trailing row.");
+Check(editorViewModel.StatusText.Contains("已刪除選取列"),
+    "Editor ViewModel removal must publish a status message.");
+Check(editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.SelectedRowIndex)) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.Rows)) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.StatusText)),
+    "Editor ViewModel removal must renumber rows and publish observable changes.");
+Check(editorViewModel.Commit() && editorViewModel.Rows.Count == 2 &&
+      !editorViewModel.HasEditSession,
+    "Editor ViewModel removal must commit the reduced draft.");
+Check(editorViewModel.BeginEdit(), "Stale-index removal draft fixture failed.");
+editorViewModel.SelectedRowIndex = 99;
+Check(!editorViewModel.RemoveSelectedRow() &&
+      editorViewModel.StatusText.Contains("索引無效"),
+    "Editor ViewModel removal must fail closed for a stale index.");
+Check(editorViewModel.Discard(), "Stale-index removal cleanup failed.");
 Console.WriteLine("Control model checks passed.");

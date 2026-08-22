@@ -221,6 +221,23 @@ public sealed class Vst3TimelineEditorViewModel : INotifyPropertyChanged
         return true;
     }
 
+    // Removes the currently selected row from the open draft. Rows are
+    // renumbered by the next refresh and the stale index is cleared so a
+    // follow-up edit cannot target shifted rows.
+    public bool RemoveSelectedRow()
+    {
+        if (!HasEditSession || _selectedRowIndex < 0 ||
+            !_model.RemoveAt(_selectedRowIndex))
+        {
+            SetStatus("無法刪除（未選取列、沒有草稿或索引無效）");
+            return false;
+        }
+        SelectedRowIndex = -1;
+        RefreshRows();
+        SetStatus("已刪除選取列");
+        return true;
+    }
+
     private bool TryParseFields(out uint parameterId, out ulong position, out double value)
     {
         parameterId = 0U;
