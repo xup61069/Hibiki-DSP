@@ -47,8 +47,7 @@ try
 
     if (!await viewModel.OneTapEnhanceAsync())
         throw new InvalidOperationException("Control model One-Tap SceneApply was not acknowledged.");
-    if ((!sessionProbe && viewModel.StatusSequence != 1UL) ||
-        (sessionProbe && viewModel.StatusSequence < 1UL) ||
+    if (viewModel.StatusSequence < 1UL ||
         viewModel.SelectedScene?.Id != "game")
         throw new InvalidOperationException(
             $"Engine status/scene did not reconcile: sequence={viewModel.StatusSequence}, scene={viewModel.SelectedScene?.Id ?? "none"}.");
