@@ -50,6 +50,56 @@ function Assert-CounterClaims {
            "update the BASELINE.md verification summary.") -f $Claims.Json, $Json
   }
 }
+
+function Convert-CommandOutputToText {
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Lines
+  )
+  if ($null -eq $Lines -or $Lines.Count -eq 0) { return '' }
+  $strings = @($Lines | ForEach-Object { [string]$_ })
+  return [string]::Join("`n", $strings)
+}
+
+function Test-MergeBaseMode {
+  param(
+    [string]$BaseRef,
+    [string]$RefName
+  )
+  if (-not [string]::IsNullOrWhiteSpace($BaseRef)) { return $true }
+  if ([string]::IsNullOrWhiteSpace($RefName)) { return $false }
+  if ($RefName -eq 'main' -or $RefName -eq 'refs/heads/main' -or $RefName.EndsWith('/main')) {
+    return $false
+  }
+  return $true
+}
+
+function Resolve-CiRefName {
+  param(
+    [string]$RefName,
+    [string]$Ref,
+    [string]$EventName,
+    [string]$CurrentBranch
+  )
+  $resolved = ''
+  if (-not [string]::IsNullOrWhiteSpace($RefName)) {
+    $resolved = $RefName
+  }
+  elseif (-not [string]::IsNullOrWhiteSpace($Ref)) {
+    $resolved = $Ref -replace '^refs/heads/', ''
+  }
+  if ($EventName -eq 'push' -and -not [string]::IsNullOrWhiteSpace($CurrentBranch)) {
+    $resolved = $CurrentBranch
+  }
+  return $resolved
+}
+
+function Test-BaselineChangedByHead {
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$ChangedPaths
+  )
+  return @($ChangedPaths | Where-Object { $_ -eq 'docs/state/BASELINE.md' }).Count -gt 0
+}
+
 $required = @(
   'AGENTS.md', 'CLAUDE.md', 'README.md', 'CONTRIBUTING.md', 'SECURITY.md',
   '.github/PULL_REQUEST_TEMPLATE.md', '.github/ISSUE_TEMPLATE/ai-task.yml',
@@ -137,6 +187,51 @@ binary/secret；
 `distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過了71 個 repository JSON 檔案均可解析。
 '@
   $caseCount = 0
+  $multilineLines = @('line-one', 'line-two', 'line-three')
+  $multilineText = Convert-CommandOutputToText -Lines $multilineLines
+  if ($multilineText -ne "line-one`nline-two`nline-three") {
+    throw 'docs-check self-test failed: multiline command output did not normalize to text.'
+  }
+  $caseCount++
+  $sameBaseline = Convert-CommandOutputToText -Lines @('BASELINE line one', 'BASELINE line two')
+  $sameHead = "BASELINE line one`nBASELINE line two"
+  if (($sameBaseline -replace "`r", '').Trim() -ne $sameHead.Trim()) {
+    throw 'docs-check self-test failed: equal multiline head/base text was not recognized.'
+  }
+  $caseCount++
+  $changedBaseline = Convert-CommandOutputToText -Lines @('BASELINE line one', 'BASELINE changed')
+  if (($changedBaseline -replace "`r", '').Trim() -eq $sameHead.Trim()) {
+    throw 'docs-check self-test failed: changed multiline head/base text was treated as equal.'
+  }
+  $caseCount++
+  if (-not (Test-MergeBaseMode -BaseRef 'main' -RefName '')) {
+    throw 'docs-check self-test failed: pull-request mode was not recognized.'
+  }
+  $caseCount++
+  if (-not (Test-MergeBaseMode -BaseRef '' -RefName 'codex/feature')) {
+    throw 'docs-check self-test failed: feature-branch push mode was not recognized.'
+  }
+  $caseCount++
+  if ((Resolve-CiRefName -RefName '' -Ref '' -EventName 'push' -CurrentBranch 'codex/feature') -ne 'codex/feature') {
+    throw 'docs-check self-test failed: push-event checkout branch fallback was not recognized.'
+  }
+  $caseCount++
+  if ((Resolve-CiRefName -RefName 'main' -Ref '' -EventName 'push' -CurrentBranch 'codex/feature') -ne 'codex/feature') {
+    throw 'docs-check self-test failed: push-event checkout branch did not override a misleading ref name.'
+  }
+  $caseCount++
+  if (Test-BaselineChangedByHead -ChangedPaths @('docs/tasks/active/64.md')) {
+    throw 'docs-check self-test failed: a handoff-only head was treated as a BASELINE owner.'
+  }
+  $caseCount++
+  if (-not (Test-BaselineChangedByHead -ChangedPaths @('docs/state/BASELINE.md'))) {
+    throw 'docs-check self-test failed: a head BASELINE edit was not detected.'
+  }
+  $caseCount++
+  if (Test-MergeBaseMode -BaseRef '' -RefName 'main') {
+    throw 'docs-check self-test failed: direct main push must remain strict.'
+  }
+  $caseCount++
   $ok = Get-CounterClaims $summaryOk
   if ($ok.Required -ne 85 -or $ok.Specs -ne 24 -or $ok.Tracked -ne 411 -or $ok.Json -ne 71) {
     throw 'docs-check self-test failed: canonical summary did not parse to expected counters.'
@@ -155,10 +250,10 @@ binary/secret；
   } catch {
     $caseCount++
   }
-  if ($caseCount -lt 7) {
-    throw "docs-check self-test failed: expected at least 7 passing cases, saw $caseCount."
+  if ($caseCount -lt 13) {
+    throw "docs-check self-test failed: expected at least 13 passing cases, saw $caseCount."
   }
-  Write-Output "docs-check self-test passed ($caseCount cases; parser markers, malformed text and drift detection)."
+  Write-Output "docs-check self-test passed ($caseCount cases; parser markers, multiline normalization, branch mode and drift detection)."
   exit 0
 }
 
@@ -182,8 +277,16 @@ if ($claims.Specs -ne $specs.Count) {
 }
 
 $baseRef = $env:GITHUB_BASE_REF
+$currentBranch = if ($env:GITHUB_EVENT_NAME -eq 'push') {
+  (git -C $repo branch --show-current 2>$null).Trim()
+} else {
+  ''
+}
+$refName = Resolve-CiRefName -RefName $env:GITHUB_REF_NAME -Ref $env:GITHUB_REF `
+  -EventName $env:GITHUB_EVENT_NAME -CurrentBranch $currentBranch
 $pullRequestMode = -not [string]::IsNullOrWhiteSpace($baseRef)
-if (-not $pullRequestMode) {
+$mergeBaseMode = Test-MergeBaseMode -BaseRef $baseRef -RefName $refName
+if (-not $mergeBaseMode) {
   # Push-to-main and local runs stay fully strict so main cannot drift silently.
   Assert-CounterClaims -Claims $claims -Required $required.Count -Specs $specs.Count `
     -Tracked $trackedFiles.Count -Json $jsonFiles.Count
@@ -192,18 +295,28 @@ if (-not $pullRequestMode) {
   exit 0
 }
 
-$baseRefName = 'origin/' + $baseRef
+$baseRefName = if ($pullRequestMode) { 'origin/' + $baseRef } else { 'origin/main' }
 git -C $repo cat-file -e ("{0}^{{commit}}" -f $baseRefName) 2>$null
 if ($LASTEXITCODE -ne 0) {
   throw "docs-check could not resolve merge base ref '$baseRefName'; ensure checkout keeps fetch-depth: 0."
 }
+$mergeBase = (git -C $repo merge-base HEAD $baseRefName 2>$null).Trim()
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($mergeBase)) {
+  throw "docs-check could not resolve the common ancestor of HEAD and '$baseRefName'."
+}
+$headBaselineChanges = @(git -C $repo diff --name-only $mergeBase HEAD -- docs/state/BASELINE.md)
+if ($LASTEXITCODE -ne 0) {
+  throw "docs-check could not determine whether this head edits docs/state/BASELINE.md."
+}
+$baselineChangedByHead = Test-BaselineChangedByHead -ChangedPaths $headBaselineChanges
 $baseTracked = @(git -C $repo ls-tree -r --name-only $baseRefName)
 if ($LASTEXITCODE -ne 0) { throw "docs-check could not list the merge base tree '$baseRefName'." }
 # git ls-tree does not expand a bare '*.json' pathspec across directories the way
 # git ls-files does; filter the full listing instead of trusting a pathspec.
 $baseJson = @($baseTracked | Where-Object { $_.ToLowerInvariant().EndsWith('.json') })
-$baseBaselineText = git -C $repo show ('{0}:docs/state/BASELINE.md' -f $baseRefName)
+$baseBaselineLines = @(git -C $repo show ('{0}:docs/state/BASELINE.md' -f $baseRefName))
 if ($LASTEXITCODE -ne 0) { throw "docs-check could not read BASELINE.md from '$baseRefName'." }
+$baseBaselineText = Convert-CommandOutputToText -Lines $baseBaselineLines
 
 # The merge base itself must be internally consistent: a stale summary on main
 # is an integrator problem and fails closed here instead of blaming the PR.
@@ -219,13 +332,13 @@ if ($baseClaims.Json -ne $baseJson.Count) {
 
 $headNormalized = $baselineText -replace "`r", ''
 $baseNormalized = $baseBaselineText -replace "`r", ''
-if ($headNormalized.Trim() -eq $baseNormalized.Trim()) {
-  # The PR did not touch BASELINE.md, so its own file additions are exactly the
-  # counter drift the shared snapshot cannot track per-slice. The base was just
-  # proven consistent; tolerate the head-side delta instead of serializing every
-  # parallel lane behind an integrator refresh.
-  $summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; BASELINE.md untouched by this pull request, verified against merge base {2}: {3} tracked paths and {4} repository JSON files.)'
-  Write-Output (($summaryTemplate) -f $required.Count, $specs.Count, $baseRefName, $baseTracked.Count, $baseJson.Count)
+if (-not $baselineChangedByHead) {
+  # Compare normalized text for the multiline regression, but use the actual
+  # merge-base diff to determine ownership. Main may have refreshed BASELINE.md
+  # after this branch forked; a handoff-only head must not become its owner.
+  $normalizationState = if ($headNormalized.Trim() -eq $baseNormalized.Trim()) { 'equal' } else { 'parallel-main-drift' }
+  $summaryTemplate = 'Documentation checks passed ({0} required paths, {1} specs; BASELINE.md untouched by this pull request, normalized comparison={2}, verified against merge base {3}: {4} tracked paths and {5} repository JSON files.)'
+  Write-Output (($summaryTemplate) -f $required.Count, $specs.Count, $normalizationState, $baseRefName, $baseTracked.Count, $baseJson.Count)
   exit 0
 }
 

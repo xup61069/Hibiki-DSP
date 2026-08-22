@@ -55,6 +55,12 @@ worktree 的實際本機路徑屬環境資訊，不寫入 repository。禁止在
   不重寫歷史。
 - 工作被另一 session 接手完成時，在 PR body 誠實記錄接手事件與後續驗證
   （先例：PR #24 / Issue #22）。
+- **接手或推送任何不是自己開始的 branch 前，必須先做兩件事**：
+  1. 執行 `git worktree list` 確認該 branch 沒有被本機任何 worktree 佔用中——
+     被佔用代表那個 session 可能還有未 push 的 edits，直接推會踩掉別人的工作；
+  2. 在該 Issue 留言宣告接手意圖，等一個輪詢週期沒有異議再動手。
+  先例：Issue #22 曾發生外部 session 對持有未 push 變更的 worktree 直接 commit，
+  事後雖依遠端 HEAD 重驗收尾，但此類碰撞應從源頭避免。
 - 收尾時只清理自己的 worktree 與本地 branch；遠端 branch 留給 integrator 決定。
 
 ## Scope 與 ownership

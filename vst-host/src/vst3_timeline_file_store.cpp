@@ -200,4 +200,64 @@ Vst3TimelineStoreStatusV1 sync_timeline_store_to_scheduler_v1(
     return Vst3TimelineStoreStatusV1::ok;
 }
 
+Vst3TimelineStoreStatusV1 sync_scheduler_to_timeline_store_v1(
+    const Vst3SceneAutomationSchedulerV1& scheduler,
+    Vst3TimelineFileStoreV1& store,
+    const std::span<std::string> stale_ids,
+    std::size_t& stale_count,
+    Vst3SchedulerStoreExportResultV1& result) {
+    result = {};
+    stale_count = 0U;
+    if (!store.is_open()) return Vst3TimelineStoreStatusV1::invalid_argument;
+
+    std::array<std::string, kVst3TimelineStoreMaxEntriesV1> scheduler_ids{};
+    std::size_t scheduler_id_count = 0U;
+    if (!scheduler.timeline_ids(scheduler_ids, scheduler_id_count)) {
+        return Vst3TimelineStoreStatusV1::invalid_argument;
+    }
+    for (std::size_t index = 0U; index < scheduler_id_count; ++index) {
+        const auto* snapshot = scheduler.timeline_snapshot(scheduler_ids[index]);
+        if (snapshot == nullptr) {
+            ++result.skipped;
+            continue;
+        }
+        const auto status = store.save(scheduler_ids[index], *snapshot);
+        if (status != Vst3TimelineStoreStatusV1::ok) {
+            ++result.skipped;
+        } else {
+            ++result.saved;
+        }
+    }
+
+    std::array<std::string, kVst3TimelineStoreMaxEntriesV1> store_ids{};
+    std::size_t store_id_count = 0U;
+    const auto listing = store.list_ids(store_ids, store_id_count);
+    if (listing != Vst3TimelineStoreStatusV1::ok) return listing;
+
+    std::array<std::string, kVst3TimelineStoreMaxEntriesV1> stale_found{};
+    std::size_t stale_total = 0U;
+    for (std::size_t index = 0U; index < store_id_count; ++index) {
+        const auto& candidate = store_ids[index];
+        bool present_in_scheduler = false;
+        for (std::size_t prior = 0U; prior < scheduler_id_count; ++prior) {
+            present_in_scheduler = present_in_scheduler || scheduler_ids[prior] == candidate;
+        }
+        if (present_in_scheduler) continue;
+        if (stale_total >= stale_found.size()) {
+            stale_count = stale_total + 1U;
+            return Vst3TimelineStoreStatusV1::capacity_exhausted;
+        }
+        stale_found[stale_total++] = candidate;
+    }
+    if (stale_total > stale_ids.size()) {
+        stale_count = stale_total;
+        return Vst3TimelineStoreStatusV1::capacity_exhausted;
+    }
+    for (std::size_t index = 0U; index < stale_total; ++index) {
+        stale_ids[index] = stale_found[index];
+    }
+    stale_count = stale_total;
+    return Vst3TimelineStoreStatusV1::ok;
+}
+
 }  // namespace hibiki
