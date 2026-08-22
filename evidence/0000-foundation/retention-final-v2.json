@@ -1,0 +1,13 @@
+{
+  "schema_version": 2,
+  "issue": 485,
+  "title": "retention-final: remove residual docs/tasks files for Issues #423 and #466",
+  "base_commit": "4ba1ce1e1ffabffdb635923a38c1f39f3101cfad",
+  "removed": [
+    "docs/tasks/active/423.md",
+    "docs/tasks/active/466.md"
+  ],
+  "rationale": "Issues #423 and #466 are CLOSED; PRs #461 and #468 merged. Git history remains the authoritative record per the retention policy applied in Issues #341/#346.",
+  "scope": "docs retention only; no product/API/schema/DSP/driver change",
+  "date": "2026-08-23"
+}
