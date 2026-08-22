@@ -1,10 +1,65 @@
 [CmdletBinding()]
 param(
-  [string]$Configuration = 'Release'
+  [string]$Configuration = 'Release',
+  [switch]$SelfTest
 )
 
 $ErrorActionPreference = 'Stop'
-$repo = (Get-Location).Path
+$repo = Split-Path -Parent $PSScriptRoot
+
+function Get-DriverBuildPaths {
+  param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+  $resolvedRepo = [System.IO.Path]::GetFullPath($RepoRoot).TrimEnd('\', '/')
+  [ordered]@{
+    RepoRoot = $resolvedRepo
+    ObjectRoot = Join-Path $resolvedRepo '.local/driver-build/obj'
+    PackageRoot = Join-Path $resolvedRepo '.local/driver-package'
+  }
+}
+
+function Test-PathUnderRoot {
+  param(
+    [Parameter(Mandatory = $true)][string]$Root,
+    [Parameter(Mandatory = $true)][string]$Candidate
+  )
+
+  $resolvedRoot = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  $resolvedCandidate = [System.IO.Path]::GetFullPath($Candidate)
+  $resolvedCandidate.StartsWith(
+    $resolvedRoot + [System.IO.Path]::DirectorySeparatorChar,
+    [System.StringComparison]::OrdinalIgnoreCase
+  )
+}
+
+$paths = Get-DriverBuildPaths -RepoRoot $repo
+if ($SelfTest) {
+  $expectedRepo = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\', '/')
+  if ($paths.RepoRoot -ne $expectedRepo) {
+    throw "build-driver self-test resolved the wrong repository root: $($paths.RepoRoot)"
+  }
+
+  $localRoot = Join-Path $paths.RepoRoot '.local'
+  foreach ($outputPath in @($paths.ObjectRoot, $paths.PackageRoot)) {
+    if (-not (Test-PathUnderRoot -Root $localRoot -Candidate $outputPath)) {
+      throw "build-driver self-test found an output path outside .local: $outputPath"
+    }
+  }
+
+  foreach ($requiredPath in @(
+      (Join-Path $paths.RepoRoot 'driver/src'),
+      (Join-Path $paths.RepoRoot 'driver/wdk'),
+      (Join-Path $paths.RepoRoot 'sdk/include')
+    )) {
+    if (-not (Test-Path -LiteralPath $requiredPath)) {
+      throw "build-driver self-test could not find repository source boundary: $requiredPath"
+    }
+  }
+
+  Write-Output 'Driver build path self-test passed (script-root discovery, .local outputs, source boundaries).'
+  exit 0
+}
+
 $kits = 'C:\Program Files (x86)\Windows Kits\10'
 $kver = Get-ChildItem (Join-Path $kits 'Include') -Directory |
   Where-Object { Test-Path (Join-Path $_.FullName 'km') } |
@@ -45,8 +100,8 @@ Write-Output "Toolchain: cl=$cl"
 Write-Output "Toolchain: WDK=$incRoot"
 
 # --- Layout ---------------------------------------------------------------
-$objDir = Join-Path $repo '.local/driver-build/obj'
-$pkgDir = Join-Path $repo '.local/driver-package'
+$objDir = $paths.ObjectRoot
+$pkgDir = $paths.PackageRoot
 New-Item -ItemType Directory -Path $objDir -Force | Out-Null
 New-Item -ItemType Directory -Path $pkgDir -Force | Out-Null
 
