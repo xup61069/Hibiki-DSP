@@ -58,8 +58,27 @@ try
         !viewModel.IrPrepareStatus.Contains("已在引擎", StringComparison.Ordinal))
         throw new InvalidOperationException("Control model IR prepare was not acknowledged.");
 
-    if (!await viewModel.SelectSceneAsync("movie") || viewModel.HasPreparedIr ||
-        !viewModel.IrPrepareStatus.Contains("IR 已清除", StringComparison.Ordinal))
+    if (!await viewModel.SelectSceneAsync("movie"))
+        throw new InvalidOperationException("Control model scene switch was not acknowledged.");
+
+    // Scene-apply ack and status snapshots are eventually consistent: a refresh
+    // computed before the engine finishes its scene transaction can still report
+    // prepared IR and overwrite the locally-cleared state. Poll bounded instead
+    // of asserting on one sample.
+    var irCleared = false;
+    for (var attempt = 0; attempt < 30 && !irCleared; attempt++)
+    {
+        irCleared = !viewModel.HasPreparedIr &&
+                    viewModel.IrPrepareStatus.Contains("IR 已清除", StringComparison.Ordinal);
+        if (!irCleared)
+        {
+            await Task.Delay(100).ConfigureAwait(true);
+            if (viewModel.IsConnected)
+                _ = await viewModel.RefreshControlStatusAsync().ConfigureAwait(true);
+        }
+    }
+
+    if (!irCleared)
         throw new InvalidOperationException("Scene switch did not clear the prepared IR state.");
 
     var physicalRefresh = await viewModel.RefreshPhysicalDevicesAsync();
