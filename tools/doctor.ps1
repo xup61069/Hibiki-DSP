@@ -27,6 +27,11 @@ function Get-WindowsKitPackageEntries {
   }
 }
 
+function Test-DisplayVersionAtLeast {
+  param([string]$Version, [version]$Minimum)
+  try { return [version]$Version -ge $Minimum } catch { return $false }
+}
+
 function Find-WindowsKitPackage(
   [object[]]$Entries,
   [ValidateSet('Sdk', 'Wdk')]
@@ -37,10 +42,11 @@ function Find-WindowsKitPackage(
   } else {
     'Windows Driver Kit'
   }
+  $floor = [version]'10.1.26100.0'
 
   $Entries |
     Where-Object {
-      ([string]$_.DisplayVersion).StartsWith($kitFamilyPrefix) -and
+      (Test-DisplayVersionAtLeast -Version ([string]$_.DisplayVersion) -Minimum $floor) -and
       $_.DisplayName -match $namePattern
     } |
     Select-Object -First 1
@@ -68,10 +74,10 @@ function Get-WindowsKitAssessment(
     $reasons.Add("missing Include/build/Tools directories for minimum kit version $minimumKitVersion")
   }
   if ($null -eq $sdkPackage) {
-    $reasons.Add("missing Windows SDK package metadata in $kitFamilyPrefix family")
+    $reasons.Add("missing Windows SDK package metadata at or above 10.1.26100.0")
   }
   if ($null -eq $wdkPackage) {
-    $reasons.Add("missing Windows Driver Kit package metadata in $kitFamilyPrefix family")
+    $reasons.Add("missing Windows Driver Kit package metadata at or above 10.1.26100.0")
   }
 
   $ok = $reasons.Count -eq 0
@@ -105,7 +111,8 @@ function Invoke-WindowsKitSelfTest {
   $cases = @(
     @{ Name = 'family-match'; Candidates = @($exactCandidate); Packages = $familyPackages; Expected = $true },
     @{ Name = 'missing-sdk-metadata'; Candidates = @($exactCandidate); Packages = @($familyPackages | Where-Object { $_.DisplayName -notmatch 'Software Development Kit' }); Expected = $false },
-    @{ Name = 'wrong-family-package'; Candidates = @($exactCandidate); Packages = @($familyPackages | ForEach-Object { [pscustomobject]@{ DisplayName = $_.DisplayName; DisplayVersion = '10.1.28000.2526' } }); Expected = $false },
+    @{ Name = 'newer-family-package'; Candidates = @($exactCandidate); Packages = @($familyPackages | ForEach-Object { [pscustomobject]@{ DisplayName = $_.DisplayName; DisplayVersion = '10.1.28000.2526' } }); Expected = $true },
+    @{ Name = 'below-floor-package'; Candidates = @($exactCandidate); Packages = @($familyPackages | ForEach-Object { [pscustomobject]@{ DisplayName = $_.DisplayName; DisplayVersion = '10.1.15063.468' } }); Expected = $false },
     @{ Name = 'below-minimum-directory'; Candidates = @([pscustomobject]@{ Root = 'fixture/windows-kits/10'; IncludeExists = $true; BuildExists = $true; ToolsExists = $true; Version = '10.0.22621.0' }); Packages = $familyPackages; Expected = $false },
     @{ Name = 'missing-kit-directory'; Candidates = @([pscustomobject]@{ Root = 'fixture/windows-kits/10'; IncludeExists = $false; BuildExists = $true; ToolsExists = $true; Version = '10.0.26100.0' }); Packages = $familyPackages; Expected = $false }
   )
