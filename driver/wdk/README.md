@@ -7,6 +7,18 @@ preserving the Q16.16 dB safety ceiling, mute and monotonic generation rules.
 The request boundary rejects missing instance/value buffers and verbs that are
 neither a single GET nor SET before dereferencing the KS property request.
 
+`hibiki_miniport_wavert.h` and `hibiki_miniport_wavert.cpp` provide the
+PortCls COM interface adapter implementations (`IMiniportWaveRT` via
+`HibikiMiniportWaveRtV1` and `IMiniportWaveRTStreamNotification` via
+`HibikiMiniportWaveRtStreamV1`). They wire PortCls miniport audio buffer
+allocation (`AllocateAudioBufferWithNotification`), event notifications
+(`RegisterNotificationEvent`/`UnregisterNotificationEvent`), latency
+reporting (`GetHWLatency`), position queries (`GetPosition`), stream state
+transitions (`SetState`) and property context binding into the portable
+`endpoint_topology_v1`, `wavert_stream_v1`, and `wavert_endpoint_state_v1`
+cores. They retain strict MS-PL licensing, zero GPL linkage, and non-allocating
+real-time audio paths.
+
 It is deliberately not part of the default CMake target: this machine does
 not have the locked WDK 10.0.28000.2526 and no `.sys` is produced. A future WDK
 adapter must provide one context per endpoint, wire the functions into the
