@@ -45,7 +45,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Gate self-test failed for $($script.Name): exit $LASTEXITCODE" }
             $modes += $script.Name
           }
-          $minimumModes = 5
+          $minimumModes = 26
           if ($modes.Count -lt $minimumModes) {
             throw "Expected at least $minimumModes gate self-test modes, found $($modes.Count): $($modes -join ', ')"
           }
