@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "issue": 309,
+  "scope_digest": "extension-csp-allowlist-v1",
+  "source_commit": "feb07c86c0238210b910a14b891137dadf10307a",
+  "main_sync_commit": "f18e57d37b363bebbcbb470220b5e7cdbebf2b61",
+  "specs": ["SPEC-0009"],
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 309",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/extension-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/extension-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 309 CSP source allowlist implementation",
+      "status": "pass",
+      "coverage": [
+        "script-src now accepts only the self source token",
+        "object-src now accepts only self or none",
+        "connect-src remains exactly ws://127.0.0.1:17842",
+        "duplicate or missing required CSP directives fail closed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/extension-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "12 bounded offline cases",
+        "external script-src source rejection",
+        "external object-src source rejection",
+        "existing permission, host, CSP, and multiline cases"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/extension-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "repository MV3 manifest policy and source presence"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "handoff/docs/source gates",
+      "status": "pass",
+      "coverage": [
+        "scoped and full handoff checks",
+        "docs self-test 13 cases",
+        "documentation checks 563 tracked paths and 131 repository JSON files before evidence",
+        "source-policy and source-only CI policy"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly / tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "Windows 26200 AMD64, Visual Studio 2026, SDK and WDK prerequisites detected",
+        "Visual Studio 2026/CMake build, CTest 2 of 2, and unsigned local verification"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Static policy-gate and offline fixture evidence only; no browser launch or extension runtime evidence.",
+    "No physical audio, endpoint, driver, WaveRT, HLK, or Microsoft-signing evidence.",
+    "The accepted SPEC-0009 contract is enforced; the Spec itself is unchanged.",
+    "Build outputs and probe artifacts remain ignored under .local/ and are not part of the PR."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369",
+    "cmake": "4.4.2",
+    "sdk_qfe": "10.1.28000.2526",
+    "wdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T21:18:00+08:00",
+  "finished_at": "2026-08-22T21:31:00+08:00"
+}
