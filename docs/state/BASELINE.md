@@ -615,6 +615,14 @@ boundary（Issue #444 / PR #445）；handoff-check 可解析 TBD pre-claim draft
 backdrop、Fluent theme 筆刷與 type ramp styles（含 AccentButtonStyle）取代硬編碼色彩
 （Issue #438 / PR #443）。皆為 source/tooling evidence，不宣稱正式 XAML build 或視覺驗收。
 
+第三波 tooling／UI 增量已合併：WinUI shell 完成標題列整合——48px drag-region 列含 app
+icon/name 固定在左、connection-status pill（圓角 Border + theme brushes）與連接按鈕固定在右
+且不與 caption buttons 重疊，ExtendsContentIntoTitleBar 由 code-behind 接線（完整 shell 限定，
+Desktop Compatibility Preview 維持自己的 chrome），標題改用 Fluent type ramp
+（Issue #446 / PR #450）；verify.ps1 -Clean 在刪除前 fail-closed 驗證 target 必須完全符合
+repo-local build root、必須是真實目錄且 target／parent 都不是 reparse point，self-test 涵蓋
+mismatch/reparse 拒絕（Issue #448 / PR #452）。皆為 source/tooling evidence。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；
