@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "issue": 329,
+  "scope_digest": "asio-ring-wrap-selftest-v1",
+  "source_commit": "PENDING",
+  "base_commit": "fab13599a0a96cbca90d071d20a2eebb3b1cb450",
+  "depends_on_issue": 285,
+  "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-10.0.28000.2526-wdk-10.0.28000.2526-cmake-4.4.2-pwsh-7.6.5",
+  "case_count_total": 14,
+  "cases_added": [
+    "wraparound_push_pop_fifo",
+    "wraparound_overflow_accounting"
+  ],
+  "commands": [
+    "pwsh -NoProfile -File tools/verify.ps1",
+    ".local/build/asio/RelWithDebInfo/hibiki_asio_transport_selftest.exe",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 329",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1 (ctest)",
+      "status": "pass",
+      "coverage": [
+        "Visual Studio 2026/CMake build with HIBIKI_BUILD_TESTS=ON",
+        "ctest 2 of 2: hibiki_asio_transport_selftest (now 14 cases) and hibiki_contract_tests pass",
+        "no compiler warnings from the modified target under /W4 /permissive-"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "hibiki_asio_transport_selftest.exe (direct run)",
+      "status": "pass",
+      "coverage": [
+        "uint32 producer wrap: 0xFFFFFFFF -> 0x00000000 lands in slot 3, ready_sequence wraps to 0 and validates against consumer + 1",
+        "FIFO pop across the wrapped boundary keeps order and bit-exact payloads; consumer advances 0xFFFFFFFC -> 0",
+        "overflow at the wrapped full state increments dropped_blocks exactly once",
+        "non-consuming capacity overflow at the wrapped state leaves both sequences untouched"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Offline white-box fixtures stamp slot memory directly to simulate a long-lived ring; no live threads are racing the ring in this test.",
+    "Production transport semantics unchanged; no COM launch, no vendor ASIO SDK, no file writes.",
+    "Does not provide driver, WaveRT, HLK, or Microsoft-signing evidence."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369",
+    "cmake": "4.4.2",
+    "sdk_qfe": "10.1.28000.2526",
+    "wdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T22:20:00+08:00",
+  "finished_at": "2026-08-22T22:45:00+08:00"
+}
