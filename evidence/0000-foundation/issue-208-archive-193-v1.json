@@ -4,8 +4,8 @@
   "scope_digest": "issue-208-archive-193-v1",
   "source_commit": "c66ea9523e0c3b3a362f1569352347abac0adadc",
   "archive_commit": "f33f5784507e663d23f58ac134fc5fbead9ea495",
-  "main_sync_commit": "0f1cdb1a44ddec3ac2c477357bbec001a00c741e",
-  "counter_refresh_commit": "f33f5784507e663d23f58ac134fc5fbead9ea495",
+  "main_sync_commit": "1adf947a50f836ee6371050ff5db58a09485df0e",
+  "counter_refresh_commit": "641adc2d7d6cf0b6c02e6d19ab322c46453282b4",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; vs2026-sdk-wdk-on-disk; target-24h2-machine-missing",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 208",
@@ -52,6 +52,25 @@
       "status": "pass",
       "coverage": ["Windows build 26200", "VS 2026", "Windows SDK/WDK on disk", "anonymous .local fingerprint"],
       "compiled_artifacts": false
+    },
+    {
+      "command": "Local merge-sync to latest origin/main 1adf947",
+      "status": "pass",
+      "coverage": ["ordinary merge commit 641adc2d", "counter refresh to 508 tracked paths / 111 repository JSON files", "no changes to Issue 208 product scope"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local gates after latest main sync",
+      "status": "pass",
+      "coverage": [
+        "handoff-check Issue 208 and full run",
+        "docs-check 508 tracked paths / 111 repository JSON files",
+        "source-policy",
+        "source-only-ci-check",
+        "verify user-space build and 1/1 CTest",
+        "git diff --check"
+      ],
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
@@ -66,5 +85,5 @@
     "powershell": "7.6.5"
   },
   "started_at": "2026-08-22T17:10:00+08:00",
-  "finished_at": "2026-08-22T17:15:21+08:00"
+  "finished_at": "2026-08-22T17:21:32+08:00"
 }
