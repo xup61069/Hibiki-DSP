@@ -35,8 +35,13 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   shell 與 public source policy gates。
 - Expert per-App route preset 已保存、會對選取 App 做規則預覽，並透過版本化 command 等待
   engine Ack；這不是已驗證的實體 per-App capture/re-send。
-- 本機 Windows 26200／Visual Studio 17 只能當 portable/user-space 證據。driver、WinUI XAML
-  preview、簽章與 Windows 11 24H2 hardware soak 必須在鎖定 target 環境重新驗證。
+- 本機 Windows 26200／Visual Studio 2026 18.9 已可產生 target-class formal WinUI 證據：
+  `tools/build-preview.ps1 -Target WinUI` 經 `visual-studio-msbuild` + `/restore` 完成 XAML
+  建置（App.xbf／MainWindow.xbf／PRI，0 警告 0 錯錯誤；證據
+  `winui-m1-formal-build-v1.json`，PR #357）；formal shell 可啟動並以
+  `tools/winui-a11y-smoke.ps1` 記錄 UIA 控制樹（55–59 controls；PR #361）；整合啟動器
+  `tools/run-preview.ps1 -Ui FormalWinUI -SmokeTest` 已端到端驗證（PR #364）。driver、
+  簽章與 Windows 11 24H2 hardware soak 仍必須在鎖定 target 環境重新驗證。
 - 本機 Desktop Compatibility Preview 已可由 `tools/build-preview.ps1 -Target DesktopCompat` 建置並通過
   啟動 smoke；它和正式 shell 共用 `EasyControlViewModel`，自帶 .NET runtime、不依賴 Windows App Runtime，
   現在包含場景選擇、路由健康摘要與音量來源／致動器顯示，但不是 XAML、無障礙、driver 或
@@ -83,7 +88,9 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   放進 source、Issue、prompt、RAG、fixture 或 evidence。
 - `evidence/0000-foundation/winui-compat-preview-v1.json` records the local Microsoft App Runtime
   1.7 installation and the successful `WinUICompat -SmokeTest`; it is only a compatibility launch
-  proof and must not be promoted to formal XAML/accessibility evidence.
+  proof and must not be promoted to formal XAML/accessibility evidence. Formal-class XAML
+  build/launch/UIA-tree evidence now lives in `winui-m1-formal-build-v1.json`,
+  `winui-a11y-smoke-v1.json` and `run-preview-formal-winui-v1.json`.
 - `evidence/0000-foundation/control-model-engine-ir-clear-v1.json` records three consecutive
   session-routing control-model runs, including IR prepare → Scene IR clear and bounded temporary
   fixture cleanup. It is user-space reliability evidence only; it does not prove physical playback.
