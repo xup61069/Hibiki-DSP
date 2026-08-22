@@ -3,6 +3,7 @@
   "issue": 187,
   "scope_digest": "issue-187-archive-182-v1",
   "source_commit": "7892245618bedc57062e5bd26b1d4d271939b5ca",
+  "archive_commit": "cb3a511",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; cmake-missing-wdk-missing-portable-user-space",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 187",
