@@ -30,7 +30,7 @@
     "SDK boundary validation and synthetic contract tests only; no vendor ASIO, driver install/load, WaveRT, physical audio, HLK, signing, or Microsoft certification evidence.",
     "No real endpoint IDs, private calibration, or compiled binaries are committed.",
     "This rejects non-zero reserved bytes in the user-space SPSC region and preserves caller state on that malformed-header path; it does not prove live producer/consumer scheduling or physical delivery.",
-    "After Issue #423 claimed tests/unit/contract_tests.cpp, the current repository-wide handoff-check and docs-check fail closed on that scope overlap; the integration coordinator must name the sole writer and merge order before this slice can proceed to Draft PR."
+    "A temporary repository-wide handoff/docs failure occurred during pre-merge coordination when Issue #423 briefly claimed tests/unit/contract_tests.cpp; that was resolved before review and is retained here only as historical context."
   ],
   "logs": [],
   "tool_versions": {
@@ -39,5 +39,13 @@
     "powershell": "pwsh 7.6.5",
     "msvc": "19.51.36256",
     "wdk": "10.1.28000.2526"
+  },
+  "completion": {
+    "pr": 425,
+    "merge_commit": "aa740d5f466808ba62ffd1cd35127e787751ac13",
+    "final_ci": [
+      "https://github.com/xup61069/Hibiki-DSP/actions/runs/32595037362",
+      "https://github.com/xup61069/Hibiki-DSP/actions/runs/32595040062"
+    ]
   }
 }
