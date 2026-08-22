@@ -101,6 +101,21 @@
       "reason": "Target main claims 462 tracked paths and 95 repository JSON files, but its tree contains 464 and 96; the target branch must be reconciled by the integrator before PR CI can pass."
     }
   ],
+  "ci_runs": [
+    {
+      "event": "push",
+      "run_id": 32547631505,
+      "status": "pass",
+      "url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32547631505"
+    },
+    {
+      "event": "pull_request",
+      "run_id": 32547633779,
+      "status": "blocked",
+      "url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32547633779",
+      "reason": "Documentation gate fail-closed on target origin/main BASELINE: 462 claimed tracked paths versus 464 in the target tree; target-main integrator reconciliation is required."
+    }
+  ],
   "limitations": [
     "Source-only static manifest and CSP validation; no browser runtime, permission prompt, user gesture, WebSocket, or tab capture claim.",
     "No physical audio, driver, WaveRT, HLK, Microsoft signing, or endpoint delivery claim.",
