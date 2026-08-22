@@ -623,6 +623,15 @@ Desktop Compatibility Preview 維持自己的 chrome），標題改用 Fluent ty
 repo-local build root、必須是真實目錄且 target／parent 都不是 reparse point，self-test 涵蓋
 mismatch/reparse 拒絕（Issue #448 / PR #452）。皆為 source/tooling evidence。
 
+第四波之後的增量已合併：SceneProfileV1 支援在相符場景切換時保留 referenced IR——schema
+新增 ir reference 形狀，hub contracts/engine 驗證並在 engine control 更新中攜帶 referenced
+IR identity，contract tests 涵蓋保留行為，evidence 記錄於 scene-ir-reference-v1.json
+（Issue #423 / PR #461）；所有 accepted ADR 補上結構化 frontmatter 且 docs-check 強制
+檢查 ADR frontmatter 欄位（Issue #453 / PR #459）；run-preview.ps1 在 Start-Process 前
+fail-closed 驗證 engine/UI launch target 必須位於 repo .local root 內，拒絕 root 外路徑、
+reparse point 與非檔案目標，-SelfTest 新增五個 launch-target 安全案例
+（Issue #455 / PR #457）。皆為 user-space/source evidence。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；

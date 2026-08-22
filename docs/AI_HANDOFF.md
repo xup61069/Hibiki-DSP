@@ -187,6 +187,17 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
 - Verify clean guard merged: verify.ps1 -Clean fails closed unless the delete target exactly matches
   the repository-local build root, is a real directory, and neither the target nor its parent is a
   reparse point; self-tests cover mismatch and reparse-point rejections (#448 / PR #452).
+- Scene IR reference preservation merged: SceneProfileV1 keeps a referenced IR across
+  matching scene switches - the schema adds an ir reference shape, hub contracts/engine
+  validate it and carry referenced IR identity through engine control updates, contract
+  tests cover the behavior, and evidence records the slice in scene-ir-reference-v1.json
+  (Issue #423 / PR #461).
+- ADR frontmatter enforcement merged: accepted ADRs gained structured frontmatter and
+  docs-check now validates required ADR frontmatter fields (Issue #453 / PR #459).
+- Run-preview launch safety merged: run-preview.ps1 fails closed unless engine/UI launch
+  targets stay inside the repository .local root, rejecting outside-root paths, reparse-
+  point files or parents and non-file launch targets; -SelfTest covers five launch-target
+  safety cases (Issue #455 / PR #457).
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe
