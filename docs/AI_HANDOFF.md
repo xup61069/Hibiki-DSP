@@ -153,7 +153,25 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   (`vst3-timeline-clear-history-v1.json`, Issue #403 / PR #404). A redacted sandbox incident
   diagnostic (`Vst3SandboxDiagnosticV1`) records initial/invalid-launch/reset/Windows-setup-failure
   assertions as a sanitized summary without private payload
-  (`vst3-sandbox-redacted-diagnostic-v1.json`, Issue #408 / PR #409).
+   (`vst3-sandbox-redacted-diagnostic-v1.json`, Issue #408 / PR #409).
+- Wave-2 merged increments recorded for the record: first kernel-mode WaveRT adapter build —
+  `tools/build-driver.ps1` compiles `driver/wdk/*` as x64 kernel C++ against WDK
+  10.0.28000.2526, links `HibikiVirtualAudio.sys`, Inf2Cat produces the catalog and
+  `driver-source-check.ps1 -PackageRoot ... -RequireInf2Cat` passes on this machine
+  (`driver-sys-build-v1.json`, Issue #394 / PR #410); no install, load, HLK or signing claims.
+- Toolchain minimum baseline relaxed to SDK/WDK >= 10.0.26100 with numeric floor comparison
+  (ADR-0005, Issue #430): newer QFE families such as the local 28000 kit now satisfy doctor.
+- ASIO transport rejects non-zero shared-memory `reserved` header fields fail-closed while
+  preserving caller output counters (Issue #420 / PR #425).
+- Driver-stream packets must carry non-zero `sequence`/`generation` freshness fields and
+  driver-control requests non-zero request IDs (Issues #411/#417, PRs #414/#418).
+- Control-model editor rows gained undo-after-remove coverage: a discarded removal undoes back
+  to the removed row and redo re-applies the deletion with canonical renumbering
+  (Issue #419 / PR #422).
+- `driver-source-check.ps1` now accepts either notification-buffer naming generation — legacy
+  `Allocate/FreeAudioBufferWithNotification` or WDK 10.0.26100+
+  `Allocate/FreeBufferWithNotification` (Issue #426 / PR #428) — and verify.yml cancels
+  superseded runs via a concurrency group (Issue #427 / PR #431).
 
 ## 目前整合主線
 

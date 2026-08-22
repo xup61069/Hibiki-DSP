@@ -158,7 +158,8 @@
 - `.github/workflows/verify.yml` now runs the WinUI source gate, MS-PL driver boundary gate and
   repository JSON parse gate in addition to the existing source/docs/control checks; the
   `source-only-ci-check.ps1` gate rejects artifact/package/release uploads, signing permissions
-  and tracked binaries.
+  and tracked binaries. A concurrency group (workflow + ref, cancel-in-progress) now cancels
+  superseded verify runs on the same branch or PR merge ref (Issue #427 / PR #431).
 - `handle_control_frame_v1` validates Hello/Volume/Scene/graph lifecycle commands before passing
   them to a host-owned typed sink; malformed or rejected commands receive Error without touching
   the graph.
@@ -195,6 +196,9 @@
 - C# control model now exposes a bounded 32-entry custom Scene card mirror. Reserved built-in IDs,
   malformed IDs and over-capacity inserts fail closed; selecting a custom card still emits the
   existing SceneApply payload and never claims that its engine graph is loaded.
+- Control-model-check now covers undo-after-remove for editor row removal: a discarded removal
+  undoes back to the removed row with stale selected-index cleanup, and redo re-applies the
+  deletion with canonical renumbering (Issue #419 / PR #422).
 - `TruePeakLimiterV1` 已接在非 Strict Direct render 尾端：固定 8-channel、非有限值歸零、
   −1 dBTP bounded inter-sample guard；目前仍不宣稱正式 ITU/BS.1770 conformance。
 - Windows-only `IAudioEndpointVolume` broker with non-blocking callback snapshot, dB/mute
@@ -431,6 +435,8 @@
 - Apache-2.0 `hibiki_asio_transport_v1` now provides a fixed-layout SPSC shared-memory ring. The
   optional native ASIO DLL writes eight-channel Float32 blocks after callbacks, and
   `AsioTransportConsumerV1` creates/owns `Local\\HibikiDSP_v1_asio` for an allocation-free pop;
+  non-zero `reserved` header fields are rejected fail-closed and malformed-header pops preserve
+  caller output counters (`driver-asio-reserved-zero-v1` coverage, Issue #420 / PR #425).
   `AudioEngineModel::process_asio_transport` now runs that block through the selected graph lane
   and Group Master, while `process_asio_transport_to_wasapi` submits the processed block once to
   the dual-worker sink handoff. Physical driver/endpoint delivery remains pending.
@@ -458,6 +464,11 @@
 - `driver/wdk/hibiki_stream_adapter.cpp` now provides a WDK-only spin-lock adapter for render
   submit/read/reset and the ring's underrun-safe fallback; it remains source-only until a real
   SYSVAD/PortCls project compiles it.
+- 第一個 kernel-mode 建置已合併：`tools/build-driver.ps1` 以 WDK 10.0.28000.2526 將 `driver/wdk/*`
+  編譯為 x64 kernel-mode C++、鏈結 `HibikiVirtualAudio.sys`，Inf2Cat 產生
+  `HibikiVirtualAudio.cat`；`driver-source-check.ps1 -PackageRoot ... -RequireInf2Cat` 於本機
+  26100-kit 通過 Windows 11 24H2/25H2 x64 驗證（`driver-sys-build-v1.json`、Issue #394 /
+  PR #410）。仍無安裝、載入、HLK 或簽章宣稱。
 - `sdk/driver_stream_transport_v1` defines a fixed 80-byte driver→engine packet header and
   allocation-free C encode/validate/payload APIs; `driver_stream_bridge.hpp` copies validated
   packets into finite-value caller-owned lane storage without linking MS-PL driver code.
