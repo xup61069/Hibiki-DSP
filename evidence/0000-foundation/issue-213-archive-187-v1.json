@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "issue": 213,
+  "scope_digest": "issue-213-archive-187-v1",
+  "source_commit": "1adf947a50f836ee6371050ff5db58a09485df0e",
+  "archive_commit": "pending",
+  "main_sync_commit": "ee1a3ac255ceb4d20223b9ac838fc8d9d6ef3dd2",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; vs2026-sdk-wdk-on-disk; target-24h2-machine-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 213",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/probe-environment.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 187 source and PR 189 review",
+      "status": "pass",
+      "coverage": [
+        "Issue 187 is closed",
+        "PR 189 is merged at 1adf947a50f836ee6371050ff5db58a09485df0e",
+        "SPEC-0000 governance metadata only",
+        "historical target-counter blocker preserved without reclassification"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR 189 final merged head)",
+      "status": "pass",
+      "coverage": ["push and merge-ref verify gates"],
+      "details_urls": [
+        "https://github.com/xup61069/Hibiki-DSP/actions/runs/32564505979/job/97011053768",
+        "https://github.com/xup61069/Hibiki-DSP/actions/runs/32564506657/job/97011055593"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP ordering, RT-thread, driver, HLK or signing behavior is changed.",
+    "Local user-space gates do not validate a physical target machine, loadable driver, WaveRT, HLK or Microsoft signing.",
+    "The historical #187 committed-counter blocker is recorded as historical evidence only; current main uses live docs-check counters after #197.",
+    "No physical audio, per-App delivery, loadable driver, HLK or Microsoft signing evidence is claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.5"
+  },
+  "started_at": "2026-08-22T17:32:00+08:00",
+  "finished_at": "pending"
+}
