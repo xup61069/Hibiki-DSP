@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "issue": 320,
+  "scope_digest": "issue-320-archive-290-v1",
+  "base_commit": "fd7a7add587d2d6326cef29b1301e4a78779044a",
+  "archived_issue": 290,
+  "merged_pr": {
+    "number": 293,
+    "merge_commit": "f7b015a970e57966158b39191c81f373edf70025",
+    "merged_at": "2026-08-22T13:11:40Z"
+  },
+  "archive_facts": {
+    "moved": "docs/tasks/active/290.md -> docs/tasks/completed/2026/290.md via git mv",
+    "front_matter_only_changes": ["status: completed", "updated_at", "merge_commit f7b015a970e57966158b39191c81f373edf70025"],
+    "body_preserved_verbatim": true,
+    "already_archived_untouched": ["docs/tasks/completed/2026/226.md", "docs/tasks/completed/2026/245.md"]
+  },
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-26100-wdk-28000-missing-cmake-4.4.0-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 320",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 320 archive implementation",
+      "status": "pass",
+      "coverage": [
+        "moved docs/tasks/active/290.md to docs/tasks/completed/2026/290.md via git mv",
+        "front-matter bookkeeping only: status completed, updated_at, PR #293 merge_commit f7b015a970e57966158b39191c81f373edf70025",
+        "body content of the archived handoff preserved verbatim"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 320 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Issue 320 schema-v2 ownership, scope and Git ancestry",
+        "full active handoff validation including no scope overlap (23 active handoffs)"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 -SelfTest / tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "13 bounded docs-check self-test cases",
+        "85 required documentation paths and 24 specs with live tracked-path and repository-JSON measurement (577 tracked / 138 JSON)"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "no blocked binary or secret among 577 tracked paths",
+        "one workflow with source-only CI policy satisfied"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly",
+      "status": "pass_with_limitation",
+      "coverage": [
+        "Windows 26200 AMD64, git, cmake 4.4.0, pwsh 7.6.4, Visual Studio 2026 18.9.12112.369 detected",
+        "Windows SDK/WDK 10.0.28000.2526 MISSING on this machine (only 10.0.26100.0 installed); no local build attempted"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP order, RT audio, driver, HLK or signing behavior is changed.",
+    "User-space Windows 26200 machine; not target Windows 11 24H2+ environment evidence.",
+    "Local verify.ps1 was skipped: this machine lacks the required Windows SDK/WDK 10.0.28000.2526 (doctor reports MISSING); CI verify on the locked runner is the authoritative build/test evidence."
+  ],
+  "logs": [],
+  "started_at": "2026-08-22T21:45:00+08:00",
+  "finished_at": "2026-08-22T22:02:00+08:00"
+}
