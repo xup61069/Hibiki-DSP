@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "issue": 278,
+  "scope_digest": "control-model-scene-ack-reliability-v1",
+  "source_commit": "a4b6406427faed6c2572e57b8e4c8d0ab62cdb1d",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-qfe-10.1.28000.2526-dotnet-10.0.400-pwsh-7.6.5-cdb-10.0.28000.x",
+  "root_cause": {
+    "summary": "hibiki_engine_preview.exe terminated with STATUS_STACK_OVERFLOW during the SceneApply control transaction that followed a PrepareIr command; the client observed the control pipe die mid-round-trip and EasyControlViewModel.SendCommandAsync returned false through its generic exception path.",
+    "client_signature": "EndOfStreamException: Control pipe closed mid-frame",
+    "engine_exit_code": "-1073741571 (0xC00000FD STATUS_STACK_OVERFLOW)",
+    "debugger_evidence": "cdb second-chance capture: stack overflow at hibiki_engine_preview+0x28e07 with a single ~626 KB frame at +0x2907f (main-loop/wmain frame) on the default 1 MB MSVC x64 stack; scene round-trip spanned ~830-1260 ms before death.",
+    "contributing_factors": [
+      "AudioEngineModel::prepare_ir allocated a fixed ~256 KB IrConvolverV1 candidate as a stack local",
+      "the engine preview executable used the default 1 MB stack reserve while its main thread hosts several fixed-capacity control structures worth hundreds of KB per frame",
+      "PrepareIr is acknowledged at enqueue time, so the heavy IR transaction and the immediately following SceneApply transaction run back-to-back inside one drain, peaking combined stack use",
+      "stack headroom depends on build layout, which explains the originally reported intermittent 1-in-3 to burst failures"
+    ]
+  },
+  "fixes": [
+    {
+      "file": "CMakeLists.txt",
+      "change": "reserve an 8 MB stack for hibiki_engine_preview via target_link_options(/STACK:8388608) under MSVC, mirroring the existing hibiki_contract_tests harness reserve"
+    },
+    {
+      "file": "src/hub/src/audio_engine.cpp",
+      "change": "heap-allocate the IrConvolverV1 candidate in AudioEngineModel::prepare_ir with fail-closed allocation handling instead of a ~256 KB stack local"
+    }
+  ],
+  "reproduction": {
+    "harness": "untracked .local/diagnostics/scene-ack/SceneAckDiag.exe replicating the smoke sequence (connect, -18 dB volume, One-Tap game scene, LinearPhase IR prepare, SelectSceneAsync(movie)) with LastCommandFailureDetail reporting",
+    "pre_fix": {
+      "scene_stage_rounds": 16,
+      "scene_ack_failed_endofstream": 13,
+      "passed": 3,
+      "note": "remaining rounds could not connect because the engine process had already died from earlier crashes"
+    },
+    "post_fix": {
+      "diagnostic_rounds": 20,
+      "diagnostic_passed": 20,
+      "fresh_engine_per_round": true,
+      "typical_scene_ack_ms": 2,
+      "original_smoke_script_runs": 5,
+      "original_smoke_script_passed": 5
+    }
+  },
+  "product_observability": [
+    "EasyControlViewModel.LastCommandFailureDetail now records which SendCommandAsync fail-closed path fired (not-connected-at-entry, not-connected-after-gate, null-command, non-ack-reply, cancelled, exception) so hosts can report ack failure reasons without masking them"
+  ],
+  "commands": [
+    "pwsh -NoProfile -File tools/build-engine-preview.ps1",
+    "pwsh -NoProfile -File .local/diagnostics/scene-ack/run-diag.ps1 -Rounds 20",
+    "pwsh -NoProfile -File tools/control-model-engine-smoke.ps1 (x5)",
+    "pwsh -NoProfile -File tools/control-model-engine-smoke.ps1 -SelfTest",
+    "cdb -lines -cf crash.cmds -logo crash.log hibiki_engine_preview.exe"
+  ],
+  "limitations": [
+    "User-space Windows 26200 verification only; no physical audio, loadable driver, WaveRT, HLK or Microsoft signing evidence.",
+    "The RT audio thread rules are untouched: all changed code paths are control-plane transactions or link configuration.",
+    "Smoke-side StatusText instrumentation in apps/control-model-engine-smoke/Program.cs remains a follow-up child slice blocked by active lane #272 scope ownership."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369",
+    "dotnet_sdk": "10.0.400"
+  },
+  "started_at": "2026-08-22T20:52:00+08:00",
+  "finished_at": "2026-08-22T21:43:49+08:00"
+}

@@ -26,6 +26,14 @@ if(WIN32 AND HIBIKI_BUILD_ENGINE_PREVIEW)
   add_executable(hibiki_engine_preview apps/engine-preview/engine_preview.cpp)
   target_link_libraries(hibiki_engine_preview PRIVATE hibiki_hub)
   target_compile_features(hibiki_engine_preview PRIVATE cxx_std_20)
+  # The control-plane transaction path (graph/IR prepare+commit) runs on the
+  # preview main thread and uses several fixed-capacity structures worth
+  # hundreds of KB per frame. Keep the default 1 MB stack from overflowing
+  # when an IR prepare is followed immediately by a SceneApply transaction;
+  # this mirrors the hibiki_contract_tests harness reserve.
+  if(MSVC)
+    target_link_options(hibiki_engine_preview PRIVATE /STACK:8388608)
+  endif()
 endif()
 
 if(HIBIKI_BUILD_TESTS)

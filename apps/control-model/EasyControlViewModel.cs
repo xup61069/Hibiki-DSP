@@ -1312,6 +1312,20 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
+    // Bounded diagnostic surface for the last failed command send. It records
+    // which fail-closed path produced the false return so hosts and smokes can
+    // report the reason instead of swallowing it. Empty after a successful send.
+    private string _lastCommandFailureDetail = string.Empty;
+
+    public string LastCommandFailureDetail => _lastCommandFailureDetail;
+
+    private void SetCommandFailureDetail(string detail)
+    {
+        if (_lastCommandFailureDetail == detail) return;
+        _lastCommandFailureDetail = detail;
+        OnPropertyChanged(nameof(LastCommandFailureDetail));
+    }
+
     private Task<bool> SendLastCommandAsync(CancellationToken cancellationToken) =>
         SendCommandAsync(() => LastCommand, cancellationToken);
 
@@ -1321,6 +1335,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         var client = _controlClient;
         if (client is null || !IsConnected)
         {
+            SetCommandFailureDetail("not-connected-at-entry");
             _session.MarkDegraded();
             StatusText = "尚未連接 Hibiki 引擎；命令未送出";
             OnPropertyChanged(nameof(Status));
@@ -1332,20 +1347,29 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         {
             await _commandGate.WaitAsync(cancellationToken).ConfigureAwait(true);
             gateHeld = true;
-            if (_controlClient is null || !IsConnected) return false;
+            if (_controlClient is null || !IsConnected)
+            {
+                SetCommandFailureDetail("not-connected-after-gate");
+                return false;
+            }
             var command = commandFactory();
             if (command is null)
             {
+                SetCommandFailureDetail("null-command");
                 _session.MarkDegraded();
                 StatusText = "命令內容無效；未送出";
                 OnPropertyChanged(nameof(Status));
                 return false;
             }
             SetBusy(true);
+            SetCommandFailureDetail(string.Empty);
             var reply = await client.RoundTripAsync(command, cancellationToken)
                 .ConfigureAwait(true);
             if (reply.Type != ControlMessageType.Ack)
+            {
+                SetCommandFailureDetail($"non-ack-reply type={reply.Type}");
                 throw new InvalidDataException("Hibiki engine rejected the command.");
+            }
             StatusText = _selectedScene is null
                 ? "命令已套用"
                 : $"已套用 {_selectedScene.Name} 到 {_selectedOutputGroup}";
@@ -1353,11 +1377,13 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         }
         catch (OperationCanceledException)
         {
+            SetCommandFailureDetail("cancelled");
             StatusText = "命令已取消；保留上一個安全狀態";
             return false;
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            SetCommandFailureDetail($"exception: {exception.GetType().Name}: {exception.Message}");
             _session.MarkDegraded();
             SetConnectionState(ControlConnectionState.Degraded);
             StatusText = "引擎連線中斷；已回到安全狀態";
