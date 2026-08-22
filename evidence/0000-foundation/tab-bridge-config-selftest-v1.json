@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "issue": 372,
+  "scope_digest": "tab-bridge-config-selftest-v1",
+  "source_commit": "14f443f3da5bdfa1f06ec6f9a156c1bd0432c915",
+  "base_commit": "128cf475ddfb30a13102fbf3aa9e69ce93a1a97b",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.12112.369-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526-cmake-4.4.2-pwsh-7.6.4",
+  "target": "hibiki_tab_bridge_selftest",
+  "cases_added": [
+    "null callback rejected before socket setup",
+    "zero port rejected before socket setup",
+    "payload below 16-byte HIBT header rejected",
+    "payload above one MiB ceiling rejected",
+    "every rejected configuration leaves running false"
+  ],
+  "commands": [
+    "cmake --build .local/build --config RelWithDebInfo --target hibiki_tab_bridge_selftest",
+    "ctest --test-dir .local/build -C RelWithDebInfo -R hibiki_tab_bridge_selftest --output-on-failure",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 372",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/extension-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "hibiki_tab_bridge_selftest.exe",
+      "status": "pass",
+      "coverage": [
+        "null callback rejected before socket setup",
+        "zero port rejected before socket setup",
+        "payload below 16-byte HIBT header rejected",
+        "payload above one MiB ceiling rejected",
+        "every rejected configuration leaves running false"
+      ]
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "CMake configure and RelWithDebInfo build",
+        "CTest 3 of 3: ASIO self-test, tab bridge self-test and contract tests"
+      ],
+      "compiled_artifacts": true,
+      "artifacts_ignored": true
+    },
+    {
+      "command": "repository gates",
+      "status": "pass",
+      "coverage": [
+        "doctor target fingerprint",
+        "Issue 372 and full handoff ownership/scope/ancestry",
+        "documentation structural checks",
+        "source-only and extension policy checks",
+        "whitespace validation"
+      ]
+    }
+  ],
+  "limitations": [
+    "Offline configuration-boundary coverage only; no listener, socket, browser, WebSocket, COM, filesystem, endpoint or real audio access.",
+    "Does not prove browser tab capture, physical playback, driver, WaveRT, HLK, signing or release behavior."
+  ]
+}
