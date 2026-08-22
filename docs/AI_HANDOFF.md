@@ -166,6 +166,19 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   either PortCls notification-buffer naming generation (#426 / PR #428), RemoveSelectedRow has
   undo-after-remove coverage (#419 / PR #422), and the verify workflow cancels superseded runs
   through concurrency groups (#427 / PR #431). Evidence files live under evidence/0000-foundation/.
+- Test-sign packaging milestone merged: the WaveRT adapter .sys and .cat were signed with a locally
+  created self-signed code-signing cert kept under ignored .local/certs (driver-load-test-v1.json,
+  Issue #433 / PR #440); signtool verify /pa ends at the expected untrusted root. Cert import,
+  TESTSIGNING boot flag and pnputil install remain explicit user-consented steps; no endpoint or
+  audio behavior claim.
+- Tooling hardening merged: build-driver.ps1 anchors its repo root from PSScriptRoot, keeps
+  obj/package outputs inside .local with containment checks and gained a -SelfTest for root
+  discovery/output containment/source boundaries (#444 / PR #445); handoff-check parses TBD
+  pre-claim drafts and validates their issue/branch fields (#439 / PR #442).
+- WinUI shell modernization merged: MainWindow.xaml now uses a Mica BaseAlt backdrop, Fluent theme
+  brushes/type-ramp styles (TitleTextBlockStyle/SubtitleTextBlockStyle) and AccentButtonStyle
+  instead of hard-coded colors (#438 / PR #443). Source-level XAML only; title-bar/status-pill
+  follow-up is Issue #446.
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe

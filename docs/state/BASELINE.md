@@ -435,6 +435,12 @@
   封裝（evidence/0000-foundation/driver-sys-build-v1.json）。輸出全部留在 ignored .local/；
   這是 build/package/signability evidence，仍無安裝、載入、runtime audio、HLK 或 Microsoft
   signing 宣稱。
+- Issue #433 已在本機完成 WaveRT adapter 的測試簽章封裝 evidence：以 .local/certs 下自建的
+  self-signed code-signing certificate（PFX/CERT 留在 ignored .local/certs，私密金鑰不進 Git）
+  以 signtool /fd SHA256 同時簽署 HibikiVirtualAudio.sys 與 .cat，signtool verify /pa 如預期
+  停在 untrusted root（evidence/0000-foundation/driver-load-test-v1.json）。憑證匯入
+  Trusted Root／TrustedPublisher、TESTSIGNING 開機旗標與 pnputil 安裝仍是需要使用者同意的
+  下一步；此 evidence 不宣稱 endpoint 出現或任何音訊行為。
 - Apache-2.0 `hibiki_asio_transport_v1` now provides a fixed-layout SPSC shared-memory ring. The
   optional native ASIO DLL writes eight-channel Float32 blocks after callbacks, and
   `AsioTransportConsumerV1` creates/owns `Local\\HibikiDSP_v1_asio` for an allocation-free pop;
@@ -601,6 +607,13 @@ fail-closed 收緊：ASIO shared-memory transport 拒絕非零 reserved bytes；
 UTF-8 編碼、extension gate 加入 tabCapture owner guard 與 tab-only media constraints、
 driver-source-check 接受兩代 PortCls notification-buffer naming、verify workflow 以 concurrency
 group 取消被取代的 run。以上皆為 user-space/source evidence，不新增實體音訊或 driver 載入宣稱。
+
+第二波 tooling／UI 增量已合併：build-driver.ps1 改為從腳本位置錨定 repo root、把 obj/package
+輸出固定在 .local 內並加 containment 檢查，新增 -SelfTest 驗證 root 探索、輸出範圍與 source
+boundary（Issue #444 / PR #445）；handoff-check 可解析 TBD pre-claim draft 並驗證其 issue/branch
+欄位（newline-stable self-test，Issue #439 / PR #442）；WinUI MainWindow.xaml 改用 Mica BaseAlt
+backdrop、Fluent theme 筆刷與 type ramp styles（含 AccentButtonStyle）取代硬編碼色彩
+（Issue #438 / PR #443）。皆為 source/tooling evidence，不宣稱正式 XAML build 或視覺驗收。
 
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
