@@ -84,15 +84,15 @@
       "reason": "Integrator-owned docs/state/BASELINE.md reports 427 tracked paths while this branch reports 429 after the claimed handoff and evidence; the worker did not modify the shared file. Issue #64 / PR #67 supplies the merge-base-aware fix."
     },
     {
-      "command": "GitHub Actions verify (push run 32534968002 / pull_request run 32535025809)",
+      "command": "GitHub Actions verify (push run 32541545410 / pull_request run 32541548317)",
       "status": "fail_external_baseline",
       "coverage": [
         "both verify jobs reached completed status",
         "Documentation gate reproduced the same 427-versus-429 shared baseline mismatch"
       ],
       "urls": [
-        "https://github.com/xup61069/Hibiki-DSP/actions/runs/32534968002",
-        "https://github.com/xup61069/Hibiki-DSP/actions/runs/32535025809"
+        "https://github.com/xup61069/Hibiki-DSP/actions/runs/32541545410",
+        "https://github.com/xup61069/Hibiki-DSP/actions/runs/32541548317"
       ],
       "compiled_artifacts": false
     }
@@ -112,9 +112,9 @@
     },
     {
       "event": "github-actions-verify",
-      "head": "915fba4bad2c6111a468b6d50771bcd55f86524b",
-      "push_run": "32534968002",
-      "pull_request_run": "32535025809",
+      "head": "e066c75d874e797ff44054bc6b4051d03a9bebdd",
+      "push_run": "32541545410",
+      "pull_request_run": "32541548317",
       "status": "fail_external_baseline"
     }
   ],
@@ -124,5 +124,5 @@
     "powershell": "pwsh 7.6.4 local"
   },
   "started_at": "2026-08-22T06:49:00+08:00",
-  "finished_at": "2026-08-22T08:47:11+08:00"
+  "finished_at": "2026-08-22T08:51:49+08:00"
 }
