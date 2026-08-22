@@ -66,9 +66,9 @@ foreach ($cpp in (Get-ChildItem (Join-Path $repo 'driver/wdk') -Filter *.cpp)) {
 # --- Link .sys ------------------------------------------------------------
 $sysPath = Join-Path $pkgDir 'HibikiVirtualAudio.sys'
 $env:LIB = "$kmLib"
-& $link /nologo /DRIVER /SUBSYSTEM:NATIVE,10.00 /ENTRY:DriverEntry `
+& $link /nologo /DRIVER /SUBSYSTEM:NATIVE,10.00 /ENTRY:GsDriverEntry /NODEFAULTLIB /INTEGRITYCHECK `
   "/OUT:$sysPath" `
-  $objs ntoskrnl.lib hal.lib ks.lib portcls.lib stdunk.lib libcntpr.lib bufferoverflowK.lib
+  $objs ntoskrnl.lib hal.lib ks.lib portcls.lib stdunk.lib libcntpr.lib ksguid.lib bufferoverflowK.lib
 if ($LASTEXITCODE -ne 0) { throw 'link.exe failed producing HibikiVirtualAudio.sys.' }
 if (-not (Test-Path $sysPath)) { throw 'HibikiVirtualAudio.sys was not produced.' }
 Write-Output "linked $sysPath"
