@@ -10,10 +10,12 @@ $streamHeader = Join-Path $repo 'driver/include/hibiki/wavert_stream_v1.h'
 $streamSource = Join-Path $repo 'driver/src/wavert_stream.c'
 $streamAdapter = Join-Path $repo 'driver/wdk/hibiki_stream_adapter.cpp'
 $propertyAdapter = Join-Path $repo 'driver/wdk/hibiki_property_adapter.cpp'
+$miniportHeader = Join-Path $repo 'driver/wdk/hibiki_miniport_wavert.h'
+$miniportSource = Join-Path $repo 'driver/wdk/hibiki_miniport_wavert.cpp'
 $readme = Join-Path $repo 'driver/wdk/README.md'
 $inf = Join-Path $repo 'driver/inf/HibikiVirtualAudio.inf'
 $infReadme = Join-Path $repo 'driver/inf/README.md'
-foreach ($path in @($adapter, $topologyHeader, $topologySource, $streamHeader, $streamSource, $streamAdapter, $propertyAdapter, $readme, $inf, $infReadme)) {
+foreach ($path in @($adapter, $topologyHeader, $topologySource, $streamHeader, $streamSource, $streamAdapter, $propertyAdapter, $miniportHeader, $miniportSource, $readme, $inf, $infReadme)) {
     if (-not (Test-Path -LiteralPath $path)) { throw "Missing WDK source boundary: $path" }
 }
 $source = Get-Content -LiteralPath $adapter -Raw
@@ -62,6 +64,21 @@ foreach ($required in @('HibikiPropertyContextInitializeEndpointV1',
 }
 if ($propertySource -match '(?i)audio_engine|scene_graph|asio_bridge|malloc|calloc|realloc') {
     throw 'WDK property adapter must remain independent from GPL user-space and allocation.'
+}
+$miniportSrc = (Get-Content -LiteralPath $miniportHeader -Raw) + (Get-Content -LiteralPath $miniportSource -Raw)
+if ($miniportSrc -notmatch 'SPDX-License-Identifier: MS-PL') { throw 'PortCls miniport adapter must retain MS-PL.' }
+if ($miniportSrc -match 'audio_engine|scene_graph|asio_bridge|plugin_host') {
+    throw 'PortCls miniport adapter must not link GPL user-space implementation.'
+}
+foreach ($required in @('IMiniportWaveRT', 'IMiniportWaveRTStreamNotification',
+    'HibikiMiniportWaveRtV1', 'HibikiMiniportWaveRtStreamV1',
+    'AllocateAudioBufferWithNotification', 'FreeAudioBufferWithNotification',
+    'RegisterNotificationEvent', 'UnregisterNotificationEvent',
+    'GetHWLatency', 'GetPosition', 'SetState', 'NewStream', 'InitEndpoint')) {
+    if (-not $miniportSrc.Contains($required)) { throw "PortCls miniport missing required method: $required" }
+}
+if ($miniportSrc -match '(?i)CreateThread|KeWaitFor') {
+    throw 'PortCls miniport must remain non-blocking.'
 }
 $infSource = Get-Content -LiteralPath $inf -Raw
 foreach ($required in @('Root\HibikiDSP', 'HibikiVirtualAudio.sys', 'EndpointMainGuid', 'EndpointVirtualMicGuid', 'PnpLockdown=1')) {
