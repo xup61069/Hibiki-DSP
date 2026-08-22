@@ -1,13 +1,14 @@
 name: AI task slice
 description: Claim one independently verifiable work slice for one AI writer.
 title: "[AI Task] "
-labels: []
+labels: [claimed]
 body:
   - type: markdown
     attributes:
       value: |
         One Issue maps to one AI writer, one dedicated clone/worktree, one branch,
-        one active handoff and one draft PR. Split child Issues for parallel writers.
+        one handoff block embedded in this Issue body, and one draft PR.
+        Split child Issues for parallel writers. Do not use a separate handoff file.
   - type: textarea
     id: objective
     attributes:
@@ -19,21 +20,39 @@ body:
     id: owner
     attributes:
       label: Owner
-      description: Stable AI/person identifier used in the v2 handoff.
+      description: Stable AI/person identifier used in the handoff block below.
       placeholder: codex-primary
     validations:
       required: true
-  - type: input
-    id: branches
+  - type: markdown
+    id: handoff-block
     attributes:
-      label: Head and target branches
-      placeholder: codex/123-short-slug -> main
+      value: |
+        Append the following machine-readable handoff block at the end of the issue body.
+        Replace placeholders before saving; `handoff-check.ps1` parses this block.
+
+        \`\`\`
+        <!-- hibiki:handoff-v1
+        schema_version: 2
+        branch: codex/<issue>-<slug>
+        target_branch: main
+        base_commit: <full-sha-at-claim>
+        owner: <owner>
+        scope_globs:
+          - src/hub/src/example.cpp
+          - tests/example/**
+        shared_paths: []
+        depends_on: []
+        resume_commands:
+          - pwsh -File tools/handoff-check.ps1 -Issue <issue>
+        -->
+        \`\`\`
     validations:
-      required: true
+      required: false
   - type: textarea
     id: scope
     attributes:
-      label: scope_globs
+      label: scope_globs (also put them in the handoff block above)
       description: Exclusive, repository-relative paths this task expects to modify.
       placeholder: |
         - src/hub/src/example.cpp
@@ -56,31 +75,15 @@ body:
       placeholder: "#120, PR #121, or none"
     validations:
       required: true
-  - type: textarea
-    id: contract
-    attributes:
-      label: Contract, safety and evidence impact
-      description: List affected Spec/schema/ADR/license/RT/privacy boundaries and required evidence.
-    validations:
-      required: true
-  - type: textarea
-    id: gates
-    attributes:
-      label: Required gates
-      placeholder: |
-        - pwsh -File tools/handoff-check.ps1 -Issue 123
-        - pwsh -File tools/verify.ps1
-        - pwsh -File tools/docs-check.ps1
-    validations:
-      required: true
   - type: checkboxes
     id: claim
     attributes:
       label: Claim checks
       options:
-        - label: I checked open Issues, draft PRs and active handoffs for scope overlap.
+        - label: I checked open Issues, draft PRs and existing handoff blocks for scope overlap.
           required: true
         - label: I will use a dedicated clone/worktree and will not share a branch with another active writer.
           required: true
-        - label: I will open a draft PR after the handoff claim commit and will not force-push a depended-on branch.
+        - label: I will embed the handoff block in this Issue body, open a draft PR after the claim commit, and will not force-push a depended-on branch.
           required: true
+

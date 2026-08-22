@@ -15,18 +15,18 @@ pwsh -File tools/handoff-check.ps1 -Issue <issue>
 pwsh -File tools/context-pack.ps1 -Issue <issue> -NoSource
 ```
 
-工作樹不是乾淨狀態、handoff check 失敗，或 target toolchain 不符合時，先在
-`docs/tasks/active/<issue>.md` 記錄事實；不要直接改 DSP、driver、永久 ID 或 release 設定。
-Issue 0 是 foundation integration handoff，只由 integrator 更新，不是所有 AI 共用的工作單。
+工作樹不是乾淨狀態、handoff check 失敗，或 target toolchain 不符合時，先在 Issue body 的
+handoff block 記錄事實；不要直接改 DSP、driver、永久 ID 或 release 設定。
+Foundation integration Issue 是 foundation handoff，只由 integrator 更新，不是所有 AI 共用的工作單。
 
 ## 多 AI 並行入口
 
 - 完整規則見 `docs/ai/MULTI_AGENT.md`：一個 AI 工作切片對應一個 Issue、獨立 worktree、
-  branch、handoff 與 draft PR。同一 Issue／branch 同時只能有一個 writer。
-- 修改前以 Issue assignee／linked draft PR 完成 live claim，並在 handoff v2 宣告
+  branch、Issue body handoff block 與 draft PR。同一 Issue／branch 同時只能有一個 writer。
+- 修改前以 Issue assignee／lifecycle label／linked draft PR 完成 live claim，並在 Issue body handoff block 宣告
   `scope_globs`、`shared_paths` 與 `depends_on`。scope 重疊時先停止，由 integrator 指定 owner。
 - feature AI 只更新自己的 handoff、目標 Spec、tests 與 evidence；全域摘要與 Issue 0 由
-  integrator 在整合時單次更新。每份 active handoff 各自只有一個 `Next safe action`，但不同
+  integrator 在整合時單次更新。每個 active claim 各自只有一個 `Next safe action`，但不同
   Issue 可以在不重疊的 scope 內並行。
 
 ## 現在的真實位置
@@ -127,12 +127,12 @@ Issue 0 是 foundation integration handoff，只由 integrator 更新，不是�
   The supervisor UI editing surface, side-chain/multi-bus worker process and third-party
   certification remain open; none of this proves physical audio or driver delivery.
 - Process gates learned this week: gate scripts require PowerShell 7 (PS 5.1 cannot run
-   the UTF-8-no-BOM tooling; install via winget), multiple gates expose `-SelfTest`
-   (`tools/docs-check.ps1 -SelfTest` is merged), the volatile BASELINE summary counters are
-   now measured live by `tools/docs-check.ps1` via `git ls-files` and fail closed without a
-   committed counter file — `#197` retired `build/baseline-counters.json` and the
-   `-WriteCounters` chore, and the #25 scope-overlap gate rejects overlapping active
-   `scope_globs` across handoffs.
+  the UTF-8-no-BOM tooling; install via winget), multiple gates expose `-SelfTest`
+  (`tools/docs-check.ps1 -SelfTest` is merged), the volatile BASELINE summary counters are
+  now measured live by `tools/docs-check.ps1` via `git ls-files` and fail closed without a
+  committed counter file — #197 retired `build/baseline-counters.json` and the
+  `-WriteCounters` chore, and the #25 scope-overlap gate rejects overlapping active
+  `scope_globs` across handoffs.
 
 ## 目前整合主線
 
@@ -159,7 +159,7 @@ user-space opt-in，不代表 driver 或完整播放驗收。
 
 1. [AGENTS.md](../AGENTS.md)：硬限制與每次必跑命令。
 2. [START_HERE.md](START_HERE.md)：fresh clone、權威順序與資料邊界。
-3. [active Issue 0 handoff](tasks/active/0.md)：已完成、最後驗證、風險與下一步。
+3. Foundation integration Issue：已完成、最後驗證、風險與下一步（見 GitHub）。
 4. [baseline](state/BASELINE.md)：main 已合併能力與限制。
 5. 對應的 [Spec index](specs/INDEX.md) 與 [evidence](../evidence/0000-foundation/)。
 
@@ -175,7 +175,7 @@ user-space opt-in，不代表 driver 或完整播放驗收。
 
 ## 交接前最小完成條件
 
-每一個後續 AI 在換機前必須：只更新自己 active handoff 的 owner、base commit、驗證、限制與
+每一個後續 AI 在換機前必須：只更新自己 Issue body handoff block 的 owner、base commit、驗證、限制與
 下一步，建立 WIP commit、push 自己的 branch，並跑與改動範圍相符的 gate。所有 public contract
 變更都要同步更新 Spec、tests 與 evidence；`docs/state/BASELINE.md` 等全域整合快照由 integrator
 在合併時更新。

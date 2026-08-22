@@ -571,7 +571,7 @@ worker process 與第三方 certification 仍待完成；以上不宣稱任何�
 漂移、push-to-main 與本機維持嚴格），並附 `-SelfTest`；#25 讓 active handoff 的
 scope_globs 重疊直接 fail-closed。gate 腳本需要 PowerShell 7（PS 5.1 無法執行）。
 
-目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 85 個必要入口與
+目前驗證摘要：`verify.ps1` 的 1 個 CTest 通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
