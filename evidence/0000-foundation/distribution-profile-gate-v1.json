@@ -73,17 +73,18 @@
     },
     {
       "command": "pwsh -NoProfile -File tools/docs-check.ps1",
-      "status": "blocked",
+      "status": "pass",
       "coverage": [
-        "required documentation paths and specs were parsed"
+        "required documentation paths and specs parsed",
+        "409 tracked paths and 71 JSON files matched BASELINE.md"
       ],
-      "limitation": "Integrator-owned docs/state/BASELINE.md claims 407 tracked paths while Git reports 409 after this handoff and evidence were added; worker did not modify the shared file."
+      "compiled_artifacts": false
     },
     {
       "command": "pwsh -NoProfile -File tools/source-policy.ps1",
       "status": "pass",
       "coverage": [
-        "406 tracked paths with no blocked binary or secret"
+        "409 tracked paths with no blocked binary or secret"
       ],
       "compiled_artifacts": false
     },
@@ -91,7 +92,7 @@
       "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
       "status": "pass",
       "coverage": [
-        "1 workflow and 406 tracked paths with no source-only policy violation"
+        "1 workflow and 409 tracked paths with no source-only policy violation"
       ],
       "compiled_artifacts": false
     },
@@ -118,8 +119,7 @@
     "The parser accepts only the repository's bounded YAML subset; it is not a general YAML parser.",
     "The gate does not prove runtime consumer behavior, installer behavior, driver loading, physical audio, HLK, or Microsoft signing.",
     "Canonical stable identities are maintainer-owned and were validated, not regenerated.",
-    "The local machine lacks the locked VS 2026 and SDK/WDK 10.0.28000.2526 toolchain.",
-    "docs-check remains blocked until integrator-owned BASELINE.md counters are refreshed from 407 to 409 tracked paths."
+    "The local machine lacks the locked VS 2026 and SDK/WDK 10.0.28000.2526 toolchain."
   ],
   "logs": [],
   "tool_versions": {
