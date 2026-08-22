@@ -2,51 +2,56 @@
   "schema_version": 1,
   "issue": 121,
   "scope_digest": "verify-selftest-v1",
-  "source_commit": "7e163ad",
-  "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-28000-dotnet10; target-wdk-28000-missing; cmake-vs-bundled",
+  "source_commit": "c20a4f1",
+  "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "pwsh -NoProfile -File tools/verify.ps1 -SelfTest",
-    "pwsh -NoProfile -File tools/verify.ps1 -Clean"
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 121",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
   ],
   "results": [
     {
       "command": "tools/verify.ps1 -SelfTest",
       "status": "pass",
       "coverage": [
-        "ignored relative output root .local/build derived from repository root",
-        "CMake configure source/build ordering and HIBIKI_BUILD_TESTS=ON",
-        "RelWithDebInfo CMake build dispatch with parallel build",
-        "RelWithDebInfo CTest dispatch with output-on-failure",
-        "rejection of invalid output root, configure flag, build configuration, and test configuration"
+        "ignored output root derivation and cleanup bounds",
+        "CMake configure argument sequence",
+        "CMake build argument sequence and RelWithDebInfo config",
+        "CTest argument sequence",
+        "invalid plan rejection"
       ],
       "compiled_artifacts": false,
-      "processes_started": false,
-      "files_written": false
+      "case_count": 5
     },
     {
-      "command": "tools/verify.ps1 -Clean",
+      "command": "tools/handoff-check.ps1 -Issue 121 / tools/handoff-check.ps1 / source-policy / source-only-ci / verify / docs-check / git diff --check",
       "status": "pass",
       "coverage": [
-        "CMake configure with HIBIKI_BUILD_TESTS=ON",
-        "RelWithDebInfo build with parallel compilation",
-        "CTest 1/1 passed with output-on-failure",
-        "generated output remained under ignored .local/build"
-      ],
-      "compiled_artifacts": false,
-      "processes_started": true,
-      "files_written": true
+        "schema v2 ownership and scope",
+        "446 tracked paths source policy",
+        "one workflow source-only publication boundary",
+        "CMake/CTest 1 of 1",
+        "documentation and baseline counters verified",
+        "no whitespace errors"
+      ]
     }
   ],
   "limitations": [
-    "This is deterministic source-only aggregate gate evidence; it does not prove CMake configure, compilation, CTest execution, Engine Preview launch, IPC delivery, physical audio delivery, driver, WaveRT, HLK, signing, or release behavior.",
-    "Normal verify execution remains dependent on the local CMake/toolchain environment.",
-    "Formal WDK/WinUI verification is unavailable on this machine."
+    "The self-test is aggregate build-dispatch/source evidence only; it does not prove CMake configure, compilation, CTest execution, physical audio delivery, driver, WaveRT, HLK, signing, or release behavior.",
+    "Release build outputs remain ignored local artifacts and are not submitted to GitHub."
   ],
   "logs": [],
   "tool_versions": {
-    "powershell": "7.6.4",
-    "cmake": "Visual Studio 2026 bundled CMake; not on default PATH"
+    "dotnet": "10.0.301",
+    "msvc": "19.44.35228.0",
+    "powershell": "7.6.5",
+    "cmake": "4.4.0"
   },
-  "started_at": "2026-08-22T00:00:00+08:00",
-  "finished_at": "2026-08-22T00:00:00+08:00"
+  "started_at": "2026-08-22T09:55:00+08:00",
+  "finished_at": "2026-08-22T09:56:00+08:00"
 }
