@@ -1599,6 +1599,23 @@ int main() {
     CHECK(pipe_response.has_value() && pipe_decode_error == IpcDecodeError::None &&
           pipe_response->header.type == IpcMessageType::Ack &&
           pipe_response->header.request_id == frame.header.request_id);
+    // Issue #343: an idle gap longer than io_timeout_ms (1000 ms here) must
+    // not terminate the session; the same connection serves another request.
+    Sleep(1500U);
+    CHECK(WriteFile(ipc_client, &request_size, sizeof(request_size), &transferred, nullptr) != FALSE &&
+          transferred == sizeof(request_size));
+    CHECK(WriteFile(ipc_client, request_bytes.data(), request_size, &transferred, nullptr) != FALSE &&
+          transferred == request_size);
+    response_size = 0U;
+    CHECK(ReadFile(ipc_client, &response_size, sizeof(response_size), &transferred, nullptr) != FALSE &&
+          transferred == sizeof(response_size) && response_size <= 1024U);
+    std::vector<std::uint8_t> response_after_idle(response_size);
+    CHECK(ReadFile(ipc_client, response_after_idle.data(), response_size, &transferred, nullptr) != FALSE &&
+          transferred == response_size);
+    const auto pipe_response_idle = decode_ipc_frame(response_after_idle, pipe_decode_error);
+    CHECK(pipe_response_idle.has_value() && pipe_decode_error == IpcDecodeError::None &&
+          pipe_response_idle->header.type == IpcMessageType::Ack &&
+          pipe_response_idle->header.request_id == frame.header.request_id);
     CloseHandle(ipc_client);
     ipc_server.stop();
     CHECK(!ipc_server.running());
