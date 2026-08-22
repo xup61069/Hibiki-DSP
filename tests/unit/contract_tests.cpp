@@ -429,6 +429,50 @@ int main() {
     auto unsorted_response = calibration_response;
     std::swap(unsorted_response[0], unsorted_response[1]);
     CHECK(!validate_calibration_response_v1(unsorted_response, calibration_policy));
+
+    CalibrationCompilePolicyV1 calibration_cap_policy;
+    calibration_cap_policy.max_filters = 16U;
+    calibration_cap_policy.min_frequency_hz = 20.0;
+    calibration_cap_policy.max_frequency_hz = 20000.0;
+    calibration_cap_policy.min_q = 0.3;
+    calibration_cap_policy.max_q = 12.0;
+    calibration_cap_policy.min_spacing_octaves = 1.0 / 12.0;
+    calibration_cap_policy.ignore_error_db = 0.25;
+    std::vector<CalibrationResponsePointV1> calibration_candidates;
+    for (std::uint32_t candidate_index = 0U; candidate_index < 17U; ++candidate_index) {
+        const double frequency = 100.0 * std::pow(2.0, static_cast<double>(candidate_index) / 3.0);
+        calibration_candidates.push_back(CalibrationResponsePointV1{frequency, -6.0, 0.0});
+    }
+    const auto calibration_cap_result = compile_bounded_peq_correction_v1(
+        calibration_candidates, calibration_cap_policy);
+    CHECK(calibration_cap_result.filters.size() == 16U && calibration_cap_result.limited);
+    CHECK(calibration_cap_result.diagnostic.find("clipped or unrepresented residuals") !=
+          std::string::npos);
+    double cap_previous_frequency = 20.0;
+    double cap_minimum_spacing = std::numeric_limits<double>::infinity();
+    for (const auto& filter : calibration_cap_result.filters) {
+        CHECK(filter.frequency_hz >= 20.0 && filter.frequency_hz <= 20000.0);
+        CHECK(filter.q >= calibration_cap_policy.min_q &&
+              filter.q <= calibration_cap_policy.max_q);
+        CHECK(filter.frequency_hz > cap_previous_frequency);
+        cap_minimum_spacing = (std::min)(
+            cap_minimum_spacing,
+            std::abs(std::log2(filter.frequency_hz / cap_previous_frequency)));
+        cap_previous_frequency = filter.frequency_hz;
+    }
+    CHECK(cap_minimum_spacing >= calibration_cap_policy.min_spacing_octaves);
+    CalibrationCompilePolicyV1 over_cap_policy = calibration_cap_policy;
+    over_cap_policy.max_filters = 17U;
+    CHECK(!validate_calibration_compile_policy_v1(over_cap_policy));
+    CalibrationCompilePolicyV1 above_default_q_policy = calibration_cap_policy;
+    above_default_q_policy.max_q = 12.5;
+    CHECK(validate_calibration_compile_policy_v1(above_default_q_policy));
+    CalibrationCompilePolicyV1 invalid_q_policy = calibration_cap_policy;
+    invalid_q_policy.max_q = 100.1;
+    CHECK(!validate_calibration_compile_policy_v1(invalid_q_policy));
+    CalibrationCompilePolicyV1 invalid_spacing_policy = calibration_cap_policy;
+    invalid_spacing_policy.min_spacing_octaves = 0.008;
+    CHECK(!validate_calibration_compile_policy_v1(invalid_spacing_policy));
     calibrated.anchor_id = "speaker-anchor";
     CHECK(!validate_policy(calibrated));
     calibrated.standard = "iso-226-2023-calibrated";
