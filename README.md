@@ -221,7 +221,9 @@ pwsh -File tools/run-preview.ps1 -Build
 
 啟動器預設使用 `-Ui Auto`：若已安裝符合版本的 Windows App Runtime 1.7，就開啟
 WinUICompat；否則自動退回不需要 Runtime 的 DesktopCompat，不會再讓使用者直接撞到缺少
-Runtime 的錯誤。要固定指定介面可使用 `-Ui WinUICompat` 或 `-Ui DesktopCompat`。
+Runtime 的錯誤。要固定指定介面可使用 `-Ui WinUICompat`、`-Ui FormalWinUI`（formal
+MSBuild/XAML shell，需先以 `tools/build-preview.ps1 -Target WinUI` 建置或加 `-Build`）或
+`-Ui DesktopCompat`。
 
 Windows 使用者也可以直接雙擊 repository 根目錄的 `Start-HibikiPreview.cmd`；它會執行同一個
 流程，先建置必要的 unsigned preview，再啟動 Engine Preview 與可用的桌面 UI。

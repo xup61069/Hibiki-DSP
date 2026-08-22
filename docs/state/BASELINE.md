@@ -4,8 +4,10 @@
 
 - AI handoff now has a short canonical entry, Git-ancestry/document gate and source-only local
   preview command. A Compatibility Preview builds and completes a launch smoke on the non-target
-  host using the same `EasyControlViewModel`; the formal WinUI XAML build remains explicitly blocked
-  on that host and still requires the locked target toolchain.
+  host using the same `EasyControlViewModel`; the formal WinUI XAML build now completes on a
+  VS2026-class host (`visual-studio-msbuild` + `/restore`, 0 warnings/errors) and its shell
+  launches with a UIA-recorded observable control tree, while hardware soak still awaits the
+  locked target toolchain.
 - The explicit `WinUICompat` target now skips the non-packaged `XamlControlsResources` merge that
   crashed during startup on the local host. With Microsoft Windows App Runtime 1.7 x64 installed,
   `tools/build-preview.ps1 -Target WinUICompat -SmokeTest` now keeps a `WinUI Desktop` window alive;
