@@ -42,7 +42,9 @@ bool transfer(HANDLE pipe,
               const bool write,
               void* const data,
               const std::size_t bytes,
-              const std::uint32_t timeout_ms) noexcept {
+              const std::uint32_t timeout_ms,
+              bool* const timed_out = nullptr) noexcept {
+    if (timed_out != nullptr) *timed_out = false;
     if (pipe == nullptr || pipe == INVALID_HANDLE_VALUE || data == nullptr || bytes == 0U ||
         bytes > (std::numeric_limits<DWORD>::max)()) {
         return false;
@@ -62,9 +64,20 @@ bool transfer(HANDLE pipe,
                                    : ReadFile(pipe, raw + offset, static_cast<DWORD>(remaining),
                                               &transferred, &overlapped);
         bool completed = immediate != FALSE;
-        if (!completed && GetLastError() == ERROR_IO_PENDING &&
-            WaitForSingleObject(event, timeout_ms) == WAIT_OBJECT_0) {
-            completed = GetOverlappedResult(pipe, &overlapped, &transferred, FALSE) != FALSE;
+        if (!completed && GetLastError() == ERROR_IO_PENDING) {
+            const DWORD wait_result = WaitForSingleObject(event, timeout_ms);
+            if (wait_result == WAIT_OBJECT_0) {
+                completed = GetOverlappedResult(pipe, &overlapped, &transferred, FALSE) != FALSE;
+            } else if (wait_result == WAIT_TIMEOUT) {
+                CancelIoEx(pipe, &overlapped);
+                CloseHandle(event);
+                if (timed_out != nullptr) *timed_out = true;
+                return false;
+            } else {
+                CancelIoEx(pipe, &overlapped);
+                CloseHandle(event);
+                return false;
+            }
         }
         if (!completed || transferred == 0U) {
             CancelIoEx(pipe, &overlapped);
@@ -178,7 +191,11 @@ void IpcNamedPipeServerV1::run() noexcept {
         client_connected_.store(true, std::memory_order_release);
         while (!stop_requested_.load(std::memory_order_acquire)) {
             std::array<std::uint8_t, 4> length_bytes{};
-            if (!transfer(pipe, false, length_bytes.data(), length_bytes.size(), io_timeout_ms_)) break;
+            bool idle_timed_out = false;
+            if (!transfer(pipe, false, length_bytes.data(), length_bytes.size(), io_timeout_ms_, &idle_timed_out)) {
+                if (idle_timed_out) continue;  // idle: retry, don't disconnect
+                break;                          // real error or stop: disconnect
+            }
             const auto frame_bytes = read_u32(length_bytes.data());
             if (frame_bytes < 20U || frame_bytes > max_frame_bytes_) break;
             std::vector<std::uint8_t> packet(frame_bytes);
