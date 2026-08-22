@@ -279,6 +279,98 @@ bool case_fixture_nonfinite_rejected() {
     return caught && fixtures_finite(kChannels, kFrames);
 }
 
+// Fabricate one occupied slot as a long-running ring would have left it.
+void stamp_slot(const uint32_t sequence, const float tag) {
+    struct hibiki_asio_transport_region_v1* r = region();
+    struct hibiki_asio_transport_slot_v1* slot =
+        &r->slots[sequence % HIBIKI_ASIO_TRANSPORT_SLOT_COUNT_V1];
+    for (uint32_t frame = 0U; frame < kFrames; ++frame) {
+        for (uint32_t channel = 0U; channel < kChannels; ++channel) {
+            slot->samples[frame * kChannels + channel] =
+                tag + static_cast<float>(frame) * 0.5f + static_cast<float>(channel) * 0.25f;
+        }
+    }
+    slot->frames = kFrames;
+    slot->channels = kChannels;
+    slot->sample_rate = kRate;
+    slot->ready_sequence = sequence + 1U;
+}
+
+bool pop_and_verify_head(const float expected_tag) {
+    uint32_t out_frames = 0U;
+    uint32_t out_channels = 0U;
+    uint32_t out_rate = 0U;
+    std::memset(g_interleaved, 0, sizeof(g_interleaved));
+    if (hibiki_asio_transport_pop_interleaved_v1(region(), sizeof(g_region_bytes), g_interleaved,
+                                                 kFrames, &out_frames, &out_channels,
+                                                 &out_rate) != 1) {
+        return false;
+    }
+    return out_frames == kFrames && out_channels == kChannels && out_rate == kRate &&
+           g_interleaved[0] == expected_tag &&
+           g_interleaved[1] == expected_tag + 0.25f;
+}
+
+bool case_wraparound_push_pop_fifo() {
+    if (!init_default()) return false;
+    struct hibiki_asio_transport_region_v1* r = region();
+    // Simulate a long-lived ring paused three blocks before the uint32 wrap:
+    // consumer=0xFFFFFFFC, producer=0xFFFFFFFF, three outstanding slots (0,1,2).
+    r->consumer_sequence = 0xFFFFFFFCU;
+    r->producer_sequence = 0xFFFFFFFFU;
+    stamp_slot(0xFFFFFFFCU, -900.0f);
+    stamp_slot(0xFFFFFFFDU, -800.0f);
+    stamp_slot(0xFFFFFFFEU, -700.0f);
+    bool ok = pop_and_verify_head(-900.0f);
+    ok = ok && r->consumer_sequence == 0xFFFFFFFDU;
+    ok = ok && pop_and_verify_head(-800.0f);
+    ok = ok && r->consumer_sequence == 0xFFFFFFFEU;
+    ok = ok && pop_and_verify_head(-700.0f);
+    ok = ok && r->consumer_sequence == 0xFFFFFFFFU;
+    // Producer crosses the wrap: 0xFFFFFFFF + 1 lands in slot 3 with sequence 0.
+    fill_block(8.0f);
+    if (!fixtures_finite(kChannels, kFrames)) return false;
+    ok = ok && hibiki_asio_transport_push_planar_v1(region(), sizeof(g_region_bytes),
+                                                    g_planar_ptrs, kChannels, kFrames) == 1;
+    ok = ok && r->producer_sequence == 0U;
+    // ready_sequence wraps too: 0xFFFFFFFF + 1 truncates to 0, and the next
+    // pop validates it against consumer + 1 which wraps identically.
+    ok = ok && r->slots[3].ready_sequence == 0U;
+    ok = ok && r->slots[3].frames == kFrames && r->slots[3].channels == kChannels;
+    ok = ok && pop_and_verify_head(-56.0f);  // fill_block(8.0f) head sample
+    ok = ok && r->consumer_sequence == 0U && r->dropped_blocks == 0U;
+    return ok;
+}
+
+bool case_wraparound_overflow_accounting() {
+    if (!init_default()) return false;
+    struct hibiki_asio_transport_region_v1* r = region();
+    // Wrapped and full: consumer=0xFFFFFFFC, producer=0x00000000 (4 outstanding).
+    r->consumer_sequence = 0xFFFFFFFCU;
+    r->producer_sequence = 0x00000000U;
+    stamp_slot(0xFFFFFFFCU, -600.0f);
+    stamp_slot(0xFFFFFFFDU, -500.0f);
+    stamp_slot(0xFFFFFFFEU, -400.0f);
+    stamp_slot(0xFFFFFFFFU, -300.0f);
+    fill_block(9.0f);
+    if (!fixtures_finite(kChannels, kFrames)) return false;
+    bool ok = hibiki_asio_transport_push_planar_v1(region(), sizeof(g_region_bytes),
+                                                   g_planar_ptrs, kChannels, kFrames) == 0;
+    ok = ok && r->dropped_blocks == 1U;
+    ok = ok && r->producer_sequence == 0U && r->consumer_sequence == 0xFFFFFFFCU;
+    // Non-consuming capacity overflow at the wrapped state leaves sequences alone.
+    uint32_t out_frames = 0U;
+    uint32_t out_channels = 0U;
+    uint32_t out_rate = 0U;
+    ok = ok && hibiki_asio_transport_pop_interleaved_v1(region(), sizeof(g_region_bytes),
+                                                        g_interleaved, kFrames - 1U, &out_frames,
+                                                        &out_channels, &out_rate) == 0;
+    ok = ok && r->consumer_sequence == 0xFFFFFFFCU && r->producer_sequence == 0U;
+    ok = ok && pop_and_verify_head(-600.0f);  // stamp_slot(-600.0f) head sample
+    ok = ok && r->consumer_sequence == 0xFFFFFFFDU;
+    return ok;
+}
+
 }  // namespace
 
 int main() {
@@ -294,11 +386,13 @@ int main() {
     check("empty_pop_zeroes_outputs", case_empty_pop_zeroes_outputs());
     check("null_arguments_fail_closed", case_null_arguments());
     check("fixture_layer_rejects_nonfinite", case_fixture_nonfinite_rejected());
+    check("wraparound_push_pop_fifo", case_wraparound_push_pop_fifo());
+    check("wraparound_overflow_accounting", case_wraparound_overflow_accounting());
 
     if (g_failures != 0) {
         std::printf("asio transport selftest FAILED: %d case(s)\n", g_failures);
         return 1;
     }
-    std::printf("asio transport selftest passed (12 cases)\n");
+    std::printf("asio transport selftest passed (14 cases)\n");
     return 0;
 }

@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "issue": 318,
+  "scope_digest": "issue-313-archive-301-v1",
+  "source_commit": "20b6bc152ffe9fc837f824b857daacbf44aa0e68",
+  "archive_commit": "cf8b81f36f673268f56a51d78c5a9b771755d7ba",
+  "main_sync_commit": "20b6bc152ffe9fc837f824b857daacbf44aa0e68",
+  "archived_issue": 301,
+  "merged_pr": 302,
+  "merged_pr_commit": "89c265b75e4bdd9ddc404f512150756de87d02a0",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 318",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 318 archive move",
+      "status": "pass",
+      "coverage": [
+        "moved docs/tasks/active/301.md to docs/tasks/completed/2026/301.md",
+        "preserved Issue 301 history and recorded PR 302 merge metadata",
+        "corrective archive commit is recorded after the archive commit is created"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "PR #302 merged-head review",
+      "status": "pass",
+      "coverage": [
+        "PR #302 merged at 89c265b75e4bdd9ddc404f512150756de87d02a0",
+        "final push verify run 32575054597 / job 97036045083 passed",
+        "final merge-ref verify run 32575057094 / job 97036051132 passed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "documentation/source gates",
+      "status": "pass",
+      "coverage": [
+        "baseline scoped/full handoff, docs self-test/docs-check, source-policy, source-only CI, doctor, and diff checks passed",
+        "baseline measurement was 568 tracked paths and 134 repository JSON files before archive additions",
+        "docs-check -WriteCounters was attempted but the current gate rejects that parameter"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "post-archive documentation/source gates",
+      "status": "pass",
+      "coverage": [
+        "scoped/full handoff, docs self-test/docs-check, source-policy, source-only CI, and diff checks",
+        "live measurement after archive is 570 tracked paths and 135 repository JSON files"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly / tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "Windows 26200 AMD64, Visual Studio 2026, SDK and WDK prerequisites detected",
+        "Visual Studio 2026/CMake build, CTest 2 of 2, and unsigned local verification"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP, RT audio, driver, HLK, signing, or hardware behavior changes.",
+    "Archive and user-space gates do not provide physical audio, loadable-driver, HLK, or Microsoft-signing evidence.",
+    "The current main branch has no build/baseline-counters.json and tools/docs-check.ps1 exposes no -WriteCounters parameter; no uncontracted counter file was added.",
+    "Local build outputs remain ignored under .local/ and are not part of the archive PR."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369",
+    "cmake": "4.4.2",
+    "sdk_qfe": "10.1.28000.2526",
+    "wdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T21:57:00+08:00",
+  "finished_at": "2026-08-22T22:12:00+08:00"
+}
