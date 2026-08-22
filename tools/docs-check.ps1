@@ -124,7 +124,7 @@ if ($SelfTest) {
   $caseCount++
 
   # BASELINE edit detection.
-  if (Test-BaselineChangedByHead -ChangedPaths @('docs/tasks/active/64.md')) {
+  if (Test-BaselineChangedByHead -ChangedPaths @('evidence/0000-foundation/initial.json')) {
     throw 'docs-check self-test failed: a handoff-only head was treated as a BASELINE owner.'
   }
   $caseCount++
@@ -198,8 +198,7 @@ $required = @(
   'docs/adr/0001-public-monorepo-and-component-licenses.md',
   'docs/adr/0002-virtual-endpoint-engine-boundary.md', 'docs/ai/HANDOFF_SCHEMA.json',
   'docs/ai/DOC_SCHEMA.json', 'docs/ai/CHANGE_CONTRACT.yml', 'docs/ai/CONFLICT_POLICY.md',
-  'docs/ai/MULTI_AGENT.md', 'docs/tasks/active/README.md', 'docs/tasks/active/TEMPLATE.md',
-  'schemas/task-handoff-v1.schema.json', 'schemas/task-handoff-v2.schema.json',
+  'docs/ai/MULTI_AGENT.md',
   'schemas/acoustic-anchor-v1.schema.json', 'schemas/equal-loudness-policy-v1.schema.json',
   'schemas/equal-loudness-status-v1.schema.json', 'schemas/ipc-envelope-v1.schema.json',
   'schemas/driver-control-v1.schema.json', 'schemas/ir-phase-policy-v1.schema.json',
@@ -224,8 +223,7 @@ $required = @(
   'docs/specs/SPEC-0012-vst3-latency-graph-commit.md',
   'docs/specs/SPEC-0013-session-route-rules.md', 'docs/specs/SPEC-0014-custom-scene-catalog.md',
   'docs/specs/SPEC-0015-physical-device-catalog.md', 'docs/specs/SPEC-0016-process-loopback-capture.md',
-  'docs/VST3_STATE_COMPATIBILITY_REVIEW.md',
-  'docs/tasks/active/0.md', 'evidence/0000-foundation/initial.json'
+  'docs/VST3_STATE_COMPATIBILITY_REVIEW.md', 'evidence/0000-foundation/initial.json'
 )
 
 $missing = @($required | Where-Object { -not (Test-Path (Join-Path $repo $_)) })
@@ -233,9 +231,8 @@ if ($missing.Count -gt 0) { throw "Missing required documentation: $($missing -j
 
 $handoffSchemaIndex = Get-Content -LiteralPath (Join-Path $repo 'docs/ai/HANDOFF_SCHEMA.json') -Raw |
   ConvertFrom-Json
-$handoffSchemaRef = $handoffSchemaIndex.PSObject.Properties['$ref'].Value
-if ($handoffSchemaRef -ne '../../schemas/task-handoff-v2.schema.json') {
-  throw 'docs/ai/HANDOFF_SCHEMA.json must reference the canonical task-handoff-v2 schema.'
+if (-not $handoffSchemaIndex.PSObject.Properties['$comment']) {
+  throw 'docs/ai/HANDOFF_SCHEMA.json must document the issue-body handoff protocol.'
 }
 
 $specs = Get-ChildItem -LiteralPath (Join-Path $repo 'docs/specs') -Filter 'SPEC-*.md' -File

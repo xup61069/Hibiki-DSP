@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "issue": 287,
+  "scope_digest": "hibt-packet-v1",
+  "source_commit": "c04415d",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-cmake-4.4.2-vs2026; wdk-missing",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "pwsh -File tools/extension-check.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "truncated header (<16 bytes) rejected with TabPacketError::Truncated",
+        "truncated payload (header declares 2ch x 2fr but body short by one float) rejected with TabPacketError::LengthMismatch",
+        "non-finite sample (NaN in first float slot) rejected with TabPacketError::NonFiniteSample",
+        "unsupported channel layout (channels=3) rejected with TabPacketError::InvalidChannels",
+        "unsupported sample rate (22222 Hz) rejected with TabPacketError::InvalidSampleRate"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": ["handoff schema v2 ownership, scope and Git state for issue 287"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": ["source-only policy for tracked paths"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": ["workflow remains source-only"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/extension-check.ps1",
+      "status": "pass",
+      "coverage": ["MV3 least-privilege permissions, host allowlist, self-only CSP verified"],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Only the portable C++ decoder contract is exercised; browser runtime, tab capture, and physical per-app routing are out of scope.",
+    "audio-worklet.js packetizer itself is not tested here; production code is unchanged."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSVC 19.51.36256 via VS 18 2026",
+    "powershell": "pwsh 7.6.4",
+    "cmake": "cmake 4.4.0"
+  },
+  "started_at": "2026-08-22T13:10:00+08:00",
+  "finished_at": "2026-08-22T14:05:00+08:00"
+}

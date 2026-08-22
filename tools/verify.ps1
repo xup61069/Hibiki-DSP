@@ -85,6 +85,19 @@ function Assert-VerifyBuildPlan {
   }
 }
 
+function Invoke-MockVerifyExecution {
+  param(
+    [hashtable]$Mocks
+  )
+  # Mocks: @{ GetCommand = { param($Name) ... }; ConfigureExitCode = 0; BuildExitCode = 0; TestExitCode = 0 }
+  $getCommand = $Mocks['GetCommand']
+  if (-not (& $getCommand 'cmake')) { throw 'cmake not found' }
+  if ($Mocks['ConfigureExitCode'] -ne 0) { throw "CMake configure failed with exit code $($Mocks['ConfigureExitCode'])" }
+  if ($Mocks['BuildExitCode'] -ne 0) { throw "CMake build failed with exit code $($Mocks['BuildExitCode'])" }
+  if ($Mocks['TestExitCode'] -ne 0) { throw "CTest failed with exit code $($Mocks['TestExitCode'])" }
+  return $true
+}
+
 function Invoke-VerifySelfTest {
   $plan = Get-VerifyBuildPlan -RepositoryRoot $repo
   Assert-VerifyBuildPlan -Plan $plan
@@ -129,7 +142,43 @@ function Invoke-VerifySelfTest {
     if ($_.Exception.Message -notmatch 'test arguments') { throw }
   }
 
-  Write-Output 'Aggregate verification self-test passed (5 cases; offline/no-build/no-process/no-CMake/no-CTest/no-delete/no-file-write).'
+  # Mocked execution path: missing cmake
+  try {
+    Invoke-MockVerifyExecution -Mocks @{ GetCommand = { param($n) $null }; ConfigureExitCode = 0; BuildExitCode = 0; TestExitCode = 0 }
+    throw 'Missing cmake was accepted.'
+  } catch {
+    if ($_.Exception.Message -notmatch 'cmake not found') { throw }
+  }
+
+  # Mocked execution path: cmake configure failure
+  try {
+    Invoke-MockVerifyExecution -Mocks @{ GetCommand = { param($n) [pscustomobject]@{Name=$n} }; ConfigureExitCode = 1; BuildExitCode = 0; TestExitCode = 0 }
+    throw 'Configure failure was accepted.'
+  } catch {
+    if ($_.Exception.Message -notmatch 'CMake configure failed') { throw }
+  }
+
+  # Mocked execution path: cmake build failure
+  try {
+    Invoke-MockVerifyExecution -Mocks @{ GetCommand = { param($n) [pscustomobject]@{Name=$n} }; ConfigureExitCode = 0; BuildExitCode = 2; TestExitCode = 0 }
+    throw 'Build failure was accepted.'
+  } catch {
+    if ($_.Exception.Message -notmatch 'CMake build failed') { throw }
+  }
+
+  # Mocked execution path: ctest failure
+  try {
+    Invoke-MockVerifyExecution -Mocks @{ GetCommand = { param($n) [pscustomobject]@{Name=$n} }; ConfigureExitCode = 0; BuildExitCode = 0; TestExitCode = 3 }
+    throw 'CTest failure was accepted.'
+  } catch {
+    if ($_.Exception.Message -notmatch 'CTest failed') { throw }
+  }
+
+  # Mocked execution path: success
+  $ok = Invoke-MockVerifyExecution -Mocks @{ GetCommand = { param($n) [pscustomobject]@{Name=$n} }; ConfigureExitCode = 0; BuildExitCode = 0; TestExitCode = 0 }
+  if (-not $ok) { throw 'Mocked success did not return true.' }
+
+  Write-Output 'Aggregate verification self-test passed (10 cases; offline/no-build/no-process/no-CMake/no-CTest/no-delete/no-file-write).'
 }
 
 if ($SelfTest) {
