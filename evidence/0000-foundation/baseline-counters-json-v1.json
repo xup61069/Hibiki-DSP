@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 137,
   "scope_digest": "baseline-counters-json-v1",
-  "source_commit": "PENDING_COMMIT",
+  "source_commit": "dc5a6ab3d90f59fc32fc19b190418d0931289537",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-dotnet10-no-vs2026-no-wdk; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/docs-check.ps1 -SelfTest",
