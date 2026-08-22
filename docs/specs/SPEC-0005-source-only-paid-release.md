@@ -20,12 +20,6 @@ VST3／PE-COFF 輸出。Public CI 可在 ephemeral runner 編譯與測試，job 
 driver source boundary、extension/installer/control-model、stable identity 與 JSON parse
 gates；任何 gate 失敗都不得視為可交付 source tag。
 
-`tools/installer-check.ps1` 是 installer source-only gate：它先以 PowerShell AST 解析
-`installer/HibikiSetup.ps1`，再確認 `ReleaseManifest` digest/signature 欄位、relative
-path confinement、SHA-256 hashing、`ShouldProcess`、administrator boundary 與
-`pnputil /add-driver /install` staging contract；`-SelfTest` 只使用記憶體 fixture，不能
-執行 installer 或證明 signed package、Secure Boot、HLK、upgrade/rollback 或實體 driver。
-
 ## 官方建置 custody
 
 1. 受保護 annotated source tag 觸發兩個 clean builder，產生並比對 unsigned hashes。
