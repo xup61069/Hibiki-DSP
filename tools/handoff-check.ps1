@@ -372,14 +372,15 @@ if ($SelfTest) {
   }
   $caseCount++
 
-  $tbdDraftBody = @'
-<!-- hibiki:handoff-v1
-schema_version: 2
-issue: TBD
-branch: codex/TBD-placeholder
-target_branch: main
--->
-'@
+  $tbdBlockLines = @(
+    '<!-- hibiki:handoff-v1',
+    'schema_version: 2',
+    'issue: TBD',
+    'branch: codex/TBD-placeholder',
+    'target_branch: main',
+    '-->'
+  )
+  $tbdDraftBody = "# Objective`n`n" + ($tbdBlockLines -join "`n")
   $tbdFields = @(Get-TbdHandoffFields -Body $tbdDraftBody)
   if ($tbdFields.Count -ne 2 -or $tbdFields -notcontains 'issue' -or $tbdFields -notcontains 'branch') {
     throw "handoff-check self-test failed: TBD draft fields were not detected."
