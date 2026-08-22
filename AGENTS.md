@@ -14,7 +14,8 @@ handoff、Spec、ADR、source 與 tests。聊天紀錄、AI memory、個人 IDE 
 - 機器沒有 `pwsh` 時先安裝：`winget install --id Microsoft.PowerShell`。本機第一次
   執行若被 Execution Policy 擋下，加 `-ExecutionPolicy Bypass`。
 - 多個 gate 提供 `-SelfTest`：不碰機器、不寫檔即可驗證 gate 自身邏輯（例：
-  `pwsh -File tools/docs-check.ps1 -SelfTest`）。
+  `pwsh -File tools/docs-check.ps1 -SelfTest`）。CI 的 `Gate self-test sweep` step 會
+  探索並逐一執行所有暴露此參數的 gate；低於最低模式數門檻即失敗。
 
 ## 多 AI 並行（必遵守）
 

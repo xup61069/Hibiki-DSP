@@ -176,7 +176,8 @@ pwsh -File tools/source-policy.ps1
 ```
 
 驗證輸出一律留在 ignored 的 `.local/`；本 GitHub repository 不上傳 EXE、DLL、SYS、MSI、
-MSIX、VST3 或 CI artifact。
+MSIX、VST3 或 CI artifact。多個 gate 提供 `-SelfTest` 模式（不碰機器、不寫檔），CI 的
+`Gate self-test sweep` step 會探索並逐一執行它們。
 
 ### 目前的 preview 狀態
 
