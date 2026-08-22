@@ -53,6 +53,47 @@ bool Vst3TimelineEditorV1::reset(const Vst3ParameterTimelineSnapshotV1& publishe
     if (!validate_vst3_parameter_timeline_v1(published)) return false;
     published_ = published;
     draft_ = {};
+    undo_stack_ = {};
+    redo_stack_ = {};
+    undo_count_ = 0U;
+    redo_count_ = 0U;
+    return true;
+}
+
+void Vst3TimelineEditorV1::clear_history() noexcept {
+    undo_stack_ = {};
+    redo_stack_ = {};
+    undo_count_ = 0U;
+    redo_count_ = 0U;
+}
+
+bool Vst3TimelineEditorV1::undo() noexcept {
+    if (draft_active_ || undo_count_ == 0U) return false;
+    // Push the current published state onto the bounded redo stack, evicting
+    // the oldest entry when full.
+    if (redo_count_ == kVst3TimelineEditorMaxHistoryV1) {
+        for (std::size_t index = 1U; index < redo_stack_.size(); ++index) {
+            redo_stack_[index - 1U] = redo_stack_[index];
+        }
+        --redo_count_;
+    }
+    redo_stack_[redo_count_++] = published_;
+    published_ = undo_stack_[--undo_count_];
+    undo_stack_[undo_count_] = {};
+    return true;
+}
+
+bool Vst3TimelineEditorV1::redo() noexcept {
+    if (draft_active_ || redo_count_ == 0U) return false;
+    if (undo_count_ == kVst3TimelineEditorMaxHistoryV1) {
+        for (std::size_t index = 1U; index < undo_stack_.size(); ++index) {
+            undo_stack_[index - 1U] = undo_stack_[index];
+        }
+        --undo_count_;
+    }
+    undo_stack_[undo_count_++] = published_;
+    published_ = redo_stack_[--redo_count_];
+    redo_stack_[redo_count_] = {};
     return true;
 }
 
@@ -74,6 +115,18 @@ bool Vst3TimelineEditorV1::discard() noexcept {
 bool Vst3TimelineEditorV1::commit() noexcept {
     if (!draft_active_) return false;
     if (!validate_vst3_parameter_timeline_v1(draft_)) return false;
+    // Push the pre-commit published state onto the bounded undo stack,
+    // evicting the oldest entry when full; a new commit branches history and
+    // therefore clears the redo stack.
+    if (undo_count_ == kVst3TimelineEditorMaxHistoryV1) {
+        for (std::size_t index = 1U; index < undo_stack_.size(); ++index) {
+            undo_stack_[index - 1U] = undo_stack_[index];
+        }
+        --undo_count_;
+    }
+    undo_stack_[undo_count_++] = published_;
+    redo_count_ = 0U;
+    redo_stack_ = {};
     published_ = draft_;
     draft_ = {};
     draft_active_ = false;

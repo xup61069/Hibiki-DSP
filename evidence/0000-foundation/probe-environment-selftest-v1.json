@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "issue": 76,
+  "scope_digest": "probe-environment-selftest-v1",
+  "source_commit": "1a75509",
+  "environment_fingerprint": "windows-11-26200-x64-preview",
+  "commands": [
+    "pwsh -NoProfile -File tools/probe-environment.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/probe-environment.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 76",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/probe-environment.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "valid probe environment schema",
+        "required OS/tool/audio fields",
+        "supported LPCM bounds",
+        "malformed/missing fields rejection",
+        "forbidden identity/private-path keys rejection",
+        "secret-like text rejection"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 12
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 76 / tools/handoff-check.ps1 / source-policy / source-only-ci / verify / docs-check / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership and scope",
+        "456 tracked paths source policy",
+        "one workflow source-only publication boundary",
+        "CMake/CTest 1 of 1",
+        "documentation and baseline counters verified",
+        "no whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "This is source-level user-space tooling evidence only; it does not prove physical audio, endpoint control, driver/WaveRT, HLK, Microsoft signing, or installer behavior.",
+    "No endpoint ID, friendly name, PID, session ID, serial, private path or compiled artifact was recorded in repository evidence."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.301",
+    "msvc": "19.44.35228.0",
+    "powershell": "7.6.5",
+    "cmake": "4.4.0"
+  },
+  "started_at": "2026-08-22T10:21:00+08:00",
+  "finished_at": "2026-08-22T10:22:00+08:00"
+}

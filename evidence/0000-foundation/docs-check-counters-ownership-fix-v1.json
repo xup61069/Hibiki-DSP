@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "issue": 182,
+  "scope_digest": "docs-check-counters-ownership-fix-v1",
+  "source_commit": "d2a9ee2",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; cmake-missing-wdk-missing-portable-user-space",
+  "commands": [
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 182",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/docs-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "genuine first-time counters introduction tolerated only when the merge base lacks build/baseline-counters.json",
+        "counters edit on an existing base falls through to strict verification (drift rejected by ownership assertion)",
+        "untouched counters never classified as a first-time introduction",
+        "existing prose parser, multiline normalization, branch mode and JSON counter fixtures unchanged"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 21
+    },
+    {
+      "command": "tools/docs-check.ps1 (PR-mode simulation against origin/main)",
+      "status": "pass",
+      "coverage": [
+        "head edits build/baseline-counters.json with matching measured counts and passes strict ownership assertion after the guard",
+        "merge-base consistency path still enforced for non-introduction heads"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Tooling and governance gate coverage only; does not alter RT-DSP, driver audio behavior, or any product API.",
+    "Push-to-main strict validation was already correct before this fix; the change is scoped to PR-mode ordering.",
+    "Does not claim physical audio, per-App delivery, a loadable driver, HLK or Microsoft signing."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.5"
+  },
+  "started_at": "2026-08-22T15:55:00+08:00",
+  "finished_at": "2026-08-22T16:05:00+08:00"
+}

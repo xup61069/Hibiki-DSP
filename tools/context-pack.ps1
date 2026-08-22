@@ -1,10 +1,77 @@
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory = $true)][int]$Issue,
-  [switch]$NoSource
+  [int]$Issue,
+  [switch]$NoSource,
+  [switch]$SelfTest
 )
 
 $repo = Split-Path -Parent $PSScriptRoot
+
+function Convert-ContextGlobToRegex([string]$glob) {
+  $normalized = $glob.Replace('\', '/')
+  $builder = [Text.StringBuilder]::new()
+  for ($index = 0; $index -lt $normalized.Length; $index++) {
+    $character = $normalized[$index]
+    if ($character -eq '*') {
+      if ($index + 1 -lt $normalized.Length -and $normalized[$index + 1] -eq '*') {
+        $index++
+        if ($index + 1 -lt $normalized.Length -and $normalized[$index + 1] -eq '/') {
+          $index++
+          [void]$builder.Append('(?:.*/)?')
+        }
+        else {
+          [void]$builder.Append('.*')
+        }
+      }
+      else {
+        [void]$builder.Append('[^/]*')
+      }
+    }
+    elseif ($character -eq '?') {
+      [void]$builder.Append('[^/]')
+    }
+    else {
+      [void]$builder.Append([regex]::Escape([string]$character))
+    }
+  }
+  return "^$($builder.ToString())$"
+}
+
+function Test-ContextGlob([string]$relativePath, [string]$glob) {
+  return $relativePath -match (Convert-ContextGlobToRegex $glob)
+}
+
+if ($SelfTest) {
+  $cases = @(
+    @{ Name = 'exact-match'; Path = 'docs/AI_HANDOFF.md'; Glob = 'docs/AI_HANDOFF.md'; Expected = $true },
+    @{ Name = 'exact-near-miss'; Path = 'docs/AI_HANDOFF.txt'; Glob = 'docs/AI_HANDOFF.md'; Expected = $false },
+    @{ Name = 'single-star-file'; Path = 'tools/context-pack.ps1'; Glob = 'tools/*.ps1'; Expected = $true },
+    @{ Name = 'single-star-no-directory-crossing'; Path = 'tools/nested/context-pack.ps1'; Glob = 'tools/*.ps1'; Expected = $false },
+    @{ Name = 'single-question-mark'; Path = 'src/a.cpp'; Glob = 'src/?.cpp'; Expected = $true },
+    @{ Name = 'recursive-direct-child'; Path = 'src/foo.cpp'; Glob = 'src/**/*.cpp'; Expected = $true },
+    @{ Name = 'recursive-deep-child'; Path = 'src/hub/foo.cpp'; Glob = 'src/**/*.cpp'; Expected = $true },
+    @{ Name = 'recursive-extension-near-miss'; Path = 'src/foo.c'; Glob = 'src/**/*.cpp'; Expected = $false },
+    @{ Name = 'recursive-suffix-direct-child'; Path = 'src/hub/output_group.cpp'; Glob = 'src/hub/**output*'; Expected = $true },
+    @{ Name = 'recursive-suffix-deep-child'; Path = 'src/hub/wasapi/output_group.cpp'; Glob = 'src/hub/**output*'; Expected = $true },
+    @{ Name = 'recursive-root-direct-child'; Path = 'evidence/initial.json'; Glob = 'evidence/**'; Expected = $true },
+    @{ Name = 'recursive-root-deep-child'; Path = 'evidence/0000-foundation/initial.json'; Glob = 'evidence/**'; Expected = $true }
+  )
+
+  foreach ($case in $cases) {
+    $actual = Test-ContextGlob -relativePath $case.Path -glob $case.Glob
+    if ($actual -ne $case.Expected) {
+      throw "context-pack self-test case '$($case.Name)' expected $($case.Expected) but got $actual for '$($case.Path)' against '$($case.Glob)'."
+    }
+  }
+
+  Write-Output "Context-pack glob self-test passed ($($cases.Count) cases)."
+  exit 0
+}
+
+if (-not $PSBoundParameters.ContainsKey('Issue')) {
+  throw "No Issue specified. Pass -Issue <number>."
+}
+
 $handoff = Join-Path $repo "docs/tasks/active/$Issue.md"
 if (-not (Test-Path $handoff)) {
   throw "No handoff exists for Issue $Issue. Create docs/tasks/active/$Issue.md before editing."
@@ -24,18 +91,6 @@ function Write-ContextFile([string]$label, [string]$path) {
   if (-not $seenFiles.Add($resolved)) { return }
   Write-Output "=== $label :: $path ==="
   Get-Content -LiteralPath $path
-}
-
-function Convert-ContextGlobToRegex([string]$glob) {
-  $pattern = [regex]::Escape($glob.Replace('\', '/'))
-  $pattern = $pattern.Replace('\*\*', '.*')
-  $pattern = $pattern.Replace('\*', '[^/]*')
-  $pattern = $pattern.Replace('\?', '[^/]')
-  return "^$pattern$"
-}
-
-function Test-ContextGlob([string]$relativePath, [string]$glob) {
-  return $relativePath -match (Convert-ContextGlobToRegex $glob)
 }
 
 Write-Output "=== Hibiki context pack: Issue #$Issue ==="
