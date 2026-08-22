@@ -1,0 +1,44 @@
+﻿{
+  "schema_version": 1,
+  "issue": 197,
+  "scope_digest": "docs-check-live-counters-v1",
+  "source_commit": "cf6f3e9",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-git-2.x; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 197",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "all gates",
+      "status": "pass",
+      "coverage": [
+        "build/baseline-counters.json deleted from repository",
+        "docs-check measures tracked-path and JSON counters live via git ls-files on every run in every mode (local, push, PR merge-ref)",
+        "no committed counter numbers are read or compared anywhere",
+        "structural counters (required entries, specs) remain strictly verified against BASELINE.md prose",
+        "-SelfTest extended to 13 cases covering: structural parser, multiline normalization, branch mode detection, BASELINE edit detection, and live git ls-files measurement returning non-zero results in a real repository",
+        "BASELINE.md summary sentence updated to reflect live measurement without committed digits",
+        "MULTI_AGENT.md counter-refresh chore section replaced with live-measurement note",
+        "net -324 lines of gate code removed"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The gate no longer detects bulk deletion of tracked files (by design; required-entry presence is the remaining structural safeguard).",
+    "Documentation-only tooling change; no product source, schema, DSP, RT-thread, driver or identity behavior is modified."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}
