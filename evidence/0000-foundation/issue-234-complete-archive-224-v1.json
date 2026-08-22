@@ -36,7 +36,7 @@
     },
     {
       "command": "Issue 234 archive implementation",
-      "status": "in_progress",
+      "status": "pass",
       "coverage": [
         "move docs/tasks/active/224.md to docs/tasks/completed/2026/224.md",
         "recover paired Issue 217 and Issue 224 evidence",
@@ -72,6 +72,20 @@
       "status": "pass",
       "coverage": ["anonymous .local/context.json fingerprint"],
       "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #239 push)",
+      "status": "pass",
+      "coverage": ["all verify workflow gates on complete archive head 31cadea"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32566922068/job/97016784804",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #239 merge-ref)",
+      "status": "pass",
+      "coverage": ["all verify workflow gates against the then-current main base"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32566936085/job/97016820129",
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
@@ -85,5 +99,5 @@
     "powershell": "7.6.5"
   },
   "started_at": "2026-08-22T20:15:00+08:00",
-  "finished_at": "pending_ci"
+  "finished_at": "2026-08-22T21:42:00+08:00"
 }
