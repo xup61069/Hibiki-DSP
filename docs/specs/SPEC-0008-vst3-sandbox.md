@@ -143,6 +143,14 @@ supervisor facade：attach/detach 恰一個非擁有的 store handle；select(id
 載入/儲存 baseline 相同」推導，不另行手動追蹤。此 surface 不擁有 worker、音訊
 buffer 或檔案 handle，也不在 RT thread 執行。
 
+`Vst3TimelineSurfaceModelV1` 是上述 supervisor surface 的 managed
+control-model mirror：它維持相同的 bounded ID、排序、draft、published、history
+與 dirty semantics，並以 `INotifyPropertyChanged` 在成功的 catalog、selection、
+edit、commit、undo/redo、save transition 後通知 binding。`IsDirtyState` 是唯讀
+projection；拒絕的操作不發通知。這只提供 future WinUI UI 的本地 binding seam，
+不增加 IPC payload、不擁有 native file store、不執行 worker/DSP，也不在 RT thread
+執行；native supervisor surface 仍是 persistence authority。
+
 supervisor 的 UI 編輯器、跨版本 plugin state persistence 與完整自動化排程仍未接入，
 因此不能宣稱完整 host automation。
 

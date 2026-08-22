@@ -721,4 +721,78 @@ Check(!overflow.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(99, 999, 0.5
     "The 17th unique parameter must be refused.");
 Check(overflow.Commit() && !overflow.HasEditSession && overflow.Published.Count == 16,
     "A valid 16-parameter draft must commit.");
+var bindingSurface = new Vst3TimelineSurfaceModelV1();
+var notifications = new List<string>();
+bindingSurface.PropertyChanged += (_, args) => notifications.Add(args.PropertyName ?? string.Empty);
+var notificationCount = notifications.Count;
+Check(!bindingSurface.RegisterTimeline("bad id") && notifications.Count == notificationCount,
+    "Rejected timeline registration must not notify bindings.");
+Check(bindingSurface.RegisterTimeline("bindable") &&
+      notifications.SequenceEqual([nameof(Vst3TimelineSurfaceModelV1.TimelineIds),
+                                    nameof(Vst3TimelineSurfaceModelV1.TimelineIdCount)]),
+    "Accepted timeline registration must notify the catalog properties.");
+notifications.Clear();
+Check(bindingSurface.Select("bindable") &&
+      notifications.Contains(nameof(Vst3TimelineSurfaceModelV1.SelectedTimelineId)) &&
+      notifications.Contains(nameof(Vst3TimelineSurfaceModelV1.Published)) &&
+      notifications.Contains(nameof(Vst3TimelineSurfaceModelV1.IsDirtyState)) &&
+      !bindingSurface.IsDirtyState,
+    "Selection must notify the binding state and start clean.");
+notifications.Clear();
+Check(bindingSurface.BeginEdit() &&
+      notifications.SequenceEqual([nameof(Vst3TimelineSurfaceModelV1.Draft),
+                                    nameof(Vst3TimelineSurfaceModelV1.HasEditSession)]),
+    "Begin edit must notify the draft state.");
+notificationCount = notifications.Count;
+Check(!bindingSurface.BeginEdit() && notifications.Count == notificationCount,
+    "Rejected concurrent edit must not notify bindings.");
+notifications.Clear();
+Check(bindingSurface.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(4, 20, 0.25)) &&
+      notifications.SequenceEqual([nameof(Vst3TimelineSurfaceModelV1.Draft)]),
+    "Accepted draft insertion must notify the draft property.");
+notifications.Clear();
+Check(bindingSurface.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(4, 20, 0.75)) &&
+      notifications.SequenceEqual([nameof(Vst3TimelineSurfaceModelV1.Draft)]),
+    "Accepted draft replacement must notify the draft property.");
+notifications.Clear();
+Check(bindingSurface.Commit() && bindingSurface.IsDirtyState &&
+      notifications.SequenceEqual([
+          nameof(Vst3TimelineSurfaceModelV1.Published),
+          nameof(Vst3TimelineSurfaceModelV1.Draft),
+          nameof(Vst3TimelineSurfaceModelV1.HasEditSession),
+          nameof(Vst3TimelineSurfaceModelV1.CanUndo),
+          nameof(Vst3TimelineSurfaceModelV1.UndoDepth),
+          nameof(Vst3TimelineSurfaceModelV1.CanRedo),
+          nameof(Vst3TimelineSurfaceModelV1.RedoDepth),
+          nameof(Vst3TimelineSurfaceModelV1.IsDirtyState)]),
+    "Commit must publish and notify all derived binding state.");
+notifications.Clear();
+Check(bindingSurface.SaveSelected() && !bindingSurface.IsDirtyState &&
+      notifications.SequenceEqual([nameof(Vst3TimelineSurfaceModelV1.IsDirtyState)]),
+    "Save must notify the dirty-state projection.");
+notifications.Clear();
+Check(bindingSurface.BeginEdit() && bindingSurface.RemoveAt(0) && bindingSurface.Commit(),
+    "Second edit fixture for binding history failed.");
+notifications.Clear();
+Check(bindingSurface.Undo() && notifications.Contains(nameof(Vst3TimelineSurfaceModelV1.Published)) &&
+      notifications.Contains(nameof(Vst3TimelineSurfaceModelV1.IsDirtyState)),
+    "Undo must notify published and dirty-state projections.");
+notifications.Clear();
+Check(bindingSurface.Redo() && notifications.Contains(nameof(Vst3TimelineSurfaceModelV1.Published)) &&
+      notifications.Contains(nameof(Vst3TimelineSurfaceModelV1.IsDirtyState)),
+    "Redo must notify published and dirty-state projections.");
+notifications.Clear();
+Check(bindingSurface.BeginEdit() &&
+      notifications.SequenceEqual([nameof(Vst3TimelineSurfaceModelV1.Draft),
+                                    nameof(Vst3TimelineSurfaceModelV1.HasEditSession)]),
+    "Begin edit fixture for discard failed.");
+notifications.Clear();
+Check(bindingSurface.Discard() &&
+      notifications.SequenceEqual([nameof(Vst3TimelineSurfaceModelV1.Draft),
+                                    nameof(Vst3TimelineSurfaceModelV1.HasEditSession)]),
+    "Discard must notify the closed draft state.");
+notificationCount = notifications.Count;
+Check(!bindingSurface.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(5, 30, 0.5)) &&
+      notifications.Count == notificationCount,
+    "Rejected edit without a draft must not notify bindings.");
 Console.WriteLine("Control model checks passed.");

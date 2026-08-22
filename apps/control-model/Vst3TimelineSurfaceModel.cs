@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System.ComponentModel;
+
 namespace Hibiki.ControlModel;
 
 // UI/control-plane mirror for the merged VST3 supervisor timeline editing
@@ -11,7 +13,7 @@ namespace Hibiki.ControlModel;
 // a time, bounded undo/redo history of 8 published snapshots and derived dirty
 // state. It owns no IPC frame, worker, audio buffer or file handle and never
 // runs on the RT thread.
-public sealed class Vst3TimelineSurfaceModelV1
+public sealed class Vst3TimelineSurfaceModelV1 : INotifyPropertyChanged
 {
     public const int MaxEvents = 256;
     public const int MaxParameters = 16;
@@ -36,6 +38,8 @@ public sealed class Vst3TimelineSurfaceModelV1
     private readonly List<List<TimelineEvent>> _redo = new(MaxHistoryDepth);
     private List<TimelineEvent>? _draft;
 
+    public event PropertyChangedEventHandler? PropertyChanged;
+
     public IReadOnlyList<string> TimelineIds => _storedTimelines.Keys.OrderBy(id => id, StringComparer.Ordinal).ToArray();
     public int TimelineIdCount => _storedTimelines.Count;
     public string? SelectedTimelineId { get; private set; }
@@ -47,6 +51,7 @@ public sealed class Vst3TimelineSurfaceModelV1
     public bool CanRedo => _redo.Count > 0;
     public int UndoDepth => _undo.Count;
     public int RedoDepth => _redo.Count;
+    public bool IsDirtyState => IsDirty();
 
     // Mirrors the store's strict filename-safe ID contract: 1..64 chars,
     // ASCII alphanumeric start, only alnum/'.'/'_'/'-' inside, no trailing
@@ -75,6 +80,7 @@ public sealed class Vst3TimelineSurfaceModelV1
         if (!IsValidTimelineId(id) || _storedTimelines.ContainsKey(id!)) return false;
         if (_storedTimelines.Count >= MaxTimelineIds) return false;
         _storedTimelines[id!] = new List<TimelineEvent>(MaxEvents);
+        Notify(nameof(TimelineIds), nameof(TimelineIdCount));
         return true;
     }
 
@@ -94,6 +100,9 @@ public sealed class Vst3TimelineSurfaceModelV1
         _baseline.AddRange(stored);
         _undo.Clear();
         _redo.Clear();
+        Notify(nameof(SelectedTimelineId), nameof(HasSelection), nameof(Published),
+               nameof(Draft), nameof(HasEditSession), nameof(CanUndo), nameof(UndoDepth),
+               nameof(CanRedo), nameof(RedoDepth), nameof(IsDirtyState));
         return true;
     }
 
@@ -101,6 +110,7 @@ public sealed class Vst3TimelineSurfaceModelV1
     {
         if (_draft is not null || !HasSelection) return false;
         _draft = new List<TimelineEvent>(_published);
+        Notify(nameof(Draft), nameof(HasEditSession));
         return true;
     }
 
@@ -108,6 +118,7 @@ public sealed class Vst3TimelineSurfaceModelV1
     {
         if (_draft is null) return false;
         _draft = null;
+        Notify(nameof(Draft), nameof(HasEditSession));
         return true;
     }
 
@@ -122,6 +133,8 @@ public sealed class Vst3TimelineSurfaceModelV1
         _published.Clear();
         _published.AddRange(_draft);
         _draft = null;
+        Notify(nameof(Published), nameof(Draft), nameof(HasEditSession), nameof(CanUndo),
+               nameof(UndoDepth), nameof(CanRedo), nameof(RedoDepth), nameof(IsDirtyState));
         return true;
     }
 
@@ -138,12 +151,14 @@ public sealed class Vst3TimelineSurfaceModelV1
         if (index >= 0)
         {
             _draft[index] = item;
+            Notify(nameof(Draft));
             return true;
         }
         if (_draft.Count >= MaxEvents) return false;
         if (!ParameterWouldStayBounded(_draft, item.ParameterId)) return false;
         var insertAt = CountKeysBefore(_draft, item.SamplePosition, item.ParameterId);
         _draft.Insert(insertAt, item);
+        Notify(nameof(Draft));
         return true;
     }
 
@@ -151,6 +166,7 @@ public sealed class Vst3TimelineSurfaceModelV1
     {
         if (_draft is null || index < 0 || index >= _draft.Count) return false;
         _draft.RemoveAt(index);
+        Notify(nameof(Draft));
         return true;
     }
 
@@ -165,6 +181,7 @@ public sealed class Vst3TimelineSurfaceModelV1
         }
         var existing = _draft[index];
         _draft[index] = existing with { NormalizedValue = normalizedValue };
+        Notify(nameof(Draft));
         return true;
     }
 
@@ -177,6 +194,8 @@ public sealed class Vst3TimelineSurfaceModelV1
         _redo.Add(new List<TimelineEvent>(_published));
         _published.Clear();
         _published.AddRange(previous);
+        Notify(nameof(Published), nameof(CanUndo), nameof(UndoDepth), nameof(CanRedo),
+               nameof(RedoDepth), nameof(IsDirtyState));
         return true;
     }
 
@@ -188,6 +207,8 @@ public sealed class Vst3TimelineSurfaceModelV1
         _undo.Add(new List<TimelineEvent>(_published));
         _published.Clear();
         _published.AddRange(next);
+        Notify(nameof(Published), nameof(CanUndo), nameof(UndoDepth), nameof(CanRedo),
+               nameof(RedoDepth), nameof(IsDirtyState));
         return true;
     }
 
@@ -201,6 +222,7 @@ public sealed class Vst3TimelineSurfaceModelV1
         stored.AddRange(_published);
         _baseline.Clear();
         _baseline.AddRange(_published);
+        Notify(nameof(IsDirtyState));
         return true;
     }
 
@@ -211,6 +233,14 @@ public sealed class Vst3TimelineSurfaceModelV1
     {
         if (!HasSelection) return false;
         return !_published.SequenceEqual(_baseline);
+    }
+
+    private void Notify(params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 
     private void PushUndo(IReadOnlyList<TimelineEvent> snapshot)
