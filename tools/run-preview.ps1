@@ -60,6 +60,68 @@ function Get-EngineArguments {
   return , $engineArguments
 }
 
+function Test-PreviewPathUnderRoot {
+  param(
+    [Parameter(Mandatory = $true)][string]$Root,
+    [Parameter(Mandatory = $true)][string]$Candidate
+  )
+
+  $resolvedRoot = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  $resolvedCandidate = [System.IO.Path]::GetFullPath($Candidate)
+  return $resolvedCandidate.StartsWith(
+    $resolvedRoot + [System.IO.Path]::DirectorySeparatorChar,
+    [System.StringComparison]::OrdinalIgnoreCase
+  )
+}
+
+function Assert-PreviewLaunchTarget {
+  param(
+    [Parameter(Mandatory = $true)][string]$LocalRoot,
+    [Parameter(Mandatory = $true)][string]$ExecutablePath,
+    [Parameter(Mandatory = $true)][System.IO.FileAttributes]$ExecutableAttributes,
+    [Parameter(Mandatory = $true)][System.IO.FileAttributes[]]$AncestorAttributes,
+    [Parameter(Mandatory = $true)][bool]$IsFile
+  )
+
+  if (-not (Test-PreviewPathUnderRoot -Root $LocalRoot -Candidate $ExecutablePath)) {
+    throw "Preview launch target is outside the repository-local .local root: $ExecutablePath"
+  }
+  if (-not $IsFile) {
+    throw "Preview launch target must be a file: $ExecutablePath"
+  }
+  if (($ExecutableAttributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+    throw "Preview launch target must not be a reparse point: $ExecutablePath"
+  }
+  foreach ($attributes in @($AncestorAttributes)) {
+    if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+      throw "Preview launch path contains a reparse-point parent: $ExecutablePath"
+    }
+  }
+}
+
+function Get-PreviewAncestorAttributes {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Root
+  )
+
+  $resolvedRoot = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  $current = [System.IO.Path]::GetFullPath((Split-Path -Parent $Path))
+  $attributes = @()
+  while ($true) {
+    $item = Get-Item -LiteralPath $current -Force -ErrorAction Stop
+    $attributes += [System.IO.FileAttributes]$item.Attributes
+    if ($current -eq $resolvedRoot) {
+      return ,$attributes
+    }
+    $parent = [System.IO.Path]::GetFullPath((Split-Path -Parent $current))
+    if ($parent -eq $current -or -not (Test-PreviewPathUnderRoot -Root $resolvedRoot -Candidate $current)) {
+      throw "Preview launch path did not resolve to the expected .local root: $Path"
+    }
+    $current = $parent
+  }
+}
+
 if ($SelfTest) {
   function Assert-GateRejection {
     param([scriptblock]$Action, [string]$ExpectedPattern, [string]$Label)
@@ -167,6 +229,39 @@ if ($SelfTest) {
   }
   $caseCount++
 
+  $selfTestLocalRoot = Join-Path $repo '.local'
+  $selfTestEngine = Join-Path $selfTestLocalRoot 'engine-preview/Release/hibiki_engine_preview.exe'
+  Assert-PreviewLaunchTarget -LocalRoot $selfTestLocalRoot -ExecutablePath $selfTestEngine `
+    -ExecutableAttributes ([System.IO.FileAttributes]::Normal) `
+    -AncestorAttributes @([System.IO.FileAttributes]::Directory, [System.IO.FileAttributes]::Directory, [System.IO.FileAttributes]::Directory) `
+    -IsFile $true
+  $caseCount++
+
+  $outsideTarget = Join-Path $repo 'outside-preview.exe'
+  Assert-GateRejection -Label 'outside-launch-target' -ExpectedPattern 'outside the repository-local \.local root' `
+    -Action { Assert-PreviewLaunchTarget -LocalRoot $selfTestLocalRoot -ExecutablePath $outsideTarget `
+      -ExecutableAttributes ([System.IO.FileAttributes]::Normal) `
+      -AncestorAttributes @([System.IO.FileAttributes]::Directory) -IsFile $true }
+  $caseCount++
+
+  Assert-GateRejection -Label 'reparse-launch-target' -ExpectedPattern 'target must not be a reparse point' `
+    -Action { Assert-PreviewLaunchTarget -LocalRoot $selfTestLocalRoot -ExecutablePath $selfTestEngine `
+      -ExecutableAttributes ([System.IO.FileAttributes]::Normal -bor [System.IO.FileAttributes]::ReparsePoint) `
+      -AncestorAttributes @([System.IO.FileAttributes]::Directory) -IsFile $true }
+  $caseCount++
+
+  Assert-GateRejection -Label 'reparse-launch-parent' -ExpectedPattern 'reparse-point parent' `
+    -Action { Assert-PreviewLaunchTarget -LocalRoot $selfTestLocalRoot -ExecutablePath $selfTestEngine `
+      -ExecutableAttributes ([System.IO.FileAttributes]::Normal) `
+      -AncestorAttributes @([System.IO.FileAttributes]::Directory, ([System.IO.FileAttributes]::Directory -bor [System.IO.FileAttributes]::ReparsePoint)) -IsFile $true }
+  $caseCount++
+
+  Assert-GateRejection -Label 'directory-launch-target' -ExpectedPattern 'target must be a file' `
+    -Action { Assert-PreviewLaunchTarget -LocalRoot $selfTestLocalRoot -ExecutablePath $selfTestEngine `
+      -ExecutableAttributes ([System.IO.FileAttributes]::Directory) `
+      -AncestorAttributes @([System.IO.FileAttributes]::Directory) -IsFile $false }
+  $caseCount++
+
   Write-Output "Preview launcher self-test passed ($caseCount cases)."
   exit 0
 }
@@ -200,6 +295,15 @@ $engineArguments = @()
 if ($EnableSystemVolume) { $engineArguments += '--enable-system-volume' }
 if ($EnableSessionRouting) { $engineArguments += '--enable-session-routing' }
 if ($EnableWasapiOutput) { $engineArguments += '--enable-wasapi-output' }
+$localRoot = Join-Path $repo '.local'
+$engineItem = Get-Item -LiteralPath $engine -Force -ErrorAction Stop
+$engineAncestors = Get-PreviewAncestorAttributes -Path $engine -Root $localRoot
+Assert-PreviewLaunchTarget -LocalRoot $localRoot -ExecutablePath $engine `
+  -ExecutableAttributes $engineItem.Attributes -AncestorAttributes $engineAncestors -IsFile:$(-not $engineItem.PSIsContainer)
+$uiItem = Get-Item -LiteralPath $uiExecutable -Force -ErrorAction Stop
+$uiAncestors = Get-PreviewAncestorAttributes -Path $uiExecutable -Root $localRoot
+Assert-PreviewLaunchTarget -LocalRoot $localRoot -ExecutablePath $uiExecutable `
+  -ExecutableAttributes $uiItem.Attributes -AncestorAttributes $uiAncestors -IsFile:$(-not $uiItem.PSIsContainer)
 $engineProcess = Start-Process -FilePath $engine -ArgumentList $engineArguments `
   -WorkingDirectory (Split-Path $engine) -WindowStyle Hidden -PassThru
 try {
