@@ -1,0 +1,315 @@
+{
+  "schema_version": 1,
+  "tool": "winui-a11y-smoke",
+  "build_tool": "visual-studio-msbuild",
+  "elapsed_ms": 1100,
+  "control_count": 59,
+  "control_types": {
+    "Pane": 3,
+    "ScrollBar": 1,
+    "ComboBox": 3,
+    "Edit": 3,
+    "Text": 31,
+    "Slider": 2,
+    "Group": 2,
+    "Button": 14
+  },
+  "controls": [
+    {
+      "type": "Pane",
+      "automation_id": "",
+      "name": ""
+    },
+    {
+      "type": "Pane",
+      "automation_id": "",
+      "name": ""
+    },
+    {
+      "type": "Group",
+      "automation_id": "RootGrid",
+      "name": "Hibiki DSP 音訊場景控制"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "Hibiki DSP"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "Audio Scene OS"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "尚未連接 Hibiki 音訊引擎"
+    },
+    {
+      "type": "Button",
+      "automation_id": "",
+      "name": "連接 Hibiki 音訊引擎"
+    },
+    {
+      "type": "Pane",
+      "automation_id": "",
+      "name": ""
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "先選輸出，再一鍵變好聽"
+    },
+    {
+      "type": "ComboBox",
+      "automation_id": "",
+      "name": "輸出群組"
+    },
+    {
+      "type": "ComboBox",
+      "automation_id": "",
+      "name": "實體輸出裝置"
+    },
+    {
+      "type": "Button",
+      "automation_id": "",
+      "name": "切換實體輸出裝置"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "尚未選擇實體輸出裝置"
+    },
+    {
+      "type": "Button",
+      "automation_id": "",
+      "name": "一鍵改善聲音"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "尚未連接 Hibiki 音訊引擎"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "場景"
+    },
+    {
+      "type": "Button",
+      "automation_id": "",
+      "name": "遊戲"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "遊戲"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "快速反應、低延遲與智慧保護"
+    },
+    {
+      "type": "Button",
+      "automation_id": "",
+      "name": "電影"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "電影"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "完整校正、對白清楚與安全音量"
+    },
+    {
+      "type": "Button",
+      "automation_id": "",
+      "name": "人聲"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "人聲"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "降低風聲與背景干擾"
+    },
+    {
+      "type": "Button",
+      "automation_id": "",
+      "name": "Studio / Direct"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "Studio / Direct"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "維持原始訊號，不加入處理"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "自訂預設"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "建立最多 32 個自訂卡片；完整 DSP graph 由引擎端 Scene catalog 驗證。"
+    },
+    {
+      "type": "Edit",
+      "automation_id": "",
+      "name": "自訂場景 ID"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "Scene ID（英文小寫）"
+    },
+    {
+      "type": "Edit",
+      "automation_id": "",
+      "name": "自訂場景名稱"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "名稱"
+    },
+    {
+      "type": "Edit",
+      "automation_id": "",
+      "name": "自訂場景說明"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "說明"
+    },
+    {
+      "type": "Button",
+      "automation_id": "",
+      "name": "加入自訂預設"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "音量保護"
+    },
+    {
+      "type": "Button",
+      "automation_id": "",
+      "name": "Expert 詳細模式"
+    },
+    {
+      "type": "Slider",
+      "automation_id": "",
+      "name": "系統音量"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "-12.0 dB"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "實際有效音量"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "安全上限 0.0 dB；目前未截頂"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "來源：Windows 系統音量"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "致動器：Hibiki DSP（單次套用）"
+    },
+    {
+      "type": "Button",
+      "automation_id": "",
+      "name": "靜音"
+    },
+    {
+      "type": "ComboBox",
+      "automation_id": "",
+      "name": "IR 相位模式"
+    },
+    {
+      "type": "Slider",
+      "automation_id": "",
+      "name": "IR 相位強度"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "Minimum-phase／0 ms 額外緩衝"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "IR 額外延遲：0.0 ms"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "IR WAV 會在 Engine Preview 的 control-plane prepare/commit；尚無實體 sink。"
+    },
+    {
+      "type": "Group",
+      "automation_id": "",
+      "name": "Expert 詳細控制"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "Expert 詳細控制（唯讀 contract）"
+    },
+    {
+      "type": "ScrollBar",
+      "automation_id": "VerticalScrollBar",
+      "name": "垂直"
+    },
+    {
+      "type": "Button",
+      "automation_id": "VerticalSmallDecrease",
+      "name": "垂直小幅減少"
+    },
+    {
+      "type": "Button",
+      "automation_id": "VerticalLargeDecrease",
+      "name": "垂直大幅減少"
+    },
+    {
+      "type": "Button",
+      "automation_id": "VerticalLargeIncrease",
+      "name": "垂直大幅增加"
+    },
+    {
+      "type": "Button",
+      "automation_id": "VerticalSmallIncrease",
+      "name": "垂直小幅增加"
+    },
+    {
+      "type": "Text",
+      "automation_id": "",
+      "name": "Easy 模式只顯示安全操作；切換 Expert 才會顯示 Matrix、DSP Graph、IR 與 VST3。"
+    }
+  ],
+  "expectations": "at-least: 10 controls, 1 named Group, 2 ComboBox, 4 Button"
+}
