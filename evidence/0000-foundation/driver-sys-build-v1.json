@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "issue": 394,
+  "scope_digest": "driver-sys-build-v1",
+  "base_commit": "248f819",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-10.0.28000.2526-cmake-4.4.2-pwsh-7.6.5",
+  "commands": [
+    "pwsh -NoProfile -File tools/build-driver.ps1",
+    "pwsh -NoProfile -File tools/driver-signability-check.ps1 -PackageRoot .local/driver-package -RequireInf2Cat"
+  ],
+  "results": [
+    {
+      "command": "tools/build-driver.ps1",
+      "status": "pass",
+      "coverage": [
+        "compiled driver/wdk/*.cpp + driver/src/*.c x64 kernel-mode via WDK 28000 km includes/libs",
+        "linked HibikiVirtualAudio.sys (/DRIVER /SUBSYSTEM:NATIVE /ENTRY:GsDriverEntry /NODEFAULTLIB /INTEGRITYCHECK)",
+        "Inf2Cat produced HibikiVirtualAudio.cat with zero errors"
+      ],
+      "compiled_artifacts": true
+    },
+    {
+      "command": "tools/driver-signability-check.ps1 -PackageRoot .local/driver-package -RequireInf2Cat",
+      "status": "pass",
+      "coverage": [
+        "package INF passes full source-policy assertions",
+        "genuine Inf2Cat output accepted; Driver signability check passed for Windows 11 24H2/25H2 x64"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Build/package/signability evidence only: no driver installation, loading, runtime audio, HLK, or Microsoft signing on this machine.",
+    "Artifacts stay under ignored .local/ and are not committed."
+  ],
+  "tool_versions": { "powershell": "pwsh 7.6.5", "windows_build": "26200", "wdk_qfe": "10.1.28000.2526" }
+}
