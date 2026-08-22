@@ -2129,6 +2129,70 @@ int main() {
             editor_parameters_ok;
     }
     CHECK(!editor_parameters_ok && parameter_cap_editor.draft()->event_count == 16U);
+    Vst3TimelineEditorV1 history_editor;
+    CHECK(!history_editor.can_undo() && !history_editor.can_redo());
+    CHECK(!history_editor.undo() && !history_editor.redo());
+    Vst3ParameterTimelineSnapshotV1 hist_base{};
+    hist_base.event_count = 1U;
+    hist_base.events[0] = Vst3ParameterTimelineEventV1{1U, 10U, 0.1};
+    CHECK(history_editor.reset(hist_base));
+    CHECK(history_editor.begin_edit() &&
+          history_editor.upsert(Vst3ParameterTimelineEventV1{2U, 20U, 0.2}) &&
+          history_editor.commit());
+    CHECK(history_editor.can_undo() && !history_editor.can_redo() &&
+          history_editor.undo_depth() == 1U &&
+          history_editor.published().event_count == 2U);
+    CHECK(history_editor.undo() &&
+          history_editor.published().event_count == 1U &&
+          history_editor.can_redo() && history_editor.redo_depth() == 1U);
+    CHECK(history_editor.redo() &&
+          history_editor.published().event_count == 2U &&
+          !history_editor.can_redo() && history_editor.redo_depth() == 0U);
+    CHECK(history_editor.begin_edit() &&
+          history_editor.upsert(Vst3ParameterTimelineEventV1{3U, 30U, 0.3}) &&
+          history_editor.commit() &&
+          history_editor.published().event_count == 3U &&
+          history_editor.undo_depth() == 2U);
+    CHECK(history_editor.undo() &&
+          history_editor.published().event_count == 2U);
+    CHECK(history_editor.begin_edit() &&
+          history_editor.upsert(Vst3ParameterTimelineEventV1{4U, 40U, 0.4}) &&
+          history_editor.commit() && !history_editor.can_redo() &&
+          history_editor.published().event_count == 3U &&
+          history_editor.published().events[2].parameter_id == 4U &&
+          history_editor.published().events[2].normalized_value == 0.4);
+    CHECK(history_editor.begin_edit() &&
+          history_editor.upsert(Vst3ParameterTimelineEventV1{5U, 50U, 0.5}));
+    CHECK(!history_editor.undo() && !history_editor.redo() &&
+          history_editor.has_edit_session() &&
+          history_editor.draft()->event_count == 4U);
+    CHECK(history_editor.discard() && history_editor.can_undo() &&
+          !history_editor.has_edit_session());
+    Vst3ParameterTimelineSnapshotV1 fresh_hist_base{};
+    CHECK(history_editor.reset(fresh_hist_base) &&
+          !history_editor.can_undo() && !history_editor.can_redo() &&
+          history_editor.undo_depth() == 0U && history_editor.redo_depth() == 0U);
+    Vst3TimelineEditorV1 capacity_history;
+    CHECK(capacity_history.reset(Vst3ParameterTimelineSnapshotV1{}));
+    bool history_capacity_ok = true;
+    for (std::uint32_t step = 1U; step <= 12U; ++step) {
+        history_capacity_ok =
+            capacity_history.begin_edit() &&
+            capacity_history.upsert(Vst3ParameterTimelineEventV1{
+                7U, static_cast<std::uint64_t>(step) * 100U, 0.5}) &&
+            capacity_history.commit() && history_capacity_ok;
+    }
+    CHECK(history_capacity_ok &&
+          capacity_history.undo_depth() == kVst3TimelineEditorMaxHistoryV1 &&
+          capacity_history.can_undo() && !capacity_history.can_redo());
+    for (std::size_t drained = 0U; drained < kVst3TimelineEditorMaxHistoryV1;
+         ++drained) {
+        CHECK(capacity_history.undo());
+    }
+    CHECK(capacity_history.can_redo() &&
+          capacity_history.redo_depth() == kVst3TimelineEditorMaxHistoryV1 &&
+          capacity_history.published().event_count == 4U &&
+          capacity_history.published().events[3].sample_position == 400U);
     CHECK(automation_scheduler->prepare(automation_lanes) &&
           automation_scheduler->upsert_timeline("djmax-default", automation_timeline) &&
           automation_scheduler->bind_scene("DJMAX", 99U, "djmax-default") &&
