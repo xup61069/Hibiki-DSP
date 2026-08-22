@@ -21,6 +21,7 @@
 #include "hibiki/vst3_timeline_editor.hpp"
 #include "hibiki/vst3_timeline_persistence.hpp"
 #include "hibiki/vst3_timeline_file_store.hpp"
+#include "hibiki/vst3_supervisor_surface.hpp"
 #include "hibiki/vst3_worker_lane.hpp"
 #include "hibiki/vst3_scene_automation.hpp"
 #include "hibiki/vst3_scene_state.hpp"
@@ -2773,6 +2774,117 @@ int main() {
               Vst3TimelineFileErrorV1::io_error);
         std::error_code cleanup_error;
         std::filesystem::remove(file_path, cleanup_error);
+    }
+#endif
+#if defined(_WIN32)
+    {
+        wchar_t surface_temp_root[MAX_PATH];
+        const DWORD surface_temp_length = GetTempPathW(MAX_PATH, surface_temp_root);
+        CHECK(surface_temp_length > 0U && surface_temp_length < MAX_PATH);
+        const std::filesystem::path surface_root =
+            std::filesystem::path(std::wstring(surface_temp_root)) /
+            (L"hibiki_supervisor_surface_" + std::to_wstring(GetTickCount()));
+
+        Vst3TimelineSupervisorSurfaceV1 detached_surface;
+        std::array<std::string, kVst3TimelineStoreMaxEntriesV1> surface_ids{};
+        std::size_t surface_id_count = 0U;
+        CHECK(!detached_surface.is_attached() && !detached_surface.has_selection());
+        CHECK(detached_surface.refresh_ids(surface_ids, surface_id_count) ==
+              Vst3TimelineStoreStatusV1::invalid_argument);
+        CHECK(!detached_surface.select("alpha") && !detached_surface.begin_edit() &&
+              !detached_surface.upsert(Vst3ParameterTimelineEventV1{1U, 0U, 0.5}) &&
+              !detached_surface.commit() && !detached_surface.undo() &&
+              !detached_surface.redo() &&
+              detached_surface.save_selected() ==
+                  Vst3TimelineStoreStatusV1::invalid_argument);
+        CHECK(detached_surface.last_store_status() ==
+              Vst3TimelineStoreStatusV1::ok);
+
+        Vst3TimelineFileStoreV1 surface_store;
+        CHECK(surface_store.open(surface_root.wstring()) && surface_store.is_open());
+        CHECK(surface_store.save("alpha", persist_source) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              surface_store.save("beta", persist_empty) ==
+                  Vst3TimelineStoreStatusV1::ok);
+
+        Vst3TimelineSupervisorSurfaceV1 surface;
+        CHECK(surface.attach(surface_store));
+        CHECK(!surface.attach(surface_store));
+        CHECK(surface.refresh_ids(surface_ids, surface_id_count) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              surface_id_count == 2U && surface_ids[0] == "alpha" &&
+              surface_ids[1] == "beta");
+        CHECK(!surface.has_selection() && !surface.is_dirty());
+
+        const bool unselected_refused =
+            !surface.begin_edit() &&
+            !surface.discard() && !surface.commit() &&
+            !surface.upsert(Vst3ParameterTimelineEventV1{1U, 0U, 0.5}) &&
+            !surface.remove_at(0U) && !surface.set_value_at(0U, 0.5) &&
+            !surface.undo() && !surface.redo();
+        CHECK(unselected_refused);
+        CHECK(surface.save_selected() ==
+              Vst3TimelineStoreStatusV1::invalid_argument);
+
+        const std::string long_but_valid_id(64U, 'a');
+        const std::string over_long_id(65U, 'a');
+        CHECK(surface_store.save(long_but_valid_id, persist_empty) ==
+              Vst3TimelineStoreStatusV1::ok);
+        CHECK(!surface.select("") && !surface.select("bad/id") &&
+              !surface.select(over_long_id) &&
+              surface.last_store_status() == Vst3TimelineStoreStatusV1::id_rejected);
+        CHECK(!surface.select("missing") &&
+              surface.last_store_status() == Vst3TimelineStoreStatusV1::not_found);
+        CHECK(!surface.has_selection());
+
+        CHECK(surface.select("alpha") && surface.selected_id() == "alpha");
+        CHECK(surface.editor().published().event_count == 2U &&
+              surface.editor().published().events[1].parameter_id == 7U);
+        CHECK(!surface.is_dirty() && !surface.editor().has_edit_session());
+
+        CHECK(surface.begin_edit() && surface.editor().has_edit_session());
+        CHECK(!surface.select("beta"));
+        CHECK(surface.upsert(Vst3ParameterTimelineEventV1{9U, 48010U, 0.5}) &&
+              surface.editor().draft() != nullptr &&
+              surface.editor().draft()->event_count == 3U);
+        CHECK(!surface.is_dirty() &&
+              surface.editor().published().event_count == 2U);
+        CHECK(surface.commit() && !surface.editor().has_edit_session());
+        CHECK(surface.is_dirty() &&
+              surface.editor().published().event_count == 3U);
+
+        CHECK(surface.begin_edit() && surface.remove_at(0U) && surface.commit());
+        CHECK(surface.editor().published().event_count == 2U &&
+              surface.editor().published().events[0].parameter_id == 7U);
+        CHECK(surface.is_dirty());
+        CHECK(surface.undo() &&
+              surface.editor().published().event_count == 3U &&
+              surface.is_dirty());
+        CHECK(surface.save_selected() == Vst3TimelineStoreStatusV1::ok &&
+              !surface.is_dirty());
+        {
+            Vst3ParameterTimelineSnapshotV1 persisted_after_save{};
+            CHECK(surface_store.load("alpha", persisted_after_save) ==
+                      Vst3TimelineStoreStatusV1::ok &&
+                  persisted_after_save.event_count == 3U &&
+                  persisted_after_save.events[2].parameter_id == 9U);
+        }
+
+        CHECK(surface.undo() &&
+              surface.editor().published().events[0].parameter_id == 3U &&
+              surface.is_dirty());
+        CHECK(surface.redo() &&
+              surface.editor().published().event_count == 3U &&
+              !surface.is_dirty());
+
+        CHECK(surface.begin_edit() && !surface.detach());
+        CHECK(surface.discard() && surface.detach());
+        CHECK(!surface.is_attached() && !surface.has_selection() &&
+              !surface.is_dirty());
+        CHECK(!surface.detach());
+
+        std::error_code surface_cleanup_error;
+        std::filesystem::remove_all(surface_root, surface_cleanup_error);
     }
 #endif
     Vst3WorkerLaneSessionV1 introspect_second_lane;

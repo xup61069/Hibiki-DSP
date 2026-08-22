@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "issue": 351,
+  "scope_digest": "vst3-supervisor-surface-v1",
+  "source_commit": "9f5591d841e2095478c4d07e708398dcf584b8d6",
+  "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-msvc-vs2026-18.9-pwsh-7.6.4; target-24h2-wdk-missing",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "selection-aware supervisor facade composing Vst3TimelineEditorV1 with Vst3TimelineFileStoreV1",
+        "attach/detach exactly one non-owned store handle; all operations fail closed while detached or unselected",
+        "select(id) loads stored snapshot as editor baseline; refused during edit session or on store failure with status preserved",
+        "save_selected() persists committed state via atomic save path and re-baselines dirty tracking",
+        "dirty state derived by comparing published snapshot to loaded/saved baseline",
+        "C++ build and CTest contract suite (3/3 passed)"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Headless control-plane facade only; no supervisor UI editing surface is implemented yet.",
+    "No IPC frame, schema file, RT-thread, driver or permanent-identity change.",
+    "User-space source-contract evidence only; proves nothing about physical audio, per-App delivery, a loadable driver, HLK or Microsoft signing."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "cmake": "4.4.0",
+    "powershell": "pwsh 7.6.4 local"
+  }
+}

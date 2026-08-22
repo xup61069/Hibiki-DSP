@@ -133,7 +133,16 @@ supervisor 端 bounded 編輯交易：draft 變更不影響已發布 snapshot，
 timeline 驗證後才交換已發布 snapshot，discard 直接還原。editor 另保留最多 8 組
 已發布 snapshot 的 bounded undo/redo 歷史：commit 推入前一個狀態並清空 redo、
 容量滿時淘汰最舊、undo/redo 在編輯 session 進行中一律拒絕、reset 清空雙 stack；
-歷史僅存在於單一 editor 範圍內。這是 headless 控制面契約，
+歷史僅存在於單一 editor 範圍內。這是 headless 控制面契約。
+
+`Vst3TimelineSupervisorSurfaceV1` 在 editor 與 file store 之上提供 selection-aware 的
+supervisor facade：attach/detach 恰一個非擁有的 store handle；select(id) 會從 store
+載入 snapshot 並作為 editor baseline，編輯 session 進行中或 store 失敗時拒絕；
+所有編輯操作在未 attach 或未選取時 fail-closed；save_selected() 只接受已 commit
+狀態並透過 store 的 atomic save path 寫入。dirty 狀態由「已發布 snapshot 是否與最後
+載入/儲存 baseline 相同」推導，不另行手動追蹤。此 surface 不擁有 worker、音訊
+buffer 或檔案 handle，也不在 RT thread 執行。
+
 supervisor 的 UI 編輯器、跨版本 plugin state persistence 與完整自動化排程仍未接入，
 因此不能宣稱完整 host automation。
 
