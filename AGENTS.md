@@ -21,11 +21,12 @@ handoff block、Spec、ADR、source 與 tests。聊天紀錄、AI memory、個�
 
 - 完整協定見 `docs/ai/MULTI_AGENT.md`。每個 AI 工作切片必須各自使用一個 GitHub Issue、
   一個獨立 clone/worktree、一個 branch、Issue body 內的 handoff block 與一個 draft PR。
-- GitHub Issue assignee／lifecycle label／linked PR 是即時認領真值；Issue body 的 handoff block 是可重建的分支交接真值。沒有認領、
-  handoff block 或明確 write scope 時只能唯讀偵察，不得開始修改。
-- 認領前必須同時檢查兩件事：open Issue／linked PR、`git ls-remote --heads origin` 上的
-  branch 佔位（先有 branch 不代表有 PR）。Issue 與 PR 共用
-  編號計數器：先建 Issue 取得號碼，再命名 branch；不要預估號碼。
+- 工作由單一 orchestrator 指派；workers 不得自行認領 open Issue。GitHub Issue assignee／
+  lifecycle label／linked PR 是即時指派真值；Issue body 的 handoff block 是可重建的分支交接真值。
+  沒有指派、handoff block 或明確 write scope 時只能唯讀偵察，不得開始修改。
+- 接手前必須以 handoff block 確認 owner，並檢查 `git ls-remote --heads origin` 上的
+  branch 佔位與本機 `git worktree list`（先有 branch 不代表沒有未 push 的 edits）。
+  新工作切片由 orchestrator 建 Issue 取得號碼後命名 branch；不要預估號碼。
 - 同一台機器可能同時跑多個 AI session（同一 Git 身分）。身分相同不等於有權進入別的
   session 的 worktree 或 branch；worktree 隔離是絕對的。回到先前中斷的 slice 時，先
   fetch 並以遠端 HEAD 與 Issue body 的 handoff block 為真值重新確認，不得假設本機工作樹仍是最新；
@@ -34,7 +35,7 @@ handoff block、Spec、ADR、source 與 tests。聊天紀錄、AI memory、個�
 - 禁止兩個仍在執行的 AI 共用 working tree、index、branch 或同一 Issue。需要並行時拆 child Issue；
   交接同一 branch 時必須先由前一個 AI commit、push、停止寫入並更新 owner。
 - Issue handoff block 的 `scope_globs` 是該工作切片的獨占 write scope。開始前必須檢查 open Issue、draft PR
-  與其他 active claim；scope 重疊、跨 lane 或會碰共享整合檔時，先由 integration coordinator
+  與其他 directory lane；scope 重疊、跨 lane 或會碰共享整合檔時，先由 orchestrator
   指定 owner 與合併順序，不得自行同時修改。
 - 會新增/刪除 tracked 檔案的切片，在同一 slice 內執行
   `pwsh -File tools/docs-check.ps1 -WriteCounters` 重生 `build/baseline-counters.json`，
@@ -126,4 +127,3 @@ compile evidence，不得當成 Chrome tabCapture、實體 per-App routing 或 s
 
 遇到環境差異先記錄 fingerprint 並更新 handoff，不要自行重生
 `config/distribution-profile.yml` 裡的 endpoint、ASIO、IPC GUID。
-
