@@ -4,8 +4,8 @@
   "scope_digest": "issue-187-archive-182-v1",
   "source_commit": "7892245618bedc57062e5bd26b1d4d271939b5ca",
   "archive_commit": "cb3a511",
-  "main_sync_commit": "986b145d8602451349f168bb7e1f84d2cd29bdcb",
-  "counter_refresh_commit": "2357867",
+  "main_sync_commit": "036b8463e5af0b3a6c58d5140b33bd4bb2ddc3b4",
+  "counter_refresh_commit": "8c0b108",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; cmake-missing-wdk-missing-portable-user-space",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 187",
@@ -161,13 +161,19 @@
       "coverage": ["merge-ref verify workflow gates on final handoff head"],
       "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562774103/job/97006828963",
       "compiled_artifacts": false
+    },
+    {
+      "command": "Local gates after fourth merge-sync to origin/main 036b846",
+      "status": "pass",
+      "coverage": ["handoff-check issue/full", "docs-check 85 required paths and 24 specs", "496 tracked paths", "107 repository JSON files", "source-policy", "source-only-ci-check", "git diff --check"],
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
     "Documentation/governance archive only; no product API, IPC/schema, DSP ordering, RT-thread, driver, HLK or signing behavior is changed.",
     "The local environment lacks CMake and WDK, so full CTest/driver coverage is delegated to GitHub Actions Windows runners.",
     "The first PR run exposed a stale target-main counter; main maintenance commit 929752f corrected it before the successful rerun.",
-    "The target branch advanced three times after earlier green checks; this lane used ordinary merge commits and recorded final green verification for the third merge-synced head.",
+    "The target branch advanced four times after earlier green checks; this lane used ordinary merge commits and is awaiting verification for the fourth merge-synced head.",
     "No physical audio, per-App delivery, loadable driver, HLK or Microsoft signing evidence is claimed."
   ],
   "logs": [],
@@ -175,5 +181,5 @@
     "powershell": "7.6.5"
   },
   "started_at": "2026-08-22T15:57:32+08:00",
-  "finished_at": "2026-08-22T16:40:14+08:00"
+  "finished_at": "2026-08-22T16:45:28+08:00"
 }
