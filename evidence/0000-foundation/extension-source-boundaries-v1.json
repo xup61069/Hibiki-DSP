@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "issue": 383,
+  "scope_digest": "extension-source-boundaries-v1",
+  "source_commit": "15bf1c5536f0c19c9286bbbcb92457d30a5c1d4e",
+  "base_commit": "196a404d76f56a5b76e99a6a58c6fa222ef3de47",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.12112.369-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526-cmake-4.4.2-pwsh-7.6.4",
+  "target": "tools/extension-check.ps1",
+  "cases_added": [
+    "valid popup click delegation and capture request",
+    "valid service-worker tabCapture and offscreen ownership",
+    "valid offscreen AudioContext, worklet and fixed loopback bridge",
+    "valid AudioWorklet HIBT packet boundary",
+    "direct popup tabCapture rejected",
+    "missing service-worker ownership rejected",
+    "external offscreen bridge rejected",
+    "missing AudioWorklet packetizer rejected"
+  ],
+  "commands": [
+    "pwsh -NoProfile -File tools/extension-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/extension-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 383",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/extension-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "20 bounded policy cases",
+        "popup click-only delegation",
+        "service-worker tabCapture/offscreen ownership",
+        "offscreen fixed loopback WebSocket",
+        "AudioWorklet HIBT packet source boundary"
+      ]
+    },
+    {
+      "command": "tools/extension-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "repository extension source satisfies manifest, exact CSP and source-boundary policy"
+      ]
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "CMake configure and RelWithDebInfo build",
+        "CTest 3 of 3: ASIO self-test, tab bridge self-test and contract tests"
+      ],
+      "compiled_artifacts": true,
+      "artifacts_ignored": true
+    },
+    {
+      "command": "repository gates",
+      "status": "pass",
+      "coverage": [
+        "doctor target fingerprint",
+        "Issue 383 and full handoff ownership/scope/ancestry",
+        "documentation structural checks",
+        "source-policy and source-only publication checks",
+        "whitespace validation"
+      ]
+    }
+  ],
+  "limitations": [
+    "Static source-policy evidence only; no browser launch, MV3 runtime, user gesture, tabCapture, WebSocket, audio, endpoint, driver, WaveRT, HLK, signing or release evidence.",
+    "No extension production source or manifest behavior was changed; only the policy gate and offline fixtures were updated."
+  ]
+}

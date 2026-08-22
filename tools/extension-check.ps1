@@ -55,6 +55,69 @@ function Assert-ExactCspDirectiveSet([string]$csp, [string]$sourceName) {
   }
 }
 
+function Assert-ExtensionSourcePolicy(
+  [string]$popupSource,
+  [string]$serviceWorkerSource,
+  [string]$offscreenSource,
+  [string]$workletSource,
+  [string]$sourceName
+) {
+  if ($popupSource -notmatch 'button\.addEventListener\(\s*(?:\x27|\x22)click(?:\x27|\x22)') {
+    throw "Popup must delegate capture from its click handler in $sourceName."
+  }
+  if ($popupSource -notmatch 'chrome\.runtime\.sendMessage\(\s*\{\s*type\s*:\s*(?:\x27|\x22)capture-active-tab') {
+    throw "Popup must send the capture-active-tab request in $sourceName."
+  }
+  if ($popupSource -match 'chrome\.tabCapture\.') {
+    throw "Popup must not access tabCapture directly in $sourceName."
+  }
+
+  foreach ($pattern in @(
+      'chrome\.runtime\.onMessage\.addListener',
+      'chrome\.offscreen\.createDocument',
+      'chrome\.tabCapture\.getMediaStreamId',
+      'targetTabId\s*:\s*message\.tabId'
+    )) {
+    if ($serviceWorkerSource -notmatch $pattern) {
+      throw "Service worker is missing required source boundary '$pattern' in $sourceName."
+    }
+  }
+
+  foreach ($pattern in @(
+      'chrome\.runtime\.onMessage\.addListener',
+      'new\s+AudioContext',
+      'audio-worklet\.js',
+      'new\s+AudioWorkletNode'
+    )) {
+    if ($offscreenSource -notmatch $pattern) {
+      throw "Offscreen source is missing required source boundary '$pattern' in $sourceName."
+    }
+  }
+  $webSocketMatches = [regex]::Matches(
+    $offscreenSource,
+    'new\s+WebSocket\s*\(\s*(?:\x27|\x22)(?<url>[^\x27\x22\)]+)(?:\x27|\x22)'
+  )
+  if ($webSocketMatches.Count -ne 1 -or
+      $webSocketMatches[0].Groups['url'].Value -cne 'ws://127.0.0.1:17842/v1/tab') {
+    throw "Offscreen source must use exactly the fixed loopback bridge in $sourceName."
+  }
+
+  foreach ($pattern in @(
+      'registerProcessor\s*\(\s*(?:\x27|\x22)hibiki-tab-packetizer',
+      'new\s+ArrayBuffer\s*\(\s*16\s*\+',
+      'setUint8\s*\(\s*0\s*,\s*0x48',
+      'setUint8\s*\(\s*1\s*,\s*0x49',
+      'setUint8\s*\(\s*2\s*,\s*0x42',
+      'setUint8\s*\(\s*3\s*,\s*0x54',
+      'setUint16\s*\(\s*4\s*,\s*1\s*,\s*true',
+      'this\.port\.postMessage'
+    )) {
+    if ($workletSource -notmatch $pattern) {
+      throw "AudioWorklet source is missing required HIBT boundary '$pattern' in $sourceName."
+    }
+  }
+}
+
 function Assert-ExtensionManifestPolicy($manifest, [string]$sourceName) {
   if ($null -eq $manifest) {
     throw "Extension manifest cannot be null in $sourceName"
@@ -201,6 +264,34 @@ if ($SelfTest) {
   try { Assert-ExtensionManifestPolicy $emptyDirective 'selftest-empty-directive' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected an empty CSP directive failure.' }
 
+  $sourceFixture = @{
+    popup = "button.addEventListener('click', async () => { await chrome.runtime.sendMessage({type: 'capture-active-tab', tabId: tab.id}); });"
+    serviceWorker = "chrome.runtime.onMessage.addListener(async (message) => { await chrome.offscreen.createDocument({url: 'offscreen.html'}); const streamId = await chrome.tabCapture.getMediaStreamId({targetTabId: message.tabId}); });"
+    offscreen = "chrome.runtime.onMessage.addListener(async () => { const context = new AudioContext(); await context.audioWorklet.addModule('audio-worklet.js'); const node = new AudioWorkletNode(context, 'hibiki-tab-packetizer'); const bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab'); });"
+    worklet = "const packet = new ArrayBuffer(16 + 4); const view = new DataView(packet); view.setUint8(0, 0x48); view.setUint8(1, 0x49); view.setUint8(2, 0x42); view.setUint8(3, 0x54); view.setUint16(4, 1, true); this.port.postMessage(packet, [packet]); registerProcessor('hibiki-tab-packetizer', HibikiTabPacketizer);"
+  }
+  Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-source-valid'
+
+  $popupDirectCapture = $sourceFixture.popup + " chrome.tabCapture.getMediaStreamId({targetTabId: tab.id});"
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $popupDirectCapture $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-popup-direct-capture' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected direct popup tabCapture failure.' }
+
+  $missingWorkerOwnership = $sourceFixture.serviceWorker -replace 'chrome\.offscreen\.createDocument', 'chrome.runtime.getPlatformInfo'
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $missingWorkerOwnership $sourceFixture.offscreen $sourceFixture.worklet 'selftest-worker-ownership' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected missing service-worker ownership failure.' }
+
+  $externalBridge = $sourceFixture.offscreen -replace 'ws://127\.0\.0\.1:17842/v1/tab', 'wss://example.com/tab'
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $externalBridge $sourceFixture.worklet 'selftest-external-bridge' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected external bridge failure.' }
+
+  $missingPacketizer = $sourceFixture.worklet -replace 'registerProcessor\(\x27hibiki-tab-packetizer\x27, HibikiTabPacketizer\);', ''
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $sourceFixture.offscreen $missingPacketizer 'selftest-missing-packetizer' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected missing packetizer failure.' }
+
   $multilineCsp = $validJson | ConvertFrom-Json
   $multilineCsp.content_security_policy.extension_pages = @"
 script-src    'self' ;
@@ -209,7 +300,7 @@ connect-src   ws://127.0.0.1:17842
 "@
   Assert-ExtensionManifestPolicy $multilineCsp 'selftest-multiline-csp'
 
-  Write-Output 'Browser extension policy self-test passed (15 cases).'
+  Write-Output 'Browser extension policy self-test passed (20 cases).'
   exit 0
 }
 
@@ -232,4 +323,10 @@ foreach ($path in @(
   }
 }
 
-Write-Output 'Browser extension source checks passed (MV3 least-privilege permissions, host allowlist, and self-only CSP verified).'
+$popupSource = Get-Content -LiteralPath (Join-Path $repo 'extensions/popup.js') -Raw
+$serviceWorkerSource = Get-Content -LiteralPath (Join-Path $repo 'extensions/service-worker.js') -Raw
+$offscreenSource = Get-Content -LiteralPath (Join-Path $repo 'extensions/offscreen.js') -Raw
+$workletSource = Get-Content -LiteralPath (Join-Path $repo 'extensions/audio-worklet.js') -Raw
+Assert-ExtensionSourcePolicy $popupSource $serviceWorkerSource $offscreenSource $workletSource 'extensions source'
+
+Write-Output 'Browser extension source checks passed (MV3 permissions, exact CSP and user-gesture/loopback source boundaries verified).'
