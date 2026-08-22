@@ -108,9 +108,30 @@
                                     <Button Tag="{Binding Id}" Click="OnSceneClick" HorizontalContentAlignment="Stretch"
                                             AutomationProperties.Name="{Binding Name}"
                                             AutomationProperties.HelpText="{Binding Description}">
-                                        <StackPanel Spacing="3">
-                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                            <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <StackPanel Spacing="6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <Border Grid.Column="1"
+                                                        Visibility="{Binding SafetyEnabled, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                        VerticalAlignment="Center">
+                                                    <FontIcon Glyph="&#xE72E;" FontSize="12"
+                                                              Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                                                </Border>
+                                            </Grid>
+                                            <TextBlock Text="{Binding Description}" TextWrapping="Wrap"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <Border CornerRadius="999" Padding="8,2" HorizontalAlignment="Left"
+                                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                    BorderThickness="1">
+                                                <TextBlock Text="{Binding LatencyLabel}"
+                                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </Border>
                                         </StackPanel>
                                     </Button>
                                 </DataTemplate>
