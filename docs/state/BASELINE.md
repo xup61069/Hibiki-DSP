@@ -667,6 +667,15 @@ fail-closed，URL、anchor 與 fenced code block 略過，-SelfTest 加入離線
 非檔案形狀，保留 missing build root 建立行為，wrapper self-test 擴充且不呼叫 CMake、
 不執行 probe、不寫 repo 檔案（Issue #492 / PR #494）。皆為 tooling/source evidence。
 
+第十一波 tooling 增量已合併：live-process-loopback-check.ps1 對固定 build root 與
+probe path 新增 fail-closed 驗證，拒絕 root 外路徑、既有 reparse point 祖先／target 與
+非目錄／非檔案形狀，保留 missing build root 建立行為，wrapper self-test 擴充且不呼叫
+CMake、不執行 probe、不寫 repo 檔案（Issue #500 / PR #502）；docs-check 的 markdown
+相對連結閘門交付實作——先前的 PR #497 僅含空 claim commit（已記錄的 race 事件），
+現對 tracked markdown 缺失 target fail-closed、略過 URL/anchor/fenced blocks、回報
+檢查數量並新增六個離線 self-test 案例（Issue #496 / PR #501）。皆為 tooling/source
+evidence。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；

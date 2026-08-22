@@ -234,6 +234,15 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   point ancestors/targets and non-directory/non-file shapes while preserving missing
   build-root creation; wrapper self-test grew with no CMake, probe execution or repository
   writes (Issue #492 / PR #494).
+- Live process-loopback probe hardening merged: live-process-loopback-check.ps1 fails
+  closed on build-root and probe-path validation, rejecting outside-root paths, existing
+  reparse-point ancestors/targets and non-directory/non-file shapes while preserving
+  missing build-root creation; wrapper self-test grew with no CMake, probe execution or
+  repository writes (Issue #500 / PR #502).
+- Markdown relative-link gate delivered: the earlier link-gate PR had merged with an empty
+  claim commit only (documented race event); docs-check now fails closed on missing relative
+  link targets across tracked markdown, skips URLs/anchors/fenced blocks, reports the checked
+  count and gained six offline -SelfTest cases (Issue #496 / PR #501).
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe
