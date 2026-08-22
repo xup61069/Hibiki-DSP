@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "issue": 286,
+  "scope_digest": "calibration-peq-cap-v1",
+  "source_commit": "6a244dca000476b822dd5fafa31db09e60fe1b50",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.1-msvc-19.51.36256-cmake-4.4.0-pwsh-7.6.4-sdk-26100; locked-wdk-28000-missing-on-host",
+  "commands": [
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 286",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "exact bounded compilation of 16 log-spaced calibration filters with limited=true diagnostic",
+        "over-cap max_filters=17 compile policy rejected by validate_calibration_compile_policy_v1",
+        "max_q=12.5 accepted above the struct default and max_q=100.1 rejected at the internal hard limit",
+        "min_spacing_octaves below the 0.01 lower bound rejected",
+        "emitted filters strictly increasing and within configured frequency and Q bounds"
+      ],
+      "case_count": 1,
+      "compiled_artifacts": false
+    },
+    {
+      "command": "handoff/docs/source-policy/source-only/diff gates",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership and exclusive scope for issue 286",
+        "live documentation counters and baseline snapshot verified",
+        "tracked-path source policy without compiled artifacts",
+        "single workflow publication boundary",
+        "no whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "Test-only slice on top of compiler commit 6a244dc; the production compiler is unchanged.",
+    "The host has Windows SDK 26100 and lacks the locked WDK 28000 package, so driver, signability, HLK, and Microsoft signing claims remain out of scope.",
+    "Offline in-memory fixtures only; this is not acoustic conformance, microphone calibration, room optimization quality, physical-audio delivery, or ISO 226 restricted-data evidence.",
+    "The Q-bound fixture intentionally documents that the internal hard limit is 100.0 while the struct default is 12.0."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.301",
+    "msvc": "19.51.36256",
+    "cmake": "4.4.0",
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-22T20:41:00+08:00",
+  "finished_at": "2026-08-22T20:50:00+08:00"
+}
