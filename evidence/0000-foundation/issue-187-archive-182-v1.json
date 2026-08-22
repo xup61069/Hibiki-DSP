@@ -4,6 +4,8 @@
   "scope_digest": "issue-187-archive-182-v1",
   "source_commit": "7892245618bedc57062e5bd26b1d4d271939b5ca",
   "archive_commit": "cb3a511",
+  "main_sync_commit": "e53fa42376dc4f28009c4a98c81e6ff6bb3d08e5",
+  "counter_refresh_commit": "70e073b",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; cmake-missing-wdk-missing-portable-user-space",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 187",
@@ -64,11 +66,25 @@
       "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32561182704/job/97002836976",
       "failure": "origin/main=741fbc3 build/baseline-counters.json claims 481 tracked paths and 102 repository JSON files, while that tree contains 483 tracked paths and 103 repository JSON files",
       "compiled_artifacts": false
+    },
+    {
+      "command": "Local gates after merge-sync to origin/main e53fa42",
+      "status": "pass",
+      "coverage": ["handoff-check issue/full", "docs-check 85 required paths and 24 specs", "487 tracked paths", "105 repository JSON files", "source-policy", "source-only-ci-check", "git diff --check"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 rerun before merge-sync)",
+      "status": "pass",
+      "coverage": ["target-main counter consistency after main maintenance refresh"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32561388210/job/97003358401",
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
     "Documentation/governance archive only; no product API, IPC/schema, DSP ordering, RT-thread, driver, HLK or signing behavior is changed.",
     "The local environment lacks CMake and WDK, so full CTest/driver coverage is delegated to GitHub Actions Windows runners.",
+    "The first PR run exposed a stale target-main counter; main maintenance commit 929752f corrected it before the successful rerun.",
     "No physical audio, per-App delivery, loadable driver, HLK or Microsoft signing evidence is claimed."
   ],
   "logs": [],
@@ -76,5 +92,5 @@
     "powershell": "7.6.5"
   },
   "started_at": "2026-08-22T15:57:32+08:00",
-  "finished_at": "2026-08-22T16:05:32+08:00"
+  "finished_at": "2026-08-22T16:10:49+08:00"
 }
