@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "issue": 369,
+  "scope_digest": "formal-winui-cmd-entry-v1",
+  "source_commit": "13c4a8a",
+  "change_summary": [
+    "Added Start-HibikiPreview-FormalWinUI.cmd next to the existing double-click wrappers: checks for pwsh, then runs tools/run-preview.ps1 -Build -Ui FormalWinUI -SmokeTest with the same Bypass/pause conventions.",
+    "Gives Windows users a one-click entry to the formal XAML shell that Issues #191/#348/#358 made buildable and launchable; requires Windows App Runtime 1.7 x64 (run-preview fails closed otherwise)."
+  ],
+  "limitations": [
+    "Launcher entry only; no driver, signing, installer or release claims.",
+    "README/AI_HANDOFF mention of this wrapper is tracked for the integrator snapshot refresh in Issue #367."
+  ],
+  "commands": [
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200"
+  },
+  "started_at": "2026-08-23T00:14:00+08:00",
+  "finished_at": "2026-08-23T00:16:00+08:00"
+}
