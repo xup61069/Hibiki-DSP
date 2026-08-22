@@ -259,6 +259,23 @@ VOID HibikiMiniportWaveRtStreamV1::FreeBufferWithNotification(
     m_AllocatedBytes = 0;
 }
 
+NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateAudioBufferWithNotification(
+    _In_     ULONG                NotificationCount,
+    _In_     ULONG                RequestedSize,
+    _Out_    PMDL*                AudioBufferMdl,
+    _Out_    ULONG*               ActualSize,
+    _Out_    ULONG*               OffsetFromFirstPage,
+    _Out_    MEMORY_CACHING_TYPE* CacheType) {
+    return AllocateBufferWithNotification(NotificationCount, RequestedSize,
+        AudioBufferMdl, ActualSize, OffsetFromFirstPage, CacheType);
+}
+
+VOID HibikiMiniportWaveRtStreamV1::FreeAudioBufferWithNotification(
+    _In_opt_ PMDL                 AudioBufferMdl,
+    _In_     ULONG                BufferSize) {
+    FreeBufferWithNotification(AudioBufferMdl, BufferSize);
+}
+
 NTSTATUS HibikiMiniportWaveRtStreamV1::GetClockRegister(
     _Out_ KSRTAUDIO_HWREGISTER*   Register) {
     UNREFERENCED_PARAMETER(Register);

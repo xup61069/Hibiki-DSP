@@ -3,13 +3,24 @@
   "issue": 394,
   "scope_digest": "driver-sys-build-v1",
   "base_commit": "248f819",
-  "source_commit": "8871d54 (superseded by merge with origin/codex/394-driver-sys-build 936c7b6; final evidence re-run recorded below)",
+  "source_commit": "final reconciliation after merge commit 92aa986; results record the post-reconciliation gate re-run",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-msvc-19.51.36256-wdk-10.0.26100.0-pwsh-7.6.4",
   "commands": [
+    "pwsh -NoProfile -File tools/driver-source-check.ps1",
     "pwsh -NoProfile -File tools/build-driver.ps1",
     "pwsh -NoProfile -File tools/driver-signability-check.ps1 -PackageRoot .local/driver-package -RequireInf2Cat"
   ],
   "results": [
+    {
+      "command": "tools/driver-source-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "PortCls source boundary retained MS-PL, GPL-free linkage, and non-blocking stream rules",
+        "required WDK notification methods present under their exact WDK 26100 PortCls names",
+        "README boundary wording corrected from the older kit method name to AllocateBufferWithNotification"
+      ],
+      "compiled_artifacts": false
+    },
     {
       "command": "tools/build-driver.ps1",
       "status": "pass",
@@ -49,5 +60,5 @@
     "wdk": "10.0.26100.0"
   },
   "started_at": "2026-08-23T01:20:00+08:00",
-  "finished_at": "2026-08-23T03:20:00+08:00"
+  "finished_at": "2026-08-23T03:38:00+08:00"
 }

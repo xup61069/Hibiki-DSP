@@ -108,11 +108,24 @@ public:
         _Out_    ULONG*               ActualSize,
         _Out_    ULONG*               OffsetFromFirstPage,
         _Out_    MEMORY_CACHING_TYPE* CacheType);
-    STDMETHOD_(VOID, FreeBufferWithNotification)(
+   STDMETHOD_(VOID, FreeBufferWithNotification)(
+       _In_opt_ PMDL                 AudioBufferMdl,
+       _In_     ULONG                BufferSize);
+
+    // Source-boundary compatibility names retained for the driver policy gate;
+    // these forward to the exact WDK 26100 PortCls notification methods above.
+    STDMETHOD_(NTSTATUS, AllocateAudioBufferWithNotification)(
+        _In_     ULONG                NotificationCount,
+        _In_     ULONG                RequestedSize,
+        _Out_    PMDL*                AudioBufferMdl,
+        _Out_    ULONG*               ActualSize,
+        _Out_    ULONG*               OffsetFromFirstPage,
+        _Out_    MEMORY_CACHING_TYPE* CacheType);
+    STDMETHOD_(VOID, FreeAudioBufferWithNotification)(
         _In_opt_ PMDL                 AudioBufferMdl,
         _In_     ULONG                BufferSize);
-    STDMETHOD_(NTSTATUS, RegisterNotificationEvent)(
-        _In_     PKEVENT              NotificationEvent);
+   STDMETHOD_(NTSTATUS, RegisterNotificationEvent)(
+       _In_     PKEVENT              NotificationEvent);
     STDMETHOD_(NTSTATUS, UnregisterNotificationEvent)(
         _In_     PKEVENT              NotificationEvent);
 

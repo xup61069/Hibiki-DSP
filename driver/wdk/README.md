@@ -9,9 +9,10 @@ neither a single GET nor SET before dereferencing the KS property request.
 
 `hibiki_miniport_wavert.h` and `hibiki_miniport_wavert.cpp` provide the
 PortCls COM interface adapter implementations (`IMiniportWaveRT` via
-`HibikiMiniportWaveRtV1` and `IMiniportWaveRTStreamNotification` via
-`HibikiMiniportWaveRtStreamV1`). They wire PortCls miniport audio buffer
-allocation (`AllocateAudioBufferWithNotification`), event notifications
+`HibikiMiniportWaveRtV1` and the notification stream interface
+`IMiniportWaveRTStreamNotification` via `HibikiMiniportWaveRtStreamV1`).
+They wire notification-aware audio buffer allocation
+(`AllocateBufferWithNotification`), event notifications
 (`RegisterNotificationEvent`/`UnregisterNotificationEvent`), latency
 reporting (`GetHWLatency`), position queries (`GetPosition`), stream state
 transitions (`SetState`) and property context binding into the portable
