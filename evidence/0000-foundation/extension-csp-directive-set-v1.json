@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "issue": 380,
+  "scope_digest": "extension-csp-directive-set-v1",
+  "source_commit": "1cd261710e77dc029da8b294e6f58fe60f9a378d",
+  "base_commit": "7e6ad729a588c98c35ff3f9a7cb4e93fbf3e8c69",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.12112.369-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526-cmake-4.4.2-pwsh-7.6.4",
+  "target": "tools/extension-check.ps1",
+  "cases_added": [
+    "extra CSP directive rejected",
+    "duplicate CSP directive rejected",
+    "empty CSP directive rejected"
+  ],
+  "commands": [
+    "pwsh -NoProfile -File tools/extension-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/extension-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 380",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/extension-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "15 bounded policy cases",
+        "exact three-directive CSP set",
+        "self-only script/object sources",
+        "loopback-only connect source"
+      ]
+    },
+    {
+      "command": "tools/extension-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "repository MV3 manifest remains within the exact CSP directive and source policy"
+      ]
+    },
+    {
+      "command": "repository gates and self-tests",
+      "status": "pass",
+      "coverage": [
+        "doctor target fingerprint",
+        "Issue 380 and full handoff ownership/scope/ancestry",
+        "documentation structural parser",
+        "source-policy and source-only publication checks",
+        "CMake build and CTest 3/3",
+        "whitespace validation"
+      ]
+    }
+  ],
+  "limitations": [
+    "Static PowerShell policy-gate evidence only; no browser launch, MV3 runtime, WebSocket, tabCapture, audio, endpoint, driver, WaveRT, HLK, signing or release evidence.",
+    "No extension production source or manifest behavior was changed; the gate and its offline fixtures were updated."
+  ]
+}
