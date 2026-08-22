@@ -1,3 +1,16 @@
+# ---
+# id: ADR-0001
+# status: accepted
+# owner: hibiki-maintainers
+# authority: architecture
+# date: 2026-08-21
+# last_reviewed: 2026-08-21
+# review_after_days: 90
+# supersedes: []
+# related_specs: [SPEC-0001, SPEC-0005]
+# source_globs: ["THIRD_PARTY.yml", "SOURCE_POLICY.md", "config/distribution-profile.yml"]
+# ---
+
 # ADR-0001：公開 monorepo 與 component licenses
 
 ## Status

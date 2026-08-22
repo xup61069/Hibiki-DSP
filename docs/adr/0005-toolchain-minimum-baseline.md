@@ -1,3 +1,16 @@
+# ---
+# id: ADR-0005
+# status: accepted
+# owner: hibiki-maintainers
+# authority: architecture
+# date: 2026-08-23
+# last_reviewed: 2026-08-23
+# review_after_days: 90
+# supersedes: []
+# related_specs: []
+# source_globs: ["build/toolchain-lock.yml", "tools/doctor.ps1"]
+# ---
+
 # ADR-0005：SDK/WDK 改採最低基線鎖定
 
 ## Status
