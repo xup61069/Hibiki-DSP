@@ -640,7 +640,7 @@ finally
 var presetPath = Path.Combine(Path.GetTempPath(), $"hibiki-peq-check-{Guid.NewGuid():N}.json");
 try
 {
-    Check(CalibrationCompilerV1.TrySavePreset(presetPath, validPreset, out _),
+Check(CalibrationCompilerV1.TrySavePreset(presetPath, validPreset, out _),
         "PEQ preset save failed.");
     Check(CalibrationCompilerV1.TryLoadPreset(presetPath, out var loadedPreset, out _) &&
           loadedPreset is not null && loadedPreset.Filters.Count == 1 &&
@@ -654,4 +654,71 @@ finally
 {
     if (File.Exists(presetPath)) File.Delete(presetPath);
 }
+var timeline = new Vst3TimelineSurfaceModelV1();
+Check(Vst3TimelineSurfaceModelV1.IsValidTimelineId("game-one") &&
+      !Vst3TimelineSurfaceModelV1.IsValidTimelineId("") &&
+      !Vst3TimelineSurfaceModelV1.IsValidTimelineId("-leading") &&
+      !Vst3TimelineSurfaceModelV1.IsValidTimelineId("trailing.") &&
+      !Vst3TimelineSurfaceModelV1.IsValidTimelineId("bad space") &&
+      !Vst3TimelineSurfaceModelV1.IsValidTimelineId("CON") &&
+      !Vst3TimelineSurfaceModelV1.IsValidTimelineId("com4") &&
+      !Vst3TimelineSurfaceModelV1.IsValidTimelineId(new string('a', 65)) &&
+      Vst3TimelineSurfaceModelV1.IsValidTimelineId(new string('a', 64)),
+    "Timeline ID validation diverges from the store contract.");
+for (var slot = 0; slot < Vst3TimelineSurfaceModelV1.MaxTimelineIds; ++slot)
+{
+    Check(timeline.RegisterTimeline($"timeline-{slot:D2}"), "Timeline registration failed.");
+}
+Check(!timeline.RegisterTimeline("overflow") && timeline.TimelineIdCount == 16,
+    "Timeline ID capacity must be bounded at 16.");
+Check(timeline.TimelineIds.SequenceEqual(timeline.TimelineIds.OrderBy(id => id, StringComparer.Ordinal)),
+    "Timeline ID listing must stay sorted.");
+Check(!timeline.Select("missing") && !timeline.HasSelection,
+    "Selecting an unknown timeline must fail closed.");
+Check(timeline.Select("timeline-00") && timeline.Published.Count == 0 && timeline.IsDirty() == false,
+    "Empty timeline selection should start clean.");
+Check(!timeline.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(7, 100, 0.5)),
+    "Editing without an open draft must fail closed.");
+Check(timeline.BeginEdit() && !timeline.BeginEdit(), "A second concurrent draft must be refused.");
+Check(timeline.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(7, 480, 0.25)) &&
+      timeline.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(3, 240, 0.75)) &&
+      timeline.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(3, 480, 0.5)),
+    "Draft upserts must succeed.");
+Check(timeline.Draft![0].ParameterId == 3 && timeline.Draft[0].SamplePosition == 240 &&
+      timeline.Draft[1].SamplePosition == 480 && timeline.Draft[1].ParameterId == 3 &&
+      timeline.Draft[2].ParameterId == 7,
+    "Draft ordering must follow (sample_position, parameter_id).");
+Check(!timeline.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(9, 10, -0.1)) &&
+      !timeline.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(9, 10, 1.1)) &&
+      !timeline.SetValueAt(0, double.NaN) &&
+      timeline.SetValueAt(0, 0.9) && timeline.Draft[0].NormalizedValue == 0.9,
+    "Value bounds must match the native validator.");
+Check(timeline.Commit() && !timeline.HasEditSession && timeline.IsDirty(),
+    "Commit should publish the draft and mark derived dirty state.");
+Check(timeline.SaveSelected() && !timeline.IsDirty(),
+    "Save must re-baseline dirty tracking.");
+Check(timeline.BeginEdit() && timeline.RemoveAt(1) && timeline.Commit() &&
+      timeline.Published.Count == 2 && timeline.UndoDepth == 2,
+    "Remove/commit/undo depth bookkeeping failed.");
+Check(timeline.Undo() && timeline.Published.Count == 3 &&
+      timeline.Redo() && timeline.Published.Count == 2,
+    "Undo/redo round trip failed.");
+Check(timeline.BeginEdit() && !timeline.Undo() && timeline.Discard() && !timeline.HasEditSession,
+    "History must be refused while a draft is open.");
+Check(timeline.Select("timeline-01") && timeline.Published.Count == 0 && timeline.UndoDepth == 0 &&
+      !timeline.IsDirty(),
+    "Re-selection must replace baseline and clear history.");
+var overflow = new Vst3TimelineSurfaceModelV1();
+Check(overflow.RegisterTimeline("overflow-case") && overflow.Select("overflow-case") &&
+      overflow.BeginEdit(),
+    "Overflow fixture setup failed.");
+for (var index = 0; index < 16; ++index)
+{
+    Check(overflow.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent((uint)index, (ulong)(index * 10), 0.5)),
+        "Unique parameter insertion failed.");
+}
+Check(!overflow.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(99, 999, 0.5)),
+    "The 17th unique parameter must be refused.");
+Check(overflow.Commit() && !overflow.HasEditSession && overflow.Published.Count == 16,
+    "A valid 16-parameter draft must commit.");
 Console.WriteLine("Control model checks passed.");
