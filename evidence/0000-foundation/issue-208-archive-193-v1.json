@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "issue": 208,
+  "scope_digest": "issue-208-archive-193-v1",
+  "source_commit": "c66ea9523e0c3b3a362f1569352347abac0adadc",
+  "archive_commit": "pending",
+  "main_sync_commit": "0f1cdb1a44ddec3ac2c477357bbec001a00c741e",
+  "counter_refresh_commit": "pending",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; cmake-missing-wdk-missing-portable-user-space",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 208",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 193 source and PR 194 review",
+      "status": "pass",
+      "coverage": [
+        "Issue 193 is closed",
+        "PR 194 is merged at c66ea9523e0c3b3a362f1569352347abac0adadc",
+        "SPEC-0005 is accepted",
+        "target-machine checklist evidence is documentation-only and preserves non-claims"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP ordering, RT-thread, driver, HLK or signing behavior is changed.",
+    "The local environment lacks CMake and WDK, so full CTest/driver coverage is delegated to GitHub Actions Windows runners.",
+    "The archived TARGET_MACHINE_CHECKLIST was not validated on an actual target machine; archiving it does not add target-machine evidence.",
+    "PR 194 merged while its historical verify runs failed on the then-stale target-main counters; Issue 208 records only the later archive-lane verification as current evidence.",
+    "No physical audio, per-App delivery, loadable driver, HLK or Microsoft signing evidence is claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.5"
+  },
+  "started_at": "2026-08-22T17:10:00+08:00",
+  "finished_at": "pending"
+}
