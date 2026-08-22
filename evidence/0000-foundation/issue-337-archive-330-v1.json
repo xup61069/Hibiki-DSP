@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "issue": 337,
+  "scope_digest": "issue-337-archive-330-v1",
+  "source_commit": "PENDING",
+  "archive_commit": "PENDING",
+  "main_sync_commit": "2250dfddffb539654403383fd7d37578139c9aaf",
+  "archived_issue": 330,
+  "merged_pr": 333,
+  "merged_pr_commit": "2250dfddffb539654403383fd7d37578139c9aaf",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-10.0.28000.2526-wdk-10.0.28000.2526-cmake-4.4.2-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 337",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -WriteCounters",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 337 archive implementation",
+      "status": "pass",
+      "coverage": [
+        "moved docs/tasks/active/330.md to docs/tasks/completed/2026/330.md",
+        "preserved Issue 330 scope and recorded PR #333 merge commit",
+        "added this anonymous archive evidence"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 337 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Issue 337 schema-v2 ownership, scope and Git ancestry",
+        "full active handoff validation across current claimed and review lanes"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 -SelfTest / tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "13 bounded docs-check self-test cases",
+        "80 required documentation paths and 24 specs",
+        "live measurement of 507 tracked paths and 146 repository JSON files"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 -WriteCounters",
+      "status": "unavailable",
+      "coverage": [
+        "current gate rejects the parameter; no uncontracted counters JSON was created"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "507 tracked paths with no blocked binary or secret",
+        "one workflow with source-only CI policy satisfied"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly / tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "Windows 26200 AMD64, Visual Studio 2026, CMake, SDK and WDK prerequisites detected",
+        "Visual Studio 2026/CMake build, CTest 2 of 2, and unsigned local verification"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "PR #333 post-merge review",
+      "status": "pass",
+      "coverage": [
+        "PR #333 merged at 2250dfddffb539654403383fd7d37578139c9aaf",
+        "final push verify run 32578861297 / job 97045124946 passed",
+        "final pull_request verify run 32578863183 / job 97045129620 passed"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP, RT audio, driver, HLK or signing behavior is changed.",
+    "Archive and user-space gates do not provide physical audio, loadable-driver, HLK or Microsoft-signing evidence.",
+    "The current tools/docs-check.ps1 has no -WriteCounters parameter and current main has no build/baseline-counters.json; no invented counter file is included.",
+    "Local verify outputs are ignored .local artifacts and are not part of the archive PR."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369",
+    "cmake": "4.4.2",
+    "sdk_qfe": "10.1.28000.2526",
+    "wdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T22:34:09+08:00",
+  "finished_at": "2026-08-22T22:37:49+08:00"
+}
