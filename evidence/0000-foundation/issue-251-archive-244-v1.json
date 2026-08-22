@@ -72,6 +72,20 @@
       "status": "pass",
       "coverage": ["anonymous .local/context.json fingerprint"],
       "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #253 push)",
+      "status": "pass",
+      "coverage": ["all verify workflow gates on complete Issue 251 archive head 03d1bab"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32567869924/job/97019043216",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #253 merge-ref)",
+      "status": "pass",
+      "coverage": ["all verify workflow gates against the then-current main base"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32567882278/job/97019073872",
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
@@ -85,5 +99,5 @@
     "powershell": "7.6.5"
   },
   "started_at": "2026-08-23T00:10:00+08:00",
-  "finished_at": "pending_ci"
+  "finished_at": "2026-08-23T01:42:00+08:00"
 }
