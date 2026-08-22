@@ -92,6 +92,63 @@ function Test-BaselineChangedByHead {
   return @($ChangedPaths | Where-Object { $_ -eq 'docs/state/BASELINE.md' }).Count -gt 0
 }
 
+function ConvertFrom-AdrFrontmatter([string]$RawText) {
+  # Parse the comment-style frontmatter block used by all ADR files.
+  # Returns a hashtable of key -> string value, or throws on structural errors.
+  $lines = @($RawText -split "`r?`n")
+  if ($lines.Count -lt 3) { throw 'ADR file is too short to contain frontmatter.' }
+  if ($lines[0] -ne '# ---') { throw 'ADR frontmatter must start with "# ---" on line 1.' }
+  $endIndex = -1
+  for ($i = 1; $i -lt $lines.Count; $i++) {
+    if ($lines[$i] -eq '# ---') { $endIndex = $i; break }
+  }
+  if ($endIndex -lt 2) { throw 'ADR frontmatter closing "# ---" not found or block is empty.' }
+
+  $fields = @{}
+  for ($i = 1; $i -lt $endIndex; $i++) {
+    $line = $lines[$i]
+    if (-not $line.StartsWith('# ')) { throw "ADR frontmatter line $($_ + 1) must start with '# ': $line" }
+    $content = $line.Substring(2).Trim()
+    if ([string]::IsNullOrEmpty($content)) { continue }
+    $colonIdx = $content.IndexOf(':')
+    if ($colonIdx -lt 1) { throw "ADR frontmatter entry lacks a key:value separator: $content" }
+    $key = $content.Substring(0, $colonIdx).Trim()
+    $value = $content.Substring($colonIdx + 1).Trim()
+    if ($fields.ContainsKey($key)) { throw "Duplicate ADR frontmatter key: $key" }
+    $fields[$key] = $value
+  }
+  return $fields
+}
+
+function Assert-AdrFrontmatter {
+  param(
+    [Parameter(Mandatory = $true)]$Fields,
+    [Parameter(Mandatory = $true)][string]$FileName
+  )
+  foreach ($key in @('id', 'status', 'owner', 'authority', 'date', 'last_reviewed', 'review_after_days', 'source_globs')) {
+    if (-not $Fields.ContainsKey($key) -or [string]::IsNullOrWhiteSpace([string]$Fields[$key])) {
+      throw "$FileName is missing required ADR frontmatter field: $key"
+    }
+  }
+
+  $allowedAuthority = @('workflow', 'product-behavior', 'architecture', 'current-state', 'task', 'evidence')
+  if ($allowedAuthority -notcontains $Fields['authority']) {
+    throw "$FileName authority '$($Fields['authority'])' is not in the allowed set."
+  }
+
+  $days = 0
+  if (-not [int]::TryParse([string]$Fields['review_after_days'], [ref]$days) -or $days -lt 1) {
+    throw "$FileName review_after_days must be a positive integer."
+  }
+
+  $parsedDate = [datetime]::MinValue
+  foreach ($dateKey in @('date', 'last_reviewed')) {
+    if (-not [datetime]::TryParseExact([string]$Fields[$dateKey], 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$parsedDate)) {
+      throw "$FileName $dateKey must be formatted as yyyy-MM-dd."
+    }
+  }
+}
+
 if ($SelfTest) {
   $caseCount = 0
 
@@ -167,10 +224,39 @@ if ($SelfTest) {
   }
   $caseCount++
 
+  # ADR frontmatter: valid block parses correctly.
+  $validAdr = "# ---`n# id: ADR-0001`n# status: accepted`n# owner: hibiki-maintainers`n# authority: architecture`n# date: 2026-08-21`n# last_reviewed: 2026-08-21`n# review_after_days: 90`n# supersedes: []`n# related_specs: []`n# source_globs: [`"src/**`"]`n# ---`n`n# Title`n`nBody text."
+  $parsedAdr = ConvertFrom-AdrFrontmatter -RawText $validAdr
+  if ($parsedAdr['id'] -ne 'ADR-0001' -or $parsedAdr['authority'] -ne 'architecture') {
+    throw 'docs-check self-test failed: valid ADR frontmatter did not parse to expected fields.'
+  }
+  Assert-AdrFrontmatter -Fields $parsedAdr -FileName 'selftest-valid.md'
+  $caseCount++
+
+  # ADR frontmatter: missing opening marker must fail.
+  try { ConvertFrom-AdrFrontmatter -RawText "no frontmatter here`njust text" | Out-Null } catch { $caseCount++; continue }
+  throw 'docs-check self-test failed: missing frontmatter opener should fail.'
+
+  # ADR frontmatter: missing required field must fail.
+  $missingField = "# ---`n# id: ADR-0002`n# status: accepted`n# ---`ntext"
+  $parsedMissing = ConvertFrom-AdrFrontmatter -RawText $missingField
+  $caughtMissing = $false
+  try { Assert-AdrFrontmatter -Fields $parsedMissing -FileName 'selftest-missing.md' | Out-Null } catch { $caughtMissing = $true }
+  if (-not $caughtMissing) { throw 'docs-check self-test failed: missing required field should fail.' }
+  $caseCount++
+
+  # ADR frontmatter: bad authority must fail.
+  $badAuthority = "# ---`n# id: ADR-0003`n# status: accepted`n# owner: x`n# authority: nonsense`n# date: 2026-08-21`n# last_reviewed: 2026-08-21`n# review_after_days: 30`n# source_globs: []`n# ---`nbody"
+  $parsedBadAuth = ConvertFrom-AdrFrontmatter -RawText $badAuthority
+  $caughtBadAuth = $false
+  try { Assert-AdrFrontmatter -Fields $parsedBadAuth -FileName 'selftest-badauth.md' | Out-Null } catch { $caughtBadAuth = $true }
+  if (-not $caughtBadAuth) { throw 'docs-check self-test failed: invalid authority should fail.' }
+  $caseCount++
+
   if ($caseCount -lt 12) {
     throw "docs-check self-test failed: expected at least 12 passing cases, saw $caseCount."
   }
-  Write-Output "docs-check self-test passed ($caseCount cases; structural parser, multiline normalization, branch mode detection, BASELINE edit detection, live measurement)."
+  Write-Output "docs-check self-test passed ($caseCount cases; structural parser, multiline normalization, branch mode detection, BASELINE edit detection, live measurement, ADR frontmatter)."
   exit 0
 }
 
@@ -238,6 +324,24 @@ if (-not $handoffSchemaIndex.PSObject.Properties['$comment']) {
 $specs = Get-ChildItem -LiteralPath (Join-Path $repo 'docs/specs') -Filter 'SPEC-*.md' -File
 $ids = @($specs | ForEach-Object { Select-String -LiteralPath $_.FullName -Pattern '^id:\s*(\S+)' | ForEach-Object { $_.Matches.Groups[1].Value } })
 if (($ids | Sort-Object -Unique).Count -ne $ids.Count) { throw 'Duplicate Spec IDs detected.' }
+
+$adrs = Get-ChildItem -LiteralPath (Join-Path $repo 'docs/adr') -Filter '*.md' -File | Sort-Object Name
+foreach ($adr in $adrs) {
+  $raw = Get-Content -LiteralPath $adr.FullName -Raw -Encoding UTF8
+  try {
+    $fields = ConvertFrom-AdrFrontmatter -RawText $raw
+    Assert-AdrFrontmatter -Fields $fields -FileName $adr.Name
+    if ($fields['id'] -notmatch '^ADR-[0-9]{4}$') { throw ($adr.Name + ' id must match ADR-NNNN pattern.') }
+    if (-not $raw.Contains(('# ' + $fields['id']))) { throw ($adr.Name + ' heading does not contain the declared ID ' + $fields['id'] + '.') }
+  } catch {
+    throw ('ADR frontmatter validation failed for ' + $adr.Name + ': ' + $_.Exception.Message)
+  }
+}
+$adrIds = @($adrs | ForEach-Object {
+  $raw = Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8
+  (ConvertFrom-AdrFrontmatter -RawText $raw)['id']
+})
+if (($adrIds | Sort-Object -Unique).Count -ne $adrIds.Count) { throw 'Duplicate ADR IDs detected.' }
 
 & (Join-Path $repo 'tools/handoff-check.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'AI handoff check failed.' }

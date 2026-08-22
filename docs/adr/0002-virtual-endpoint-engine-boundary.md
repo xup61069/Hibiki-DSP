@@ -1,3 +1,16 @@
+# ---
+# id: ADR-0002
+# status: accepted
+# owner: hibiki-maintainers
+# authority: architecture
+# date: 2026-08-21
+# last_reviewed: 2026-08-21
+# review_after_days: 90
+# supersedes: []
+# related_specs: [SPEC-0002, SPEC-0003]
+# source_globs: ["src/**", "driver/**", "sdk/**"]
+# ---
+
 # ADR-0002：固定虛擬端點與獨立 RT engine
 
 ## Status

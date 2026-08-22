@@ -1,3 +1,16 @@
+# ---
+# id: ADR-0003
+# status: accepted
+# owner: hibiki-maintainers
+# authority: architecture
+# date: 2026-08-21
+# last_reviewed: 2026-08-21
+# review_after_days: 90
+# supersedes: []
+# related_specs: [SPEC-0005]
+# source_globs: ["installer/**", "tools/**", ".github/**", "schemas/release-manifest-v1.schema.json"]
+# ---
+
 # ADR-0003：source-only 公開與付費簽章交付
 
 ## Status

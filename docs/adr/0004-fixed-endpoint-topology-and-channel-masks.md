@@ -1,9 +1,15 @@
----
-id: ADR-0004
-status: accepted
-date: 2026-08-21
-supersedes: []
----
+# ---
+# id: ADR-0004
+# status: accepted
+# owner: hibiki-maintainers
+# authority: architecture
+# date: 2026-08-21
+# last_reviewed: 2026-08-21
+# review_after_days: 90
+# supersedes: []
+# related_specs: [SPEC-0003]
+# source_globs: ["driver/include/hibiki/endpoint_topology_v1.h"]
+# ---
 
 # ADR-0004：固定 endpoint topology 與 Windows channel mask
 
