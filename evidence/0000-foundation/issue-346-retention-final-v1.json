@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "issue": 346,
+  "title": "retention-final: remove residual docs/tasks files after merged PRs",
+  "base_commit": "b15e3c79163585017fac6b1bf3fb1eb379100547",
+  "removed": [
+    "docs/tasks/active/339.md",
+    "docs/tasks/completed/2026/337.md"
+  ],
+  "rationale": "Both Issues #339 and #337 are CLOSED; PRs #340/#345 merged. Git history remains the authoritative record per the #341 retention policy.",
+  "scope": "docs retention only; no product/API/schema/DSP/driver change",
+  "date": "2026-08-22"
+}
+
