@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "issue": 348,
+  "scope_digest": "winui-m1-formal-build-v1",
+  "source_commit": "b15e3c7",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.12112.369-sdk-wdk-qfe-10.1.28000.2526-winapp-runtime-1.7-pwsh-7.6.5",
+  "formal_winui_build": {
+    "command": "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUI -SmokeTest",
+    "build_tool": "visual-studio-msbuild",
+    "result": "pass",
+    "xaml_compiled": ["App.xbf", "MainWindow.xbf"],
+    "pri_generated": "Hibiki.WinUI.pri",
+    "warnings": 0,
+    "errors": 0,
+    "output_root": ".local/preview/WinUI/ (ignored, excluded from Git)"
+  },
+  "launch_accessibility_smoke": {
+    "result": "pass",
+    "window_name": "Hibiki DSP",
+    "window_class": "WinUIDesktopWin32WindowClass",
+    "control_count": 55,
+    "mechanism": "process launch + bounded MainWindowHandle wait + System.Windows.Automation subtree enumeration; fail-closed on early exit, missing automation window, empty Name or fewer than 10 controls"
+  },
+  "milestone_context": [
+    "completes the second half of Issue #191's acceptance: the formal WinUI XAML build now succeeds and the shell launches with an observable automation tree on this target-class toolchain",
+    "first recorded formal XAML compile for the project; earlier evidence was limited to DesktopCompat/WinUICompat compatibility launches"
+  ],
+  "commands": [
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUI -SmokeTest",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/winui-shell-check.ps1",
+    "git diff --check"
+  ],
+  "limitations": [
+    "Unsigned local preview only; no driver, WaveRT, HLK, Microsoft signing, installer or release-artifact evidence.",
+    "Accessibility smoke asserts presence of a populated named automation tree; it does not certify screen-reader conformance.",
+    "Smoke summary JSON stays under ignored .local/; nothing binary is committed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369"
+  },
+  "started_at": "2026-08-22T23:33:00+08:00",
+  "finished_at": "2026-08-22T23:46:00+08:00"
+}
