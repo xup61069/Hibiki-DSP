@@ -114,6 +114,13 @@ bool Vst3TimelineSupervisorSurfaceV1::redo() {
     return editor_.redo();
 }
 
+// Drops both history stacks without touching any published snapshot, baseline
+// or open draft. Surface-level: the editor is always valid (just empty while
+// detached/unselected), so this is safe to call at any time.
+void Vst3TimelineSupervisorSurfaceV1::clear_history() noexcept {
+    editor_.clear_history();
+}
+
 Vst3TimelineStoreStatusV1 Vst3TimelineSupervisorSurfaceV1::save_selected() {
     if (!ready_for_editing()) return Vst3TimelineStoreStatusV1::invalid_argument;
     if (editor_.has_edit_session()) return Vst3TimelineStoreStatusV1::invalid_argument;

@@ -2877,6 +2877,24 @@ int main() {
               surface.editor().published().event_count == 3U &&
               !surface.is_dirty());
 
+        // Surface-level history introspection: the accessors delegate to the
+        // composed editor and are valid even while detached/unselected.
+        CHECK(surface.can_undo() && surface.can_redo() &&
+              surface.undo_depth() == 1U && surface.redo_depth() == 1U);
+        surface.clear_history();
+        CHECK(!surface.can_undo() && !surface.can_redo() &&
+              surface.undo_depth() == 0U && surface.redo_depth() == 0U);
+        CHECK(surface.editor().published().event_count == 3U &&
+              !surface.is_dirty());
+        // Detached surface: introspection is still valid on an empty editor.
+        Vst3TimelineSupervisorSurfaceV1 empty_history_surface;
+        CHECK(!empty_history_surface.can_undo() &&
+              !empty_history_surface.can_redo() &&
+              empty_history_surface.undo_depth() == 0U &&
+              empty_history_surface.redo_depth() == 0U);
+        empty_history_surface.clear_history();
+        CHECK(empty_history_surface.undo_depth() == 0U);
+
         CHECK(surface.begin_edit() && !surface.detach());
         CHECK(surface.discard() && surface.detach());
         CHECK(!surface.is_attached() && !surface.has_selection() &&

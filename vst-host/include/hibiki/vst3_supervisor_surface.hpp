@@ -65,6 +65,17 @@ public:
     [[nodiscard]] bool undo();
     [[nodiscard]] bool redo();
 
+    // Bounded history introspection forwarded from the composed editor.
+    // These are surface-level: the editor is always valid (just empty while
+    // detached/unselected), so they never fail and never require attach or
+    // selection. clear_history() drops both stacks without touching any
+    // published snapshot, baseline or open draft.
+    [[nodiscard]] bool can_undo() const noexcept { return editor_.can_undo(); }
+    [[nodiscard]] bool can_redo() const noexcept { return editor_.can_redo(); }
+    [[nodiscard]] std::size_t undo_depth() const noexcept { return editor_.undo_depth(); }
+    [[nodiscard]] std::size_t redo_depth() const noexcept { return editor_.redo_depth(); }
+    void clear_history() noexcept;
+
     // Persist the current published snapshot under the selected ID through the
     // store's atomic save path. Requires a committed state (no open draft); a
     // successful save re-baselines dirty tracking.
