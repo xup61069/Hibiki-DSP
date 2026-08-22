@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "issue": 395,
+  "scope_digest": "vst3-timeline-editor-viewmodel-v1",
+  "source_commit": "b2f452391e854ceee4ac1c450f8c392c9bb6beb9",
+  "environment_fingerprint": "windows-26200-amd64-dotnet-10.0.400-pwsh-7.6.5; target-24h2-wdk-missing",
+  "commands": [
+    "pwsh -File tools/control-model-check.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 395",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "observable Vst3TimelineEditorViewModel wrapper over the merged Vst3TimelineSurfaceModelV1 editing surface (Issue #390 / PR #393)",
+        "timeline registration/selection with observable ID list, selected timeline, row projection and Traditional Chinese status transitions",
+        "draft begin/discard/commit/save plus undo/redo command results projected through bounded observable state",
+        "fail-closed invariant-culture parsing for parameter ID, sample position and normalized value text fields; full-width and locale-specific numeric text is refused without touching draft state",
+        "selected-row set-value preserves the canonical ordering key; invalid values leave draft rows untouched",
+        "no IPC payload, native engine, XAML, driver or physical-audio change"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Headless control-plane view model only; no supervisor UI, no binding-state model notifications, and no wire contract change.",
+    "Control-model check coverage of this view model intentionally waits for Issue #396 (Program.cs is its exclusive write scope); evidence currently proves compile/link integration.",
+    "No RT-thread, driver, signing or physical-audio implication."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.400",
+    "powershell": "pwsh 7.6.5 local"
+  }
+}
