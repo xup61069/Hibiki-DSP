@@ -632,6 +632,12 @@ fail-closed 驗證 engine/UI launch target 必須位於 repo .local root 內，�
 reparse point 與非檔案目標，-SelfTest 新增五個 launch-target 安全案例
 （Issue #455 / PR #457）。皆為 user-space/source evidence。
 
+第六波 tooling 增量已合併：winui-a11y-smoke.ps1 在 Start-Process 前 fail-closed 驗證
+supplied WinUI accessibility smoke 輸出目錄必須位於 repo .local root 內、為真實目錄且
+parent 安全，Hibiki.WinUI.exe 必須位於該輸出目錄之下、為真實檔案且 target／祖先皆非
+reparse point；-SelfTest 從 4 個案例擴充至 11 個離線案例，不寫檔、不載入
+UI Automation、不啟動程序（Issue #470 / PR #472）。皆為 tooling/source evidence。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；
