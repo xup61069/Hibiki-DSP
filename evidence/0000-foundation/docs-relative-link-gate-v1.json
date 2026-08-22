@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "issue": 496,
+  "title": "docs-check markdown relative-link validation",
+  "base_commit": "24b2b83045e4928ed0a61df3ece2671bc3140aed",
+  "summary": {
+    "gate": "tools/docs-check.ps1",
+    "behavior": "Every tracked .md file is scanned for relative ](target) links outside fenced code blocks; targets are resolved against the containing directory and missing paths fail the gate.",
+    "skipped": ["http://", "https://", "mailto:", "#anchor"],
+    "selftest_cases_added": 6
+  },
+  "validation": [
+    { "command": "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest", "result": "pass", "notes": "18 offline cases including 6 new link cases" },
+    { "command": "pwsh -NoProfile -File tools/docs-check.ps1", "result": "pass", "notes": "30 relative links checked across 61 tracked markdown files, 0 broken" },
+    { "command": "pwsh -NoProfile -File tools/source-policy.ps1", "result": "pass" },
+    { "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1", "result": "pass" },
+    { "command": "git diff --check", "result": "pass" }
+  ],
+  "scope": "tools-only docs gate hardening; no product/API/schema/DSP/driver change",
+  "date": "2026-08-23"
+}
