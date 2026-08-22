@@ -93,12 +93,9 @@ handoff v2 的 `scope_globs` 是該 Issue 的獨占預告 write-set；`shared_pa
 writer：root/subsystem `CMakeLists.txt`、`tests/unit/contract_tests.cpp`、
 `apps/control-model-check/Program.cs`、workflow、dependency lock、distribution identity 與 Spec index。
 
-`docs/state/BASELINE.md` 的摘要計數（tracked paths／repository JSON）由 #21 門檻
-fail-closed 把關：會新增/刪除 tracked 檔案的切片，把 BASELINE 放進 `shared_paths`
-並機械式更新這兩個數字（以 `tools/docs-check.ps1` 錯誤訊息報出的實測值為準；
-敘述文字仍屬 integrator）。#51 之後，PR CI 對「未動 BASELINE」的 PR 容忍此漂移，
-改為驗證 merge base 自洽；push-to-main 與本機仍是完整嚴格。衝突合併後若摘要句
-出現重複行，合併者負責去重——docs-check 只讀第一個符合處。
+`docs/state/BASELINE.md` 的結構計數（必要入口與 Spec 數量）由 `tools/docs-check.ps1`
+門檻 fail-closed 把關；tracked paths 與 repository JSON 檔案計數則由 `docs-check.ps1`
+在執行時直接自 Git 樹即時實測，不依賴已提交的計數檔案，切片新增或刪除檔案不再需要手動更新計數。
 
 永久 ID、public IPC/schema、DSP 順序、安全規則與 license boundary 同時只能有一個 active owner；
 即使檔案不重疊，也不得由不同 AI 各自修改同一契約語意。

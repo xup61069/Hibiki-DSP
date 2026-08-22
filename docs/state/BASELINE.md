@@ -575,7 +575,7 @@ scope_globs 重疊直接 fail-closed。gate 腳本需要 PowerShell 7（PS 5.1 �
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；`docs-check.ps1` 亦會把這些摘要計數對照 git 實測值，落後即 fail-closed；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
-`distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；repository JSON 檔案均可解析（volatile 計數由 `build/baseline-counters.json` 管理）。C++/C# DeviceSwitch
+`distribution-check.ps1`、`driver-source-check.ps1` 與 `driver-signability-check.ps1` 通過；repository JSON 檔案均可解析（volatile 計數由 `docs-check.ps1` 即時實測）。C++/C# DeviceSwitch
 288-byte payload、catalog sequence、handler fail-closed、WinUI send-failure rollback、DeviceCatalogSnapshot、ControlStatusSnapshot
 wire/atomic replace、catalog-to-wire publisher、Windows worker unbound/coordinator rollback、
 DeviceCatalogRequest provider response、連線後自動刷新裝置清單、ControlPlaneHost loopback

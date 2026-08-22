@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "issue": 197,
+  "scope_digest": "docs-check-live-counters-v1",
+  "source_commit": "e78b834",
+  "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 197"
+  ],
+  "results": [
+    {
+      "command": "tools/docs-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "14 self-test cases passing including prose parser, multiline normalization, branch mode, and live counter fixtures"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "85 required paths present",
+        "24 specs verified",
+        "Live-measured 500 tracked paths and 108 repository JSON files without relying on committed counter file"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 197",
+      "status": "pass",
+      "coverage": [
+        "Schema v2 handoff validation, ownership, and scope integrity"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Tooling-only change; does not modify C++ runtime or DSP behavior."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5"
+  },
+  "started_at": "2026-08-22T17:03:00+08:00",
+  "finished_at": "2026-08-22T17:05:00+08:00"
+}

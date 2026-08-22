@@ -36,13 +36,9 @@ handoff、Spec、ADR、source 與 tests。聊天紀錄、AI memory、個人 IDE 
 - handoff 的 `scope_globs` 是該工作切片的獨占 write scope。開始前必須檢查 open Issue、draft PR
   與 active handoff；scope 重疊、跨 lane 或會碰共享整合檔時，先由 integration coordinator
   指定 owner 與合併順序，不得自行同時修改。
-- 會新增/刪除 tracked 檔案的切片，在同一 slice 內執行
-  `pwsh -File tools/docs-check.ps1 -WriteCounters` 重生 `build/baseline-counters.json`，
-  隨實作一起 commit（#137 起揮發性計數真值在該 JSON：檔案缺失、JSON 畸形、schema drift
-  或數值不符皆 fail-closed）。#183 起 PR 對 counters JSON 的編輯一律對照 head 實測嚴格
-  驗證，僅 merge base 缺檔的首次引入容忍；未動 `docs/state/BASELINE.md` 與 counters JSON
-  的 handoff-only head 在 PR CI 容忍漂移，push/local 保持 strict。
-  數字以 `tools/docs-check.ps1` 的錯誤訊息為準。
+- tracked paths 與 repository JSON 檔案計數由 `tools/docs-check.ps1` 即時實測
+  （#197 起廢除 committed counters JSON 與 `-WriteCounters`），切片新增或刪除 tracked
+  檔案不再需要手動維護計數檔。
 - `docs/AI_HANDOFF.md`、`docs/state/BASELINE.md`、`docs/PROJECT_MAP.md`、root `README.md` 與
   `docs/tasks/active/0.md` 是整合快照，由 integrator 單寫。feature AI 更新自己的 handoff、
   Spec、tests 與 evidence，不在未合併分支宣稱全域完成狀態。
