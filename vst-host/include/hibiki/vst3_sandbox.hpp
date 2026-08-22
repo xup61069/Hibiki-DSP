@@ -35,6 +35,27 @@ enum class Vst3SandboxState : std::uint8_t {
     Quarantined,
 };
 
+// Stable, redacted reason codes for the control-plane incident summary. The
+// enum deliberately carries no Win32 error, path, PID, handle, exception or
+// plugin payload data.
+enum class Vst3SandboxDiagnosticReasonV1 : std::uint8_t {
+    None,
+    InvalidLaunch,
+    ProcessSetupFailed,
+    WorkerExited,
+    WatchdogTimeout,
+    WorkerExchangeFailed,
+    UnsupportedPlatform,
+};
+
+struct Vst3SandboxDiagnosticV1 {
+    std::uint32_t schema_version{1U};
+    Vst3SandboxState state{Vst3SandboxState::Stopped};
+    Vst3SandboxDiagnosticReasonV1 reason{Vst3SandboxDiagnosticReasonV1::None};
+    bool worker_pipe_server_ready{false};
+    bool worker_connected{false};
+};
+
 // Bounded control-plane exchange result.  These calls are intentionally not
 // callable from the RT graph: they may wait for the worker-pipe timeout and
 // copy packet payloads owned by the caller.
@@ -82,12 +103,20 @@ public:
     [[nodiscard]] bool worker_pipe_ready() const noexcept { return worker_pipe_.server_ready(); }
     [[nodiscard]] bool worker_connected() const noexcept { return worker_pipe_.connected(); }
     [[nodiscard]] Vst3SandboxState state() const noexcept { return state_; }
+    // Returns only stable enums and pipe-state booleans. No process/path,
+    // exception, endpoint or opaque plugin data is retained or exposed.
+    [[nodiscard]] Vst3SandboxDiagnosticV1 diagnostic() const noexcept {
+        return Vst3SandboxDiagnosticV1{1U, state_, diagnostic_reason_,
+                                       worker_pipe_.server_ready(), worker_pipe_.connected()};
+    }
 
 private:
-    void quarantine() noexcept;
+    void quarantine(Vst3SandboxDiagnosticReasonV1 reason) noexcept;
     void close_handles() noexcept;
 
     Vst3SandboxState state_{Vst3SandboxState::Stopped};
+    Vst3SandboxDiagnosticReasonV1 diagnostic_reason_{
+        Vst3SandboxDiagnosticReasonV1::None};
     std::uint32_t watchdog_timeout_ms_{250};
     std::uint64_t last_heartbeat_ms_{0};
     void* process_handle_{nullptr};

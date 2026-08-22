@@ -203,13 +203,18 @@ handler 都必須依 `docs/VST3_STATE_COMPATIBILITY_REVIEW.md` 完成 identity�
 失敗回復、隱私與非 RT 執行檢查；未審查或無法證明 redistribution 權利的 plugin 維持
 quarantined，不得進入 trusted/certified 或 Low Latency Lane。
 
+`Vst3SandboxDiagnosticV1` 提供固定 schema version、sandbox state、有限的 reason enum 與
+worker pipe ready/connected 布林值，作為 control-plane 的去敏化事故摘要。它不保留或輸出
+worker/plugin path、PID、handle、command line、raw exception、endpoint identity 或 opaque
+plugin bytes；它不是 crash dump capture，也不會取代 production worker policy。
+
 ## 尚未完成的邊界
 
 plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter、multi-bus/side-chain
 admission validator、bounded parameter frame、latency alignment primitive、latency graph commit
 與 optional worker executable 已有 bridge；仍未完成第三方 plugin certification、第三方 plugin
 compatibility review、RT graph lane latency wiring、side-chain/multi-bus 的實際 worker process、
-crash dump redaction 與 production worker policy。目前
+完整 crash dump capture/redaction pipeline 與 production worker policy。目前
 supervisor、named pipe、passthrough worker、catalog、bounded SDK processor、handshake/process
 exchange、timeline lane 與 Scene automation scheduler 提供可測試的 process
 containment/metadata/automation boundary，不能宣稱已完成第三方 VST3 host。

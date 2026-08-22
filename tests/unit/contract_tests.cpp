@@ -1958,7 +1958,18 @@ int main() {
     CHECK(!plugin.process_passthrough(plugin_input, plugin_output, 2));
 
     Vst3SandboxProcess sandbox;
+    const auto initial_sandbox_diagnostic = sandbox.diagnostic();
+    CHECK(initial_sandbox_diagnostic.schema_version == 1U &&
+          initial_sandbox_diagnostic.state == Vst3SandboxState::Stopped &&
+          initial_sandbox_diagnostic.reason == Vst3SandboxDiagnosticReasonV1::None &&
+          !initial_sandbox_diagnostic.worker_pipe_server_ready &&
+          !initial_sandbox_diagnostic.worker_connected);
     CHECK(!sandbox.launch(Vst3SandboxLaunchV1{L"", L"", 250}));
+    const auto invalid_launch_diagnostic = sandbox.diagnostic();
+    CHECK(invalid_launch_diagnostic.state == Vst3SandboxState::Quarantined &&
+          invalid_launch_diagnostic.reason == Vst3SandboxDiagnosticReasonV1::InvalidLaunch &&
+          !invalid_launch_diagnostic.worker_pipe_server_ready &&
+          !invalid_launch_diagnostic.worker_connected);
     CHECK(!validate_vst3_sandbox_launch_v1(Vst3SandboxLaunchV1{L"worker.exe", L"plugin.vst3", 250,
                                                                1U, L"pipe", 1000U, L"uid", 48000.0,
                                                                4U}));
@@ -1967,7 +1978,23 @@ int main() {
                                                               2U}));
     CHECK(sandbox.state() == Vst3SandboxState::Quarantined);
     sandbox.stop();
-    CHECK(sandbox.state() == Vst3SandboxState::Stopped);
+    CHECK(sandbox.state() == Vst3SandboxState::Stopped &&
+          sandbox.diagnostic().reason == Vst3SandboxDiagnosticReasonV1::None);
+#if defined(_WIN32)
+    Vst3SandboxProcess setup_failure_sandbox;
+    CHECK(!setup_failure_sandbox.launch(Vst3SandboxLaunchV1{
+              L"hibiki-missing-worker-405.exe", L"missing-plugin-405.vst3", 250U}));
+    CHECK(setup_failure_sandbox.diagnostic().state == Vst3SandboxState::Quarantined &&
+          setup_failure_sandbox.diagnostic().reason ==
+              Vst3SandboxDiagnosticReasonV1::ProcessSetupFailed);
+#else
+    Vst3SandboxProcess unsupported_sandbox;
+    CHECK(!unsupported_sandbox.launch(Vst3SandboxLaunchV1{
+              L"worker.exe", L"plugin.vst3", 250U}));
+    CHECK(unsupported_sandbox.diagnostic().state == Vst3SandboxState::Quarantined &&
+          unsupported_sandbox.diagnostic().reason ==
+              Vst3SandboxDiagnosticReasonV1::UnsupportedPlatform);
+#endif
     CHECK(sandbox.handshake_worker() == Vst3WorkerExchangeResultV1::not_running);
     const std::array<float, 4> worker_exchange_input{0.1F, -0.1F, 0.2F, -0.2F};
     std::array<float, 4> worker_exchange_output{1.0F, 1.0F, 1.0F, 1.0F};
