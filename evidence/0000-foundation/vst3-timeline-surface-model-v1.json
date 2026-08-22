@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "issue": 390,
+  "scope_digest": "vst3-timeline-surface-model-v1",
+  "source_commit": "8e058ed318e839f9c9b503e01c8b97672330181d",
+  "environment_fingerprint": "windows-26200-amd64-dotnet-10.0.400-pwsh-7.6.5; target-24h2-wdk-missing",
+  "commands": [
+    "pwsh -File tools/control-model-check.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 390",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "bounded C# mirror Vst3TimelineSurfaceModelV1 for the native Vst3TimelineSupervisorSurfaceV1 editing contract (Issue #351)",
+        "strict filename-safe timeline ID validation matching the native store contract, including reserved Windows stems and 64-byte cap",
+        "16-slot sorted timeline ID listing with capacity refusal",
+        "draft transaction semantics: single open draft, canonical (sample_position, parameter_id) order, insert-or-replace upsert, remove/set-value",
+        "256-event / 16-parameter / [0,1] normalized value limits mirrored from validate_vst3_parameter_timeline_v1",
+        "commit publishes only fully valid snapshots; invalid drafts are kept for repair",
+        "derived dirty state from published-vs-baseline comparison; save re-baselines",
+        "undo/redo depth 8 refused while a draft is open"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Control-plane mirror only; no supervisor UI, no IPC wire change, no engine source change.",
+    "No RT-thread, driver, signing or physical-audio implication.",
+    "Managed model does not own persistence; the native store remains authoritative."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.400",
+    "powershell": "pwsh 7.6.5 local"
+  }
+}
