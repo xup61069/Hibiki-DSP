@@ -51,6 +51,15 @@
       "compiled_artifacts": false
     },
     {
+      "command": "PR #280 metadata-head final CI",
+      "status": "pass",
+      "coverage": [
+        "push verify run 32571938358 / job 97028496505 passed",
+        "merge-ref verify run 32571940412 / job 97028502374 passed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
       "command": "tools/handoff-check.ps1 -Issue 274 / tools/handoff-check.ps1",
       "status": "pass",
       "coverage": [
