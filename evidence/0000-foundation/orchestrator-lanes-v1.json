@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "issue": 199,
+  "title": "Adopt single-orchestrator assignment and directory lanes in MULTI_AGENT.md",
+  "date": "2026-08-22",
+  "branch": "codex/199-orchestrator-lanes",
+  "base_commit": "e5a4b32",
+  "owner": "xup61069",
+  "scope_globs": [
+    "docs/ai/MULTI_AGENT.md",
+    "docs/ai/CONFLICT_POLICY.md",
+    "AGENTS.md",
+    "evidence/0000-foundation/orchestrator-lanes-v1.json"
+  ],
+  "changes_summary": [
+    "MULTI_AGENT.md now states that workers act only on orchestrator-assigned issues and never self-claim.",
+    "Directory lanes (driver/, tools/, apps/, docs/, extensions/, vst-host/, src/) are documented with a one-active-writer-per-lane limit.",
+    "Tool-provided worktree isolation is the default mechanism; the #124 occupancy check is explicitly recorded as fallback.",
+    "CONFLICT_POLICY.md routes cross-lane arbitration to the orchestrator instead of first-commit ownership.",
+    "AGENTS.md entry rules point at orchestrator assignment, handoff-block owner confirmation and worktree occupancy checks without contradicting the new model."
+  ],
+  "limitations": [
+    "Documentation/workflow-only change; no product API, IPC/schema, DSP order, RT-thread, driver boundary or release behavior change.",
+    "Entry documents outside this slice still contain legacy self-claim wording; follow-up slice required for docs/START_HERE.md, SPEC-0004, README.md, CONTRIBUTING.md and templates."
+  ],
+  "gates_run": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 199",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ]
+}
