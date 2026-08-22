@@ -46,7 +46,7 @@
       "status": "pass",
       "coverage": [
         "handoff-check Issue 244 and full ownership checks",
-        "docs-check 85 required paths / 24 specs / 525 tracked paths / 115 repository JSON files",
+        "docs-check 85 required paths / 24 specs / 526 tracked paths / 116 repository JSON files",
         "source-policy and source-only-ci-check",
         "git diff --check"
       ],
