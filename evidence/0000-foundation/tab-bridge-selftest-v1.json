@@ -3,7 +3,7 @@
   "issue": 366,
   "scope_digest": "tab-bridge-selftest-v1",
   "source_commit": "83427d8f7ea4579dbca7c51ba7c54c2c86e7b9d8",
-  "base_commit": "7a9b241d1e2b2f79d4cee345ebb7501ad03bda95",
+  "base_commit": "13c4a8a65e48f4308384c3381e80ec99f40c9c57",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.12112.369-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526-cmake-4.4.2-pwsh-7.6.4",
   "target": "hibiki_tab_bridge_selftest",
   "case_groups": [
