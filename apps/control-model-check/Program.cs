@@ -1020,4 +1020,31 @@ Check(!editorViewModel.RemoveSelectedRow() &&
       editorViewModel.StatusText.Contains("索引無效"),
     "Editor ViewModel removal must fail closed for a stale index.");
 Check(editorViewModel.Discard(), "Stale-index removal cleanup failed.");
+Check(editorViewModel.BeginEdit(), "Undo-after-remove draft fixture failed.");
+editorViewModel.SelectedRowIndex = 1;
+editorNotifications.Clear();
+Check(editorViewModel.RemoveSelectedRow(), "Undo-after-remove fixture failed.");
+Check(editorViewModel.Discard(),
+    "Undo-after-remove must discard the draft before history moves.");
+editorNotifications.Clear();
+Check(editorViewModel.Undo(),
+    "Editor ViewModel removal undo fixture failed.");
+Check(editorViewModel.SelectedRowIndex == -1,
+    "Editor ViewModel removal undo must clear the selection.");
+Check(editorViewModel.Rows.Count == 3,
+    "Editor ViewModel removal undo must restore three rows.");
+Check(editorViewModel.Rows[1] == rowsBeforeRemoval[1],
+    "Editor ViewModel removal undo must restore the removed row.");
+Check(editorViewModel.IsDirty && editorViewModel.CanRedo,
+    "Editor ViewModel removal undo must expose dirty and redo state.");
+Check(editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.Rows)) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.StatusText)),
+    "Editor ViewModel removal undo must publish observable changes.");
+Check(editorViewModel.Redo() &&
+      editorViewModel.SelectedRowIndex == -1 &&
+      editorViewModel.Rows.Count == 2 &&
+      editorViewModel.Rows[0] == rowsBeforeRemoval[0] &&
+      editorViewModel.Rows[1] == new Vst3TimelineEditorViewModel.TimelineEventRow(
+          1, 8U, 720UL, 0.15),
+    "Editor ViewModel removal redo must re-apply the row deletion.");
 Console.WriteLine("Control model checks passed.");
