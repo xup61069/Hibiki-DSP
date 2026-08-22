@@ -124,6 +124,26 @@
       "compiled_artifacts": false
     },
     {
+      "command": "GitHub Actions push verify run 32540929708 (job 96950667071) at d5f87ef",
+      "status": "blocked_by_integrator_baseline",
+      "coverage": [
+        "Configure and test unsigned source passed",
+        "Documentation gate failed because BASELINE.md claims 427 tracked paths while git reports 429",
+        "later gates were skipped by workflow dependency"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions pull_request verify run 32540932946 (job 96950676061) at d5f87ef",
+      "status": "blocked_by_integrator_baseline",
+      "coverage": [
+        "Configure and test unsigned source passed",
+        "Documentation gate failed because BASELINE.md claims 427 tracked paths while git reports 429",
+        "later gates were skipped by workflow dependency"
+      ],
+      "compiled_artifacts": false
+    },
+    {
       "command": "git diff --check",
       "status": "pass",
       "coverage": [
