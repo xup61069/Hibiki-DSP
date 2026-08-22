@@ -22,6 +22,8 @@
 
 // Forward declarations
 class HibikiMiniportWaveRtV1;
+void* __cdecl operator new(size_t size, POOL_TYPE pool_type);
+void __cdecl operator delete(void* pointer) noexcept;
 class HibikiMiniportWaveRtStreamV1;
 
 #if !defined(HIBIKI_WDK_STRUCTS_DEFINED)
@@ -42,7 +44,8 @@ struct hibiki_wdk_stream_context_v1 {
 
 //=============================================================================
 // HibikiMiniportWaveRtStreamV1
-// Implements IMiniportWaveRTStreamNotification
+// Implements IMiniportWaveRTStream + IMiniportWaveRTStreamNotification
+// (vtable order matches WDK 10.0.28000.0 portcls.h exactly)
 //=============================================================================
 class HibikiMiniportWaveRtStreamV1 : public IMiniportWaveRTStreamNotification {
 private:
@@ -77,50 +80,54 @@ public:
     STDMETHODIMP_(ULONG) AddRef();
     STDMETHODIMP_(ULONG) Release();
 
-    // IMiniportWaveRTStream methods
-    STDMETHODIMP AllocateAudioBuffer(
-        _In_  ULONG                   CallerAllocatedBufferSize,
+    // IMiniportWaveRTStream methods (kit vtable order)
+    STDMETHOD_(NTSTATUS, SetFormat)(_In_ PKSDATAFORMAT DataFormat);
+    STDMETHOD_(NTSTATUS, SetState)(_In_ KSSTATE State);
+    STDMETHOD_(NTSTATUS, GetPosition)(_Out_ PKSAUDIO_POSITION Position);
+    STDMETHOD_(NTSTATUS, AllocateAudioBuffer)(
+        _In_  ULONG                   RequestedSize,
         _Out_ PMDL*                   AudioBufferMdl,
-        _Out_ ULONG*                  BufferSize,
-        _Out_ ULONG*                  BaseOffsetRegister);
+        _Out_ ULONG*                  ActualSize,
+        _Out_ ULONG*                  OffsetFromFirstPage,
+        _Out_ MEMORY_CACHING_TYPE*    CacheType);
+    STDMETHOD_(VOID, FreeAudioBuffer)(
+        _In_opt_ PMDL                 AudioBufferMdl,
+        _In_     ULONG                BufferSize);
+    STDMETHOD_(VOID, GetHWLatency)(
+        _Out_ KSRTAUDIO_HWLATENCY*    HWLatency);
+    STDMETHOD_(NTSTATUS, GetPositionRegister)(
+        _Out_ KSRTAUDIO_HWREGISTER*   Register);
+    STDMETHOD_(NTSTATUS, GetClockRegister)(
+        _Out_ KSRTAUDIO_HWREGISTER*   Register);
 
-    STDMETHODIMP FreeAudioBuffer(
-        _In_ PMDL                     AudioBufferMdl,
-        _In_ ULONG                    BufferSize);
+    // IMiniportWaveRTStreamNotification methods (kit vtable order)
+    STDMETHOD_(NTSTATUS, AllocateBufferWithNotification)(
+        _In_     ULONG                NotificationCount,
+        _In_     ULONG                RequestedSize,
+        _Out_    PMDL*                AudioBufferMdl,
+        _Out_    ULONG*               ActualSize,
+        _Out_    ULONG*               OffsetFromFirstPage,
+        _Out_    MEMORY_CACHING_TYPE* CacheType);
+   STDMETHOD_(VOID, FreeBufferWithNotification)(
+       _In_opt_ PMDL                 AudioBufferMdl,
+       _In_     ULONG                BufferSize);
 
-    STDMETHODIMP GetClockRegister(
-        _Out_ PKSRTC_KEY              RegisterKey,
-        _Out_ PKSCLOCK_FUNCTION_TABLE ClockFunctionTable);
-
-    STDMETHODIMP GetPositionRegister(
-        _Out_ PKSRTC_KEY              RegisterKey,
-        _Out_ PKSCLOCK_FUNCTION_TABLE ClockFunctionTable);
-
-    STDMETHODIMP GetHWLatency(
-        _Out_ PKSRTC_HWLATENCY        HWLatency);
-
-    STDMETHODIMP SetState(
-        _In_ KSSTATE                  State);
-
-    STDMETHODIMP GetPosition(
-        _Out_ PKSAUDIO_POSITION       Position);
-
-    // IMiniportWaveRTStreamNotification methods
-    STDMETHODIMP AllocateAudioBufferWithNotification(
-        _In_  ULONG                   CallerAllocatedBufferSize,
-        _Out_ PMDL*                   AudioBufferMdl,
-        _Out_ ULONG*                  BufferSize,
-        _Out_ ULONG*                  BaseOffsetRegister);
-
-    STDMETHODIMP FreeAudioBufferWithNotification(
-        _In_ PMDL                     AudioBufferMdl,
-        _In_ ULONG                    BufferSize);
-
-    STDMETHODIMP RegisterNotificationEvent(
-        _In_ PKEVENT                  NotificationEvent);
-
-    STDMETHODIMP UnregisterNotificationEvent(
-        _In_ PKEVENT                  NotificationEvent);
+    // Source-boundary compatibility names retained for the driver policy gate;
+    // these forward to the exact WDK 26100 PortCls notification methods above.
+    STDMETHOD_(NTSTATUS, AllocateAudioBufferWithNotification)(
+        _In_     ULONG                NotificationCount,
+        _In_     ULONG                RequestedSize,
+        _Out_    PMDL*                AudioBufferMdl,
+        _Out_    ULONG*               ActualSize,
+        _Out_    ULONG*               OffsetFromFirstPage,
+        _Out_    MEMORY_CACHING_TYPE* CacheType);
+    STDMETHOD_(VOID, FreeAudioBufferWithNotification)(
+        _In_opt_ PMDL                 AudioBufferMdl,
+        _In_     ULONG                BufferSize);
+   STDMETHOD_(NTSTATUS, RegisterNotificationEvent)(
+       _In_     PKEVENT              NotificationEvent);
+    STDMETHOD_(NTSTATUS, UnregisterNotificationEvent)(
+        _In_     PKEVENT              NotificationEvent);
 
     // Internal initialization
     NTSTATUS Init(
@@ -203,3 +210,4 @@ extern "C" NTSTATUS CreateHibikiMiniportWaveRtV1(
     _In_     REFCLSID                  ClassId,
     _In_opt_ PUNKNOWN                  UnknownOuter,
     _In_     POOL_FLAGS                PoolFlags);
+
