@@ -69,6 +69,20 @@
       "status": "pass",
       "coverage": ["anonymous .local/context.json fingerprint"],
       "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #248 push)",
+      "status": "pass",
+      "coverage": ["all verify workflow gates on complete CRLF-safe self-test head 2a797e4"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32567445909/job/97018037913",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #248 merge-ref)",
+      "status": "pass",
+      "coverage": ["all verify workflow gates against the then-current main base"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32567458470/job/97018069105",
+      "compiled_artifacts": false
     }
   ],
   "root_cause": "The Issue #39 self-test fixture used a LF-only Replace token while the Windows CRLF script text produced CRLF fixture lines, so duplicate-root-key was not injected.",
@@ -82,5 +96,5 @@
     "powershell": "7.6.5"
   },
   "started_at": "2026-08-22T22:10:00+08:00",
-  "finished_at": "pending_ci"
+  "finished_at": "2026-08-22T23:42:00+08:00"
 }
