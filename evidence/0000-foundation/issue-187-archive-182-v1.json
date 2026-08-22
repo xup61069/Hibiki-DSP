@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "issue": 187,
+  "scope_digest": "issue-187-archive-182-v1",
+  "source_commit": "7892245618bedc57062e5bd26b1d4d271939b5ca",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; cmake-missing-wdk-missing-portable-user-space",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 187",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/handoff-check.ps1 -Issue 187",
+      "status": "pass",
+      "coverage": ["schema v2 ownership, scope and Git state"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": ["all active handoffs and overlap checks"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": ["85 required paths", "24 specs", "483 tracked paths", "103 repository JSON files"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": ["483 tracked paths", "no blocked binary or secret content"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": ["1 workflow", "483 tracked paths"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "blocked",
+      "coverage": ["cmake unavailable in local environment"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": ["no whitespace errors"],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP ordering, RT-thread, driver, HLK or signing behavior is changed.",
+    "The local environment lacks CMake and WDK, so full CTest/driver coverage is delegated to GitHub Actions Windows runners.",
+    "No physical audio, per-App delivery, loadable driver, HLK or Microsoft signing evidence is claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.5"
+  },
+  "started_at": "2026-08-22T15:57:32+08:00",
+  "finished_at": "2026-08-22T16:00:11+08:00"
+}
