@@ -99,6 +99,31 @@
       "compiled_artifacts": false
     },
     {
+      "command": "tools/docs-check.ps1",
+      "status": "blocked_by_integrator_baseline",
+      "coverage": [
+        "documentation validation reached the shared baseline counter",
+        "BASELINE.md claims 427 tracked paths while this branch has 429"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "source-only policy passed for 429 tracked paths"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "one workflow and 429 tracked paths satisfy source-only CI policy"
+      ],
+      "compiled_artifacts": false
+    },
+    {
       "command": "git diff --check",
       "status": "pass",
       "coverage": [
