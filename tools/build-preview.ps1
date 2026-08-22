@@ -44,6 +44,31 @@ function Get-PreviewDispatchMetadata([string]$repoRoot, [string]$target) {
   }
 }
 
+function Find-VisualStudioMsBuild {
+  $roots = @()
+  foreach ($root in @(${env:ProgramFiles(x86)}, ${env:ProgramFiles})) {
+    if (-not [string]::IsNullOrWhiteSpace($root)) {
+      $roots += Join-Path $root 'Microsoft Visual Studio\Installer\vswhere.exe'
+    }
+  }
+
+  $vswhere = $roots | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+  if (-not $vswhere) { return $null }
+
+  $candidate = & $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild `
+    -find 'MSBuild\**\Bin\MSBuild.exe' 2>$null | Select-Object -First 1
+  if ($candidate) {
+    $resolved = $candidate.ToString().Trim()
+    if (Test-Path -LiteralPath $resolved) { return $resolved }
+  }
+  return $null
+}
+
+function Get-FormalWinUiBuildTool([string]$msbuildPath) {
+  if ([string]::IsNullOrWhiteSpace($msbuildPath)) { return 'dotnet-fallback' }
+  return 'visual-studio-msbuild'
+}
+
 if ($SelfTest) {
   $expected = [ordered]@{
     WinUI = @{ ProjectRelativePath = 'apps/winui-shell/Hibiki.WinUI.csproj'; OutputProperty = 'OutputPath'; SmokeExecutable = $null }
@@ -73,9 +98,17 @@ if ($SelfTest) {
   } catch {
     $invalidCaught = $_.Exception.Message -match 'Unsupported preview target'
   }
-  if (-not $invalidCaught) { throw 'Preview dispatch self-test expected unsupported-target rejection.' }
+    if (-not $invalidCaught) { throw 'Preview dispatch self-test expected unsupported-target rejection.' }
 
-  Write-Output 'Preview target dispatch self-test passed (5 cases).'
+  if ((Get-FormalWinUiBuildTool $null) -ne 'dotnet-fallback') {
+    throw 'Preview dispatch self-test expected the null MSBuild path to use the explicit dotnet fallback.'
+  }
+  if ((Get-FormalWinUiBuildTool 'synthetic/MSBuild.exe') -ne 'visual-studio-msbuild') {
+    throw 'Preview dispatch self-test expected a resolved MSBuild path to use Visual Studio MSBuild.'
+  }
+
+  Write-Output 'Preview target dispatch self-test passed (7 cases).'
+
   exit 0
 }
 
@@ -137,8 +170,16 @@ if ($Target -eq 'DesktopCompat') {
 # This is deliberately a local developer preview only. It does not build a
 # virtual driver, sign anything, stage an installer, or create a GitHub asset.
 $project = $preview.ProjectPath
-dotnet build $project --configuration Release "-p:OutputPath=$previewRoot/"
-if ($LASTEXITCODE -ne 0) {
-  throw "WinUI preview build failed. Check tools/doctor.ps1; target Windows 11 24H2, VS 2026 and the locked SDK/WDK are required before treating a build as preview evidence."
+$msbuild = Find-VisualStudioMsBuild
+$buildTool = Get-FormalWinUiBuildTool $msbuild
+if ($msbuild) {
+  Write-Output 'Using Visual Studio MSBuild for the formal WinUI target.'
+  & $msbuild $project '/nologo' '/t:Build' '/p:Configuration=Release' '/p:Platform=x64' "/p:OutputPath=$previewRoot\"
+} else {
+  Write-Warning 'Visual Studio MSBuild was not found; using an explicit dotnet fallback. This cannot be promoted to formal XAML/accessibility evidence on a target machine.'
+  dotnet build $project --configuration Release "-p:OutputPath=$previewRoot/"
 }
-Write-Output "WinUI local preview build succeeded. It remains unsigned, driver-free and excluded from Git."
+if ($LASTEXITCODE -ne 0) {
+  throw "WinUI preview build failed via $buildTool for project $($preview.ProjectRelativePath). Check tools/doctor.ps1 and the locked Windows 11 24H2, VS 2026 and SDK/WDK toolchain before treating any output as evidence."
+}
+Write-Output "WinUI local preview build succeeded via $buildTool. It remains unsigned, driver-free and excluded from Git."
