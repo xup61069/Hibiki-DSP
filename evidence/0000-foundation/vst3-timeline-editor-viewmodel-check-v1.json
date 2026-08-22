@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "issue": 400,
+  "scope_digest": "vst3-timeline-editor-viewmodel-check-v1",
+  "source_commit": "afb6fbe63bceb8b28e75f11b19492094b4fbad3d",
+  "environment_fingerprint": "windows-26200-amd64-msvc-19.51.36256-dotnet-10.0.400-pwsh-7.6.5; target-24h2-wdk-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 400",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Vst3TimelineEditorViewModel registration and selection projections with Traditional Chinese refusal/success status",
+        "observable draft begin, commit, discard, save, undo and redo transitions",
+        "canonical row projection ordered by sample position then parameter ID",
+        "invariant-culture parsing for parameter ID, sample position and normalized value",
+        "full-width digits, locale decimal separators, NaN, out-of-range values, missing selection and out-of-range row refusal without unintended row mutation",
+        "selected-row value update preserves the row ordering key and dirty/undo/redo projections remain coherent"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "CMake/MSVC RelWithDebInfo verification build completed for repository targets"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 400",
+      "status": "pass",
+      "coverage": [
+        "Issue-based owner, branch identity and exclusive test/evidence scope"
+      ]
+    },
+    {
+      "command": "tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Active #400, #398 and #394 handoffs have valid non-overlapping scopes"
+      ]
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "80 required paths and 24 accepted Specs; live measurement passed at 513 tracked paths and 172 repository JSON files after this evidence was staged"
+      ]
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "Source-only policy over 513 tracked paths"
+      ]
+    },
+    {
+      "command": "tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Source-only workflow policy passed"
+      ]
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "No whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "This slice changes only deterministic headless control-model tests and anonymous evidence; it adds no IPC, native VST3, engine, worker, RT-thread, WinUI XAML, driver or signing behavior.",
+    "The ViewModel remains a managed control-plane surface and does not prove physical audio, driver, WaveRT, HLK, signing, third-party VST3 certification or production UI integration.",
+    "The local environment lacks the WDK needed for driver .sys/signability evidence; that remains exclusively owned by Issue #394."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.400",
+    "powershell": "pwsh 7.6.5",
+    "msvc": "19.51.36256"
+  }
+}
