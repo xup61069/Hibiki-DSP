@@ -7,9 +7,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $results = [System.Collections.Generic.List[object]]::new()
 
-$requiredKitVersion = '10.0.28000.2526'
-$kitDirectoryVersion = '10.0.28000.0'
-$requiredPackageVersion = '10.1.28000.2526'
+$minimumKitVersion = '10.0.26100'
+$kitFamilyPrefix = '10.1.26100.'
 
 function Add-Check([string]$Name, [bool]$Ok, [string]$Detail) {
   $results.Add([pscustomobject]@{ Name = $Name; Status = $(if ($Ok) { 'OK' } else { 'MISSING' }); Detail = $Detail })
@@ -41,10 +40,17 @@ function Find-WindowsKitPackage(
 
   $Entries |
     Where-Object {
-      $_.DisplayVersion -eq $requiredPackageVersion -and
+      ([string]$_.DisplayVersion).StartsWith($kitFamilyPrefix) -and
       $_.DisplayName -match $namePattern
     } |
     Select-Object -First 1
+}
+
+function Test-WindowsKitDirectoryVersion {
+  param([string]$Version)
+  $parts = $Version.Split('.')
+  if ($parts.Count -lt 3) { return $false }
+  try { return ([version]"$($parts[0]).$($parts[1]).$($parts[2])") -ge [version]$minimumKitVersion } catch { return $false }
 }
 
 function Get-WindowsKitAssessment(
@@ -52,25 +58,25 @@ function Get-WindowsKitAssessment(
   [object[]]$PackageEntries
 ) {
   $candidate = $Candidates |
-    Where-Object { $_.IncludeExists -and $_.BuildExists -and $_.ToolsExists } |
+    Where-Object { $_.IncludeExists -and $_.BuildExists -and $_.ToolsExists -and (Test-WindowsKitDirectoryVersion -Version $_.Version) } |
     Select-Object -First 1
   $sdkPackage = Find-WindowsKitPackage -Entries $PackageEntries -Kind Sdk
   $wdkPackage = Find-WindowsKitPackage -Entries $PackageEntries -Kind Wdk
   $reasons = [System.Collections.Generic.List[string]]::new()
 
   if ($null -eq $candidate) {
-    $reasons.Add("missing Include/build/Tools directories for $kitDirectoryVersion")
+    $reasons.Add("missing Include/build/Tools directories for minimum kit version $minimumKitVersion")
   }
   if ($null -eq $sdkPackage) {
-    $reasons.Add("missing Windows SDK package metadata version $requiredPackageVersion")
+    $reasons.Add("missing Windows SDK package metadata in $kitFamilyPrefix family")
   }
   if ($null -eq $wdkPackage) {
-    $reasons.Add("missing Windows Driver Kit package metadata version $requiredPackageVersion")
+    $reasons.Add("missing Windows Driver Kit package metadata in $kitFamilyPrefix family")
   }
 
   $ok = $reasons.Count -eq 0
   $detail = if ($ok) {
-    "on-disk=$kitDirectoryVersion; SDK QFE=$($sdkPackage.DisplayVersion); WDK QFE=$($wdkPackage.DisplayVersion); root=$($candidate.Root)"
+    "on-disk=$($candidate.Version); SDK QFE=$($sdkPackage.DisplayVersion); WDK QFE=$($wdkPackage.DisplayVersion); root=$($candidate.Root)"
   } else {
     $reasons -join '; '
   }
@@ -85,21 +91,23 @@ function Get-WindowsKitAssessment(
 }
 
 function Invoke-WindowsKitSelfTest {
-  $exactPackages = @(
-    [pscustomobject]@{ DisplayName = 'Windows Software Development Kit - Windows 10.0.28000.2526'; DisplayVersion = '10.1.28000.2526' },
-    [pscustomobject]@{ DisplayName = 'Windows Driver Kit - Windows 10.0.28000.2526'; DisplayVersion = '10.1.28000.2526' }
+  $familyPackages = @(
+    [pscustomobject]@{ DisplayName = 'Windows Software Development Kit - Windows 10.0.26100'; DisplayVersion = '10.1.26100.8249' },
+    [pscustomobject]@{ DisplayName = 'Windows Driver Kit - Windows 10.0.26100'; DisplayVersion = '10.1.26100.6584' }
   )
   $exactCandidate = [pscustomobject]@{
     Root = 'fixture/windows-kits/10'
+    Version = '10.0.26100.0'
     IncludeExists = $true
     BuildExists = $true
     ToolsExists = $true
   }
   $cases = @(
-    @{ Name = 'exact-match'; Candidates = @($exactCandidate); Packages = $exactPackages; Expected = $true },
-    @{ Name = 'missing-sdk-metadata'; Candidates = @($exactCandidate); Packages = @($exactPackages | Where-Object { $_.DisplayName -notmatch 'Software Development Kit' }); Expected = $false },
-    @{ Name = 'mismatched-qfe'; Candidates = @($exactCandidate); Packages = @($exactPackages | ForEach-Object { [pscustomobject]@{ DisplayName = $_.DisplayName; DisplayVersion = '10.1.26100.8249' } }); Expected = $false },
-    @{ Name = 'missing-kit-directory'; Candidates = @([pscustomobject]@{ Root = 'fixture/windows-kits/10'; IncludeExists = $false; BuildExists = $true; ToolsExists = $true }); Packages = $exactPackages; Expected = $false }
+    @{ Name = 'family-match'; Candidates = @($exactCandidate); Packages = $familyPackages; Expected = $true },
+    @{ Name = 'missing-sdk-metadata'; Candidates = @($exactCandidate); Packages = @($familyPackages | Where-Object { $_.DisplayName -notmatch 'Software Development Kit' }); Expected = $false },
+    @{ Name = 'wrong-family-package'; Candidates = @($exactCandidate); Packages = @($familyPackages | ForEach-Object { [pscustomobject]@{ DisplayName = $_.DisplayName; DisplayVersion = '10.1.28000.2526' } }); Expected = $false },
+    @{ Name = 'below-minimum-directory'; Candidates = @([pscustomobject]@{ Root = 'fixture/windows-kits/10'; IncludeExists = $true; BuildExists = $true; ToolsExists = $true; Version = '10.0.22621.0' }); Packages = $familyPackages; Expected = $false },
+    @{ Name = 'missing-kit-directory'; Candidates = @([pscustomobject]@{ Root = 'fixture/windows-kits/10'; IncludeExists = $false; BuildExists = $true; ToolsExists = $true; Version = '10.0.26100.0' }); Packages = $familyPackages; Expected = $false }
   )
 
   foreach ($case in $cases) {
@@ -141,15 +149,20 @@ $kitRoots = @(
   (Join-Path ${env:ProgramFiles(x86)} 'Windows Kits/10')
 ) | Select-Object -Unique
 $kitCandidates = foreach ($root in $kitRoots) {
-  [pscustomobject]@{
-    Root = $root
-    IncludeExists = Test-Path (Join-Path $root "Include/$kitDirectoryVersion")
-    BuildExists = Test-Path (Join-Path $root "build/$kitDirectoryVersion")
-    ToolsExists = Test-Path (Join-Path $root "Tools/$kitDirectoryVersion")
+  foreach ($dir in @(Get-ChildItem -LiteralPath (Join-Path $root 'Include') -Directory -ErrorAction SilentlyContinue)) {
+    $versionName = $dir.Name
+    if ($versionName -notmatch '^10\.0\.\d+(\.0)?$') { continue }
+    [pscustomobject]@{
+      Root = $root
+      Version = $versionName
+      IncludeExists = Test-Path (Join-Path $root "Include/$versionName")
+      BuildExists = Test-Path (Join-Path $root "build/$versionName")
+      ToolsExists = Test-Path (Join-Path $root "Tools/$versionName")
+    }
   }
 }
 $kitAssessment = Get-WindowsKitAssessment -Candidates $kitCandidates -PackageEntries (Get-WindowsKitPackageEntries)
-Add-Check "Windows SDK/WDK $requiredKitVersion" $kitAssessment.Ok $kitAssessment.Detail
+Add-Check "Windows SDK/WDK >= $minimumKitVersion" $kitAssessment.Ok $kitAssessment.Detail
 
 $results | Format-Table -AutoSize
 if (($results | Where-Object Status -eq 'MISSING').Count -gt 0) {
