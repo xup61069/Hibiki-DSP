@@ -29,9 +29,9 @@
         "multiple blocked extensions flagged preserving input order",
         "case-insensitive extension match (.EXE, .Dll, .so) flagged",
         "every blocked extension class (19 types) flagged",
-        "secret pattern BEGIN PRIVATE KEY detected",
-        "secret pattern ghp_ detected",
-        "secret pattern GUMROAD_ACCESS_TOKEN detected",
+        "private-key header pattern detected",
+        "github personal token pattern detected",
+        "generic token pattern detected",
         "clean text produces no secret violation",
         "PE header MZ detection positive and negative"
       ],
@@ -52,7 +52,7 @@
       "command": "tools/handoff-check.ps1 -Issue 232 / tools/handoff-check.ps1 / tools/docs-check.ps1 -SelfTest / tools/docs-check.ps1 / tools/source-only-ci-check.ps1 / git diff --check",
       "status": "pass",
       "coverage": [
-        "schema v2 ownership, scope and Git ancestry for Issue 232 (no overlap with active handoffs 0,30,55,82,92,120,169,171,175,177,179,184,187,208,211,213,215,217,219,222)",
+        "schema v2 ownership, scope and Git ancestry for Issue 232",
         "docs-check self-test 13 cases and live measurement 515 tracked / 111 JSON",
         "source-only CI 16-case self-test and 1 workflow policy pass",
         "no whitespace errors"
