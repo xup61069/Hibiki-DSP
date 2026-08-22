@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 149,
   "scope_digest": "extension-policy-selftest-v2",
-  "source_commit": "pending",
+  "source_commit": "5865e47373131fda53af54e6a899c20e7e0e9d2a",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5; target-vs2026-sdk-wdk-missing",
   "commands": [
     "pwsh -NoProfile -File tools/extension-check.ps1 -SelfTest",
@@ -12,12 +12,13 @@
     "pwsh -NoProfile -File tools/docs-check.ps1",
     "pwsh -NoProfile -File tools/source-policy.ps1",
     "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
     "git diff --check"
   ],
   "results": [
     {
       "command": "tools/extension-check.ps1 -SelfTest",
-      "status": "pending",
+      "status": "pass",
       "cases": 10,
       "coverage": [
         "valid MV3 manifest acceptance",
@@ -34,6 +35,70 @@
       "repository_reads": false,
       "process_started": false,
       "files_written": false
+    },
+    {
+      "command": "tools/extension-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "MV3 least-privilege permission validation",
+        "http://127.0.0.1/* host boundary validation",
+        "self-only and loopback-only extension_pages CSP validation",
+        "required source component existence validation"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 149 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope, shared path and Git ancestry"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "85 required documentation paths",
+        "24 specs",
+        "466 tracked paths and 97 repository JSON files against the branch BASELINE summary"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "466 tracked paths with no blocked binary or secret",
+        "one workflow source-only publication boundary"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "CMake configure and build",
+        "CTest 1 of 1"
+      ],
+      "compiled_artifacts": true,
+      "artifacts_ignored": true
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "PR-mode tools/docs-check.ps1 against origin/main 5783fbc7a5270434919dce1532ce602ace901581",
+      "status": "blocked",
+      "coverage": [
+        "target merge-base BASELINE consistency"
+      ],
+      "reason": "Target main claims 462 tracked paths and 95 repository JSON files, but its tree contains 464 and 96; the target branch must be reconciled by the integrator before PR CI can pass."
     }
   ],
   "limitations": [
@@ -45,5 +110,5 @@
     "powershell": "pwsh 7.6.5"
   },
   "started_at": "2026-08-22T11:00:00+08:00",
-  "finished_at": "pending"
+  "finished_at": "2026-08-22T11:30:00+08:00"
 }
