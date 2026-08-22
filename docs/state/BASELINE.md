@@ -660,6 +660,13 @@ Preview 執行檔、工作目錄、project path 與 .local/control-model-engine-
 docs/tasks/active/466.md handoff 檔案，依 Issue #341/#346 前例新增
 retention-final-v2.json evidence（Issue #485 / PR #487）。
 
+第十波 tooling 增量已合併：docs-check.ps1 新增 markdown 相對連結驗證——target 缺失時
+fail-closed，URL、anchor 與 fenced code block 略過，-SelfTest 加入離線連結案例
+（Issue #496 / PR #497）；live-audio-session-check.ps1 對固定 build root 與 probe path
+新增 fail-closed 驗證，拒絕 root 外路徑、既有 reparse point 祖先／target 與非目錄／
+非檔案形狀，保留 missing build root 建立行為，wrapper self-test 擴充且不呼叫 CMake、
+不執行 probe、不寫 repo 檔案（Issue #492 / PR #494）。皆為 tooling/source evidence。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；

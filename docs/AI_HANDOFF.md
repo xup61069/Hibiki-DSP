@@ -226,6 +226,14 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   docs/tasks/active/466.md were removed after their slices merged, with
   retention-final-v2.json evidence following the Issue #341/#346 precedent
   (Issue #485 / PR #487).
+- Docs link gate merged: docs-check.ps1 validates markdown relative links and fails closed
+  on missing targets while skipping URLs, anchors and fenced code blocks; -SelfTest gained
+  offline link cases (Issue #496 / PR #497).
+- Live audio-session probe hardening merged: live-audio-session-check.ps1 fails closed on
+  build-root and probe-path validation, rejecting outside-root paths, existing reparse-
+  point ancestors/targets and non-directory/non-file shapes while preserving missing
+  build-root creation; wrapper self-test grew with no CMake, probe execution or repository
+  writes (Issue #492 / PR #494).
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe
