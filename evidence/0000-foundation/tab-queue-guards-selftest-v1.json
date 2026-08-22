@@ -16,7 +16,50 @@
   ],
   "commands": [
     "cmake --build .local/build --config RelWithDebInfo --target hibiki_tab_bridge_selftest",
-    "ctest --test-dir .local/build -C RelWithDebInfo -R hibiki_tab_bridge_selftest --output-on-failure"
+    "ctest --test-dir .local/build -C RelWithDebInfo -R hibiki_tab_bridge_selftest --output-on-failure",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 375",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/extension-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "hibiki_tab_bridge_selftest.exe",
+      "status": "pass",
+      "coverage": [
+        "null sample pointer, sample-count mismatch, unsupported channels/rate and non-finite sample rejection",
+        "rejected pushes leave dropped_blocks unchanged",
+        "null, zero-capacity and insufficient-capacity pops do not consume a valid block",
+        "valid block remains available after every rejected pop guard"
+      ]
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "CMake configure and RelWithDebInfo build",
+        "CTest 3 of 3: ASIO self-test, tab bridge self-test and contract tests"
+      ],
+      "compiled_artifacts": true,
+      "artifacts_ignored": true
+    },
+    {
+      "command": "repository gates",
+      "status": "pass",
+      "coverage": [
+        "doctor target fingerprint",
+        "Issue 375 and full handoff ownership/scope/ancestry",
+        "documentation structural checks",
+        "source-only and extension policy checks",
+        "whitespace validation"
+      ]
+    }
   ],
   "limitations": [
     "Offline queue boundary coverage only; no listener, socket, browser, WebSocket, COM, filesystem, endpoint or real audio access.",
