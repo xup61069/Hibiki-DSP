@@ -4,6 +4,9 @@
   "scope_digest": "issue-244-distribution-selftest-crlf-v1",
   "source_commit": "4f5e2c6f975970fcaf1aa371dca0907d433d04c5",
   "implementation_commit": "cf845d7",
+  "merge_commit": "1fd76a74906d95ae65d5ece08410ab45b70a1b82",
+  "corrective_archive_commit": "pending",
+  "post_merge_metadata_commits": ["db3e3c7", "58ab51f"],
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; vs2026-sdk-wdk-on-disk; target-24h2-machine-missing",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 244",
@@ -69,6 +72,17 @@
       "status": "pass",
       "coverage": ["anonymous .local/context.json fingerprint"],
       "compiled_artifacts": false
+    },
+    {
+      "command": "PR #248 merge history",
+      "status": "pass",
+      "coverage": [
+        "implementation head 2a797e47c892cf5652fad07807ac3d5c2c84d72b merged at 1fd76a74906d95ae65d5ece08410ab45b70a1b82",
+        "push verify run 32567445909",
+        "merge-ref verify run 32567458470",
+        "post-merge metadata commits db3e3c7 and 58ab51f remain outside main"
+      ],
+      "compiled_artifacts": false
     }
   ],
   "root_cause": "The Issue #39 self-test fixture used a LF-only Replace token while the Windows CRLF script text produced CRLF fixture lines, so duplicate-root-key was not injected.",
@@ -82,5 +96,5 @@
     "powershell": "7.6.5"
   },
   "started_at": "2026-08-22T22:10:00+08:00",
-  "finished_at": "pending_ci"
+  "finished_at": "2026-08-22T23:42:00+08:00"
 }
