@@ -9,8 +9,8 @@ compiler:
   visual_studio: "2026"
   generator: "Visual Studio 18 2026"
 windows:
-  sdk: "10.0.28000.2526"
-  wdk: "10.0.28000.2526"
+  sdk: ">= 10.0.26100"
+  wdk: ">= 10.0.26100"
   app_sdk: "1.7.250401001"
 build:
   language_standard: c++20

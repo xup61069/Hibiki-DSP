@@ -35,8 +35,8 @@ driver entry point (`DriverEntry`), device object initialization
 (`HibikiPnpDispatchV1` / `HibikiPowerDispatchV1`). They bind all four endpoints
 to the Windows audio driver life cycle without linking GPL user-space code.
 
-It is deliberately not part of the default CMake target: this machine does
-not have the locked WDK 10.0.28000.2526 and no `.sys` is produced. A future WDK
+It is deliberately not part of the default CMake target: the default build does
+not invoke the kernel-mode toolchain and no `.sys` is produced by CMake. A future WDK
 adapter must provide one context per endpoint, wire the functions into the
 SYSVAD property/automation tables, expose the fixed LPCM pin formats and use
 the Apache driver-control ABI over IPC. For endpoint-state and volume

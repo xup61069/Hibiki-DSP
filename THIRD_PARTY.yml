@@ -3,7 +3,7 @@ policy: Every dependency is pinned by source URL, commit/version, hash, SPDX lic
 dependencies:
   - name: Microsoft Windows SDK/WDK
     source: https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk
-    version: 10.0.28000.2526
+    version: minimum 10.0.26100 family (QFE updates permitted)
     license: Microsoft-redistributable-tooling
     purpose: Windows driver and SDK build prerequisite
     redistribution: Do not vendor into the public repository
