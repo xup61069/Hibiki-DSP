@@ -199,6 +199,22 @@
       "status": "pass",
       "coverage": ["ordinary merge commit 937b5ec", "no product source changes"],
       "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 sixth-sync push)",
+      "status": "fail",
+      "coverage": ["target-base counter consistency"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32563829553/job/97009400862",
+      "failure": "origin/main build/baseline-counters.json claims 501 tracked paths but that target tree has 500; target-main counter repair is owned by the integrator lane (#206/#207)",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 sixth-sync merge-ref)",
+      "status": "fail",
+      "coverage": ["target-base counter consistency"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32563830981/job/97009404503",
+      "failure": "origin/main build/baseline-counters.json claims 501 tracked paths but that target tree has 500; target-main counter repair is owned by the integrator lane (#206/#207)",
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
@@ -206,6 +222,7 @@
     "The local environment lacks CMake and WDK, so full CTest/driver coverage is delegated to GitHub Actions Windows runners.",
     "The first PR run exposed a stale target-main counter; main maintenance commit 929752f corrected it before the successful rerun.",
     "The target branch advanced six times after earlier green checks; this lane used ordinary merge commits and is awaiting verification for the sixth merge-synced head.",
+    "The sixth-sync PR checks failed because origin/main counters claim 501 tracked paths while the target tree contains 500; the repair belongs to integrator-owned #206/#207 and this lane does not modify those branches.",
     "No physical audio, per-App delivery, loadable driver, HLK or Microsoft signing evidence is claimed."
   ],
   "logs": [],
