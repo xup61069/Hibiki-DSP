@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "issue": 96,
+  "scope_digest": "readme-dual-audience-v1",
+  "source_commit": "740ee44",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -File tools/handoff-check.ps1 -Issue 96",
+    "pwsh -File tools/handoff-check.ps1",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "pwsh -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "documentation review",
+      "status": "pass",
+      "coverage": [
+        "README restructured into dual-audience layout: plain-language introduction with English abstract, table of contents, general-visitor status table and three common misconceptions, a three-minute safe try-it path, and a dedicated AI-collaborator section preserving the canonical AGENTS/START_HERE/AI_HANDOFF entry order",
+        "all existing preview/probe commands, caveats and user-space non-claims preserved under explicit 預覽與驗證詳情 headings",
+        "license, source-policy and release statements carried over verbatim in meaning",
+        "BASELINE counters refreshed mechanically for this slice's two new files"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation-only change; no product source, schema or behavior is modified.",
+    "docs/state/BASELINE.md remains multi-PR hot for counter refreshes."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5 local"
+  },
+  "started_at": "2026-08-22T00:00:00+08:00",
+  "finished_at": "2026-08-22T00:00:00+08:00"
+}

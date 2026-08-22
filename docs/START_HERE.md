@@ -5,6 +5,13 @@
 
 ## Fresh clone 流程
 
+所有 `tools/*.ps1` gates 必須用 PowerShell 7（`pwsh`）執行：腳本為 UTF-8（無 BOM）
+並使用 .NET Core API，Windows 內建的 PowerShell 5.1 會把中文解成亂碼且缺少必要
+方法，直接跑必失敗。沒有 `pwsh` 先 `winget install --id Microsoft.PowerShell`；
+本機被 Execution Policy 擋下時加 `-ExecutionPolicy Bypass`。多個 gate 另提供
+`-SelfTest`（例：`tools/docs-check.ps1 -SelfTest`），可在不碰機器、不寫檔的前提下
+驗證 gate 自身邏輯。
+
 1. 讀 root `AGENTS.md`、本檔、`docs/AI_HANDOFF.md`、`docs/ai/MULTI_AGENT.md` 與
    `docs/PROJECT_MAP.md`。
 2. 執行 `git fetch --all --prune`，檢查 open Issue／PR／active handoff；選擇未被認領且
@@ -92,8 +99,11 @@ branch，確認前一個 AI 停止寫入後才把 owner 交給下一個 AI。真
   named-pipe boundary、source-only passthrough worker、可選的 pinned VST3 SDK factory catalog
   與單一主 bus worker-side SDK processor/optional worker executable；bounded parameter timeline、
   latency graph commit、RT compensation、private identity/version-checked state、explicit
-  migration handler/registry、Scene binding、EngineControl preflight gate 與第三方 state review
-  checklist 已接入；supervisor UI timeline 編輯、side-chain/multi-bus 與 certification 仍待完成。
+   migration handler/registry、Scene binding、EngineControl preflight gate 與第三方 state review
+   checklist 已接入；supervisor 端 headless timeline 編輯交易、canonical JSON 持久化、
+   per-timeline 檔案儲存、store→scheduler 同步與排程器內省亦已完成（Issues #14/#22/#35/
+   #63/#72/#78）；supervisor UI 編輯介面、side-chain/multi-bus worker process 與
+   certification 仍待完成。
   `extensions/` 已有 HIBT decoder、loopback bridge、bounded capture queue 與
   graph-lane adapter；Virtual Mic 有 bounded normalized-LMS/gate baseline，但正式 AEC/NS model
   provenance 與 signed capture driver 仍待完成。process-loopback 是 process-level source，
