@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "slice": "driver-load-test",
+  "date": "2026-08-22T20:26:48.169Z",
+  "machine_fingerprint": "windows-26200-amd64-vs2026-18.9-wdk-on-disk-10.0.26100.0",
+  "steps": [
+    {
+      "command": "pwsh -File tools/build-driver.ps1",
+      "result": "exit 0",
+      "details": "HibikiVirtualAudio.sys linked; Inf2Cat catalog generation complete; Signability test complete with 0 errors and 0 warnings."
+    },
+    {
+      "command": "New-SelfSignedCertificate -Type CodeSigningCert",
+      "result": "created",
+      "details": "Self-signed code-signing certificate exported as PFX and CER under .local/certs (untracked by policy); private key never enters Git."
+    },
+    {
+      "command": "signtool sign /fd SHA256 (sys and cat)",
+      "result": "Successfully signed both files"
+    },
+    {
+      "command": "signtool verify /pa",
+      "result": "chain terminates in untrusted root (expected)",
+      "details": "Root-trust import into LocalMachine Trusted Root and TrustedPublisher stores is the next user-consented step; verification expected to pass after import."
+    }
+  ],
+  "next_user_gated_steps": [
+    "Import .local/certs/hibiki-testsign.cer into LocalMachine Trusted Root and TrustedPublisher stores.",
+    "bcdedit /set testsigning on (requires reboot; explicit user consent required).",
+    "pnputil /add-driver HibikiVirtualAudio.inf /install",
+    "Verify Hibiki virtual audio endpoint appears via Get-PnpDevice."
+  ],
+  "claims": "Build, package and signature evidence only; no endpoint presence or audio behavior claim yet."
+}
