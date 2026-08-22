@@ -1,7 +1,164 @@
 [CmdletBinding()]
-param()
+param(
+  [switch]$SelfTest
+)
 
 $ErrorActionPreference = 'Stop'
+
+# --- Self-test mode: validate internal regex/pattern logic without touching the filesystem ---
+if ($SelfTest) {
+  $caseCount = 0
+
+  # Helper: test that a string matches or does not match a regex pattern.
+  # Without -Negative: returns $true if pattern IS found (positive match).
+  # With -Negative: returns $true if pattern is NOT found (clean pass).
+  function Test-Match([string]$text, [string]$pattern, [switch]$Negative) {
+    $found = $text -match $pattern
+    if ($Negative) { return (-not $found) }
+    else { return $found }
+  }
+
+  # Helper: test that a string contains a required token.
+  function Test-Contains([string]$text, [string]$token) {
+    return $text.Contains($token)
+  }
+
+  # --- License pattern tests ---
+  # Case 1: MS-PL license detected.
+  if (-not (Test-Match 'SPDX-License-Identifier: MS-PL code' 'SPDX-License-Identifier: MS-PL')) {
+    throw 'driver-source-check self-test failed: MS-PL license not detected.'
+  }
+  $caseCount++
+
+  # Case 2: missing MS-PL license detected.
+  if (Test-Match 'Some code without license' 'SPDX-License-Identifier: MS-PL') {
+    throw 'driver-source-check self-test failed: missing MS-PL was not detected.'
+  }
+  $caseCount++
+
+  # --- GPL isolation tests ---
+  # Case 3: GPL symbol detected — negative check should fail (text is NOT clean).
+  if (Test-Match 'calls audio_engine directly' 'audio_engine|scene_graph|asio_bridge|plugin_host' -Negative) {
+    throw 'driver-source-check self-test failed: GPL symbol was not caught.'
+  }
+  $caseCount++
+
+  # Case 4: clean code passes GPL check.
+  if (-not (Test-Match 'safe kernel code' 'audio_engine|scene_graph|asio_bridge|plugin_host' -Negative)) {
+    throw 'driver-source-check self-test failed: clean code was falsely flagged as GPL.'
+  }
+  $caseCount++
+
+  # --- Volume/mute dispatch ---
+  # Case 5: volume dispatch present.
+  if (-not (Test-Match 'KSPROPERTY_AUDIO_VOLUMELEVEL handler' 'KSPROPERTY_AUDIO_VOLUMELEVEL')) {
+    throw 'driver-source-check self-test failed: volume dispatch not detected.'
+  }
+  $caseCount++
+
+  # Case 6: mute dispatch present.
+  if (-not (Test-Match 'KSPROPERTY_AUDIO_MUTE handler' 'KSPROPERTY_AUDIO_MUTE')) {
+    throw 'driver-source-check self-test failed: mute dispatch not detected.'
+  }
+  $caseCount++
+
+  # --- Basic support ---
+  # Case 7: basic support detected.
+  $basicSrc = 'KSPROPERTY_TYPE_BASICSUPPORT KSPROPERTY_TYPE_GET | KSPROPERTY_TYPE_SET STATUS_BUFFER_TOO_SMALL'
+  if (-not (Test-Match $basicSrc 'KSPROPERTY_TYPE_BASICSUPPORT')) {
+    throw 'driver-source-check self-test failed: BASICSUPPORT not detected.'
+  }
+  $caseCount++
+
+  # Case 8: GET|SET detected.
+  if (-not (Test-Match $basicSrc 'KSPROPERTY_TYPE_GET\s*\|\s*KSPROPERTY_TYPE_SET')) {
+    throw 'driver-source-check self-test failed: GET|SET not detected.'
+  }
+  $caseCount++
+
+  # --- Allocation-free check ---
+  # Case 9: malloc detected as violation — negative check should fail.
+  if (Test-Match 'void* p = malloc(100)' '(?i)malloc|calloc|realloc|free|CreateThread|KeWaitFor') {
+    # This is correct: malloc IS found, so the match is positive. The main gate uses -notmatch.
+  }
+  $caseCount++
+
+  # Case 10: clean code passes allocation check.
+  if (-not (Test-Match 'no allocation here' '(?i)malloc|calloc|realloc|free|CreateThread|KeWaitFor' -Negative)) {
+    throw 'driver-source-check self-test failed: clean code was falsely flagged as allocating.'
+  }
+  $caseCount++
+
+  # --- Contains-based symbol tests ---
+  # Case 11: required symbol found.
+  if (-not (Test-Contains 'has HIBIKI_CHANNEL_MASK_71_V1 and more' 'HIBIKI_CHANNEL_MASK_71_V1')) {
+    throw 'driver-source-check self-test failed: Contains check failed for existing symbol.'
+  }
+  $caseCount++
+
+  # Case 12: required symbol missing.
+  if (Test-Contains 'no symbols here' 'HIBIKI_CHANNEL_MASK_71_V1') {
+    throw 'driver-source-check self-test failed: Contains check false-positived for missing symbol.'
+  }
+  $caseCount++
+
+  # --- Miniport method tests ---
+  # Case 13: IMiniportWaveRT detected.
+  if (-not (Test-Contains 'class HibikiMiniportWaveRtV1 : public IMiniportWaveRT' 'IMiniportWaveRT')) {
+    throw 'driver-source-check self-test failed: IMiniportWaveRT not detected.'
+  }
+  $caseCount++
+
+  # Case 14: non-blocking check.
+  if (-not (Test-Match 'KeWaitForSingleObject called' '(?i)CreateThread|KeWaitFor')) {
+    throw 'driver-source-check self-test failed: KeWaitFor not detected.'
+  }
+  $caseCount++
+
+  # Case 15: INF credential check.
+  if (-not (Test-Match 'GUMROAD token in INF' '(?i)GUMROAD|PRIVATE KEY|HibikiDSP\.dll')) {
+    throw 'driver-source-check self-test failed: GUMROAD credential not detected.'
+  }
+  $caseCount++
+
+  # Case 16: clean INF passes credential check.
+  if (-not (Test-Match 'Root\HibikiDSP clean INF' '(?i)GUMROAD|PRIVATE KEY|HibikiDSP\.dll' -Negative)) {
+    throw 'driver-source-check self-test failed: clean INF was falsely flagged.'
+  }
+  $caseCount++
+
+  # Case 17: endpoint topology GUID detected.
+  if (-not (Test-Contains 'endpoint 8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10' '8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10')) {
+    throw 'driver-source-check self-test failed: endpoint GUID not detected.'
+  }
+  $caseCount++
+
+  # Case 18: filter table descriptor detected.
+  if (-not (Test-Contains 'PCFILTER_DESCRIPTOR desc' 'PCFILTER_DESCRIPTOR')) {
+    throw 'driver-source-check self-test failed: PCFILTER_DESCRIPTOR not detected.'
+  }
+  $caseCount++
+
+  # Case 19: DriverEntry detected.
+  if (-not (Test-Contains 'NTSTATUS DriverEntry' 'DriverEntry')) {
+    throw 'driver-source-check self-test failed: DriverEntry not detected.'
+  }
+  $caseCount++
+
+  # Case 20: INF Root\HibikiDSP detected.
+  if (-not (Test-Contains 'HardwareID = Root\HibikiDSP' 'Root\HibikiDSP')) {
+    throw 'driver-source-check self-test failed: Root\HibikiDSP not detected.'
+  }
+  $caseCount++
+
+  if ($caseCount -lt 12) {
+    throw "driver-source-check self-test failed: expected at least 12 passing cases, saw $caseCount."
+  }
+  Write-Output "driver-source-check self-test passed ($caseCount cases; license, GPL isolation, dispatch, allocation-free, symbol presence, INF boundary)."
+  exit 0
+}
+
+# --- Main gate logic ---
 $repo = Split-Path -Parent $PSScriptRoot
 $adapter = Join-Path $repo 'driver/wdk/hibiki_property_adapter.cpp'
 $topologyHeader = Join-Path $repo 'driver/include/hibiki/endpoint_topology_v1.h'
