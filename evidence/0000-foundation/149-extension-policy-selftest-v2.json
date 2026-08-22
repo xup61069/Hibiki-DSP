@@ -114,6 +114,18 @@
       "status": "blocked",
       "url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32547633779",
       "reason": "Documentation gate fail-closed on target origin/main BASELINE: 462 claimed tracked paths versus 464 in the target tree; target-main integrator reconciliation is required."
+    },
+    {
+      "event": "push",
+      "run_id": 32548163597,
+      "status": "pass",
+      "url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32548163597"
+    },
+    {
+      "event": "pull_request",
+      "run_id": 32548165538,
+      "status": "pass",
+      "url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32548165538"
     }
   ],
   "limitations": [
