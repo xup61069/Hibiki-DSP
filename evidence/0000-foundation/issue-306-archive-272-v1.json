@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "issue": 306,
+  "scope_digest": "issue-306-archive-272-v1",
+  "source_commit": "831dcb0",
+  "archive_commit": "831dcb0",
+  "main_sync_commit": "20b6bc1",
+  "archived_issue": 272,
+  "merged_pr": 282,
+  "merged_pr_commit": "80e0f365d1215a20897140ebcd14c4c01e40c3f7",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-10.0.28000.2526-wdk-10.0.28000.2526-cmake-4.4.2-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 306",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 306 archive implementation",
+      "status": "pass",
+      "coverage": [
+        "moved docs/tasks/active/272.md to docs/tasks/completed/2026/272.md",
+        "preserved Issue 272 scope and recorded PR #282 merge commit 80e0f365d1215a20897140ebcd14c4c01e40c3f7",
+        "superseded draft PR #276 content excluded"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "PR #282 final CI review",
+      "status": "pass",
+      "coverage": [
+        "PR #282 merged at 80e0f365d1215a20897140ebcd14c4c01e40c3f7 from head 5531467",
+        "push verify run 32571809510 / job 97028188945 passed",
+        "pull_request verify run 32571850886 / job 97028284097 passed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 306 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Issue 306 schema-v2 ownership, scope and Git ancestry",
+        "full active handoff validation across all open lanes"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 -SelfTest / tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "bounded docs-check self-test cases",
+        "85 required documentation paths and 24 specs",
+        "live measurement of 570 tracked paths and 135 repository JSON files after rebase onto origin/main 20b6bc1"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "570 tracked paths with no blocked binary or secret",
+        "one workflow with source-only CI policy satisfied"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP, RT audio, driver, HLK or signing behavior is changed.",
+    "Archive and user-space gates do not provide physical audio, loadable-driver, HLK or Microsoft-signing evidence.",
+    "Local verify outputs are ignored .local artifacts and are not part of the archive PR."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4",
+    "windows_build": "26200"
+  },
+  "started_at": "2026-08-22T21:10:00+08:00",
+  "finished_at": "2026-08-22T21:35:00+08:00"
+}
