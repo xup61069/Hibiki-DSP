@@ -1978,6 +1978,72 @@ int main() {
         parameter_packet, decoded_worker, std::span<Vst3WorkerParameterPointV1>(decoded_parameters),
         decoded_parameter_count, decoded_parameter_samples, worker_error) &&
           worker_error == Vst3WorkerProtocolErrorV1::InvalidFormat);
+
+    // Issue 284: bounded offline fixtures for the v1 worker frame codec. Each case
+    // is deterministic, in-memory, and exercises one fail-closed boundary without
+    // launching a process or touching the filesystem.
+    {
+        std::array<std::uint8_t, kVst3WorkerHeaderBytesV1 + 2U * sizeof(float)>
+            selftest_packet{};
+        const Vst3WorkerFrameV1 selftest_frame{
+            Vst3WorkerMessageTypeV1::ProcessBlockResponse, 284U, 2U, 1U,
+            2U * sizeof(float), 0U};
+        std::size_t selftest_header_bytes = 0U;
+
+        // 1) Valid little-endian round-trip: encode → decode → validate finite payload.
+        CHECK(encode_vst3_worker_frame_v1(
+            selftest_frame,
+            std::span<std::uint8_t>(selftest_packet).first(kVst3WorkerHeaderBytesV1),
+            selftest_header_bytes));
+        const float selftest_samples[2] = {0.5F, -0.5F};
+        std::memcpy(selftest_packet.data() + kVst3WorkerHeaderBytesV1, selftest_samples,
+                    sizeof(selftest_samples));
+        Vst3WorkerFrameV1 selftest_decoded{};
+        Vst3WorkerProtocolErrorV1 selftest_error{Vst3WorkerProtocolErrorV1::None};
+        std::span<const float> selftest_payload;
+        CHECK(validate_vst3_worker_audio_frame_v1(selftest_packet, selftest_decoded,
+                                                   selftest_payload, selftest_error));
+        CHECK(selftest_decoded.request_id == 284U && selftest_payload.size() == 2U);
+        // Explicit little-endian byte order on the wire.
+        CHECK(selftest_packet[0] == 0x48U && selftest_packet[1] == 0x49U &&
+              selftest_packet[2] == 0x56U && selftest_packet[3] == 0x53U);
+
+        // 2) Truncated header: below the fixed 36-byte minimum must fail closed.
+        Vst3WorkerFrameV1 truncated_frame{};
+        Vst3WorkerProtocolErrorV1 truncated_error{Vst3WorkerProtocolErrorV1::None};
+        CHECK(!decode_vst3_worker_frame_v1(
+            std::span<const std::uint8_t>(selftest_packet).first(kVst3WorkerHeaderBytesV1 - 1U),
+            truncated_frame, truncated_error));
+        CHECK(truncated_error == Vst3WorkerProtocolErrorV1::Truncated);
+
+        // 3) Non-finite sample: NaN in an otherwise valid audio frame is rejected.
+        float selftest_nan = std::numeric_limits<float>::quiet_NaN();
+        std::memcpy(selftest_packet.data() + kVst3WorkerHeaderBytesV1, &selftest_nan,
+                    sizeof(selftest_nan));
+        Vst3WorkerProtocolErrorV1 nan_error{Vst3WorkerProtocolErrorV1::None};
+        CHECK(!validate_vst3_worker_audio_frame_v1(selftest_packet, selftest_decoded,
+                                                    selftest_payload, nan_error));
+        CHECK(nan_error == Vst3WorkerProtocolErrorV1::NonFiniteSample);
+        std::memcpy(selftest_packet.data() + kVst3WorkerHeaderBytesV1, selftest_samples,
+                    sizeof(selftest_samples));
+
+        // 4) Wrong-endian rejection: big-endian byte order of the same magic fails closed.
+        std::array<std::uint8_t, kVst3WorkerHeaderBytesV1 + 2U * sizeof(float)>
+            wrong_endian_packet{};
+        std::memcpy(wrong_endian_packet.data(), selftest_packet.data(), wrong_endian_packet.size());
+        std::swap(wrong_endian_packet[0], wrong_endian_packet[3]);
+        std::swap(wrong_endian_packet[1], wrong_endian_packet[2]);
+        Vst3WorkerFrameV1 endian_frame{};
+        Vst3WorkerProtocolErrorV1 endian_error{Vst3WorkerProtocolErrorV1::None};
+        CHECK(!decode_vst3_worker_frame_v1(wrong_endian_packet, endian_frame, endian_error));
+        CHECK(endian_error == Vst3WorkerProtocolErrorV1::InvalidMagic);
+    }
+    // Issue 284 regression guard: the pre-existing parameter-frame boundary must
+    // still fail closed on a reserved-byte violation after the new fixtures.
+    CHECK(!validate_vst3_worker_parameter_frame_v1(
+        parameter_packet, decoded_worker, std::span<Vst3WorkerParameterPointV1>(decoded_parameters),
+        decoded_parameter_count, decoded_parameter_samples, worker_error) &&
+          worker_error == Vst3WorkerProtocolErrorV1::InvalidFormat);
     Vst3ParameterTimelineV1 parameter_timeline;
     CHECK(parameter_timeline.append(Vst3ParameterTimelineEventV1{7U, 48003U, 0.75}) &&
           parameter_timeline.append(Vst3ParameterTimelineEventV1{3U, 48000U, 0.25}) &&

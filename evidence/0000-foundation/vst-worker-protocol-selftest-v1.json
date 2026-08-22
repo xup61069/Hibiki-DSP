@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "issue": 284,
+  "scope_digest": "vst-worker-protocol-selftest-v1",
+  "source_commit": "da42350",
+  "environment_fingerprint": "windows-11-26200-x64-preview",
+  "commands": [
+    "cmake --preset windows-dev",
+    "cmake --build .local/build --target hibiki_contract_tests --config RelWithDebInfo -- /m:1",
+    "ctest --test-dir .local/build -C RelWithDebInfo --output-on-failure",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 284",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "ctest -C RelWithDebInfo",
+      "status": "pass",
+      "coverage": [
+        "valid little-endian ProcessBlockResponse frame round-trip with finite Float32 samples",
+        "explicit wire byte-order check (HIVS magic little-endian)",
+        "truncated header below fixed 36-byte minimum rejected as Truncated",
+        "non-finite NaN sample rejected as NonFiniteSample",
+        "wrong-endian magic rejected as InvalidMagic",
+        "pre-existing parameter-frame reserved-byte regression guard still fail-closed"
+      ],
+      "case_count": 6,
+      "offline": true,
+      "process_launch": false,
+      "file_writes": false
+    }
+  ],
+  "limitations": [
+    "In-memory fixtures only; no browser, supervisor process, worker executable, or physical audio launch.",
+    "Does not prove driver, WaveRT, HLK, Microsoft-signing, or release behavior.",
+    "Local Windows SDK/WDK is missing; full MSVC target-toolchain evidence must be revalidated separately."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "cmake": "4.4.0",
+    "msvc": "14.51.36231",
+    "powershell": "7.6.5"
+  },
+  "started_at": "2026-08-22T20:12:00+08:00",
+  "finished_at": "2026-08-22T20:21:00+08:00"
+}
