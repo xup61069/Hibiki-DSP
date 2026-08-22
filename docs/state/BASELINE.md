@@ -652,6 +652,14 @@ accepted ADR-0005（SDK/WDK >= 10.0.26100 最低基線），並把 V1 gap/milest
 test-sign evidence，同時明確保留未宣稱的安裝／載入、runtime audio、HLK、Microsoft
 signing 與 consumer release 界限（Issue #478 / PR #480）。
 
+第九波 tooling／retention 增量已合併：control-model-engine-smoke.ps1 對固定 Engine
+Preview 執行檔、工作目錄、project path 與 .local/control-model-engine-smoke 輸出 root
+新增 fail-closed 驗證，build/launch 前驗證並在 dotnet run 前重新驗證 project/output
+路徑，保留既有 missing output-root 建立行為，launcher self-test 以離線合成路以離線合成路徑案例
+擴充（Issue #489 / PR #490）；另移除切片合併後殘留的 docs/tasks/active/423.md 與
+docs/tasks/active/466.md handoff 檔案，依 Issue #341/#346 前例新增
+retention-final-v2.json evidence（Issue #485 / PR #487）。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；
