@@ -2,139 +2,56 @@
   "schema_version": 1,
   "issue": 86,
   "scope_digest": "build-preview-dispatch-selftest-v1",
-  "source_commit": "de042f5",
-  "environment_fingerprint": "windows-26200-amd64-vs2026-msvc-14.51.36231-sdk-10.0.28000.0-cmake-path-missing-dotnet-10.0.400-pwsh-7.6.4",
+  "source_commit": "40c8f24",
+  "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
-    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
-    "pwsh -NoProfile -File tools/probe-environment.ps1",
     "pwsh -NoProfile -File tools/build-preview.ps1 -SelfTest",
-    "pwsh -NoProfile -File tools/build-preview.ps1 -Target ControlModel",
-    "pwsh -NoProfile -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
-    "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 86",
     "pwsh -NoProfile -File tools/handoff-check.ps1",
-    "pwsh -NoProfile -File tools/docs-check.ps1",
     "pwsh -NoProfile -File tools/source-policy.ps1",
     "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
-    "pwsh -NoProfile -File tools/verify.ps1 (with VS2026 CMake directory prepended process-locally)",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
     "git diff --check"
   ],
   "results": [
     {
-      "command": "tools/doctor.ps1 -CheckOnly",
-      "status": "pass_with_limitations",
-      "coverage": [
-        "Windows 11 build 26200, AMD64, Git, PowerShell 7.6.4, Visual Studio 2026 and .NET 10.0.400 detected",
-        "CMake is not on PATH and the locked SDK/WDK prerequisite is reported missing"
-      ],
-      "compiled_artifacts": false
-    },
-    {
-      "command": "tools/probe-environment.ps1",
-      "status": "pass",
-      "coverage": [
-        "local environment fingerprint written under ignored .local/context.json"
-      ],
-      "compiled_artifacts": false
-    },
-    {
       "command": "tools/build-preview.ps1 -SelfTest",
       "status": "pass",
       "coverage": [
-        "four target-to-project/output mappings",
-        "distinct output roots",
-        "unsupported target rejection",
-        "no dotnet, process, CMake or file build activity"
+        "WinUI target dispatch metadata and AppxManifest mapping",
+        "WinUICompat target dispatch and entrypoint mapping",
+        "DesktopCompat target dispatch and entrypoint mapping",
+        "ControlModel target dispatch and entrypoint mapping",
+        "unsupported target rejection"
       ],
-      "compiled_artifacts": false
+      "compiled_artifacts": false,
+      "case_count": 5
     },
     {
-      "command": "tools/build-preview.ps1 -Target ControlModel",
+      "command": "tools/handoff-check.ps1 -Issue 86 / tools/handoff-check.ps1 / source-policy / source-only-ci / verify / docs-check / git diff --check",
       "status": "pass",
       "coverage": [
-        "control-model preview baseline passed",
-        "output stayed under ignored .local/preview/ControlModel"
-      ],
-      "compiled_artifacts": true
-    },
-    {
-      "command": "tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
-      "status": "pass",
-      "coverage": [
-        "self-contained desktop preview built",
-        "launch smoke passed",
-        "output stayed under ignored .local/preview/DesktopCompat"
-      ],
-      "compiled_artifacts": true
-    },
-    {
-      "command": "tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
-      "status": "pass",
-      "coverage": [
-        "compatibility WinUI preview built",
-        "launch smoke passed",
-        "output stayed under ignored .local/preview/WinUICompat"
-      ],
-      "compiled_artifacts": true
-    },
-    {
-      "command": "tools/handoff-check.ps1 -Issue 86; tools/handoff-check.ps1",
-      "status": "pass",
-      "coverage": [
-        "Issue 86 schema-v2 ownership and full active-handoff scope checks passed"
-      ],
-      "compiled_artifacts": false
-    },
-    {
-      "command": "tools/docs-check.ps1",
-      "status": "blocked_by_shared_baseline",
-      "coverage": [
-        "handoff checks passed before the shared baseline count check",
-        "BASELINE.md claims 421 tracked paths while this branch reports 423"
-      ],
-      "compiled_artifacts": false
-    },
-    {
-      "command": "tools/source-policy.ps1; tools/source-only-ci-check.ps1",
-      "status": "pass",
-      "coverage": [
-        "source-only policy passed for 423 tracked paths",
-        "source-only CI policy passed for 1 workflow and 423 tracked paths"
-      ],
-      "compiled_artifacts": false
-    },
-    {
-      "command": "tools/verify.ps1 (with VS2026 CMake directory prepended process-locally)",
-      "status": "pass",
-      "coverage": [
-        "unsigned CMake configure/build completed",
-        "CTest passed 1/1"
-      ],
-      "compiled_artifacts": true
-    },
-    {
-      "command": "git diff --check",
-      "status": "pass",
-      "coverage": [
-        "no whitespace errors in the source diff"
-      ],
-      "compiled_artifacts": false
+        "schema v2 ownership and scope",
+        "454 tracked paths source policy",
+        "one workflow source-only publication boundary",
+        "CMake/CTest 1 of 1",
+        "documentation and baseline counters verified",
+        "no whitespace errors"
+      ]
     }
   ],
   "limitations": [
-    "The formal WinUI target was not treated as verified because the locked SDK/WDK prerequisite is unavailable on this machine.",
-    "WinUICompat is a non-packaged compatibility launch check, not formal XAML, accessibility, driver, HLK, signing or release evidence.",
-    "Preview outputs remain under ignored .local paths and are not GitHub artifacts.",
-    "An initial parallel DesktopCompat validation raced with VBCSCompiler on the shared control-model obj path; the required sequential rerun passed.",
-    "The documentation gate remains blocked until the integrator refreshes shared docs/state/BASELINE.md from 421 to the current tracked-path count."
+    "The self-test validates PowerShell dispatch metadata only; it does not prove a WinUI XAML build, Windows App Runtime availability, audio output, driver behavior, HLK, or signing.",
+    "Preview build outputs remain ignored local artifacts and are not submitted to GitHub."
   ],
   "logs": [],
   "tool_versions": {
-    "dotnet": "10.0.400",
-    "msvc": "14.51.36231",
-    "powershell": "7.6.4",
-    "cmake": "not on PATH"
+    "dotnet": "10.0.301",
+    "msvc": "19.44.35228.0",
+    "powershell": "7.6.5",
+    "cmake": "4.4.0"
   },
-  "started_at": "2026-08-22T07:20:00+08:00",
-  "finished_at": "2026-08-22T07:40:00+08:00"
+  "started_at": "2026-08-22T10:16:00+08:00",
+  "finished_at": "2026-08-22T10:17:00+08:00"
 }
