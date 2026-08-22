@@ -253,6 +253,16 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   validating build roots and the engine executable (under-root, reparse-point scan and
   kind checks) before any build, write or process launch; -SelfTest gained offline
   synthetic-attribute cases (Issue #505 / PR #511).
+- Live device-catalog probe hardening merged: live-device-catalog-check.ps1 fails closed
+  on fixed .local-root containment, reparse-point and directory/file-kind checks before
+  build-tree creation and probe execution; -SelfTest grew with 11 offline synthetic path
+  cases without CMake, probe execution, endpoint access, audio-state changes or repository
+  writes (Issue #512 / PR #513).
+- WinUI hero quick-start surface merged: the hero card is now an adaptive two-column Grid
+  with a Quick Start panel (connect button, busy ProgressRing, one-tap enhance action and
+  status chip), an 840px adaptive trigger for narrow windows, capsule status chips, and the
+  connection button moved from the title bar into the hero panel while preserving all 32
+  automation property names (Issue #495 / PR #514).
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe
