@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "issue": 407,
+  "scope_digest": "vst3-timeline-editor-remove-selected-row-v1",
+  "source_commit": "3a9d50afa6570bcd4372c75ee1ac5b86378ef2a7",
+  "environment_fingerprint": "windows-26200-amd64-dotnet-10.0.301-pwsh-7.6.4; target-24h2-wdk-missing",
+  "commands": [
+    "pwsh -File tools/control-model-check.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 407",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "RemoveSelectedRow requires an open draft and a selected row before touching model state",
+        "accepted removal clears the stale selected index, renumbers projected rows and publishes Traditional Chinese status text",
+        "removal publishes observable SelectedRowIndex, Rows and StatusText notifications for editor bindings",
+        "reduced draft commits without the removed event and a stale index fails closed after row shifts",
+        "no IPC payload, native engine, XAML, driver or physical-audio change"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Headless control-plane view model only; no supervisor UI, binding-state wiring or wire contract change.",
+    "No RT-thread, driver, signing or physical-audio implication."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.301",
+    "powershell": "pwsh 7.6.4 local"
+  }
+}
