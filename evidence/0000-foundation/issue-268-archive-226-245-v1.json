@@ -86,6 +86,15 @@
         "no whitespace errors"
       ],
       "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #292)",
+      "status": "pass",
+      "coverage": [
+        "push verify run 32572642710 passed on codex/268-record-merge-refs at 14aeb36",
+        "pull_request verify run 32572697237 passed"
+      ],
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
