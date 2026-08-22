@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "issue": 332,
+  "scope_digest": "ir-convolver-stack-hygiene-v1",
+  "source_commit": "9219697",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-qfe-10.1.28000.2526-pwsh-7.6.5",
+  "change_summary": [
+    "AudioEngineModel::prepare_ir now heap-allocates the IrConvolverV1 candidate via std::make_unique with fail-closed allocation handling instead of materializing a fixed ~256 KB stack local inside a noexcept control-plane transaction.",
+    "No ABI/API/schema/DSP-order change; RT audio thread rules untouched; return semantics preserved (allocation failure returns false like every other prepare failure)."
+  ],
+  "motivation": [
+    "Issue #278 investigation measured hibiki_engine_preview.exe dying with STATUS_STACK_OVERFLOW (0xC00000FD) during back-to-back IR prepare + SceneApply transactions; the ~256 KB candidate was one of the largest avoidable per-call stack consumers.",
+    "PR #305 mitigated the crash site with a large stack reserve; this slice removes the stack pressure itself so hosts embedding hibiki_hub with default-size stacks stay safe."
+  ],
+  "commands": [
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "Visual Studio/CMake build of hibiki_hub including modified audio_engine.cpp",
+        "CTest 2/2 passed",
+        "distribution self-test sweep and unsigned local verification"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "User-space Windows verification only; no physical audio, WaveRT, HLK or Microsoft signing evidence.",
+    "Control-plane transaction path only; RT audio thread behavior is unchanged.",
+    "Allocation-failure handling is fail-closed and bounded; no unbounded growth is introduced."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369"
+  },
+  "started_at": "2026-08-22T22:18:00+08:00",
+  "finished_at": "2026-08-22T22:24:00+08:00"
+}
