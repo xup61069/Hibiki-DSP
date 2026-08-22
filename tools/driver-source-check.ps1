@@ -34,6 +34,17 @@ function Assert-StreamAdapterPolicy {
   if ($Text -match '(?i)malloc|calloc|realloc|free|CreateThread|audio_engine|scene_graph|asio_bridge') { throw "WDK stream adapter must remain non-allocating and independent from GPL user-space in $SourceName." }
 }
 
+function Assert-MiniportMethodPolicy {
+  param([string]$Text, [string]$SourceName)
+  $baseMethods = @('IMiniportWaveRT', 'IMiniportWaveRTStreamNotification', 'HibikiMiniportWaveRtV1', 'HibikiMiniportWaveRtStreamV1', 'RegisterNotificationEvent', 'UnregisterNotificationEvent', 'GetHWLatency', 'GetPosition', 'SetState', 'NewStream', 'InitEndpoint')
+  foreach ($required in $baseMethods) {
+    if (-not $Text.Contains($required)) { throw "PortCls miniport missing required method in ${SourceName}: $required" }
+  }
+  $hasLegacyPair = $Text.Contains('AllocateAudioBufferWithNotification') -and $Text.Contains('FreeAudioBufferWithNotification')
+  $hasKitCurrentPair = $Text.Contains('AllocateBufferWithNotification') -and $Text.Contains('FreeBufferWithNotification')
+  if (-not ($hasLegacyPair -or $hasKitCurrentPair)) { throw "PortCls miniport missing notification-buffer pair (legacy AllocateAudioBufferWithNotification or kit-current AllocateBufferWithNotification) in ${SourceName}." }
+}
+
 function Assert-InfPolicy {
   param([string]$Text, [string]$SourceName)
   foreach ($required in @('Root\HibikiDSP', 'HibikiVirtualAudio.sys', 'EndpointMainGuid', 'EndpointVirtualMicGuid', 'PnpLockdown=1')) {
@@ -105,6 +116,19 @@ if ($SelfTest) {
   if (-not $caught) { throw 'SelfTest expected INF credential failure.' }
   $caseCount++
 
+  $legacyMiniport = 'IMiniportWaveRT IMiniportWaveRTStreamNotification HibikiMiniportWaveRtV1 HibikiMiniportWaveRtStreamV1 AllocateAudioBufferWithNotification FreeAudioBufferWithNotification RegisterNotificationEvent UnregisterNotificationEvent GetHWLatency GetPosition SetState NewStream InitEndpoint'
+  Assert-MiniportMethodPolicy -Text $legacyMiniport -SourceName 'selftest-miniport-legacy-naming'
+  $caseCount++
+
+  $kitCurrentMiniport = 'IMiniportWaveRT IMiniportWaveRTStreamNotification HibikiMiniportWaveRtV1 HibikiMiniportWaveRtStreamV1 AllocateBufferWithNotification FreeBufferWithNotification RegisterNotificationEvent UnregisterNotificationEvent GetHWLatency GetPosition SetState NewStream InitEndpoint'
+  Assert-MiniportMethodPolicy -Text $kitCurrentMiniport -SourceName 'selftest-miniport-kit-current-naming'
+  $caseCount++
+
+  $caught = $false
+  try { Assert-MiniportMethodPolicy -Text 'IMiniportWaveRT IMiniportWaveRTStreamNotification HibikiMiniportWaveRtV1 RegisterNotificationEvent' -SourceName 'selftest-miniport-missing-naming' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected missing notification-buffer pair failure.' }
+  $caseCount++
+
   Write-Output "WDK source boundary gate self-test passed ($caseCount cases)."
   exit 0
 }
@@ -145,9 +169,7 @@ if ($propertySource -match '(?i)audio_engine|scene_graph|asio_bridge|malloc|call
 $miniportSrc = (Get-Content -LiteralPath $miniportHeader -Raw) + (Get-Content -LiteralPath $miniportSource -Raw)
 if ($miniportSrc -notmatch 'SPDX-License-Identifier: MS-PL') { throw 'PortCls miniport adapter must retain MS-PL.' }
 if ($miniportSrc -match 'audio_engine|scene_graph|asio_bridge|plugin_host') { throw 'PortCls miniport adapter must not link GPL user-space implementation.' }
-foreach ($required in @('IMiniportWaveRT', 'IMiniportWaveRTStreamNotification', 'HibikiMiniportWaveRtV1', 'HibikiMiniportWaveRtStreamV1', 'AllocateAudioBufferWithNotification', 'FreeAudioBufferWithNotification', 'RegisterNotificationEvent', 'UnregisterNotificationEvent', 'GetHWLatency', 'GetPosition', 'SetState', 'NewStream', 'InitEndpoint')) {
-    if (-not $miniportSrc.Contains($required)) { throw "PortCls miniport missing required method: $required" }
-}
+Assert-MiniportMethodPolicy -Text $miniportSrc -SourceName 'driver/wdk/hibiki_miniport_wavert.*'
 if ($miniportSrc -match '(?i)CreateThread|KeWaitFor') { throw 'PortCls miniport must remain non-blocking.' }
 $filterSrc = (Get-Content -LiteralPath $filterHeader -Raw) + (Get-Content -LiteralPath $filterSource -Raw)
 if ($filterSrc -notmatch 'SPDX-License-Identifier: MS-PL') { throw 'PortCls filter tables must retain MS-PL.' }
