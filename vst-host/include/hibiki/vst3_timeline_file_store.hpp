@@ -77,4 +77,22 @@ struct Vst3TimelineStoreSyncResultV1 {
     Vst3SceneAutomationSchedulerV1& scheduler,
     Vst3TimelineStoreSyncResultV1& result);
 
+struct Vst3SchedulerStoreExportResultV1 {
+    std::size_t saved{0U};
+    std::size_t skipped{0U};
+};
+
+// Reverse direction: exports every scheduler timeline into the store through
+// the atomic save path, then reports store IDs absent from the scheduler as
+// stale candidates. Stale entries are never deleted here; pruning stays an
+// explicit caller decision. The stale destination must have room for every
+// stale entry (fail-closed with the true total in stale_count, no partial
+// listing). The result is zeroed before any work.
+[[nodiscard]] Vst3TimelineStoreStatusV1 sync_scheduler_to_timeline_store_v1(
+    const Vst3SceneAutomationSchedulerV1& scheduler,
+    Vst3TimelineFileStoreV1& store,
+    std::span<std::string> stale_ids,
+    std::size_t& stale_count,
+    Vst3SchedulerStoreExportResultV1& result);
+
 }  // namespace hibiki

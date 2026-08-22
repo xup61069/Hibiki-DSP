@@ -2129,6 +2129,70 @@ int main() {
             editor_parameters_ok;
     }
     CHECK(!editor_parameters_ok && parameter_cap_editor.draft()->event_count == 16U);
+    Vst3TimelineEditorV1 history_editor;
+    CHECK(!history_editor.can_undo() && !history_editor.can_redo());
+    CHECK(!history_editor.undo() && !history_editor.redo());
+    Vst3ParameterTimelineSnapshotV1 hist_base{};
+    hist_base.event_count = 1U;
+    hist_base.events[0] = Vst3ParameterTimelineEventV1{1U, 10U, 0.1};
+    CHECK(history_editor.reset(hist_base));
+    CHECK(history_editor.begin_edit() &&
+          history_editor.upsert(Vst3ParameterTimelineEventV1{2U, 20U, 0.2}) &&
+          history_editor.commit());
+    CHECK(history_editor.can_undo() && !history_editor.can_redo() &&
+          history_editor.undo_depth() == 1U &&
+          history_editor.published().event_count == 2U);
+    CHECK(history_editor.undo() &&
+          history_editor.published().event_count == 1U &&
+          history_editor.can_redo() && history_editor.redo_depth() == 1U);
+    CHECK(history_editor.redo() &&
+          history_editor.published().event_count == 2U &&
+          !history_editor.can_redo() && history_editor.redo_depth() == 0U);
+    CHECK(history_editor.begin_edit() &&
+          history_editor.upsert(Vst3ParameterTimelineEventV1{3U, 30U, 0.3}) &&
+          history_editor.commit() &&
+          history_editor.published().event_count == 3U &&
+          history_editor.undo_depth() == 2U);
+    CHECK(history_editor.undo() &&
+          history_editor.published().event_count == 2U);
+    CHECK(history_editor.begin_edit() &&
+          history_editor.upsert(Vst3ParameterTimelineEventV1{4U, 40U, 0.4}) &&
+          history_editor.commit() && !history_editor.can_redo() &&
+          history_editor.published().event_count == 3U &&
+          history_editor.published().events[2].parameter_id == 4U &&
+          history_editor.published().events[2].normalized_value == 0.4);
+    CHECK(history_editor.begin_edit() &&
+          history_editor.upsert(Vst3ParameterTimelineEventV1{5U, 50U, 0.5}));
+    CHECK(!history_editor.undo() && !history_editor.redo() &&
+          history_editor.has_edit_session() &&
+          history_editor.draft()->event_count == 4U);
+    CHECK(history_editor.discard() && history_editor.can_undo() &&
+          !history_editor.has_edit_session());
+    Vst3ParameterTimelineSnapshotV1 fresh_hist_base{};
+    CHECK(history_editor.reset(fresh_hist_base) &&
+          !history_editor.can_undo() && !history_editor.can_redo() &&
+          history_editor.undo_depth() == 0U && history_editor.redo_depth() == 0U);
+    Vst3TimelineEditorV1 capacity_history;
+    CHECK(capacity_history.reset(Vst3ParameterTimelineSnapshotV1{}));
+    bool history_capacity_ok = true;
+    for (std::uint32_t step = 1U; step <= 12U; ++step) {
+        history_capacity_ok =
+            capacity_history.begin_edit() &&
+            capacity_history.upsert(Vst3ParameterTimelineEventV1{
+                7U, static_cast<std::uint64_t>(step) * 100U, 0.5}) &&
+            capacity_history.commit() && history_capacity_ok;
+    }
+    CHECK(history_capacity_ok &&
+          capacity_history.undo_depth() == kVst3TimelineEditorMaxHistoryV1 &&
+          capacity_history.can_undo() && !capacity_history.can_redo());
+    for (std::size_t drained = 0U; drained < kVst3TimelineEditorMaxHistoryV1;
+         ++drained) {
+        CHECK(capacity_history.undo());
+    }
+    CHECK(capacity_history.can_redo() &&
+          capacity_history.redo_depth() == kVst3TimelineEditorMaxHistoryV1 &&
+          capacity_history.published().event_count == 4U &&
+          capacity_history.published().events[3].sample_position == 400U);
     CHECK(automation_scheduler->prepare(automation_lanes) &&
           automation_scheduler->upsert_timeline("djmax-default", automation_timeline) &&
           automation_scheduler->bind_scene("DJMAX", 99U, "djmax-default") &&
@@ -2484,6 +2548,67 @@ int main() {
               full_scheduler->timeline_count() == 16U);
         std::error_code sync_cleanup_error;
         std::filesystem::remove_all(sync_root, sync_cleanup_error);
+    }
+#endif
+#if defined(_WIN32)
+    {
+        wchar_t export_temp_root[MAX_PATH];
+        const DWORD export_temp_length = GetTempPathW(MAX_PATH, export_temp_root);
+        CHECK(export_temp_length > 0U && export_temp_length < MAX_PATH);
+        const std::filesystem::path export_root =
+            std::filesystem::path(std::wstring(export_temp_root)) /
+            (L"hibiki_timeline_export_" + std::to_wstring(GetTickCount()));
+        Vst3TimelineFileStoreV1 export_store;
+        auto export_scheduler = std::make_unique<Vst3SceneAutomationSchedulerV1>();
+        Vst3SchedulerStoreExportResultV1 export_result{};
+        std::array<std::string, kVst3TimelineStoreMaxEntriesV1> stale_listing{};
+        std::size_t stale_listing_count = 99U;
+        CHECK(sync_scheduler_to_timeline_store_v1(
+                  *export_scheduler, export_store, stale_listing,
+                  stale_listing_count, export_result) ==
+                  Vst3TimelineStoreStatusV1::invalid_argument &&
+              export_result.saved == 0U && export_result.skipped == 0U &&
+              stale_listing_count == 0U);
+        CHECK(export_store.open(export_root.wstring()) && export_store.is_open());
+        CHECK(export_store.save("ghost", persist_empty) ==
+              Vst3TimelineStoreStatusV1::ok);
+        {
+            std::ofstream corrupt_stream(export_root / L"alpha.json",
+                                         std::ios::binary | std::ios::trunc);
+            corrupt_stream << "{ broken";
+            corrupt_stream.close();
+        }
+        CHECK(sync_scheduler_to_timeline_store_v1(
+                  *export_scheduler, export_store, stale_listing,
+                  stale_listing_count, export_result) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              export_result.saved == 0U && export_result.skipped == 0U &&
+              stale_listing_count == 2U && stale_listing[0] == "alpha" &&
+              stale_listing[1] == "ghost");
+        CHECK(export_scheduler->upsert_timeline("alpha", persist_source) &&
+              export_scheduler->upsert_timeline("beta-9", persist_empty));
+        CHECK(sync_scheduler_to_timeline_store_v1(
+                  *export_scheduler, export_store, stale_listing,
+                  stale_listing_count, export_result) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              export_result.saved == 2U && export_result.skipped == 0U &&
+              stale_listing_count == 1U && stale_listing[0] == "ghost");
+        Vst3ParameterTimelineSnapshotV1 exported_reload{};
+        CHECK(export_store.load("alpha", exported_reload) ==
+                  Vst3TimelineStoreStatusV1::ok &&
+              exported_reload.event_count == 2U &&
+              exported_reload.events[1].parameter_id == 7U);
+        CHECK(export_store.save("stale-one", persist_empty) ==
+              Vst3TimelineStoreStatusV1::ok);
+        std::array<std::string, 0> zero_stale{};
+        stale_listing_count = 0U;
+        CHECK(sync_scheduler_to_timeline_store_v1(
+                  *export_scheduler, export_store, zero_stale,
+                  stale_listing_count, export_result) ==
+                  Vst3TimelineStoreStatusV1::capacity_exhausted &&
+              stale_listing_count == 2U);
+        std::error_code export_cleanup_error;
+        std::filesystem::remove_all(export_root, export_cleanup_error);
     }
 #endif
 #if defined(_WIN32)
