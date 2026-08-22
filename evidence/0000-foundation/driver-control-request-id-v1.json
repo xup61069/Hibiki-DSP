@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "issue": 417,
+  "scope_digest": "driver-control-request-id-v1",
+  "source_commit": "1fb24353e98e6a065f9f804fb6337dd98dd9811e",
+  "environment_fingerprint": "windows-26200-amd64-msvc-19.51.36256-dotnet-10.0.400-pwsh-7.6.5-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526",
+  "commands": [
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 417",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/probe-environment.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    "verify.ps1 passed: MSVC/Visual Studio 2026 build completed and 3/3 CTest tests passed.",
+    "handoff-check.ps1 -Issue 417 passed.",
+    "handoff-check.ps1 passed for all active handoffs observed at validation time.",
+    "docs-check.ps1 passed after this evidence file was tracked: 80 required paths, 24 specs, 519 tracked paths, and 178 repository JSON files.",
+    "source-policy.ps1 passed for 519 tracked paths after this evidence file was tracked.",
+    "source-only-ci-check.ps1 passed: 1 workflow and 519 tracked paths after this evidence file was tracked.",
+    "doctor.ps1 -CheckOnly passed: Windows 11 build 26200 AMD64, Visual Studio 2026, Windows SDK/WDK 10.0.28000.2526.",
+    "probe-environment.ps1 passed and wrote only .local/context.json.",
+    "git diff --check passed."
+  ],
+  "limitations": [
+    "SDK boundary validation and synthetic contract tests only; no driver install/load, WaveRT, physical audio, HLK, signing, or Microsoft certification evidence.",
+    "No real endpoint IDs, private calibration, or compiled binaries are committed.",
+    "This reserves zero request_id for uninitialized/no-correlation state at the packet boundary; it does not prove request-ID uniqueness or ordering across a live driver."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "cmake": "4.4.2",
+    "dotnet": "10.0.400",
+    "powershell": "pwsh 7.6.5",
+    "msvc": "19.51.36256",
+    "wdk": "10.1.28000.2526"
+  }
+}

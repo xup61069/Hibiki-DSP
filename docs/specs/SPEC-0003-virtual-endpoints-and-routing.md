@@ -77,7 +77,9 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
 - `sdk/include/hibiki/driver_control_transport_v1.h` 定義固定 136-byte little-endian
   `endpoint-state`／`volume-notification` control packet；所有欄位以明確 offset 編碼，
   不依賴 C struct padding，並在 driver/user-space boundary 驗證 GUID、LPCM 格式、Q16.16
-  dB、mute、generation 與 actuator。GPL engine 的 `DriverVolumeLinkV1` 只透過此 Apache
+  dB、mute、generation 與 actuator。`request_id` 是 driver/user-space correlation 欄位，
+  必須非零；零值保留給未初始化／無 correlation 狀態，encode、validate 與 decode 一律
+  fail closed。GPL engine 的 `DriverVolumeLinkV1` 只透過此 Apache
   ABI 解碼，套用 requested dB/mute 到 canonical output-group safety path，並可忽略已登記
   event-context 防止回授迴圈；這仍是 user-space/control-plane evidence，不是 loadable
   WaveRT、PortCls、HLK 或 Microsoft-signing evidence。
