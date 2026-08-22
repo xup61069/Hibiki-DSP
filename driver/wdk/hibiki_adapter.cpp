@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MS-PL
+﻿// SPDX-License-Identifier: MS-PL
 //
 // Hibiki WaveRT PortCls Adapter Implementation.
 // Implements DriverEntry, AddDevice, StartDevice, and subdevice registration
@@ -63,7 +63,7 @@ extern "C" NTSTATUS HibikiRegisterSingleSubdeviceV1(
     }
 
     // 3. Initialize Port with Miniport
-    ntStatus = port->Init(DeviceObject, nullptr, miniport, ResourceList);
+    ntStatus = port->Init(DeviceObject, nullptr, miniport, nullptr, ResourceList);
     if (!NT_SUCCESS(ntStatus)) {
         miniport->Release();
         port->Release();
@@ -71,7 +71,7 @@ extern "C" NTSTATUS HibikiRegisterSingleSubdeviceV1(
     }
 
     // 4. Register Subdevice with PortCls
-    ntStatus = PcRegisterSubdevice(DeviceObject, SubdeviceName, port);
+    ntStatus = PcRegisterSubdevice(DeviceObject, const_cast<PWSTR>(SubdeviceName), port);
 
     // Release local COM references (PortCls retains registered references)
     miniport->Release();
@@ -177,3 +177,28 @@ extern "C" NTSTATUS DriverEntry(
         RegistryPath,
         (PDRIVER_ADD_DEVICE)HibikiAddDevice);
 }
+
+
+void* __cdecl operator new(size_t size, POOL_TYPE pool_type) {
+    if (pool_type == NonPagedPoolNx) {
+        return ExAllocatePoolWithTag(NonPagedPoolNx, size, 'ibiH');
+    }
+    return ExAllocatePoolWithTag(pool_type, size, 'ibiH');
+}
+
+void* __cdecl operator new[](size_t size, POOL_TYPE pool_type) {
+    return operator new(size, pool_type);
+}
+
+void __cdecl operator delete(void* pointer) noexcept {
+    if (pointer != nullptr) ExFreePoolWithTag(pointer, 'ibiH');
+}
+
+void __cdecl operator delete[](void* pointer) noexcept {
+    operator delete(pointer);
+}
+
+void __cdecl operator delete(void* pointer, size_t) noexcept {
+    operator delete(pointer);
+}
+
