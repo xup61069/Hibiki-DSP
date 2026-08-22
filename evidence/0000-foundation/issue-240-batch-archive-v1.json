@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "issue": 240,
+  "title": "batch archive merged Issues 30, 55, 82, 92 handoffs",
+  "type": "documentation-archive",
+  "archived_issues": [30, 55, 82, 92],
+  "archived_handoffs": [
+    "docs/tasks/completed/2026/30.md",
+    "docs/tasks/completed/2026/55.md",
+    "docs/tasks/completed/2026/82.md",
+    "docs/tasks/completed/2026/92.md"
+  ],
+  "acceptance": [
+    "All four handoffs moved to completed/2026/",
+    "Archive handoff created at docs/tasks/active/240.md",
+    "No product source, API, IPC, DSP, driver, or signing changes"
+  ],
+  "limits": [
+    "Documentation-only archive; no physical audio or driver evidence"
+  ],
+  "gates": {
+    "handoff_check": "pass",
+    "docs_check": "pass",
+    "source_policy": "pass"
+  }
+}
