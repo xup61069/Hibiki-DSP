@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "issue": 398,
+  "scope_digest": "vst3-supervisor-history-introspection",
+  "source_commit": "6fa3b7bbf449f350f081e26398f56fa8ad543e66",
+  "base_commit": "40b4a4a459e696e4eb5edbb4c7339be9c39f4556",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-10.0.26100-cmake-4.4.0-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/verify.ps1",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/docs-check.ps1",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/source-policy.ps1",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/handoff-check.ps1 -Issue 398",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/doctor.ps1 -CheckOnly",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/verify.ps1",
+      "status": "pass",
+      "coverage": "build + ctest (asio_transport_selftest, tab_bridge_selftest, contract_tests)"
+    },
+    {
+      "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": "documentation contract"
+    },
+    {
+      "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": "source policy"
+    },
+    {
+      "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": "source-only CI publication"
+    },
+    {
+      "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/handoff-check.ps1 -Issue 398",
+      "status": "pass",
+      "coverage": "handoff block and scope"
+    },
+    {
+      "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/doctor.ps1 -CheckOnly",
+      "status": "pass",
+      "coverage": "environment doctor"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": "whitespace"
+    }
+  ],
+  "limitations": [
+    "This is a control-plane facade extension; no IPC, engine, driver, WinUI or C# change.",
+    "History introspection is surface-level; it does not require attach or selection.",
+    "clear_history() drops both stacks without touching published snapshots, baselines or open drafts."
+  ],
+  "tool_versions": {
+    "cmake": "4.4.0",
+    "powershell": "7.6.4"
+  }
+}
