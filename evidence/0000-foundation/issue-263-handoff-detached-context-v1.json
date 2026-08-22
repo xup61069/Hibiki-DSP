@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "issue": 263,
+  "scope_digest": "handoff-detached-context-v1",
+  "source_commit": "7fb98d642f6c31dd0e82f430def6a4bbc682cd5a",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-10.0.28000.2526-wdk-10.0.28000.2526-cmake-4.4.2-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 263",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "detached worktree: pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/handoff-check.ps1 -SelfTest",
+      "status": "pass",
+      "case_count": 41,
+      "coverage": [
+        "GITHUB_HEAD_REF priority",
+        "current branch fallback",
+        "GITHUB_REF_NAME fallback",
+        "no branch context returns null without a method call",
+        "existing glob overlap, pipeline parsing, validation and resume consistency cases"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "detached worktree handoff-check before fix",
+      "status": "reproduced",
+      "coverage": [
+        "old branch-context lookup failed with a null-valued expression when no branch/ref context existed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "detached worktree handoff-check after fix",
+      "status": "pass",
+      "coverage": [
+        "detached run exited 0",
+        "all numeric active handoffs validated without GITHUB_HEAD_REF or GITHUB_REF_NAME"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 263 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Issue 263 schema-v2 ownership, scope and Git ancestry",
+        "full active handoff validation"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 -SelfTest / tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "13 bounded docs-check self-test cases",
+        "85 required documentation paths and 24 specs",
+        "live measurement of 534 tracked paths and 120 repository JSON files"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 -SelfTest / tools/source-policy.ps1 / tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "10 bounded source-policy self-test cases",
+        "534 tracked paths with no blocked binary or secret",
+        "one workflow with source-only CI policy satisfied"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly",
+      "status": "pass",
+      "coverage": [
+        "Windows 26200 AMD64, Visual Studio 2026, CMake, SDK and WDK prerequisites detected"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "Visual Studio 2026/CMake build",
+        "CTest 1 of 1 passed",
+        "unsigned local verification passed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "This slice hardens governance-gate execution only; it does not change product runtime, audio, driver, signing, or hardware behavior.",
+    "A detached run without branch context skips branch-specific ancestry enforcement only when no explicit -Issue is selected; explicit issue checks remain fail-closed.",
+    "Verify outputs are ignored local build artifacts and no compiled artifact is part of the change or evidence."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369",
+    "cmake": "4.4.2",
+    "sdk_qfe": "10.1.28000.2526",
+    "wdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T19:00:00+08:00",
+  "finished_at": "2026-08-22T19:14:00+08:00"
+}

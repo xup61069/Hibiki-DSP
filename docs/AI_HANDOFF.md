@@ -128,12 +128,11 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   certification remain open; none of this proves physical audio or driver delivery.
 - Process gates learned this week: gate scripts require PowerShell 7 (PS 5.1 cannot run
   the UTF-8-no-BOM tooling; install via winget), multiple gates expose `-SelfTest`
-  (`tools/docs-check.ps1 -SelfTest` is merged), the volatile BASELINE summary counters live
-  in `build/baseline-counters.json` and fail closed — file-adding slices regenerate them with
-  `tools/docs-check.ps1 -WriteCounters` in the same slice, counters-editing PRs are verified
-  against their own head tree (#182/#183), the merge-ref-aware gate tolerates only
-  untouched-BASELINE handoff-only PR drift in CI while keeping push/local strict, and the
-  #25 scope-overlap gate rejects overlapping active `scope_globs` across handoffs.
+  (`tools/docs-check.ps1 -SelfTest` is merged), the volatile BASELINE summary counters are
+  now measured live by `tools/docs-check.ps1` via `git ls-files` and fail closed without a
+  committed counter file — #197 retired `build/baseline-counters.json` and the
+  `-WriteCounters` chore, and the #25 scope-overlap gate rejects overlapping active
+  `scope_globs` across handoffs.
 
 ## 目前整合主線
 

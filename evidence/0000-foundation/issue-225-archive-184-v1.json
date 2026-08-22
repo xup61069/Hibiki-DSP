@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "issue": 225,
+  "title": "archive merged Issue 184 handoff",
+  "type": "documentation-archive",
+  "source_commit": "1345618edb43faa47cf00f20e09f6a1ace311b67",
+  "merge_commit": "1345618edb43faa47cf00f20e09f6a1ace311b67",
+  "archived_handoff": "docs/tasks/completed/2026/184.md",
+  "acceptance": [
+    "Issue #184 handoff moved to completed/2026/184.md",
+    "Archive handoff created at docs/tasks/active/225.md",
+    "No product source, API, IPC, DSP, driver, or signing changes"
+  ],
+  "limits": [
+    "Documentation-only archive; no physical audio or driver evidence",
+    "Local machine lacks VS 2026/SDK-WDK for full CTest"
+  ],
+  "gates": {
+    "handoff_check": "pass",
+    "docs_check": "pass",
+    "source_policy": "pass"
+  }
+}

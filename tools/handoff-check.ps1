@@ -235,8 +235,35 @@ function Assert-Throws {
   try { & $Action } catch { $caught = $true }
   if (-not $caught) { throw "handoff-check self-test failed: expected rejection ($Label)." }
 }
+function Resolve-BranchContext {
+  param(
+    [AllowNull()][string]$HeadRef,
+    [AllowNull()][string]$CurrentBranch,
+    [AllowNull()][string]$RefName
+  )
+
+  foreach ($candidate in @($HeadRef, $CurrentBranch, $RefName)) {
+    if (-not [string]::IsNullOrWhiteSpace($candidate)) { return $candidate.Trim() }
+  }
+  return $null
+}
+
 if ($SelfTest) {
   $caseCount = 0
+  $branchContextCases = @(
+    @{ HeadRef = 'codex/from-head-ref'; CurrentBranch = 'codex/from-branch'; RefName = 'main'; Expected = 'codex/from-head-ref' },
+    @{ HeadRef = ''; CurrentBranch = ' codex/from-branch '; RefName = 'main'; Expected = 'codex/from-branch' },
+    @{ HeadRef = ''; CurrentBranch = ''; RefName = ' main '; Expected = 'main' },
+    @{ HeadRef = ''; CurrentBranch = ''; RefName = ''; Expected = $null }
+  )
+  foreach ($case in $branchContextCases) {
+    $actual = Resolve-BranchContext $case.HeadRef $case.CurrentBranch $case.RefName
+    if ($actual -ne $case.Expected) {
+      throw "Branch context self-test failed: expected '$($case.Expected)', got '$actual'."
+    }
+    $caseCount++
+  }
+
 
   function New-MockIssue {
     param(
@@ -409,8 +436,8 @@ foreach ($issueData in $withHandoff) {
   if ($LASTEXITCODE -ne 0) { throw "Issue handoff base_commit is not present locally: $base ($path)" }
 
   if ($Issue -ge 0 -and $issueNumber -eq $Issue) {
-    $branchContext = $env:GITHUB_HEAD_REF
-    if (-not $branchContext) { $branchContext = (& git -C $repo branch --show-current).Trim() }
+    $currentBranch = (& git -C $repo branch --show-current 2>$null | Select-Object -First 1)
+    $branchContext = Resolve-BranchContext $env:GITHUB_HEAD_REF $currentBranch $env:GITHUB_REF_NAME
     if ($branchContext -and $branchContext -ne $branch) {
       throw "Selected issue branch '$branch' does not match current branch '$branchContext': $path"
     }

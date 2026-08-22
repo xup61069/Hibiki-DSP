@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "issue": 285,
+  "scope_digest": "asio-transport-selftest-v1",
+  "source_commit": "0e26e60ee45b4cc2dc00c7b41708c895fd3621ae",
+  "base_commit": "b89a284c8e6dad0bdb7a3768b6265b985e51c954",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-10.0.28000.2526-wdk-10.0.28000.2526-cmake-4.4.2-pwsh-7.6.5",
+  "case_count": 12,
+  "cases": [
+    "region_size_matches_struct",
+    "init_valid_sets_header",
+    "init_rejects_invalid_formats",
+    "roundtrip_8ch_bit_exact",
+    "push_rejects_mapping_mismatch",
+    "truncated_payload_fail_closed",
+    "corrupted_header_fail_closed",
+    "overflow_drops_and_fifo_order",
+    "pop_capacity_overflow_nonconsuming",
+    "empty_pop_zeroes_outputs",
+    "null_arguments_fail_closed",
+    "fixture_layer_rejects_nonfinite"
+  ],
+  "commands": [
+    "pwsh -NoProfile -File tools/verify.ps1",
+    ".local/build/asio/RelWithDebInfo/hibiki_asio_transport_selftest.exe",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 285",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1 (ctest)",
+      "status": "pass",
+      "coverage": [
+        "Visual Studio 2026/CMake build with HIBIKI_BUILD_TESTS=ON",
+        "ctest 2 of 2: hibiki_asio_transport_selftest and hibiki_contract_tests pass",
+        "no compiler warnings from the new self-test target under /W4 /permissive-"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "hibiki_asio_transport_selftest.exe (direct run)",
+      "status": "pass",
+      "coverage": [
+        "12 deterministic offline cases; exit code 0",
+        "valid 8-channel Float32 roundtrip is bit-exact with sequence advance",
+        "fail-closed rejections: invalid init formats, truncated region bytes, corrupted magic/abi/size, channel/frame mapping mismatch, null arguments",
+        "ring overflow increments dropped_blocks; FIFO order verified across all four slots; pop capacity overflow does not consume",
+        "non-finite fixtures are rejected by the fixture layer only; production transport semantics unchanged"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Offline source-level validation only; no COM launch, no vendor ASIO SDK, optional hibiki_asio_native DLL not built.",
+    "Does not exercise the engine consumer path, real hardware, WaveRT, HLK, or Microsoft signing.",
+    "Non-finite sample rejection lives in this self-test's fixture layer; production push keeps its current documented format/ring fail-closed semantics per Issue #285 'keep the production COM transport unchanged'."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369",
+    "cmake": "4.4.2",
+    "sdk_qfe": "10.1.28000.2526",
+    "wdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T20:50:00+08:00",
+  "finished_at": "2026-08-22T21:15:00+08:00"
+}

@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "issue": 256,
+  "scope_digest": "live-counters-doc-sync-v1",
+  "source_commit": "5e5573f78653c87d36229979ad4c95aaa3cb2cda",
+  "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 256",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/handoff-check.ps1 -Issue 256 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 256 (AGENTS.md + AI_HANDOFF.md, no overlap with 226/232/245)",
+        "resume_commands front matter and block aligned (5 entries)"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "13 cases: structural parser, multiline normalization, branch mode, BASELINE edit detection, live measurement"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "85 required paths, 24 specs, live measurement 530 tracked / 118 JSON, no committed counter file"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1 / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "source-only policy 530 tracked, no blocked binary or secret",
+        "source-only CI 1 workflow policy pass",
+        "no whitespace errors (AGENTS.md and AI_HANDOFF.md edits clean)"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "docs text check",
+      "status": "pass",
+      "coverage": [
+        "AGENTS.md no longer contains -WriteCounters or build/baseline-counters.json (replaced with live git ls-files wording)",
+        "docs/AI_HANDOFF.md bullet updated to live measurement, retired WriteCounters",
+        "docs/ai/MULTI_AGENT.md already correct, verified unchanged"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Docs-only; does not change tools/docs-check.ps1 logic which already measures live.",
+    "No product API, IPC, DSP, driver, or signing behavior change.",
+    "Local machine is below locked target toolchain (Windows 26200, cmake missing); full build requires 24H2/VS2026/SDK-WDK 28000.2526.",
+    "Evidence is anonymous and reproducible."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200",
+    "vs": "18.9.12112.369",
+    "sdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T18:30:00+08:00",
+  "finished_at": "2026-08-22T19:10:00+08:00"
+}
