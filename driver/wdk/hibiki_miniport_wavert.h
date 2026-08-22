@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MS-PL
+// SPDX-License-Identifier: MS-PL
 //
 // Hibiki WaveRT PortCls Miniport Header.
 // Defines the IMiniportWaveRT and IMiniportWaveRTStreamNotification COM adapter
@@ -22,6 +22,8 @@
 
 // Forward declarations
 class HibikiMiniportWaveRtV1;
+void* __cdecl operator new(size_t size, POOL_TYPE pool_type);
+void __cdecl operator delete(void* pointer) noexcept;
 class HibikiMiniportWaveRtStreamV1;
 
 #if !defined(HIBIKI_WDK_STRUCTS_DEFINED)

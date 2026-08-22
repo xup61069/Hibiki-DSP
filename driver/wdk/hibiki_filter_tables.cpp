@@ -12,6 +12,13 @@
 #include "hibiki_filter_tables.h"
 #include "hibiki_miniport_wavert.h"
 
+#ifndef KSAUDFNAME_VOLUME
+#define KSAUDFNAME_VOLUME KSAUDFNAME_VOLUME_CONTROL
+#endif
+#ifndef KSAUDFNAME_MUTE
+#define KSAUDFNAME_MUTE nullptr
+#endif
+
 // Forward declaration from hibiki_property_adapter.cpp
 extern "C" NTSTATUS HibikiPropertyHandlerVolumeV1(
     _In_ PPCPROPERTY_REQUEST request,
@@ -359,13 +366,13 @@ extern "C" NTSTATUS HibikiGetFilterDescriptorEndpointV1(
     if (Description == nullptr) return STATUS_INVALID_PARAMETER;
 
     switch (EndpointIndex) {
-        case HIBIKI_ENDPOINT_MAIN_V1:
+        case HIBIKI_ENDPOINT_MAIN_RENDER_V1:
             *Description = &FilterDescriptor_Main;
             return STATUS_SUCCESS;
-        case HIBIKI_ENDPOINT_LOW_LATENCY_V1:
+        case HIBIKI_ENDPOINT_LOW_LATENCY_RENDER_V1:
             *Description = &FilterDescriptor_LowLatency;
             return STATUS_SUCCESS;
-        case HIBIKI_ENDPOINT_SURROUND_71_V1:
+        case HIBIKI_ENDPOINT_SURROUND_RENDER_V1:
             *Description = &FilterDescriptor_Surround;
             return STATUS_SUCCESS;
         case HIBIKI_ENDPOINT_VIRTUAL_MIC_CAPTURE_V1:
@@ -438,5 +445,7 @@ extern "C" NTSTATUS HibikiDataRangeIntersectionEndpointV1(
 
     return STATUS_SUCCESS;
 }
+
+
 
 

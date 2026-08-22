@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MS-PL
+// SPDX-License-Identifier: MS-PL
 //
 // Hibiki WaveRT PortCls Miniport Implementation.
 // Bridges standard PortCls COM interfaces (IMiniportWaveRT,
@@ -156,7 +156,7 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::Init(
     return STATUS_SUCCESS;
 }
 
-STDMETHOD_(NTSTATUS, HibikiMiniportWaveRtStreamV1::AllocateAudioBuffer)(
+NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateAudioBuffer(
     _In_  ULONG                   RequestedSize,
     _Out_ PMDL*                   AudioBufferMdl,
     _Out_ ULONG*                  ActualSize,
@@ -166,13 +166,13 @@ STDMETHOD_(NTSTATUS, HibikiMiniportWaveRtStreamV1::AllocateAudioBuffer)(
         0U, RequestedSize, AudioBufferMdl, ActualSize, OffsetFromFirstPage, CacheType);
 }
 
-STDMETHOD_(VOID, HibikiMiniportWaveRtStreamV1::FreeAudioBuffer)(
+VOID HibikiMiniportWaveRtStreamV1::FreeAudioBuffer(
     _In_opt_ PMDL                 AudioBufferMdl,
     _In_     ULONG                BufferSize) {
     FreeBufferWithNotification(AudioBufferMdl, BufferSize);
 }
 
-STDMETHOD_(NTSTATUS, HibikiMiniportWaveRtStreamV1::AllocateBufferWithNotification)(
+NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferWithNotification(
     _In_     ULONG                NotificationCount,
     _In_     ULONG                RequestedSize,
     _Out_    PMDL*                AudioBufferMdl,
@@ -201,11 +201,7 @@ STDMETHOD_(NTSTATUS, HibikiMiniportWaveRtStreamV1::AllocateBufferWithNotificatio
     }
 
     // Allocate continuous memory through port stream
-    PMDL mdl = nullptr;
-    NTSTATUS ntStatus = m_PortStream->AllocatePagesForMdl(
-        PHYSICAL_ADDRESS{0},
-        actual_size,
-        &mdl);
+    PMDL mdl = m_PortStream->AllocatePagesForMdl(PHYSICAL_ADDRESS{0}, actual_size);
     if (!NT_SUCCESS(ntStatus) || mdl == nullptr) {
         return STATUS_INSUFFICIENT_RESOURCES;
     }
@@ -222,7 +218,7 @@ STDMETHOD_(NTSTATUS, HibikiMiniportWaveRtStreamV1::AllocateBufferWithNotificatio
     m_AllocatedBytes = actual_size;
 
     // Initialize the stream ring context
-    ntStatus = m_Capture
+    NTSTATUS ntStatus = m_Capture
         ? HibikiWaveRtPinInitializeCaptureEndpointV1(&m_StreamContext, static_cast<uint8_t*>(buffer), actual_size, m_EndpointIndex, period_count)
         : HibikiWaveRtPinInitializeEndpointV1(&m_StreamContext, static_cast<uint8_t*>(buffer), actual_size, m_EndpointIndex, period_count);
 
@@ -243,7 +239,7 @@ STDMETHOD_(NTSTATUS, HibikiMiniportWaveRtStreamV1::AllocateBufferWithNotificatio
     return STATUS_SUCCESS;
 }
 
-STDMETHOD_(VOID, HibikiMiniportWaveRtStreamV1::FreeBufferWithNotification)(
+VOID HibikiMiniportWaveRtStreamV1::FreeBufferWithNotification(
     _In_opt_ PMDL                 AudioBufferMdl,
     _In_     ULONG                BufferSize) {
     UNREFERENCED_PARAMETER(BufferSize);
@@ -263,19 +259,19 @@ STDMETHOD_(VOID, HibikiMiniportWaveRtStreamV1::FreeBufferWithNotification)(
     m_AllocatedBytes = 0;
 }
 
-STDMETHOD_(NTSTATUS, HibikiMiniportWaveRtStreamV1::GetClockRegister)(
+NTSTATUS HibikiMiniportWaveRtStreamV1::GetClockRegister(
     _Out_ KSRTAUDIO_HWREGISTER*   Register) {
     UNREFERENCED_PARAMETER(Register);
     return STATUS_NOT_IMPLEMENTED;
 }
 
-STDMETHOD_(NTSTATUS, HibikiMiniportWaveRtStreamV1::GetPositionRegister)(
+NTSTATUS HibikiMiniportWaveRtStreamV1::GetPositionRegister(
     _Out_ KSRTAUDIO_HWREGISTER*   Register) {
     UNREFERENCED_PARAMETER(Register);
     return STATUS_NOT_IMPLEMENTED;
 }
 
-STDMETHOD_(VOID, HibikiMiniportWaveRtStreamV1::GetHWLatency)(
+VOID HibikiMiniportWaveRtStreamV1::GetHWLatency(
     _Out_ KSRTAUDIO_HWLATENCY*    HWLatency) {
     if (HWLatency == nullptr) return;
 
@@ -290,11 +286,11 @@ STDMETHOD_(VOID, HibikiMiniportWaveRtStreamV1::GetHWLatency)(
     // 100ns units latency estimation based on frame buffer size
     const ULONG latency_100ns = static_cast<ULONG>((topology.frames_per_buffer * 10000000ULL) / topology.sample_rate);
     HWLatency->FifoSize = topology.frames_per_buffer * topology.channel_count * sizeof(float);
-    HWLatency->ChipDelay = latency_100ns;
+    
     HWLatency->CodecDelay = 0;
 }
 
-STDMETHOD_(NTSTATUS, HibikiMiniportWaveRtStreamV1::SetFormat)(
+NTSTATUS HibikiMiniportWaveRtStreamV1::SetFormat(
     _In_ PKSDATAFORMAT            DataFormat) {
     if (DataFormat == nullptr ||
         DataFormat->FormatSize < sizeof(KSDATAFORMAT_WAVEFORMATEXTENSIBLE)) {
@@ -311,7 +307,7 @@ STDMETHOD_(NTSTATUS, HibikiMiniportWaveRtStreamV1::SetFormat)(
     return STATUS_SUCCESS;
 }
 
-STDMETHOD_(NTSTATUS, HibikiMiniportWaveRtStreamV1::SetState)(
+NTSTATUS HibikiMiniportWaveRtStreamV1::SetState(
     _In_ KSSTATE                  State) {
     switch (State) {
         case KSSTATE_STOP:
@@ -541,5 +537,7 @@ STDMETHODIMP HibikiMiniportWaveRtV1::GetDeviceDescription(
     DeviceDescription->MaximumLength = 0xFFFFFFFF;
     return STATUS_SUCCESS;
 }
+
+
 
 
