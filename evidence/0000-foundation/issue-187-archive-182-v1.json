@@ -133,13 +133,27 @@
       "status": "pass",
       "coverage": ["handoff-check issue/full", "docs-check 85 required paths and 24 specs", "490 tracked paths", "105 repository JSON files", "source-policy", "source-only-ci-check", "git diff --check"],
       "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 third-sync final push)",
+      "status": "pass",
+      "coverage": ["push verify workflow gates on third merge-synced head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562613745/job/97006437076",
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions verify (PR #189 third-sync final merge-ref)",
+      "status": "pass",
+      "coverage": ["merge-ref verify workflow gates on third merge-synced head"],
+      "details_url": "https://github.com/xup61069/Hibiki-DSP/actions/runs/32562610786/job/97006429337",
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
     "Documentation/governance archive only; no product API, IPC/schema, DSP ordering, RT-thread, driver, HLK or signing behavior is changed.",
     "The local environment lacks CMake and WDK, so full CTest/driver coverage is delegated to GitHub Actions Windows runners.",
     "The first PR run exposed a stale target-main counter; main maintenance commit 929752f corrected it before the successful rerun.",
-    "The target branch advanced three times after earlier green checks; this lane used ordinary merge commits and is awaiting verification for the third merge-synced head.",
+    "The target branch advanced three times after earlier green checks; this lane used ordinary merge commits and recorded final green verification for the third merge-synced head.",
     "No physical audio, per-App delivery, loadable driver, HLK or Microsoft signing evidence is claimed."
   ],
   "logs": [],
@@ -147,5 +161,5 @@
     "powershell": "7.6.5"
   },
   "started_at": "2026-08-22T15:57:32+08:00",
-  "finished_at": "2026-08-22T16:33:05+08:00"
+  "finished_at": "2026-08-22T16:36:59+08:00"
 }
