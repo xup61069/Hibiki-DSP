@@ -162,6 +162,9 @@ identities:
   asio_transport_shared_memory: Local\\HibikiDSP_v1_asio
   schema_version: 1
 '@
+  # Normalize CRLF/CR to LF so the fixture mutations below are deterministic
+  # regardless of the developer's git autocrlf checkout setting.
+  $valid = $valid -replace "`r`n", "`n"
   $validValues = Read-DistributionProfile $valid 'selftest-valid.yml'
   Assert-DistributionProfile $validValues 'selftest-valid.yml'
 
