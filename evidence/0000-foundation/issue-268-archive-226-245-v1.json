@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "issue": 268,
+  "scope_digest": "issue-268-archive-226-245-v1",
+  "source_commit": "b89a284c8e6dad0bdb7a3768b6265b985e51c954",
+  "archive_commit": "eb96bdbf161df35f8a148db624986bb5c0aa14d0",
+  "main_sync_commit": "b89a284c8e6dad0bdb7a3768b6265b985e51c954",
+  "archived_issues": [226, 245],
+  "merged_prs": [
+    {
+      "issue": 226,
+      "pull_request": 231,
+      "merge_commit": "40cef330dbae616928d9268fedca8fa6098928fd"
+    },
+    {
+      "issue": 245,
+      "pull_request": 247,
+      "merge_commit": "5e5573f78653c87d36229979ad4c95aaa3cb2cda"
+    }
+  ],
+  "batch_archive_pull_request": 261,
+  "claim_pull_request": 281,
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-qfe-10.1.28000.2526-pwsh-7.6.5",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 268",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 268 corrective archive implementation",
+      "status": "pass",
+      "coverage": [
+        "recorded PR #231 merge commit 40cef330dbae616928d9268fedca8fa6098928fd in docs/tasks/completed/2026/226.md",
+        "recorded PR #247 merge commit 5e5573f78653c87d36229979ad4c95aaa3cb2cda in docs/tasks/completed/2026/245.md",
+        "recorded batch archive commit eb96bdbf161df35f8a148db624986bb5c0aa14d0 (PR #261) in both completed handoffs",
+        "closed stale post-merge Remaining work / Next safe action sections in both files"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "dual-session claim reconciliation",
+      "status": "pass",
+      "coverage": [
+        "two local sessions raced on Issue #268 between 20:00 and 20:03 +08:00",
+        "session A claim commit b9a52f8 and session B claim commit 416f323 are both preserved in merged claim PR #281",
+        "continuation uses new branch codex/268-record-merge-refs from b89a284 without force-push or history rewrite"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 268 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Issue 268 schema-v2 ownership, scope and Git ancestry",
+        "full active handoff validation with no scope overlap across 20 active lanes"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 / tools/source-policy.ps1 / tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "85 required documentation paths and 24 specs",
+        "live measurement: 553 tracked paths and 128 repository JSON files with this evidence file staged",
+        "no blocked binary or secret; one workflow satisfies source-only CI policy"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly",
+      "status": "pass",
+      "coverage": [
+        "Windows 26200 AMD64, Visual Studio 2026 18.9.12112.369, SDK/WDK QFE 10.1.28000.2526"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance archive only; no product API, IPC/schema, DSP, RT audio, driver, HLK or signing behavior is changed.",
+    "The file move itself was performed by merged batch archive PR #261; this slice only records references and evidence.",
+    "Archive and user-space gates do not provide physical audio, loadable-driver, HLK or Microsoft-signing evidence."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369",
+    "sdk_qfe": "10.1.28000.2526",
+    "wdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T19:56:00+08:00",
+  "finished_at": "2026-08-22T20:16:18+08:00"
+}
