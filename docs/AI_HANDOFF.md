@@ -179,6 +179,14 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   brushes/type-ramp styles (TitleTextBlockStyle/SubtitleTextBlockStyle) and AccentButtonStyle
   instead of hard-coded colors (#438 / PR #443). Source-level XAML only; title-bar/status-pill
   follow-up is Issue #446.
+- WinUI title-bar integration merged: a 48px drag-region row keeps the app icon/name on the left
+  and pins the connection-status pill plus connect button away from the caption buttons;
+  ExtendsContentIntoTitleBar is wired from code-behind for the full shell while Desktop
+  Compatibility Preview keeps its own chrome, and headings use Fluent type-ramp styles
+  (#446 / PR #450).
+- Verify clean guard merged: verify.ps1 -Clean fails closed unless the delete target exactly matches
+  the repository-local build root, is a real directory, and neither the target nor its parent is a
+  reparse point; self-tests cover mismatch and reparse-point rejections (#448 / PR #452).
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe
