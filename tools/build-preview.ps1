@@ -174,7 +174,7 @@ $msbuild = Find-VisualStudioMsBuild
 $buildTool = Get-FormalWinUiBuildTool $msbuild
 if ($msbuild) {
   Write-Output 'Using Visual Studio MSBuild for the formal WinUI target.'
-  & $msbuild $project '/nologo' '/t:Build' '/p:Configuration=Release' '/p:Platform=x64' "/p:OutputPath=$previewRoot\"
+  & $msbuild $project '/restore' '/nologo' '/t:Build' '/p:Configuration=Release' '/p:Platform=x64' "/p:OutputPath=$previewRoot\"
 } else {
   Write-Warning 'Visual Studio MSBuild was not found; using an explicit dotnet fallback. This cannot be promoted to formal XAML/accessibility evidence on a target machine.'
   dotnet build $project --configuration Release "-p:OutputPath=$previewRoot/"
