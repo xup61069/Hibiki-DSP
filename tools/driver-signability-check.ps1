@@ -90,13 +90,17 @@ HibikiVirtualAudio.sys=1
       @{ Name = 'missing-section-directive'; Text = $valid.Replace('CatalogFile=HibikiVirtualAudio.cat', '') },
       @{ Name = 'misplaced-directive'; Text = $valid.Replace('PnpLockdown=1', '') + "`nPnpLockdown=1" },
       @{ Name = 'comment-only-token'; Text = $valid.Replace('CatalogFile=HibikiVirtualAudio.cat', '; CatalogFile=HibikiVirtualAudio.cat') },
-      @{ Name = 'forbidden-traversal'; Text = $valid + "`n[Bad]`nCopyFiles=..\secret.sys" }
+      @{ Name = 'forbidden-traversal'; Text = $valid + "`n[Bad]`nCopyFiles=..\secret.sys" },
+      @{ Name = 'missing-service-binding'; Text = $valid.Replace('AddService=HibikiVirtualAudio,0x00000002,HibikiVirtualAudio.Service', '') },
+      @{ Name = 'forbidden-gpl-payload'; Text = $valid + "`n[Bad]`nCopyFiles=HibikiDSP.dll" },
+      @{ Name = 'forbidden-private-key-token'; Text = $valid + "`n[Bad]`nDescription=PRIVATE KEY" },
+      @{ Name = 'forbidden-absolute-drive-path'; Text = $valid + "`n[Bad]`nCopyFiles=C:\secret.sys" }
   )) {
     $caught = $false
     try { Assert-InfSourcePolicy $fixture.Text "selftest-$($fixture.Name).inf" } catch { $caught = $true }
     if (-not $caught) { throw "INF section self-test expected rejection: $($fixture.Name)" }
   }
-  Write-Output 'Driver INF section self-test passed (5 cases).'
+  Write-Output 'Driver INF section self-test passed (9 cases).'
   exit 0
 }
 

@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "issue": 260,
+  "scope_digest": "driver-signability-selftest-v1",
+  "source_commit": "fa3dc232f37715f76b0c5cf0161bb924ba276ff2",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-10.0.28000.2526-wdk-10.0.28000.2526-cmake-pwsh-7.6.5; source-only-no-package",
+  "commands": [
+    "pwsh -NoProfile -File tools/driver-signability-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/driver-signability-check.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 260",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/probe-environment.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/driver-signability-check.ps1 -SelfTest",
+      "status": "pass",
+      "case_count": 9,
+      "coverage": [
+        "valid INF section structure acceptance",
+        "missing section directive fail-closed rejection",
+        "misplaced section directive fail-closed rejection",
+        "commented-out directive fail-closed rejection",
+        "forbidden path traversal rejection",
+        "missing AddService binding rejection",
+        "forbidden GPL HibikiDSP.dll payload rejection",
+        "forbidden PRIVATE KEY token rejection",
+        "forbidden absolute drive path rejection"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/driver-signability-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "source-only driver INF policy validation",
+        "no package supplied, so Inf2Cat was not run"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 260 / tools/handoff-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 260",
+        "all active handoff schema and scope checks"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1 -SelfTest / tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "13 bounded docs-check self-test cases",
+        "85 required documentation paths and 24 specs",
+        "live measurement of 534 tracked paths and 120 repository JSON files"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1 / tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "534 tracked paths with no blocked binary or secret",
+        "one workflow with source-only CI policy satisfied"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly / tools/probe-environment.ps1",
+      "status": "pass",
+      "coverage": [
+        "Windows 26200 AMD64, Visual Studio 2026, CMake, SDK and WDK prerequisites detected",
+        "anonymous local environment fingerprint written only under ignored .local"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "Visual Studio 2026/CMake build",
+        "CTest 1 of 1 passed",
+        "unsigned local verification passed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors; Git reported only the expected LF-to-CRLF normalization warning"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Self-test coverage is bounded in-memory parser validation only; no package root was supplied and Inf2Cat was not run.",
+    "This evidence does not claim a loadable driver, WaveRT operation, physical audio, HLK, Driver Verifier, Microsoft signing, or endpoint behavior.",
+    "Verify outputs are local ignored build artifacts and no compiled artifact is part of the change or evidence."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4",
+    "windows_build": "26200",
+    "visual_studio": "18.9.12112.369",
+    "cmake": "4.4.2",
+    "sdk_qfe": "10.1.28000.2526",
+    "wdk_qfe": "10.1.28000.2526"
+  },
+  "started_at": "2026-08-22T18:35:00+08:00",
+  "finished_at": "2026-08-22T18:57:00+08:00"
+}
