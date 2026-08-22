@@ -110,7 +110,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   control plane 建立合法的 `Local\\HibikiDSP_v1_asio` named mapping；ASIO DLL 只在 host callback
   完成後把八聲道 Float32 block 寫入 SPSC ring。Engine 端 `AsioTransportConsumerV1` 在 RT lane
   以 caller-owned buffer pop，禁止配置與等待。mapping 不存在、格式不符或 ring 滿載時，ASIO
-  仍可運作但 UI 必須顯示 detached／dropped blocks，不能宣稱已套用 Hibiki graph。
+  仍可運作但 UI 必須顯示 detached／dropped blocks，不能宣稱已套用 Hibiki graph。shared-memory
+  region 的 reserved header field 必須為零；push／pop 對非零值 fail closed，不消費或發布
+  ring slot，也不改 caller-owned output counters。這是 user-space SPSC contract，不是 vendor
+  ASIO、實體 sink、driver、HLK 或 signing evidence。
 - `AudioEngineModel::process_asio_transport` 將一個已 pop 的 ASIO block 暫時置入指定 Lane，
   走現有 immutable graph 與唯一 Group Master，再寫入 caller-owned output；完成後還原 caller
   的 Lane view。它只證明 user-space graph data path，不代表已連接實體 sink、WaveRT endpoint

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "issue": 420,
+  "scope_digest": "asio-transport-reserved-zero-v1",
+  "source_commit": "2351ff74203337f4647b3859d35d76a6c048ee7d",
+  "environment_fingerprint": "windows-26200-amd64-msvc-19.51.36256-dotnet-10.0.400-pwsh-7.6.5-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526",
+  "commands": [
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 420",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/probe-environment.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    "verify.ps1 passed: MSVC/Visual Studio 2026 build completed and 3/3 CTest tests passed.",
+    "handoff-check.ps1 -Issue 420 passed.",
+    "handoff-check.ps1 passed for all active handoffs observed before Issue #423 claimed the overlapping shared test path.",
+    "docs-check.ps1 passed after this evidence file was tracked: 80 required paths, 24 specs, 520 tracked paths, and 179 repository JSON files.",
+    "source-policy.ps1 passed for 520 tracked paths after this evidence file was tracked.",
+    "source-only-ci-check.ps1 passed: 1 workflow and 520 tracked paths after this evidence file was tracked.",
+    "doctor.ps1 -CheckOnly passed: Windows 11 build 26200 AMD64, Visual Studio 2026, Windows SDK/WDK 10.0.28000.2526.",
+    "probe-environment.ps1 passed and wrote only .local/context.json.",
+    "git diff --check passed."
+  ],
+  "limitations": [
+    "SDK boundary validation and synthetic contract tests only; no vendor ASIO, driver install/load, WaveRT, physical audio, HLK, signing, or Microsoft certification evidence.",
+    "No real endpoint IDs, private calibration, or compiled binaries are committed.",
+    "This rejects non-zero reserved bytes in the user-space SPSC region and preserves caller state on that malformed-header path; it does not prove live producer/consumer scheduling or physical delivery.",
+    "After Issue #423 claimed tests/unit/contract_tests.cpp, the current repository-wide handoff-check and docs-check fail closed on that scope overlap; the integration coordinator must name the sole writer and merge order before this slice can proceed to Draft PR."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "cmake": "4.4.2",
+    "dotnet": "10.0.400",
+    "powershell": "pwsh 7.6.5",
+    "msvc": "19.51.36256",
+    "wdk": "10.1.28000.2526"
+  }
+}

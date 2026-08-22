@@ -3193,7 +3193,8 @@ int main() {
     auto* transport = reinterpret_cast<hibiki_asio_transport_region_v1*>(transport_words.data());
     CHECK(hibiki_asio_transport_init_v1(transport,
                                         transport_words.size() * sizeof(std::uint64_t),
-                                        2U, 48000U, 4U) == 1);
+                                        2U, 48000U, 4U) == 1 &&
+          transport->reserved == 0U);
     const float left[4] = {1.0F, 2.0F, 3.0F, 4.0F};
     const float right[4] = {-1.0F, -2.0F, -3.0F, -4.0F};
     const float* planar[2] = {left, right};
@@ -3209,6 +3210,25 @@ int main() {
     CHECK(transport_frames == 4U && transport_channels == 2U && transport_rate == 48000U);
     CHECK(transport_output[0] == 1.0F && transport_output[1] == -1.0F &&
           transport_output[6] == 4.0F && transport_output[7] == -4.0F);
+    const auto producer_before_reserved = transport->producer_sequence;
+    const auto consumer_before_reserved = transport->consumer_sequence;
+    const auto dropped_before_reserved = transport->dropped_blocks;
+    transport->reserved = 1U;
+    CHECK(hibiki_asio_transport_push_planar_v1(
+              transport, transport_words.size() * sizeof(std::uint64_t), planar, 2U, 4U) == 0 &&
+          transport->producer_sequence == producer_before_reserved &&
+          transport->consumer_sequence == consumer_before_reserved &&
+          transport->dropped_blocks == dropped_before_reserved);
+    transport_frames = 17U;
+    transport_channels = 17U;
+    transport_rate = 17U;
+    CHECK(hibiki_asio_transport_pop_interleaved_v1(
+              transport, transport_words.size() * sizeof(std::uint64_t), transport_output, 4U,
+              &transport_frames, &transport_channels, &transport_rate) == 0 &&
+          transport_frames == 17U && transport_channels == 17U && transport_rate == 17U &&
+          transport->producer_sequence == producer_before_reserved &&
+          transport->consumer_sequence == consumer_before_reserved);
+    transport->reserved = 0U;
 
     hibiki_driver_endpoint_state_v1 driver_state{};
     driver_state.header.abi_version = HIBIKI_DRIVER_CONTROL_ABI_V1;

@@ -33,3 +33,9 @@ The same header exposes a 16-byte little-endian header-only Hello/Ack/Error
 framing path for request correlation. It accepts the five message types from
 `driver_control_v1.h`, but intentionally carries no private error text or
 unbounded payload in v1; a future payload needs a new versioned contract.
+
+`include/hibiki/asio_transport_v1.h` defines the fixed shared-memory ASIO
+region. Its reserved header field must remain zero; push and pop reject a
+non-zero value before touching ring state or caller output counters. This is a
+user-space SPSC contract and does not provide vendor-ASIO or physical sink
+evidence.

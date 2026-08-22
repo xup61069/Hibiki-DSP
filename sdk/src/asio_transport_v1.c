@@ -66,6 +66,7 @@ static int valid_region(const struct hibiki_asio_transport_region_v1* const regi
            region->magic == HIBIKI_ASIO_TRANSPORT_MAGIC_V1 &&
            region->abi_version == HIBIKI_ASIO_TRANSPORT_ABI_V1 &&
            region->size_bytes == sizeof(*region) &&
+           region->reserved == 0U &&
            valid_format(region->channels, region->sample_rate, region->frames_per_buffer);
 }
 
@@ -111,13 +112,13 @@ int hibiki_asio_transport_pop_interleaved_v1(
     uint32_t* const output_frames,
     uint32_t* const output_channels,
     uint32_t* const output_sample_rate) {
-    if (output_frames != NULL) *output_frames = 0U;
-    if (output_channels != NULL) *output_channels = 0U;
-    if (output_sample_rate != NULL) *output_sample_rate = 0U;
     if (!valid_region(region, region_bytes) || interleaved == NULL || output_frames == NULL ||
         output_channels == NULL || output_sample_rate == NULL) {
         return 0;
     }
+    *output_frames = 0U;
+    *output_channels = 0U;
+    *output_sample_rate = 0U;
     const uint32_t consumer = load_acquire(&region->consumer_sequence);
     const uint32_t producer = load_acquire(&region->producer_sequence);
     if (consumer == producer) return 0;
