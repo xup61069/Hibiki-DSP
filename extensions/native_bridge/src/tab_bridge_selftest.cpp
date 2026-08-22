@@ -168,6 +168,58 @@ bool test_queue_boundaries() {
     return expect(!full_queue->pop(drain.data(), 2U, block), "drained queue is empty");
 }
 
+bool test_queue_input_output_guards() {
+    auto packet = make_packet();
+    TabCapturePacketViewV1 view{};
+    TabPacketError error{TabPacketError::None};
+    if (!expect(hibiki::decode_tab_capture_packet_v1(packet, view, error),
+                "guard fixture decodes")) {
+        return false;
+    }
+
+    auto rejected_queue = std::make_unique<TabCaptureQueueV1>();
+    auto null_samples = view;
+    null_samples.samples_bytes = nullptr;
+    auto short_sample_count = view;
+    short_sample_count.sample_count -= 1U;
+    auto unsupported_channels = view;
+    unsupported_channels.channels = 3U;
+    auto unsupported_rate = view;
+    unsupported_rate.sample_rate = 22222U;
+    std::array<float, 4U> non_finite_samples{0.25F, -0.25F, 0.5F, -0.5F};
+    non_finite_samples[2] = std::numeric_limits<float>::quiet_NaN();
+    const TabCapturePacketViewV1 non_finite_view{
+        2U, 2U, 48000U, reinterpret_cast<const std::uint8_t*>(non_finite_samples.data()), 4U};
+
+    if (!expect(!rejected_queue->push(null_samples), "null sample pointer is rejected") ||
+        !expect(!rejected_queue->push(short_sample_count), "sample-count mismatch is rejected") ||
+        !expect(!rejected_queue->push(unsupported_channels), "unsupported channels are rejected") ||
+        !expect(!rejected_queue->push(unsupported_rate), "unsupported sample rate is rejected") ||
+        !expect(!rejected_queue->push(non_finite_view), "non-finite samples are rejected") ||
+        !expect(rejected_queue->dropped_blocks() == 0U,
+                "rejected pushes do not increment dropped blocks")) {
+        return false;
+    }
+
+    auto pop_queue = std::make_unique<TabCaptureQueueV1>();
+    if (!expect(pop_queue->push(view), "valid pop guard fixture is queued")) return false;
+    std::array<float, 4U> output{};
+    hibiki::TabCaptureBlockV1 block{};
+    if (!expect(!pop_queue->pop(nullptr, 2U, block) && block.frames == 0U,
+                "null output is rejected without a block") ||
+        !expect(!pop_queue->pop(output.data(), 0U, block) && block.frames == 0U,
+                "zero output capacity is rejected without a block") ||
+        !expect(!pop_queue->pop(output.data(), 1U, block) && block.frames == 0U,
+                "insufficient output capacity is rejected without a block") ||
+        !expect(pop_queue->pop(output.data(), 2U, block) && block.frames == 2U &&
+                    output[0] == 0.25F,
+                "valid pop remains available after rejected guards") ||
+        !expect(!pop_queue->pop(output.data(), 2U, block), "guard queue is empty after valid pop")) {
+        return false;
+    }
+    return true;
+}
+
 void noop_callback(const TabCapturePacketViewV1&, void*) noexcept {}
 
 bool expect_rejected_server_config(const hibiki::TabBridgeServerConfigV1 config,
@@ -201,9 +253,10 @@ bool test_server_config_boundaries() {
 }  // namespace
 
 int main() {
-    if (!test_packet_boundaries() || !test_queue_boundaries() || !test_server_config_boundaries()) {
+    if (!test_packet_boundaries() || !test_queue_boundaries() ||
+        !test_queue_input_output_guards() || !test_server_config_boundaries()) {
         return 1;
     }
-    std::cout << "hibiki_tab_bridge_selftest passed (packet boundaries, FIFO queue, capacity, drops and server guards).\n";
+    std::cout << "hibiki_tab_bridge_selftest passed (packet boundaries, FIFO queue, input/output guards, drops and server guards).\n";
     return 0;
 }

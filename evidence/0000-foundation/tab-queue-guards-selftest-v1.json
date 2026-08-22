@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "issue": 375,
+  "scope_digest": "tab-queue-guards-selftest-v1",
+  "source_commit": "pending",
+  "base_commit": "8a4d064009f616c7d1130294822bab83c6521a46",
+  "environment_fingerprint": "pending-local-run",
+  "target": "hibiki_tab_bridge_selftest",
+  "cases_added": [
+    "null sample pointer rejected",
+    "sample-count mismatch rejected",
+    "unsupported channel and sample-rate metadata rejected",
+    "non-finite queue sample rejected",
+    "rejected pushes do not increment dropped blocks",
+    "null/zero/insufficient output pop guards do not consume a valid block"
+  ],
+  "commands": [
+    "cmake --build .local/build --config RelWithDebInfo --target hibiki_tab_bridge_selftest",
+    "ctest --test-dir .local/build -C RelWithDebInfo -R hibiki_tab_bridge_selftest --output-on-failure"
+  ],
+  "limitations": [
+    "Offline queue boundary coverage only; no listener, socket, browser, WebSocket, COM, filesystem, endpoint or real audio access.",
+    "Does not prove browser tab capture, physical playback, driver, WaveRT, HLK, signing or release behavior."
+  ]
+}
