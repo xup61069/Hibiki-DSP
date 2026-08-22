@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "issue": 217,
+  "scope_digest": "issue-217-complete-archive-187-v1",
+  "source_commit": "857c57c0a059b7e7b2541ad46d61c0e45524c261",
+  "archive_commit": "pending",
+  "main_sync_commit": "857c57c0a059b7e7b2541ad46d61c0e45524c261",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; vs2026-sdk-wdk-on-disk; target-24h2-machine-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 217",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/probe-environment.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "Issue 217 claim handoff check before scope expansion",
+      "status": "pass",
+      "coverage": ["schema v2 ownership, scope and Git state"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Corrective history review",
+      "status": "pass",
+      "coverage": [
+        "PR #214 merged claim-only head 3123c0f9e8c59ef08a52494658f3ac3fac1fd23c at d5bb6b6aa0f07c4b5f69f40b3f9537c314d3ead5",
+        "old branch implementation head 9d6da36 was not merged into main",
+        "Issue #217 uses a fresh worktree from origin/main 857c57c"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Issue 217 archive implementation",
+      "status": "in_progress",
+      "coverage": [
+        "move docs/tasks/active/187.md and docs/tasks/active/213.md to completed/2026",
+        "update final merge/takeover handoff records",
+        "add this anonymous evidence file"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "Local archive gates after moving source handoffs",
+      "status": "pass",
+      "coverage": [
+        "handoff-check Issue 217 and full ownership checks",
+        "docs-check 85 required paths / 24 specs / 512 tracked paths / 111 repository JSON files",
+        "source-policy and source-only-ci-check",
+        "git diff --check"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1 -Clean",
+      "status": "pass",
+      "coverage": ["Visual Studio 2026/CMake user-space build", "1/1 CTest contract test"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/doctor.ps1 -CheckOnly",
+      "status": "pass",
+      "coverage": ["Windows build 26200", "VS 2026", "Windows SDK/WDK QFE fingerprint"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/probe-environment.ps1",
+      "status": "pass",
+      "coverage": ["anonymous .local/context.json fingerprint"],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/verify.ps1 initial non-clean attempt",
+      "status": "transient_failure",
+      "coverage": ["local MSVC build"],
+      "details": "C1041 PDB sharing error during parallel test compilation; -Clean rerun passed and no source assertion failed.",
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation/governance correction only; no product API, IPC/schema, DSP ordering, RT-thread, driver, HLK or signing behavior is changed.",
+    "The target machine is unavailable; local documentation and user-space gates do not provide Windows hardware, loadable-driver, HLK or Microsoft-signing evidence.",
+    "PR #214 was merged claim-only before the archive implementation; the corrective lane preserves that boundary and does not continue the already-merged codex/213-archive-187 branch.",
+    "No physical audio, per-App delivery, loadable driver, HLK or Microsoft signing evidence is claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.5"
+  },
+  "started_at": "2026-08-22T17:45:00+08:00",
+  "finished_at": "pending_ci"
+}
