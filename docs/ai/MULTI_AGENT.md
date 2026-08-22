@@ -1,7 +1,7 @@
 # Hibiki DSP 多 AI 並行開發協定
 
-本檔是多 AI 協作的穩定規則。即時認領狀態放在 GitHub Issue、assignee、linked draft PR；
-不要建立一份所有 AI 都要頻繁改寫的中央 claim 清單。產品、架構與完成狀態的權威順序仍以
+本檔是多 AI 協作的穩定規則。工作由單一 orchestrator 指派，workers 不得自行認領 open Issue。
+即時指派狀態放在 GitHub Issue assignee、lifecycle label 與 linked draft PR。產品、架構與完成狀態的權威順序仍以
 `docs/START_HERE.md` 為準。
 
 ## 不變式
@@ -18,27 +18,32 @@
 交給另一個 AI，原 owner 必須先完成可重建的 WIP commit、push、更新 handoff 並停止寫入；新 owner
 確認遠端 HEAD 與乾淨工作樹後才接手。
 
-## 開始工作：claim protocol
+## 開始工作：orchestrator 指派
 
-1. `git fetch --all --prune`，讀 open Issue、open/draft PR 與其他 Issue 的 handoff block。
-2. 確認 Issue 沒有 active owner，且預計的 `scope_globs` 不和其他 active claim 重疊。同時
-   檢查 `git ls-remote --heads origin` 是否已有同名/相鄰 branch 佔位——branch 存在但沒有
-   PR 也算已被認領。Issue 與 PR 共用編號計數器：先建 Issue 取得確定號碼，再命名 branch；
-   不要預估號碼後才建 Issue。
-3. 在 Issue 記錄 acceptance、owner、branch、target branch、scope、dependencies、contract 影響與
-   required gates。
-4. 從 target branch 的最新遠端 HEAD 建立獨立 worktree/branch。例如：
+1. Orchestrator 從 open Issue 中挑選下一個工作切片，確認目錄 lane（`driver/`、`tools/`、
+   `apps/`、`docs/`、`extensions/`、`vst-host/`、`src/`）內沒有其他 active writer。
+   每個 directory lane 同時最多一個 active writer；跨 lane 或 shared-path 衝突由 orchestrator
+   指定 owner 與合併順序，不是先 commit 者贏。
+2. Orchestrator 在 Issue body 加入 handoff block（branch、base_commit、owner、scope_globs、
+   shared_paths、depends_on），指派 assignee 並加上 `claimed` label；同時建立 branch。
+3. Worker 收到指派後，從 handoff block 的 base/target branch 最新遠端 HEAD 建立獨立
+   clone/worktree 與 branch；tool-provided worktree isolation 是標準機制。例如：
 
    ```powershell
    git fetch origin
-   git worktree add ..\Hibiki-DSP-<issue>-<slug> -b codex/<issue>-<slug> origin/main
+   git worktree add ..\Hibiki-DSP-<issue>-<slug> -b codex/<issue>-<slug> <base-or-target>
    ```
 
-5. 在 Issue body 加入 handoff block（branch、base_commit、owner、scope_globs、shared_paths、
-   depends_on 與 resume_commands），執行 `pwsh -File tools/handoff-check.ps1 -Issue <issue>`，
-   push claim commit，立即開 draft PR。Lifecycle label 使用 `claimed`（進行中）或 `in-review`
-   （待審）；Issue 關閉即代表 done，不需要額外 label。
-6. claim 在 GitHub 可見後才開始修改產品檔案。沒有 Issue／handoff block／scope 時只能做唯讀偵察。
+4. Worker 確認 branch、base_commit 與 handoff scope，執行指定的 required gates，開 draft PR，
+   然後才修改產品檔案。Lifecycle label 使用 `claimed`（進行中）或 `in-review`（待審）；
+   Issue 關閉即代表 done，不需要額外 label。沒有 orchestrator 指派的 handoff block 時，
+   workers 只能做唯讀偵察，不得建立或認領 Issue。
+
+### #124 occupancy fallback
+
+若工具無法提供 worktree isolation，接手或推送非自己開始的 branch 前，
+必須執行 `git worktree list` 確認 branch 未被本機任何 worktree 佔用，並在該 Issue 宣告意圖；
+這是 fallback 檢查，不能取代隔離的 worktree。
 
 worktree 的實際本機路徑屬環境資訊，不寫入 repository。禁止在別的 AI 正在使用的 worktree 執行
 `checkout`、`switch`、branch rename、reset、clean 或 rebase。
@@ -50,17 +55,16 @@ worktree 的實際本機路徑屬環境資訊，不寫入 repository。禁止在
 
 - worktree 隔離是絕對的；不得讀寫、build、commit 或 cleanup 別的 session 的 worktree，
   即使看起來「只是幫忙」。
-- 認領前除了 GitHub 檢查，也要 `git ls-remote --heads` 確認 branch 未被佔位——另一個
-  session 可能已推了 claim commit 但還沒開 PR。
+- 接手前以 GitHub handoff block 為真值確認 owner，也要 `git ls-remote --heads` 與
+  `git worktree list` 確認 branch 未被佔位——另一個 session 可能仍有未 push 的 edits；
+  workers 不自行挑選未被指派的 open Issue。
 - 回到先前中斷的 slice 時：先 fetch，以遠端 HEAD 與 Issue body handoff block 為唯一真值重新確認；
   本機未 push 的 edits 若已被遠端接手完成，接受遠端版本、獨立重跑全部 gates 驗證，
   不重寫歷史。
 - 工作被另一 session 接手完成時，在 PR body 誠實記錄接手事件與後續驗證
   （先例：PR #24 / Issue #22）。
-- **接手或推送任何不是自己開始的 branch 前，必須先做兩件事**：
-  1. 執行 `git worktree list` 確認該 branch 沒有被本機任何 worktree 佔用中——
-     被佔用代表那個 session 可能還有未 push 的 edits，直接推會踩掉別人的工作；
-  2. 在該 Issue 留言宣告接手意圖，等一個輪詢週期沒有異議再動手。
+- 接手或推送任何不是自己開始的 branch 前，套用 #124 occupancy fallback；若仍有碰撞疑慮，
+  先由 orchestrator 確認前一個 session 已停寫。
   先例：Issue #22 曾發生外部 session 對持有未 push 變更的 worktree 直接 commit，
   事後雖依遠端 HEAD 重驗收尾，但此類碰撞應從源頭避免。
 - 收尾時只清理自己的 worktree 與本地 branch；遠端 branch 留給 integrator 決定。
@@ -71,11 +75,13 @@ handoff block 的 `scope_globs` 是該 Issue 的獨占預告 write-set；`shared
 或其他 lane 配合的檔案，不代表 worker 已取得寫入權。工作範圍擴張前，先更新 Issue body 並重新
 檢查 overlap。
 
-建議 lane：
+Directory lanes 是 orchestrator 分配工作的粗粒度邊界：`driver/`、`tools/`、`apps/`、
+`docs/`、`extensions/`、`vst-host/`、`src/` 各自最多一個 active writer。下列 functional lanes
+是常用細分，仍不得違反 directory-lane 上限：
 
 | Lane | 主要範圍 |
 | --- | --- |
-| Integrator | 全域狀態、合併順序、CI/workflow、跨 lane 收斂 |
+| Orchestrator/Integrator | 全域狀態、工作指派、合併順序、CI/workflow、跨 lane 收斂 |
 | Contract | Spec、schema、SDK/IPC、跨語言 codec |
 | RT core | audio engine、graph、DSP 與 RT tests |
 | Windows runtime | device/session/WASAPI worker、engine preview、live probe |
