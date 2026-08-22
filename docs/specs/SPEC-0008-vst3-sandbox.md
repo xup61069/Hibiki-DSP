@@ -121,12 +121,19 @@ fail-closed，絕不部分載入。
 `sync_timeline_store_to_scheduler_v1` 則把整個 store 以確定順序載入 Scene
 automation scheduler：任何單一項目失敗只計入 skipped，不中斷同步、也不改變
 scheduler 既有項目。
+`sync_scheduler_to_timeline_store_v1` 提供反方向匯出：排程器內所有 timeline 依
+確定順序原子寫回 store，並把 store 中已不存在於排程器的 ID 回報為 stale 候選；
+stale 僅回報、不刪除，是否清除由呼叫端決定；目的地容量不足時整體失敗並回報
+真實總數。
 排程器另提供唯讀內省：`timeline_ids` 以確定排序列舉已儲存 ID，
 `binding_views` 回傳每個 Scene/lane/timeline 綁定的不可變複本；目的地容量
 不足時整體失敗且計數歸零，絕不部分輸出。`Vst3TimelineEditorV1` 現在提供
 supervisor 端 bounded 編輯交易：draft 變更不影響已發布 snapshot，同一
 (parameter_id, sample_position) 的 upsert 以取代而非重複呈現，commit 只在通過既有
-timeline 驗證後才交換已發布 snapshot，discard 直接還原；這是 headless 控制面契約，
+timeline 驗證後才交換已發布 snapshot，discard 直接還原。editor 另保留最多 8 組
+已發布 snapshot 的 bounded undo/redo 歷史：commit 推入前一個狀態並清空 redo、
+容量滿時淘汰最舊、undo/redo 在編輯 session 進行中一律拒絕、reset 清空雙 stack；
+歷史僅存在於單一 editor 範圍內。這是 headless 控制面契約，
 supervisor 的 UI 編輯器、跨版本 plugin state persistence 與完整自動化排程仍未接入，
 因此不能宣稱完整 host automation。
 
