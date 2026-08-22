@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
   [switch]$Build,
-  [ValidateSet('Auto', 'DesktopCompat', 'WinUICompat')]
+  [ValidateSet('Auto', 'DesktopCompat', 'WinUICompat', 'FormalWinUI')]
   [string]$Ui = 'Auto',
   [switch]$SmokeTest,
   [switch]$EnableSystemVolume,
@@ -15,6 +15,7 @@ $repo = Split-Path -Parent $PSScriptRoot
 $engine = Join-Path $repo '.local/engine-preview/Release/hibiki_engine_preview.exe'
 $desktop = Join-Path $repo '.local/preview/DesktopCompat/Hibiki.DesktopPreview.exe'
 $winui = Join-Path $repo '.local/preview/WinUICompat/Hibiki.WinUI.exe'
+$formal = Join-Path $repo '.local/preview/WinUI/Hibiki.WinUI.exe'
 
 function Test-WindowsAppRuntimePackages {
   param([AllowNull()][object[]]$Packages)
@@ -42,8 +43,10 @@ function Resolve-SelectedUi {
   if ($RequestedUi -eq 'Auto') {
     $selected = if ($RuntimePresent) { 'WinUICompat' } else { 'DesktopCompat' }
   }
-  if ($selected -eq 'WinUICompat' -and -not $RuntimePresent) {
-    throw 'WinUICompat needs Windows App Runtime 1.7 x64 (>= 7000.456.1632.0). Use -Ui DesktopCompat or install the runtime.'
+  # The framework-dependent XAML previews (compatibility and formal) both need
+  # the Windows App Runtime; DesktopCompat is self-contained and does not.
+  if (($selected -eq 'WinUICompat' -or $selected -eq 'FormalWinUI') -and -not $RuntimePresent) {
+    throw "The $selected preview needs Windows App Runtime 1.7 x64 (>= 7000.456.1632.0). Use -Ui DesktopCompat or install the runtime."
   }
   return $selected
 }
@@ -95,8 +98,18 @@ if ($SelfTest) {
   $caseCount++
 
   # Case 5: explicit WinUICompat without the runtime fails closed with the actionable message.
-  Assert-GateRejection -Label 'winuicompat-without-runtime' -ExpectedPattern 'WinUICompat needs Windows App Runtime 1\.7 x64 \(>= 7000\.456\.1632\.0\)' `
+  Assert-GateRejection -Label 'winuicompat-without-runtime' -ExpectedPattern 'WinUICompat preview needs Windows App Runtime 1\.7 x64 \(>= 7000\.456\.1632\.0\)' `
     -Action { Resolve-SelectedUi -RequestedUi 'WinUICompat' -RuntimePresent $false }
+  $caseCount++
+
+  # Case 5b: explicit FormalWinUI with the runtime present passes.
+  $resolved = Resolve-SelectedUi -RequestedUi 'FormalWinUI' -RuntimePresent $true
+  if ($resolved -ne 'FormalWinUI') { throw "run-preview self-test case 'explicit-formalwinui-with-runtime' expected FormalWinUI, got $resolved." }
+  $caseCount++
+
+  # Case 5c: explicit FormalWinUI without the runtime fails closed like WinUICompat.
+  Assert-GateRejection -Label 'formalwinui-without-runtime' -ExpectedPattern 'FormalWinUI preview needs Windows App Runtime 1\.7 x64 \(>= 7000\.456\.1632\.0\)' `
+    -Action { Resolve-SelectedUi -RequestedUi 'FormalWinUI' -RuntimePresent $false }
   $caseCount++
 
   # Cases 6..10: runtime package qualification boundary and filtering.
@@ -163,14 +176,20 @@ $selectedUi = Resolve-SelectedUi -RequestedUi $Ui -RuntimePresent $runtimePresen
 if ($Ui -eq 'Auto') {
   Write-Output "Auto-selected preview UI: $selectedUi"
 }
-$uiExecutable = if ($selectedUi -eq 'WinUICompat') { $winui } else { $desktop }
+$uiExecutable = switch ($selectedUi) {
+  'WinUICompat' { $winui }
+  'FormalWinUI' { $formal }
+  default { $desktop }
+}
+# build-preview.ps1 knows the formal target as 'WinUI'.
+$buildTarget = if ($selectedUi -eq 'FormalWinUI') { 'WinUI' } else { $selectedUi }
 
 if ($Build -or -not (Test-Path -LiteralPath $engine)) {
   & (Join-Path $repo 'tools/build-engine-preview.ps1')
   if ($LASTEXITCODE -ne 0) { throw "Engine Preview build failed: $LASTEXITCODE" }
 }
 if ($Build -or -not (Test-Path -LiteralPath $uiExecutable)) {
-  & (Join-Path $repo 'tools/build-preview.ps1') -Target $selectedUi
+  & (Join-Path $repo 'tools/build-preview.ps1') -Target $buildTarget
   if ($LASTEXITCODE -ne 0) { throw "$selectedUi preview build failed: $LASTEXITCODE" }
 }
 if (@(Get-Process -Name hibiki_engine_preview -ErrorAction SilentlyContinue).Count -gt 0) {

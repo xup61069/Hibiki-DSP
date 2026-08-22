@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "issue": 358,
+  "scope_digest": "run-preview-formal-winui-v1",
+  "source_commit": "915a77d",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-qfe-10.1.28000.2526-winapp-runtime-1.7-pwsh-7.6.5",
+  "change_summary": [
+    "tools/run-preview.ps1 accepts -Ui FormalWinUI: selects .local/preview/WinUI/Hibiki.WinUI.exe (the formal MSBuild/XAML shell from build-preview.ps1 -Target WinUI), requires Windows App Runtime 1.7 x64 exactly like WinUICompat (fail-closed with an actionable message otherwise), builds via -Target WinUI when missing or with -Build, and flows through the existing -SmokeTest and engine-flag paths.",
+    "-Ui Auto behavior is intentionally unchanged (WinUICompat when the runtime is present, else DesktopCompat); the formal shell remains explicit opt-in.",
+    "Launcher self-test extended to 22 cases covering FormalWinUI resolution with and without the runtime."
+  ],
+  "end_to_end_verification": {
+    "command": "pwsh -NoProfile -File tools/run-preview.ps1 -Ui FormalWinUI -SmokeTest",
+    "result": "pass",
+    "coverage": [
+      "engine preview built and started hidden",
+      "formal XAML shell built via visual-studio-msbuild and launched",
+      "launch smoke kept the UI alive for the bounded window and closed it safely",
+      "exit code 0"
+    ]
+  },
+  "commands": [
+    "pwsh -NoProfile -File tools/run-preview.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/run-preview.ps1 -Ui FormalWinUI -SmokeTest",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/winui-shell-check.ps1",
+    "git diff --check"
+  ],
+  "limitations": [
+    "User-space launcher tooling only; no driver, WaveRT, HLK or Microsoft signing evidence.",
+    "FormalWinUI remains framework-dependent on Windows App Runtime 1.7 x64 by design.",
+    "Auto selection is unchanged; no behavior change for existing DesktopCompat/WinUICompat users beyond the shared runtime-requirement message wording."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5",
+    "windows_build": "26200"
+  },
+  "started_at": "2026-08-22T23:52:00+08:00",
+  "finished_at": "2026-08-23T00:04:00+08:00"
+}
