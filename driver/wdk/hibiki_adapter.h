@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MS-PL
+﻿// SPDX-License-Identifier: MS-PL
 //
 // Hibiki WaveRT PortCls Adapter Header.
 // Declares DriverEntry, AddDevice, StartDevice, and subdevice registration
@@ -54,3 +54,9 @@ extern "C" NTSTATUS HibikiPnpDispatchV1(
 extern "C" NTSTATUS HibikiPowerDispatchV1(
     _In_ PDEVICE_OBJECT   DeviceObject,
     _Inout_ PIRP          Irp);
+// Kernel-mode C++ allocation for PortCls adapter classes (Issue #394).
+void* __cdecl operator new(size_t size, POOL_TYPE pool_type);
+void* __cdecl operator new[](size_t size, POOL_TYPE pool_type);
+void __cdecl operator delete(void* pointer) noexcept;
+void __cdecl operator delete[](void* pointer) noexcept;
+void __cdecl operator delete(void* pointer, size_t) noexcept;
