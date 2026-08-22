@@ -69,6 +69,65 @@ function Get-FormalWinUiBuildTool([string]$msbuildPath) {
   return 'visual-studio-msbuild'
 }
 
+function Test-PreviewPathUnderRoot {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$Root
+  )
+
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  return $fullPath.StartsWith($fullRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-PreviewExistingAttributes {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [hashtable]$SyntheticAttributes
+  )
+
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
+    return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
+  }
+  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
+  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+}
+
+function Assert-PreviewBuildOutputRoot {
+  param(
+    [Parameter(Mandatory)][string]$OutputRoot,
+    [Parameter(Mandatory)][string]$RepositoryRoot,
+    [hashtable]$SyntheticAttributes
+  )
+
+  $expectedRoot = [IO.Path]::GetFullPath((Join-Path $RepositoryRoot '.local')).TrimEnd('\', '/')
+  $candidate = [IO.Path]::GetFullPath($OutputRoot).TrimEnd('\', '/')
+  if (-not (Test-PreviewPathUnderRoot -Path $candidate -Root $expectedRoot)) {
+    throw "Preview output root must remain under the repository .local root: $candidate"
+  }
+
+  $cursor = $candidate
+  while ($true) {
+    $attributes = Get-PreviewExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    if ($null -ne $attributes) {
+      if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Preview output root or parent is a reparse point: $cursor"
+      }
+      if (($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+        throw "Preview output root or parent is not a directory: $cursor"
+      }
+    }
+
+    if ($cursor -eq $expectedRoot) { break }
+    $parent = [IO.Path]::GetFullPath((Split-Path -Parent $cursor)).TrimEnd('\', '/')
+    if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) {
+      throw "Preview output root could not reach the repository .local root: $candidate"
+    }
+    $cursor = $parent
+  }
+}
+
 if ($SelfTest) {
   $expected = [ordered]@{
     WinUI = @{ ProjectRelativePath = 'apps/winui-shell/Hibiki.WinUI.csproj'; OutputProperty = 'OutputPath'; SmokeExecutable = $null }
@@ -86,6 +145,7 @@ if ($SelfTest) {
         [IO.Path]::GetFullPath($metadata.OutputRoot) -ne $expectedOutputRoot) {
       throw "Preview dispatch self-test mapping mismatch for target $($case.Key)."
     }
+    Assert-PreviewBuildOutputRoot -OutputRoot $metadata.OutputRoot -RepositoryRoot $repo
     $outputRoots[[IO.Path]::GetFullPath($metadata.OutputRoot)] = $case.Key
   }
   if ($outputRoots.Count -ne $expected.Count) {
@@ -107,13 +167,51 @@ if ($SelfTest) {
     throw 'Preview dispatch self-test expected a resolved MSBuild path to use Visual Studio MSBuild.'
   }
 
-  Write-Output 'Preview target dispatch self-test passed (7 cases).'
+  $outsideRootCaught = $false
+  try {
+    Assert-PreviewBuildOutputRoot -OutputRoot (Join-Path $repo 'build') -RepositoryRoot $repo
+  } catch {
+    $outsideRootCaught = $_.Exception.Message -match 'under the repository .local root'
+  }
+  if (-not $outsideRootCaught) { throw 'Preview dispatch self-test expected an outside-root rejection.' }
+
+  $localRoot = [IO.Path]::GetFullPath((Join-Path $repo '.local')).TrimEnd('\', '/')
+  $syntheticChild = [IO.Path]::GetFullPath((Join-Path $repo '.local/preview/Synthetic')).TrimEnd('\', '/')
+  $reparseParentCaught = $false
+  try {
+    Assert-PreviewBuildOutputRoot -OutputRoot $syntheticChild -RepositoryRoot $repo `
+      -SyntheticAttributes @{ $localRoot = [System.IO.FileAttributes]::Directory -bor [System.IO.FileAttributes]::ReparsePoint }
+  } catch {
+    $reparseParentCaught = $_.Exception.Message -match 'reparse point'
+  }
+  if (-not $reparseParentCaught) { throw 'Preview dispatch self-test expected a reparse-parent rejection.' }
+
+  $reparseTargetCaught = $false
+  try {
+    Assert-PreviewBuildOutputRoot -OutputRoot $syntheticChild -RepositoryRoot $repo `
+      -SyntheticAttributes @{ $syntheticChild = [System.IO.FileAttributes]::Directory -bor [System.IO.FileAttributes]::ReparsePoint }
+  } catch {
+    $reparseTargetCaught = $_.Exception.Message -match 'reparse point'
+  }
+  if (-not $reparseTargetCaught) { throw 'Preview dispatch self-test expected a reparse-target rejection.' }
+
+  $nonDirectoryCaught = $false
+  try {
+    Assert-PreviewBuildOutputRoot -OutputRoot $syntheticChild -RepositoryRoot $repo `
+      -SyntheticAttributes @{ $syntheticChild = [System.IO.FileAttributes]::Archive }
+  } catch {
+    $nonDirectoryCaught = $_.Exception.Message -match 'not a directory'
+  }
+  if (-not $nonDirectoryCaught) { throw 'Preview dispatch self-test expected a non-directory rejection.' }
+
+  Write-Output 'Preview target dispatch self-test passed (11 cases).'
 
   exit 0
 }
 
 $preview = Get-PreviewDispatchMetadata $repo $Target
 $previewRoot = $preview.OutputRoot
+Assert-PreviewBuildOutputRoot -OutputRoot $previewRoot -RepositoryRoot $repo
 
 if ($Target -eq 'ControlModel') {
   $project = $preview.ProjectPath
@@ -133,6 +231,7 @@ if ($Target -eq 'WinUICompat') {
   dotnet build $project --configuration Release "-p:OutputPath=$previewRoot/" '-p:HibikiCompatibilityPreview=true' '-p:Platform=x64'
   if ($LASTEXITCODE -ne 0) { throw "Compatibility preview build failed: $LASTEXITCODE" }
   if ($SmokeTest) {
+    Assert-PreviewBuildOutputRoot -OutputRoot $previewRoot -RepositoryRoot $repo
     $executable = Join-Path $previewRoot 'Hibiki.WinUI.exe'
     if (-not (Test-Path -LiteralPath $executable)) { throw "Compatibility preview executable was not produced: $executable" }
     $process = Start-Process -FilePath $executable -WorkingDirectory $previewRoot -PassThru
@@ -154,6 +253,7 @@ if ($Target -eq 'DesktopCompat') {
   dotnet publish $project --configuration Release --runtime win-x64 --self-contained true --output $previewRoot
   if ($LASTEXITCODE -ne 0) { throw "Desktop compatibility preview build failed: $LASTEXITCODE" }
   if ($SmokeTest) {
+    Assert-PreviewBuildOutputRoot -OutputRoot $previewRoot -RepositoryRoot $repo
     $executable = Join-Path $previewRoot 'Hibiki.DesktopPreview.exe'
     if (-not (Test-Path -LiteralPath $executable)) { throw "Desktop preview executable was not produced: $executable" }
     $process = Start-Process -FilePath $executable -WorkingDirectory $previewRoot -WindowStyle Hidden -PassThru
@@ -193,6 +293,7 @@ if ($SmokeTest) {
   }
   Add-Type -AssemblyName UIAutomationClient
   Add-Type -AssemblyName UIAutomationTypes
+  Assert-PreviewBuildOutputRoot -OutputRoot $previewRoot -RepositoryRoot $repo
   $executable = Join-Path $previewRoot 'Hibiki.WinUI.exe'
   if (-not (Test-Path -LiteralPath $executable)) { throw "Formal WinUI preview executable was not produced: $executable" }
   $process = Start-Process -FilePath $executable -WorkingDirectory $previewRoot -PassThru
