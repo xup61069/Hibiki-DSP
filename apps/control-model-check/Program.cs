@@ -795,4 +795,123 @@ notificationCount = notifications.Count;
 Check(!bindingSurface.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(5, 30, 0.5)) &&
       notifications.Count == notificationCount,
     "Rejected edit without a draft must not notify bindings.");
+var editorViewModel = new Vst3TimelineEditorViewModel();
+var editorNotifications = new List<string>();
+editorViewModel.PropertyChanged += (_, args) =>
+    editorNotifications.Add(args.PropertyName ?? string.Empty);
+Check(!editorViewModel.RegisterTimeline("bad id") &&
+      editorViewModel.StatusText.Contains("註冊失敗"),
+    "Editor ViewModel must fail closed on invalid timeline registration.");
+Check(editorViewModel.RegisterTimeline("editor-timeline") &&
+      editorViewModel.TimelineIds.SequenceEqual(["editor-timeline"]) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.TimelineIds)) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.StatusText)),
+    "Editor ViewModel must project accepted timeline registration.");
+editorNotifications.Clear();
+Check(!editorViewModel.Select("missing") &&
+      editorViewModel.StatusText.Contains("選取失敗") &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.StatusText)),
+    "Editor ViewModel must reject selection of an unknown timeline.");
+editorNotifications.Clear();
+Check(editorViewModel.Select("editor-timeline") &&
+      editorViewModel.SelectedTimelineId == "editor-timeline" &&
+      editorViewModel.Rows.Count == 0 && !editorViewModel.IsDirty &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.SelectedTimelineId)) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.Rows)),
+    "Editor ViewModel must project an empty selected timeline.");
+editorNotifications.Clear();
+Check(editorViewModel.BeginEdit() && editorViewModel.HasEditSession &&
+      editorViewModel.Rows.Count == 0 &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.HasEditSession)),
+    "Editor ViewModel must expose the accepted draft transition.");
+Check(!editorViewModel.Select("missing") && editorViewModel.HasEditSession &&
+      editorViewModel.StatusText.Contains("草稿進行中"),
+    "Editor ViewModel must refuse selection changes during a draft.");
+editorViewModel.NewParameterIdText = "7";
+editorViewModel.NewPositionText = "480";
+editorViewModel.NewValueText = "0.25";
+editorNotifications.Clear();
+Check(editorViewModel.UpsertFromFields() && editorViewModel.Rows.Count == 1 &&
+      editorViewModel.Rows[0] == new Vst3TimelineEditorViewModel.TimelineEventRow(
+          0, 7U, 480UL, 0.25) &&
+      editorViewModel.StatusText.Contains("事件已加入") &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.Rows)),
+    "Editor ViewModel must parse and project a valid event.");
+editorViewModel.NewParameterIdText = "3";
+editorViewModel.NewPositionText = "240";
+editorViewModel.NewValueText = "0.75";
+Check(editorViewModel.UpsertFromFields() && editorViewModel.Rows.Select(row =>
+          (row.ParameterId, row.SamplePosition)).SequenceEqual([(3U, 240UL), (7U, 480UL)]),
+    "Editor ViewModel rows must retain canonical sample/parameter ordering.");
+var rowsBeforeInvalidInput = editorViewModel.Rows.ToArray();
+editorViewModel.NewParameterIdText = "７";
+editorViewModel.NewPositionText = "720";
+editorViewModel.NewValueText = "0.5";
+Check(!editorViewModel.UpsertFromFields() &&
+      editorViewModel.Rows.SequenceEqual(rowsBeforeInvalidInput) &&
+      editorViewModel.StatusText.Contains("欄位格式無效"),
+    "Full-width parameter text must be refused without changing the draft.");
+editorViewModel.NewParameterIdText = "8";
+editorViewModel.NewPositionText = "720";
+editorViewModel.NewValueText = "0,5";
+Check(!editorViewModel.UpsertFromFields() &&
+      editorViewModel.Rows.SequenceEqual(rowsBeforeInvalidInput),
+    "Locale-specific decimal text must be refused without changing the draft.");
+editorViewModel.NewParameterIdText = "8";
+editorViewModel.NewPositionText = "720";
+editorViewModel.NewValueText = "NaN";
+Check(!editorViewModel.UpsertFromFields() &&
+      editorViewModel.Rows.SequenceEqual(rowsBeforeInvalidInput),
+    "Non-finite value text must be refused without changing the draft.");
+editorViewModel.NewParameterIdText = "8";
+editorViewModel.NewPositionText = "720";
+editorViewModel.NewValueText = "1.1";
+Check(!editorViewModel.UpsertFromFields() &&
+      editorViewModel.Rows.SequenceEqual(rowsBeforeInvalidInput) &&
+      editorViewModel.StatusText.Contains("事件超出限制"),
+    "Out-of-range normalized value must be refused by the bounded model.");
+editorViewModel.SelectedRowIndex = 0;
+var firstRowBeforeValueEdit = editorViewModel.Rows[0];
+Check(!editorViewModel.SetSelectedRowValue("NaN") &&
+      editorViewModel.Rows[0] == firstRowBeforeValueEdit,
+    "Non-finite selected-row value must be refused without changing the row.");
+Check(editorViewModel.SetSelectedRowValue("0.9") &&
+      editorViewModel.Rows[0] == firstRowBeforeValueEdit with { NormalizedValue = 0.9 },
+    "Selected-row value edit must preserve its ordering key.");
+editorViewModel.SelectedRowIndex = -1;
+Check(!editorViewModel.SetSelectedRowValue("0.4") &&
+      editorViewModel.StatusText.Contains("未選取列"),
+    "Selected-row edit must refuse when no row is selected.");
+editorViewModel.SelectedRowIndex = 0;
+editorNotifications.Clear();
+Check(editorViewModel.Commit() && !editorViewModel.HasEditSession &&
+      editorViewModel.IsDirty && editorViewModel.UndoDepth == 1 &&
+      editorViewModel.CanUndo && !editorViewModel.CanRedo &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.IsDirty)) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.UndoDepth)),
+    "Editor ViewModel commit must publish rows and history projections.");
+Check(editorViewModel.SaveSelected() && !editorViewModel.IsDirty &&
+      editorViewModel.StatusText.Contains("已保存"),
+    "Editor ViewModel save must re-baseline dirty state.");
+Check(editorViewModel.Undo() && editorViewModel.Rows.Count == 0 &&
+      editorViewModel.IsDirty && editorViewModel.CanRedo,
+    "Editor ViewModel undo must restore the previous published snapshot.");
+Check(editorViewModel.Redo() && editorViewModel.Rows.Count == 2 &&
+      !editorViewModel.IsDirty && !editorViewModel.CanRedo,
+    "Editor ViewModel redo must restore the saved snapshot.");
+Check(editorViewModel.BeginEdit(), "Second editor ViewModel draft fixture failed.");
+editorViewModel.SelectedRowIndex = 1;
+Check(editorViewModel.SetSelectedRowValue("0.1") && editorViewModel.Commit() &&
+      editorViewModel.IsDirty && editorViewModel.UndoDepth == 2,
+    "Editor ViewModel second commit must create bounded undo history.");
+Check(editorViewModel.Undo() && !editorViewModel.IsDirty && editorViewModel.CanRedo &&
+      editorViewModel.Redo() && editorViewModel.IsDirty,
+    "Editor ViewModel undo/redo must expose dirty and redo transitions.");
+Check(editorViewModel.BeginEdit() && editorViewModel.Discard() &&
+      !editorViewModel.HasEditSession && editorViewModel.IsDirty,
+    "Editor ViewModel discard must preserve the last published state.");
+editorViewModel.SelectedRowIndex = 99;
+Check(!editorViewModel.SetSelectedRowValue("0.2") &&
+      editorViewModel.StatusText.Contains("數值修改被拒絕"),
+    "Editor ViewModel must refuse an out-of-range selected row.");
 Console.WriteLine("Control model checks passed.");
