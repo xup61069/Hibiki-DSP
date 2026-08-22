@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "issue": 466,
+  "scope_digest": "contract-test-resource-isolation-v1",
+  "source_commit": "e7755e9 (base) + working tree slice",
+  "environment_fingerprint": "windows-26200-amd64-msvc-19.51.36256-cmake-4.4.0-dotnet-10.0.400-pwsh-7.6.5",
+  "commands": [
+    "cmake --preset windows-dev",
+    "cmake --build .local/build --config RelWithDebInfo --target hibiki_contract_tests",
+    ".local/build/tests/RelWithDebInfo/hibiki_contract_tests.exe"
+  ],
+  "results": [
+    {
+      "command": "hibiki_contract_tests.exe",
+      "status": "pass",
+      "coverage": [
+        "IPC control pipe, host pipe and Local ASIO mapping names are pid-scoped so parallel test processes cannot collide",
+        "Existing IPC round-trip and idle-tolerance regressions still pass"
+      ],
+      "compiled_artifacts": true
+    }
+  ],
+  "limitations": [
+    "Tests-only slice; no production source, schema, driver or signing claims.",
+    "Motivating failure was observed once under concurrent verify.ps1 runs and reproduced as a fixed-name race; uniqueness is enforced per process id."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "cmake": "4.4.0",
+    "msvc": "19.51.36256"
+  },
+  "started_at": "2026-08-23T06:00:00+08:00",
+  "finished_at": "2026-08-23T05:50:32+08:00"
+}
