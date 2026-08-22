@@ -114,6 +114,26 @@
         "direct invocation cannot locate cmake because CMake is not on PATH"
       ],
       "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions push verify run 32538770331 (job 96944457068)",
+      "status": "blocked_by_integrator_baseline",
+      "coverage": [
+        "Configure and test unsigned source passed",
+        "Documentation gate failed because BASELINE.md claims 425 tracked paths while git reports 427",
+        "later gates were skipped by workflow dependency"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "GitHub Actions pull_request verify run 32538772767 (job 96944462959)",
+      "status": "blocked_by_integrator_baseline",
+      "coverage": [
+        "Configure and test unsigned source passed",
+        "Documentation gate failed because BASELINE.md claims 425 tracked paths while git reports 427",
+        "later gates were skipped by workflow dependency"
+      ],
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
