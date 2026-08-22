@@ -27,6 +27,13 @@ automation tables for all four endpoints (Main, Low Latency, Surround 7.1,
 and Virtual Mic). They wire `GetDescription` and `DataRangeIntersection` to
 static, allocation-free filter topologies matching `endpoint_topology_v1`.
 
+`hibiki_adapter.h` and `hibiki_adapter.cpp` provide the PortCls adapter
+driver entry point (`DriverEntry`), device object initialization
+(`HibikiAddDevice`), subdevice registration (`HibikiStartDevice` calling
+`PcRegisterSubdevice` for `PortWaveRT`), and PNP/Power dispatch
+(`HibikiPnpDispatchV1` / `HibikiPowerDispatchV1`). They bind all four endpoints
+to the Windows audio driver life cycle without linking GPL user-space code.
+
 It is deliberately not part of the default CMake target: this machine does
 not have the locked WDK 10.0.28000.2526 and no `.sys` is produced. A future WDK
 adapter must provide one context per endpoint, wire the functions into the
