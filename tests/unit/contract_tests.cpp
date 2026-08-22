@@ -67,6 +67,7 @@ extern "C" {
 #include "hibiki/virtual_mic.hpp"
 #include "hibiki/true_peak_limiter.hpp"
 #if defined(_WIN32)
+#include <process.h>
 #include <windows.h>
 #include "hibiki/windows_volume_broker.hpp"
 #include "hibiki/windows_volume_link.hpp"
@@ -1636,7 +1637,9 @@ int main() {
           !control_host.running() &&
           !control_host.start_with_queue(IpcNamedPipeConfigV1{L"", 1024U, 100U}));
 #if defined(_WIN32)
-    constexpr wchar_t kControlPipe[] = L"\\\\.\\pipe\\HibikiDSP_contract_control";
+    const std::wstring control_pipe =
+        L"\\\\.\\pipe\\HibikiDSP_contract_control_" + std::to_wstring(_getpid());
+    const wchar_t* const kControlPipe = control_pipe.c_str();
     CHECK(ipc_server.start(IpcNamedPipeConfigV1{kControlPipe, 1024U, 1000U},
                            acknowledge_ipc_request, nullptr));
     HANDLE ipc_client = INVALID_HANDLE_VALUE;
@@ -1688,7 +1691,9 @@ int main() {
     ipc_server.stop();
     CHECK(!ipc_server.running());
 
-    constexpr wchar_t kHostControlPipe[] = L"\\\\.\\pipe\\HibikiDSP_contract_host";
+    const std::wstring host_control_pipe =
+        L"\\\\.\\pipe\\HibikiDSP_contract_host_" + std::to_wstring(_getpid());
+    const wchar_t* const kHostControlPipe = host_control_pipe.c_str();
     ControlPlaneHostV1 host;
     CHECK(host.start_with_queue(IpcNamedPipeConfigV1{kHostControlPipe, 1024U, 1000U}));
     HANDLE host_client = INVALID_HANDLE_VALUE;
@@ -3828,7 +3833,9 @@ int main() {
         engine, lane_mic, 0U, lane_mic_input, 2U, lane_mic_capture, 2U, mic_lane_inputs,
         lane_mic_output, 2U, 2U));
 #if defined(_WIN32)
-    constexpr wchar_t kContractMapping[] = L"Local\\HibikiDSP_v1_contract_asio";
+    const std::wstring contract_mapping_name =
+        L"Local\\HibikiDSP_v1_contract_asio_" + std::to_wstring(_getpid());
+    const wchar_t* const kContractMapping = contract_mapping_name.c_str();
     CHECK(engine.bind_asio_transport(kContractMapping, 2U, 48000U, 4U));
     CHECK(engine.asio_transport_bound());
     const auto contract_bytes = hibiki_asio_transport_region_size_v1();
