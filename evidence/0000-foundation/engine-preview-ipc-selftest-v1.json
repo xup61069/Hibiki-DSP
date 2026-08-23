@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 70,
   "scope_digest": "engine-preview-ipc-selftest-v1",
-  "source_commit": "b9407f4",
+  "source_commit": "6e50f347149076fb6d08d44a393d44fddafb2722",
   "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "pwsh -NoProfile -File tools/engine-preview-smoke.ps1 -SelfTest",

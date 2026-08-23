@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 97,
   "scope_digest": "live-session-volume-selftest-v1",
-  "source_commit": "da4faf6",
+  "source_commit": "786ca24b975f5e8654ceece6cda922e8f54f524e",
   "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "pwsh -NoProfile -File tools/live-session-volume-check.ps1 -SelfTest",

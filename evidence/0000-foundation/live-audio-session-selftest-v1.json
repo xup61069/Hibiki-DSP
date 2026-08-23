@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 102,
   "scope_digest": "live-audio-session-selftest-v1",
-  "source_commit": "4828040",
+  "source_commit": "4551e6b4535d912a86964ca98b9273fc027f7cd0",
   "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "pwsh -NoProfile -File tools/live-audio-session-check.ps1 -SelfTest",
