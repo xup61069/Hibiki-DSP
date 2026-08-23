@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "issue": 662,
+  "scope_digest": "mute-node-name-v1",
+  "source_commit": "7d0c6d3",
+  "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100-pwsh-7.6",
+  "commands": [
+    "pwsh -NoProfile -File tools/build-driver.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 662",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/driver-source-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/build-driver.ps1",
+      "status": "pass",
+      "coverage": [
+        "WDK Release build links HibikiVirtualAudio.sys",
+        "Inf2Cat signability zero errors/zero warnings"
+      ],
+      "compiled_artifacts": true,
+      "case_count": 2
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 662",
+      "status": "pass",
+      "coverage": [
+        "ownership",
+        "branch/base",
+        "scope"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 1
+    },
+    {
+      "command": "docs/source/driver gates",
+      "status": "pass",
+      "coverage": [
+        "required paths",
+        "source-only policy",
+        "WDK source boundary",
+        "whitespace"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 4
+    }
+  ],
+  "changes": [
+    {
+      "file": "driver/wdk/hibiki_filter_tables.cpp",
+      "summary": "Mute node Name now references KSAUDFNAME_MASTER_MUTE instead of nullptr; removed the unused null fallback define."
+    }
+  ],
+  "limitations": [
+    "Source/build evidence only; no guest install/load, HLK, or Microsoft-signing claim.",
+    "Naming-quality fix only: PortCls already accepted a null name (falls back to Type GUID); this does not claim to resolve the VM PnP start failure.",
+    "Remaining C4996/C4189 build warnings belong to the separate #652 slice and are intentionally untouched here."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-23T17:28:00+08:00",
+  "finished_at": "2026-08-23T17:48:00+08:00"
+}

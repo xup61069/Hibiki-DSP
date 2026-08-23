@@ -15,10 +15,6 @@
 #ifndef KSAUDFNAME_VOLUME
 #define KSAUDFNAME_VOLUME KSAUDFNAME_VOLUME_CONTROL
 #endif
-#ifndef KSAUDFNAME_MUTE
-#define KSAUDFNAME_MUTE nullptr
-#endif
-
 // Forward declaration from hibiki_property_adapter.cpp
 extern "C" NTSTATUS HibikiPropertyHandlerVolumeV1(
     _In_ PPCPROPERTY_REQUEST request,
@@ -91,7 +87,7 @@ static const PCNODE_DESCRIPTOR EndpointNodes[] = {
         0,                      // Flags
         &AutomationMute,        // AutomationTable
         &KSNODETYPE_MUTE,       // Type
-        nullptr        // Name
+        &KSAUDFNAME_MASTER_MUTE  // Name
     },
     // NODE_VOLUME
     {
