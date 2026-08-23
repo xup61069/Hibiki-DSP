@@ -488,6 +488,39 @@ int main() {
     const auto large_db = 20.0 * std::log10(static_cast<double>(large_final));
     CHECK(std::abs(small_db - large_db) < 0.01);
 
+    // Regression: recovery must be equivalent across sample rates over the
+    // same elapsed time.  480 frames at 48 kHz and 960 frames at 96 kHz are
+    // both 10 ms; after one quiet block each limiter should have recovered
+    // by approximately the same number of dB.
+    TruePeakLimiterV1 limiter_48k;
+    TruePeakLimiterV1 limiter_96k;
+    float engage_48k[] = {2.0F, -2.0F};
+    float engage_96k[] = {2.0F, -2.0F};
+    const auto engage_48k_gain =
+        limiter_48k.limit_in_place(engage_48k, 1U, 2U, -1.0, 48000U);
+    const auto engage_96k_gain =
+        limiter_96k.limit_in_place(engage_96k, 1U, 2U, -1.0, 96000U);
+    CHECK(std::abs(engage_48k_gain - engage_96k_gain) < 1e-6F);
+
+    static float quiet_48k[960];   // 480 frames x 2 channels
+    static float quiet_96k[1920];  // 960 frames x 2 channels
+    for (auto& f : quiet_48k) f = 0.001F;
+    for (auto& f : quiet_96k) f = 0.001F;
+    (void)limiter_48k.limit_in_place(quiet_48k, 480U, 2U, -1.0, 48000U);
+    (void)limiter_96k.limit_in_place(quiet_96k, 960U, 2U, -1.0, 96000U);
+    const auto gain_48k = limiter_48k.applied_gain_for_test();
+    const auto gain_96k = limiter_96k.applied_gain_for_test();
+
+    // Both should have recovered by ~6 dB/ms * 10 ms = ~60 dB from their
+    // engaged level.  Compare the amount recovered in dB domain.
+    const auto recovered_48k_db =
+        20.0 * std::log10(static_cast<double>(gain_48k)) -
+        20.0 * std::log10(static_cast<double>(engage_48k_gain));
+    const auto recovered_96k_db =
+        20.0 * std::log10(static_cast<double>(gain_96k)) -
+        20.0 * std::log10(static_cast<double>(engage_96k_gain));
+    CHECK(std::abs(recovered_48k_db - recovered_96k_db) < 0.01);
+
     std::vector<IsoContourPoint> current{{100.0, 60.0}, {1000.0, 40.0}};
     std::vector<IsoContourPoint> reference{{100.0, 50.0}, {1000.0, 40.0}};
     EqualLoudnessPolicyV1 policy;
