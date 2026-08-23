@@ -18,6 +18,73 @@ function Get-DriverBuildPaths {
   }
 }
 
+function Get-DriverIncludeDirectories {
+  param(
+    [Parameter(Mandatory = $true)][string]$RepoRoot,
+    [Parameter(Mandatory = $true)][string]$WdkIncludeRoot,
+    [Parameter(Mandatory = $true)][string]$MsvcIncludeRoot
+  )
+
+  @(
+    (Join-Path $WdkIncludeRoot 'km'),
+    $MsvcIncludeRoot,
+    (Join-Path $WdkIncludeRoot 'ucrt'),
+    (Join-Path $WdkIncludeRoot 'km\crt'),
+    (Join-Path $WdkIncludeRoot 'shared'),
+    (Join-Path $RepoRoot 'driver\include'),
+    (Join-Path $RepoRoot 'sdk\include')
+  )
+}
+
+function Get-DriverCompilerFlags {
+  param([Parameter(Mandatory = $true)][string]$WdkIncludeRoot)
+
+  @(
+    '/nologo',
+    "/FI$(Join-Path $WdkIncludeRoot 'km\ntddk.h')",
+    '/W4',
+    '/WX',
+    '/wd4005',
+    '/kernel',
+    '/c',
+    '/Zp8',
+    '/GR-',
+    '/GS',
+    '/EHs-c-',
+    '/Zl'
+  )
+}
+
+function Get-DriverLinkerFlags {
+  @('/nologo', '/WX', '/DRIVER', '/SUBSYSTEM:NATIVE,10.00', '/ENTRY:GsDriverEntry',
+    '/NODEFAULTLIB', '/INTEGRITYCHECK')
+}
+
+function Get-DriverCompilePlan {
+  param(
+    [Parameter(Mandatory = $true)][string]$RepoRoot,
+    [Parameter(Mandatory = $true)][string]$ObjectRoot
+  )
+
+  $sources = @(
+    Get-ChildItem (Join-Path $RepoRoot 'driver\src') -Filter *.c -File
+    Get-ChildItem (Join-Path $RepoRoot 'driver\wdk') -Filter *.cpp -File
+  )
+  $plan = @($sources | ForEach-Object {
+    [pscustomobject]@{
+      Source = $_.FullName
+      Object = Join-Path $ObjectRoot ($_.BaseName + '.obj')
+    }
+  })
+  $duplicateSources = @($plan | Group-Object Source | Where-Object Count -gt 1)
+  $duplicateObjects = @($plan | Group-Object Object | Where-Object Count -gt 1)
+  if ($duplicateSources.Count -ne 0 -or $duplicateObjects.Count -ne 0) {
+    $details = @($duplicateSources.Name) + @($duplicateObjects.Name)
+    throw "Driver compile plan contains duplicate source/object inputs: $($details -join ', ')"
+  }
+  $plan
+}
+
 function Test-PathUnderRoot {
   param(
     [Parameter(Mandatory = $true)][string]$Root,
@@ -232,6 +299,29 @@ if ($SelfTest) {
   Write-Output 'Driver build path self-test passed (script-root discovery, .local outputs, source boundaries).'
   $pathCases = Invoke-DriverOutputPathSelfTest
   Write-Output "Driver output path self-test: $pathCases cases passed (offline/no-wdk/no-compiler/no-file-write)."
+
+  $syntheticWdk = 'C:\Program Files (x86)\Windows Kits\10\Include\10.0.test'
+  $syntheticMsvc = 'C:\Program Files\Microsoft Visual Studio\VC\Tools\MSVC\test\include'
+  $includeDirectories = @(Get-DriverIncludeDirectories -RepoRoot $paths.RepoRoot `
+    -WdkIncludeRoot $syntheticWdk -MsvcIncludeRoot $syntheticMsvc)
+  if ($includeDirectories.Count -ne 7 -or
+      $includeDirectories[0] -ne (Join-Path $syntheticWdk 'km') -or
+      $includeDirectories[1] -ne $syntheticMsvc -or
+      $includeDirectories[2] -ne (Join-Path $syntheticWdk 'ucrt') -or
+      $includeDirectories[3] -ne (Join-Path $syntheticWdk 'km\crt')) {
+    throw 'build-driver self-test found an incompatible MSVC/UCRT/WDK include order.'
+  }
+  $compilerFlags = @(Get-DriverCompilerFlags -WdkIncludeRoot $syntheticWdk)
+  $linkerFlags = @(Get-DriverLinkerFlags)
+  if ($compilerFlags -notcontains '/WX' -or $linkerFlags -notcontains '/WX') {
+    throw 'build-driver self-test requires compiler and linker warnings-as-errors.'
+  }
+  $compilePlan = @(Get-DriverCompilePlan -RepoRoot $paths.RepoRoot -ObjectRoot $paths.ObjectRoot)
+  if (@($compilePlan | Where-Object { [System.IO.Path]::GetFileName($_.Source) -eq 'guids.cpp' }).Count -ne 1 -or
+      @($compilePlan.Object | Select-Object -Unique).Count -ne $compilePlan.Count) {
+    throw 'build-driver self-test requires one source per unique object, including guids.cpp exactly once.'
+  }
+  Write-Output "Driver build plan self-test passed ($($compilePlan.Count) unique source/object mappings, compatible include order, warnings-as-errors)."
   exit 0
 }
 
@@ -289,7 +379,12 @@ Assert-DriverOutputDirectory -Path $pkgDir -Root $localRoot
 # --- Compile kernel-mode x64 ----------------------------------------------
 $clDir = Split-Path -Parent $cl
 $msvcInc = Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $clDir))) 'include'
-$env:INCLUDE = "$incRoot\km;$incRoot\km\crt;$incRoot\shared;$msvcInc;$repo\driver\include;$repo\sdk\include"
+$includeDirectories = @(Get-DriverIncludeDirectories -RepoRoot $repo -WdkIncludeRoot $incRoot `
+  -MsvcIncludeRoot $msvcInc)
+foreach ($includeDirectory in $includeDirectories) {
+  Assert-Tool $includeDirectory 'Driver include directory'
+}
+$env:INCLUDE = $includeDirectories -join ';'
 $defines = @(
   '/D_AMD64_', '/DAMD64', '/D_WIN64', '/DWINNT=1',
   '/D_WIN32_WINNT=0x0A00', '/DWINVER=0x0A00', '/DNTDDI_VERSION=0x0A000008',
@@ -297,26 +392,16 @@ $defines = @(
 )
 # The WDK headers also define _NTDDK_; the duplicate-definition notice is
 # expected when the guard is provided by the build environment instead.
-$flags = @('/nologo', "/FI$incRoot\km\ntddk.h", '/W4', '/wd4005', '/kernel', '/c', '/Zp8', '/GR-', '/GS', '/EHs-c-', '/Zl')
+$flags = @(Get-DriverCompilerFlags -WdkIncludeRoot $incRoot)
 $objs = @()
-foreach ($cfile in (Get-ChildItem (Join-Path $repo 'driver/src') -Filter *.c)) {
-  $obj = Join-Path $objDir ($cfile.BaseName + '.obj')
-  & $cl @flags @defines "/Fo$obj" $cfile.FullName
-  if ($LASTEXITCODE -ne 0) { throw "cl.exe failed for $($cfile.Name)." }
-  $objs += $obj
-}
-$guidsCpp = Join-Path $objDir 'guids.cpp'
-Copy-Item (Join-Path $repo 'driver/wdk/guids.cpp') $guidsCpp -Force
-$obj = Join-Path $objDir 'guids.obj'
-& $cl @flags @defines "/Fo$obj" $guidsCpp
-if ($LASTEXITCODE -ne 0) { throw 'cl.exe failed for guids.cpp.' }
-$objs += $obj
-foreach ($cpp in (Get-ChildItem (Join-Path $repo 'driver/wdk') -Filter *.cpp)) {
-  $obj = Join-Path $objDir ($cpp.BaseName + '.obj')
-  & $cl @flags @defines "/Fo$obj" $cpp.FullName
-  if ($LASTEXITCODE -ne 0) { throw "cl.exe failed for $($cpp.Name)." }
-  $objs += $obj
-  Write-Output "compiled $($cpp.Name)"
+$compilePlan = @(Get-DriverCompilePlan -RepoRoot $repo -ObjectRoot $objDir)
+foreach ($unit in $compilePlan) {
+  & $cl @flags @defines "/Fo$($unit.Object)" $unit.Source
+  if ($LASTEXITCODE -ne 0) {
+    throw "cl.exe failed for $([System.IO.Path]::GetFileName($unit.Source))."
+  }
+  $objs += $unit.Object
+  Write-Output "compiled $([System.IO.Path]::GetFileName($unit.Source))"
 }
 
 # --- Link .sys ------------------------------------------------------------
@@ -325,7 +410,8 @@ Assert-DriverOutputDirectory -Path $objDir -Root $localRoot
 Assert-DriverOutputDirectory -Path $pkgDir -Root $localRoot
 $env:LIB = "$kmLib"
 $env:WDK_BIN = Split-Path -Parent $inf2cat
-& $link /nologo /DRIVER /SUBSYSTEM:NATIVE,10.00 /ENTRY:GsDriverEntry /NODEFAULTLIB /INTEGRITYCHECK `
+$linkFlags = @(Get-DriverLinkerFlags)
+& $link @linkFlags `
   "/OUT:$sysPath" `
   $objs ntoskrnl.lib hal.lib ks.lib portcls.lib stdunk.lib libcntpr.lib ksguid.lib bufferoverflowK.lib
 if ($LASTEXITCODE -ne 0) { throw 'link.exe failed producing HibikiVirtualAudio.sys.' }
