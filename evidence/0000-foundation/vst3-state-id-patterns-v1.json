@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "issue": 919,
+  "scope_digest": "vst3-state-id-patterns-v1",
+  "source_commit": "a5e41c2d94c16f875e03bb79c2cdee3f32ee90ba",
+  "environment_fingerprint": "windows-local-pwsh-schema-id-tightening",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 919",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass",
+      "required_paths": 85,
+      "specs": 24
+    },
+    {
+      "command": "source-policy",
+      "status": "pass",
+      "scanned_paths": 638
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Metadata-only schema pattern tightening to match the project-wide ID convention; no runtime code, IPC payload, DSP, driver, signing or physical-audio behavior changes.",
+    "The runtime C++ validator already accepts a superset of the tightened patterns; this change makes the schema contract consistent with documented ID rules.",
+    "No driver installation, loading, TESTSIGNING, certificate purchase or real-device changes were performed."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-24T21:50:00+08:00",
+  "finished_at": "2026-08-24T22:00:00+08:00"
+}
