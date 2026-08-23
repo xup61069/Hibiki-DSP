@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "issue": 954,
+  "scope_digest": "manifest-string-bounds-v1",
+  "source_commit": "0901663d",
+  "environment_fingerprint": "windows-amd64-pwsh-manifest-string-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 954",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/installer-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "installer-check",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Schema and spec documentation only; no runtime C++ validator change in this slice.",
+    "Existing valid manifests with bounded timestamps, paths, and test labels continue to pass."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-25T01:40:00+08:00",
+  "finished_at": "2026-08-25T02:00:00+08:00"
+}
