@@ -1,8 +1,8 @@
-{
+﻿{
   "schema_version": 1,
   "issue": 706,
   "scope_digest": "offscreen-stream-ended-v1",
-  "source_commit": "PENDING",
+  "source_commit": "d52844c53c65d2089acba673c42b7fa2f1f35446",
   "base_commit": "cc7b36d",
   "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6",
   "target": "extensions/offscreen.js",
@@ -43,3 +43,4 @@
     "Static source and syntax evidence only; no browser launch, MV3 runtime, real tab-close event, tabCapture, WebSocket audio flow, endpoint, driver, WaveRT, HLK, signing or release evidence."
   ]
 }
+
