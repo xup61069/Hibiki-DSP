@@ -157,6 +157,11 @@ public sealed partial class MainWindow : Window
         ViewModel.Vst3TimelineEditor.Redo();
     }
 
+    private void OnVst3ClearHistoryClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.Vst3TimelineEditor.ClearHistory();
+    }
+
     private void OnVst3RegisterClick(object sender, RoutedEventArgs e)
     {
         ViewModel.Vst3TimelineEditor.RegisterTimeline(ViewModel.Vst3TimelineEditor.NewTimelineIdText);
