@@ -13,7 +13,7 @@
     "adaptation_rate": {"type": "number", "minimum": 0, "maximum": 1},
     "noise_gate_threshold_dbfs": {"type": "number", "minimum": -144, "maximum": 0},
     "noise_gate_floor": {"type": "number", "minimum": 0, "maximum": 1},
-    "attack_ms": {"type": "number", "exclusiveMinimum": 0},
-    "release_ms": {"type": "number", "exclusiveMinimum": 0}
+    "attack_ms": {"type": "number", "minimum": 0.1, "maximum": 2000},
+    "release_ms": {"type": "number", "minimum": 1, "maximum": 5000}
   }
 }
