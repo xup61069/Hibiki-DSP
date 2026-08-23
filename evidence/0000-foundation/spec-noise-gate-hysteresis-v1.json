@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "issue": 810,
+  "scope_digest": "spec-noise-gate-hysteresis-v1",
+  "source_commit": "c6f2ad5d5cc41f4e2df30181abe84346eb402dd8",
+  "environment_fingerprint": "windows-local-pwsh-7.6.4; documentation-only spec slice",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 810",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/handoff-check.ps1 -Issue 810",
+      "status": "pass",
+      "coverage": [
+        "issue ownership",
+        "branch and base commit",
+        "declared write scope"
+      ],
+      "case_count": 1
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "80 required paths, 24 specs; live measurement 625 tracked paths, 270 repository JSON files, 47 markdown links"
+      ],
+      "case_count": 80
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "625 tracked source-only paths"
+      ],
+      "case_count": 625
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "whitespace"
+      ],
+      "case_count": 1
+    }
+  ],
+  "findings": [
+    {
+      "finding": "PR #780 (BasicNoiseSuppressorV1) and PR #795 (VirtualMicDspV1) added upper-only 2 dB reopen hysteresis with regression tests, but SPEC-0003 still described both gates without the hysteresis contract.",
+      "resolution": "SPEC-0003 now documents the hysteresis boundary for both gates: close at configured threshold, reopen only when the envelope reaches threshold +2 dB, hold state between."
+    }
+  ],
+  "changes": [
+    {
+      "file": "docs/specs/SPEC-0003-virtual-endpoints-and-routing.md",
+      "summary": "Record upper-only 2 dB hysteresis for BasicNoiseSuppressorV1 and the optional VirtualMicDspV1 noise gate, including the anti-chatter rationale."
+    }
+  ],
+  "limitations": [
+    "Documentation-only slice; no DSP source behavior change.",
+    "No physical audio, driver, WaveRT, HLK, Microsoft signing, or endpoint delivery claim."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4"
+  },
+  "started_at": "2026-08-24T00:30:00+08:00",
+  "finished_at": "2026-08-24T00:40:00+08:00"
+}
