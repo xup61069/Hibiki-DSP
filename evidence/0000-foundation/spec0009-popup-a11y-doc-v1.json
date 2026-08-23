@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "issue": 753,
+  "scope_digest": "spec0009-popup-a11y-doc-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6; documentation-only spec update",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 753",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/extension-check.ps1 -SelfTest"
+  ],
+  "results": [
+    {
+      "command": "SPEC-0009 accessibility subsection review",
+      "status": "pass",
+      "coverage": [
+        "New 'Popup accessibility policy' section documents the gate introduced in PR #744 and extended in PR #750.",
+        "Documents the enforced rule: every interactive popup control must expose a non-empty aria-label, or an aria-labelledby whose targets all resolve to non-empty visible text.",
+        "States fail-closed behavior for missing IDs or empty labelledby targets and records that extension-check.ps1 scans button/input/select/textarea constructions with offline self-test coverage.",
+        "Explicit limitation recorded: source-level policy only; no browser runtime screen-reader claim."
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation-only change; no product source behavior is modified by this slice.",
+    "The documented boundary matches the already-enforced gate from PR #744 / #750; this slice adds no new enforcement."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6"
+  },
+  "started_at": "2026-08-23T22:05:00+08:00",
+  "finished_at": "2026-08-23T22:12:00+08:00"
+}
