@@ -18,11 +18,15 @@ source_globs: ["src/hub/**scene_catalog*", "src/hub/**engine_control*", "apps/co
 ID 維持原本行為；其他 ID 必須由 catalog 解析，且 payload 的 output group 必須與保存的
 Scene 完全相同，避免 UI 顯示一組 Scene 卻把音訊送到另一個 group。
 
-控制模型同時提供一個最多 32 筆的 UI Scene card mirror。它只保存可顯示的 ID、名稱、說明、
-延遲標籤與安全旗標；完整 graph、loudness 與 calibration 仍由引擎端
+控制模型同時提供一個最多 32 筆的 UI Scene card mirror。它只保存可顯示的 ID、名稱（字串）、
+說明（字串）、延遲標籤（字串）與安全旗標；完整 graph、loudness 與 calibration 仍由引擎端
 `SceneDefinitionV1` 管理。UI mirror 不得覆寫四個內建 ID，選取自訂卡片仍只能送出既有
 `SceneApply(scene_id, output_group)`，因此 output-group exact-match 與引擎端 fail-closed
 規則不會被繞過。
+
+UI Scene card mirror 的 `name`、`description` 與 `latency_label` 在持久化 schema 中
+必須明確宣告為字串；長度與非空白限制維持不變，讓外部驗證與 C# runtime parser 對欄位型別
+有一致的 fail-closed 行為。
 
 UI mirror 以 `custom-scene-cards-v1.schema.json` 保存到 user-space 的本機設定檔；寫入採同目錄
 暫存檔替換，載入先完整驗證後才交換 catalog。檔案只含顯示卡片，不含裝置 ID、校正資料、
@@ -71,7 +75,8 @@ Remove 向引擎推送同步刪除指令。引擎在 `SceneCatalogV1::remove` �
 payload 時解碼即拒收，同樣不觸碰既有 catalog。
 
 未連線時，新增與移除仍立即作用於 UI mirror 與本機
-`custom-scene-cards-v1.schema.json` 檔案。控制模型同時把同一筆 Upsert／Remove 記入有界
+`custom-scene-cards-v1.schema.json` 檔案；schema 對三個顯示欄位明確要求字串型別。控制模型
+同時把同一筆 Upsert／Remove 記入有界
 重播佇列，並在卡片檔保存後以 `scene-sync-queue-v1.json` 的同目錄暫存檔替換流程原子持久化；
 佇列保存失敗視同卡片變更失敗，必須回復原卡片與選取狀態。佇列上限為 64 筆，超過時捨棄最舊
 操作、累計保存並顯示已捨棄數量，且後續離線操作與重播完成訊息不得覆蓋這個容量損失警告。
@@ -103,3 +108,4 @@ ViewModel 先更新記憶體 mirror，再以既有暫存檔替換流程保存；
 4. wire format encode→decode 往返一致；破損 lane count 或非法 padding 拒收。
 5. CTest、docs-check、source-policy 與 source-only CI gate 通過；沒有 binary 或私人裝置
   metadata 進入 catalog/schema。
+6. custom-scene-cards-v1 schema 對 name/description/latency_label 強制 string 型別；非字串值在 schema 驗證即拒收。
