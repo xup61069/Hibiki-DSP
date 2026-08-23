@@ -9,8 +9,8 @@
     "schema_version": {"const": 1},
     "device_class": {"enum": ["speaker", "headphone-coupler", "headphone-estimated"]},
     "test_signal_dbfs": {"type": "number", "minimum": -144, "maximum": 0},
-    "endpoint_gain_db": {"type": "number"},
-    "measured_1k_spl_db": {"type": "number"},
+    "endpoint_gain_db": {"type": "number", "minimum": -144, "maximum": 12},
+    "measured_1k_spl_db": {"type": "number", "minimum": 0, "maximum": 140},
     "uncertainty_db": {"type": "number", "minimum": 0},
     "measured_f3_hz": {"type": "number", "exclusiveMinimum": 0},
     "microphone_calibration_id": {"type": "string", "minLength": 1, "maxLength": 128}
