@@ -3985,6 +3985,46 @@ int main() {
     CHECK(!engine.process_driver_stream_packet(
         0U, "6d5706a4-b661-4bf6-9c2d-9c31b8f7df21", bad_engine_driver_packet,
         engine_driver_storage, engine_driver_inputs, engine_driver_output.data()));
+
+    AudioEngineModel limiter_reset_engine;
+    GraphConfigV1 limiter_reset_graph;
+    limiter_reset_graph.lanes.push_back(LaneConfigV1{"limiter-reset", "main", 2, 0.0, true});
+    CHECK(limiter_reset_engine.prepare_graph(limiter_reset_graph, 20U) &&
+          limiter_reset_engine.commit_graph());
+    limiter_reset_engine.set_sample_rate(48000U);
+    CHECK(limiter_reset_engine.apply_windows_volume(
+              VolumeNotificationV1{0.0, false, 1U}) == VolumeNotificationResult::Accepted);
+    // The 512-frame warm-up spans the 8 ms Group Master ramp at 48 kHz, so the
+    // second block differs only by the committed limiter state.
+    std::array<float, 1024> limiter_loud_input{};
+    std::array<float, 1024> limiter_loud_output{};
+    for (std::size_t index = 0U; index < limiter_loud_input.size(); index += 2U) {
+        limiter_loud_input[index] = 2.0F;
+        limiter_loud_input[index + 1U] = -2.0F;
+    }
+    const RtLaneInputV1 limiter_loud_view{limiter_loud_input.data(), 2};
+    CHECK(limiter_reset_engine.process(
+        std::span<const RtLaneInputV1>(&limiter_loud_view, 1),
+        limiter_loud_output.data(), 512U));
+    // A 2.0 peak exceeds the -1 dBTP ceiling, so the guard must attenuate.
+    CHECK(std::abs(limiter_loud_output[0]) < 1.0F);
+    CHECK(limiter_reset_engine.prepare_graph(limiter_reset_graph, 21U));
+    CHECK(limiter_reset_engine.commit_graph());
+    std::array<float, 64> limiter_quiet_input{};
+    std::array<float, 64> limiter_quiet_output{};
+    for (std::size_t index = 0U; index < limiter_quiet_input.size(); index += 2U) {
+        limiter_quiet_input[index] = 0.001F;
+        limiter_quiet_input[index + 1U] = -0.001F;
+    }
+    const RtLaneInputV1 limiter_quiet_view{limiter_quiet_input.data(), 2};
+    CHECK(limiter_reset_engine.process(
+        std::span<const RtLaneInputV1>(&limiter_quiet_view, 1),
+        limiter_quiet_output.data(), 32U));
+    // Graph commit starts the limiter at unity gain; attenuation carried over
+    // from the loud graph must not scale the first quiet block.
+    for (std::size_t index = 0U; index < limiter_quiet_output.size(); ++index) {
+        CHECK(limiter_quiet_output[index] == limiter_quiet_input[index]);
+    }
     engine.set_sample_rate(8000U);
     CHECK(engine.prepare_output_fanout(fanout_plan, 1.0));
     std::array<float, 16> engine_fanout_a{};

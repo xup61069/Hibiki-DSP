@@ -40,6 +40,8 @@ bounded guard；它以三個線性 inter-sample probes 作保守估算並採 blo
 區塊大小無關。避免保護電路本身在短區塊間瞬間跳回或在大區塊間恢復過慢。
 恢復是有界的線性（dB domain）爬升；在爬升完成前，實際增益可能暫時低於 unity，
 這是預期行為而非缺陷。取樣率改變時，相同經過時間內的恢復量等價。
+graph commit 會把 limiter 狀態重置回 unity gain：前一個 graph 累積的恢復衰減不會
+延續到新 graph 的安靜段落，新 graph 中超過上限的峰值仍然立即衰減。
 目前不宣稱 ITU/BS.1770 conformance，正式 meter oracle 仍是 release gate。
 
 目前 user-space contract 已提供 `apply_windows_notification`：只接受有限 dB 範圍與不倒退
