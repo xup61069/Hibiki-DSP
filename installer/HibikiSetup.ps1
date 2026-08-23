@@ -82,7 +82,7 @@ function Resolve-HibikiDestination([string]$Requested) {
     throw 'Destination path cannot be blank.'
   }
   $expanded = [Environment]::ExpandEnvironmentVariables($Requested)
-  $rawSegments = $expanded.Split('\/') | Where-Object { $_ }
+  $rawSegments = $expanded.Split([char[]]@('\', '/')) | Where-Object { $_ }
   foreach ($seg in $rawSegments) {
     if ($seg -eq '.' -or $seg -eq '..') {
       throw "Destination must not contain '.' or '..' segments: $Requested"
