@@ -12,10 +12,6 @@ namespace Hibiki.WinUI;
 public sealed partial class MainWindow
 {
 #if HIBIKI_COMPATIBILITY_PREVIEW
-    // Shared formal-shell handlers reference these named fields. The preview
-    // keeps them detached until a follow-up can expose editable inputs safely.
-    private TextBox Vst3NewTimelineIdBox = null!;
-    private TextBox Vst3RowValueBox = null!;
 
     private static T ResolveThemeResource<T>(string key) where T : class
     {
