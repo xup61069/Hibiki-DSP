@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "issue": 794,
+  "scope_digest": "winui-vst3-baseline-save-v1",
+  "source_commit": "57fb75aae38b8dc60d401a40121dd9e825095484",
+  "environment_fingerprint": "windows-local-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/winui-shell-check.ps1",
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 794",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/winui-shell-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "XAML contains OnVst3SaveBaselineClick and AutomationProperties.Name=保存時間軸基準",
+        "code-behind calls ViewModel.Vst3TimelineEditor.SaveSelected()",
+        "54 interactive controls pass accessibility scan"
+      ]
+    },
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": ["control model builds and existing SaveSelected seam remains source-compatible"]
+    },
+    {
+      "command": "always-run gates",
+      "status": "pass",
+      "coverage": [
+        "handoff-check Issue 794 ownership scope and Git state",
+        "docs-check 619 tracked paths 264 repository JSON files",
+        "source-policy 619 tracked paths no blocked binary or secret",
+        "git diff --check no whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "Source-level design and offline verification only; no WinUI runtime build or interactive launch.",
+    "Does not claim engine IPC, driver, HLK, Microsoft signing, or Authenticode execution evidence."
+  ],
+  "logs": [],
+  "tool_versions": { "powershell": "pwsh 7.6.4" }
+}

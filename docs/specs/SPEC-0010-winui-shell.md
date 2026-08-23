@@ -26,8 +26,8 @@ process loopback、瀏覽器單分頁與 direct bypass 的路由健康卡片、�
 ／DeviceCatalogRequest／DeviceCatalogSnapshot／ControlStatusRequest／ControlStatusSnapshot 命令、連線失敗回復；音量拖曳使用 40 ms bounded debounce 與 command serialization，
 只送出最新的控制值。
 Expert 另提供 Vst3TimelineEditorViewModelV1 的本機時間軸編輯面：註冊／選取、草稿
-新增／修改／刪除列、commit／discard、undo／redo、保存基準與繁中狀態回饋。正式 shell 的清除歷史動作只呼叫既有 surface-level
-ViewModel seam：復原／重做堆疊會歸零，已發布內容、dirty 基準與開啟中的草稿不得改變；空歷史時仍可安全操作並回報狀態。此動作不觸碰引擎或 timeline 持久化格式。
+新增／修改／刪除列、commit／discard、undo／redo、保存基準與繁中狀態回饋。正式 shell 的清除歷史與保存基準動作只呼叫既有 surface-level
+ViewModel seams：清除歷史會將復原／重做堆疊歸零，已發布內容、dirty 基準與開啟中的草稿不得改變；保存基準會在無草稿且已選取時間軸時，把目前內容存為新的未修改基準並清 dirty 狀態。兩者皆不觸碰引擎或 timeline 持久化格式。
 
 Out：WaveRT/PortCls 驅動、實體裝置枚舉、音訊處理、VST3 host UI、校正量測與
 任何編譯後的 EXE／DLL。這些能力仍由各自 Spec 與 worker 負責。
