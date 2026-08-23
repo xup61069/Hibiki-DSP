@@ -124,15 +124,31 @@ function Get-PropertyMap {
   $map
 }
 
+function Test-HibikiTargetDevice {
+  param(
+    [Parameter(Mandatory)][string]$InstanceId,
+    [hashtable]$PropertyMap
+  )
+
+  if ($InstanceId -match $targetInstancePattern) { return $true }
+  if ($null -eq $PropertyMap -or -not $PropertyMap.ContainsKey('DEVPKEY_Device_HardwareIds')) {
+    return $false
+  }
+  foreach ($hardwareId in @($PropertyMap['DEVPKEY_Device_HardwareIds'])) {
+    if ([string]$hardwareId -eq $targetHardwareId) { return $true }
+  }
+  $false
+}
+
 function ConvertTo-HibikiDeviceSummary {
   param(
     [Parameter(Mandatory)]$Device,
     [object[]]$Properties
   )
 
-  $instanceId = [string]$Device.InstanceId
-  if ($instanceId -notmatch $targetInstancePattern) { return $null }
   $propertyMap = Get-PropertyMap -Properties $Properties
+  $instanceId = [string]$Device.InstanceId
+  if (-not (Test-HibikiTargetDevice -InstanceId $instanceId -PropertyMap $propertyMap)) { return $null }
   $problemCode = $null
   if ($propertyMap.ContainsKey('DEVPKEY_Device_ProblemCode')) {
     try { $problemCode = [uint32]$propertyMap['DEVPKEY_Device_ProblemCode'] } catch { $problemCode = $null }
@@ -225,11 +241,12 @@ function Invoke-DriverPnpInspectionSelfTest {
   if (-not $reparseCaught) { throw 'Driver PnP inspection self-test expected reparse-parent rejection.' }
   $cases++
 
-  $targetDevice = [pscustomobject]@{ InstanceId = 'ROOT\HIBIKIDSP\0000'; Status = 'ERROR'; Class = 'MEDIA' }
+  $targetDevice = [pscustomobject]@{ InstanceId = 'ROOT\MEDIA\0000'; Status = 'ERROR'; Class = 'MEDIA' }
   $otherDevice = [pscustomobject]@{ InstanceId = 'PCI\VEN_1234\PRIVATE'; Status = 'OK'; Class = 'MEDIA' }
   $properties = @(
     [pscustomobject]@{ KeyName = 'DEVPKEY_Device_ProblemCode'; Data = [uint32]10 },
     [pscustomobject]@{ KeyName = 'DEVPKEY_Device_ProblemStatus'; Data = [int32]-1073741811 },
+    [pscustomobject]@{ KeyName = 'DEVPKEY_Device_HardwareIds'; Data = @('Root\HibikiDSP') },
     [pscustomobject]@{ KeyName = 'DEVPKEY_Device_Service'; Data = 'HibikiVirtualAudio' },
     [pscustomobject]@{ KeyName = 'DEVPKEY_Device_DriverInfPath'; Data = 'oem2.inf' },
     [pscustomobject]@{ KeyName = 'DEVPKEY_Device_DriverVersion'; Data = '1.0.0.0' }
@@ -240,7 +257,7 @@ function Invoke-DriverPnpInspectionSelfTest {
       $summary.instance_token.Length -ne 16) {
     throw 'Driver PnP inspection self-test failed typed target-device projection.'
   }
-  if ($null -ne (ConvertTo-HibikiDeviceSummary -Device $otherDevice -Properties $properties)) {
+  if ($null -ne (ConvertTo-HibikiDeviceSummary -Device $otherDevice -Properties @())) {
     throw 'Driver PnP inspection self-test accepted an unrelated device.'
   }
   $cases++
@@ -295,13 +312,17 @@ $pnpError = $null
 if ($null -ne $pnpDeviceCommand -and $null -ne $pnpPropertyCommand) {
   try {
     $allDevices = @(Get-PnpDevice -ErrorAction Stop)
-    foreach ($device in @($allDevices | Where-Object { [string]$_.InstanceId -match $targetInstancePattern })) {
+    $candidateDevices = @($allDevices | Where-Object {
+      [string]$_.InstanceId -match $targetInstancePattern -or [string]$_.Class -eq 'MEDIA'
+    })
+    foreach ($device in $candidateDevices) {
       $properties = @()
       $propertyError = $null
       try {
         $properties = @(Get-PnpDeviceProperty -InstanceId ([string]$device.InstanceId) -KeyName @(
             'DEVPKEY_Device_ProblemCode',
             'DEVPKEY_Device_ProblemStatus',
+            'DEVPKEY_Device_HardwareIds',
             'DEVPKEY_Device_Service',
             'DEVPKEY_Device_DriverInfPath',
             'DEVPKEY_Device_DriverVersion'
@@ -311,8 +332,10 @@ if ($null -ne $pnpDeviceCommand -and $null -ne $pnpPropertyCommand) {
         $propertyError = 'property-query-failed'
       }
       $summary = ConvertTo-HibikiDeviceSummary -Device $device -Properties $properties
-      $summary['property_error'] = $propertyError
-      $devices += $summary
+      if ($null -ne $summary) {
+        $summary['property_error'] = $propertyError
+        $devices += $summary
+      }
     }
   }
   catch {

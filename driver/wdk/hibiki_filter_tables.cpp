@@ -223,6 +223,21 @@ static const KSPIN_MEDIUM PinMediumsDontCare[] = {
     }
 };
 
+// Both halves of a registered physical connection must advertise at least one
+// matching range. PortCls otherwise rejects PcRegisterPhysicalConnection with
+// STATUS_RANGE_NOT_FOUND while starting the adapter.
+static const KSDATARANGE BridgeDataRange = {
+    sizeof(KSDATARANGE),
+    0, 0, 0,
+    STATICGUIDOF(KSDATAFORMAT_TYPE_AUDIO),
+    STATICGUIDOF(KSDATAFORMAT_SUBTYPE_ANALOG),
+    STATICGUIDOF(KSDATAFORMAT_SPECIFIER_NONE)
+};
+
+static const PKSDATARANGE BridgeDataRangePointers[] = {
+    const_cast<PKSDATARANGE>(&BridgeDataRange)
+};
+
 //=============================================================================
 // Pin Descriptors
 //=============================================================================
@@ -252,7 +267,7 @@ static const PCPIN_DESCRIPTOR Pins_##Name[] = {                                \
         {                                                                      \
             0, NULL,                                                           \
             0, NULL,                                                           \
-            0, NULL,                                                           \
+            SIZEOF_ARRAY(BridgeDataRangePointers), BridgeDataRangePointers,    \
             KSPIN_DATAFLOW_OUT,                                                 \
             KSPIN_COMMUNICATION_NONE,                                          \
             &KSNODETYPE_SPEAKER,                                               \
@@ -275,7 +290,7 @@ static const PCPIN_DESCRIPTOR Pins_VirtualMic[] = {
         {
             0, NULL,
             0, NULL,
-            0, NULL,
+            SIZEOF_ARRAY(BridgeDataRangePointers), BridgeDataRangePointers,
             KSPIN_DATAFLOW_IN,
             KSPIN_COMMUNICATION_NONE,
             &KSNODETYPE_MICROPHONE,
@@ -440,18 +455,6 @@ extern "C" NTSTATUS HibikiDataRangeIntersectionEndpointV1(
 // Topology Filter Tables (bridge half of each WaveRT/Topology pair)
 //=============================================================================
 
-static const KSDATARANGE TopologyBridgeDataRange = {
-    sizeof(KSDATARANGE),
-    0, 0, 0,
-    STATICGUIDOF(KSDATAFORMAT_TYPE_AUDIO),
-    STATICGUIDOF(KSDATAFORMAT_SUBTYPE_ANALOG),
-    STATICGUIDOF(KSDATAFORMAT_SPECIFIER_NONE)
-};
-
-static const PKSDATARANGE TopologyBridgeDataRangePointers[] = {
-    const_cast<PKSDATARANGE>(&TopologyBridgeDataRange)
-};
-
 #define DEFINE_RENDER_TOPOLOGY_PINS(Name)                                       \
 static const PCPIN_DESCRIPTOR TopoPins_##Name[] = {                             \
     /* Pin 0: Wave bridge input */                                              \
@@ -461,8 +464,8 @@ static const PCPIN_DESCRIPTOR TopoPins_##Name[] = {                             
         {                                                                      \
             0, NULL,                                                           \
             0, NULL,                                                           \
-            SIZEOF_ARRAY(TopologyBridgeDataRangePointers),                     \
-            TopologyBridgeDataRangePointers,                                   \
+            SIZEOF_ARRAY(BridgeDataRangePointers),                             \
+            BridgeDataRangePointers,                                           \
             KSPIN_DATAFLOW_IN,                                                 \
             KSPIN_COMMUNICATION_NONE,                                          \
             &KSCATEGORY_AUDIO,                                                 \
@@ -477,8 +480,8 @@ static const PCPIN_DESCRIPTOR TopoPins_##Name[] = {                             
         {                                                                      \
             0, NULL,                                                           \
             0, NULL,                                                           \
-            SIZEOF_ARRAY(TopologyBridgeDataRangePointers),                     \
-            TopologyBridgeDataRangePointers,                                   \
+            SIZEOF_ARRAY(BridgeDataRangePointers),                             \
+            BridgeDataRangePointers,                                           \
             KSPIN_DATAFLOW_OUT,                                                \
             KSPIN_COMMUNICATION_NONE,                                          \
             &KSNODETYPE_SPEAKER,                                               \
@@ -496,11 +499,11 @@ DEFINE_RENDER_TOPOLOGY_PINS(TopoSurround);
 static const PCPIN_DESCRIPTOR TopoPins_TopoVirtualMic[] = {
     { 0, 0, 0, NULL,
       { 0, NULL, 0, NULL,
-        SIZEOF_ARRAY(TopologyBridgeDataRangePointers), TopologyBridgeDataRangePointers,
+        SIZEOF_ARRAY(BridgeDataRangePointers), BridgeDataRangePointers,
         KSPIN_DATAFLOW_IN, KSPIN_COMMUNICATION_NONE, &KSNODETYPE_MICROPHONE, NULL, 0 } },
     { 0, 0, 0, NULL,
       { 0, NULL, 0, NULL,
-        SIZEOF_ARRAY(TopologyBridgeDataRangePointers), TopologyBridgeDataRangePointers,
+        SIZEOF_ARRAY(BridgeDataRangePointers), BridgeDataRangePointers,
         KSPIN_DATAFLOW_OUT, KSPIN_COMMUNICATION_NONE, &KSCATEGORY_AUDIO, NULL, 0 } }
 };
 
