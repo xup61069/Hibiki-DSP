@@ -6,7 +6,7 @@ authority: product-behavior
 last_reviewed: 2026-08-23
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["src/hub/**scene_catalog*", "src/hub/**engine_control*", "apps/control-model/**Scene*", "apps/winui-shell/**", "schemas/scene-definition-v1.schema.json", "schemas/custom-scene-cards-v1.schema.json", "tests/**"]
+source_globs: ["src/hub/**scene_catalog*", "src/hub/**engine_control*", "apps/control-model/**Scene*", "apps/winui-shell/**", "schemas/scene-definition-v1.schema.json", "schemas/custom-scene-cards-v1.schema.json", "schemas/scene-sync-queue-v1.schema.json", "tests/**"]
 ---
 
 # SPEC-0014：自定義 Scene catalog 與 SceneApply resolver
@@ -77,7 +77,11 @@ payload 時解碼即拒收，同樣不觸碰既有 catalog。
 操作、累計保存並顯示已捨棄數量，且後續離線操作與重播完成訊息不得覆蓋這個容量損失警告。
 新 ViewModel 載入本機卡片時會先完整驗證並還原佇列與累計捨棄數；佇列檔不存在代表空佇列，
 破損、未知版本或超過大小／容量上限則 fail-closed，不更換已載入的場景卡片。控制管線重新連線
-成功後，ViewModel 依原順序把佇列中的 Upsert／Remove 補送到引擎：全部成功才回報「引擎已同步」，
+成功後，ViewModel 依原順序把佇列中的 Upsert／Remove 補送到引擎。持久化格式由
+`schemas/scene-sync-queue-v1.schema.json` 描述：頂層必須是 `schema_version`（固定 1）、
+`dropped_operations` 與最多 64 筆 `operations`；每筆操作只允許 `is_upsert`、`scene_id`、
+`name` 與 `output_group` 四個欄位，且欄位限制必須與控制模型執行期驗證一致。
+全部成功才回報「引擎已同步」，
 同時保留先前捨棄數量並清空持久化佇列；中途失敗則保留剩餘操作與其持久化狀態，誠實顯示降級
 狀態，待下一次連線再補送。此重播只使用既有 `SceneCatalogCommandV1` wire format 與 Ack 語意，
 不改變引擎端驗證或 catalog 容量契約；已連線時的同步同樣以收到引擎 Ack 為準，不得在送出前
