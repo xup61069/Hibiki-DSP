@@ -92,6 +92,18 @@ Issue/branch、v2 ownership/scope/dependency、Git ancestry、必要 headings �
 CI 失敗時不可宣稱該變更可交接。Handoff 檔案已由 issue body handoff block 取代；
 `schemas/task-handoff-v2.schema.json` 已刪除。
 
+## 對人回報與 Codex Goal 契約
+
+AI 對 maintainer 的進度與完成回報以產品結果為主：先用白話說明正在建立或修正的能力、使用者
+影響、可重現的驗證與剩餘缺口。branch、commit、push、PR、merge 與 CI 是內部協作或 audit
+evidence；除非它們改變風險、阻擋或結論可信度，或 maintainer 明確詢問，否則只在末尾簡短列出，
+不得作為標題或主要敘事。這個呈現規則不降低 handoff、scope、validation 或 evidence 要求。
+
+新 Codex 視窗使用一個可驗證成果作為單一 Goal。長任務也必須包含邊界、驗證、停止條件與需要
+人類決定時的 pause 條件，不得用「永遠處理所有 backlog」讓 agent 自行無限擴張 scope。建議的
+五種視窗角色與可貼用啟動詞見 `docs/ai/CODEX_GOALS.md`；並行視窗仍受本 Spec 的獨占 write scope
+與 handoff 規則約束。
+
 ## 語言與相容性
 
 正式規格以繁體中文為真值；符號、schema 欄位與協定維持英文。英文 adapter 只能由
