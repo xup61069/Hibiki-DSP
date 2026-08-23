@@ -1,7 +1,9 @@
 # Hibiki DSP 多 AI 並行開發協定
 
-本檔是多 AI 協作的穩定規則。工作由單一 orchestrator 指派，workers 不得自行認領 open Issue。
-即時指派狀態放在 GitHub Issue assignee、lifecycle label 與 linked draft PR。產品、架構與完成狀態的權威順序仍以
+本檔是多 AI 協作的穩定規則。工作由 human maintainer 或單一 designated orchestrator 指派；
+workers 不得自行挑選 open backlog。maintainer 對目前 session 的直接要求算明確指派，active
+orchestrator 可在 overlap 檢查後建立／正式 claim 對應 Issue。即時指派狀態放在 GitHub Issue
+assignee、lifecycle label 與 handoff block；linked draft PR 在第一個 WIP commit 後加入。產品、架構與完成狀態的權威順序仍以
 `docs/START_HERE.md` 為準。
 
 ## 不變式
@@ -9,10 +11,11 @@
 每個可獨立驗收的工作切片必須一對一擁有：
 
 1. 一個 GitHub Issue；需要兩個 writer 就拆成兩個 child Issue。
-2. 一個位於其他 AI working tree 之外的 clone 或 `git worktree`。
-3. 一個 `<agent>/<issue>-<slug>` branch；不得直接在 `main` 開發。
-4. Issue body 內的 `<!-- hibiki:handoff-v1 -->` handoff block（取代舊 handoff 檔案）。
-5. 一個 draft PR；除非有明確 dependency，base 一律是 `main`。draft PR 在首次可審閱的
+2. 一個 `<agent>/<issue>-<slug>` branch；不得直接在 `main` 開發。
+3. Issue body 內的 `<!-- hibiki:handoff-v1 -->` handoff block（取代舊 handoff 檔案）。
+4. 當其他 writer 正在工作、branch 已被 worktree 佔用或 occupancy 不確定時，一個位於其他
+   session working tree 之外的 clone／`git worktree`；單一 writer 且狀態可證明時仍建議隔離。
+5. 一個 draft PR；除非有明確 dependency，base 一律是 `main`。draft PR 在首次可重建的
    WIP/reviewable commit push 後開啟；不需要空的認領 commit。
 
 同一時間不得有兩個 writer 共用 Issue、working tree、index、branch 或 handoff。若要把同一 branch
@@ -21,22 +24,27 @@
 
 ## 開始工作：orchestrator 指派
 
-1. Orchestrator 從 open Issue 中挑選下一個工作切片。衝突判定的權威依據是 handoff block 的
+1. Human maintainer／orchestrator 指定工作切片；worker 不自行挑選 backlog。若是 maintainer
+   對目前 session 的直接要求，active orchestrator 先將要求 materialize 成 Issue，再進行下列
+   claim。衝突判定的權威依據是 handoff block 的
    `scope_globs`、語意契約 ownership 與 open Issue/draft PR 狀態；目錄 lane 表（見下節）
    只是 orchestrator 的路由提示，不是全域單寫者瓶頸。
 2. Orchestrator 在 Issue body 加入 handoff block（branch、base_commit、owner、scope_globs、
    shared_paths、depends_on），指派 assignee 並加上 `claimed` label；branch 由 worker 建立，
    不需要空認領 commit 佔位。
-3. Worker 收到指派後，從 handoff block 的 base/target branch 最新遠端 HEAD 建立獨立
-   clone/worktree 與 branch；tool-provided worktree isolation 是標準機制。例如：
+3. Worker 收到指派後，從 handoff block 的 base/target branch 最新遠端 HEAD 建立非 `main`
+   branch。並行、occupied 或不確定時必須建立獨立 clone/worktree；單一 writer 時可在已確認
+   乾淨且未被別人使用的 clone 建 branch。例如：
 
    ```powershell
    git fetch origin
    git worktree add ..\Hibiki-DSP-<issue>-<slug> -b codex/<issue>-<slug> <base-or-target>
    ```
 
-4. Worker 確認 branch、base_commit 與 handoff scope，執行指定的核心 gates，開 draft PR，
-   然後才修改產品檔案。Lifecycle label 使用 `claimed`（進行中）或 `in-review`（待審）；
+4. Worker 確認 branch、base_commit 與 handoff scope，執行開始前需要的 scoped handoff check，
+   完成最小可重建的 WIP/reviewable edit，commit + push 後立即開 draft PR。PR 不得晚於第一次
+   handoff／外部 review，也不需要為了先開 PR 製造空 commit。Lifecycle label 使用 `claimed`
+   （進行中）或 `in-review`（待審）；
    Issue 關閉即代表 done，不需要額外 label。沒有 orchestrator 指派的 handoff block 時，
    workers 只能做唯讀偵察，不得建立或認領 Issue。
 
@@ -47,13 +55,13 @@ Orchestrator 可以在正式指派前先建立 pre-claim 草稿：Issue body 已
 跳過該草稿的完整驗證（含 lifecycle label），不會阻擋其他 active claim 的檢查；這是 #439／PR
 #442 導入的行為。TBD 草稿不是指派：它沒有 assignee、沒有 claimed label、也沒有 linked draft PR。
 正式認領時必須補上實際 issue 號與 branch 名、加 assignee 與 `claimed` label、從最新 origin/main
-建立獨立 worktree，之後才適用一般 claim 的全部規則。
+建立 branch，並依 occupancy 決定是否必須建立獨立 worktree；之後才適用一般 claim 的全部規則。
 
 ### #124 occupancy fallback
 
-若工具無法提供 worktree isolation，接手或推送非自己開始的 branch 前，
+若需要隔離但工具無法提供 worktree，或接手／推送非自己開始的 branch 前，
 必須執行 `git worktree list` 確認 branch 未被本機任何 worktree 佔用，並在該 Issue 宣告意圖；
-這是 fallback 檢查，不能取代隔離的 worktree。
+這是 fallback 檢查；occupancy 仍不明時不得開始寫入。
 
 worktree 的實際本機路徑屬環境資訊，不寫入 repository。禁止在別的 AI 正在使用的 worktree 執行
 `checkout`、`switch`、branch rename、reset、clean 或 rebase。
@@ -69,7 +77,7 @@ worktree 的實際本機路徑屬環境資訊，不寫入 repository。禁止在
   `git worktree list` 確認 branch 未被佔位——另一個 session 可能仍有未 push 的 edits；
   workers 不自行挑選未被指派的 open Issue。
 - 回到先前中斷的 slice 時：先 fetch，以遠端 HEAD 與 Issue body handoff block 為唯一真值重新確認；
-  本機未 push 的 edits 若已被遠端接手完成，接受遠端版本、獨立重跑全部 gates 驗證，
+  本機未 push 的 edits 若已被遠端接手完成，接受遠端版本、獨立重跑 scope 所需 gates 驗證，
   不重寫歷史。
 - 工作被另一 session 接手完成時，在 PR body 誠實記錄接手事件與後續驗證
   （先例：PR #24 / Issue #22）。
@@ -135,7 +143,7 @@ evidence；integrator 在合併階段單次更新全域快照。未合併 branch
 - 發布後的 branch 不 force-push、不 rewrite history；需要同步 target branch 時採可審查的 merge，
   或由唯一 owner 在未被依賴前 rebase。
 - push 前比較 `git diff --name-only <target>...HEAD` 與 `scope_globs`；超出 scope 先停下協調。
-- PR 轉 ready 前執行 AGENTS.md 第三層的核心 gates 加上範圍相關的條件式 gates、把 lifecycle label 從 `claimed` 改為 `in-review`、更新
+- PR 轉 ready 前執行 AGENTS.md 第三層的 always-run checks 加上範圍相關的條件式 gates、把 lifecycle label 從 `claimed` 改為 `in-review`、更新
   handoff block 的驗證紀錄、限制與唯一 `Next safe action`。
 - 交接時原 owner commit + push + 停寫，新 owner readback 遠端 HEAD、更新 owner 後再修改。
 - 合併後 integrator 關閉 Issue 並記錄 merge SHA 與 evidence；lifecycle 由 issue state 表示，不再歸檔 handoff 檔案。
@@ -145,7 +153,7 @@ evidence；integrator 在合併階段單次更新全域快照。未合併 branch
 發生任一條件時立即停止重疊範圍的寫入：
 
 - 兩個 active claim 的 Issue、branch 或 `scope_globs` 重複。
-- 一個變更跨出已認領 lane，或需要另一個 writer 正在修改的 shared path。
+- 一個變更跨出已認領 `scope_globs`／語意契約，或需要另一個 writer 正在修改的 shared path。
 - accepted Spec、ADR、source/tests/evidence 或全域快照互相矛盾。
 - branch base、handoff base、PR head 或遠端 HEAD 與預期不一致。
 

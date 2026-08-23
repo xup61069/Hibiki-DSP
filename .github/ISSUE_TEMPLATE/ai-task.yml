@@ -6,9 +6,10 @@ body:
     attributes:
       value: |
         This form creates an unassigned TBD pre-claim. One Issue maps to one AI writer,
-        one dedicated clone/worktree, one branch, one handoff block embedded in this
-        Issue body, and one draft PR. The orchestrator fills the Issue number, branch,
-        base and owner before adding an assignee and the `claimed` label.
+        one non-main branch, one handoff block and one draft PR. A dedicated clone/worktree
+        is mandatory when another writer is active or occupancy is uncertain, and recommended
+        otherwise. The orchestrator fills the Issue number, branch, base and owner before
+        adding an assignee and the `claimed` label.
   - type: textarea
     id: objective
     attributes:
@@ -38,7 +39,7 @@ body:
         depends_on: []
         specs: []
         adrs: []
-        next_safe_action: "TBD: orchestrator assigns the Issue and creates the isolated worktree."
+        next_safe_action: "TBD: orchestrator assigns the Issue, checks overlap/occupancy and selects an isolated workspace when required."
         resume_commands: ["git fetch origin --prune", "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue TBD"]
         -->
     validations:
@@ -52,5 +53,5 @@ body:
           required: true
         - label: I understand this draft is not assigned until the orchestrator fills the handoff, assigns one owner and adds `claimed`.
           required: true
-        - label: The assigned writer will use a dedicated clone/worktree, push the first reviewable commit and open one draft PR.
+        - label: The assigned writer will use a non-main branch, isolate the worktree when required, then push the first WIP/reviewable commit and open one draft PR.
           required: true
