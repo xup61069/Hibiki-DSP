@@ -3,7 +3,7 @@ id: SPEC-0014
 status: accepted
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-23
 review_after_days: 30
 related_adrs: [ADR-0002]
 source_globs: ["src/hub/**scene_catalog*", "src/hub/**engine_control*", "apps/control-model/**Scene*", "apps/winui-shell/**", "schemas/scene-definition-v1.schema.json", "schemas/custom-scene-cards-v1.schema.json", "tests/**"]
@@ -45,6 +45,14 @@ plugin state 或完整 graph；載入失敗時保留目前記憶體內容。
 未知 custom ID、output group 不一致、非法 definition 與容量耗盡都回傳 Invalid／Failed，
 並保留上一個 active graph、Scene 與 revision。內建 Game／Movie／Voice／Studio 不依賴
 catalog，讓沒有使用者 preset 的 fresh clone 維持向後相容。
+
+## 正式殼層的本機卡片移除
+
+正式 WinUI 殼層列出本機自訂卡片，並為每個移除操作提供非空無障礙名稱。移除只作用於 UI
+mirror 與本機 `custom-scene-cards-v1.schema.json` 檔案；引擎端 `SceneDefinition` catalog 不會被
+刪除或改寫。ViewModel 先更新記憶體 mirror，再以既有暫存檔替換流程保存；未知或內建 ID
+fail-closed，保存失敗時回復原卡片與選取狀態並顯示可讀錯誤。選取自訂卡片仍只能送出既有
+`SceneApply(scene_id, output_group)`。
 
 ## 驗收
 
