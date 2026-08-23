@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "issue": 713,
+  "scope_digest": "build-preview-clean-smoke-v1",
+  "base_commit": "7b86b5362d86527bf865fbaf8dc1322547dcc9ed",
+  "environment_fingerprint": "windows-11-26200-x64-dotnet-sdk-10.0.400-pwsh7-windows-app-runtime-1.7; dotnet-only host",
+  "commands": [
+    "pwsh -NoProfile -File tools/build-preview.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest (run 1)",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest (run 2 after staged rerun)"
+  ],
+  "results": [
+    {
+      "command": "tools/build-preview.ps1 -SelfTest",
+      "status": "pass",
+      "exit_code": 0,
+      "coverage": [
+        "22 bounded dispatch/staging cases including: stale WinUICompat output moves to .local/preview/_trash with contents intact, absent output directory is a no-op, and output roots outside .local/preview are refused."
+      ]
+    },
+    {
+      "command": "WinUICompat build + smoke twice in a row",
+      "status": "pass",
+      "exit_code": 0,
+      "coverage": [
+        "Both runs pass because each build now starts from a clean output directory; run 2 exercises exactly the post-failure mixed-artifact scenario that previously crashed the smoke (0xC000027B) before this change.",
+        "DesktopCompat receives the same pre-build staging guard; ControlModel and formal WinUI targets are unchanged."
+      ]
+    }
+  ],
+  "limitations": [
+    "Source/tooling evidence only: no browser launch, MV3 runtime, audio, endpoint, driver, WaveRT, HLK, signing or release claims."
+  ],
+  "started_at": "2026-08-23T20:55:00+08:00",
+  "finished_at": "2026-08-23T21:12:00+08:00"
+}

@@ -44,6 +44,25 @@ function Get-PreviewDispatchMetadata([string]$repoRoot, [string]$target) {
   }
 }
 
+function Move-PreviewOutputAside {
+  param(
+    [Parameter(Mandatory)][string]$OutputRoot,
+    [Parameter(Mandatory)][string]$RepositoryRoot
+  )
+
+  $fullRoot = [IO.Path]::GetFullPath($OutputRoot).TrimEnd([char]'\', [char]'/')
+  $allowedParent = [IO.Path]::GetFullPath((Join-Path $RepositoryRoot '.local/preview')).TrimEnd([char]'\', [char]'/')
+  if (-not $fullRoot.StartsWith($allowedParent + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Clean-output staging refused: output root must stay under <repo>/.local/preview.'
+  }
+  if (-not (Test-Path -LiteralPath $fullRoot)) { return }
+  $leaf = Split-Path -Path $fullRoot -Leaf
+  $trashRoot = Join-Path $allowedParent '_trash'
+  New-Item -ItemType Directory -Force -Path $trashRoot | Out-Null
+  $destination = Join-Path $trashRoot ($leaf + '-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+  Move-Item -LiteralPath $fullRoot -Destination $destination
+}
+
 function Find-VisualStudioMsBuild {
   $roots = @()
   foreach ($root in @(${env:ProgramFiles(x86)}, ${env:ProgramFiles})) {
@@ -344,7 +363,24 @@ if ($SelfTest) {
   } catch { $parentInspectionErrorCaught = $_.Exception.Message -match 'path inspection failed' }
   if (-not $parentInspectionErrorCaught) { throw 'Preview dispatch self-test expected a parent inspection-error rejection.' }
 
-  Write-Output 'Preview target dispatch self-test passed (19 cases).'
+  $stagingRepo = Join-Path ([IO.Path]::GetTempPath()) ('build-preview-staging-' + [guid]::NewGuid().ToString('N'))
+  try {
+    $previewDir = Join-Path $stagingRepo '.local/preview'
+    $staleRoot = Join-Path $previewDir 'WinUICompat'
+    New-Item -ItemType Directory -Force -Path (Join-Path $staleRoot 'bin') | Out-Null
+    Set-Content -LiteralPath (Join-Path $staleRoot 'bin/stale.txt') -Value 'stale'
+    Move-PreviewOutputAside -OutputRoot $staleRoot -RepositoryRoot $stagingRepo
+    $movedItems = @(Get-ChildItem -LiteralPath (Join-Path $previewDir '_trash') -Filter 'WinUICompat-*' -Directory)
+    if ((Test-Path -LiteralPath $staleRoot) -or ($movedItems.Count -ne 1) -or -not (Test-Path (Join-Path $movedItems[0].FullName 'bin/stale.txt'))) { throw 'Clean-output staging failed to move the stale output directory.' }
+    Move-PreviewOutputAside -OutputRoot (Join-Path $previewDir 'DesktopCompat') -RepositoryRoot $stagingRepo
+    $outsideCaught = $false
+    try { Move-PreviewOutputAside -OutputRoot (Join-Path $stagingRepo 'outside/WinUICompat') -RepositoryRoot $stagingRepo } catch { $outsideCaught = $_.Exception.Message -match 'output root must stay under' }
+    if (-not $outsideCaught) { throw 'Expected outside-root rejection from clean-output staging.' }
+  } finally {
+    Remove-Item -LiteralPath $stagingRepo -Recurse -Force -ErrorAction SilentlyContinue
+  }
+  Write-Output 'Preview target dispatch self-test passed (22 cases).'
+
 
   exit 0
 }
@@ -363,6 +399,7 @@ if ($Target -eq 'ControlModel') {
   return
 }
 
+  Move-PreviewOutputAside -OutputRoot $previewRoot -RepositoryRoot $repo
 if ($Target -eq 'WinUICompat') {
   # This fallback is intentionally explicit: it is useful to preview the
   # ViewModel on a machine where the App SDK XAML compiler cannot run, but it
@@ -386,6 +423,7 @@ if ($Target -eq 'WinUICompat') {
   return
 }
 
+  Move-PreviewOutputAside -OutputRoot $previewRoot -RepositoryRoot $repo
 if ($Target -eq 'DesktopCompat') {
   # A self-contained .NET fallback for machines without Windows App Runtime.
   # It shares the control model, but is not the formal WinUI shell.
