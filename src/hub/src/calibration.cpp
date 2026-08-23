@@ -6,7 +6,10 @@ namespace hibiki {
 
 bool validate_acoustic_anchor(const AcousticAnchorV1& anchor) noexcept {
     return anchor.schema_version == 1 && std::isfinite(anchor.test_signal_dbfs) &&
-           std::isfinite(anchor.endpoint_gain_db) && std::isfinite(anchor.measured_1k_spl_db) &&
+           std::isfinite(anchor.endpoint_gain_db) &&
+           anchor.endpoint_gain_db >= -144.0 && anchor.endpoint_gain_db <= 12.0 &&
+           std::isfinite(anchor.measured_1k_spl_db) &&
+           anchor.measured_1k_spl_db >= 0.0 && anchor.measured_1k_spl_db <= 140.0 &&
            std::isfinite(anchor.uncertainty_db) && anchor.uncertainty_db >= 0.0 &&
            std::isfinite(anchor.measured_f3_hz) && anchor.measured_f3_hz >= 0.0 &&
            anchor.test_signal_dbfs <= 0.0 && anchor.test_signal_dbfs >= -144.0;
