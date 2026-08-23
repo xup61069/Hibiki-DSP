@@ -101,3 +101,9 @@ stopButton.addEventListener('click', async () => {
 });
 
 refreshState();
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    void refreshState();
+  }
+});
