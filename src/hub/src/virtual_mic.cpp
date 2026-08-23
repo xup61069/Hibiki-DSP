@@ -79,7 +79,11 @@ bool VirtualMicDspV1::process(const float* const capture,
         const float alpha = magnitude > envelope_[channel] ? attack_alpha_ : release_alpha_;
         envelope_[channel] = alpha * envelope_[channel] + (1.0F - alpha) * magnitude;
         const float target = envelope_[channel] < threshold_linear_ ? policy_.noise_gate_floor : 1.0F;
-        const float gain_alpha = target < gate_gain_[channel] ? attack_alpha_ : release_alpha_;
+        // Attack (attack_ms) controls how fast the gate OPENS as the signal
+        // rises above threshold; release (release_ms) controls how fast it
+        // CLOSES after the signal falls below threshold.
+        const float gate_opening = target > gate_gain_[channel];
+        const float gain_alpha = gate_opening ? attack_alpha_ : release_alpha_;
         gate_gain_[channel] = gain_alpha * gate_gain_[channel] + (1.0F - gain_alpha) * target;
         value *= gate_gain_[channel];
       }

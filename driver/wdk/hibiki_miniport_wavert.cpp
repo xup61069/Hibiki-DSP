@@ -295,7 +295,7 @@ VOID HibikiMiniportWaveRtStreamV1::GetHWLatency(
     hibiki_endpoint_topology_v1 topology{};
     if (hibiki_endpoint_topology_get_v1(m_EndpointIndex, &topology) != 0) {
         HWLatency->FifoSize = 0;
-    
+
         HWLatency->CodecDelay = 0;
         return;
     }
@@ -303,8 +303,7 @@ VOID HibikiMiniportWaveRtStreamV1::GetHWLatency(
     // 100ns units latency estimation based on frame buffer size
     const ULONG latency_100ns = static_cast<ULONG>((topology.frames_per_buffer * 10000000ULL) / topology.sample_rate);
     HWLatency->FifoSize = topology.frames_per_buffer * topology.channel_count * sizeof(float);
-    
-    HWLatency->CodecDelay = 0;
+    HWLatency->CodecDelay = latency_100ns;
 }
 
 NTSTATUS HibikiMiniportWaveRtStreamV1::SetFormat(
