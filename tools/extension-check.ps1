@@ -55,6 +55,34 @@ function Assert-ExactCspDirectiveSet([string]$csp, [string]$sourceName) {
   }
 }
 
+function Get-ExtensionInteractiveControlOpenings([string]$popupHtml) {
+  $pattern = '(?ms)<(?<type>button|input|select|textarea)\b(?<attributes>[^>]*?)(?:/?>)'
+  foreach ($match in [regex]::Matches($popupHtml, $pattern)) {
+    $line = 1 + @($popupHtml.Substring(0, $match.Index) -split "`n").Count - 1
+    [pscustomobject]@{
+      Type = $match.Groups['type'].Value
+      Attributes = $match.Groups['attributes'].Value
+      Line = $line
+    }
+  }
+}
+
+function Assert-ExtensionPopupControlNames([string]$popupHtml, [string]$sourceName) {
+  $controls = @(Get-ExtensionInteractiveControlOpenings $popupHtml)
+  $missing = @($controls | Where-Object {
+      $aria = [regex]::Match($_.Attributes, 'aria-label\s*=\s*["''](?<value>[^"'']*)["'']')
+      $labelledBy = [regex]::Match($_.Attributes, 'aria-labelledby\s*=\s*["''](?<value>[^"'']*)["'']')
+      (!$aria.Success -and !$labelledBy.Success) -or
+        (($aria.Success -and [string]::IsNullOrWhiteSpace($aria.Groups['value'].Value)) -or
+        ($labelledBy.Success -and [string]::IsNullOrWhiteSpace($labelledBy.Groups['value'].Value)))
+    })
+  if ($missing.Count -gt 0) {
+    $details = @($missing | ForEach-Object { "$($_.Type) at $($sourceName):$($_.Line)" }) -join ', '
+    throw "Extension popup interactive controls must declare a non-empty aria-label or aria-labelledby: $details"
+  }
+  return $controls.Count
+}
+
 function Assert-ExtensionSourcePolicy(
   [string]$popupSource,
   [string]$serviceWorkerSource,
@@ -472,7 +500,32 @@ connect-src   ws://127.0.0.1:17842
   try { Assert-ExtensionSourcePolicy $missingErrorPersistence $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-missing-error-persistence' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected missing error persistence failure.' }
 
-  Write-Output 'Browser extension policy self-test passed (42 cases).'
+  $popupValidLines = @(
+    '<button type="button" aria-label="Capture this tab">Capture</button>',
+    "<input type='text' aria-label='Tab title' />"
+  )
+  $popupValid = $popupValidLines -join [Environment]::NewLine
+  if ((Assert-ExtensionPopupControlNames $popupValid 'selftest-popup-valid.html') -ne 2) {
+    throw 'Extension accessibility self-test expected two named popup controls.'
+  }
+
+  $popupMissing = '<button type="button">Capture</button>'
+  $popupMissingCaught = $false
+  try { [void](Assert-ExtensionPopupControlNames $popupMissing 'selftest-popup-missing.html') } catch {
+    $popupMissingCaught = $true
+    if ($_.Exception.Message -notmatch 'button at selftest-popup-missing\.html:1') { throw }
+  }
+  if (-not $popupMissingCaught) { throw 'Extension accessibility self-test expected a missing-name failure.' }
+
+  $popupEmpty = '<select aria-label="">Output group</select>'
+  $popupEmptyCaught = $false
+  try { [void](Assert-ExtensionPopupControlNames $popupEmpty 'selftest-popup-empty.html') } catch {
+    $popupEmptyCaught = $true
+    if ($_.Exception.Message -notmatch 'select at selftest-popup-empty\.html:1') { throw }
+  }
+  if (-not $popupEmptyCaught) { throw 'Extension accessibility self-test expected an empty-name failure.' }
+
+  Write-Output 'Browser extension policy self-test passed (45 cases).'
   exit 0
 }
 
@@ -495,10 +548,12 @@ foreach ($path in @(
   }
 }
 
+$popupMarkup = Get-Content -LiteralPath (Join-Path $repo 'extensions/popup.html') -Raw
 $popupSource = Get-Content -LiteralPath (Join-Path $repo 'extensions/popup.js') -Raw
 $serviceWorkerSource = Get-Content -LiteralPath (Join-Path $repo 'extensions/service-worker.js') -Raw
 $offscreenSource = Get-Content -LiteralPath (Join-Path $repo 'extensions/offscreen.js') -Raw
 $workletSource = Get-Content -LiteralPath (Join-Path $repo 'extensions/audio-worklet.js') -Raw
 Assert-ExtensionSourcePolicy $popupSource $serviceWorkerSource $offscreenSource $workletSource 'extensions source'
+Write-Output "Extension popup accessibility scan: $(Assert-ExtensionPopupControlNames $popupMarkup 'extensions/popup.html') controls."
 
 Write-Output 'Browser extension source checks passed (MV3 permissions, exact CSP and user-gesture/loopback source boundaries verified).'
