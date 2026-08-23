@@ -3,7 +3,7 @@
   "issue": 800,
   "corrects_issue": 785,
   "scope_digest": "installer-uninstall-selftests-v2",
-  "source_commit": "79450791862a86e1459deaad90ff3ef1d65c63ac",
+  "source_commit": "2833c9bb066a3be49c191f5e20a7565e1850d932",
   "environment_fingerprint": "windows-local-pwsh-7.6.4",
   "commands": [
     "pwsh -NoProfile -File tools/installer-check.ps1 -SelfTest",

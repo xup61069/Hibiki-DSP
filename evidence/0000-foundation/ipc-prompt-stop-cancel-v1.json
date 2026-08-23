@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 637,
   "scope_digest": "ipc-prompt-stop-cancel-v1",
-  "source_commit": "516213f",
+  "source_commit": "d4fcb13cb39dc08ad6e669efeadf11964671be16",
   "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100",
   "commands": [
     "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/doctor.ps1 -CheckOnly",

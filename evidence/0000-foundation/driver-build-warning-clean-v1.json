@@ -3,7 +3,7 @@
   "issue": 774,
   "title": "Warning-clean and duplicate-free driver package build plan",
   "base_commit": "0eb83ef8b9f476efc7412ea71468c3d01c6843e3",
-  "source_commit": "65af76c8",
+  "source_commit": "5e4e60ea017e1f732bb146a5d8b7673d99be5c3a",
   "summary": {
     "behavior": "The local WDK build resolves matching MSVC and UCRT headers before the WDK kernel CRT fallback, maps each driver source to one unique object, compiles guids.cpp once, and treats compiler and linker warnings as errors.",
     "user_impact": "Driver package diagnostics are no longer obscured by repeated C4083 header warnings or a duplicate guids.obj linker warning; new warnings stop the build before VM testing.",

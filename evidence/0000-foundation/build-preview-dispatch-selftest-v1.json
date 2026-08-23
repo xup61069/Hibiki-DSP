@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 86,
   "scope_digest": "build-preview-dispatch-selftest-v1",
-  "source_commit": "40c8f24",
+  "source_commit": "07c17455aaa8b06f80c861b6dda5bd74d9e3ee42",
   "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "pwsh -NoProfile -File tools/build-preview.ps1 -SelfTest",

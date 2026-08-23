@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 114,
   "scope_digest": "build-engine-preview-selftest-v1",
-  "source_commit": "4b8d970e7b4d88408adfa24789e18539ccb702cf",
+  "source_commit": "bb667e9e9966fcc061ae52cec6805ff6997fa9ee",
   "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "pwsh -NoProfile -File tools/build-engine-preview.ps1 -SelfTest",

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 80,
   "scope_digest": "control-model-engine-smoke-selftest-v1",
-  "source_commit": "cd237422998a69e77ebc102a0a2dfcb0565814bf",
+  "source_commit": "6f3eb6b91294ce77961601a798b8087263aae3e2",
   "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "pwsh -NoProfile -File tools/control-model-engine-smoke.ps1 -SelfTest",
