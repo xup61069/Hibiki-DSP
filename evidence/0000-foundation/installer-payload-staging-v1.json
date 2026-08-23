@@ -18,16 +18,17 @@
       "command": "tools/installer-check.ps1 -SelfTest",
       "status": "pass",
       "coverage": [
-        "valid fixture with all 15 required boundaries parses and passes policy",
-        "missing Read-ReleaseManifest rejected and names the boundary",
-        "missing sha256 rejected",
-        "missing pnputil.exe rejected",
-        "missing IsPathRooted traversal guard rejected",
-        "missing microsoft_signature_thumbprint rejected",
-        "PowerShell parse error rejected via ParseInput error reporting",
-        "missing rfc3161_timestamp rejected"
+        "valid fixture with all 16 required boundaries parses and passes policy",
+        "real installer source parsed and all required boundaries present",
+        "Resolve-HibikiDestination rejects blank destination path",
+        "Resolve-HibikiDestination rejects dot-dot traversal segments (C:\\safe\\..\\escape)",
+        "Resolve-HibikiDestination rejects drive root (C:\\)",
+        "Resolve-HibikiDestination accepts and canonicalizes valid absolute path",
+        "Get-StagingPlan rejects manifest entry escaping DestinationPath via traversal",
+        "Invoke-PayloadStaging successfully copies verified payload, removes backup dir on success",
+        "hash mismatch during staging triggers rollback; prior file content restored; backup dir retained for recovery"
       ],
-      "case_count": 8,
+      "case_count": 9,
       "compiled_artifacts": false
     },
     {
@@ -35,36 +36,32 @@
       "status": "pass",
       "coverage": [
         "real installer/HibikiSetup.ps1 parsed via Parser.ParseFile with zero errors",
-        "all 15 required source boundaries present including Resolve-HibikiDestination, Get-StagingPlan, Copy-HibikiFileWithHash for transactional payload staging"
+        "all 16 required source boundaries present including Resolve-HibikiDestination, Get-StagingPlan, Copy-HibikiFileWithHash, Invoke-PayloadStaging for transactional payload staging"
       ],
       "compiled_artifacts": false
     },
     {
-      "command": "tools/distribution-check.ps1",
-      "status": "pass",
-      "coverage": [
-        "distribution profile stable GUID and identity checks"
-      ]
-    },
-    {
-      "command": "always-run gates",
+      "command": "always-run gates + installer + distribution",
       "status": "pass",
       "coverage": [
         "handoff-check Issue 745 ownership scope and Git state",
-        "docs-check 597 tracked paths 243 repository JSON files",
-        "source-policy 597 tracked paths no blocked binary or secret",
+        "docs-check tracked paths measurement",
+        "source-policy no blocked binary or secret",
+        "distribution profile stable GUID identity checks",
         "git diff --check no whitespace errors"
-      ]
+      ],
+      "compiled_artifacts": false
     }
   ],
   "limitations": [
     "Source-level design and offline verification only; no -Apply execution.",
+    "Functional staging self-tests use temp-dir fixtures to verify rollback and cleanup boundaries without touching real system paths.",
     "Does not claim install, load, runtime audio, driver, HLK, Microsoft signing, or Authenticode execution evidence."
   ],
   "logs": [],
   "tool_versions": {
     "powershell": "pwsh 7.6.4"
   },
-  "started_at": "2026-08-23 13:53:50+08:00",
-  "finished_at": "2026-08-23 13:53:50+08:00"
+  "started_at": "2026-08-23 22:00:00+08:00",
+  "finished_at": "2026-08-23 22:05:00+08:00"
 }
