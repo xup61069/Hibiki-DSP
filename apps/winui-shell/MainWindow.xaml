@@ -90,7 +90,7 @@
                                           Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
                                           VerticalAlignment="Center" />
                                 <TextBlock Text="先選輸出，再一鍵變好聽"
-                                           Style="{ThemeResource TitleTextBlockStyle}"
+                                           Style="{ThemeResource SubtitleTextBlockStyle}"
                                            VerticalAlignment="Center"
                                            Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             </StackPanel>
@@ -188,9 +188,10 @@
                             <controls:ItemsRepeater.ItemTemplate>
                                 <DataTemplate>
                                     <Button Tag="{Binding Id}" Click="OnSceneClick" HorizontalContentAlignment="Stretch"
+                                            Style="{StaticResource SceneCardStyle}"
                                             AutomationProperties.Name="{Binding Name}"
                                             AutomationProperties.HelpText="{Binding Description}">
-                                        <StackPanel Spacing="6">
+                                        <StackPanel Spacing="8">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
@@ -200,8 +201,12 @@
                                                 <Border Grid.Column="1"
                                                         Visibility="{Binding SafetyEnabled, Converter={StaticResource BoolToVisibilityConverter}}"
                                                         VerticalAlignment="Center">
-                                                    <FontIcon Glyph="&#xE72E;" FontSize="12"
-                                                              Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                                        <FontIcon Glyph="&#xE72E;" FontSize="12"
+                                                                  Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                                                        <TextBlock Text="安全" FontSize="12"
+                                                                   Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                                                    </StackPanel>
                                                 </Border>
                                             </Grid>
                                             <TextBlock Text="{Binding Description}" TextWrapping="Wrap"
@@ -232,7 +237,7 @@
                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
                                       VerticalAlignment="Center" />
                             <TextBlock Text="自訂預設"
-                                       Style="{ThemeResource TitleTextBlockStyle}"
+                                       Style="{ThemeResource SubtitleTextBlockStyle}"
                                        VerticalAlignment="Center"
                                        Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                         </StackPanel>
