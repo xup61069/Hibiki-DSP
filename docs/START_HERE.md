@@ -18,9 +18,10 @@
    `scope_globs` 不重疊的 Issue。Issue 0 只保留給 foundation integration，不再承載新 feature。
 3. 每個 AI 在 repository 外建立自己的 clone/worktree 與 branch；禁止在另一個仍在工作的 AI
    所使用的 working tree 執行 `checkout`、`switch`、branch rename 或 rebase。
-4. 在 GitHub Issue body 加入 handoff block，宣告 owner、target branch、base commit、
-   `scope_globs`、shared paths 與 dependencies，push claim commit 並開 draft PR 後才開始寫 code。
-   Lifecycle label 使用 `claimed`（進行中）或 `in-review`（待審）。
+4. Orchestrator 在 GitHub Issue body 補齊 handoff block（owner、branch、base commit、
+   `scope_globs`、shared paths、dependencies）、指派 assignee 並加上 lifecycle label
+   （`claimed` 進行中／`in-review` 待審）；worker 從指派 base 的最新遠端 HEAD 建立隔離
+   worktree 後即可開始。首次可審閱的 commit push 後就開 draft PR，不要建立空的認領 commit。
 5. 確認 branch、HEAD、working tree 與 dependency lock，再執行
    `pwsh -File tools/handoff-check.ps1 -Issue <issue>`。有 scope 或文件衝突時停止寫入，交由
    integration coordinator 切分或排序。
@@ -34,33 +35,15 @@
    `-NoSource`，不要把與該 Issue 無關的聊天內容帶入新工作階段。
 9. 修改中定期把可建置的 WIP commit push 到自己的 branch，並同步 handoff block 的已完成內容、
    限制與下一個安全動作；不得靠未 push 的工作樹或聊天紀錄交接。
-10. 修改後執行 `tools/verify.ps1`、`tools/handoff-check.ps1 -Issue <issue>`、
-   `tools/docs-check.ps1` 與
-   `tools/source-policy.ps1`、`tools/source-only-ci-check.ps1`；若改動 extension、installer 或 control model，再執行
-   `tools/extension-check.ps1`、`tools/installer-check.ps1`、`tools/control-model-check.ps1`、
-   `tools/winui-shell-check.ps1`。
-   Windows 主機若要驗證 worker-owned endpoint enumeration，可額外執行
-   `pwsh -File tools/live-device-catalog-check.ps1`；它是 opt-in，只輸出數量、sequence、
-   payload 大小與 wire 結果，不會把真實 endpoint ID 寫入 repository。
-   若要驗證實際 shared-mode sink 與 30 ms 無聲 handoff，可額外執行
-   `pwsh -File tools/live-wasapi-handoff-check.ps1`；它只輸出 mix format 與 aggregate
-   worker counters，沒有可用 endpoint 時會回報 `wasapi=unavailable`。
-   若要驗證 Windows endpoint volume 的實際讀回、短暫衰減與恢復，可額外執行
-   `pwsh -File tools/live-system-volume-check.ps1 -WriteTest`；只有明確旗標才會改變本機音量，
-   probe 會啟動 Engine Preview 並經 named pipe 驗證 write-through，結束前恢復原值，仍不等於
-   driver/WaveRT/HLK evidence。`-DirectBroker` 只供隔離 broker 除錯。
-   若要驗證單一 App/session volume 的實際 handle 讀回、短暫衰減與恢復，可額外執行
-   `pwsh -File tools/live-session-volume-check.ps1 -WriteTest`；它只建立本 probe 的無聲
-   shared-mode session，結束前恢復原值，仍不等於實體 per-App capture/re-send 或 DSP delivery。
-   若要驗證 process-level loopback source，可額外執行
-   `pwsh -File tools/live-process-loopback-check.ps1`；它只輸出匿名格式與 frame aggregate，
-   沒有可用 runtime 時會回報 `loopback=unavailable`，不等於 tabCapture 或實體 per-App routing。
-   任何 identity/config 變更都必須再執行 `tools/distribution-check.ps1`；改動 driver source
-   boundary 時也執行 `tools/driver-source-check.ps1` 與
-   `tools/driver-signability-check.ps1`。若有目標 WDK 編出的 package，可用
-   `tools/driver-signability-check.ps1 -PackageRoot <package> -RequireInf2Cat` 產生
-   Inf2Cat signability evidence；fresh clone 沒有 SYS 時，預設命令只驗證 source boundary，
-   不會假裝完成 `.sys`／CAT 或 Microsoft signing。
+10. 修改後執行 AGENTS.md 第三層的核心 gates（verify／handoff-check／docs-check／
+   source-policy／source-only-ci-check），再依觸發條件加跑條件式 gates：UI 用
+   build-preview 與 winui-shell-check，engine 整合用 engine preview 系列，extensions 用
+   extension-check，installer/distribution identity 用 installer-check 與
+   distribution-check，driver boundary 用 driver-source-check（driver 簽章屬 release 階段）。
+   live-* probes 一律是明確 opt-in：預設只輸出匿名資料且不改變機器狀態；帶 `-WriteTest`
+   的變體會短暫改變本機音量並在結束前恢復。任何 live probe 的結果都只能算 user-space
+   evidence，不得宣稱 driver/WaveRT/HLK/Microsoft signing 或實體音訊 delivery 已完成；
+   各 probe 的詳細邊界說明見各工具腳本開頭註解。
 
 ## 文件權威順序
 

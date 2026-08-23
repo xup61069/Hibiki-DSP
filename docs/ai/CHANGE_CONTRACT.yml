@@ -6,6 +6,16 @@ rules:
     required: [adr_or_superseding_adr, project_map_update, third_party_update]
   build_or_toolchain:
     required: [agents_update, readme_update, ci_update]
+  validation_tiers:
+    core_gates: [doctor_check_only, handoff_check_issue, verify, docs_check, source_policy, source_only_ci_check]
+    conditional_gates:
+      ui_or_control_model: [build_preview, winui_shell_check]
+      engine_integration: [build_engine_preview, engine_preview_smoke, control_model_check, control_model_engine_smoke]
+      extensions: [extension_check]
+      installer_or_distribution_identity: [installer_check, distribution_check]
+      driver_source_boundary: [driver_source_check]
+      driver_release_stage: [driver_signability_check]
+      opt_in_live_probes: [live_device_catalog_check, live_wasapi_handoff_check, live_system_volume_check, live_session_volume_check, live_audio_session_check, live_process_loopback_check]
   task_handoff:
     required: [issue, branch, target_branch, owner, scope_globs, shared_paths, depends_on, issue_body_handoff_block, base_commit, next_safe_action]
   release:
