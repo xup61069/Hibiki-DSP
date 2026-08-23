@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "issue": 664,
+  "scope_digest": "global-snapshot-wave24",
+  "source_commit": null,
+  "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100-pwsh-7.6; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 664",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #652 / PR #660 merged: driver adapter allocation uses ExAllocatePool3 with unchanged paged/non-paged classes and ibiH tag; build definition raises NTDDI to WIN10_VB; GetHWLatency reports its per-buffer estimate through HWLatency->CodecDelay.",
+        "Issue #662 / PR #663 merged: NODE_MUTE descriptor name points at standard KSAUDFNAME_MASTER_MUTE and the unused null fallback was removed."
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; this update does not change product source behavior.",
+    "Driver items remain source/local WDK build/Inf2Cat evidence.",
+    "No guest installation/load/PnP start/audio delivery, HLK or Microsoft signing claim."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-23T17:07:05+08:00",
+  "finished_at": "2026-08-23T17:15:00+08:00"
+}
