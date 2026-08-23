@@ -1,8 +1,8 @@
-{
+﻿{
   "schema_version": 1,
   "issue": 710,
   "scope_digest": "spec-tab-bridge-boundaries-v1",
-  "source_commit": "PENDING",
+  "source_commit": "8d037ed7602653f8d15c089e3fae33100bb07ce5",
   "base_commit": "b737339",
   "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6",
   "target": "docs/specs/SPEC-0009-browser-tab-bridge.md",
@@ -27,3 +27,4 @@
     "No browser runtime, audio, endpoint, driver, WaveRT, HLK, signing or release evidence."
   ]
 }
+
