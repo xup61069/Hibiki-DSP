@@ -25,6 +25,10 @@ bool VirtualMicDspV1::prepare(const VirtualMicDspPolicyV1& policy,
   channels_ = channels;
   filter_length_ = policy.filter_length;
   threshold_linear_ = std::pow(10.0F, policy.noise_gate_threshold_dbfs / 20.0F);
+  // Upper-only hysteresis: the gate closes at the configured threshold
+  // (identical to prior behavior) but requires a 2 dB higher envelope to
+  // reopen. This prevents chatter when the signal hovers near threshold.
+  threshold_open_linear_ = threshold_linear_ * std::pow(10.0F, 2.0F / 20.0F);
   attack_alpha_ = std::exp(-1.0F / (policy.attack_ms * 0.001F * static_cast<float>(sample_rate)));
   release_alpha_ = std::exp(-1.0F / (policy.release_ms * 0.001F * static_cast<float>(sample_rate)));
   prepared_ = true;
@@ -37,6 +41,7 @@ void VirtualMicDspV1::reset() noexcept {
   history_.fill({});
   envelope_.fill(0.0F);
   gate_gain_.fill(1.0F);
+  gate_open_.fill(false);
 }
 
 bool VirtualMicDspV1::process(const float* const capture,
@@ -78,7 +83,14 @@ bool VirtualMicDspV1::process(const float* const capture,
         const float magnitude = std::abs(value);
         const float alpha = magnitude > envelope_[channel] ? attack_alpha_ : release_alpha_;
         envelope_[channel] = alpha * envelope_[channel] + (1.0F - alpha) * magnitude;
-        const float target = envelope_[channel] < threshold_linear_ ? policy_.noise_gate_floor : 1.0F;
+        // Upper-only hysteresis prevents chatter: close at the configured
+        // threshold, reopen only 2 dB higher; hold state between.
+        if (!gate_open_[channel] && envelope_[channel] >= threshold_open_linear_) {
+          gate_open_[channel] = true;
+        } else if (gate_open_[channel] && envelope_[channel] < threshold_linear_) {
+          gate_open_[channel] = false;
+        }
+        const float target = gate_open_[channel] ? 1.0F : policy_.noise_gate_floor;
         // Attack (attack_ms) controls how fast the gate OPENS as the signal
         // rises above threshold; release (release_ms) controls how fast it
         // CLOSES after the signal falls below threshold.
