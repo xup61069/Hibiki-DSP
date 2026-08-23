@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 96,
   "scope_digest": "readme-dual-audience-v1",
-  "source_commit": "740ee44",
+  "source_commit": "740ee44836bfd31a213341f27d229a3b3075f281",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/handoff-check.ps1 -Issue 96",

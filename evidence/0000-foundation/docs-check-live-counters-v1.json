@@ -1,8 +1,8 @@
-﻿{
+{
   "schema_version": 1,
   "issue": 197,
   "scope_digest": "docs-check-live-counters-v1",
-  "source_commit": "cf6f3e9",
+  "source_commit": "cf6f3e98211397b346250ed79957816b6215da6c",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-git-2.x; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/docs-check.ps1 -SelfTest",

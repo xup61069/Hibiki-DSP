@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 201,
   "scope_digest": "driver-portcls-adapter-entry-v1",
-  "source_commit": "9efb211",
+  "source_commit": "9efb211633e9102bd6382b74df5461f1c0cf4a69",
   "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/driver-source-check.ps1",

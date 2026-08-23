@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "ir-graph-attachment-v1",
-  "source_commit": "dcb38bb",
+  "source_commit": "dcb38bb6f4b736e5d1da7a0059d8bf92ec757501",
   "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/verify.ps1",

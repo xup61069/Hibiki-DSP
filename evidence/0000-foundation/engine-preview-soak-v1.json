@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 672,
   "scope_digest": "engine-preview-soak-v1",
-  "source_commit": "647d29c",
+  "source_commit": "647d29c9042d737931aaf26a2b5f19e18ba9f453",
   "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -NoProfile -File tools/engine-preview-soak.ps1 -SelfTest",

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "ir-phase-kernel-v1",
-  "source_commit": "8e73ea0",
+  "source_commit": "8e73ea02d13d675cfe8eecfaf4874cc83c41fb44",
   "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/verify.ps1",

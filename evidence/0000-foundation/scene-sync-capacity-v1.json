@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 840,
   "scope_digest": "scene-sync-capacity-v1",
-  "source_commit": "997d136a1dea",
+  "source_commit": "997d136a1dea1e87e6309c49765c2f330f3033f1",
   "environment_fingerprint": "windows-local-pwsh-7.6.4-dotnet8",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 840",
