@@ -6,6 +6,8 @@ param(
   [switch]$SelfTest
 )
 
+Set-StrictMode -Version Latest
+
 $ErrorActionPreference = 'Stop'
 
 function Get-InfSections([string]$text) {
@@ -128,6 +130,7 @@ HibikiVirtualAudio.sys=1
     if (-not $caught) { throw "INF section self-test expected rejection: $($fixture.Name)" }
   }
   $resolverRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('hibiki-signability-selftest-' + [guid]::NewGuid().ToString('N'))
+  $caseCount = 0
   try {
     $wdkBinDir = Join-Path $resolverRoot 'wdk-bin'
     $kitsBinDir = Join-Path (Join-Path $resolverRoot 'kits') 'bin'

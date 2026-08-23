@@ -3,6 +3,8 @@ param(
   [switch]$SelfTest
 )
 
+Set-StrictMode -Version Latest
+
 $ErrorActionPreference = 'Stop'
 
 function Get-ProfileScalar([hashtable]$values, [string]$key, [string]$sourceName) {

@@ -5,6 +5,8 @@ param(
   [switch]$SelfTest
 )
 
+Set-StrictMode -Version Latest
+
 $repo = Split-Path -Parent $PSScriptRoot
 
 function Convert-ContextGlobToRegex([string]$glob) {

@@ -9,6 +9,8 @@ param(
     [switch]$SelfTest
 )
 
+Set-StrictMode -Version Latest
+
 $ErrorActionPreference = 'Stop'
 function Assert-LiveSessionVolumeOptIn([bool]$windowsHost, [bool]$writeTest, [bool]$selfTest) {
     if (-not $windowsHost) { throw 'Live Windows session-volume probe is Windows-only.' }
