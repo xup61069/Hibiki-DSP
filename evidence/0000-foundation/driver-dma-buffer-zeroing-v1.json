@@ -1,0 +1,54 @@
+{
+  "schema_version": 2,
+  "issue": 462,
+  "title": "DMA buffer zeroing after MapAllocatedPages to prevent garbage audio on first stream",
+  "base_commit": "50010fa2",
+  "summary": {
+    "behavior": "AllocateBufferWithNotification now calls RtlZeroMemory on the mapped DMA buffer immediately after MapAllocatedPages succeeds, so the first stream start does not expose stale physical page contents to the audio pipeline.",
+    "scope_boundary": "Source + local WDK build + Inf2Cat signability + user-space contract tests only. No guest installation, driver load, PnP start, audio delivery, HLK or Microsoft signing claim.",
+    "files": [
+      "driver/wdk/hibiki_miniport_wavert.cpp",
+      "evidence/0000-foundation/driver-dma-buffer-zeroing-v1.json"
+    ]
+  },
+  "validation": [
+    {
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 462",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1",
+      "result": "pass (80 required paths; 624 tracked paths)"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-policy.ps1",
+      "result": "pass (624 tracked paths)"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/driver-source-check.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/build-driver.ps1",
+      "result": "pass; HibikiVirtualAudio.sys linked; Inf2Cat 0 errors / 0 warnings"
+    },
+    {
+      "command": "cmake --build .local/build --config RelWithDebInfo --target hibiki_contract_tests -- /m:1 /p:CL_MPCount=1",
+      "result": "pass"
+    },
+    {
+      "command": "ctest --test-dir .local/build -C RelWithDebInfo --output-on-failure",
+      "result": "pass; 3/3 tests"
+    }
+  ],
+  "limits": [
+    "This is a source-level defensive fix; it does not claim guest installation, PnP start or audible output verification.",
+    "The stale-page scenario is inferred from the Windows memory manager contract for AllocatePagesForMdl/MapAllocatedPages; no runtime DMA capture was performed."
+  ],
+  "next_safe_action": "Push branch and open draft PR for maintainer review; Issue #462 VM retest still requires explicit user consent.",
+  "date": "2026-08-24"
+}
