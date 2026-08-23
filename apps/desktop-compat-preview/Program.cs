@@ -34,6 +34,11 @@ internal sealed class PreviewForm : Form
     private readonly Button _applySessionRoute = new() { Text = "套用選取 App 路由", AutoSize = true, AccessibleName = "套用選取 App 路由" };
     private readonly Label _effective = new() { AutoSize = true };
     private readonly ComboBox _scenes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取情境設定檔" };
+    private readonly TextBox _customSceneId = new() { Width = 220, PlaceholderText = "Scene ID", AccessibleName = "自訂場景 ID" };
+    private readonly TextBox _customSceneName = new() { Width = 220, PlaceholderText = "名稱", AccessibleName = "自訂場景名稱" };
+    private readonly TextBox _customSceneDescription = new() { Width = 460, PlaceholderText = "說明", AccessibleName = "自訂場景說明" };
+    private readonly Button _addCustomScene = new() { Text = "加入自訂場景", AutoSize = true, AccessibleName = "加入自訂場景" };
+    private readonly Button _removeCustomScene = new() { Text = "移除選取的自訂場景", AutoSize = true, AccessibleName = "移除選取的自訂場景" };
     private readonly ComboBox _irModes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取 IR 模式" };
     private readonly TrackBar _irStrength = new() { Minimum = 0, Maximum = 100, TickFrequency = 10, Width = 460, AccessibleName = "IR 強度百分比" };
     private readonly Label _irStatus = new() { AutoSize = false, Width = 550, Height = 58 };
@@ -68,9 +73,7 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(connect);
         panel.Controls.Add(_connection);
         panel.Controls.Add(new Label { Text = "場景", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
-        _scenes.DataSource = _viewModel.Scenes.ToList();
-        _scenes.DisplayMember = "Name";
-        _scenes.ValueMember = "Id";
+        SyncSceneList();
         _scenes.SelectedIndexChanged += async (_, _) =>
         {
             if (_updatingScene || _scenes.SelectedValue is not string id || !_viewModel.IsConnected)
@@ -79,6 +82,42 @@ internal sealed class PreviewForm : Form
             RefreshView();
         };
         panel.Controls.Add(_scenes);
+        panel.Controls.Add(new Label { Text = "自訂場景（最多 32 筆）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        _customSceneId.TextChanged += (_, _) => _viewModel.CustomSceneId = _customSceneId.Text;
+        _customSceneName.TextChanged += (_, _) => _viewModel.CustomSceneName = _customSceneName.Text;
+        _customSceneDescription.TextChanged += (_, _) => _viewModel.CustomSceneDescription = _customSceneDescription.Text;
+        var customSceneIdentity = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false
+        };
+        customSceneIdentity.Controls.Add(_customSceneId);
+        customSceneIdentity.Controls.Add(_customSceneName);
+        panel.Controls.Add(customSceneIdentity);
+        panel.Controls.Add(_customSceneDescription);
+        _addCustomScene.Click += (_, _) =>
+        {
+            _viewModel.AddCustomScene();
+            SyncSceneList();
+            RefreshView();
+        };
+        _removeCustomScene.Click += (_, _) =>
+        {
+            if (_scenes.SelectedValue is string sceneId)
+                _viewModel.RemoveCustomScene(sceneId);
+            SyncSceneList();
+            RefreshView();
+        };
+        var customSceneActions = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false
+        };
+        customSceneActions.Controls.Add(_addCustomScene);
+        customSceneActions.Controls.Add(_removeCustomScene);
+        panel.Controls.Add(customSceneActions);
         panel.Controls.Add(new Label { Text = "IR 檔案與相位", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
         _irModes.DataSource = _viewModel.IrPhaseModeOptions.ToList();
         _irModes.DisplayMember = "Label";
@@ -268,12 +307,41 @@ internal sealed class PreviewForm : Form
         var strength = Math.Clamp((int)Math.Round(_viewModel.IrPhaseStrength * 100.0),
                                   _irStrength.Minimum, _irStrength.Maximum);
         if (_irStrength.Value != strength) _irStrength.Value = strength;
+        if (!string.Equals(_customSceneId.Text, _viewModel.CustomSceneId, StringComparison.Ordinal))
+            _customSceneId.Text = _viewModel.CustomSceneId;
+        if (!string.Equals(_customSceneName.Text, _viewModel.CustomSceneName, StringComparison.Ordinal))
+            _customSceneName.Text = _viewModel.CustomSceneName;
+        if (!string.Equals(_customSceneDescription.Text, _viewModel.CustomSceneDescription, StringComparison.Ordinal))
+            _customSceneDescription.Text = _viewModel.CustomSceneDescription;
+        _removeCustomScene.Enabled = _scenes.SelectedValue is string removableSceneId &&
+                                     _viewModel.CustomSceneCards.Any(item => item.Id == removableSceneId);
         var selectedScene = _viewModel.SelectedScene?.Id;
         if (selectedScene is not null && !string.Equals(_scenes.SelectedValue as string, selectedScene,
                                                          StringComparison.Ordinal))
         {
             _updatingScene = true;
             _scenes.SelectedValue = selectedScene;
+            _updatingScene = false;
+        }
+    }
+
+    private void SyncSceneList()
+    {
+        var selectedId = _scenes.SelectedValue as string ?? _viewModel.SelectedScene?.Id;
+        _updatingScene = true;
+        try
+        {
+            _scenes.DataSource = null;
+            _scenes.DataSource = _viewModel.Scenes.ToList();
+            _scenes.DisplayMember = nameof(SceneCard.Name);
+            _scenes.ValueMember = nameof(SceneCard.Id);
+            if (selectedId is null) return;
+            var scenes = _viewModel.Scenes.ToArray();
+            var selectedIndex = Array.FindIndex(scenes, item => item.Id == selectedId);
+            if (selectedIndex >= 0) _scenes.SelectedIndex = selectedIndex;
+        }
+        finally
+        {
             _updatingScene = false;
         }
     }
