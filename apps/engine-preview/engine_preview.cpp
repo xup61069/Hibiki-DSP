@@ -633,7 +633,9 @@ int wmain(const int argc, wchar_t* const* argv) {
                                       session_routing_detail, process_loopback_detail);
     if (!status_store.publish(status)) return 4;
     hibiki::ControlPlaneHostV1 host;
-    if (!host.start_with_queue(hibiki::IpcNamedPipeConfigV1{kPipeName, 64U * 1024U, 1000U},
+    hibiki::IpcNamedPipeConfigV1 pipe_config{kPipeName, 64U * 1024U, 1000U};
+    pipe_config.require_first_pipe_instance = true;
+    if (!host.start_with_queue(pipe_config,
                                physical_catalog_ready ? physical_catalog.snapshot_store() : nullptr,
                                &status_store,
                                session_routing_requested ? &session_routing.catalog_store

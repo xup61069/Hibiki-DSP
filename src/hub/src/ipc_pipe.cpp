@@ -139,16 +139,44 @@ bool IpcNamedPipeServerV1::start(const IpcNamedPipeConfigV1& config,
         return false;
     }
     pipe_name_ = config.pipe_name;
+    first_pipe_created_ = config.require_first_pipe_instance;
     max_frame_bytes_ = config.max_frame_bytes;
     io_timeout_ms_ = config.io_timeout_ms;
     handler_ = handler;
     handler_context_ = context;
     stop_requested_.store(false, std::memory_order_release);
     running_.store(true, std::memory_order_release);
+    // Create the initial pipe synchronously when exclusive ownership is
+    // required so start() can fail closed before reporting success. Without
+    // this, a duplicate server would briefly report running=true while its
+    // worker loses the race and exits silently.
+    HANDLE initial_pipe = nullptr;
+    if (first_pipe_created_) {
+        const DWORD open_mode =
+            PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE;
+        const auto pipe = CreateNamedPipeW(
+            pipe_name_.c_str(), open_mode,
+            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+            1U, max_frame_bytes_, max_frame_bytes_, io_timeout_ms_, nullptr);
+        if (pipe == INVALID_HANDLE_VALUE) {
+            running_.store(false, std::memory_order_release);
+            pipe_name_.clear();
+            max_frame_bytes_ = 0U;
+            io_timeout_ms_ = 0U;
+            handler_ = nullptr;
+            handler_context_ = nullptr;
+            return false;
+        }
+        initial_pipe = pipe;
+    }
     try {
-        worker_ = std::thread([this] { run(); });
+        worker_ = std::thread([this, initial_pipe] { run(static_cast<void*>(initial_pipe)); });
     } catch (...) {
+        if (initial_pipe != nullptr) close_pipe(initial_pipe);
         running_.store(false, std::memory_order_release);
+        pipe_name_.clear();
+        max_frame_bytes_ = 0U;
+        io_timeout_ms_ = 0U;
         handler_ = nullptr;
         handler_context_ = nullptr;
         return false;
@@ -174,12 +202,19 @@ void IpcNamedPipeServerV1::stop() noexcept {
     io_timeout_ms_ = 0U;
 }
 
-void IpcNamedPipeServerV1::run() noexcept {
+void IpcNamedPipeServerV1::run(void* initial_pipe) noexcept {
     while (!stop_requested_.load(std::memory_order_acquire)) {
-        const auto pipe = CreateNamedPipeW(
-            pipe_name_.c_str(), PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
-            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS, 1U,
-            max_frame_bytes_, max_frame_bytes_, io_timeout_ms_, nullptr);
+        auto pipe = static_cast<HANDLE>(initial_pipe);
+        if (pipe == nullptr) {
+            const DWORD open_mode =
+                PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED |
+                (first_pipe_created_ ? FILE_FLAG_FIRST_PIPE_INSTANCE : 0U);
+            pipe = CreateNamedPipeW(
+                pipe_name_.c_str(), open_mode,
+                PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+                1U, max_frame_bytes_, max_frame_bytes_, io_timeout_ms_, nullptr);
+        }
+        initial_pipe = nullptr;
         if (pipe == INVALID_HANDLE_VALUE) break;
         pipe_handle_.store(as_integer(pipe), std::memory_order_release);
         if (!connect_client(pipe, io_timeout_ms_)) {
