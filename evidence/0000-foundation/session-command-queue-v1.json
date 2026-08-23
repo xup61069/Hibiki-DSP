@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "session-command-worker-queue-v1",
-  "source_commit": "6f9d6b1",
+  "source_commit": "6f9d6b1c963053046ebff3705748b6ed9af3593d",
   "environment_fingerprint": "windows-22631-vs17-sdk-26100-local",
   "commands": [
     "pwsh -File tools/verify.ps1",

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 139,
   "scope_digest": "readme-road-to-v1-v1",
-  "source_commit": "e483be8",
+  "source_commit": "e483be80056db46496ee9992f28673abe6684bca",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/handoff-check.ps1 -Issue 139",

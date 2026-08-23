@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "ai-handoff-and-preview-readiness-v1",
-  "source_commit": "d069a26",
+  "source_commit": "d069a2685b46b7312bfd1438bc7d7b8e88164480",
   "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/doctor.ps1 -CheckOnly",

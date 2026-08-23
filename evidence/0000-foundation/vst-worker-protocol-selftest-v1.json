@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 284,
   "scope_digest": "vst-worker-protocol-selftest-v1",
-  "source_commit": "da42350",
+  "source_commit": "da4235070b2d05b220fc35ec12ad65a6a52df042",
   "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "cmake --preset windows-dev",

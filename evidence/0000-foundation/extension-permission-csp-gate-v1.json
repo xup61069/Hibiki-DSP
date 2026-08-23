@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 32,
   "scope_digest": "extension-permission-csp-gate-v1",
-  "source_commit": "7d7c6a1",
+  "source_commit": "7d7c6a1ca90f4611a3d6905fb9235c6fceb10a48",
   "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-git-2.55.0-pwsh-7.6.5; target-vs2026-sdk-wdk-missing",
   "commands": [
     "pwsh -File tools/extension-check.ps1 -SelfTest",

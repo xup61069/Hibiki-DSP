@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "control-model-engine-ir-clear-v1",
-  "source_commit": "9d3dee8",
+  "source_commit": "9d3dee8953af4fdd8c256ef5e0064d3fa78bffea",
   "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/control-model-engine-smoke.ps1 -EnableSessionRouting (three consecutive runs)"
