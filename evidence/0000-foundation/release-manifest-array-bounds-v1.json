@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "issue": 950,
+  "scope_digest": "release-manifest-array-bounds-v1",
+  "source_commit": "0901663d",
+  "environment_fingerprint": "windows-amd64-pwsh-schema-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 950",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Schema-only contract tightening; no runtime code, IPC payload, DSP, driver, signing or physical-audio behavior changes.",
+    "Realistic release manifests stay well below the new array caps; existing valid payloads are unaffected."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-25T00:50:00+08:00",
+  "finished_at": "2026-08-25T01:00:00+08:00"
+}
+
