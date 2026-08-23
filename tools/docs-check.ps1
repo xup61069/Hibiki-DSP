@@ -94,6 +94,22 @@ function Test-BaselineChangedByHead {
   return @($ChangedPaths | Where-Object { $_ -eq 'docs/state/BASELINE.md' }).Count -gt 0
 }
 
+function Get-MissingRequiredSchemas {
+  # Every tracked JSON Schema is a durable public contract and therefore must be
+  # a required docs-check entry. Keep this pure so -SelfTest can cover the
+  # fail-closed behavior without touching the repository.
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$TrackedPaths,
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$RequiredEntries
+  )
+  $trackedSchemas = @($TrackedPaths |
+    Where-Object { $_ -match '^(?:schemas)/[^/]+\.schema\.json$' } |
+    Sort-Object)
+  $requiredSet = @{}
+  foreach ($entry in $RequiredEntries) { $requiredSet[$entry] = $true }
+  return ,@($trackedSchemas | Where-Object { -not $requiredSet.ContainsKey($_) })
+}
+
 function ConvertFrom-AdrFrontmatter([string]$RawText) {
   # Parse the comment-style frontmatter block used by all ADR files.
   # Returns a hashtable of key -> string value, or throws on structural errors.
@@ -286,6 +302,17 @@ if ($SelfTest) {
   # BASELINE edit detection.
   if (Test-BaselineChangedByHead -ChangedPaths @('evidence/0000-foundation/initial.json')) {
     throw 'docs-check self-test failed: a handoff-only head was treated as a BASELINE owner.'
+  }
+  $caseCount++
+
+  # Required schema coverage: all tracked contract schemas must be covered.
+  if ((Get-MissingRequiredSchemas -TrackedPaths @('schemas/a-v1.schema.json', 'docs/example.json') -RequiredEntries @('schemas/a-v1.schema.json')).Count -ne 0) {
+    throw 'docs-check self-test failed: a covered schema was reported as missing.'
+  }
+  $caseCount++
+  $missingSchema = Get-MissingRequiredSchemas -TrackedPaths @('schemas/a-v1.schema.json', 'schemas/b-v1.schema.json') -RequiredEntries @('schemas/a-v1.schema.json')
+  if ($missingSchema.Count -ne 1 -or $missingSchema[0] -ne 'schemas/b-v1.schema.json') {
+    throw 'docs-check self-test failed: an uncovered schema was not reported.'
   }
   $caseCount++
   if (-not (Test-BaselineChangedByHead -ChangedPaths @('docs/state/BASELINE.md'))) {
@@ -482,7 +509,12 @@ $required = @(
   'schemas/vst3-parameter-timeline-v1.schema.json',
   'schemas/vst3-plugin-state-v1.schema.json',
   'schemas/scene-vst3-state-binding-v1.schema.json',
+  'schemas/output-group-volume-v1.schema.json',
+  'schemas/scene-profile-v1.schema.json',
   'schemas/output-fanout-plan-v1.schema.json',
+  'schemas/session-route-rule-v1.schema.json',
+  'schemas/session-route-rules-v1.schema.json',
+  'schemas/scene-sync-queue-v1.schema.json',
   'docs/specs/SPEC-0010-winui-shell.md',
   'docs/specs/SPEC-0011-calibration-compiler.md',
   'docs/specs/SPEC-0012-vst3-latency-graph-commit.md',
@@ -493,6 +525,14 @@ $required = @(
 
 $missing = @($required | Where-Object { -not (Test-Path (Join-Path $repo $_)) })
 if ($missing.Count -gt 0) { throw "Missing required documentation: $($missing -join ', ')" }
+
+$trackedSchemas = @(git -C $repo ls-files -- 'schemas/*.schema.json')
+if ($LASTEXITCODE -ne 0) { throw 'docs-check could not list tracked contract schemas.' }
+$missingRequiredSchemas = Get-MissingRequiredSchemas -TrackedPaths $trackedSchemas -RequiredEntries $required
+if ($missingRequiredSchemas.Count -gt 0) {
+  throw ('Contract schemas must be required docs-check entries; missing: ' +
+         ($missingRequiredSchemas -join ', '))
+}
 
 $handoffSchemaIndex = Get-Content -LiteralPath (Join-Path $repo 'docs/ai/HANDOFF_SCHEMA.json') -Raw |
   ConvertFrom-Json
