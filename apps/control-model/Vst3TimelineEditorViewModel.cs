@@ -167,6 +167,30 @@ public sealed class Vst3TimelineEditorViewModel : INotifyPropertyChanged
         return true;
     }
 
+    // Removes the selected timeline through the model's bounded removal and
+    // refreshes the projected timeline list. The stale selection index is
+    // cleared so a follow-up action cannot target shifted entries.
+    public bool RemoveSelectedTimeline()
+    {
+        if (!_model.RemoveSelected())
+        {
+            SetStatus("刪除失敗（未選取時間軸或草稿進行中）");
+            return false;
+        }
+        SelectedRowIndex = -1;
+        RefreshTimelineIds();
+        RefreshRows();
+        OnPropertyChanged(nameof(SelectedTimelineId));
+        OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(IsDirty));
+        OnPropertyChanged(nameof(UndoDepth));
+        OnPropertyChanged(nameof(RedoDepth));
+        OnPropertyChanged(nameof(CanUndo));
+        OnPropertyChanged(nameof(CanRedo));
+        SetStatus("已刪除選取時間軸");
+        return true;
+    }
+
     // Surface-level history reset mirrors the native supervisor facade. It is
     // valid with or without a selection and never changes rows, dirty state or
     // an open draft.

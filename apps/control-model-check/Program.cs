@@ -1047,4 +1047,59 @@ Check(editorViewModel.Redo() &&
       editorViewModel.Rows[1] == new Vst3TimelineEditorViewModel.TimelineEventRow(
           1, 8U, 720UL, 0.15),
     "Editor ViewModel removal redo must re-apply the row deletion.");
+var removeMirror = new Vst3TimelineSurfaceModelV1();
+var removeMirrorNotifications = new List<string>();
+removeMirror.PropertyChanged += (_, args) =>
+    removeMirrorNotifications.Add(args.PropertyName ?? string.Empty);
+Check(removeMirror.RegisterTimeline("removable") &&
+      removeMirror.RegisterTimeline("keeper"),
+    "Managed remove-selected fixture failed to register timelines.");
+Check(removeMirror.Select("removable") &&
+      removeMirror.BeginEdit() &&
+      removeMirror.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(5, 40, 0.35)) &&
+      removeMirror.Commit(),
+    "Managed remove-selected fixture failed to build a published snapshot.");
+removeMirror.BeginEdit();
+Check(!removeMirror.RemoveSelected() && removeMirror.HasSelection,
+    "Managed remove-selected must refuse while an edit session is open.");
+Check(removeMirror.Discard(), "Managed remove-selected draft cleanup failed.");
+removeMirrorNotifications.Clear();
+Check(removeMirror.RemoveSelected() && !removeMirror.HasSelection &&
+      removeMirror.SelectedTimelineId is null && removeMirror.TimelineIdCount == 1 &&
+      removeMirror.TimelineIds.SequenceEqual(["keeper"]) &&
+      removeMirror.Published.Count == 0 && removeMirror.UndoDepth == 0 &&
+      removeMirror.RedoDepth == 0 && !removeMirror.CanUndo && !removeMirror.CanRedo &&
+      removeMirror.IsDirtyState == false &&
+      removeMirrorNotifications.Contains(nameof(Vst3TimelineSurfaceModelV1.TimelineIds)) &&
+      removeMirrorNotifications.Contains(nameof(Vst3TimelineSurfaceModelV1.TimelineIdCount)) &&
+      removeMirrorNotifications.Contains(nameof(Vst3TimelineSurfaceModelV1.SelectedTimelineId)),
+    "Managed remove-selected must clear selection/history and keep other stored timelines.");
+Check(!removeMirror.RemoveSelected(),
+    "Managed remove-selected without a selection must fail closed.");
+var removeViewModel = new Vst3TimelineEditorViewModel();
+var removeViewModelNotifications = new List<string>();
+removeViewModel.PropertyChanged += (_, args) =>
+    removeViewModelNotifications.Add(args.PropertyName ?? string.Empty);
+Check(removeViewModel.RegisterTimeline("removable-vm") &&
+      removeViewModel.Select("removable-vm") && removeViewModel.BeginEdit(),
+    "Editor ViewModel timeline-removal fixture failed to prepare.");
+removeViewModelNotifications.Clear();
+Check(!removeViewModel.RemoveSelectedTimeline() &&
+      removeViewModel.StatusText.Contains("刪除失敗") &&
+      removeViewModel.HasSelection && removeViewModel.HasEditSession,
+    "Editor ViewModel timeline removal must fail closed without a removable selection.");
+
+Check(removeViewModel.Discard(), "Editor ViewModel timeline-removal discard failed.");
+removeViewModelNotifications.Clear();
+Check(removeViewModel.RemoveSelectedTimeline() &&
+      !removeViewModel.HasSelection && removeViewModel.SelectedTimelineId is null &&
+      removeViewModel.TimelineIds.Count == 0 && removeViewModel.Rows.Count == 0 &&
+      removeViewModel.SelectedRowIndex == -1 && !removeViewModel.IsDirty &&
+      removeViewModel.UndoDepth == 0 && removeViewModel.RedoDepth == 0 &&
+      removeViewModel.StatusText.Contains("已刪除選取時間軸") &&
+      removeViewModelNotifications.Contains(nameof(Vst3TimelineEditorViewModel.TimelineIds)) &&
+      removeViewModelNotifications.Contains(nameof(Vst3TimelineEditorViewModel.SelectedTimelineId)) &&
+      removeViewModelNotifications.Contains(nameof(Vst3TimelineEditorViewModel.Rows)) &&
+      removeViewModelNotifications.Contains(nameof(Vst3TimelineEditorViewModel.StatusText)),
+    "Editor ViewModel timeline removal must refresh projections and notify bindings.");
 Console.WriteLine("Control model checks passed.");

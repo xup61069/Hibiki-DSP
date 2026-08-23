@@ -137,6 +137,22 @@ Vst3TimelineStoreStatusV1 Vst3TimelineSupervisorSurfaceV1::save_selected() {
     return status;
 }
 
+bool Vst3TimelineSupervisorSurfaceV1::remove_selected() {
+    // An open draft represents unsaved intent; deleting the selected
+    // timeline must not discard it silently. The caller commits or discards
+    // explicitly first.
+    if (!ready_for_editing() || editor_.has_edit_session()) return false;
+    const auto status =
+        store_->remove(std::string_view(selected_id_.data(), selected_size_));
+    last_store_status_ = status;
+    if (status != Vst3TimelineStoreStatusV1::ok) return false;
+    editor_ = {};
+    baseline_ = {};
+    selected_id_ = {};
+    selected_size_ = 0U;
+    return true;
+}
+
 bool Vst3TimelineSupervisorSurfaceV1::is_dirty() const noexcept {
     if (!ready_for_editing()) return false;
     return !snapshots_equal(editor_.published(), baseline_);

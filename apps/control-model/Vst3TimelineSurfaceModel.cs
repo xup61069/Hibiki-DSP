@@ -236,6 +236,25 @@ public sealed class Vst3TimelineSurfaceModelV1 : INotifyPropertyChanged
         return true;
     }
 
+    // Removes the selected timeline from the bounded stored catalog and
+    // clears selection, published/baseline and history state. Refused while
+    // an edit session is open so an unsaved draft cannot be silently lost.
+    public bool RemoveSelected()
+    {
+        if (_draft is not null || SelectedTimelineId is null) return false;
+        _storedTimelines.Remove(SelectedTimelineId);
+        SelectedTimelineId = null;
+        _published.Clear();
+        _baseline.Clear();
+        _undo.Clear();
+        _redo.Clear();
+        Notify(nameof(TimelineIds), nameof(TimelineIdCount), nameof(SelectedTimelineId),
+               nameof(HasSelection), nameof(Published), nameof(Draft), nameof(HasEditSession),
+               nameof(CanUndo), nameof(UndoDepth), nameof(CanRedo), nameof(RedoDepth),
+               nameof(IsDirtyState));
+        return true;
+    }
+
     // Derived dirty state: a selection exists and its published snapshot
     // differs from the last loaded/saved baseline. An open draft is reported
     // by HasEditSession, not by this flag.
