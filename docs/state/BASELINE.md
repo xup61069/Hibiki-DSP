@@ -820,6 +820,8 @@ schema version 1、harness identity、completed <= requested 且 iteration resul
 contract-model、source-gate、compatibility preview build/launch 或離線 self-test evidence；
 不宣稱 runtime screen-reader audit、實體音訊量測、driver guest 安裝／載入／HLK 或 Microsoft signing。
 
+第三十七波整合增量已合併：自訂 Scene catalog 離線同步的佇列滿溢現在誠實處理容量損失：超過 64 筆時捨棄最舊操作並累計顯示已捨棄數量；後續離線操作與重播完成訊息不得覆蓋這個警告，重播全部 Ack 才回報「引擎已同步」並保留先前捨棄數，中途失敗保留剩餘操作並誠實顯示降級狀態；control-model-check 新增 65 筆有序操作的回歸案例，SPEC-0014 同步記錄此權威契約 (Issue #840 / PR #844、Issue #838 / PR #847)。driver WaveRT bridge pin 補上與 topology 半邊相同的 analog data range，PortCls 得以完成 physical connection 註冊，解決先前 guest 回報 STATUS_RANGE_NOT_FOUND (Code 10) 的啟動根因；PnP 診斷工具追加 hardware ID 解析與精確目標自檢 (Issue #462 / PR #845)。隨後以官方 Windows 11 Enterprise Evaluation 25H2 x64 媒體（SHA-256 事先驗證）在隔離 Hyper-V Gen2 guest 完成同意重測：test-signed SYS/CAT 在 guest 內簽章有效、pnputil staging 成功、devcon 建立裝置，乾淨重新啟動後單一 MEDIA 裝置 Status OK、ProblemCode 0、HibikiVirtualAudio 服務 Running；匿名證據記錄於 driver-vm-pnp-retest-v2.json (Issue #462 / PR #850)。證據來源修正：scene-offline-sync-v1.json 改用 main 可達的 squash merge commit，另將 18 份 evidence JSON 的孤兒 source_commit 逐一替換為經 git merge-base 驗證祖先關係的合併 commit (Issue #846 / PR #848、Issue #849 / PR #854)。以上分別是 source+contract test/control-model evidence、documentation-only evidence、driver source/build/signability evidence、anonymous isolated-guest PnP-start evidence 與 evidence-metadata correction；不宣稱實體音訊播放、WaveRT streaming 行為、HLK 認證或 Microsoft signing。
+
 第三十六波整合增量已合併：瀏覽器單分頁捕捉在 bridge 啟動晚或暫時掉線時，offscreen 以有界指數退避重試
 連線（最多 10 次、上限 15 秒）；bridge 恢復後新封包自動送入，不需重新 Start capture。手動 Stop 或串流
 自然結束仍完整 teardown graph 並取消重試；extension-check 追加對 connectBridge、scheduleBridgeRetry、
