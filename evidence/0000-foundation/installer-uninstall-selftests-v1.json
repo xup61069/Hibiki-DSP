@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "issue": 785,
+  "scope_digest": "installer-uninstall-selftests-v1",
+  "source_commit": "c8de4cc7",
+  "environment_fingerprint": "windows-local-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/installer-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 785",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/installer-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "Case 10: uninstall plan rejects traversal entry escaping DestinationPath",
+        "Case 11: successful uninstall removes only planned files, preserves siblings, reports count, idempotent re-run, no backup residue",
+        "Case 12: locked second file triggers rollback; first removed file restored byte-identically (SHA-256); locked original unchanged after lock release; backup residue cleaned"
+      ],
+      "case_count": 12,
+      "compiled_artifacts": false
+    },
+    {
+      "command": "always-run gates",
+      "status": "pass",
+      "coverage": [
+        "handoff-check Issue 785 ownership scope and Git state",
+        "docs-check 616 tracked paths 261 repository JSON files 24 specs",
+        "source-policy 616 tracked paths no blocked binary or secret",
+        "git diff --check no whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "Offline self-test only; no real install, uninstall, driver load, HLK, Microsoft signing, or Authenticode execution evidence.",
+    "Locked-file rollback verified via in-process FileShare::None fixture; does not claim external process lock behavior."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4"
+  }
+}
