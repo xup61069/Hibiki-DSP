@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 647,
   "scope_digest": "true-peak-release-v1",
-  "source_commit": "f5155fd1d49028135ca1aa5d38be19729f173ddc",
+  "source_commit": "44e5f5bda478c4268a46c2b1ba33f1da5d944ef3",
   "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100",
   "commands": [
     "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/doctor.ps1 -CheckOnly",

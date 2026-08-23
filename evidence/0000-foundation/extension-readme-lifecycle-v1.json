@@ -3,7 +3,7 @@
   "issue": 712,
   "scope_digest": "extension-readme-lifecycle-v1",
   "source_commit": null,
-  "base_commit": "53805fe00d75ff6e5fc99f9e2411736e9c2cd06",
+  "base_commit": "5d7e0c277c65b46e8773caf47a1fed15847987e0",
   "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6",
   "target": "extensions/README.md",
   "cases_added": [

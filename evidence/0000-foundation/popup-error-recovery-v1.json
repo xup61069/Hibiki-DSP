@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 702,
   "scope_digest": "popup-error-recovery-v1",
-  "source_commit": "39d8423262da268466b07babd7f484f4f504b2d5",
+  "source_commit": "8c9244a32de4555e4c4afaeace31fda4bc285988",
   "base_commit": "d2ccb55",
   "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6",
   "target": "extensions/popup.js",
@@ -45,4 +45,3 @@
     "Popup messaging failure recovery is verified by code inspection and syntax check; no automated browser runtime test was added."
   ]
 }
-
