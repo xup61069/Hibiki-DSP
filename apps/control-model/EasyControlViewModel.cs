@@ -533,6 +533,13 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         CustomSceneName = string.Empty;
         CustomSceneDescription = string.Empty;
         StatusText = $"已加入自訂場景：{scene.Name}";
+        if (IsConnected)
+        {
+            LastCommand = _commands.UpsertSceneCatalog(scene.Id, scene.Name,
+                _session.ActiveOutputGroup ?? "main");
+            OnPropertyChanged(nameof(LastCommand));
+            StatusText += "；正在同步到引擎";
+        }
         return true;
     }
 
@@ -1250,6 +1257,12 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(SelectedScene));
             StatusText = $"自訂場景未移除：{saveError}";
             return false;
+        }
+
+        if (IsConnected)
+        {
+            LastCommand = _commands.RemoveSceneCatalog(sceneId);
+            OnPropertyChanged(nameof(LastCommand));
         }
 
         StatusText = $"已移除自訂場景：{previous.Name}";

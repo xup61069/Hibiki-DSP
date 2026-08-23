@@ -1,5 +1,6 @@
 #include "hibiki/engine_control.hpp"
 
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -28,6 +29,95 @@ bool scene_kind_from_id(const std::string_view id, EasySceneKind& kind) noexcept
 
 }  // namespace
 
+EngineControlResultV1 EngineControlWorkerV1::apply_scene_catalog(
+    const SceneCatalogCommandV1& payload) noexcept {
+    if (payload.operation == SessionRouteRuleOperationV1::Clear) {
+        if (mutable_scene_catalog() != nullptr) mutable_scene_catalog()->clear();
+        return EngineControlResultV1::Applied;
+    }
+
+    const std::string_view scene_id(payload.id.data(), payload.id_bytes);
+    if (payload.operation == SessionRouteRuleOperationV1::Remove) {
+        auto* const catalog = mutable_scene_catalog();
+        if (catalog == nullptr ||
+            catalog->remove(scene_id) != SceneCatalogResultV1::Applied) {
+            return EngineControlResultV1::Invalid;
+        }
+        return EngineControlResultV1::Applied;
+    }
+
+    SceneDefinitionV1 definition{};
+    definition.scene.schema_version = 1U;
+    definition.scene.id.assign(scene_id);
+    definition.scene.name.assign(payload.name.data(), payload.name_bytes);
+    definition.scene.output_group.assign(payload.output_group.data(),
+                                         payload.output_group_bytes);
+    if (payload.ir_reference_bytes > 0U) {
+        definition.scene.ir_reference.assign(payload.ir_reference.data(),
+                                             payload.ir_reference_bytes);
+    }
+    for (std::size_t index = 0U; index < payload.timeline_count; ++index) {
+        definition.scene.automation_timeline_ids.emplace_back(
+            payload.timeline_ids[index].data());
+    }
+    definition.scene.latency_mode = payload.latency_mode;
+    definition.scene.ir_phase.schema_version = 1U;
+    definition.scene.ir_phase.mode = payload.ir_phase_mode;
+    definition.scene.ir_phase.strength = payload.ir_phase_strength;
+    definition.scene.auto_attenuate = payload.auto_attenuate != 0U;
+    definition.scene.limiter_dbtp = payload.limiter_dbtp;
+
+    definition.graph.schema_version = 1U;
+    definition.graph.output_channels = payload.graph_output_channels;
+    definition.graph.strict_direct = payload.strict_direct != 0U;
+    for (std::size_t lane_index = 0U; lane_index < payload.lane_count; ++lane_index) {
+        const auto& wire_lane = payload.lanes[lane_index];
+        LaneConfigV1 lane{};
+        lane.id.assign(wire_lane.id.data(), wire_lane.id_bytes);
+        lane.output_group.assign(wire_lane.output_group.data(),
+                                 wire_lane.output_group_bytes);
+        lane.channel_count = wire_lane.channel_count;
+        lane.makeup_gain_db = static_cast<double>(wire_lane.makeup_gain_db);
+        lane.enabled = wire_lane.enabled != 0U;
+        lane.reported_latency_samples = wire_lane.reported_latency_samples;
+        lane.channel_map = wire_lane.channel_map;
+        lane.matrix_enabled = wire_lane.matrix_enabled != 0U;
+        lane.channel_matrix = wire_lane.channel_matrix;
+        definition.graph.lanes.push_back(std::move(lane));
+    }
+
+    definition.loudness.schema_version = 1U;
+    switch (payload.standard_id) {
+        case 1U:
+            definition.loudness.standard = "iso-226-2023-derived";
+            break;
+        case 2U:
+            definition.loudness.standard = "iso-226-2023-calibrated";
+            break;
+        default:
+            definition.loudness.standard = "invalid";
+            break;
+    }
+    definition.loudness.mode = payload.loudness_mode;
+    definition.loudness.reference_phon = payload.reference_phon;
+    definition.loudness.strength = payload.strength;
+    definition.loudness.max_boost_db = payload.max_boost_db;
+    definition.loudness.measured_f3_hz = payload.measured_f3_hz;
+    if (payload.anchor_id_bytes > 0U) {
+        definition.loudness.anchor_id.assign(payload.anchor_id.data(),
+                                             payload.anchor_id_bytes);
+    }
+    definition.loudness.calibrated = payload.calibrated_flag != 0U;
+
+    auto* const catalog = mutable_scene_catalog();
+    if (catalog == nullptr ||
+        !validate_scene_definition_v1(definition) ||
+        catalog->upsert(definition) != SceneCatalogResultV1::Applied) {
+        return EngineControlResultV1::Invalid;
+    }
+    return EngineControlResultV1::Applied;
+}
+
 EngineControlResultV1 EngineControlWorkerV1::apply_scene(
     const SceneApplyPayloadV1& payload) noexcept {
     const std::string_view scene_id(payload.scene_id.data(), payload.scene_id_bytes);
@@ -45,8 +135,8 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             candidate_scene = std::move(candidate.scene);
             candidate_graph = std::move(candidate.graph);
         } else {
-            if (scene_catalog_ == nullptr) return EngineControlResultV1::Invalid;
-            const auto* const definition = scene_catalog_->find(scene_id);
+            if (active_scene_catalog() == nullptr) return EngineControlResultV1::Invalid;
+            const auto* const definition = active_scene_catalog()->find(scene_id);
             if (definition == nullptr || definition->scene.output_group != output_group) {
                 return EngineControlResultV1::Invalid;
             }
@@ -144,6 +234,8 @@ EngineControlResultV1 EngineControlWorkerV1::consume(
                        : EngineControlResultV1::Invalid;
         case IpcMessageType::SceneApply:
             return apply_scene(command.scene);
+        case IpcMessageType::SceneCatalogCommand:
+            return apply_scene_catalog(command.scene_catalog);
         case IpcMessageType::DeviceSwitch:
             if (device_switch_handler_ == nullptr) return EngineControlResultV1::Failed;
             return device_switch_handler_(command.device_switch, device_switch_context_)

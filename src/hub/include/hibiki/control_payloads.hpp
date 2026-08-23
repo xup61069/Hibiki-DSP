@@ -4,10 +4,14 @@
 
 #include "hibiki/volume_state.hpp"
 #include "hibiki/ipc.hpp"
+#include "hibiki/contracts.hpp"
+#include "hibiki/ir_phase.hpp"
+#include "hibiki/iso226.hpp"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 #include <span>
 #include <string_view>
 
@@ -39,6 +43,70 @@ constexpr std::size_t kSessionRouteRuleRouteMaxBytesV1 = 64U;
 constexpr std::size_t kSessionRouteRuleCommandPayloadBytesV1 = 480U;
 constexpr std::size_t kIrPreparePathMaxBytesV1 = 260U;
 constexpr std::size_t kIrPrepareCommandPayloadBytesV1 = 288U;
+constexpr std::size_t kSceneCatalogIdMaxBytesV1 = 31U;
+constexpr std::size_t kSceneCatalogNameMaxBytesV1 = 120U;
+constexpr std::size_t kSceneCatalogOutputGroupMaxBytesV1 = 64U;
+constexpr std::size_t kSceneCatalogLaneCountV1 = 4U;
+constexpr std::size_t kSceneCatalogTimelineCapacityV1 = 16U;
+constexpr std::size_t kSceneCatalogTimelineIdBytesV1 = 64U;
+constexpr std::size_t kSceneCatalogCommandPayloadBytesV1 = 3260U;
+
+enum class SessionRouteRuleOperationV1 : std::uint8_t {
+    Upsert = 1U,
+    Remove = 2U,
+    Clear = 3U,
+};
+
+struct SceneCatalogWireLaneV1 {
+    std::array<char, kSceneCatalogIdMaxBytesV1> id{};
+    std::array<char, kSceneCatalogOutputGroupMaxBytesV1> output_group{};
+    std::uint32_t channel_count{2U};
+    float makeup_gain_db{0.0F};
+    std::uint8_t enabled{1U};
+    std::uint8_t matrix_enabled{0U};
+    std::array<std::int8_t, 8> channel_map{0, 1, 2, 3, 4, 5, 6, 7};
+    std::array<std::array<float, 8>, 8> channel_matrix{};
+    std::uint32_t reported_latency_samples{0U};
+    std::uint16_t id_bytes{0U};
+    std::uint16_t output_group_bytes{0U};
+    std::uint16_t reserved{0U};
+};
+
+struct SceneCatalogCommandV1 {
+    std::uint32_t schema_version{1U};
+    SessionRouteRuleOperationV1 operation{SessionRouteRuleOperationV1::Upsert};
+    LatencyMode latency_mode{LatencyMode::Game};
+    IrPhaseMode ir_phase_mode{IrPhaseMode::MinimumPhase};
+    EqualLoudnessMode loudness_mode{EqualLoudnessMode::Relative};
+    double limiter_dbtp{-1.0};
+    double auto_attenuate_gain{-1.0};
+    double reference_phon{80.0};
+    double strength{1.0};
+    double max_boost_db{6.0};
+    double measured_f3_hz{0.0};
+    double ir_phase_strength{0.0};
+    std::uint64_t reserved_a{0U};
+    std::uint8_t auto_attenuate{1U};
+    std::uint8_t strict_direct{0U};
+    std::uint8_t graph_output_channels{2U};
+    std::uint8_t lane_count{1U};
+    std::uint8_t timeline_count{0U};
+    std::uint8_t id_bytes{0U};
+    std::uint8_t name_bytes{0U};
+    std::uint8_t output_group_bytes{0U};
+    std::uint8_t ir_reference_bytes{0U};
+    std::uint8_t anchor_id_bytes{0U};
+    std::uint8_t standard_id{0U};
+    std::uint8_t calibrated_flag{0U};
+    std::uint8_t reserved_b{0U};
+    std::array<char, kSceneCatalogIdMaxBytesV1> id{};
+    std::array<char, kSceneCatalogNameMaxBytesV1> name{};
+    std::array<char, kSceneCatalogOutputGroupMaxBytesV1> output_group{};
+    std::array<char, 64> ir_reference{};
+    std::array<char, 64> anchor_id{};
+    std::array<std::array<char, kSceneCatalogTimelineIdBytesV1>, kSceneCatalogTimelineCapacityV1> timeline_ids{};
+    std::array<SceneCatalogWireLaneV1, kSceneCatalogLaneCountV1> lanes{};
+};
 
 struct SessionVolumeCommandV1 {
     std::uint64_t handle{0U};
@@ -81,17 +149,18 @@ encode_ir_prepare_command_v1(const IrPrepareCommandV1& command) noexcept;
     std::span<const std::uint8_t> payload,
     IrPrepareCommandV1& command) noexcept;
 
+[[nodiscard]] bool encode_scene_catalog_command_v1(
+    const SceneCatalogCommandV1& command,
+    std::vector<std::uint8_t>& payload) noexcept;
+[[nodiscard]] bool decode_scene_catalog_command_v1(
+    std::span<const std::uint8_t> payload,
+    SceneCatalogCommandV1& command) noexcept;
+
 [[nodiscard]] std::array<std::uint8_t, kSessionRouteCommandPayloadBytesV1>
 encode_session_route_command_v1(const SessionRouteCommandV1& command) noexcept;
 [[nodiscard]] bool decode_session_route_command_v1(
     std::span<const std::uint8_t> payload,
     SessionRouteCommandV1& command) noexcept;
-
-enum class SessionRouteRuleOperationV1 : std::uint8_t {
-    Upsert = 1U,
-    Remove = 2U,
-    Clear = 3U,
-};
 
 enum class SessionRouteRuleGainOwnerV1 : std::uint8_t {
     WindowsSession = 0U,
@@ -235,6 +304,7 @@ struct ControlCommandV1 {
     SessionRouteCommandV1 session_route{};
     SessionRouteRuleCommandV1 session_route_rule{};
     IrPrepareCommandV1 ir_prepare{};
+    SceneCatalogCommandV1 scene_catalog{};
     bool has_volume_target{false};
 };
 

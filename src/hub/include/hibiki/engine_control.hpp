@@ -3,12 +3,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "hibiki/audio_engine.hpp"
+#include "hibiki/control_payloads.hpp"
 #include "hibiki/control_service.hpp"
 #include "hibiki/scene_presets.hpp"
 #include "hibiki/scene_catalog.hpp"
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 namespace hibiki {
@@ -49,11 +51,41 @@ public:
         scene_preflight_context_ = context;
     }
 
-    // Non-owning catalog configured by the control worker. Built-in Easy IDs
-    // keep their existing behavior; any other ID is resolved from this catalog
-    // and must match the payload's output group exactly.
+    // Non-owning read-only catalog for SceneApply. Built-in Easy IDs keep
+    // their existing behavior; any other ID is resolved from this catalog and
+    // must match the payload's output group exactly. Hosts that instead accept
+    // SceneCatalog IPC own the writable catalog with
+    // ensure_owned_scene_catalog(); these source modes are exclusive.
     void set_scene_catalog(const SceneCatalogV1* catalog) noexcept {
-        scene_catalog_ = catalog;
+        owned_scene_catalog_.reset();
+        mutable_scene_catalog_ = nullptr;
+        external_scene_catalog_ = catalog;
+    }
+
+    // Ownership variant for hosts that do not keep their own catalog object.
+    // The worker owns it for its lifetime and exposes the same non-owning
+    // resolution semantics to SceneApply.
+    void ensure_owned_scene_catalog() noexcept {
+        if (!owned_scene_catalog_) {
+            try {
+                owned_scene_catalog_ = std::make_unique<SceneCatalogV1>();
+            } catch (...) {
+                owned_scene_catalog_.reset();
+            }
+        }
+
+        external_scene_catalog_ = nullptr;
+        mutable_scene_catalog_ = owned_scene_catalog_.get();
+    }
+
+    [[nodiscard]] SceneCatalogV1* mutable_scene_catalog() noexcept {
+        ensure_owned_scene_catalog();
+        return owned_scene_catalog_.get();
+    }
+
+    [[nodiscard]] const SceneCatalogV1* active_scene_catalog() const noexcept {
+        return mutable_scene_catalog_ != nullptr ? mutable_scene_catalog_
+                                                 : external_scene_catalog_;
     }
 
     // The callback is control-plane only. It must resolve the request through
@@ -101,6 +133,8 @@ public:
 
 private:
     [[nodiscard]] EngineControlResultV1 apply_scene(const SceneApplyPayloadV1& payload) noexcept;
+    [[nodiscard]] EngineControlResultV1 apply_scene_catalog(
+        const SceneCatalogCommandV1& payload) noexcept;
 
     AudioEngineModel& engine_;
     SceneProfileV1 active_scene_{};
@@ -108,7 +142,9 @@ private:
     bool has_active_scene_{false};
     ScenePreflightFnV1 scene_preflight_{nullptr};
     void* scene_preflight_context_{nullptr};
-    const SceneCatalogV1* scene_catalog_{nullptr};
+    const SceneCatalogV1* external_scene_catalog_{nullptr};
+    SceneCatalogV1* mutable_scene_catalog_{nullptr};
+    std::unique_ptr<SceneCatalogV1> owned_scene_catalog_{};
     DeviceSwitchHandlerFnV1 device_switch_handler_{nullptr};
     void* device_switch_context_{nullptr};
     SessionVolumeHandlerFnV1 session_volume_handler_{nullptr};
