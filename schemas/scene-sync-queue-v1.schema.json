@@ -31,8 +31,16 @@
         },
         "then": {
           "properties": {
-            "name": {"minLength": 1, "maxLength": 120},
-            "output_group": {"minLength": 1, "maxLength": 64}
+            "name": {
+              "minLength": 1,
+              "maxLength": 120,
+              "pattern": "\\S"
+            },
+            "output_group": {
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "\\S"
+            }
           }
         },
         "else": {
