@@ -42,20 +42,29 @@ chrome.runtime.onMessage.addListener((message) => {
 button.addEventListener('click', async () => {
   setBusy(true);
   status.textContent = 'Requesting capture…';
-  const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
-  if (!tab?.id) {
-    status.textContent = 'No active tab';
-    setBusy(false);
-    return;
-  }
-  const response = await chrome.runtime.sendMessage({type: 'capture-active-tab', tabId: tab.id});
-  if (response?.ok) {
-    capturing = true;
-    render();
-  } else {
-    status.textContent = response?.error ?? 'Capture failed';
+  try {
+    const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
+    if (!tab?.id) {
+      status.textContent = 'No active tab';
+      setBusy(false);
+      return;
+    }
+    const response = await chrome.runtime.sendMessage({type: 'capture-active-tab', tabId: tab.id});
+    if (response?.ok) {
+      capturing = true;
+      render();
+    } else {
+      status.textContent = response?.error ?? 'Capture failed';
+      capturing = false;
+      render();
+    }
+  } catch (error) {
+    status.textContent = error instanceof Error ? error.message : String(error);
     capturing = false;
+    bridgeConnected = false;
     render();
+    await refreshState();
+    return;
   }
   setBusy(false);
 });
@@ -63,13 +72,22 @@ button.addEventListener('click', async () => {
 stopButton.addEventListener('click', async () => {
   setBusy(true);
   status.textContent = 'Stopping capture…';
-  const response = await chrome.runtime.sendMessage({type: 'stop-capture'});
-  if (response?.ok) {
+  try {
+    const response = await chrome.runtime.sendMessage({type: 'stop-capture'});
+    if (response?.ok) {
+      capturing = false;
+      bridgeConnected = false;
+      render();
+    } else {
+      status.textContent = response?.error ?? 'Stop failed';
+    }
+  } catch (error) {
+    status.textContent = error instanceof Error ? error.message : String(error);
     capturing = false;
     bridgeConnected = false;
     render();
-  } else {
-    status.textContent = response?.error ?? 'Stop failed';
+    await refreshState();
+    return;
   }
   setBusy(false);
 });
