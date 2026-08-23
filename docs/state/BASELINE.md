@@ -2,6 +2,7 @@
 
 ## 已完成（有 commit 與 evidence）
 
+第二十六波整合增量已合併：calibration response 的 measured_db／target_db schema 契約收緊到 -144..12，SPEC-0011 同步記錄 bounded dB contract；本切片為 schema/spec/evidence 變更，runtime compiler 行為不變（Issue #957 / PR #960）。
 - AI handoff now has a short canonical entry, Git-ancestry/document gate and source-only local
   preview command. A Compatibility Preview builds and completes a launch smoke on the non-target
   host using the same `EasyControlViewModel`; the formal WinUI XAML build now completes on a

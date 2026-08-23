@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "issue": 964,
+  "scope_digest": "baseline-wave-26-v1",
+  "source_commit": "fe144300",
+  "environment_fingerprint": "windows-amd64-pwsh-baseline-wave-26",
+  "commands": [
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "git-diff-check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Documentation-only BASELINE snapshot update; no runtime code, IPC payload, DSP, driver, signing or physical-audio behavior changes.",
+    "The snapshot records the already merged #957 / #960 calibration-response contract increment."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-24T06:52:00+08:00",
+  "finished_at": "2026-08-24T06:59:31+08:00"
+}
