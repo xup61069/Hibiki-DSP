@@ -11,7 +11,9 @@ bool validate_acoustic_anchor(const AcousticAnchorV1& anchor) noexcept {
            std::isfinite(anchor.measured_1k_spl_db) &&
            anchor.measured_1k_spl_db >= 0.0 && anchor.measured_1k_spl_db <= 140.0 &&
            std::isfinite(anchor.uncertainty_db) && anchor.uncertainty_db >= 0.0 &&
+           anchor.uncertainty_db <= 36.0 &&
            std::isfinite(anchor.measured_f3_hz) && anchor.measured_f3_hz >= 0.0 &&
+           anchor.measured_f3_hz <= 20000.0 &&
            anchor.test_signal_dbfs <= 0.0 && anchor.test_signal_dbfs >= -144.0;
 }
 

@@ -578,8 +578,8 @@ int main() {
         20.0 * std::log10(static_cast<double>(engage_96k_gain));
     CHECK(std::abs(recovered_48k_db - recovered_96k_db) < 0.01);
 
-    std::vector<IsoContourPoint> current{{100.0, 60.0}, {1000.0, 40.0}};
-    std::vector<IsoContourPoint> reference{{100.0, 50.0}, {1000.0, 40.0}};
+    const std::vector<IsoContourPoint> current{{100.0, 60.0}, {1000.0, 40.0}};
+    const std::vector<IsoContourPoint> reference{{100.0, 50.0}, {1000.0, 40.0}};
     EqualLoudnessPolicyV1 policy;
     policy.max_boost_db = 6.0;
     const auto result = build_compensation(current, reference, policy);
@@ -618,7 +618,13 @@ int main() {
           std::isfinite(formula_result.points[0].gain_db));
     const std::array<Iso226FormulaPointV1, 1> no_anchor{{{100.0, 0.25, 50.0, 0.0}}};
     CHECK(build_formula_compensation(no_anchor, 60.0, policy).points.empty());
-    const EqualLoudnessPolicyV1 full_range_policy{};
+    EqualLoudnessPolicyV1 full_range_policy{};
+    full_range_policy.measured_f3_hz = 20000.0;
+    CHECK(build_formula_compensation(formula_points, 60.0, full_range_policy)
+              .points.size() == 2U);
+    full_range_policy.measured_f3_hz = 20000.1;
+    CHECK(build_formula_compensation(formula_points, 60.0, full_range_policy).points.empty());
+    full_range_policy.measured_f3_hz = 0.0;
     const std::array<Iso226FormulaPointV1, 3> valid_high_band_points{{
         {4000.0, 0.25, 50.0, 0.0},
         {5000.0, 0.25, 50.0, 0.0},
@@ -1060,9 +1066,23 @@ int main() {
     CHECK(validate_acoustic_anchor(anchor));
     anchor.endpoint_gain_db = -144.5;
     CHECK(!validate_acoustic_anchor(anchor));
-   anchor.endpoint_gain_db = -144.0;
-   CHECK(validate_acoustic_anchor(anchor));
-   anchor.endpoint_gain_db = 0.0;
+    anchor.endpoint_gain_db = -144.0;
+    CHECK(validate_acoustic_anchor(anchor));
+    anchor.endpoint_gain_db = 0.0;
+    anchor.measured_f3_hz = -0.0001;
+    CHECK(!validate_acoustic_anchor(anchor));
+    anchor.measured_f3_hz = 0.0;
+    CHECK(validate_acoustic_anchor(anchor));
+    anchor.measured_f3_hz = 20000.0;
+    CHECK(validate_acoustic_anchor(anchor));
+    anchor.measured_f3_hz = 20000.1;
+    CHECK(!validate_acoustic_anchor(anchor));
+    anchor.measured_f3_hz = 0.0;
+    anchor.uncertainty_db = 36.0;
+    CHECK(validate_acoustic_anchor(anchor));
+    anchor.uncertainty_db = 36.0001;
+    CHECK(!validate_acoustic_anchor(anchor));
+    anchor.uncertainty_db = 1.5;
     const auto phon = estimate_phon(anchor, -14.0, -3.0);
     CHECK(phon.calibrated && std::abs(phon.phon - 68.0) < 1e-12);
     anchor.device_class = AcousticDeviceClass::HeadphoneEstimated;
