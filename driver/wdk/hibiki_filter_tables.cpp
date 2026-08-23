@@ -208,35 +208,22 @@ static const PKSDATARANGE PinDataRanges_VirtualMic[] = {
     (PKSDATARANGE)&DataRange_VirtualMic
 };
 
-// Interface & Medium descriptors
-static const KSDATARANGE PinInterfacesStream[] = {
+// Interface & Medium descriptors for streaming pins.
+// WDK KSPIN_DESCRIPTOR expects const KSPIN_INTERFACE* and const KSPIN_MEDIUM*
+// (both are KSIDENTIFIER: Set GUID + Id + Flags), not KSDATARANGE arrays.
+static const KSPIN_INTERFACE PinInterfacesStream[] = {
     {
-        sizeof(KSDATARANGE),
-        0,
-        0,
-        0,
         STATICGUIDOF(KSINTERFACESETID_Standard),
         KSINTERFACE_STANDARD_STREAMING,
-        STATICGUIDOF(KSDATAFORMAT_SPECIFIER_NONE)
+        0
     }
 };
 
-#ifndef KSAUDFNAME_MUTE
-#define KSAUDFNAME_MUTE KSAUDFNAME_MUTE_CONTROL
-#endif
-#ifndef KSAUDFNAME_VOLUME
-#define KSAUDFNAME_VOLUME KSAUDFNAME_VOLUME_CONTROL
-#endif
-
-static const KSDATARANGE PinMediumsDontCare[] = {
+static const KSPIN_MEDIUM PinMediumsDontCare[] = {
     {
-        sizeof(KSDATARANGE),
-        0,
-        0,
-        0,
         STATICGUIDOF(KSMEDIUMSETID_Standard),
         KSMEDIUM_STANDARD_DEVIO,
-        STATICGUIDOF(KSDATAFORMAT_SPECIFIER_NONE)
+        0
     }
 };
 
@@ -247,30 +234,30 @@ static const KSDATARANGE PinMediumsDontCare[] = {
 // Helper macro for render pin tables
 #define DEFINE_RENDER_PINS(Name, DataRanges)                                   \
 static const PCPIN_DESCRIPTOR Pins_##Name[] = {                                \
-    /* Pin 0: Streaming WaveRT Pin (Sink) */                                   \
+    /* Pin 0: Streaming WaveRT Pin (Source -> internal graph) */                \
     {                                                                          \
         1, 1, 1,                                                               \
         NULL,                                                                  \
         {                                                                      \
-            1, (PKSPIN_INTERFACE)PinInterfacesStream,                          \
-            1, (PKSPIN_MEDIUM)PinMediumsDontCare,                              \
+            1, PinInterfacesStream,                                           \
+            1, PinMediumsDontCare,                                            \
             SIZEOF_ARRAY(DataRanges), DataRanges,                              \
-            KSPIN_DATAFLOW_IN,                                                 \
+            KSPIN_DATAFLOW_OUT,                                                \
             KSPIN_COMMUNICATION_SINK,                                          \
             &KSCATEGORY_AUDIO,                                                 \
             NULL,                                                              \
             0                                                                  \
         }                                                                      \
     },                                                                         \
-    /* Pin 1: Physical Bridge Pin */                                           \
+    /* Pin 1: Physical Bridge Pin (all instance counts zero) */                 \
     {                                                                          \
-        1, 1, 0,                                                               \
+        0, 0, 0,                                                               \
         NULL,                                                                  \
         {                                                                      \
             0, NULL,                                                           \
             0, NULL,                                                           \
             0, NULL,                                                           \
-            KSPIN_DATAFLOW_OUT,                                                \
+            KSPIN_DATAFLOW_IN,                                                 \
             KSPIN_COMMUNICATION_NONE,                                          \
             &KSNODETYPE_SPEAKER,                                               \
             NULL,                                                              \
@@ -285,31 +272,31 @@ DEFINE_RENDER_PINS(Surround, PinDataRanges_Surround);
 
 // Pin table for Virtual Mic (Capture)
 static const PCPIN_DESCRIPTOR Pins_VirtualMic[] = {
-    /* Pin 0: Physical Bridge Pin (Microphone In) */
+    /* Pin 0: Physical Bridge Pin (all instance counts zero) */
     {
-        1, 1, 0,
+        0, 0, 0,
         NULL,
         {
             0, NULL,
             0, NULL,
             0, NULL,
-            KSPIN_DATAFLOW_IN,
+            KSPIN_DATAFLOW_OUT,
             KSPIN_COMMUNICATION_NONE,
             &KSNODETYPE_MICROPHONE,
             NULL,
             0
         }
     },
-    /* Pin 1: Streaming WaveRT Pin (Source) */
+    /* Pin 1: Streaming WaveRT Pin (Sink <- internal graph) */
     {
         1, 1, 1,
         NULL,
         {
-            1, (PKSPIN_INTERFACE)PinInterfacesStream,
-            1, (PKSPIN_MEDIUM)PinMediumsDontCare,
+            1, PinInterfacesStream,
+            1, PinMediumsDontCare,
             SIZEOF_ARRAY(PinDataRanges_VirtualMic), PinDataRanges_VirtualMic,
-            KSPIN_DATAFLOW_OUT,
-            KSPIN_COMMUNICATION_BOTH,
+            KSPIN_DATAFLOW_IN,
+            KSPIN_COMMUNICATION_SINK,
             &KSCATEGORY_AUDIO,
             NULL,
             0
@@ -365,17 +352,19 @@ extern "C" NTSTATUS HibikiGetFilterDescriptorEndpointV1(
     _Out_ const PCFILTER_DESCRIPTOR** Description) {
     if (Description == nullptr) return STATUS_INVALID_PARAMETER;
 
+    // EndpointIndex is a zero-based slot into the topology table (same as
+    // hibiki_endpoint_topology_get_v1), not the one-based endpoint_kind enum.
     switch (EndpointIndex) {
-        case HIBIKI_ENDPOINT_MAIN_RENDER_V1:
+        case 0: /* HIBIKI_ENDPOINT_MAIN_RENDER_V1 */
             *Description = &FilterDescriptor_Main;
             return STATUS_SUCCESS;
-        case HIBIKI_ENDPOINT_LOW_LATENCY_RENDER_V1:
+        case 1: /* HIBIKI_ENDPOINT_LOW_LATENCY_RENDER_V1 */
             *Description = &FilterDescriptor_LowLatency;
             return STATUS_SUCCESS;
-        case HIBIKI_ENDPOINT_SURROUND_RENDER_V1:
+        case 2: /* HIBIKI_ENDPOINT_SURROUND_RENDER_V1 */
             *Description = &FilterDescriptor_Surround;
             return STATUS_SUCCESS;
-        case HIBIKI_ENDPOINT_VIRTUAL_MIC_CAPTURE_V1:
+        case 3: /* HIBIKI_ENDPOINT_VIRTUAL_MIC_CAPTURE_V1 */
             *Description = &FilterDescriptor_VirtualMic;
             return STATUS_SUCCESS;
         default:
