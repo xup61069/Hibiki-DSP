@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "issue": 790,
+  "scope_digest": "global-snapshot-w33",
+  "base_commit": "e1f55321723b778c7f0bc9443dc9187530ce21a8",
+  "source_commit": null,
+  "environment_fingerprint": "windows-local-pwsh-7.6.4; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 790",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #745 / PR #759 merged at 42076ca4: verified transactional user-space payload staging preserves user data and rolls back partial copies; source and offline policy evidence only, with no -Apply execution.",
+        "Issue #745 follow-up PR #770 merged at eace3742: nine offline functional staging cases cover valid copy, path rejection, hash mismatch, rollback, restoration and backup cleanup.",
+        "Issue #766 / PR #777 merged at 36d5bc8d: manifest-bounded transactional uninstall preserves user data and restores removals on failure by design; source/boundary evidence only, with functional uninstall self-tests still tracked by Issue #785.",
+        "Issue #764 / PR #769 merged at 0eb83ef8: driver signability discovers Inf2Cat by explicit WDK_BIN, Windows Kits tree and PATH precedence while all-missing remains fail-closed.",
+        "Issue #774 / PR #776 merged at 5e4e60ea: the WDK build uses a unique source/object plan and compiler/linker /WX; local package build and Inf2Cat completed warning-free.",
+        "Issue #781 / PR #783 merged at c8de4cc7: exact-target, read-only PnP inspection emits typed device/service/driver fields and a bounded redacted SetupAPI excerpt under .local; offline AST tests reject mutating commands.",
+        "Issue #762 / PR #773 merged at f1502b9b: the extension popup refreshes actual capture state on visibility return without erasing a persisted error; source gate and offline self-tests only.",
+        "Issue #765 / PR #771 merged at d0d41a28: both previews project the complete route-health accessible summary from the control model; source and contract-model evidence only.",
+        "Issue #767 / PR #775 merged at 1bd21f7b: formal WinUI can remove local custom Scene cards, rolls back the UI mirror on save failure and rejects built-in or unknown IDs.",
+        "Issue #779 / PR #784 merged at e1f55321: formal WinUI can request a fresh bounded physical-device snapshot; disconnect, timeout, error and stale data preserve the previous picker.",
+        "Issue #778 / PR #780 merged at e2f0e7e8: the allocation-free basic noise gate adds 2 dB reopening hysteresis with contract regression coverage, preventing threshold chatter while retaining RT constraints."
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; this update does not change product source behavior.",
+    "Installer evidence does not include real -Apply or -Uninstall execution; uninstall functional self-test expansion remains active in Issue #785.",
+    "Driver evidence does not include guest install, load, PnP start, endpoint visibility, physical audio, HLK or Microsoft signing.",
+    "UI and extension evidence does not include formal runtime UIA, screen-reader or browser automation.",
+    "Noise-gate evidence is a user-space source and contract test, not a physical audio measurement."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-24T02:50:00+08:00",
+  "finished_at": "pending-gates"
+}
