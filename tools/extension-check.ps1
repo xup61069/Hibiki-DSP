@@ -112,6 +112,18 @@ function Assert-ExtensionSourcePolicy(
   if ($serviceWorkerSource -notmatch 'return\s+true\s*;') {
     throw "Service worker onMessage listener must return true to keep the async response channel open in $sourceName."
   }
+  if ($serviceWorkerSource -notmatch 'message\?\.type\s*===\s*(?:\x27|\x22)offscreen-capture-released(?:\x27|\x22)') {
+    throw "Service worker must handle the offscreen natural-end release notification in $sourceName."
+  }
+  if ($serviceWorkerSource -notmatch 'typeof\s+sender\.url\s*===\s*(?:\x27|\x22)string(?:\x27|\x22)') {
+    throw "Service worker must validate sender URL type before trusting the release notification in $sourceName."
+  }
+  if ($serviceWorkerSource -notmatch 'sender\.url\.endsWith\(\s*(?:\x27|\x22)/offscreen\.html(?:\x27|\x22)\s*\)') {
+    throw "Service worker must accept the natural-end release notification only from offscreen.html in $sourceName."
+  }
+  if ($serviceWorkerSource -notmatch 'offscreen-capture-released[\s\S]{0,500}closeOffscreenDocument\s*\(') {
+    throw "Service worker must close the offscreen document after a validated natural-end release notification in $sourceName."
+  }
 
   foreach ($pattern in @(
       'chrome\.runtime\.onMessage\.addListener',
@@ -129,7 +141,10 @@ function Assert-ExtensionSourcePolicy(
       'onopen\s*=',
       'onclose\s*=',
       'activeStream\s*=\s*stream',
-      'track\.stop\(\)'
+      'track\.stop\(\)',
+      'track\.addEventListener\(\s*(?:\x27|\x22)ended(?:\x27|\x22)',
+      'handleSourceEnded',
+      'offscreen-capture-released'
     )) {
     if ($offscreenSource -notmatch $pattern) {
       throw "Offscreen source is missing required source boundary '$pattern' in $sourceName."
@@ -137,6 +152,9 @@ function Assert-ExtensionSourcePolicy(
   }
   if ($offscreenSource -notmatch 'return\s+true\s*;') {
     throw "Offscreen onMessage listener must return true to keep the async response channel open in $sourceName."
+  }
+  if ($offscreenSource -notmatch 'async\s+function\s+handleSourceEnded\s*\(\s*\)\s*\{[\s\S]{0,400}await\s+teardownCaptureGraph\s*\(\s*\)\s*;[\s\S]{0,300}offscreen-capture-released') {
+    throw "Offscreen natural-end handler must tear down the capture graph before reporting and requesting document release in $sourceName."
   }
   $webSocketMatches = [regex]::Matches(
     $offscreenSource,
@@ -311,8 +329,8 @@ if ($SelfTest) {
 
   $sourceFixture = @{
     popup = "button.addEventListener('click', async () => { delete status.dataset.error; const response = await chrome.runtime.sendMessage({type: 'capture-active-tab', tabId: tab.id}); if (response?.ok) { render(); } else { status.textContent = response?.error ?? 'Capture failed'; status.dataset.error = 'true'; render(); } }); stopButton.addEventListener('click', async () => { delete status.dataset.error; const response = await chrome.runtime.sendMessage({type: 'stop-capture'}); if (response?.ok) { render(); } else { status.textContent = response?.error ?? 'Stop failed'; status.dataset.error = 'true'; } }); chrome.runtime.onMessage.addListener((message) => { if (message.type === 'capture-state') render(); }); refreshState(); async function refreshState() { await chrome.runtime.sendMessage({type: 'get-capture-state'}); }"
-    serviceWorker = "chrome.runtime.onMessage.addListener((message, sender, sendResponse) => { if (message.type === 'stop-capture') { (async () => { await closeOffscreenDocument(); await chrome.offscreen.closeDocument(); sendResponse({stopped: true}); })(); return true; } if (message.type === 'get-capture-state') { (async () => { const state = await chrome.runtime.sendMessage({type: 'get-capture-state'}); sendResponse(state); })(); return true; } if (message.type === 'start-capture') { (async () => { await chrome.offscreen.createDocument({url: 'offscreen.html'}); const streamId = await chrome.tabCapture.getMediaStreamId({targetTabId: message.tabId}); sendResponse({streamId}); })(); return true; } return false; });"
-    offscreen = "chrome.runtime.onMessage.addListener(async (message, _sender, sendResponse) => { if (message.type === 'stop-tab-stream') { activeStream.getTracks().forEach(track => track.stop()); sendResponse({stopped: true}); return true; } if (message.type === 'get-capture-state') { sendResponse({capturing: true, bridgeConnected: false}); return false; } if (message.type !== 'start-tab-stream') return false; const context = new AudioContext(); await context.audioWorklet.addModule('audio-worklet.js'); const node = new AudioWorkletNode(context, 'hibiki-tab-packetizer'); const constraints = {audio: {mandatory: {chromeMediaSource: 'tab', chromeMediaSourceId: message.streamId}}, video: false}; await navigator.mediaDevices.getUserMedia(constraints); const stream = await navigator.mediaDevices.getUserMedia(constraints); activeStream = stream; sendResponse({ok: true}); const bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab'); bridgeConnected = true; bridge.onopen = () => {}; bridge.onclose = () => {}; return true; });"
+    serviceWorker = "chrome.runtime.onMessage.addListener((message, sender, sendResponse) => { if (message.type === 'stop-capture') { (async () => { await closeOffscreenDocument(); await chrome.offscreen.closeDocument(); sendResponse({stopped: true}); })(); return true; } if (message?.type === 'offscreen-capture-released' && typeof sender.url === 'string' && sender.url.endsWith('/offscreen.html')) { closeOffscreenDocument(); return false; } if (message.type === 'get-capture-state') { (async () => { const state = await chrome.runtime.sendMessage({type: 'get-capture-state'}); sendResponse(state); })(); return true; } if (message.type === 'start-capture') { (async () => { await chrome.offscreen.createDocument({url: 'offscreen.html'}); const streamId = await chrome.tabCapture.getMediaStreamId({targetTabId: message.tabId}); sendResponse({streamId}); })(); return true; } return false; });"
+    offscreen = "chrome.runtime.onMessage.addListener(async (message, _sender, sendResponse) => { if (message.type === 'stop-tab-stream') { activeStream.getTracks().forEach(track => track.stop()); sendResponse({stopped: true}); return true; } if (message.type === 'get-capture-state') { sendResponse({capturing: true, bridgeConnected: false}); return false; } if (message.type !== 'start-tab-stream') return false; const context = new AudioContext(); await context.audioWorklet.addModule('audio-worklet.js'); const node = new AudioWorkletNode(context, 'hibiki-tab-packetizer'); const constraints = {audio: {mandatory: {chromeMediaSource: 'tab', chromeMediaSourceId: message.streamId}}, video: false}; await navigator.mediaDevices.getUserMedia(constraints); const stream = await navigator.mediaDevices.getUserMedia(constraints); activeStream = stream; track.addEventListener('ended', handleSourceEnded); sendResponse({ok: true}); const bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab'); bridgeConnected = true; bridge.onopen = () => {}; bridge.onclose = () => {}; return true; }); async function handleSourceEnded() { await teardownCaptureGraph(); reportState(); chrome.runtime.sendMessage({type: 'offscreen-capture-released'}); }"
     worklet = "const packet = new ArrayBuffer(16 + 4); const view = new DataView(packet); view.setUint8(0, 0x48); view.setUint8(1, 0x49); view.setUint8(2, 0x42); view.setUint8(3, 0x54); view.setUint16(4, 1, true); this.port.postMessage(packet, [packet]); registerProcessor('hibiki-tab-packetizer', HibikiTabPacketizer);"
   }
   Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-source-valid'
@@ -419,12 +437,37 @@ connect-src   ws://127.0.0.1:17842
   try { Assert-ExtensionSourcePolicy $droppedResponseCheck $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-popup-drops-ok-check' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected popup dropped ok-check failure.' }
 
+  $droppedEndedListener = $sourceFixture.offscreen -replace "track\.addEventListener\('ended', handleSourceEnded\);", ''
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $droppedEndedListener $sourceFixture.worklet 'selftest-offscreen-drops-ended-listener' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected missing offscreen ended listener failure.' }
+
+  $droppedReleaseNotification = $sourceFixture.offscreen -replace "sendMessage\(\{type: 'offscreen-capture-released'\}\);", ''
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $droppedReleaseNotification $sourceFixture.worklet 'selftest-offscreen-drops-release-notification' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected missing natural-end release notification failure.' }
+
+  $unvalidatedSenderUrlType = $sourceFixture.serviceWorker -replace "typeof sender\.url === 'string'", 'false'
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $unvalidatedSenderUrlType $sourceFixture.offscreen $sourceFixture.worklet 'selftest-release-skips-sender-type-check' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected unvalidated release sender type failure.' }
+
+  $unvalidatedSenderPath = $sourceFixture.serviceWorker -replace "sender\.url\.endsWith\('/offscreen.html'\)", 'true'
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $unvalidatedSenderPath $sourceFixture.offscreen $sourceFixture.worklet 'selftest-release-skips-sender-path-check' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected unvalidated release sender path failure.' }
+
+  $releaseWithoutClose = $sourceFixture.serviceWorker -replace 'closeOffscreenDocument\(\); return false;', 'return false;'
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $releaseWithoutClose $sourceFixture.offscreen $sourceFixture.worklet 'selftest-release-without-close' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected release notification without document close failure.' }
+
   $missingErrorPersistence = $sourceFixture.popup -replace 'status\.dataset\.error', 'status.dataset.ok'
   $caught = $false
   try { Assert-ExtensionSourcePolicy $missingErrorPersistence $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-missing-error-persistence' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected missing error persistence failure.' }
 
-  Write-Output 'Browser extension policy self-test passed (36 cases).'
+  Write-Output 'Browser extension policy self-test passed (41 cases).'
   exit 0
 }
 
