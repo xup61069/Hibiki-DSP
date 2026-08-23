@@ -358,6 +358,28 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   diagnostic (`Vst3SandboxDiagnosticV1`) records initial/invalid-launch/reset/Windows-setup-failure
   assertions as a sanitized summary without private payload
   (`vst3-sandbox-redacted-diagnostic-v1.json`, Issue #408 / PR #409).
+- Build-preview and build-driver inspection guards merged: build-preview.ps1 and
+  build-driver.ps1 treat only ObjectNotFound as a missing path and fail closed on any other
+  existing-path inspection error before builds or writes, each with offline self-test cases
+  (Issue #586 / PR #590, Issue #598 / PR #599). README now carries the AGENTS.md-aligned
+  required-gate inventory as the single source of truth (Issue #591 / PR #594).
+- Scene-card system re-landed after an empty merge: Styles/SceneCard.xaml adds a shared
+  rounded/stroked/tinted card style with hover/pressed/focused affordances; MainWindow
+  headings use one Subtitle scale and the safety badge gained an accessible label while all
+  32 automation bindings stayed intact. PR #595 merged empty; Issue #603 / PR #605 restored
+  the full system on current main.
+- Live-device-catalog inspection guard recovered: live-device-catalog-check.ps1 fails closed
+  on leaf/parent inspection errors (13 offline cases) after PR #597 also merged empty;
+  Issue #592 was reopened so PR #601 could deliver the real diff.
+- VST3 supervisor surface remove_selected() re-landed after the PR #583 empty merge
+  (Issue #600 / PR #602): the native surface refuses removal while detached, unselected or
+  inside an edit session, removes through the store and clears state on success; the C#
+  Vst3TimelineSurfaceModelV1.RemoveSelected mirror plus ViewModel wrapper keep control-model
+  checks green. Contract tests now assert list_ids lexicographic order where the 64-character
+  valid ID sorts before "alpha".
+- Structured GitHub issue intake enforced: .github/ISSUE_TEMPLATE/config.yml disables blank
+  issues in favor of the structured AI task form while keeping a vulnerability-reporting
+  contact link and GitHub's documented maintainer escape hatch (Issue #604 / PR #606).
 
 ## 目前整合主線
 
