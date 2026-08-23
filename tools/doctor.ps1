@@ -16,6 +16,12 @@ function Add-Check([string]$Name, [bool]$Ok, [string]$Detail) {
   $results.Add([pscustomobject]@{ Name = $Name; Status = $(if ($Ok) { 'OK' } else { 'MISSING' }); Detail = $Detail })
 }
 
+function Test-WindowsKitPackageEntryProperty {
+  param([object]$Entry, [string]$PropertyName)
+  $property = $Entry.PSObject.Properties[$PropertyName]
+  return ($null -ne $property -and $property.Value)
+}
+
 function Get-WindowsKitPackageEntries {
   $uninstallRoots = @(
     'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
@@ -24,7 +30,7 @@ function Get-WindowsKitPackageEntries {
 
   foreach ($root in $uninstallRoots) {
     Get-ItemProperty -Path $root -ErrorAction SilentlyContinue |
-      Where-Object { $_.DisplayName -and $_.DisplayVersion } |
+      Where-Object { (Test-WindowsKitPackageEntryProperty -Entry $_ -PropertyName 'DisplayName') -and (Test-WindowsKitPackageEntryProperty -Entry $_ -PropertyName 'DisplayVersion') } |
       Select-Object DisplayName, DisplayVersion
   }
 }
@@ -99,6 +105,20 @@ function Get-WindowsKitAssessment(
 }
 
 function Invoke-WindowsKitSelfTest {
+  $strictModeCases = @(
+    @{ Entry = [pscustomobject]@{ DisplayName = 'App'; DisplayVersion = '1.0' }; Expected = $true },
+    @{ Entry = [pscustomobject]@{ DisplayName = 'App without version' }; Expected = $false },
+    @{ Entry = [pscustomobject]@{ DisplayVersion = '1.0' }; Expected = $false },
+    @{ Entry = [pscustomobject]@{ DisplayName = ''; DisplayVersion = '' }; Expected = $false }
+  )
+  foreach ($case in $strictModeCases) {
+    $hasBoth = (Test-WindowsKitPackageEntryProperty -Entry $case.Entry -PropertyName 'DisplayName') -and
+      (Test-WindowsKitPackageEntryProperty -Entry $case.Entry -PropertyName 'DisplayVersion')
+    if ($hasBoth -ne $case.Expected) {
+      throw "Windows SDK/WDK detection self-test failed: package-entry property case expected $($case.Expected), got $hasBoth."
+    }
+  }
+
   $familyPackages = @(
     [pscustomobject]@{ DisplayName = 'Windows Software Development Kit - Windows 10.0.26100'; DisplayVersion = '10.1.26100.8249' },
     [pscustomobject]@{ DisplayName = 'Windows Driver Kit - Windows 10.0.26100'; DisplayVersion = '10.1.26100.6584' }
@@ -173,8 +193,9 @@ $kitCandidates = foreach ($root in $kitRoots) {
 $kitAssessment = Get-WindowsKitAssessment -Candidates $kitCandidates -PackageEntries (Get-WindowsKitPackageEntries)
 Add-Check "Windows SDK/WDK >= $minimumKitVersion" $kitAssessment.Ok $kitAssessment.Detail
 
+$missingCount = @($results | Where-Object Status -eq 'MISSING').Count
 $results | Format-Table -AutoSize
-if (($results | Where-Object Status -eq 'MISSING').Count -gt 0) {
+if ($missingCount -gt 0) {
   Write-Warning 'The repository foundation can be inspected now, but a full Windows build requires the missing prerequisites.'
   if (-not $CheckOnly) { exit 2 }
 }
