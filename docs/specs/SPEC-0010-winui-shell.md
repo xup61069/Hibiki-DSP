@@ -70,8 +70,9 @@ generation、origin 與 actuator。UI 永遠分開顯示使用者要求和實際
 「安全限制已介入」，狀態 generation 倒退或數值不合法則保留上一個狀態，不回寫 Windows。
 
 `PrepareIrAsync` 只接受使用者指定的 bounded local path 與目前 phase policy；ViewModel 先檢查
-檔案存在與 64 MiB 上限，再送出固定 288-byte `IrPrepareCommand`。Engine Preview 的 control
-worker 在 pipe thread 之外讀取 WAV、解碼、phase-transform 並準備 convolver，只有成功才回 Ack。
+檔案存在與 64 MiB 上限，再送出固定 288-byte `IrPrepareCommand`。正式殼層與 Compatibility Preview
+都提供「選擇並準備 IR WAV 檔」入口，經系統檔案挑選器取得使用者指定路徑。Engine Preview 的
+control worker 在 pipe thread 之外讀取 WAV、解碼、phase-transform 並準備 convolver，只有成功才回 Ack。
 Bypass、過期／不存在檔案、格式或 tap 上限錯誤都 fail-closed；這個 Ack 仍不是 graph commit、
 實體 sink 或 audible playback 證據。
 
