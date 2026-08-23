@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "issue": 627,
+  "scope_digest": "multigroup-latency-clock-v1",
+  "source_commit": "a37ed1b",
+  "environment_fingerprint": "windows-26200-pwsh-7.6.4-dotnet-10.0.400",
+  "commands": [
+    "pwsh -File tools/verify.ps1",
+    "pwsh -File tools/handoff-check.ps1 -Issue 627",
+    "pwsh -File tools/docs-check.ps1",
+    "pwsh -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "multi-group background lane delay clock advance regression test",
+        "delayed impulse emerges at expected compensation step after interleaved non-target-group render",
+        "non-target-group output is not mixed into target buffer",
+        "existing contract tests including scene graph, DSP, control model, engine smoke"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 627",
+      "status": "pass",
+      "coverage": [
+        "issue-based ownership, scope_globs match, clean Git state"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "SPEC-0003 grouped render latency clock paragraph",
+        "80 required paths",
+        "24 specs",
+        "live measurement: 558 tracked paths"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "no tracked executable or CI binary artifact in 558 tracked paths"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors or conflict markers"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Test verifies sample-exact ring advancement in a deterministic unit harness; real-device WASAPI/WaveRT end-to-end latency measurement remains pending.",
+    "The fix advances fixed-delay rings only; variable-latency plugin reconfiguration during a group switch still relies on the existing epoch boundary.",
+    "No physical audio device was exercised; the test runs entirely in user-space graph simulation."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": ".NET SDK 10.0.400 native AOT / MSBuild",
+    "dotnet": "10.0.400",
+    "powershell": "pwsh 7.6.4"
+  },
+  "started_at": "2026-08-23T13:00:00+08:00",
+  "finished_at": "2026-08-23T14:30:00+08:00"
+}
