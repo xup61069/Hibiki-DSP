@@ -86,6 +86,15 @@ public sealed partial class MainWindow
         prepareIrButton.Click += OnPrepareIrClick;
         content.Children.Add(prepareIrButton);
         content.Children.Add(BoundText("IrPrepareStatus"));
+        content.Children.Add(new TextBlock
+        {
+            Text = "路由狀態",
+            Style = ResolveThemeResource<Style>("SubtitleTextBlockStyle"),
+        });
+        var routeSummary = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        AutomationProperties.SetName(routeSummary, "路由健康狀態摘要");
+        routeSummary.SetBinding(TextBlock.TextProperty, BindingFor("Expert.RouteHealthAccessibleSummary"));
+        content.Children.Add(routeSummary);
         var volume = new Slider
         {
             Minimum = -60,
