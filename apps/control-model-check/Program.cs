@@ -350,11 +350,14 @@ Check(!ControlPayloadsV1.TryDecodeSceneApply(invalidUtf8Scene, out _, out _),
     "SceneApply decoder must reject invalid UTF-8 rather than substitute characters.");
 var removableScenePath = Path.Combine(
     Path.GetTempPath(), $"hibiki-removable-scene-check-{Guid.NewGuid():N}.json");
+var removableQueuePath = Path.Combine(
+    Path.GetTempPath(), $"hibiki-removable-scene-queue-{Guid.NewGuid():N}.json");
 try
 {
     var removableSceneViewModel = new EasyControlViewModel
     {
         CustomSceneCatalogPath = removableScenePath,
+        CustomSceneQueuePath = removableQueuePath,
         SelectedOutputGroup = "main"
     };
     var customSceneNotifications = new List<string>();
@@ -373,6 +376,13 @@ try
           removableSceneViewModel.StatusText.Contains("已移除") &&
           customSceneNotifications.Contains(nameof(EasyControlViewModel.CustomSceneCards)),
         "ViewModel must remove a selected custom Scene, notify cards and report success.");
+    var persistedQueue = new CustomSceneSyncQueueV1();
+    Check(persistedQueue.TryLoad(removableQueuePath, out var persistedDropped, out _) &&
+          persistedQueue.Operations.Count == 1 &&
+          !persistedQueue.Operations[0].IsUpsert &&
+          persistedQueue.Operations[0].SceneId == "removable-scene" &&
+          persistedDropped == 0,
+        "Offline removal must persist the bounded replay operation atomically with the card save.");
     Check(removableSceneViewModel.SaveCustomScenes(out _),
         "Removed custom Scene catalog could not be saved.");
     var reloadedRemovableScenes = new CustomSceneCatalogV1();
@@ -389,7 +399,8 @@ try
 }
 finally
 {
-    if (File.Exists(removableScenePath)) File.Delete(removableScenePath);
+        if (File.Exists(removableScenePath)) File.Delete(removableScenePath);
+        if (File.Exists(removableQueuePath)) File.Delete(removableQueuePath);
 }
 
 var blockedSceneDirectory = Path.Combine(
@@ -1414,11 +1425,14 @@ static async Task RunSceneCatalogCheckServerAsync(
     }, connectedSignal, serverCts.Token);
     var syncPath = Path.Combine(Path.GetTempPath(),
         $"hibiki-scene-sync-flush-{Guid.NewGuid():N}.json");
+    var syncQueuePath = Path.Combine(Path.GetTempPath(),
+        $"hibiki-scene-sync-flush-queue-{Guid.NewGuid():N}.json");
     try
     {
         var syncViewModel = new EasyControlViewModel(pipeName)
         {
             CustomSceneCatalogPath = syncPath,
+            CustomSceneQueuePath = syncQueuePath,
             SelectedOutputGroup = "main"
         };
         Check(syncViewModel.PendingSceneCatalogOpsCount == 0,
@@ -1442,12 +1456,17 @@ static async Task RunSceneCatalogCheckServerAsync(
             "Flushed scene sync must be acknowledged and honestly reported.");
         Check(ackingCatalogIds.Contains(sceneSyncBaseId),
             "Engine-side check catalog must contain the flushed custom scene.");
+        var flushedQueue = new CustomSceneSyncQueueV1();
+        Check(flushedQueue.TryLoad(syncQueuePath, out _, out _) &&
+              flushedQueue.Operations.Count == 0,
+            "A successful flush must clear the persisted replay queue.");
     }
     finally
     {
         serverCts.Cancel();
         try { await serverTask; } catch (OperationCanceledException) { }
         if (File.Exists(syncPath)) File.Delete(syncPath);
+        if (File.Exists(syncQueuePath)) File.Delete(syncQueuePath);
     }
 }
 
@@ -1472,11 +1491,14 @@ static async Task RunSceneCatalogCheckServerAsync(
     }, connectedSignal, serverCts.Token);
     var livePath = Path.Combine(Path.GetTempPath(),
         $"hibiki-scene-sync-live-{Guid.NewGuid():N}.json");
+    var liveQueuePath = Path.Combine(Path.GetTempPath(),
+        $"hibiki-scene-sync-live-queue-{Guid.NewGuid():N}.json");
     try
     {
         var liveViewModel = new EasyControlViewModel(pipeName)
         {
             CustomSceneCatalogPath = livePath,
+            CustomSceneQueuePath = liveQueuePath,
             SelectedOutputGroup = "main"
         };
         await liveViewModel.ConnectAsync(TimeSpan.FromSeconds(5));
@@ -1501,12 +1523,17 @@ static async Task RunSceneCatalogCheckServerAsync(
             "Unknown scene removal must keep failing closed.");
         Check(!liveCatalogIds.Any(id => id.EndsWith("-live", StringComparison.Ordinal)),
             "Failed removals must not mutate the engine-side check catalog.");
+        var livePersistedQueue = new CustomSceneSyncQueueV1();
+        Check(livePersistedQueue.TryLoad(liveQueuePath, out _, out _) &&
+              livePersistedQueue.Operations.Count == 0,
+            "Connected add must not create a persisted replay queue.");
     }
     finally
     {
         serverCts.Cancel();
         try { await serverTask; } catch (OperationCanceledException) { }
         if (File.Exists(livePath)) File.Delete(livePath);
+        if (File.Exists(liveQueuePath)) File.Delete(liveQueuePath);
     }
 }
 
@@ -1523,11 +1550,14 @@ static async Task RunSceneCatalogCheckServerAsync(
             : null, connectedSignal, serverCts.Token);
     var nackPath = Path.Combine(Path.GetTempPath(),
         $"hibiki-scene-sync-nack-{Guid.NewGuid():N}.json");
+    var nackQueuePath = Path.Combine(Path.GetTempPath(),
+        $"hibiki-scene-sync-nack-queue-{Guid.NewGuid():N}.json");
     try
     {
         var nackViewModel = new EasyControlViewModel(pipeName)
         {
             CustomSceneCatalogPath = nackPath,
+            CustomSceneQueuePath = nackQueuePath,
             SelectedOutputGroup = "main"
         };
         Check(await nackViewModel.AddCustomSceneAsync(new SceneCard(
@@ -1541,16 +1571,69 @@ static async Task RunSceneCatalogCheckServerAsync(
         Check(nackViewModel.StatusText.Contains("尚未全部同步") ||
               nackViewModel.StatusText.Contains("未完成"),
             "Flush failure must surface a degraded status message.");
+        var retainedQueue = new CustomSceneSyncQueueV1();
+        Check(retainedQueue.TryLoad(nackQueuePath, out _, out _) &&
+              retainedQueue.Operations.Count ==
+                  nackViewModel.PendingSceneCatalogOpsCount,
+            "A failed flush must persist the remaining replay queue for restart.");
     }
     finally
     {
         serverCts.Cancel();
         try { await serverTask; } catch (OperationCanceledException) { }
         if (File.Exists(nackPath)) File.Delete(nackPath);
+        if (File.Exists(nackQueuePath)) File.Delete(nackQueuePath);
     }
 }
 
-// Case 4: the bounded sync queue drops its oldest operation under pressure
+// Case 5: persisted offline operations survive a restart, and malformed queue
+// files fail closed without corrupting the already-loaded card catalog.
+{
+    var restartPath = Path.Combine(Path.GetTempPath(), $"hibiki-restart-scene-{Guid.NewGuid():N}.json");
+    var restartQueuePath = Path.Combine(Path.GetTempPath(), $"hibiki-restart-scene-queue-{Guid.NewGuid():N}.json");
+    try
+    {
+        var writer = new EasyControlViewModel
+        {
+            CustomSceneCatalogPath = restartPath,
+            CustomSceneQueuePath = restartQueuePath,
+            SelectedOutputGroup = "main"
+        };
+        const string restartId = "restart-scene";
+        Check(await writer.AddCustomSceneAsync(new SceneCard(
+                restartId, "重啟同步", "離線重啟保留", "零額外緩衝", true)),
+            "Offline restart add fixture failed locally.");
+
+        var reader = new EasyControlViewModel
+        {
+            CustomSceneCatalogPath = restartPath,
+            CustomSceneQueuePath = restartQueuePath,
+            SelectedOutputGroup = "main"
+        };
+        Check(reader.LoadCustomScenes(out _) &&
+              reader.Scenes.Any(scene => scene.Id == restartId) &&
+              reader.PendingSceneCatalogOpsCount == 1 &&
+              reader.DroppedSceneCatalogOperations == 0,
+            "A new ViewModel must restore a valid offline scene replay queue.");
+        Check(reader.LoadPendingSceneCatalogOps(out _) &&
+              reader.PendingSceneCatalogOpsCount == 1 &&
+              reader.Scenes.First(scene => scene.Id == restartId).Name == "重啟同步",
+            "A restored replay operation must preserve its exact add payload.");
+
+        File.WriteAllText(restartQueuePath, "{\"schema_version\":1,\"dropped_operations\":-1}");
+        Check(!reader.LoadPendingSceneCatalogOps(out var corruptError) &&
+              reader.Scenes.Count == 5 &&
+              corruptError.Contains("同步佇列"),
+            "A malformed or invalid queue file must fail closed without replacing cards.");
+    }
+    finally
+    {
+        if (File.Exists(restartPath)) File.Delete(restartPath);
+        if (File.Exists(restartQueuePath)) File.Delete(restartQueuePath);
+    }
+}
+
+// Case 6: the bounded sync queue drops its oldest operation under pressure
 // and keeps that loss visible through later offline work and replay success.
 {
     const string pipeName = "HibikiDSP_scene_sync_capacity_check";
@@ -1568,11 +1651,14 @@ static async Task RunSceneCatalogCheckServerAsync(
     }, connectedSignal, serverCts.Token);
     var capacityPath = Path.Combine(Path.GetTempPath(),
         $"hibiki-scene-sync-capacity-{Guid.NewGuid():N}.json");
+    var capacityQueuePath = Path.Combine(Path.GetTempPath(),
+        $"hibiki-scene-sync-capacity-queue-{Guid.NewGuid():N}.json");
     try
     {
         var capacityViewModel = new EasyControlViewModel(pipeName)
         {
             CustomSceneCatalogPath = capacityPath,
+            CustomSceneQueuePath = capacityQueuePath,
             SelectedOutputGroup = "main"
         };
         var capacityId = sceneSyncBaseId + "-capacity";
@@ -1623,6 +1709,7 @@ static async Task RunSceneCatalogCheckServerAsync(
         serverCts.Cancel();
         try { await serverTask; } catch (OperationCanceledException) { }
         if (File.Exists(capacityPath)) File.Delete(capacityPath);
+        if (File.Exists(capacityQueuePath)) File.Delete(capacityQueuePath);
     }
 }
 
