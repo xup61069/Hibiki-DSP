@@ -61,15 +61,24 @@ function Test-A11yPathUnderRoot {
 function Get-A11yExistingAttributes {
   param(
     [Parameter(Mandatory)][string]$Path,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
   if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
     return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
   }
-  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
-  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+  if ($null -ne $SyntheticInspectionErrors -and $SyntheticInspectionErrors.ContainsKey($fullPath)) {
+    throw "WinUI accessibility path inspection failed: $fullPath ($($SyntheticInspectionErrors[$fullPath]))"
+  }
+  try {
+    return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop).Attributes
+  }
+  catch {
+    if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return $null }
+    throw "WinUI accessibility path inspection failed: $fullPath ($($_.Exception.Message))"
+  }
 }
 
 function Assert-A11ySafePath {
@@ -77,7 +86,8 @@ function Assert-A11ySafePath {
     [Parameter(Mandatory)][string]$Path,
     [Parameter(Mandatory)][string]$Root,
     [Parameter(Mandatory)][ValidateSet('Directory', 'File')][string]$Kind,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $expectedRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
@@ -88,7 +98,8 @@ function Assert-A11ySafePath {
 
   $cursor = $candidate
   while ($true) {
-    $attributes = Get-A11yExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    $attributes = Get-A11yExistingAttributes -Path $cursor `
+      -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
     if ($null -eq $attributes -and $cursor -eq $candidate) {
       throw "WinUI accessibility $Kind does not exist: $candidate"
     }
@@ -119,11 +130,12 @@ function Assert-A11yOutputDirectory {
   param(
     [Parameter(Mandatory)][string]$OutputDir,
     [Parameter(Mandatory)][string]$RepositoryRoot,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   Assert-A11ySafePath -Path $OutputDir -Root (Join-Path $RepositoryRoot '.local') `
-    -Kind Directory -SyntheticAttributes $SyntheticAttributes
+    -Kind Directory -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
 }
 
 function Assert-A11yLaunchTarget {
@@ -131,14 +143,15 @@ function Assert-A11yLaunchTarget {
     [Parameter(Mandatory)][string]$Executable,
     [Parameter(Mandatory)][string]$OutputDir,
     [Parameter(Mandatory)][string]$RepositoryRoot,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   if (-not (Test-A11yPathUnderRoot -Path $Executable -Root $OutputDir)) {
     throw "WinUI accessibility executable must remain under the selected output directory: $Executable"
   }
   Assert-A11ySafePath -Path $Executable -Root (Join-Path $RepositoryRoot '.local') `
-    -Kind File -SyntheticAttributes $SyntheticAttributes
+    -Kind File -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
 }
 
 if ($SelfTest) {
@@ -256,8 +269,26 @@ if ($SelfTest) {
   if (-not $reparseExecutableCaught) { throw 'winui a11y self-test expected a reparse-executable rejection.' }
   $caseCount++
 
-  if ($caseCount -lt 11) { throw "winui a11y self-test failed: expected at least 11 passing cases, saw $caseCount." }
-  Write-Output "WinUI accessibility smoke self-test passed ($caseCount cases; expectation thresholds, empty/sparse rejection, evidence JSON shape)."
+  $leafInspectionErrorCaught = $false
+  try {
+    Assert-A11yLaunchTarget -Executable $syntheticExecutable -OutputDir $syntheticOutput `
+      -RepositoryRoot $repo -SyntheticAttributes @{ $localRoot = [System.IO.FileAttributes]::Directory; $syntheticOutput = [System.IO.FileAttributes]::Directory } `
+      -SyntheticInspectionErrors @{ $syntheticExecutable = 'synthetic access denied' }
+  } catch { $leafInspectionErrorCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $leafInspectionErrorCaught) { throw 'winui a11y self-test expected a leaf inspection-error rejection.' }
+  $caseCount++
+
+  $parentInspectionErrorCaught = $false
+  try {
+    Assert-A11yLaunchTarget -Executable $syntheticExecutable -OutputDir $syntheticOutput `
+      -RepositoryRoot $repo -SyntheticAttributes @{ $syntheticOutput = [System.IO.FileAttributes]::Directory; $syntheticExecutable = [System.IO.FileAttributes]::Archive } `
+      -SyntheticInspectionErrors @{ $localRoot = 'synthetic sharing violation' }
+  } catch { $parentInspectionErrorCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $parentInspectionErrorCaught) { throw 'winui a11y self-test expected a parent inspection-error rejection.' }
+  $caseCount++
+
+  if ($caseCount -lt 13) { throw "winui a11y self-test failed: expected at least 13 passing cases, saw $caseCount." }
+  Write-Output "WinUI accessibility smoke self-test passed ($caseCount cases; expectation thresholds, empty/sparse rejection, evidence JSON shape, inspection errors)."
   exit 0
 }
 
@@ -267,7 +298,6 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
 
 Assert-A11yOutputDirectory -OutputDir $OutputDir -RepositoryRoot $repo
 $exe = Join-Path $OutputDir 'Hibiki.WinUI.exe'
-if (-not (Test-Path -LiteralPath $exe)) { throw "Hibiki.WinUI.exe not found under '$OutputDir'." }
 Assert-A11yLaunchTarget -Executable $exe -OutputDir $OutputDir -RepositoryRoot $repo
 
 Add-Type -AssemblyName UIAutomationClient
