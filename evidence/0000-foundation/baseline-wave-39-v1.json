@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "issue": 964,
-  "scope_digest": "baseline-wave-26-v1",
+  "scope_digest": "baseline-wave-39-v1",
   "source_commit": "fe144300",
-  "environment_fingerprint": "windows-amd64-pwsh-baseline-wave-26",
+  "environment_fingerprint": "windows-amd64-pwsh-baseline-wave-39",
   "commands": [
     "pwsh -NoProfile -File tools/docs-check.ps1",
     "pwsh -NoProfile -File tools/source-policy.ps1",
