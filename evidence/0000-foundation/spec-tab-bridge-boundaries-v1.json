@@ -1,0 +1,30 @@
+﻿{
+  "schema_version": 1,
+  "issue": 710,
+  "scope_digest": "spec-tab-bridge-boundaries-v1",
+  "source_commit": "8d037ed7602653f8d15c089e3fae33100bb07ce5",
+  "base_commit": "b737339",
+  "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6",
+  "target": "docs/specs/SPEC-0009-browser-tab-bridge.md",
+  "cases_added": [
+    "documented popup Start/Stop messaging-error recovery boundary",
+    "documented automatic capture-graph release when source stream ends"
+  ],
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 710",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": ["80 required entry paths", "24 specs", "584 tracked paths live measurement", "230 repository JSON files"]
+    }
+  ],
+  "limitations": [
+    "Documentation-only evidence; behavior verification lives in PR #704 and PR #707 evidence.",
+    "No browser runtime, audio, endpoint, driver, WaveRT, HLK, signing or release evidence."
+  ]
+}
+
