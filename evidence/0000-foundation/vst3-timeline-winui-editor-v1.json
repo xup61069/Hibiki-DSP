@@ -59,4 +59,5 @@
   ],
   "scope": "WinUI Expert local timeline editor binding, compatibility preview seam, control-model checks and SPEC-0010 boundary update.",
   "date": "2026-08-23"
+  "source_commit": "36cb027e9756e1390bc34f99d2dd81d65725533b",
 }

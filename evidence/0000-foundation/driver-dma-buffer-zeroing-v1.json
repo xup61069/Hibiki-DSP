@@ -51,4 +51,5 @@
   ],
   "next_safe_action": "Push branch and open draft PR for maintainer review; Issue #462 VM retest still requires explicit user consent.",
   "date": "2026-08-24"
+  "source_commit": "9bd815d3a494ca760fdff4b1d2134d8b34daf8c7",
 }

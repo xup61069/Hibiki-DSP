@@ -31,4 +31,5 @@
     "Verify Hibiki virtual audio endpoint appears via Get-PnpDevice."
   ],
   "claims": "Build, package and signature evidence only; no endpoint presence or audio behavior claim yet."
+  "source_commit": "b6df060f8105bc7ac36777adc2f457bf7f0051b3",
 }

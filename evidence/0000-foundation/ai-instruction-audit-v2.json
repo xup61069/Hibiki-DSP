@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 610,
   "scope_digest": "ai-instruction-audit-v2",
-  "source_commit": null,
+  "source_commit": "9c7b5fd8b9a6862fb4fee50f9a12529bf26ff536"
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-pwsh-7.6; docs-only slice",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 610",

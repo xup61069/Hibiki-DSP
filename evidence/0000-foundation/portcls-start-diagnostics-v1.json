@@ -41,4 +41,5 @@
   "scope": "driver start/control-path diagnostics only; no ABI, topology, DSP or streaming behavior change; no live probe executed and no machine-state change",
   "limits": "Build and offline gates do not prove successful device start; the next isolated VM load test consumes these DbgPrintEx stages to localize any remaining CM_PROB_FAILED_START cause.",
   "date": "2026-08-23"
+  "source_commit": "0f4cb240d2b8810436f5dd0cceadd41aad90afe7",
 }

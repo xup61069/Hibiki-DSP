@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 540,
   "scope_digest": "readme-live-probe-surface-v1",
-  "source_commit": null,
+  "source_commit": "96a7e3e409b3aa27e8a0fb6570428206d04d0670"
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-26100-pwsh-7.6; target-machine-pending",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 540",

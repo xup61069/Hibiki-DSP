@@ -29,4 +29,5 @@
     "tools/build-preview.ps1 -SelfTest"
   ],
   "status": "pending-gates"
+  "source_commit": "3caf23b10516264774b75dd749b4d302250bf746",
 }

@@ -18,4 +18,5 @@
   ],
   "scope": "tools-only docs gate hardening; no product/API/schema/DSP/driver change",
   "date": "2026-08-23"
+  "source_commit": "866a96398d57d0e61eece218e7ab4b4261c220ab",
 }

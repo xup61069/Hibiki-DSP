@@ -20,4 +20,5 @@
   ],
   "scope": "winui-shell compatibility code-behind only; formal XAML path and DesktopCompat behavior unchanged",
   "date": "2026-08-23"
+  "source_commit": "58c67940579611bfdab42876a558e6fa28f3c93a",
 }

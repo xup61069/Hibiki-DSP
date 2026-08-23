@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 753,
   "scope_digest": "spec0009-popup-a11y-doc-v1",
-  "source_commit": null,
+  "source_commit": "f4ad7f057745b9c50f6bfaecea41ad77d9ddb197"
   "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6; documentation-only spec update",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 753",

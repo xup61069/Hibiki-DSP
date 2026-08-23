@@ -25,4 +25,5 @@
   "validation": [],
   "scope": "tools/context-pack.ps1 hardening plus offline self-test and evidence only; no product/API/schema/DSP/driver change; no filesystem writes or machine-state change during self-test; no live probe executed.",
   "date": "2026-08-23"
+  "source_commit": "81308569eb26f6c068d014e99bfc59e7cfa8e49f",
 }

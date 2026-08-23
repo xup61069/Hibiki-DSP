@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 747,
   "scope_digest": "desktopcompat-a11y-names-v1",
-  "source_commit": null,
+  "source_commit": "06326e9d78938355d185e897315c884a4355f013"
   "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6; DesktopCompat source + build + launch smoke",
   "commands": [
     "pwsh -NoProfile -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",

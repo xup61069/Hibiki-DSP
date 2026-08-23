@@ -60,6 +60,7 @@
     "docs/tasks/active/328.md",
     "evidence/0000-foundation/issue-328-batch-archive-v1.json"
   ],
+  "source_commit": "56fd93779adabceceb6fb3178331ac71ade00be9",
   "limitations": [
     "Documentation-only archive; no product source change.",
     "No browser runtime evidence.",

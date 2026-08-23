@@ -67,4 +67,5 @@
   },
   "claims": "Anonymous VM provisioning, test-signing configuration, package staging, publisher-trust recovery and reproducible failed-start evidence only. No endpoint/audio behavior, physical-device, HLK or release claim.",
   "next_safe_action": "Diagnose the PortCls adapter start path against the existing WDK descriptor fixes before another guest installation attempt."
+  "source_commit": "44588ea1eb1e63444900cbf3d5569768a01de238",
 }

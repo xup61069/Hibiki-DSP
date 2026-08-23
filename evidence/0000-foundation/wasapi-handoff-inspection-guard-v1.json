@@ -21,4 +21,5 @@
   ],
   "scope": "tools-only live probe hardening; no product/API/schema/DSP/driver change; no live audio handoff performed; no identity-bearing output introduced",
   "date": "2026-08-23"
+  "source_commit": "93bedbe77f3333968a992f4a154b05d7660004a9",
 }

@@ -47,4 +47,5 @@
   ],
   "next_safe_action": "Open PR for maintainer review; optional follow-up to suppress toolchain-header C4083 noise in build flags if desired.",
   "date": "2026-08-23"
+  "source_commit": "b8e7591808ffa48c7f6ff9f56cdb6453fe739bb8",
 }

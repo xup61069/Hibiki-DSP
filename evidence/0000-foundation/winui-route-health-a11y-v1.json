@@ -21,4 +21,5 @@
     "Static source, contract-model and non-target Desktop Compatibility Preview evidence only.",
     "No runtime UI Automation or screen-reader audit, no formal WinUI XAML build, no physical audio, no driver install/load/HLK or Microsoft signing claim."
   ]
+  "source_commit": "928fa2151abd517bf804f1a8fd09bcd8dea7a664",
 }
