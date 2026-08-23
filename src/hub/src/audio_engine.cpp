@@ -62,7 +62,6 @@ bool AudioEngineModel::commit_graph() noexcept {
     // A committed graph is a new listening context. Start every bounded
     // true-peak guard from unity gain so attenuation accumulated by any
     // previous group cannot keep ducking quiet audio after the switch.
-    main_true_peak_limiter_.reset();
     if (volume_bank_ != nullptr) volume_bank_->reset_limiters();
     active_latency_bank_ = std::move(pending_latency_bank_);
     has_active_graph_ = true;
@@ -175,9 +174,15 @@ bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
     if (!apply_ir("main", output_interleaved, frames)) return false;
     if (!apply_group_master("main", output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
-        (void)main_true_peak_limiter_.limit_in_place(
-            output_interleaved, frames, active_graph_.output_channels, -1.0,
-            sample_rate_.load(std::memory_order_relaxed));
+        auto* const main_limiter =
+            volume_bank_ != nullptr
+                ? volume_bank_->limiter_for_group("main")
+                : nullptr;
+        (void)(main_limiter != nullptr
+                   ? main_limiter->limit_in_place(
+                         output_interleaved, frames, active_graph_.output_channels,
+                         -1.0, sample_rate_.load(std::memory_order_relaxed))
+                   : 1.0F);
     }
     return true;
 }
