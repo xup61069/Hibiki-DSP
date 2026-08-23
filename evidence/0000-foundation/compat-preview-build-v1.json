@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "issue": 687,
+  "scope_digest": "compat-preview-build-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-11-26200-x64-dotnet-sdk-local-windows-app-runtime-1.7; compatibility-preview source-only",
+  "commands": [
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 687",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/build-preview.ps1 -Target WinUICompat",
+      "status": "pass",
+      "coverage": [
+        "The Compatibility Preview WinUICompat target compiles again with zero warnings and zero errors.",
+        "Shared formal-shell VST3 handlers have preview-owned detached TextBox fields, restoring the source-level preview seam.",
+        "The preview theme-resource helper performs a type-safe lookup instead of an unsafe cast."
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "The Compatibility Preview keeps its XAML compiler disabled but no longer disables Windows App SDK Core MRT resource tooling.",
+        "Restoring resource tooling lets the runtime initialize theme/control resources without App.xaml, resolving the prior 0xC000027B startup failure.",
+        "The bounded official launch smoke passes; a manual observation also remained live beyond 12 seconds."
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "This is source-level Compatibility Preview support, not formal XAML, accessibility, launch-stability or audio evidence.",
+    "Launch stability is bounded local preview evidence only; formal accessibility validation remains separate.",
+    "Formal target-machine WinUI validation remains separate; no driver, physical audio, HLK or signing claim is made."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "local .NET SDK",
+    "powershell": "PowerShell 7",
+    "windows_app_runtime": "1.7"
+  },
+  "started_at": "2026-08-23T18:16:00+08:00",
+  "finished_at": "2026-08-23T18:40:00+08:00"
+}
