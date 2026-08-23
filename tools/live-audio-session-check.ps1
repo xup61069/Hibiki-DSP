@@ -3,6 +3,8 @@ param(
   [switch]$SelfTest
 )
 
+Set-StrictMode -Version Latest
+
 $ErrorActionPreference = 'Stop'
 function Assert-LiveAudioSessionWindowsOnly([bool]$windowsHost) {
   if (-not $windowsHost) { throw 'Live Windows audio-session probe is Windows-only.' }

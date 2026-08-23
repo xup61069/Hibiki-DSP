@@ -170,18 +170,18 @@ if ($SelfTest) {
     @{ type = 'Button'; id = ''; name = 'scene-movie' },
     @{ type = 'Button'; id = ''; name = 'volume' }
   )
-  $reasons = Test-ControlExpectations -Inventory $good
+  @($reasons = Test-ControlExpectations -Inventory $good)
   if ($reasons.Count -ne 0) { throw "winui a11y self-test failed: happy-path inventory rejected: $($reasons -join '; ')" }
   $caseCount++
 
   # Empty inventory must be rejected.
-  $reasons = Test-ControlExpectations -Inventory @()
+  @($reasons = Test-ControlExpectations -Inventory @())
   if ($reasons.Count -eq 0) { throw 'winui a11y self-test failed: empty inventory accepted.' }
   $caseCount++
 
   # Below-minimum interactive controls must be rejected.
   $sparse = @(@{ type = 'Text'; id = ''; name = 'label' }, @{ type = 'Group'; id = 'g'; name = 'root' })
-  $reasons = Test-ControlExpectations -Inventory $sparse
+  @($reasons = Test-ControlExpectations -Inventory $sparse)
   if ($reasons.Count -eq 0) { throw 'winui a11y self-test failed: sparse inventory accepted.' }
   $caseCount++
 
@@ -334,7 +334,7 @@ try {
     }
   }
 
-  $reasons = Test-ControlExpectations -Inventory $inventory
+  @($reasons = Test-ControlExpectations -Inventory $inventory)
   if ($reasons.Count -gt 0) {
     throw ("WinUI accessibility expectations unmet: " + ($reasons -join '; '))
   }

@@ -10,6 +10,8 @@ param(
   [switch]$SelfTest
 )
 
+Set-StrictMode -Version Latest
+
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $engine = Join-Path $repo '.local/engine-preview/Release/hibiki_engine_preview.exe'
