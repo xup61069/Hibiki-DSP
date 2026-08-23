@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "issue": 822,
+  "scope_digest": "scene-catalog-reconnect-sync-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.4-dotnet8",
+  "commands": [
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 822",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "reconnect replays bounded local custom-scene upserts and pending removals via transport seam",
+        "failed catalog Ack during replay degrades connection and preserves local mirror"
+      ]
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+      "status": "pass"
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 822",
+      "status": "pass"
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass"
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Control-model source/self-test evidence only; no live engine or physical audio claim."
+  ],
+  "logs": [],
+  "started_at": null,
+  "finished_at": null
+}

@@ -363,7 +363,7 @@ try
           removableSceneViewModel.SelectScene("removable-scene") &&
           removableSceneViewModel.SelectedScene?.Id == "removable-scene",
         "ViewModel removable custom Scene fixture failed.");
-    Check(removableSceneViewModel.RemoveCustomScene("removable-scene") &&
+    Check(await removableSceneViewModel.RemoveCustomSceneAsync("removable-scene") &&
           removableSceneViewModel.Scenes.Count == 4 &&
           removableSceneViewModel.CustomSceneCards.Count == 0 &&
           removableSceneViewModel.SelectedScene is null &&
@@ -376,10 +376,10 @@ try
     Check(reloadedRemovableScenes.TryLoad(removableScenePath, out _) &&
           reloadedRemovableScenes.Count == 0,
         "Removed custom Scene card must remain removed after reload.");
-    Check(!removableSceneViewModel.RemoveCustomScene("missing-scene") &&
+    Check(!await removableSceneViewModel.RemoveCustomSceneAsync("missing-scene") &&
           removableSceneViewModel.StatusText.Contains("找不到"),
         "Unknown custom Scene removal must fail closed.");
-    Check(!removableSceneViewModel.RemoveCustomScene("game") &&
+    Check(!await removableSceneViewModel.RemoveCustomSceneAsync("game") &&
           removableSceneViewModel.Scenes.Count == 4 &&
           removableSceneViewModel.SelectedScene is null,
         "Built-in Scene IDs must remain non-removable through the custom-card seam.");
@@ -404,7 +404,7 @@ try
           rollbackSceneViewModel.SelectScene("rollback-scene") &&
           rollbackSceneViewModel.SelectedScene?.Id == "rollback-scene",
         "ViewModel custom Scene rollback fixture failed.");
-    Check(!rollbackSceneViewModel.RemoveCustomScene("rollback-scene") &&
+    Check(!await rollbackSceneViewModel.RemoveCustomSceneAsync("rollback-scene") &&
           rollbackSceneViewModel.Scenes.Count == 5 &&
           rollbackSceneViewModel.CustomSceneCards.Count == 1 &&
           rollbackSceneViewModel.CustomSceneCards[0].Id == "rollback-scene" &&
@@ -628,6 +628,47 @@ Check(!await noEngine.RefreshPhysicalDevicesAsync() &&
     "Disconnected device catalog refresh must fail closed.");
 Check(!await noEngine.QueueVolumeAsync(TimeSpan.FromMilliseconds(1)),
     "Disconnected volume debounce must fail closed.");
+
+// #822: reconnect replay exercises the transport seam against a fake engine.
+var sceneReplayCommands = new List<ControlMessageType>();
+var sceneReplayFailAfter = int.MaxValue;
+var fakeEngine = new FakeSceneCatalogEngine(sceneReplayCommands, () => sceneReplayFailAfter);
+var replayViewModel = new EasyControlViewModel(
+    "HibikiDSP_v1_scene_replay_check", _ => fakeEngine)
+{
+    SelectedOutputGroup = "main"
+};
+Check(replayViewModel.UpsertCustomScene(new SceneCard("offline-add", "離線新增",
+          "重播測試", "零額外緩衝", true)),
+    "Offline custom-scene upsert fixture failed.");
+Check(await replayViewModel.RemoveCustomSceneAsync("offline-add"),
+    "Offline custom-scene removal must stay local and wait for reconnect.");
+Check(replayViewModel.CustomSceneSyncStatus.Contains("等待重播"),
+    "Offline custom-scene removal must mark pending replay.");
+Check(replayViewModel.CustomSceneCards.Count == 0,
+    "Offline custom-scene removal must update the local mirror.");
+Check(replayViewModel.UpsertCustomScene(new SceneCard("offline-add", "離線新增",
+          "重播測試", "零額外緩衝", true)),
+    "Offline custom-scene upsert fixture (second) failed.");
+Check(await replayViewModel.ConnectAsync(TimeSpan.FromMilliseconds(50)) &&
+      sceneReplayCommands.SequenceEqual([
+          ControlMessageType.SceneCatalogCommand
+      ]) &&
+      replayViewModel.CustomSceneSyncStatus.Contains("已同步"),
+    "Reconnect must replay local custom-scene upserts and pending removals.");
+
+var sceneFailCommands = new List<ControlMessageType>();
+sceneReplayFailAfter = 4;
+var failEngine = new FakeSceneCatalogEngine(sceneFailCommands, () => sceneReplayFailAfter);
+var failViewModel = new EasyControlViewModel(
+    "HibikiDSP_v1_scene_replay_fail", _ => failEngine);
+Check(failViewModel.UpsertCustomScene(new SceneCard("offline-fail", "離線失敗",
+          "Ack 失敗", "零額外緩衝", true)),
+    "Offline fail upsert fixture failed.");
+Check(await failViewModel.ConnectAsync(TimeSpan.FromMilliseconds(50)) &&
+      failViewModel.ConnectionState == ControlConnectionState.Degraded &&
+      failViewModel.CustomSceneSyncStatus.Contains("同步失敗"),
+    "A failed catalog Ack during replay must degrade the connection.");
 var invalidDebounceRejected = false;
 try
 {
@@ -1312,3 +1353,58 @@ Check(writableSelectionViewModel.SelectedTimelineId == "writable-selection" &&
     "A rejected selection change must keep the prior selection and open draft.");
 
 Console.WriteLine("Control model checks passed.");
+
+sealed class FakeSceneCatalogEngine(
+    List<ControlMessageType> commands,
+    Func<int> failAfter) : IControlTransportV1
+{
+    private int _requests;
+
+    public bool IsConnected { get; private set; }
+
+    public Task ConnectAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
+    {
+        IsConnected = true;
+        return Task.CompletedTask;
+    }
+
+    public async Task<IpcEnvelopeV1> RoundTripAsync(IpcEnvelopeV1 request,
+                                                    CancellationToken cancellationToken = default)
+    {
+        _requests++;
+        if (_requests > failAfter())
+        {
+            IsConnected = false;
+            throw new IOException("simulated catalog ack failure");
+        }
+        if (request.Type == ControlMessageType.SceneCatalogCommand)
+            commands.Add(request.Type);
+        await Task.Yield();
+        // Return the expected snapshot type for each refresh request so the
+        // full connect flow succeeds before scene catalog replay is exercised.
+        var replyType = request.Type switch
+        {
+            ControlMessageType.DeviceCatalogRequest =>
+                ControlMessageType.DeviceCatalogSnapshot,
+            ControlMessageType.ControlStatusRequest =>
+                ControlMessageType.ControlStatusSnapshot,
+            ControlMessageType.SessionCatalogRequest =>
+                ControlMessageType.SessionCatalogSnapshot,
+            _ => ControlMessageType.Ack
+        };
+        var payload = replyType switch
+        {
+            ControlMessageType.DeviceCatalogSnapshot =>
+                ControlPayloadsV1.EncodeDeviceCatalogSnapshot([], 1UL),
+            ControlMessageType.ControlStatusSnapshot =>
+                ControlPayloadsV1.EncodeControlStatusSnapshot(1UL,
+                    VolumeSafetyStateV1.Initial(), []),
+            ControlMessageType.SessionCatalogSnapshot =>
+                ControlPayloadsV1.EncodeSessionCatalogSnapshot(1UL, 1UL, []),
+            _ => ReadOnlyMemory<byte>.Empty
+        };
+        return new IpcEnvelopeV1(replyType, request.RequestId, payload);
+    }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}

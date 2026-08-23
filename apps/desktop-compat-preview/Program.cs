@@ -112,14 +112,14 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(_customSceneDescription);
         _addCustomScene.Click += (_, _) =>
         {
-            _viewModel.AddCustomScene();
+            _ = _viewModel.AddCustomSceneAsync();
             SyncSceneList();
             RefreshView();
         };
         _removeCustomScene.Click += (_, _) =>
         {
             if (_scenes.SelectedValue is string sceneId)
-                _viewModel.RemoveCustomScene(sceneId);
+                _ = _viewModel.RemoveCustomSceneAsync(sceneId);
             SyncSceneList();
             RefreshView();
         };

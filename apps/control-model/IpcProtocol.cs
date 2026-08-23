@@ -1244,10 +1244,23 @@ public sealed class ControlCommandFactoryV1
         _requests.Create(ControlMessageType.ControlStatusRequest);
 }
 
+// The view model depends only on this bounded transport seam so reconnect
+// replay can be checked without starting a real engine. Production still uses
+// the thin pipe client below.
+public interface IControlTransportV1 : IAsyncDisposable
+{
+    Task ConnectAsync(TimeSpan timeout, CancellationToken cancellationToken = default);
+
+    bool IsConnected { get; }
+
+    Task<IpcEnvelopeV1> RoundTripAsync(IpcEnvelopeV1 request,
+                                       CancellationToken cancellationToken = default);
+}
+
 // Thin asynchronous client for the control worker. It owns no UI state and
 // never runs on the audio callback. The pipe name is the stable logical name
 // from distribution-profile.yml; Windows adds the local named-pipe namespace.
-public sealed class NamedPipeControlClientV1 : IAsyncDisposable
+public sealed class NamedPipeControlClientV1 : IControlTransportV1
 {
     public const string DefaultPipeName = "HibikiDSP_v1_control";
 
