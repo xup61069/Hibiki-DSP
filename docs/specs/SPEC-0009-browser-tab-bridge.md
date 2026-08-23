@@ -21,7 +21,10 @@ popup 必須提供明確的 Stop 控制項：點擊後透過 service worker 通�
 stream（停止所有 track、斷開 graph）並關閉 offscreen document。popup 開啟時必須
 查詢真實狀態（idle 或 capturing），不得假設 idle。start 失敗必須回報錯誤，不得
 宣稱「Capture started」。`tools/extension-check.ps1` 驗證這些 stop 與 state 邊界，
-self-test 涵蓋缺少 handler 的情況。
+self-test 涵蓋缺少 handler 的情況。offscreen 的 onMessage listener 必須對非同步回應
+路徑 `return true`，讓 Chrome 保持訊息通道開啟直到 `sendResponse` 完成；
+`tools/extension-check.ps1` 強制此邊界，self-test 涵蓋缺少 `return true` 或回傳
+值不是 `return true;` 陳述式的情況。
 
 ## HIBT packet
 
