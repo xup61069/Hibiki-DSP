@@ -188,7 +188,6 @@ private:
     LaneLatencyBankV1 pending_latency_bank_{};
     std::unique_ptr<OutputGroupVolumeBankV1> volume_bank_{};
     std::atomic<std::uint32_t> sample_rate_{48000U};
-    mutable TruePeakLimiterV1 rt_true_peak_limiter_{};
     mutable IrGraphAttachmentV1 active_ir_{};
     IrGraphAttachmentV1 pending_ir_{};
     bool has_active_ir_{false};

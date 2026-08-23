@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "issue": 698,
+  "scope_digest": "global-snapshot-wave28",
+  "source_commit": null,
+  "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100-pwsh-7.6; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 698",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #681 / PR #692 merged: offscreen start-tab-stream and stop-tab-stream listeners return true so the async response channel remains open until sendResponse runs; successful tab-capture starts reach the popup instead of being reported as failures.",
+        "Wave27 (#689 / PR #691) recorded the true-peak limiter graph-commit reset and the first real start/stop response fix.",
+        "Issue #687 / PR #694 merged: Compatibility Preview WinUICompat compiles and passes bounded launch smoke; enabling Core MRT resource tooling resolves the prior 0xC000027B startup failure.",
+        "Issue #697 / PR #699 merged: stale detached VST3 TextBox stubs left by #687 were removed; existing two-way ViewModel bindings remain authoritative, with no runtime behavior change.",
+        "Issue #683 / PR #695 merged: each registered output sink owns independent TruePeakLimiterV1 state, so a loud transient in one group no longer attenuates a later quiet block in another group; graph commit still resets every limiter.",
+        "Issue #672 / PR #685 merged: Engine Preview gains a bounded opt-in soak harness with 12 offline self-test cases; the default three-cycle run verifies Hello/Ack, Main volume round-trip, status convergence and clean stop, writing an anonymous report."
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; this update does not change product source behavior.",
+    "The tab-capture item remains extension source and policy-gate evidence; no vendor browser capture-control claim beyond Hibiki own response handling.",
+    "The WinUICompat item remains local compatibility-preview source/build/launch evidence, not formal XAML, accessibility, launch-stability or audio evidence.",
+    "The per-group limiter item remains user-space DSP source, contract-test and SPEC-0002 evidence; no physical-audio delivery claim.",
+    "The soak item remains local user-space process evidence over the existing Engine Preview build; no driver or physical endpoint claim.",
+    "No driver install/load/HLK/Microsoft signing claim."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-23T18:58:00+08:00",
+  "finished_at": "pending-gates"
+}
