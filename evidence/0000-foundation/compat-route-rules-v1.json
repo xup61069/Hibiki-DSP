@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "issue": 804,
+  "scope_digest": "compat-route-rules-v1",
+  "source_commit": "5c804dc",
+  "environment_fingerprint": "windows-local-pwsh-7.6.4-dotnet8",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 804",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
+    "pwsh -NoProfile -File tools/winui-shell-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "existing route-rule validation and persistence seams unchanged"
+      ]
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "route-rule list, fields, actions, accessible names, launch smoke"
+      ]
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "route-rule list, fields, actions, accessible names, launch smoke"
+      ]
+    },
+    {
+      "command": "tools/winui-shell-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "34 WinUICompat controls",
+        "26 DesktopCompat controls"
+      ]
+    }
+  ],
+  "limitations": [
+    "Compatibility preview source/build/launch evidence only.",
+    "No runtime screen-reader audit, physical audio, driver install/load, HLK or Microsoft signing claim."
+  ],
+  "logs": [],
+  "started_at": "2026-08-24T08:10:00+08:00",
+  "finished_at": "2026-08-24T08:35:00+08:00"
+}

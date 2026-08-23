@@ -32,6 +32,19 @@ internal sealed class PreviewForm : Form
     private readonly TextBox _sessionLane = new() { Width = 220, PlaceholderText = "Lane ID", AccessibleName = "Lane ID 輸入欄" };
     private readonly TextBox _sessionOutput = new() { Width = 220, PlaceholderText = "Output Group", AccessibleName = "Output Group 輸入欄" };
     private readonly Button _applySessionRoute = new() { Text = "套用選取 App 路由", AutoSize = true, AccessibleName = "套用選取 App 路由" };
+    private readonly ListBox _routeRuleList = new() { Width = 550, Height = 110, AccessibleName = "App 路由預設列表" };
+    private readonly TextBox _routeRuleId = new() { Width = 260, PlaceholderText = "預設 ID（小寫英文／數字／- _ .）", AccessibleName = "App 路由預設 ID" };
+    private readonly TextBox _routeRuleAppId = new() { Width = 260, PlaceholderText = "App ID（例如 game.exe，可留空）", AccessibleName = "App 路由預設 App ID" };
+    private readonly TextBox _routeRuleDisplayName = new() { Width = 260, PlaceholderText = "顯示名稱（可留空）", AccessibleName = "App 路由預設顯示名稱" };
+    private readonly TextBox _routeRuleLaneId = new() { Width = 260, PlaceholderText = "Lane ID", AccessibleName = "App 路由預設 Lane ID" };
+    private readonly TextBox _routeRuleOutputGroup = new() { Width = 260, PlaceholderText = "Output Group（main／low-latency／surround）", AccessibleName = "App 路由預設 Output Group" };
+    private readonly NumericUpDown _routeRulePriority = new() { Minimum = -1000000, Maximum = 1000000, Value = 0, Width = 160, AccessibleName = "App 路由預設優先級" };
+    private readonly NumericUpDown _routeRuleMakeupGain = new() { Minimum = -144, Maximum = 12, DecimalPlaces = 1, Increment = 0.5M, Width = 160, AccessibleName = "App 路由預設補償增益分貝" };
+    private readonly CheckBox _routeRuleEnabled = new() { Text = "啟用預設", AutoSize = true, Checked = true, AccessibleName = "啟用 App 路由預設" };
+    private readonly ComboBox _routeRuleGainOwner = new() { Width = 220, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "App 路由預設增益控制者" };
+    private readonly Button _applyRouteRule = new() { Text = "新增／更新預設", AutoSize = true, AccessibleName = "新增或更新 App 路由預設" };
+    private readonly Button _removeRouteRule = new() { Text = "移除選取預設", AutoSize = true, AccessibleName = "移除選取的 App 路由預設" };
+    private readonly Button _clearRouteRules = new() { Text = "清除全部預設", AutoSize = true, AccessibleName = "清除全部 App 路由預設" };
     private readonly Label _effective = new() { AutoSize = true };
     private readonly ComboBox _scenes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取情境設定檔" };
     private readonly TextBox _customSceneId = new() { Width = 220, PlaceholderText = "Scene ID", AccessibleName = "自訂場景 ID" };
@@ -48,6 +61,7 @@ internal sealed class PreviewForm : Form
     private readonly System.Windows.Forms.Timer _statusTimer = new() { Interval = 1000 };
     private bool _updatingScene;
     private bool _updatingSession;
+    private bool _updatingRouteRules;
     private bool _statusRefreshActive;
 
     internal PreviewForm(EasyControlViewModel viewModel)
@@ -206,6 +220,112 @@ internal sealed class PreviewForm : Form
             RefreshView();
         };
         panel.Controls.Add(_applySessionRoute);
+        panel.Controls.Add(new Label { Text = "App 路由預設（Expert）", AutoSize = true, Margin = new Padding(3, 18, 3, 0) });
+        panel.Controls.Add(new Label
+        {
+            Text = "建立後會保存到本機；只有 App 清單已同步且引擎回覆 Ack，才會顯示為已套用。App ID 或顯示名稱至少填一項。",
+            AutoSize = false,
+            Width = 550,
+            Height = 42
+        });
+        SyncRouteRuleList();
+        panel.Controls.Add(_routeRuleList);
+        _routeRuleId.TextChanged += (_, _) => _viewModel.RouteRuleId = _routeRuleId.Text;
+        _routeRuleAppId.TextChanged += (_, _) => _viewModel.RouteRuleAppId = _routeRuleAppId.Text;
+        _routeRuleDisplayName.TextChanged += (_, _) => _viewModel.RouteRuleDisplayName = _routeRuleDisplayName.Text;
+        _routeRuleLaneId.TextChanged += (_, _) => _viewModel.RouteRuleLaneId = _routeRuleLaneId.Text;
+        _routeRuleOutputGroup.TextChanged += (_, _) => _viewModel.RouteRuleOutputGroup = _routeRuleOutputGroup.Text;
+        _routeRulePriority.ValueChanged += (_, _) => _viewModel.RouteRulePriority = (int)_routeRulePriority.Value;
+        _routeRuleMakeupGain.ValueChanged += (_, _) => _viewModel.RouteRuleMakeupGainDb = (double)_routeRuleMakeupGain.Value;
+        _routeRuleEnabled.CheckedChanged += (_, _) => _viewModel.RouteRuleEnabled = _routeRuleEnabled.Checked;
+        _routeRuleGainOwner.DataSource = _viewModel.RouteRuleGainOwners.ToList();
+        _routeRuleGainOwner.SelectedIndexChanged += (_, _) =>
+        {
+            if (_updatingRouteRules || _routeRuleGainOwner.SelectedItem is not SessionRouteRuleGainOwnerV1 owner) return;
+            _viewModel.RouteRuleGainOwner = owner;
+        };
+        _updatingRouteRules = true;
+        try
+        {
+            _routeRuleGainOwner.SelectedItem = _viewModel.RouteRuleGainOwner;
+        }
+        finally
+        {
+            _updatingRouteRules = false;
+        }
+        var routeRuleIdentityFields = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false
+        };
+        routeRuleIdentityFields.Controls.Add(_routeRuleId);
+        routeRuleIdentityFields.Controls.Add(_routeRuleAppId);
+        panel.Controls.Add(routeRuleIdentityFields);
+        var routeRuleMatcherFields = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false
+        };
+        routeRuleMatcherFields.Controls.Add(_routeRuleDisplayName);
+        routeRuleMatcherFields.Controls.Add(_routeRuleLaneId);
+        panel.Controls.Add(routeRuleMatcherFields);
+        panel.Controls.Add(_routeRuleOutputGroup);
+        var routeRuleNumericFields = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false
+        };
+        routeRuleNumericFields.Controls.Add(_routeRulePriority);
+        routeRuleNumericFields.Controls.Add(_routeRuleMakeupGain);
+        panel.Controls.Add(routeRuleNumericFields);
+        var routeRuleOptionFields = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false
+        };
+        routeRuleOptionFields.Controls.Add(_routeRuleEnabled);
+        routeRuleOptionFields.Controls.Add(_routeRuleGainOwner);
+        panel.Controls.Add(routeRuleOptionFields);
+        _applyRouteRule.Click += async (_, _) =>
+        {
+            await _viewModel.ApplyRouteRuleAsync();
+            SyncRouteRuleList();
+            RefreshView();
+        };
+        _removeRouteRule.Click += async (_, _) =>
+        {
+            if (_routeRuleList.SelectedValue is string ruleId)
+            {
+                await _viewModel.ApplyRemoveRouteRuleAsync(ruleId);
+                SyncRouteRuleList();
+            }
+            RefreshView();
+        };
+        _clearRouteRules.Click += async (_, _) =>
+        {
+            await _viewModel.ApplyClearRouteRulesAsync();
+            SyncRouteRuleList();
+            RefreshView();
+        };
+        var routeRuleActions = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false
+        };
+        routeRuleActions.Controls.Add(_applyRouteRule);
+        routeRuleActions.Controls.Add(_removeRouteRule);
+        routeRuleActions.Controls.Add(_clearRouteRules);
+        panel.Controls.Add(routeRuleActions);
+        _routeRuleList.SelectedIndexChanged += (_, _) =>
+        {
+            if (_updatingRouteRules) return;
+            RefreshView();
+        };
         panel.Controls.Add(_status);
         Controls.Add(panel);
         _viewModel.PropertyChanged += OnViewModelChanged;
@@ -243,7 +363,13 @@ internal sealed class PreviewForm : Form
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (!IsDisposed && IsHandleCreated) BeginInvoke(RefreshView);
+        if (IsDisposed || !IsHandleCreated) return;
+        if (e.PropertyName == nameof(EasyControlViewModel.RouteRules))
+        {
+            BeginInvoke(SyncRouteRuleList);
+            return;
+        }
+        BeginInvoke(RefreshView);
     }
 
     private void RefreshView()
@@ -294,6 +420,8 @@ internal sealed class PreviewForm : Form
         _sessionLane.Enabled = _viewModel.IsConnected && hasSession;
         _sessionOutput.Enabled = _viewModel.IsConnected && hasSession;
         _applySessionRoute.Enabled = _viewModel.IsConnected && hasSession;
+        _removeRouteRule.Enabled = _viewModel.RouteRules.Count > 0 && _routeRuleList.SelectedValue is string;
+        _clearRouteRules.Enabled = _viewModel.RouteRules.Count > 0;
         _loadIr.Enabled = _viewModel.IsConnected && _viewModel.IrPhaseMode != IrPhaseMode.Bypass;
         _irStrength.Enabled = _viewModel.IrPhaseMode is IrPhaseMode.MixedPhase or IrPhaseMode.LinearPhase;
         _effective.Text = $"實際有效音量：{_viewModel.EffectiveVolumeDb:0.0} dB；{_viewModel.VolumeOriginText}；{_viewModel.VolumeActuatorText}";
@@ -357,5 +485,26 @@ internal sealed class PreviewForm : Form
         if (_sessionOutput.Text != _viewModel.SessionRouteOutputGroup)
             _sessionOutput.Text = _viewModel.SessionRouteOutputGroup;
         if (selected is null) _sessionSelector.SelectedIndex = -1;
+    }
+
+    private void SyncRouteRuleList()
+    {
+        var selectedId = _routeRuleList.SelectedValue as string;
+        _updatingRouteRules = true;
+        try
+        {
+            var rules = _viewModel.RouteRules.ToArray();
+            _routeRuleList.DataSource = null;
+            _routeRuleList.DisplayMember = nameof(SessionRouteRuleCard.Summary);
+            _routeRuleList.ValueMember = nameof(SessionRouteRuleCard.RuleId);
+            _routeRuleList.DataSource = rules;
+            if (selectedId is null) return;
+            var selectedIndex = Array.FindIndex(rules, item => item.RuleId == selectedId);
+            if (selectedIndex >= 0) _routeRuleList.SelectedIndex = selectedIndex;
+        }
+        finally
+        {
+            _updatingRouteRules = false;
+        }
     }
 }

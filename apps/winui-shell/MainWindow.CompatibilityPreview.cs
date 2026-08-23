@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 
 using System.ComponentModel;
 using Microsoft.UI.Xaml;
@@ -15,6 +15,7 @@ public sealed partial class MainWindow
 {
 #if HIBIKI_COMPATIBILITY_PREVIEW
     private readonly StackPanel _compatibilityCustomSceneList = new() { Spacing = 8 };
+    private readonly StackPanel _compatibilityRouteRuleList = new() { Spacing = 8 };
 
     private static T ResolveThemeResource<T>(string key) where T : class
     {
@@ -139,6 +140,81 @@ public sealed partial class MainWindow
         AutomationProperties.SetName(routeSummary, "路由健康狀態摘要");
         routeSummary.SetBinding(TextBlock.TextProperty, BindingFor("Expert.RouteHealthAccessibleSummary"));
         content.Children.Add(routeSummary);
+
+        content.Children.Add(new TextBlock
+        {
+            Text = "App 路由預設（Expert）",
+            Style = ResolveThemeResource<Style>("SubtitleTextBlockStyle"),
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+        });
+        content.Children.Add(new TextBlock
+        {
+            Text = "建立後會保存到本機；只有 App 清單已同步且引擎回覆 Ack，才會顯示為已套用。App ID 或顯示名稱至少填一項。",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush"),
+        });
+        AutomationProperties.SetName(_compatibilityRouteRuleList, "App 路由預設列表");
+        content.Children.Add(_compatibilityRouteRuleList);
+        var routeRuleIdBox = new TextBox { Header = "預設 ID（小寫英文／數字／- _ .）" };
+        AutomationProperties.SetName(routeRuleIdBox, "App 路由預設 ID");
+        routeRuleIdBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("RouteRuleId"));
+        content.Children.Add(routeRuleIdBox);
+        var routeRuleAppIdBox = new TextBox { Header = "App ID（例如 game.exe，可留空）" };
+        AutomationProperties.SetName(routeRuleAppIdBox, "App 路由預設 App ID");
+        routeRuleAppIdBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("RouteRuleAppId"));
+        content.Children.Add(routeRuleAppIdBox);
+        var routeRuleDisplayNameBox = new TextBox { Header = "顯示名稱（可留空）" };
+        AutomationProperties.SetName(routeRuleDisplayNameBox, "App 路由預設顯示名稱");
+        routeRuleDisplayNameBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("RouteRuleDisplayName"));
+        content.Children.Add(routeRuleDisplayNameBox);
+        var routeRuleLaneBox = new TextBox { Header = "Lane ID" };
+        AutomationProperties.SetName(routeRuleLaneBox, "App 路由預設 Lane ID");
+        routeRuleLaneBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("RouteRuleLaneId"));
+        content.Children.Add(routeRuleLaneBox);
+        var routeRuleOutputBox = new TextBox { Header = "Output Group（main／low-latency／surround）" };
+        AutomationProperties.SetName(routeRuleOutputBox, "App 路由預設 Output Group");
+        routeRuleOutputBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("RouteRuleOutputGroup"));
+        content.Children.Add(routeRuleOutputBox);
+        var routeRulePriorityBox = new NumberBox
+        {
+            Header = "優先級",
+            Minimum = -1_000_000,
+            Maximum = 1_000_000,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
+        };
+        AutomationProperties.SetName(routeRulePriorityBox, "App 路由預設優先級");
+        routeRulePriorityBox.SetBinding(NumberBox.ValueProperty, TwoWayBindingFor("RouteRulePriority"));
+        content.Children.Add(routeRulePriorityBox);
+        var routeRuleGainBox = new NumberBox
+        {
+            Header = "補償增益 dB",
+            Minimum = -144,
+            Maximum = 12,
+            SmallChange = 0.5,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
+        };
+        AutomationProperties.SetName(routeRuleGainBox, "App 路由預設補償增益分貝");
+        routeRuleGainBox.SetBinding(NumberBox.ValueProperty, TwoWayBindingFor("RouteRuleMakeupGainDb"));
+        content.Children.Add(routeRuleGainBox);
+        var routeRuleEnabledCheck = new CheckBox { Content = "啟用預設" };
+        AutomationProperties.SetName(routeRuleEnabledCheck, "啟用 App 路由預設");
+        routeRuleEnabledCheck.SetBinding(CheckBox.IsCheckedProperty, TwoWayBindingFor("RouteRuleEnabled"));
+        content.Children.Add(routeRuleEnabledCheck);
+        var routeRuleGainOwnerSelector = new ComboBox { Header = "增益控制者" };
+        AutomationProperties.SetName(routeRuleGainOwnerSelector, "App 路由預設增益控制者");
+        routeRuleGainOwnerSelector.SetBinding(ItemsControl.ItemsSourceProperty, BindingFor("RouteRuleGainOwners"));
+        routeRuleGainOwnerSelector.SetBinding(Selector.SelectedItemProperty, TwoWayBindingFor("RouteRuleGainOwner"));
+        content.Children.Add(routeRuleGainOwnerSelector);
+        var applyRouteRuleButton = new Button { Content = "新增／更新預設" };
+        AutomationProperties.SetName(applyRouteRuleButton, "新增或更新 App 路由預設");
+        applyRouteRuleButton.Click += OnCompatibilityApplyRouteRuleClick;
+        content.Children.Add(applyRouteRuleButton);
+        var clearRouteRulesButton = new Button { Content = "清除全部預設" };
+        AutomationProperties.SetName(clearRouteRulesButton, "清除全部 App 路由預設");
+        clearRouteRulesButton.Click += OnCompatibilityClearRouteRulesClick;
+        content.Children.Add(clearRouteRulesButton);
+        SyncCompatibilityRouteRules();
+
         var volume = new Slider
         {
             Minimum = -60,
@@ -234,6 +310,8 @@ public sealed partial class MainWindow
     {
         if (e.PropertyName == nameof(EasyControlViewModel.CustomSceneCards))
             SyncCompatibilityCustomScenes();
+        if (e.PropertyName == nameof(EasyControlViewModel.RouteRules))
+            SyncCompatibilityRouteRules();
     }
 
     private void OnCompatibilityPreviewClosed(object sender, WindowEventArgs e)
@@ -280,6 +358,50 @@ public sealed partial class MainWindow
     {
         if (sender is Button { Tag: string sceneId })
             ViewModel.RemoveCustomScene(sceneId);
+    }
+
+    private async void OnCompatibilityApplyRouteRuleClick(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.ApplyRouteRuleAsync();
+    }
+
+    private async void OnCompatibilityRemoveRouteRuleClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string ruleId })
+            await ViewModel.ApplyRemoveRouteRuleAsync(ruleId);
+    }
+
+    private async void OnCompatibilityClearRouteRulesClick(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.ApplyClearRouteRulesAsync();
+    }
+
+    private void SyncCompatibilityRouteRules()
+    {
+        _compatibilityRouteRuleList.Children.Clear();
+        var secondaryBrush = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush");
+        foreach (var rule in ViewModel.RouteRules)
+        {
+            var row = new Grid { ColumnSpacing = 8 };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var summary = new TextBlock
+            {
+                Text = rule.Summary,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = secondaryBrush,
+            };
+            AutomationProperties.SetName(summary, $"App 路由預設 {rule.RuleId}");
+            Grid.SetColumn(summary, 0);
+            var removeButton = new Button { Content = "移除", Tag = rule.RuleId };
+            AutomationProperties.SetName(removeButton, $"移除 App 路由預設 {rule.RuleId}");
+            removeButton.Click += OnCompatibilityRemoveRouteRuleClick;
+            Grid.SetColumn(removeButton, 1);
+            row.Children.Add(summary);
+            row.Children.Add(removeButton);
+            _compatibilityRouteRuleList.Children.Add(row);
+        }
     }
 
     private static Binding BindingFor(string property) => new()
