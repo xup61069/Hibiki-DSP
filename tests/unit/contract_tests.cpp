@@ -252,6 +252,12 @@ int main() {
     scene.id = "game";
     scene.name = "Game";
     scene.output_group = "main";
+    CHECK(validate_scene(scene));
+    scene.output_group = std::string(64, 'g');
+    CHECK(validate_scene(scene));
+    scene.output_group = std::string(65, 'g');
+    CHECK(!validate_scene(scene));
+    scene.output_group = "main";
     scene.lanes.push_back("game-lane");
     CHECK(validate_scene(scene));
     scene.lanes.clear();
@@ -718,6 +724,11 @@ int main() {
     CHECK(!validate_policy(calibrated));
     calibrated.standard = "iso-226-2023-calibrated";
     CHECK(validate_policy(calibrated));
+    calibrated.anchor_id = std::string(64, 'a');
+    CHECK(validate_policy(calibrated));
+    calibrated.anchor_id = std::string(65, 'a');
+    CHECK(!validate_policy(calibrated));
+    calibrated.anchor_id = "speaker-anchor";
     calibrated.reference_phon = 95.0;
     CHECK(!validate_policy(calibrated));
 
