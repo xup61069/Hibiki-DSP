@@ -2,6 +2,7 @@
 
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Linq;
 
 namespace Hibiki.ControlModel;
 
@@ -91,6 +92,11 @@ public sealed class ExpertSurfaceModel : INotifyPropertyChanged
     public string RouteSummary =>
         "每個來源的處理邊界獨立顯示；未收到引擎快照前不宣稱已路由。";
 
+    public string RouteHealthAccessibleSummary =>
+        RouteHealth.Count == 0
+            ? "路由狀態：尚未收到引擎快照"
+            : "路由狀態：" + string.Join("／", RouteHealth.Select(route => route.AccessibleSummary));
+
     public string StatusText =>
         IsVisible
             ? "Expert 檢視：目前為唯讀 contract；修改必須經版本化 engine command"
@@ -130,6 +136,7 @@ public sealed class ExpertSurfaceModel : INotifyPropertyChanged
         _routeHealth = cards.ToArray();
         OnPropertyChanged(nameof(RouteHealth));
         OnPropertyChanged(nameof(RouteSummary));
+        OnPropertyChanged(nameof(RouteHealthAccessibleSummary));
         return true;
     }
 
