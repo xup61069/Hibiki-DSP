@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 627,
   "scope_digest": "multigroup-latency-clock-v1",
-  "source_commit": "a37ed1b",
+  "source_commit": "413b694612fd1b3d803b40d9576e7404c65531d1",
   "environment_fingerprint": "windows-26200-pwsh-7.6.4-dotnet-10.0.400",
   "commands": [
     "pwsh -File tools/verify.ps1",

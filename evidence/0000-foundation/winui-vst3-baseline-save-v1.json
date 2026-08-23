@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 794,
   "scope_digest": "winui-vst3-baseline-save-v1",
-  "source_commit": "57fb75aae38b8dc60d401a40121dd9e825095484",
+  "source_commit": "3a2845f031fba2d6e1fab42a75f71452859e1488",
   "environment_fingerprint": "windows-local-pwsh-7.6.4",
   "commands": [
     "pwsh -NoProfile -File tools/winui-shell-check.ps1",
