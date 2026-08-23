@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "issue": 647,
+  "scope_digest": "true-peak-release-v1",
+  "source_commit": "f5155fd1d49028135ca1aa5d38be19729f173ddc",
+  "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100",
+  "commands": [
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/handoff-check.ps1 -Issue 647",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/verify.ps1",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/docs-check.ps1",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/source-policy.ps1",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/doctor.ps1 -CheckOnly",
+      "status": "pass",
+      "coverage": ["build toolchain and required SDK/WDK baseline"],
+      "compiled_artifacts": false,
+      "case_count": 6
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 647",
+      "status": "pass",
+      "coverage": ["issue ownership", "branch and base commit", "scope"],
+      "compiled_artifacts": false,
+      "case_count": 1
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "hibiki_asio_transport_selftest: pass",
+        "hibiki_tab_bridge_selftest: pass",
+        "hibiki_contract_tests: pass including bounded true-peak release regression"
+      ],
+      "compiled_artifacts": true,
+      "case_count": 3
+    },
+    {
+      "command": "docs/source/source-only-ci/diff checks",
+      "status": "pass",
+      "coverage": [
+        "documentation links and required paths",
+        "560 tracked source-only paths",
+        "CI publication policy",
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 4
+    }
+  ],
+  "changes": [
+    {
+      "file": "src/hub/include/hibiki/true_peak_limiter.hpp",
+      "summary": "Track the last applied block gain and cap recovery at +6 dB per processed block; attenuation remains immediate."
+    },
+    {
+      "file": "src/hub/src/true_peak_limiter.cpp",
+      "summary": "Apply bounded block-to-block gain recovery, reset it with the limiter, and retain existing ceiling/probe/finiteness behavior."
+    },
+    {
+      "file": "tests/unit/contract_tests.cpp",
+      "summary": "Add consecutive-block regression for capped recovery, eventual settle, and immediate re-attenuation."
+    },
+    {
+      "file": "docs/specs/SPEC-0002-volume-and-iso.md",
+      "summary": "Document the bounded recovery boundary and retained no-conformance limitation."
+    }
+  ],
+  "limitations": [
+    "User-space source contract only; no RT-thread allocation, lock, wait, COM, filesystem, or UI work is introduced.",
+    "The fixed +6 dB per block policy is not an ITU/BS.1770 or certified true-peak conformance claim.",
+    "No physical endpoint, driver, HLK, Microsoft-signing, or audible listening-test claim is made."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "cmake": "4.4.0",
+    "msbuild": "18.9.1.35102",
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-23T15:54:00+08:00",
+  "finished_at": "2026-08-23T16:04:12+08:00"
+}

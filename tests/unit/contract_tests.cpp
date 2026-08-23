@@ -437,6 +437,17 @@ int main() {
     float finite_guard[] = {std::numeric_limits<float>::quiet_NaN(), 0.25F};
     CHECK(limiter.limit_in_place(finite_guard, 1U, 2U, -1.0) == 1.0F &&
           finite_guard[0] == 0.0F);
+    limiter.reset();
+    float limiter_loud[] = {2.0F, -2.0F};
+    const auto loud_gain = limiter.limit_in_place(limiter_loud, 1U, 2U, -1.0);
+    CHECK(loud_gain < 1.0F);
+    float limiter_quiet[] = {0.001F, -0.001F};
+    const auto recovery_gain =
+        limiter.limit_in_place(limiter_quiet, 1U, 2U, -1.0);
+    CHECK(recovery_gain > loud_gain && recovery_gain < 1.0F &&
+          recovery_gain <= loud_gain * 2.0F + 1.0e-6F);
+    const auto settled_gain = limiter.limit_in_place(limiter_quiet, 1U, 2U, -1.0);
+    CHECK(settled_gain == 1.0F);
 
     std::vector<IsoContourPoint> current{{100.0, 60.0}, {1000.0, 40.0}};
     std::vector<IsoContourPoint> reference{{100.0, 50.0}, {1000.0, 40.0}};
