@@ -795,6 +795,13 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
+第二十六波整合增量已合併：WinUI Expert shell 開放本機 VST3 時間軸編輯器，
+支援時間軸選取、草稿開始／提交／捨棄、復原／重做與事件增刪／數值編輯，
+Compatibility Preview 補上相同的選取 seam（Issue #667 / PR #669、Issue #673 /
+PR #677）。瀏覽器單分頁捕捉新增使用者控制的 Stop，popup 開啟時反映真實捕捉
+狀態，啟動失敗如實回報錯誤而非假裝成功（Issue #671 / PR #676）。皆為
+control-model／shell source、extension source、policy check 與 SPEC-0009／SPEC-0010
+evidence；不宣稱實體音訊或 driver 能力。
 第二十五波整合增量已合併：IpcNamedPipeServerV1 在兩次連線之間的空檔收到 stop() 時，
 會重複取消當下註冊的 server handle I/O 直到 worker 結束，Engine Preview 關閉不再
 固定等待完整 idle timeout；connected-idle prompt-stop 行為維持不變，IPC framing 與
