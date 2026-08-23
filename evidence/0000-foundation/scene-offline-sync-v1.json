@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 823,
   "scope_digest": "scene-offline-sync-v1",
-  "source_commit": "pending",
+  "source_commit": "8b3b5a380752",
   "environment_fingerprint": "windows-local-pwsh-7.6.4-dotnet8",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 823",
@@ -50,3 +50,4 @@
   "started_at": "2026-08-24T01:30:00+08:00",
   "finished_at": "2026-08-24T01:32:51+08:00"
 }
+
