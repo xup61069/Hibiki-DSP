@@ -345,6 +345,78 @@ var invalidUtf8Scene = viewModel.LastCommand.Payload.ToArray();
 invalidUtf8Scene[1] = 0xFF;
 Check(!ControlPayloadsV1.TryDecodeSceneApply(invalidUtf8Scene, out _, out _),
     "SceneApply decoder must reject invalid UTF-8 rather than substitute characters.");
+var removableScenePath = Path.Combine(
+    Path.GetTempPath(), $"hibiki-removable-scene-check-{Guid.NewGuid():N}.json");
+try
+{
+    var removableSceneViewModel = new EasyControlViewModel
+    {
+        CustomSceneCatalogPath = removableScenePath,
+        SelectedOutputGroup = "main"
+    };
+    var customSceneNotifications = new List<string>();
+    removableSceneViewModel.PropertyChanged += (_, args) =>
+        customSceneNotifications.Add(args.PropertyName ?? string.Empty);
+    Check(removableSceneViewModel.UpsertCustomScene(new SceneCard(
+              "removable-scene", "可移除遊戲", "測試本機卡片", "零額外緩衝", true)) &&
+          removableSceneViewModel.CustomSceneCards.Count == 1 &&
+          removableSceneViewModel.SelectScene("removable-scene") &&
+          removableSceneViewModel.SelectedScene?.Id == "removable-scene",
+        "ViewModel removable custom Scene fixture failed.");
+    Check(removableSceneViewModel.RemoveCustomScene("removable-scene") &&
+          removableSceneViewModel.Scenes.Count == 4 &&
+          removableSceneViewModel.CustomSceneCards.Count == 0 &&
+          removableSceneViewModel.SelectedScene is null &&
+          removableSceneViewModel.StatusText.Contains("已移除") &&
+          customSceneNotifications.Contains(nameof(EasyControlViewModel.CustomSceneCards)),
+        "ViewModel must remove a selected custom Scene, notify cards and report success.");
+    Check(removableSceneViewModel.SaveCustomScenes(out _),
+        "Removed custom Scene catalog could not be saved.");
+    var reloadedRemovableScenes = new CustomSceneCatalogV1();
+    Check(reloadedRemovableScenes.TryLoad(removableScenePath, out _) &&
+          reloadedRemovableScenes.Count == 0,
+        "Removed custom Scene card must remain removed after reload.");
+    Check(!removableSceneViewModel.RemoveCustomScene("missing-scene") &&
+          removableSceneViewModel.StatusText.Contains("找不到"),
+        "Unknown custom Scene removal must fail closed.");
+    Check(!removableSceneViewModel.RemoveCustomScene("game") &&
+          removableSceneViewModel.Scenes.Count == 4 &&
+          removableSceneViewModel.SelectedScene is null,
+        "Built-in Scene IDs must remain non-removable through the custom-card seam.");
+}
+finally
+{
+    if (File.Exists(removableScenePath)) File.Delete(removableScenePath);
+}
+
+var blockedSceneDirectory = Path.Combine(
+    Path.GetTempPath(), $"hibiki-blocked-scene-check-{Guid.NewGuid():N}");
+File.WriteAllText(blockedSceneDirectory, "blocked");
+try
+{
+    var rollbackSceneViewModel = new EasyControlViewModel
+    {
+        CustomSceneCatalogPath = Path.Combine(blockedSceneDirectory, "scene-cards-v1.json"),
+        SelectedOutputGroup = "main"
+    };
+    Check(rollbackSceneViewModel.UpsertCustomScene(new SceneCard(
+              "rollback-scene", "回復測試", "保存失敗必須復原", "零額外緩衝", true)) &&
+          rollbackSceneViewModel.SelectScene("rollback-scene") &&
+          rollbackSceneViewModel.SelectedScene?.Id == "rollback-scene",
+        "ViewModel custom Scene rollback fixture failed.");
+    Check(!rollbackSceneViewModel.RemoveCustomScene("rollback-scene") &&
+          rollbackSceneViewModel.Scenes.Count == 5 &&
+          rollbackSceneViewModel.CustomSceneCards.Count == 1 &&
+          rollbackSceneViewModel.CustomSceneCards[0].Id == "rollback-scene" &&
+          rollbackSceneViewModel.SelectedScene?.Id == "rollback-scene" &&
+          rollbackSceneViewModel.StatusText.Contains("自訂場景未移除"),
+        "A failed custom Scene save must restore the prior card and selection.");
+}
+finally
+{
+    if (File.Exists(blockedSceneDirectory)) File.Delete(blockedSceneDirectory);
+}
+
 Check(viewModel.UpsertPhysicalDevice(speakers, out _) &&
       viewModel.SelectPhysicalDevice("endpoint-a") &&
       viewModel.SelectedPhysicalDevice?.DisplayName == "客廳喇叭" &&
@@ -466,6 +538,10 @@ Check(routeSnapshot[0].AccessibleSummary == "Process Loopback：已可用。目�
 Check(RouteHealthCatalogV1.Defaults.Single(card => card.Id == "direct-path").
       AccessibleSummary.Contains("Vendor ASIO／WASAPI Exclusive：繞過 Hibiki。"),
     "Default bypass route must expose an honest accessible summary.");
+Check(viewModel.Expert.RouteHealthAccessibleSummary.StartsWith("路由狀態：Process Loopback：已可用。目前引擎已回報可用。") &&
+      viewModel.Expert.RouteHealthAccessibleSummary.EndsWith("Chrome／Edge 單分頁：等待引擎回報。需要擴充功能。") &&
+      viewModel.Expert.RouteHealthAccessibleSummary.Contains("／"),
+      "Route health projection must compose full accessible summaries (name, state and boundary detail) per card.");
 var duplicateRoutes = new[] { routeSnapshot[0], routeSnapshot[0] };
 Check(!viewModel.ApplyRouteHealth(duplicateRoutes, out var duplicateRouteError) &&
       duplicateRouteError.Contains("重複"),

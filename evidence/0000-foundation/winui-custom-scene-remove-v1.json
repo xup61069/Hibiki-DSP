@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "slice": "winui-custom-scene-remove-v1",
+  "issue": "https://github.com/xup61069/Hibiki-DSP/issues/767",
+  "base_commit": "0eb83ef8b9f476efc7412ea71468c3d01c6843e3",
+  "product_outcome": [
+    "The formal WinUI custom-preset section lists local custom Scene cards and gives every remove action an accessible name and help text.",
+    "Removing a local card updates the bounded UI mirror first, saves the local catalog, clears a matching selection and reports the outcome through status text.",
+    "Unknown or built-in IDs fail closed without changing cards; a failed local save restores the prior card and selection."
+  ],
+  "verification": {
+    "control_model_check": "PASS",
+    "winui_shell_check_self_test": "PASS (10 cases)",
+    "winui_shell_check": "PASS; XAML scan found 51 named interactive controls and required the formal CustomSceneCards/remove seam.",
+    "build_preview_desktop_compat_smoke": "PASS on non-target host; compatibility launch/build evidence only.",
+    "always_run_gates": "See issue verification for final docs-check/source-policy/git diff --check/scoped handoff-check results."
+  },
+  "evidence_boundary": [
+    "Static source, contract-model and non-target Desktop Compatibility Preview evidence only.",
+    "No runtime UI Automation or screen-reader audit, no formal WinUI XAML build, no engine catalog mutation, no physical audio, no driver install/load/HLK or Microsoft signing claim."
+  ]
+}
