@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "issue": 941,
+  "scope_digest": "scene-lanes-contract-v1",
+  "source_commit": "6529040a",
+  "environment_fingerprint": "windows-amd64-pwsh-scene-lanes-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 941",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass",
+      "log": ".local/verify-941.log"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Schema maxItems 32 and per-item 1..64 chars with non-whitespace pattern; runtime validator mirrors the same bounds.",
+    "Existing valid scenes continue to pass; empty lanes arrays remain valid."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-25T00:30:00+08:00",
+  "finished_at": "2026-08-25T01:00:00+08:00"
+}
