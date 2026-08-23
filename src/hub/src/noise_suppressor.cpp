@@ -82,8 +82,12 @@ bool BasicNoiseSuppressorV1::process_interleaved(float* const interleaved,
                                             : envelope_release_coeff_;
             envelope_[channel] += envelope_coeff * (magnitude - envelope_[channel]);
             const auto desired_gain = envelope_[channel] < threshold_linear_ ? floor_linear_ : 1.0F;
-            const auto gain_coeff = desired_gain < gain_[channel] ? gain_attack_coeff_
-                                                                   : gain_release_coeff_;
+            // Attack (attack_ms) controls how fast the gate OPENS as the signal
+            // rises above threshold; release (release_ms) controls how fast it
+            // CLOSES after the signal falls below threshold.
+            const auto gate_opening = desired_gain > gain_[channel];
+            const auto gain_coeff = gate_opening ? gain_attack_coeff_
+                                                 : gain_release_coeff_;
             gain_[channel] += gain_coeff * (desired_gain - gain_[channel]);
             const auto output = filtered * gain_[channel];
             interleaved[index] = std::isfinite(output) ? output : 0.0F;

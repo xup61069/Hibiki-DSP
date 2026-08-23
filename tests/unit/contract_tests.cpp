@@ -358,6 +358,47 @@ int main() {
     voice_block.fill(0.5F);
     CHECK(noise_suppressor.process_interleaved(voice_block.data(), voice_block.size()));
     CHECK(voice_block.back() > 0.4F);
+    // Regression: gate opening must use attack_ms (fast), not release_ms (slow).
+    // Without reset, close the gate first with sub-threshold signal.
+    BasicNoiseSuppressorV1 gate_transition;
+    CHECK(gate_transition.configure(
+        BasicNoiseSuppressorPolicyV1{1, true, -40.0, -30.0, 1.0, 10.0, 80.0}, 48000U, 1U));
+    std::array<float, 480> silence_block{};
+    silence_block.fill(0.001F);
+    CHECK(gate_transition.process_interleaved(silence_block.data(), silence_block.size()));
+    // After processing silence, gain should be near floor (gate closed).
+    CHECK(silence_block.back() < 0.0005F);
+    // Now feed a loud above-threshold signal without resetting.
+    std::array<float, 48> open_block{};
+    open_block.fill(0.5F);
+    CHECK(gate_transition.process_interleaved(open_block.data(), open_block.size()));
+    // With attack_ms=1.0 at 48kHz (~21 samples per time constant), after 48 frames
+    // the gate is well open. The reversed mapping (opening with the 10 ms
+    // release coefficient) only reached ~0.062 here.
+    CHECK(open_block.back() > 0.1F);
+    // Compare two short close tails after a common recovery point so envelope
+    // history cannot mask the rate change: the second (attack_ms) tail must
+    // collapse much further than the first (release_ms) tail.
+    std::array<float, 96> recovery_block{};
+    recovery_block.fill(0.5F);
+    CHECK(gate_transition.process_interleaved(recovery_block.data(),
+                                              recovery_block.size()));
+    CHECK(recovery_block.back() > 1.0e-4F);
+    std::array<float, 480> quiet_tail{};
+    quiet_tail.fill(0.001F);
+    CHECK(gate_transition.process_interleaved(quiet_tail.data(), quiet_tail.size()));
+    std::array<float, 24> reopen_block{};
+    reopen_block.fill(0.5F);
+    CHECK(gate_transition.process_interleaved(reopen_block.data(),
+                                              reopen_block.size()));
+    CHECK(reopen_block.back() > 1.0e-4F);
+    std::array<float, 960> fast_tail{};
+    fast_tail.fill(0.001F);
+    CHECK(gate_transition.process_interleaved(fast_tail.data(), fast_tail.size()));
+    // Closing with attack_ms collapses to well under 5 percent of the
+    // release_ms tail level within the same window; compare magnitudes
+    // because the high-pass makes both tail samples negative.
+    CHECK(std::abs(fast_tail.back()) < std::abs(quiet_tail.back()) * 0.05F);
 
     OutputGroupVolumeStateV1 state;
     state.requested_db = 3.0;
