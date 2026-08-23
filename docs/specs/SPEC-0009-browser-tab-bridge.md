@@ -13,7 +13,10 @@ source_globs: ["extensions/**", "tools/extension-check.ps1"]
 
 瀏覽器只能在使用者點擊 popup 後呼叫 `tabCapture`。MV3 offscreen document 維持
 stream，AudioWorklet 將音訊轉成 `HIBT` packet；Windows process routing 不得宣稱
-能靜默取得 Chrome/Edge 單一分頁。
+能靜默取得 Chrome/Edge 單一分頁。同一時間至多一個單分頁捕捉；popup 必須顯示目前
+是否正在捕捉，並提供明確的停止控制。停止或啟動失敗時要關閉捕捉 graph 與不再需要的
+offscreen document，不得讓使用者在 UI 外殘留無法關閉的串流。UI 回報的啟動成功必須
+代表 offscreen 已實際建立串流。
 
 ## HIBT packet
 
@@ -47,4 +50,3 @@ MV3 extension source gate (`tools/extension-check.ps1`) 強制驗證最小權限
 2. Host 權限僅限 `http://127.0.0.1/*`，拒絕 wildcard remote hosts 與 `<all_urls>`。
 3. `extension_pages` CSP 必須為 `script-src 'self'; object-src 'self'; connect-src ws://127.0.0.1:17842`，
    嚴格禁止 `unsafe-eval`、`unsafe-inline`、外部 script 或 non-loopback connect-src。
-

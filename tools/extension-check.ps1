@@ -71,6 +71,12 @@ function Assert-ExtensionSourcePolicy(
   if ($popupSource -match 'chrome\.tabCapture\.') {
     throw "Popup must not access tabCapture directly in $sourceName."
   }
+  if ($popupSource -notmatch 'stopButton\.addEventListener\(\s*(?:\x27|\x22)click(?:\x27|\x22)') {
+    throw "Popup must provide an explicit stop-capture click handler in $sourceName."
+  }
+  if ($popupSource -notmatch 'type\s*:\s*(?:\x27|\x22)get-capture-state(?:\x27|\x22)') {
+    throw "Popup must query real capture state when opened in $sourceName."
+  }
   if ($offscreenSource -match 'chrome\.tabCapture\.' -or $workletSource -match 'chrome\.tabCapture\.') {
     throw "Only the service worker may access tabCapture in $sourceName."
   }
@@ -78,8 +84,11 @@ function Assert-ExtensionSourcePolicy(
   foreach ($pattern in @(
       'chrome\.runtime\.onMessage\.addListener',
       'chrome\.offscreen\.createDocument',
+      'chrome\.offscreen\.closeDocument',
       'chrome\.tabCapture\.getMediaStreamId',
-      'targetTabId\s*:\s*message\.tabId'
+      'targetTabId\s*:\s*message\.tabId',
+      'stop-tab-stream',
+      'capturing\s*=\s*false'
     )) {
     if ($serviceWorkerSource -notmatch $pattern) {
       throw "Service worker is missing required source boundary '$pattern' in $sourceName."
@@ -89,12 +98,14 @@ function Assert-ExtensionSourcePolicy(
   foreach ($pattern in @(
       'chrome\.runtime\.onMessage\.addListener',
       'new\s+AudioContext',
+      'disconnectCaptureGraph',
       'audio-worklet\.js',
       'new\s+AudioWorkletNode',
       'navigator\.mediaDevices\.getUserMedia',
       'chromeMediaSource\s*:\s*(?:\x27|\x22)tab(?:\x27|\x22)',
       'chromeMediaSourceId\s*:\s*message\.streamId',
-      'video\s*:\s*false'
+      'video\s*:\s*false',
+      'stop-tab-stream-impl'
     )) {
     if ($offscreenSource -notmatch $pattern) {
       throw "Offscreen source is missing required source boundary '$pattern' in $sourceName."
@@ -272,9 +283,9 @@ if ($SelfTest) {
   if (-not $caught) { throw 'SelfTest expected an empty CSP directive failure.' }
 
   $sourceFixture = @{
-    popup = "button.addEventListener('click', async () => { await chrome.runtime.sendMessage({type: 'capture-active-tab', tabId: tab.id}); });"
-    serviceWorker = "chrome.runtime.onMessage.addListener(async (message) => { await chrome.offscreen.createDocument({url: 'offscreen.html'}); const streamId = await chrome.tabCapture.getMediaStreamId({targetTabId: message.tabId}); });"
-    offscreen = "chrome.runtime.onMessage.addListener(async (message) => { const context = new AudioContext(); await context.audioWorklet.addModule('audio-worklet.js'); const node = new AudioWorkletNode(context, 'hibiki-tab-packetizer'); const constraints = {audio: {mandatory: {chromeMediaSource: 'tab', chromeMediaSourceId: message.streamId}}, video: false}; await navigator.mediaDevices.getUserMedia(constraints); const bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab'); });"
+    popup = "button.addEventListener('click', async () => { await chrome.runtime.sendMessage({type: 'capture-active-tab', tabId: tab.id}); }); stopButton.addEventListener('click', () => { chrome.runtime.sendMessage({type: 'stop-tab-stream'}); }); chrome.runtime.sendMessage({type: 'get-capture-state'});"
+    serviceWorker = "let capturing = false; chrome.runtime.onMessage.addListener(async (message) => { await chrome.offscreen.createDocument({url: 'offscreen.html'}); const streamId = await chrome.tabCapture.getMediaStreamId({targetTabId: message.tabId}); if (message.type === 'stop-tab-stream') { capturing = false; await chrome.offscreen.closeDocument(); } });"
+    offscreen = "function disconnectCaptureGraph() {} chrome.runtime.onMessage.addListener(async (message) => { const context = new AudioContext(); await context.audioWorklet.addModule('audio-worklet.js'); const node = new AudioWorkletNode(context, 'hibiki-tab-packetizer'); const constraints = {audio: {mandatory: {chromeMediaSource: 'tab', chromeMediaSourceId: message.streamId}}, video: false}; await navigator.mediaDevices.getUserMedia(constraints); const bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab'); if (message.type === 'stop-tab-stream-impl') { disconnectCaptureGraph(); } });"
     worklet = "const packet = new ArrayBuffer(16 + 4); const view = new DataView(packet); view.setUint8(0, 0x48); view.setUint8(1, 0x49); view.setUint8(2, 0x42); view.setUint8(3, 0x54); view.setUint16(4, 1, true); this.port.postMessage(packet, [packet]); registerProcessor('hibiki-tab-packetizer', HibikiTabPacketizer);"
   }
   Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-source-valid'
@@ -319,6 +330,21 @@ if ($SelfTest) {
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $sourceFixture.offscreen $missingPacketizer 'selftest-missing-packetizer' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected missing packetizer failure.' }
 
+  $popupWithoutStop = $sourceFixture.popup -replace "stopButton\.addEventListener\('click'.*?\);", ''
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $popupWithoutStop $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-popup-without-stop' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected missing popup stop control failure.' }
+
+  $workerWithoutStop = $sourceFixture.serviceWorker -replace "capturing\s*=\s*false", 'capturing = true'
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $workerWithoutStop $sourceFixture.offscreen $sourceFixture.worklet 'selftest-worker-without-close' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected service worker without offscreen close failure.' }
+
+  $offscreenWithoutStop = $sourceFixture.offscreen -replace "if \(message\.type === 'stop-tab-stream-impl'\) \{ disconnectCaptureGraph\(\); \}", ''
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $offscreenWithoutStop $sourceFixture.worklet 'selftest-offscreen-without-stop' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected offscreen without stop handler failure.' }
+
   $multilineCsp = $validJson | ConvertFrom-Json
   $multilineCsp.content_security_policy.extension_pages = @"
 script-src    'self' ;
@@ -327,7 +353,7 @@ connect-src   ws://127.0.0.1:17842
 "@
   Assert-ExtensionManifestPolicy $multilineCsp 'selftest-multiline-csp'
 
-  Write-Output 'Browser extension policy self-test passed (24 cases).'
+  Write-Output 'Browser extension policy self-test passed (27 cases).'
   exit 0
 }
 
