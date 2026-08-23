@@ -113,6 +113,64 @@ function Assert-VerifyCleanTarget {
   }
 }
 
+function Get-VerifyExistingPath {
+  param(
+    [Parameter(Mandatory)]
+    [string]$LiteralPath
+  )
+
+  try {
+    return Get-Item -LiteralPath $LiteralPath -Force -ErrorAction Stop
+  }
+  catch {
+    if ($_.CategoryInfo.Category -eq 'ObjectNotFound') {
+      return $null
+    }
+    throw "Unable to inspect verify output path '$LiteralPath': $($_.Exception.Message)"
+  }
+}
+
+function Assert-VerifyBuildTarget {
+  param(
+    [Parameter(Mandatory)]
+    [pscustomobject]$Plan,
+    [Parameter(Mandatory)]
+    [bool]$TargetExists,
+    [Parameter(Mandatory)]
+    [System.IO.FileAttributes]$TargetAttributes,
+    [Parameter(Mandatory)]
+    [bool]$TargetIsContainer,
+    [Parameter(Mandatory)]
+    [bool]$ParentExists,
+    [Parameter(Mandatory)]
+    [System.IO.FileAttributes]$ParentAttributes,
+    [Parameter(Mandatory)]
+    [bool]$ParentIsContainer
+  )
+
+  $expectedBuildRoot = [System.IO.Path]::GetFullPath((Join-Path $Plan.RepositoryRoot $Plan.RelativeBuildRoot))
+  $actualBuildRoot = [System.IO.Path]::GetFullPath($Plan.BuildRoot)
+  if ($actualBuildRoot -ne $expectedBuildRoot) {
+    throw "Verify build target does not match the repository-local build root: $actualBuildRoot"
+  }
+  if ($ParentExists) {
+    if (-not $ParentIsContainer) {
+      throw 'Verify build target parent must be a directory.'
+    }
+    if (($ParentAttributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+      throw 'Verify build target parent must not be a reparse point.'
+    }
+  }
+  if ($TargetExists) {
+    if (-not $TargetIsContainer) {
+      throw 'Verify build target must be a directory.'
+    }
+    if (($TargetAttributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+      throw 'Verify build target must not be a reparse point.'
+    }
+  }
+}
+
 function Invoke-MockVerifyExecution {
   param(
     [hashtable]$Mocks
@@ -129,6 +187,102 @@ function Invoke-MockVerifyExecution {
 function Invoke-VerifySelfTest {
   $plan = Get-VerifyBuildPlan -RepositoryRoot $repo
   Assert-VerifyBuildPlan -Plan $plan
+
+  Assert-VerifyBuildTarget -Plan $plan `
+    -TargetExists $false `
+    -TargetAttributes ([System.IO.FileAttributes]::Normal) `
+    -TargetIsContainer $true `
+    -ParentExists $false `
+    -ParentAttributes ([System.IO.FileAttributes]::Normal) `
+    -ParentIsContainer $true
+
+  Assert-VerifyBuildTarget -Plan $plan `
+    -TargetExists $false `
+    -TargetAttributes ([System.IO.FileAttributes]::Normal) `
+    -TargetIsContainer $true `
+    -ParentExists $true `
+    -ParentAttributes ([System.IO.FileAttributes]::Directory) `
+    -ParentIsContainer $true
+
+  Assert-VerifyBuildTarget -Plan $plan `
+    -TargetExists $true `
+    -TargetAttributes ([System.IO.FileAttributes]::Directory) `
+    -TargetIsContainer $true `
+    -ParentExists $true `
+    -ParentAttributes ([System.IO.FileAttributes]::Directory) `
+    -ParentIsContainer $true
+
+  $outsideBuildTarget = $plan.PSObject.Copy()
+  $outsideBuildTarget.BuildRoot = Join-Path $repo 'outside-verify-build'
+  try {
+    Assert-VerifyBuildTarget -Plan $outsideBuildTarget `
+      -TargetExists $false `
+      -TargetAttributes ([System.IO.FileAttributes]::Normal) `
+      -TargetIsContainer $true `
+      -ParentExists $false `
+      -ParentAttributes ([System.IO.FileAttributes]::Normal) `
+      -ParentIsContainer $true
+    throw 'Outside build target was accepted.'
+  }
+  catch {
+    if ($_.Exception.Message -notmatch 'does not match the repository-local build root') { throw }
+  }
+
+  try {
+    Assert-VerifyBuildTarget -Plan $plan `
+      -TargetExists $true `
+      -TargetAttributes ([System.IO.FileAttributes]::Normal) `
+      -TargetIsContainer $false `
+      -ParentExists $true `
+      -ParentAttributes ([System.IO.FileAttributes]::Directory) `
+      -ParentIsContainer $true
+    throw 'File build target was accepted.'
+  }
+  catch {
+    if ($_.Exception.Message -notmatch 'target must be a directory') { throw }
+  }
+
+  try {
+    Assert-VerifyBuildTarget -Plan $plan `
+      -TargetExists $true `
+      -TargetAttributes ([System.IO.FileAttributes]::Directory -bor [System.IO.FileAttributes]::ReparsePoint) `
+      -TargetIsContainer $true `
+      -ParentExists $true `
+      -ParentAttributes ([System.IO.FileAttributes]::Directory) `
+      -ParentIsContainer $true
+    throw 'Reparse-point build target was accepted.'
+  }
+  catch {
+    if ($_.Exception.Message -notmatch 'target must not be a reparse point') { throw }
+  }
+
+  try {
+    Assert-VerifyBuildTarget -Plan $plan `
+      -TargetExists $false `
+      -TargetAttributes ([System.IO.FileAttributes]::Normal) `
+      -TargetIsContainer $true `
+      -ParentExists $true `
+      -ParentAttributes ([System.IO.FileAttributes]::Normal) `
+      -ParentIsContainer $false
+    throw 'File build parent was accepted.'
+  }
+  catch {
+    if ($_.Exception.Message -notmatch 'parent must be a directory') { throw }
+  }
+
+  try {
+    Assert-VerifyBuildTarget -Plan $plan `
+      -TargetExists $false `
+      -TargetAttributes ([System.IO.FileAttributes]::Normal) `
+      -TargetIsContainer $true `
+      -ParentExists $true `
+      -ParentAttributes ([System.IO.FileAttributes]::Directory -bor [System.IO.FileAttributes]::ReparsePoint) `
+      -ParentIsContainer $true
+    throw 'Reparse-point build parent was accepted.'
+  }
+  catch {
+    if ($_.Exception.Message -notmatch 'parent must not be a reparse point') { throw }
+  }
 
   Assert-VerifyCleanTarget -Plan $plan `
     -TargetAttributes ([System.IO.FileAttributes]::Directory) `
@@ -257,7 +411,7 @@ function Invoke-VerifySelfTest {
   $ok = Invoke-MockVerifyExecution -Mocks @{ GetCommand = { param($n) [pscustomobject]@{Name=$n} }; ConfigureExitCode = 0; BuildExitCode = 0; TestExitCode = 0 }
   if (-not $ok) { throw 'Mocked success did not return true.' }
 
-  Write-Output 'Aggregate verification self-test passed (14 cases; offline/no-build/no-process/no-CMake/no-CTest/no-delete/no-file-write).'
+  Write-Output 'Aggregate verification self-test passed (22 cases; offline/no-build/no-process/no-CMake/no-CTest/no-delete/no-file-write).'
 }
 
 if ($SelfTest) {
@@ -276,6 +430,29 @@ if ($Clean -and (Test-Path -LiteralPath $build)) {
     -TargetIsContainer $cleanTarget.PSIsContainer
   Remove-Item -LiteralPath $build -Recurse -Force
 }
+$target = Get-VerifyExistingPath -LiteralPath $build
+$parent = Get-VerifyExistingPath -LiteralPath (Split-Path -Parent $build)
+$targetExists = $null -ne $target
+$targetAttributes = [System.IO.FileAttributes]::Normal
+$targetIsContainer = $true
+if ($targetExists) {
+  $targetAttributes = $target.Attributes
+  $targetIsContainer = $target.PSIsContainer
+}
+$parentExists = $null -ne $parent
+$parentAttributes = [System.IO.FileAttributes]::Normal
+$parentIsContainer = $true
+if ($parentExists) {
+  $parentAttributes = $parent.Attributes
+  $parentIsContainer = $parent.PSIsContainer
+}
+Assert-VerifyBuildTarget -Plan $plan `
+  -TargetExists $targetExists `
+  -TargetAttributes $targetAttributes `
+  -TargetIsContainer $targetIsContainer `
+  -ParentExists $parentExists `
+  -ParentAttributes $parentAttributes `
+  -ParentIsContainer $parentIsContainer
 New-Item -ItemType Directory -Path $build -Force | Out-Null
 
 cmake @($plan.ConfigureArguments)
