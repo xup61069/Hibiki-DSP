@@ -656,6 +656,10 @@ var validPoint = new CalibrationPointV1(1000.0, -3.0, 0.0);
 Check(validPoint.IsValid, "Valid calibration point must be accepted.");
 Check(!new CalibrationPointV1(0.0, 0.0, 0.0).IsValid &&
       !new CalibrationPointV1(25000.0, 0.0, 0.0).IsValid &&
+      !new CalibrationPointV1(1000.0, -144.5, 0.0).IsValid &&
+      !new CalibrationPointV1(1000.0, 12.5, 0.0).IsValid &&
+      !new CalibrationPointV1(1000.0, 0.0, -200.0).IsValid &&
+      new CalibrationPointV1(1000.0, -144.0, 12.0).IsValid &&
       !new CalibrationPointV1(double.NaN, 0.0, 0.0).IsValid,
     "Invalid calibration point must fail closed.");
 var calibPoints = new List<CalibrationPointV1>

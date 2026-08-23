@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "issue": 979,
+  "scope_digest": "calib-dbruntime-bounds-v1",
+  "source_commit": "61cf2f3f",
+  "environment_fingerprint": "windows-amd64-pwsh-calib-dbruntime-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 979",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass",
+      "log": ".local/wt-979-verify.log"
+    },
+    {
+      "command": "control-model-check",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "C++ validate_calibration_response_v1 and C# CalibrationPointV1.IsValid now enforce [-144, +12] dB for measured_db/target_db, matching the calibration-response-v1 schema bound from PR #960.",
+    "Contract and control-model tests cover inclusive boundaries (-144/+12 accepted) and adjacent rejects; no DSP gain math or PEQ filter behavior changed for in-range inputs."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-24T07:22:00+08:00",
+  "finished_at": "2026-08-24T07:34:00+08:00"
+}
