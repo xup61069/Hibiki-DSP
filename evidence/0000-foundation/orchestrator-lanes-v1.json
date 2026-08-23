@@ -19,6 +19,7 @@
     "CONFLICT_POLICY.md routes cross-lane arbitration to the orchestrator instead of first-commit ownership.",
     "AGENTS.md entry rules point at orchestrator assignment, handoff-block owner confirmation and worktree occupancy checks without contradicting the new model."
   ],
+  "source_commit": "389149affc225feb473fec70275ea43e5839455b",
   "limitations": [
     "Documentation/workflow-only change; no product API, IPC/schema, DSP order, RT-thread, driver boundary or release behavior change.",
     "Entry documents outside this slice still contain legacy self-claim wording; follow-up slice required for docs/START_HERE.md, SPEC-0004, README.md, CONTRIBUTING.md and templates."

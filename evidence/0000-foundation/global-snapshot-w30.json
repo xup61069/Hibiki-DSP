@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 739,
   "scope_digest": "global-snapshot-w30",
-  "source_commit": null,
+  "source_commit": "a666fede6cdd8d94bd1e883a729850d1ebd34d2b",
   "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6; documentation-only integrator snapshot",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 739",

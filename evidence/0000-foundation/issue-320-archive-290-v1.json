@@ -82,6 +82,7 @@
       "compiled_artifacts": false
     }
   ],
+  "source_commit": "dc8e9fde80e99b1d87ab4cf95baacd5f83455c58",
   "limitations": [
     "Documentation/governance archive only; no product API, IPC/schema, DSP order, RT audio, driver, HLK or signing behavior is changed.",
     "User-space Windows 26200 machine; not target Windows 11 24H2+ environment evidence.",

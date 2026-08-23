@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 687,
   "scope_digest": "compat-preview-build-v1",
-  "source_commit": null,
+  "source_commit": "fe19c49a365cc1187262b87ad83dbb013caa1075",
   "environment_fingerprint": "windows-11-26200-x64-dotnet-sdk-local-windows-app-runtime-1.7; compatibility-preview source-only",
   "commands": [
     "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat",

@@ -56,6 +56,7 @@
   "implementation": [
     "apps/winui-shell/MainWindow.CompatibilityPreview.cs: add 刪除目前時間軸 button with AutomationProperties.Name, wired to the existing OnVst3RemoveTimelineClick handler."
   ],
+  "source_commit": "368c0f1e35eb30ed12859ca19ed41c2ee27265df",
   "limitations": [
     "Compatibility Preview build/launch is degraded-UI evidence only.",
     "No driver installation/load, HLK, Microsoft signing, engine commit, persistence, or audible playback claim."

@@ -16,5 +16,6 @@
     "source_policy": "pass",
     "diff_check": "pass"
   },
-  "boundary": "Source/self-test evidence only. No browser runtime automation, no physical audio measurement, no driver install/load/HLK or Microsoft signing claim."
+  "boundary": "Source/self-test evidence only. No browser runtime automation, no physical audio measurement, no driver install/load/HLK or Microsoft signing claim.",
+  "source_commit": "ef50aa0237970d219b981fafba134c42c7745cbb"
 }

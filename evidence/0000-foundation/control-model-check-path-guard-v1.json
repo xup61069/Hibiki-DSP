@@ -23,5 +23,6 @@
     { "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1", "result": "pass", "notes": "workflow set unchanged" }
   ],
   "scope": "tools-only gate hardening; no product/schema/DSP/driver change; gate remains in the AGENTS.md required-command set",
-  "date": "2026-08-23"
+  "date": "2026-08-23",
+  "source_commit": "0c3273f05ef97765128c81d84011da877424449d"
 }

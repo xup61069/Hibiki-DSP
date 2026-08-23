@@ -9,6 +9,6 @@
   ],
   "rationale": "Both Issues #339 and #337 are CLOSED; PRs #340/#345 merged. Git history remains the authoritative record per the #341 retention policy.",
   "scope": "docs retention only; no product/API/schema/DSP/driver change",
-  "date": "2026-08-22"
+  "date": "2026-08-22",
+  "source_commit": "12f6e9712e4738f0427abd72841891e076d7bad8"
 }
-

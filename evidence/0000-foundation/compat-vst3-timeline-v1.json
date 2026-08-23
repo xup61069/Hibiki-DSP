@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 815,
   "scope_digest": "compat-vst3-timeline-v1",
-  "source_commit": null,
+  "source_commit": "d5ace9db5ee8fc90ce9c5e08de3bb0e213f6309f",
   "environment_fingerprint": "windows-local-pwsh-7.6.4-dotnet8",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 815",

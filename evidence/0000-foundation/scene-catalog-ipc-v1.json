@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 768,
   "scope_digest": "scene-catalog-ipc-v1",
-  "source_commit": null,
+  "source_commit": "db8efc4b68c584b9000c772dd151a180b546e52a",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-vs2026",
   "commands": [
     "pwsh -NoProfile -File tools/verify.ps1 (clean rebuild)",

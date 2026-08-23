@@ -44,5 +44,6 @@
     "No guest retest, install, load, HLK or Microsoft signing evidence is claimed by this tooling slice."
   ],
   "next_safe_action": "Maintainer review of the draft PR; after merge, release acceptance can rerun the standalone signability gate without exporting WDK_BIN.",
-  "date": "2026-08-23"
+  "date": "2026-08-23",
+  "source_commit": "0eb83ef8b9f476efc7412ea71468c3d01c6843e3"
 }

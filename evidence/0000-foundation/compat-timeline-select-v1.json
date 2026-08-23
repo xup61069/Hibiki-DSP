@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 673,
   "scope_digest": "compat-timeline-select-v1",
-  "source_commit": null,
+  "source_commit": "f49bef9a69861ce3a1c96a5977ed31dd4446f911",
   "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100-pwsh-7.6-dotnet-10; compatibility-preview source-only",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 673",

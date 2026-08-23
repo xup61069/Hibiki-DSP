@@ -1,4 +1,5 @@
 {
+  "source_commit": "37b561ee406f0d07c706afa8d4fe06c19c97693c",
   "limitations": "User-space extension source/policy evidence only. No browser runtime capture, physical audio, driver, HLK or Microsoft signing is claimed.",
   "verification": [
     "node --check extensions/popup.js",
