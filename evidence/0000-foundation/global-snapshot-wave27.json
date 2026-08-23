@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "issue": 689,
+  "scope_digest": "global-snapshot-wave27",
+  "source_commit": null,
+  "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100-pwsh-7.6; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 689",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #678 / PR #678 merged: AudioEngineModel::commit_graph resets the bounded true-peak limiter to unity gain so recovery attenuation from the previous graph cannot duck quiet audio in a newly committed graph; excessive peaks still attenuate immediately.",
+        "Wave26 snapshot (#680 / PR #682) recorded the VST3 timeline UI wave and tab-capture stop lifecycle before these fixes.",
+        "Issue #681 / PR #684 merged: browser tab-capture offscreen responses now report real start/stop success or failure; the service worker no longer turns a successful start into an apparent failure, and extension policy checks cover the response boundary."
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; this update does not change product source behavior.",
+    "The limiter item remains user-space source, contract-test and SPEC-0002 evidence; no physical-audio delivery claim.",
+    "The tab-capture item remains extension source and policy-gate evidence; no vendor browser capture-control claim beyond Hibiki's own response handling.",
+    "No driver install/load/HLK/Microsoft signing claim."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-23T18:18:51+08:00",
+  "finished_at": "2026-08-23T18:28:00+08:00"
+}
