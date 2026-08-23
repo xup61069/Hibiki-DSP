@@ -74,6 +74,9 @@ function Assert-ExtensionSourcePolicy(
   if ($popupSource -notmatch 'chrome\.runtime\.sendMessage\(\s*\{\s*type\s*:\s*(?:\x27|\x22)get-capture-state') {
     throw "Popup must query get-capture-state on open in $sourceName."
   }
+  if ($popupSource -notmatch 'capture-state') {
+    throw "Popup must listen for live capture-state messages in $sourceName."
+  }
   if ($popupSource -match 'chrome\.offscreen\.') {
     throw "Popup must not access offscreen directly in $sourceName."
   }
@@ -110,6 +113,9 @@ function Assert-ExtensionSourcePolicy(
       'sendResponse',
       'stop-tab-stream',
       'get-capture-state',
+      'bridgeConnected',
+      'onopen\s*=',
+      'onclose\s*=',
       'activeStream\s*=\s*stream',
       'track\.stop\(\)'
     )) {
@@ -289,9 +295,9 @@ if ($SelfTest) {
   if (-not $caught) { throw 'SelfTest expected an empty CSP directive failure.' }
 
   $sourceFixture = @{
-    popup = "button.addEventListener('click', async () => { await chrome.runtime.sendMessage({type: 'capture-active-tab', tabId: tab.id}); }); stopButton.addEventListener('click', async () => { await chrome.runtime.sendMessage({type: 'stop-capture'}); }); refreshState(); async function refreshState() { await chrome.runtime.sendMessage({type: 'get-capture-state'}); }"
+    popup = "button.addEventListener('click', async () => { await chrome.runtime.sendMessage({type: 'capture-active-tab', tabId: tab.id}); }); stopButton.addEventListener('click', async () => { await chrome.runtime.sendMessage({type: 'stop-capture'}); }); chrome.runtime.onMessage.addListener((message) => { if (message.type === 'capture-state') render(); }); refreshState(); async function refreshState() { await chrome.runtime.sendMessage({type: 'get-capture-state'}); }"
     serviceWorker = "chrome.runtime.onMessage.addListener(async (message) => { if (message.type === 'stop-capture') { await closeOffscreenDocument(); } if (message.type === 'get-capture-state') { await chrome.runtime.sendMessage({type: 'get-capture-state'}); } await chrome.offscreen.createDocument({url: 'offscreen.html'}); await chrome.offscreen.closeDocument(); const streamId = await chrome.tabCapture.getMediaStreamId({targetTabId: message.tabId}); });"
-    offscreen = "chrome.runtime.onMessage.addListener(async (message) => { if (message.type === 'stop-tab-stream') { activeStream.getTracks().forEach(track => track.stop()); } if (message.type === 'get-capture-state') { return; } if (message.type !== 'start-tab-stream') return; const context = new AudioContext(); await context.audioWorklet.addModule('audio-worklet.js'); const node = new AudioWorkletNode(context, 'hibiki-tab-packetizer'); const constraints = {audio: {mandatory: {chromeMediaSource: 'tab', chromeMediaSourceId: message.streamId}}, video: false}; await navigator.mediaDevices.getUserMedia(constraints); const stream = await navigator.mediaDevices.getUserMedia(constraints); activeStream = stream; sendResponse({ok: true}); const bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab'); });"
+    offscreen = "chrome.runtime.onMessage.addListener(async (message) => { if (message.type === 'stop-tab-stream') { activeStream.getTracks().forEach(track => track.stop()); } if (message.type === 'get-capture-state') { return; } if (message.type !== 'start-tab-stream') return; const context = new AudioContext(); await context.audioWorklet.addModule('audio-worklet.js'); const node = new AudioWorkletNode(context, 'hibiki-tab-packetizer'); const constraints = {audio: {mandatory: {chromeMediaSource: 'tab', chromeMediaSourceId: message.streamId}}, video: false}; await navigator.mediaDevices.getUserMedia(constraints); const stream = await navigator.mediaDevices.getUserMedia(constraints); activeStream = stream; sendResponse({ok: true}); const bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab'); bridgeConnected = true; bridge.onopen = () => {}; bridge.onclose = () => {}; });"
     worklet = "const packet = new ArrayBuffer(16 + 4); const view = new DataView(packet); view.setUint8(0, 0x48); view.setUint8(1, 0x49); view.setUint8(2, 0x42); view.setUint8(3, 0x54); view.setUint16(4, 1, true); this.port.postMessage(packet, [packet]); registerProcessor('hibiki-tab-packetizer', HibikiTabPacketizer);"
   }
   Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-source-valid'
@@ -315,6 +321,16 @@ if ($SelfTest) {
   $caught = $false
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $missingOffscreenStop $sourceFixture.worklet 'selftest-missing-offscreen-stop' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected missing offscreen stream-stop failure.' }
+
+  $missingBridgeState = $sourceFixture.offscreen -replace 'bridgeConnected', 'removed'
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $missingBridgeState $sourceFixture.worklet 'selftest-missing-bridge-state' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected missing bridge state failure.' }
+
+  $missingPopupStateListener = $sourceFixture.popup -replace 'capture-state', 'other-state'
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $missingPopupStateListener $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-missing-popup-state-listener' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected missing popup state listener failure.' }
 
   $missingStartResponse = $sourceFixture.offscreen -replace 'sendResponse\(\{ok: true\}\)', 'console.log()'
   $caught = $false
@@ -368,7 +384,7 @@ connect-src   ws://127.0.0.1:17842
 "@
   Assert-ExtensionManifestPolicy $multilineCsp 'selftest-multiline-csp'
 
-  Write-Output 'Browser extension policy self-test passed (29 cases).'
+  Write-Output 'Browser extension policy self-test passed (31 cases).'
   exit 0
 }
 
