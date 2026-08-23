@@ -1,0 +1,20 @@
+{
+  "schema_version": 2,
+  "issue": 518,
+  "title": "probe-environment context output path guard",
+  "base_commit": "fc46682213821053f1b8a93d91c8b34a78f83981",
+  "summary": {
+    "tools": [
+      "tools/probe-environment.ps1"
+    ],
+    "behavior": "Before creating the repository .local root or writing context.json, the environment probe fails closed unless the target stays beneath the repository root and involves no reparse-point target or ancestor; existing ancestors must be real directories. Missing leaves remain allowed because the tool legitimately creates them.",
+    "precedent": "Issue #444/#460/#455/#470/#474/#482/#489/#492/#500/#505/#506/#512 path-hardening family",
+    "selftest_cases_added": {
+      "document_cases_existing": 12,
+      "path_cases_added": 8
+    }
+  },
+  "validation": [],
+  "scope": "tools-only gate hardening; no product/schema/DSP/driver change; identity-free probe output semantics unchanged",
+  "date": "2026-08-23"
+}
