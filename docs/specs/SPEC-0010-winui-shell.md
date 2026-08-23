@@ -117,8 +117,9 @@ bytes。WinUI shell 可在沒有引擎時啟動，並以 Degraded 狀態呈現�
 仍可在沒有 WinUI SDK 的環境由獨立 check project 驗證。
 
 Compatibility Preview 在純 .NET SDK 主機保留 `EnableDefaultApplicationDefinition=false`、
-`EnableDefaultPageItems=false`，且必須維持 Core MRT resource tooling 停用：啟用它需要
-Visual Studio 的 Appx packaging 工作，dotnet-only 建置會以 MSB4062 失敗。此模式不產生 PRI；
+`EnableDefaultPageItems=false`，且必須維持 Core MRT resource tooling 停用：dotnet CLI
+建置不會載入 Visual Studio 的 Appx packaging 工作（MSBuild host boundary），因此
+MrtCore.PriGen 會以 MSB4062 失敗；即使主機已安裝 VS2026 與相關工作也一樣。此模式不產生 PRI；
 缺漏的主題資源由 fail-soft resolver 忽略，視窗可啟動但呈現未套樣式的降級外觀。
 Compatibility Preview 的建置與啟動 smoke 不構成樣式、資源載入、無障礙或正式 XAML 證據。
 
