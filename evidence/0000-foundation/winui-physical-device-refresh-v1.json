@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "slice": "winui-physical-device-refresh-v1",
+  "issue": "https://github.com/xup61069/Hibiki-DSP/issues/779",
+  "base_commit": "1bd21f7b16febc885999d7bda8965fd059992aed",
+  "product_outcome": [
+    "The formal WinUI shell exposes an accessible physical-device refresh action next to the output picker.",
+    "Refresh is connection-aware, reports progress and outcome through status text, and asks the engine for one bounded device-catalog snapshot.",
+    "Timeouts, failures and stale snapshots fail closed; the previous picker remains usable without fabricated devices."
+  ],
+  "verification": {
+    "control_model_check": "PASS",
+    "always_run_gates": "See issue verification for final docs-check/source-policy/git diff --check/scoped handoff-check results.",
+    "build_preview_desktop_compat_smoke": "PASS on non-target host; compatibility launch/build evidence only.",
+    "winui_shell_check": "PASS; source accessibility scan found 52 named interactive controls and required the formal refresh seam."
+  },
+  "evidence_boundary": [
+    "Static source, contract-model and non-target Desktop Compatibility Preview evidence only.",
+    "No runtime UI Automation or screen-reader audit, no formal WinUI XAML build, no local Windows enumeration by UI, no engine catalog mutation beyond the existing bounded IPC seam, no physical audio, no driver install/load/HLK or Microsoft signing claim."
+  ]
+}

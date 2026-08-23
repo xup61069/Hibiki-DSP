@@ -111,6 +111,11 @@
                                       SelectedValuePath="EndpointId"
                                       SelectedValue="{Binding SelectedPhysicalDeviceId, Mode=TwoWay}"
                                       HorizontalAlignment="Stretch" />
+                            <Button Content="重新掃描裝置" Click="OnRefreshPhysicalDevicesClick"
+                                    IsEnabled="{Binding IsConnected}"
+                                    AutomationProperties.Name="重新掃描實體輸出裝置"
+                                    AutomationProperties.HelpText="向引擎要求最新裝置快照；失敗時保留目前清單"
+                                    HorizontalAlignment="Left" />
                             <Button Content="切換實體裝置" Click="OnSwitchDeviceClick"
                                     IsEnabled="{Binding IsConnected}"
                                     AutomationProperties.Name="切換實體輸出裝置"
