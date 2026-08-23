@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 573,
   "scope_digest": "github-handoff-ci-isolation-v1",
-  "source_commit": "b22e14fc6530ed3e1842d5bc5f3b48cf07cc0557",
+  "source_commit": "b041ac21507d3447af99bc098dbc44a9eea783b0",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-26100-pwsh-7.6; target-machine-pending",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -SelfTest",

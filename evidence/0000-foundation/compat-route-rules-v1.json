@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 804,
   "scope_digest": "compat-route-rules-v1",
-  "source_commit": "5c804dc",
+  "source_commit": "c6f2ad5d5cc41f4e2df30181abe84346eb402dd8",
   "environment_fingerprint": "windows-local-pwsh-7.6.4-dotnet8",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 804",

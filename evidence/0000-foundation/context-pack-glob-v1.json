@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 66,
   "scope_digest": "context-pack-glob-v1",
-  "source_commit": "68aed23",
+  "source_commit": "ba4d0dba7620af2d5644732fa63c169f4436d9e0",
   "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "pwsh -NoProfile -File tools/context-pack.ps1 -SelfTest",

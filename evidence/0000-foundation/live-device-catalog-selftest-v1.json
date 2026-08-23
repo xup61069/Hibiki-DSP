@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 106,
   "scope_digest": "live-device-catalog-selftest-v1",
-  "source_commit": "fe99934",
+  "source_commit": "0893cc921b2ad0d4862eb92265df1ce7954868ed",
   "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "pwsh -NoProfile -File tools/live-device-catalog-check.ps1 -SelfTest",
