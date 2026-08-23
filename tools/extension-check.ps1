@@ -208,6 +208,24 @@ function Assert-ExtensionSourcePolicy(
   if ($offscreenSource -notmatch 'return\s+true\s*;') {
     throw "Offscreen onMessage listener must return true to keep the async response channel open in $sourceName."
   }
+  if ($offscreenSource -notmatch 'function\s+connectBridge\s*\(\s*\)') {
+    throw "Offscreen source must define connectBridge for bounded reconnect in $sourceName."
+  }
+  if ($offscreenSource -notmatch 'function\s+scheduleBridgeRetry\s*\(\s*\)') {
+    throw "Offscreen source must define scheduleBridgeRetry for bounded backoff in $sourceName."
+  }
+  if ($offscreenSource -notmatch 'function\s+cancelBridgeRetry\s*\(\s*\)') {
+    throw "Offscreen source must define cancelBridgeRetry to stop retries on teardown in $sourceName."
+  }
+  if ($offscreenSource -notmatch 'capturing\s*=\s*true') {
+    throw "Offscreen source must set capturing=true during active capture for retry gating in $sourceName."
+  }
+  if ($offscreenSource -notmatch 'capturing\s*=\s*false') {
+    throw "Offscreen source must set capturing=false on teardown so retries stop in $sourceName."
+  }
+  if ($offscreenSource -notmatch 'BRIDGE_RETRY_MAX_ATTEMPTS\s*=\s*\d+') {
+    throw "Offscreen source must declare a bounded BRIDGE_RETRY_MAX_ATTEMPTS constant in $sourceName."
+  }
   if ($offscreenSource -notmatch 'async\s+function\s+handleSourceEnded\s*\(\s*\)\s*\{[\s\S]{0,400}await\s+teardownCaptureGraph\s*\(\s*\)\s*;[\s\S]{0,300}offscreen-capture-released') {
     throw "Offscreen natural-end handler must tear down the capture graph before reporting and requesting document release in $sourceName."
   }
