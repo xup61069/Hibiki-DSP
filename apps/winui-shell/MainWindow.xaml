@@ -245,6 +245,31 @@
                         <TextBlock Text="建立最多 32 個自訂卡片；完整 DSP graph 由引擎端 Scene catalog 驗證。"
                                    TextWrapping="Wrap"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <controls:ItemsRepeater ItemsSource="{Binding CustomSceneCards}">
+                            <controls:ItemsRepeater.Layout>
+                                <controls:StackLayout Spacing="8" />
+                            </controls:ItemsRepeater.Layout>
+                            <controls:ItemsRepeater.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Id}"
+                                                       Style="{ThemeResource CaptionTextBlockStyle}"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="移除" Tag="{Binding Id}"
+                                                Click="OnRemoveCustomSceneClick"
+                                                AutomationProperties.Name="移除自訂場景"
+                                                AutomationProperties.HelpText="移除本機保存的自訂卡片；不會改變引擎端 Scene catalog" />
+                                    </Grid>
+                                </DataTemplate>
+                            </controls:ItemsRepeater.ItemTemplate>
+                        </controls:ItemsRepeater>
                         <Grid x:Name="CustomFormLayout" ColumnSpacing="16" RowSpacing="0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" MinWidth="280" />

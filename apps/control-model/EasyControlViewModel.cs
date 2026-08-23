@@ -53,6 +53,9 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private string _customSceneId = string.Empty;
     private string _customSceneName = string.Empty;
     private string _customSceneDescription = string.Empty;
+    private string _customSceneCatalogPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Hibiki DSP", "scene-cards-v1.json");
 
     public ExpertSurfaceModel Expert { get; } = new();
 
@@ -76,6 +79,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public IReadOnlyList<SceneCard> Scenes => _session.Scenes;
+    public IReadOnlyList<SceneCard> CustomSceneCards => _session.CustomScenes.Scenes;
     public IReadOnlyList<OutputGroupCard> OutputGroups => OutputGroupCatalog.Fixed;
     public IReadOnlyList<PhysicalDeviceCard> PhysicalDevices => _session.PhysicalDevices.Devices;
     // The engine publishes ephemeral handles instead of raw Windows session
@@ -201,9 +205,17 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         get => _routeRuleGainOwner;
         set { if (!Enum.IsDefined(value) || value == _routeRuleGainOwner) return; _routeRuleGainOwner = value; OnPropertyChanged(); }
     }
-    public string CustomSceneCatalogPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Hibiki DSP", "scene-cards-v1.json");
+    public string CustomSceneCatalogPath
+    {
+        get => _customSceneCatalogPath;
+        set
+        {
+            var normalized = value ?? string.Empty;
+            if (normalized == _customSceneCatalogPath) return;
+            _customSceneCatalogPath = normalized;
+            OnPropertyChanged();
+        }
+    }
     public UiMode Mode => _isExpert ? UiMode.Expert : UiMode.Easy;
     public AudioControlStatus Status => _session.Status;
     public ControlConnectionState ConnectionState => _connectionState;
@@ -484,6 +496,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     {
         if (!_session.CustomScenes.Upsert(scene)) return false;
         OnPropertyChanged(nameof(Scenes));
+        OnPropertyChanged(nameof(CustomSceneCards));
         return true;
     }
 
@@ -512,6 +525,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             if (previous is null) _session.CustomScenes.Remove(scene.Id);
             else _session.CustomScenes.Upsert(previous);
             OnPropertyChanged(nameof(Scenes));
+            OnPropertyChanged(nameof(CustomSceneCards));
             StatusText = $"自訂場景未保存：{saveError}";
             return false;
         }
@@ -1165,7 +1179,11 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     public bool LoadCustomScenes(out string error)
     {
         var loaded = _session.CustomScenes.TryLoad(CustomSceneCatalogPath, out error);
-        if (loaded) OnPropertyChanged(nameof(Scenes));
+        if (loaded)
+        {
+            OnPropertyChanged(nameof(Scenes));
+            OnPropertyChanged(nameof(CustomSceneCards));
+        }
         return loaded;
     }
 
@@ -1184,10 +1202,39 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public bool RemoveCustomScene(string sceneId)
     {
-        if (!_session.CustomScenes.Remove(sceneId)) return false;
-        if (_selectedScene?.Id == sceneId) _selectedScene = null;
+        var previous = _session.CustomScenes.Scenes.FirstOrDefault(
+            item => item.Id == sceneId?.Trim());
+        if (previous is null)
+        {
+            StatusText = "找不到這個自訂場景";
+            return false;
+        }
+
+        var previousSelection = _selectedScene;
+        var removesSelection = previousSelection?.Id == previous.Id;
+        if (!_session.CustomScenes.Remove(previous.Id))
+        {
+            StatusText = "自訂場景移除失敗";
+            return false;
+        }
+
+        if (removesSelection) _selectedScene = null;
         OnPropertyChanged(nameof(Scenes));
+        OnPropertyChanged(nameof(CustomSceneCards));
         OnPropertyChanged(nameof(SelectedScene));
+
+        if (!SaveCustomScenes(out var saveError))
+        {
+            _session.CustomScenes.Upsert(previous);
+            _selectedScene = previousSelection;
+            OnPropertyChanged(nameof(Scenes));
+            OnPropertyChanged(nameof(CustomSceneCards));
+            OnPropertyChanged(nameof(SelectedScene));
+            StatusText = $"自訂場景未移除：{saveError}";
+            return false;
+        }
+
+        StatusText = $"已移除自訂場景：{previous.Name}";
         return true;
     }
 
