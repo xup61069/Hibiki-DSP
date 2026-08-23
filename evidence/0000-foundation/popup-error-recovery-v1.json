@@ -1,0 +1,48 @@
+﻿{
+  "schema_version": 1,
+  "issue": 702,
+  "scope_digest": "popup-error-recovery-v1",
+  "source_commit": "39d8423262da268466b07babd7f484f4f504b2d5",
+  "base_commit": "d2ccb55",
+  "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6",
+  "target": "extensions/popup.js",
+  "cases_added": [
+    "start click handler catches messaging errors and refreshes live state",
+    "stop click handler catches messaging errors and refreshes live state"
+  ],
+  "commands": [
+    "pwsh -NoProfile -File tools/extension-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/extension-check.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 702",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/extension-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": ["31 bounded policy cases including existing popup state boundaries"]
+    },
+    {
+      "command": "tools/extension-check.ps1",
+      "status": "pass",
+      "coverage": ["MV3 permissions, exact CSP, user-gesture and loopback source boundaries"]
+    },
+    {
+      "command": "repository gates",
+      "status": "pass",
+      "coverage": [
+        "Issue 702 ownership/scope/ancestry via handoff-check",
+        "documentation structural checks",
+        "source-only policy scan",
+        "whitespace validation"
+      ]
+    }
+  ],
+  "limitations": [
+    "Static source and policy evidence only; no browser launch, MV3 runtime, user gesture, tabCapture, WebSocket, audio, endpoint, driver, WaveRT, HLK, signing or release evidence.",
+    "Popup messaging failure recovery is verified by code inspection and syntax check; no automated browser runtime test was added."
+  ]
+}
+
