@@ -46,9 +46,11 @@ private:
   std::array<std::array<float, kMaxTaps>, kMaxChannels> history_{};
   std::array<float, kMaxChannels> envelope_{};
   std::array<float, kMaxChannels> gate_gain_{};
+  std::array<bool, kMaxChannels> gate_open_{};
   std::uint32_t channels_{0};
   std::uint32_t filter_length_{0};
   float threshold_linear_{0.0F};
+  float threshold_open_linear_{0.0F};
   float attack_alpha_{0.0F};
   float release_alpha_{0.0F};
   bool prepared_{false};
