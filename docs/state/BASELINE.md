@@ -704,6 +704,17 @@ IR phase 控制項收進帶說明的 tinted 子面板（mode 文字與 added-del
 32 個互動控制項與必要 bindings 全數保留（Issue #517 / PR #524）。皆為
 tooling/source evidence。
 
+第十五波 tooling 增量已合併：probe-environment.ps1 在建立 .local 或寫入
+.local/context.json 前，把 fail-closed path-guard 家族延伸到 root／leaf 驗證
+（必須位於 repo .local 樹內、祖先為真實目錄、leaf 與祖先皆非 reparse point，
+保留 missing leaf 行為），self-test 在 12 個文件案例外新增 8 個離線合成路徑案例，
+不探測機器也不寫 repo；該 PR 同時完成 PR #520 空白 claim commit 提前合併的補救
+並依 #497/#507 前例記錄 race 事件（Issue #518 / PR #527）；
+build-driver.ps1 在 New-Item 與後續 compiler/linker/package 寫入前，對 object 與
+package 輸出目錄 fail-closed 驗證，拒絕 repo .local 外輸出、reparse point
+target／祖先與非目錄 target，write-free self-test 新增 10 個離線輸出路徑案例
+（Issue #525 / PR #528）。皆為 tooling/source evidence。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；

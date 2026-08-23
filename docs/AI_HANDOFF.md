@@ -274,6 +274,17 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   polite-live, and IR phase controls are grouped into a tinted sub-panel with caption,
   mode text and added-delay chips while preserving all 32 interactive controls and required
   bindings (Issue #517 / PR #524).
+- Probe-environment path hardening merged: probe-environment.ps1 extends the fail-closed
+  path-guard family to the .local context root/leaf before any creation or write, keeping
+  missing-leaf behavior; -SelfTest grew with 8 offline synthetic path cases over 12
+  document cases without machine probing or repository writes. This delivery also completed
+  the remediation for PR #520, which had merged from an empty claim-commit branch (race
+  event recorded per the #497/#507 precedents) (Issue #518 / PR #527).
+- Build-driver output hardening merged: build-driver.ps1 fails closed before New-Item and
+  subsequent compiler/linker/package writes on object and package output directories,
+  rejecting outside-repository-.local outputs, reparse-point targets/ancestors and
+  non-directory targets; the write-free self-test gained 10 offline synthetic output-path
+  cases (Issue #525 / PR #528).
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe
