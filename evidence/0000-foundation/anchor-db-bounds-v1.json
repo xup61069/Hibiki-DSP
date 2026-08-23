@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "issue": 961,
+  "scope_digest": "anchor-db-bounds-v1",
+  "source_commit": "acf5f318",
+  "environment_fingerprint": "windows-amd64-pwsh-anchor-db-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 961",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass",
+      "log": ".local/verify-961.log"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Relative endpoint_gain_db is bounded to [-144, +12] dB and absolute measured_1k_spl_db is bounded to [0, 140] dB SPL in schema and runtime validator; contract tests cover inclusive boundaries and adjacent rejects for both fields.",
+    "Existing valid anchors continue to pass; phon estimate arithmetic unchanged for in-range inputs."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-24T06:43:00+08:00",
+  "finished_at": "2026-08-24T06:58:00+08:00"
+}

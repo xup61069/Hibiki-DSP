@@ -82,6 +82,9 @@ Driver ABI 另外使用 Q16.16 dB；`db_to_q16_16`／`q16_16_to_db` 將量化集
 來源 context 做 ACK/read-back，而不靠浮點相等或時間猜測 feedback loop。
 
 `AcousticAnchorV1` 會保存 test signal、endpoint gain、1 kHz SPL、uncertainty 與 F3；
+schema 與 runtime validator 一致地把相對增益 `endpoint_gain_db` 限制在 -144..+12 dB，
+並把絕對音壓級 `measured_1k_spl_db` 限制在 0..140 dB SPL，超出範圍的錨點
+在 metadata contract 層即被拒絕；
 JSON schema 的 `anchor_id` 欄位要求非空字串或 null，空字串一律拒絕。
 只有 speaker／headphone-coupler 才能回報 calibrated phon，`headphone-estimated` 永遠
 標示為估算，不能包裝成 HATS/coupler 測量。
