@@ -143,6 +143,67 @@ public sealed partial class MainWindow
 
         content.Children.Add(new TextBlock
         {
+            Text = "App 工作階段（需以 -EnableSessionRouting 啟動引擎）",
+            Style = ResolveThemeResource<Style>("SubtitleTextBlockStyle"),
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+        });
+        content.Children.Add(new TextBlock
+        {
+            Text = "只顯示 bounded metadata；套用 App 音量會寫入 Windows session，實體 per-App 重新送出仍未驗證。",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush"),
+        });
+        var sessionSelector = new ComboBox { Header = "選取 Expert App", MinWidth = 280 };
+        AutomationProperties.SetName(sessionSelector, "選取 Expert App");
+        sessionSelector.DisplayMemberPath = nameof(SessionCatalogEntryV1.DisplayName);
+        sessionSelector.SelectedValuePath = nameof(SessionCatalogEntryV1.Handle);
+        sessionSelector.SetBinding(ItemsControl.ItemsSourceProperty, BindingFor("SessionCatalog"));
+        sessionSelector.SetBinding(Selector.SelectedValueProperty, TwoWayBindingFor("SelectedSessionHandle"));
+        sessionSelector.SelectionChanged += OnCompatibilitySessionSelect;
+        content.Children.Add(sessionSelector);
+        var refreshSessionsButton = new Button { Content = "刷新 App 清單" };
+        AutomationProperties.SetName(refreshSessionsButton, "刷新 App 工作階段清單");
+        refreshSessionsButton.Click += OnCompatibilityRefreshSessionsClick;
+        content.Children.Add(refreshSessionsButton);
+        content.Children.Add(BoundText("SelectedSessionDisplayText"));
+        content.Children.Add(BoundText("SessionCatalogSequenceDisplayText"));
+        content.Children.Add(BoundText("SelectedRouteRuleSummary"));
+        content.Children.Add(BoundText("SessionVolumeDisplayText"));
+
+        var sessionVolumeSlider = new Slider
+        {
+            Header = "選取 App 音量 dB",
+            Minimum = -60,
+            Maximum = 12,
+            StepFrequency = 0.5,
+        };
+        AutomationProperties.SetName(sessionVolumeSlider, "選取 App 音量分貝");
+        sessionVolumeSlider.SetBinding(RangeBase.ValueProperty, TwoWayBindingFor("SessionVolumeDb"));
+        content.Children.Add(sessionVolumeSlider);
+        var sessionMuteCheck = new CheckBox { Content = "靜音選取 App" };
+        AutomationProperties.SetName(sessionMuteCheck, "靜音選取的 App 工作階段");
+        sessionMuteCheck.SetBinding(CheckBox.IsCheckedProperty, TwoWayBindingFor("SessionMuted"));
+        content.Children.Add(sessionMuteCheck);
+        var applySessionVolumeButton = new Button { Content = "套用選取 App 音量" };
+        AutomationProperties.SetName(applySessionVolumeButton, "套用選取 App 的音量與靜音設定");
+        applySessionVolumeButton.Click += OnCompatibilityApplySessionVolumeClick;
+        content.Children.Add(applySessionVolumeButton);
+
+        var sessionLaneBox = new TextBox { Header = "App 路由 Lane ID" };
+        AutomationProperties.SetName(sessionLaneBox, "選取 App 路由 Lane ID");
+        sessionLaneBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("SessionRouteLaneId"));
+        content.Children.Add(sessionLaneBox);
+        var sessionOutputGroupBox = new TextBox { Header = "App 路由 Output Group（main／low-latency／surround）" };
+        AutomationProperties.SetName(sessionOutputGroupBox, "選取 App 路由 Output Group");
+        sessionOutputGroupBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("SessionRouteOutputGroup"));
+        content.Children.Add(sessionOutputGroupBox);
+        var applySessionRouteButton = new Button { Content = "套用選取 App 路由" };
+        AutomationProperties.SetName(applySessionRouteButton, "套用選取 App 的路由設定");
+        applySessionRouteButton.Click += OnCompatibilityApplySessionRouteClick;
+        content.Children.Add(applySessionRouteButton);
+
+        content.Children.Add(new TextBlock
+        {
             Text = "App 路由預設（Expert）",
             Style = ResolveThemeResource<Style>("SubtitleTextBlockStyle"),
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
@@ -312,6 +373,27 @@ public sealed partial class MainWindow
             SyncCompatibilityCustomScenes();
         if (e.PropertyName == nameof(EasyControlViewModel.RouteRules))
             SyncCompatibilityRouteRules();
+    }
+
+    private void OnCompatibilitySessionSelect(object sender, SelectionChangedEventArgs e)
+    {
+        // SelectedSessionHandle is a TwoWay binding; the ViewModel owns
+        // fail-closed validation and rule-preview refresh on selection change.
+    }
+
+    private async void OnCompatibilityRefreshSessionsClick(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.RefreshSessionCatalogAsync();
+    }
+
+    private async void OnCompatibilityApplySessionVolumeClick(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.ApplySelectedSessionVolumeAsync();
+    }
+
+    private async void OnCompatibilityApplySessionRouteClick(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.ApplySelectedSessionRouteAsync();
     }
 
     private void OnCompatibilityPreviewClosed(object sender, WindowEventArgs e)
