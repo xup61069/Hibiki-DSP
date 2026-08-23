@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 600,
   "scope_digest": "vst3-surface-remove-timeline-v1",
-  "source_commit": "f037343e5d1d09785fa5a13910d53bf54a9cf820",
+  "source_commit": "0d23e78b4eacb1bb98b2a694198f11d7a0b1ce39",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-dotnet-10.0.400-pwsh-7.6.4",
   "commands": [
     "pwsh -NoProfile -File tools/control-model-check.ps1",

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 76,
   "scope_digest": "probe-environment-selftest-v1",
-  "source_commit": "1a75509",
+  "source_commit": "2ab5ff4e77678ee1ba6e24bbe86ad4bbbb6ded55",
   "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "pwsh -NoProfile -File tools/probe-environment.ps1 -SelfTest",
