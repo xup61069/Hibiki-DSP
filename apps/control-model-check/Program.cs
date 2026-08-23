@@ -1,4 +1,7 @@
 using Hibiki.ControlModel;
+using System.Buffers.Binary;
+using System.IO.Pipes;
+using System.Text;
 
 static void Check(bool condition, string message)
 {
@@ -363,7 +366,7 @@ try
           removableSceneViewModel.SelectScene("removable-scene") &&
           removableSceneViewModel.SelectedScene?.Id == "removable-scene",
         "ViewModel removable custom Scene fixture failed.");
-    Check(removableSceneViewModel.RemoveCustomScene("removable-scene") &&
+    Check(removableSceneViewModel.RemoveCustomSceneAsync("removable-scene").GetAwaiter().GetResult() &&
           removableSceneViewModel.Scenes.Count == 4 &&
           removableSceneViewModel.CustomSceneCards.Count == 0 &&
           removableSceneViewModel.SelectedScene is null &&
@@ -376,10 +379,10 @@ try
     Check(reloadedRemovableScenes.TryLoad(removableScenePath, out _) &&
           reloadedRemovableScenes.Count == 0,
         "Removed custom Scene card must remain removed after reload.");
-    Check(!removableSceneViewModel.RemoveCustomScene("missing-scene") &&
+    Check(!removableSceneViewModel.RemoveCustomSceneAsync("missing-scene").GetAwaiter().GetResult() &&
           removableSceneViewModel.StatusText.Contains("找不到"),
         "Unknown custom Scene removal must fail closed.");
-    Check(!removableSceneViewModel.RemoveCustomScene("game") &&
+    Check(!removableSceneViewModel.RemoveCustomSceneAsync("game").GetAwaiter().GetResult() &&
           removableSceneViewModel.Scenes.Count == 4 &&
           removableSceneViewModel.SelectedScene is null,
         "Built-in Scene IDs must remain non-removable through the custom-card seam.");
@@ -404,7 +407,7 @@ try
           rollbackSceneViewModel.SelectScene("rollback-scene") &&
           rollbackSceneViewModel.SelectedScene?.Id == "rollback-scene",
         "ViewModel custom Scene rollback fixture failed.");
-    Check(!rollbackSceneViewModel.RemoveCustomScene("rollback-scene") &&
+    Check(!rollbackSceneViewModel.RemoveCustomSceneAsync("rollback-scene").GetAwaiter().GetResult() &&
           rollbackSceneViewModel.Scenes.Count == 5 &&
           rollbackSceneViewModel.CustomSceneCards.Count == 1 &&
           rollbackSceneViewModel.CustomSceneCards[0].Id == "rollback-scene" &&
@@ -1310,5 +1313,242 @@ Check(writableSelectionViewModel.SelectedTimelineId == "writable-selection" &&
       writableSelectionViewModel.StatusText.Contains("選取失敗") &&
       writableSelectionViewModel.HasEditSession,
     "A rejected selection change must keep the prior selection and open draft.");
+
+// ---- #823 honest custom-scene sync -------------------------------------
+const string sceneSyncBaseId = "sync-check-scene";
+var ackingCatalogIds = new SortedSet<string>(StringComparer.Ordinal);
+
+static IpcEnvelopeV1 AckReply(IpcEnvelopeV1 request) =>
+    new(ControlMessageType.Ack, request.RequestId, Array.Empty<byte>());
+
+static bool TryReadSceneCatalogOp(byte[] payload, out string operation, out string sceneId)
+{
+    operation = string.Empty;
+    sceneId = string.Empty;
+    if (payload.Length < 97 || payload[1] is < 1 or > 3) return false;
+    var idLength = payload[17];
+    if (idLength is < 1 or > 31 || 96 + idLength > payload.Length) return false;
+    operation = ((SessionRouteRuleOperationV1)payload[1]).ToString();
+    sceneId = Encoding.UTF8.GetString(payload, 96, idLength);
+    return true;
+}
+
+static async Task ReadExactBytesAsync(Stream stream, byte[] buffer, CancellationToken token)
+{
+    var offset = 0;
+    while (offset < buffer.Length)
+    {
+        var read = await stream.ReadAsync(buffer.AsMemory(offset), token);
+        if (read <= 0) throw new EndOfStreamException("check pipe closed early");
+        offset += read;
+    }
+}
+
+static async Task RunSceneCatalogCheckServerAsync(
+    string pipeName,
+    Func<IpcEnvelopeV1, IpcEnvelopeV1?> responder,
+    TaskCompletionSource connectedSignal,
+    CancellationToken token)
+{
+    while (!token.IsCancellationRequested)
+    {
+        NamedPipeServerStream? server = null;
+        try
+        {
+            server = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1,
+                PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+            await server.WaitForConnectionAsync(token);
+            connectedSignal.TrySetResult();
+            while (true)
+            {
+                var lengthPrefix = new byte[4];
+                await ReadExactBytesAsync(server, lengthPrefix, token);
+                var frameLength = BinaryPrimitives.ReadUInt32LittleEndian(lengthPrefix);
+                if (frameLength > IpcCodecV1.MaxPayloadBytes + IpcCodecV1.HeaderBytes)
+                    throw new InvalidDataException("frame too large");
+                var frame = new byte[frameLength];
+                await ReadExactBytesAsync(server, frame, token);
+                if (!IpcCodecV1.TryDecode(frame, out var request, out _))
+                    throw new InvalidDataException("undecodable request");
+                var response = responder(request!) ?? AckReply(request!);
+                var encoded = IpcCodecV1.Encode(response);
+                var replyLength = new byte[4];
+                BinaryPrimitives.WriteUInt32LittleEndian(replyLength, (uint)encoded.Length);
+                await server.WriteAsync(replyLength, token);
+                await server.WriteAsync(encoded, token);
+                await server.FlushAsync(token);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            break;
+        }
+        catch (Exception exception)
+        {
+            Console.WriteLine($"[scene-sync-check-server:{pipeName}] {exception.Message}");
+        }
+        finally
+        {
+            if (server is not null) await server.DisposeAsync();
+        }
+    }
+}
+
+// Case 1: offline changes are queued honestly, then flushed on connect with
+// a real engine-side Ack before the UI claims sync completion.
+{
+    const string pipeName = "HibikiDSP_scene_sync_flush_check";
+    using var serverCts = new CancellationTokenSource();
+    var connectedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var serverTask = RunSceneCatalogCheckServerAsync(pipeName, request =>
+    {
+        if (request.Type == ControlMessageType.SceneCatalogCommand &&
+            TryReadSceneCatalogOp(request.Payload.ToArray(), out var operation, out var sceneId))
+        {
+            if (operation == nameof(SessionRouteRuleOperationV1.Upsert))
+                ackingCatalogIds.Add(sceneId);
+            else
+                ackingCatalogIds.Remove(sceneId);
+        }
+        return null; // default Ack
+    }, connectedSignal, serverCts.Token);
+    var syncPath = Path.Combine(Path.GetTempPath(),
+        $"hibiki-scene-sync-flush-{Guid.NewGuid():N}.json");
+    try
+    {
+        var syncViewModel = new EasyControlViewModel(pipeName)
+        {
+            CustomSceneCatalogPath = syncPath,
+            SelectedOutputGroup = "main"
+        };
+        Check(syncViewModel.PendingSceneCatalogOpsCount == 0,
+            "Offline scene sync queue must start empty.");
+        Check(await syncViewModel.AddCustomSceneAsync(new SceneCard(
+                sceneSyncBaseId, "同步檢查", "離線新增後補送", "零額外緩衝", true)) &&
+              syncViewModel.StatusText.Contains("離線"),
+            "Offline add must be reported as deferred, not synced.");
+        Check(syncViewModel.PendingSceneCatalogOpsCount == 1,
+            "Offline add must enqueue exactly one bounded scene catalog op.");
+        Check(!syncViewModel.StatusText.Contains("引擎已同步"),
+            "Offline status must not claim engine sync.");
+
+        await syncViewModel.ConnectAsync(TimeSpan.FromSeconds(5));
+        Check(syncViewModel.IsConnected,
+            "Scene sync fixture failed to reach the local check engine.");
+        Check(syncViewModel.PendingSceneCatalogOpsCount == 0,
+            "Connect must flush the offline scene catalog queue.");
+        Check(syncViewModel.LastCommand?.Type == ControlMessageType.SceneCatalogCommand &&
+              syncViewModel.StatusText.Contains("引擎已同步"),
+            "Flushed scene sync must be acknowledged and honestly reported.");
+        Check(ackingCatalogIds.Contains(sceneSyncBaseId),
+            "Engine-side check catalog must contain the flushed custom scene.");
+    }
+    finally
+    {
+        serverCts.Cancel();
+        try { await serverTask; } catch (OperationCanceledException) { }
+        if (File.Exists(syncPath)) File.Delete(syncPath);
+    }
+}
+
+// Case 2: while connected, add/remove round-trip immediately; failures are
+// reported instead of being silently queued behind a success message.
+{
+    const string pipeName = "HibikiDSP_scene_sync_live_check";
+    using var serverCts = new CancellationTokenSource();
+    var liveCatalogIds = new SortedSet<string>(StringComparer.Ordinal);
+    var connectedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var serverTask = RunSceneCatalogCheckServerAsync(pipeName, request =>
+    {
+        if (request.Type == ControlMessageType.SceneCatalogCommand &&
+            TryReadSceneCatalogOp(request.Payload.ToArray(), out var operation, out var sceneId))
+        {
+            if (operation == nameof(SessionRouteRuleOperationV1.Upsert))
+                liveCatalogIds.Add(sceneId);
+            else
+                liveCatalogIds.Remove(sceneId);
+        }
+        return null;
+    }, connectedSignal, serverCts.Token);
+    var livePath = Path.Combine(Path.GetTempPath(),
+        $"hibiki-scene-sync-live-{Guid.NewGuid():N}.json");
+    try
+    {
+        var liveViewModel = new EasyControlViewModel(pipeName)
+        {
+            CustomSceneCatalogPath = livePath,
+            SelectedOutputGroup = "main"
+        };
+        await liveViewModel.ConnectAsync(TimeSpan.FromSeconds(5));
+        Check(liveViewModel.IsConnected && liveViewModel.PendingSceneCatalogOpsCount == 0,
+            "Live scene sync fixture failed to connect cleanly.");
+
+        var onlineId = sceneSyncBaseId + "-live";
+        Check(await liveViewModel.AddCustomSceneAsync(new SceneCard(
+                onlineId, "線上同步", "連線中新增", "零額外緩衝", true)) &&
+              liveViewModel.StatusText.Contains("引擎已同步") &&
+              liveCatalogIds.Contains(onlineId),
+            "Connected add must round-trip through the engine and report sync honestly.");
+        Check(liveViewModel.PendingSceneCatalogOpsCount == 0,
+            "Connected add must not leave anything in the offline queue.");
+
+        Check(await liveViewModel.RemoveCustomSceneAsync(onlineId) &&
+              !liveCatalogIds.Contains(onlineId) &&
+              liveViewModel.StatusText.Contains("引擎已同步"),
+            "Connected remove must round-trip through the engine and report sync honestly.");
+        Check(!await liveViewModel.RemoveCustomSceneAsync("missing-scene") &&
+              liveViewModel.StatusText.Contains("找不到"),
+            "Unknown scene removal must keep failing closed.");
+        Check(!liveCatalogIds.Any(id => id.EndsWith("-live", StringComparison.Ordinal)),
+            "Failed removals must not mutate the engine-side check catalog.");
+    }
+    finally
+    {
+        serverCts.Cancel();
+        try { await serverTask; } catch (OperationCanceledException) { }
+        if (File.Exists(livePath)) File.Delete(livePath);
+    }
+}
+
+// Case 3: an engine that NACKs scene catalog commands keeps the queue and
+// degrades honestly; nothing is silently dropped.
+{
+    const string pipeName = "HibikiDSP_scene_sync_nack_check";
+    using var serverCts = new CancellationTokenSource();
+    var connectedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var serverTask = RunSceneCatalogCheckServerAsync(pipeName, request =>
+        request.Type == ControlMessageType.SceneCatalogCommand
+            ? new IpcEnvelopeV1(ControlMessageType.Error, request.RequestId,
+                  Array.Empty<byte>())
+            : null, connectedSignal, serverCts.Token);
+    var nackPath = Path.Combine(Path.GetTempPath(),
+        $"hibiki-scene-sync-nack-{Guid.NewGuid():N}.json");
+    try
+    {
+        var nackViewModel = new EasyControlViewModel(pipeName)
+        {
+            CustomSceneCatalogPath = nackPath,
+            SelectedOutputGroup = "main"
+        };
+        Check(await nackViewModel.AddCustomSceneAsync(new SceneCard(
+                sceneSyncBaseId + "-nack", "拒收測試", "引擎拒收仍保留", "零額外緩衝", true)),
+            "Offline NACK fixture add should still succeed locally.");
+        await nackViewModel.ConnectAsync(TimeSpan.FromSeconds(5));
+        Check(nackViewModel.ConnectionState == ControlConnectionState.Degraded,
+            "A NACK during flush must degrade the connection state honestly.");
+        Check(nackViewModel.PendingSceneCatalogOpsCount >= 1,
+            "A NACKed scene catalog op must stay queued.");
+        Check(nackViewModel.StatusText.Contains("尚未全部同步") ||
+              nackViewModel.StatusText.Contains("未完成"),
+            "Flush failure must surface a degraded status message.");
+    }
+    finally
+    {
+        serverCts.Cancel();
+        try { await serverTask; } catch (OperationCanceledException) { }
+        if (File.Exists(nackPath)) File.Delete(nackPath);
+    }
+}
+
 
 Console.WriteLine("Control model checks passed.");

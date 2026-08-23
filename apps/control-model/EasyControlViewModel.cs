@@ -56,6 +56,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private string _customSceneCatalogPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Hibiki DSP", "scene-cards-v1.json");
+    private readonly Queue<PendingSceneCatalogOp> _pendingSceneCatalogOps = new();
 
     public ExpertSurfaceModel Expert { get; } = new();
 
@@ -492,6 +493,13 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         return true;
     }
 
+    public const int MaxPendingSceneCatalogOps = 64;
+
+    public int PendingSceneCatalogOpsCount => _pendingSceneCatalogOps.Count;
+
+    private sealed record PendingSceneCatalogOp(
+        bool IsUpsert, string SceneId, string Name, string OutputGroup);
+
     public bool UpsertCustomScene(SceneCard scene)
     {
         if (!_session.CustomScenes.Upsert(scene)) return false;
@@ -510,10 +518,25 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         return true;
     }
 
-    public bool AddCustomScene()
+    public async Task<bool> AddCustomSceneAsync(
+        CancellationToken cancellationToken = default)
     {
-        var scene = new SceneCard(CustomSceneId.Trim(), CustomSceneName.Trim(),
-                                  CustomSceneDescription.Trim(), "平衡", true);
+        return await AddCustomSceneCoreAsync(
+            new SceneCard(CustomSceneId.Trim(), CustomSceneName.Trim(),
+                          CustomSceneDescription.Trim(), "平衡", true),
+            cancellationToken).ConfigureAwait(true);
+    }
+
+    public async Task<bool> AddCustomSceneAsync(SceneCard scene,
+                                                CancellationToken cancellationToken = default)
+    {
+        return await AddCustomSceneCoreAsync(scene, cancellationToken)
+            .ConfigureAwait(true);
+    }
+
+    private async Task<bool> AddCustomSceneCoreAsync(SceneCard scene,
+                                                     CancellationToken cancellationToken)
+    {
         var previous = _session.CustomScenes.Scenes.FirstOrDefault(item => item.Id == scene.Id);
         if (!UpsertCustomScene(scene))
         {
@@ -532,14 +555,27 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         CustomSceneId = string.Empty;
         CustomSceneName = string.Empty;
         CustomSceneDescription = string.Empty;
-        StatusText = $"已加入自訂場景：{scene.Name}";
+
         if (IsConnected)
         {
-            LastCommand = _commands.UpsertSceneCatalog(scene.Id, scene.Name,
-                _session.ActiveOutputGroup ?? "main");
-            OnPropertyChanged(nameof(LastCommand));
-            StatusText += "；正在同步到引擎";
+            var sent = await SendSceneCatalogCommandAsync(
+                _commands.UpsertSceneCatalog(scene.Id, scene.Name,
+                    _session.ActiveOutputGroup ?? "main"),
+                cancellationToken).ConfigureAwait(true);
+            if (!sent)
+            {
+                EnqueueSceneCatalogOp(new PendingSceneCatalogOp(
+                    true, scene.Id, scene.Name, _session.ActiveOutputGroup ?? "main"));
+                StatusText = $"已加入自訂場景：{scene.Name}；同步未完成，連線恢復後自動重試";
+                return false;
+            }
+            StatusText = $"已加入自訂場景：{scene.Name}；引擎已同步";
+            return true;
         }
+
+        EnqueueSceneCatalogOp(new PendingSceneCatalogOp(
+            true, scene.Id, scene.Name, _session.ActiveOutputGroup ?? "main"));
+        StatusText = $"已加入自訂場景：{scene.Name}（離線；連線後自動同步）";
         return true;
     }
 
@@ -1225,7 +1261,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     public bool SaveRouteRules(out string error) =>
         _session.RouteRules.TrySave(RouteRuleCatalogPath, out error);
 
-    public bool RemoveCustomScene(string sceneId)
+    public async Task<bool> RemoveCustomSceneAsync(
+        string sceneId, CancellationToken cancellationToken = default)
     {
         var previous = _session.CustomScenes.Scenes.FirstOrDefault(
             item => item.Id == sceneId?.Trim());
@@ -1259,13 +1296,75 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             return false;
         }
 
+        StatusText = $"已移除自訂場景：{previous.Name}";
         if (IsConnected)
         {
-            LastCommand = _commands.RemoveSceneCatalog(sceneId);
-            OnPropertyChanged(nameof(LastCommand));
+            var sent = await SendSceneCatalogCommandAsync(
+                _commands.RemoveSceneCatalog(previous.Id), cancellationToken)
+                .ConfigureAwait(true);
+            if (!sent) return false;
+            StatusText = $"已移除自訂場景：{previous.Name}；引擎已同步";
         }
+        else
+        {
+            EnqueueSceneCatalogOp(new PendingSceneCatalogOp(false, previous.Id, "", ""));
+            StatusText += "（離線；連線後自動同步）";
+        }
+        return true;
+    }
 
-        StatusText = $"已移除自訂場景：{previous.Name}";
+    private void EnqueueSceneCatalogOp(PendingSceneCatalogOp operation)
+    {
+        while (_pendingSceneCatalogOps.Count >= MaxPendingSceneCatalogOps)
+        {
+            _pendingSceneCatalogOps.Dequeue();
+            StatusText = "離線場景同步佇列已滿；捨棄最舊的變更以維持有界容量";
+        }
+        _pendingSceneCatalogOps.Enqueue(operation);
+    }
+
+    // Scene catalog sync is honest by construction: the engine must Ack the
+    // exact request before any UI text claims the card reached the engine.
+    private async Task<bool> SendSceneCatalogCommandAsync(IpcEnvelopeV1 command,
+                                                          CancellationToken cancellationToken)
+    {
+        LastCommand = command;
+        OnPropertyChanged(nameof(LastCommand));
+        var sent = await SendCommandAsync(() => command, cancellationToken)
+            .ConfigureAwait(true);
+        return sent && IsConnected;
+    }
+
+    private async Task<bool> FlushPendingSceneCatalogOpsAsync(
+        CancellationToken cancellationToken)
+    {
+        var total = _pendingSceneCatalogOps.Count;
+        while (_pendingSceneCatalogOps.Count > 0)
+        {
+            var operation = _pendingSceneCatalogOps.Peek();
+            IpcEnvelopeV1 command;
+            try
+            {
+                command = operation.IsUpsert
+                    ? _commands.UpsertSceneCatalog(operation.SceneId, operation.Name,
+                          operation.OutputGroup)
+                    : _commands.RemoveSceneCatalog(operation.SceneId);
+            }
+            catch (ArgumentException)
+            {
+                _pendingSceneCatalogOps.Dequeue();
+                continue;
+            }
+            if (!await SendSceneCatalogCommandAsync(command, cancellationToken)
+                    .ConfigureAwait(true))
+            {
+                StatusText = "離線場景同步未完成；保留佇列，稍後重新連線再試";
+                return false;
+            }
+            _pendingSceneCatalogOps.Dequeue();
+        }
+        if (total > 0)
+            StatusText = $"離線場景變更已補送（{total} 筆）；引擎已同步";
         return true;
     }
 
@@ -1294,6 +1393,12 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
                 StatusText = "引擎已連線；控制狀態暫不可用，音訊保持安全狀態";
             if (IsConnected && !await RefreshSessionCatalogAsync(cancellationToken).ConfigureAwait(true))
                 StatusText = "引擎已連線；App 清單暫不可用，音訊保持安全狀態";
+            if (IsConnected && _pendingSceneCatalogOps.Count > 0)
+            {
+                if (!await FlushPendingSceneCatalogOpsAsync(cancellationToken)
+                        .ConfigureAwait(true))
+                    StatusText = "引擎已連線；離線期間的場景變更尚未全部同步，音訊保持安全狀態";
+            }
             return true;
         }
         catch (OperationCanceledException)
