@@ -1,74 +1,49 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "issue": 655,
-  "scope_digest": "ipc-between-connect-stop-v1",
-  "source_commit": "501ffe97fb35cfe424a412c6cb118f567d99d8df",
-  "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100-pwsh-7.6",
-  "commands": [
-    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/handoff-check.ps1 -Issue 655",
-    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/verify.ps1",
-    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/docs-check.ps1",
-    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/source-policy.ps1",
-    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/source-only-ci-check.ps1",
-    "git diff --check"
-  ],
-  "results": [
+  "title": "IPC between-connection pipe stop cancels immediately",
+  "base_commit": "6e9b5b98d1c39f15805efb5d47859ea3d7c035a9",
+  "summary": {
+    "behavior": "stop() now cancels the active server pipe handle while the worker is between client connections, so shutdown returns immediately instead of waiting for the idle timeout; connected-idle prompt-stop from #637 is unchanged.",
+    "scope_boundary": "User-space control-plane source, contract tests and SPEC-0001 documentation only. No ABI/schema/framing change; no driver, installer, machine-state or physical-audio claim.",
+    "files": [
+      "src/hub/include/hibiki/ipc_pipe.hpp",
+      "src/hub/src/ipc_pipe.cpp",
+      "tests/unit/contract_tests.cpp",
+      "docs/specs/SPEC-0001-core-contracts.md"
+    ]
+  },
+  "validation": [
     {
-      "command": "tools/handoff-check.ps1 -Issue 655",
-      "status": "pass",
-      "coverage": ["issue ownership", "branch and base commit", "scope"],
-      "compiled_artifacts": false,
-      "case_count": 1
+      "command": "pwsh -NoProfile -File tools/verify.ps1",
+      "result": "pass on 501ffe97fb35cfe424a412c6cb118f567d99d8df; 3/3 CTest including the new between-connection immediate-stop regression"
     },
     {
-      "command": "tools/verify.ps1",
-      "status": "pass",
-      "coverage": [
-        "hibiki_asio_transport_selftest: pass",
-        "hibiki_tab_bridge_selftest: pass",
-        "hibiki_contract_tests: pass including between-connection immediate-stop regression"
-      ],
-      "compiled_artifacts": true,
-      "case_count": 3
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 655",
+      "result": "pass after correcting base_commit to the full wave22 merge-base SHA"
     },
     {
-      "command": "docs/source/source-only-ci/diff checks",
-      "status": "pass",
-      "coverage": [
-        "80 required paths and 24 specs",
-        "570 tracked source-only paths",
-        "2 workflows under publication policy",
-        "no whitespace errors"
-      ],
-      "compiled_artifacts": false,
-      "case_count": 4
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1",
+      "result": "pass (80 required paths; 570 tracked paths)"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-policy.ps1",
+      "result": "pass (570 tracked paths)"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
     }
   ],
-  "changes": [
-    {
-      "file": "src/hub/src/ipc_pipe.cpp",
-      "summary": "stop() now repeatedly cancels the registered server handle until the worker observes stop, covering the gap after client disconnect and before the next connect is armed."
-    },
-    {
-      "file": "tests/unit/contract_tests.cpp",
-      "summary": "Add a regression that connects once, disconnects, waits for the server to return to listening state, then proves stop completes below io_timeout_ms."
-    },
-    {
-      "file": "docs/specs/SPEC-0001-core-contracts.md",
-      "summary": "Record that stop must cancel across connected-idle and between-connection states without a fixed full idle-timeout wait."
-    }
-  ],
-  "limitations": [
-    "User-space control-plane source contract only; no RT-thread allocation, lock, wait, COM, filesystem, or UI work is introduced.",
-    "No physical endpoint, driver install/load, HLK, Microsoft-signing, or audible listening-test claim is made."
+  "limits": [
+    "Bounded-stop behavior is a control-plane contract; it does not measure end-to-end audio latency.",
+    "Driver install/load, HLK, Microsoft signing and runtime audio remain release-stage evidence."
   ],
   "logs": [],
   "tool_versions": {
-    "cmake": "4.4.0",
-    "msbuild": "18.9.1+a81b43525",
     "powershell": "7.6.4"
   },
-  "started_at": "2026-08-23T17:20:00+08:00",
-  "finished_at": "2026-08-23T17:50:00+08:00"
+  "started_at": "2026-08-23T17:36:00+08:00",
+  "finished_at": "2026-08-23T17:55:00+08:00",
+  "date": "2026-08-23"
 }
-
