@@ -417,6 +417,12 @@
                                            TextWrapping="Wrap"
                                            Style="{ThemeResource CaptionTextBlockStyle}"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <Button Content="選擇並準備 IR WAV 檔"
+                                        AutomationProperties.Name="準備 IR WAV 檔案"
+                                        Click="OnPrepareIrClick" />
+                                <TextBlock Text="{Binding IrPrepareStatus}"
+                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
                         </Border>
                     </StackPanel>

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "issue": 736,
+  "scope_digest": "global-snapshot-wave29-followup",
+  "source_commit": null,
+  "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100-pwsh-7.6; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 736",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/extension-check.ps1 -SelfTest"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #724 / PR #727 merged: popup capture failure text persists across background state refreshes and clears only on the next explicit user action; render() skips status overwrite while the error marker is present, and Start/Stop handlers clear the marker at entry.",
+        "tools/extension-check.ps1 enforces the persistence boundary: popup must keep status.dataset.error so refreshState cannot overwrite the failed state with Idle; self-test removes that marker and expects fail-closed behavior (42 cases total).",
+        "Global snapshots now record both the user-visible error persistence fix and its gate enforcement, closing the wave29 documentation gap left when PR #727 merged after snapshot #730."
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; this update does not change product source behavior.",
+    "The persistence item remains extension source and policy-gate evidence; no vendor browser runtime or physical audio claim.",
+    "No driver install/load/HLK/Microsoft signing claim."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-23T20:47:00+08:00",
+  "finished_at": "2026-08-23T20:52:45+08:00"
+}

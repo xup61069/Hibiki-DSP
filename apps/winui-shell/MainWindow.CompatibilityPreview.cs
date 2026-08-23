@@ -81,6 +81,11 @@ public sealed partial class MainWindow
             Style = ResolveThemeResource<Style>("SubtitleTextBlockStyle"),
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
         });
+        var prepareIrButton = new Button { Content = "選擇並準備 IR WAV 檔" };
+        AutomationProperties.SetName(prepareIrButton, "準備 IR WAV 檔案");
+        prepareIrButton.Click += OnPrepareIrClick;
+        content.Children.Add(prepareIrButton);
+        content.Children.Add(BoundText("IrPrepareStatus"));
         var volume = new Slider
         {
             Minimum = -60,
