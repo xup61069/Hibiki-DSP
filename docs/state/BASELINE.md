@@ -805,11 +805,15 @@ user-space payload staging，失敗會回復既有安裝且不碰 `%LocalAppData
 driver host 工具統一 Inf2Cat 探測順序（明確 `WDK_BIN`、Windows Kits tree、PATH），本機已建置
 package 可在不手動設定環境變數時重跑 signability；build-driver 使用唯一 source/object plan，
 `guids.cpp` 只編譯一次，compiler 與 linker warning 都以 `/WX` fail-closed（Issue #764 /
-PR #769、Issue #774 / PR #776）。另新增只讀匿名 PnP 診斷工具，只鎖定
+PR #769、Issue #774 / PR #776）。PortCls adapter 原本把四組 endpoint pair 數量誤當成
+可註冊 filter object 上限，`PcAddAdapterDevice` 只預留 4 個 slot 卻需註冊 8 個
+Topology/WaveRT filter；`MaxObjects` 已修為 8，本機 WDK build、Inf2Cat 與 CI 通過
+（Issue #462 / PR #782）。另新增只讀匿名 PnP 診斷工具，只鎖定
 `ROOT\HIBIKIDSP`／`HibikiVirtualAudio`，記錄 typed problem/service/driver 欄位及有界、遮蔽後的
 SetupAPI 摘要到 `.local/`；AST 自檢拒絕安裝、啟停、移除裝置或修改開機設定的命令
 （Issue #781 / PR #783）。上述皆為 host-side source/build/self-test 或 unavailable-path evidence，
-不代表 driver 已在 guest 安裝、載入、PnP start、出聲、通過 HLK 或取得 Microsoft signing。
+不代表 driver 已在 guest 安裝、載入、PnP start、出聲、通過 HLK 或取得 Microsoft signing；
+Issue #462 因重建 package 的隔離 VM PnP start 重測尚未完成而保持開啟。
 
 瀏覽器 popup 從隱藏回到可見時，會透過既有 service-worker query 重新取得實際捕捉狀態，且
 不覆蓋先前需保留到下一次使用者操作的錯誤（Issue #762 / PR #773）。DesktopCompat 與

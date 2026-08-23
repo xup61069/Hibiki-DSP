@@ -2,8 +2,8 @@
   "schema_version": 1,
   "issue": 790,
   "scope_digest": "global-snapshot-w33",
-  "base_commit": "e1f55321723b778c7f0bc9443dc9187530ce21a8",
-  "source_commit": "4605adb826fab88d75ba6374bc2b691640505051",
+  "base_commit": "674709cc4dbeb94b43dcf768bab941405586608b",
+  "source_commit": null,
   "environment_fingerprint": "windows-local-pwsh-7.6.4; documentation-only integrator snapshot",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 790",
@@ -21,6 +21,7 @@
         "Issue #766 / PR #777 merged at 36d5bc8d: manifest-bounded transactional uninstall preserves user data and restores removals on failure by design; source/boundary evidence only, with functional uninstall self-tests still tracked by Issue #785.",
         "Issue #764 / PR #769 merged at 0eb83ef8: driver signability discovers Inf2Cat by explicit WDK_BIN, Windows Kits tree and PATH precedence while all-missing remains fail-closed.",
         "Issue #774 / PR #776 merged at 5e4e60ea: the WDK build uses a unique source/object plan and compiler/linker /WX; local package build and Inf2Cat completed warning-free.",
+        "Issue #462 / PR #782 merged at 674709cc: PcAddAdapterDevice now reserves eight PortCls object slots for four Topology/WaveRT pairs instead of under-allocating four; local WDK build, Inf2Cat and CI passed, while the rebuilt package still requires a consent-gated guest PnP-start retest.",
         "Issue #781 / PR #783 merged at c8de4cc7: exact-target, read-only PnP inspection emits typed device/service/driver fields and a bounded redacted SetupAPI excerpt under .local; offline AST tests reject mutating commands.",
         "Issue #762 / PR #773 merged at f1502b9b: the extension popup refreshes actual capture state on visibility return without erasing a persisted error; source gate and offline self-tests only.",
         "Issue #765 / PR #771 merged at d0d41a28: both previews project the complete route-health accessible summary from the control model; source and contract-model evidence only.",
