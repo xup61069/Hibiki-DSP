@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "issue": 668,
+  "scope_digest": "global-snapshot-wave25",
+  "source_commit": null,
+  "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100-pwsh-7.6; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 668",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #655 / PR #661 merged: stop() repeatedly cancels the currently registered server pipe handle while the worker is between client connections, so shutdown observes stop immediately instead of waiting a full idle timeout; connected-idle prompt-stop, framing and ownership semantics unchanged.",
+        "Issue #659 / PR #666 merged: TruePeakLimiterV1 recovery cap is computed from processed audio duration (bounded linear ramp of about +6 dB per millisecond) using the configured sample rate; cross-block-size regression covers 20 x 48-frame blocks versus one 960-frame block recovering identically over the same span while engagement stays immediate."
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; this update does not change product source behavior.",
+    "Both items remain user-space control-plane/DSP source, contract-test and SPEC-0001/SPEC-0002 documentation evidence.",
+    "No physical-audio delivery, driver installation/load/PnP start, HLK or Microsoft signing claim."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-23T17:40:00+08:00",
+  "finished_at": "2026-08-23T17:52:00+08:00"
+}

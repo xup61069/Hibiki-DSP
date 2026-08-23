@@ -795,6 +795,14 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
+第二十五波整合增量已合併：IpcNamedPipeServerV1 在兩次連線之間的空檔收到 stop() 時，
+會重複取消當下註冊的 server handle I/O 直到 worker 結束，Engine Preview 關閉不再
+固定等待完整 idle timeout；connected-idle prompt-stop 行為維持不變，IPC framing 與
+ownership 語意不變（Issue #655 / PR #661）。TruePeakLimiterV1 恢復上限從每區塊 +6 dB
+改為以經過音訊時間（dB domain，約 +6 dB 每毫秒）計算並跟隨引擎取樣率，20 個 48-frame
+區塊與單一 960-frame 區塊在相同時間跨度內恢復曲線一致，需要壓低時仍立即反應
+（Issue #659 / PR #666）。皆為 user-space source／contract test／SPEC-0001、SPEC-0002
+evidence；不宣稱實體音訊、driver 安裝/載入/HLK 或 Microsoft signing。
 第二十四波整合增量已合併：driver adapter 配置改為 ExAllocatePool3，paged／non-paged pool 類別與 'ibiH' tag 不變，建置定義升至 NTDDI_WIN10_VB 以取得宣告；GetHWLatency 把每 buffer 延遲估計寫入 HWLatency->CodecDelay，PortCls 讀到有效硬體延遲而不是被丟棄（Issue #652 / PR #660）。NODE_MUTE 名稱改指向 WDK 既有 KSAUDFNAME_MASTER_MUTE，移除未用的 null fallback，讓系統屬性頁與音效工具顯示標準「靜音」名稱（Issue #662 / PR #663）。皆為 source／local WDK build／Inf2Cat evidence；不宣稱 guest 安裝／載入／PnP start／實體音訊／HLK／Microsoft signing。
 
 第二十三波整合增量已合併：TruePeakLimiterV1 記錄上一區塊套用增益，恢復上限固定為 2x/區塊（約 +6 dB），attenuation 仍立即套用；reset() 一併重置 recovery 狀態，並新增連續區塊回歸測試確保安靜後不會瞬間跳回（Issue #647 / PR #648）。屬 user-space DSP 契約證據，不宣稱 ITU/BS.1770 或 certified true-peak conformance、實體音訊、driver 安裝/載入/HLK/Microsoft signing。

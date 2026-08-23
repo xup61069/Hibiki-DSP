@@ -31,6 +31,7 @@ driver、永久 ID 或 release 設定。需要 build／target evidence 的切片
 
 ## 目前狀態與已完成能力
 
+- 第二十五波整合增量：IPC 控制管線在兩次 client 連線之間的空檔收到 stop() 時，會重複取消當下註冊的 server handle I/O 直到 worker 觀察到停止，Engine Preview 關閉不再固定等待完整 idle timeout，framing 與 ownership 語意不變（Issue #655 / PR #661）；TruePeakLimiterV1 恢復速率改為以經過音訊時間（約 +6 dB 每毫秒）計算並跟隨引擎取樣率，限制器放開的速度不再隨回呼區塊大小改變（Issue #659 / PR #666）。兩者皆為 user-space source 與 contract test 證據；不宣稱實體音訊、driver 安裝/載入/HLK 或 Microsoft signing。
 - 第二十四波整合增量：driver 端 `operator new` 改用現代 ExAllocatePool3 分配 API，並把 GetHardwareLatency 的每 buffer 延遲估計填入 CodecDelay，讓 PortCls 收到有意義的硬體延遲值（Issue #652 / PR #660）；主靜音控制節點改用標準 KSAUDFNAME_MASTER_MUTE 命名，音效工具或系統屬性頁不再看到匿名靜音節點（Issue #662 / PR #663）。兩者皆為本機 WDK 建置與 Inf2Cat source/build 證據；不宣稱 guest 安裝、載入、PnP start、實體音訊、HLK 或 Microsoft signing。
 - 第二十三波整合增量：TruePeakLimiterV1 恢復期改為每區塊最多放寬約 +6 dB 的有界增益回升，需要壓低時仍然立即反應，限制器本身不再產生突兀的 click/pumping（Issue #647 / PR #648）。屬 user-space DSP 契約證據；不宣稱 ITU/BS.1770 認證、實體端點、driver 或 HLK/Microsoft signing。
 - 第二十二波整合增量：noise gate 修正開／關方向，開啟速度由 attack 控制、關閉速度由 release 控制，說話開頭與尾音不再被吃掉（Issue #636 / PR #640）；共用 handoff 稽核新增同 branch 拒絕的離線自檢（Issue #643 / PR #644）；Engine Preview 同步建立 canonical pipe 後立即 stop 時可馬上取消 pending connect，不再等完整 idle timeout（Issue #637 / PR #645）；driver 端每個 endpoint 改為成對註冊 PortCls Topology 與 WaveRT filter 並接上 bridge 連線，本機 WDK 建置與 Inf2Cat 通過，待隔離 VM 重測確認先前的啟動失敗是否解決（Issue #462 / PR #638）。DSP 與 IPC 項目為 user-space/source evidence；不宣稱實體音訊、driver 安裝/載入/HLK/Microsoft signing。
