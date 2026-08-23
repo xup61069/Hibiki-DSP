@@ -40,6 +40,6 @@
     "docs/tasks/active/337.md"
   ],
   "reason": "Issue #198 retired file-based handoffs; subsequent archive PRs re-introduced tracked copies. Git history is the authoritative record.",
-  "timestamp_utc": "2026-08-22T15:17:14.121Z"
+  "timestamp_utc": "2026-08-22T15:17:14.121Z",
+  "source_commit": "1a51f9ff139bfef6f946ee15615fa858b7d50887"
 }
-

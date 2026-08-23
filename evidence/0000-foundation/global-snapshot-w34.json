@@ -3,7 +3,7 @@
   "issue": 805,
   "scope_digest": "global-snapshot-w34",
   "base_commit": "2833c9bb066a3be49c191f5e20a7565e1850d932",
-  "source_commit": null,
+  "source_commit": "50010fa2f7ef402ef8f516741bee96e93b5dcdd6",
   "environment_fingerprint": "windows-local-pwsh-7.6.4; documentation-only integrator snapshot",
   "commands": [
     "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",

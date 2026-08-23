@@ -38,5 +38,6 @@
     "The isolated VM remains intentionally unchanged by this host-side build."
   ],
   "next_safe_action": "With explicit user consent, stage and start this rebuilt pair in the existing isolated VM and capture staged debug logs.",
-  "date": "2026-08-23"
+  "date": "2026-08-23",
+  "source_commit": "e0a38ed398f029fcab177377f21d03aa20d735d2"
 }

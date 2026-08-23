@@ -28,6 +28,7 @@
       ]
     }
   ],
+  "source_commit": "0ddad62e6b465868c36348ce129e1ee7813ad494",
   "limitations": [
     "Source/tooling evidence only: no browser launch, MV3 runtime, audio, endpoint, driver, WaveRT, HLK, signing or release claims."
   ],

@@ -106,6 +106,7 @@
       "result": "pass"
     }
   ],
+  "source_commit": "00c0c1a115c319b9c77200484b97d2012aba74f4",
   "limitations": [
     "This is a process/documentation change only; no product code or DSP behavior was modified.",
     "The new protocol depends on gh CLI access for handoff parsing; offline environments cannot run handoff-check against real issues.",

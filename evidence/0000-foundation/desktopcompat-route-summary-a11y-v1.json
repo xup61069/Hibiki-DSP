@@ -2,7 +2,7 @@
   "$schema": "evidence/0000-foundation/schema/evidence-entry-v1.json",
   "id": "desktopcompat-route-summary-a11y-v1",
   "title": "Preview route health projects full AccessibleSummary (name + state + boundary detail)",
-  "source_commit": null,
+  "source_commit": "d0d41a289069b3da402eca9c5234cc4db3333cad",
   "date": "2026-08-23",
   "scope": [
     "apps/control-model/ExpertSurfaceModel.cs",

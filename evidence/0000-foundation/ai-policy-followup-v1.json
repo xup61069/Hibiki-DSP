@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 623,
   "scope_digest": "ai-policy-followup-v1",
-  "source_commit": null,
+  "source_commit": "9824732edaa8aedeaa7ab1b05ecbcc6a53b6cce4",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6; documentation-only follow-up",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 623",

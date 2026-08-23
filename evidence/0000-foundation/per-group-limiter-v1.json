@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 683,
   "scope_digest": "per-group-limiter-v1",
-  "source_commit": null,
+  "source_commit": "cc7b36de00582b8734c60d1150f4c0963b3ae9a6",
   "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6",
   "commands": [
     "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/verify.ps1",

@@ -17,5 +17,6 @@
   "evidence_boundary": [
     "Static source, contract-model and non-target Desktop Compatibility Preview evidence only.",
     "No runtime UI Automation or screen-reader audit, no formal WinUI XAML build, no native supervisor behavior change, no timeline persistence format change, no engine graph change, no physical audio, no driver install/load/HLK or Microsoft signing claim."
-  ]
+  ],
+  "source_commit": "1f644999c6a923d18361cfa33598eb10293819b1"
 }
