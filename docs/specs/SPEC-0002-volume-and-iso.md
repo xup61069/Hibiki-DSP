@@ -94,9 +94,13 @@ Driver ABI 另外使用 Q16.16 dB；`db_to_q16_16`／`q16_16_to_db` 將量化集
 `iso226_spl_from_phon` 實作 ISO 226:2023 的公式，但只接受 caller-supplied
 `Iso226FormulaPointV1 {alpha_f, threshold_db, transfer_db}` 與 reference parameters；
 repository 不包含標準的 29 點係數表。20–90 phon 以外回傳 invalid，1 kHz reference invariant
-由測試固定。`build_formula_compensation` 會以同一組 caller-supplied points 計算
-current/reference phon 的 1 kHz 正規化增益、F3/boost 限制與 `limited` 診斷；缺少 1 kHz
-anchor 或任何公式點 invalid 時整批 fail-closed。
+由測試固定。normative validity boundary 是頻率相依：5 kHz 以上上限收斂到 80 phon，
+4-5 kHz 過渡與 12.5 kHz 上限由保守線性模型固定。已知 caveat：0 phon 在公式上會落到
+threshold，但目前仍視為 informative domain 並 fail-closed，不宣稱 conformance。
+`build_formula_compensation` 會以同一組 caller-supplied points 計算 current/reference
+phon 的 1 kHz 正規化增益、F3/boost 限制與 `limited` 診斷；缺少 1 kHz anchor、current
+或 reference phon 超過任何點的頻率相依 valid domain，或任何公式點 invalid 時整批
+fail-closed。
 
 預設 reference=80 phon。未校準時只能使用 Relative Compensation；校準模式必須保存 acoustic
 anchor、測試信號、實測 SPL、gain path 與 uncertainty。ISO 只定 magnitude；phase 是 Hibiki 的

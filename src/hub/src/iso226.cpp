@@ -10,6 +10,21 @@ namespace {
 constexpr double kOneKhz = 1000.0;
 constexpr double kMinFrequency = 20.0;
 constexpr double kMaxFrequency = 12500.0;
+constexpr double kHighBandStartHz = 5000.0;
+
+// Frequency-dependent maximum phon per the ISO 226:2023-derived normative
+// domain documented for this module:
+//   20-4000 Hz: 20-90 phon
+//   5000-12500 Hz: 20-80 phon
+// The 4-5 kHz transition is linearly interpolated.
+double max_valid_phon(const double frequency_hz) noexcept {
+    constexpr double kMidBandEndHz = 4000.0;
+    if (frequency_hz <= kMidBandEndHz) { return 90.0; }
+    if (frequency_hz >= kHighBandStartHz) { return 80.0; }
+    // Linear transition between 4 kHz and 5 kHz.
+    const double t = (frequency_hz - kMidBandEndHz) / (kHighBandStartHz - kMidBandEndHz);
+    return 90.0 - t * 10.0;
+}
 
 bool valid_mode(const EqualLoudnessMode mode) noexcept {
     return mode == EqualLoudnessMode::Calibrated || mode == EqualLoudnessMode::Relative ||
@@ -61,7 +76,7 @@ bool iso226_spl_from_phon(const Iso226FormulaPointV1& point,
         !std::isfinite(point.threshold_db) || !std::isfinite(point.transfer_db) ||
         !std::isfinite(reference.reference_alpha) || reference.reference_alpha <= 0.0 ||
         !std::isfinite(reference.reference_threshold_db) || !std::isfinite(phon) || phon < 20.0 ||
-        phon > 90.0) {
+        phon > max_valid_phon(point.frequency_hz)) {
         return false;
     }
     const double loudness_term =
@@ -138,9 +153,22 @@ CompensationResult build_formula_compensation(
     const EqualLoudnessPolicyV1& policy) noexcept {
     CompensationResult result;
     if (!validate_policy(policy) || !std::isfinite(current_phon) || current_phon < 20.0 ||
-        current_phon > 90.0 || points.empty()) {
+        points.empty()) {
         result.diagnostic = "invalid ISO formula compensation inputs";
         return result;
+    }
+
+    // Enforce the frequency-dependent phon domain: the requested phon and the
+    // policy reference phon must both be valid at every point in the
+    // caller-supplied table, not just at 1 kHz.
+    for (const auto& point : points) {
+        if (current_phon > max_valid_phon(point.frequency_hz) ||
+            policy.reference_phon > max_valid_phon(point.frequency_hz)) {
+            result.diagnostic =
+                "requested or reference phon exceeds the valid domain for one "
+                "or more frequencies";
+            return result;
+        }
     }
 
     const Iso226FormulaPointV1* one_khz = nullptr;

@@ -577,6 +577,34 @@ int main() {
     CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{1000.0, 0.25, 2.4, 0.0},
                                Iso226FormulaReferenceV1{0.25, 2.4}, 60.0, one_k_spl));
     CHECK(std::abs(one_k_spl - 60.0) < 1e-10);
+    // Frequency-dependent phon validity per issue #789:
+    //   20-4000 Hz: up to 90 phon; 5000-12500 Hz: up to 80 phon.
+    double low_f_spl = 0.0;
+    CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{1000.0, 0.30, 2.4, 0.0},
+                               Iso226FormulaReferenceV1{0.30, 2.4}, 90.0, one_k_spl));
+    // Mid-band boundary: 90 phon valid at exactly 4 kHz.
+    CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{4000.0, 0.30, 2.4, 0.0},
+                               Iso226FormulaReferenceV1{0.30, 2.4}, 90.0, low_f_spl));
+    // High-frequency boundary: 80 phon valid at 12.5 kHz; 81 invalid.
+    CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{12500.0, 0.30, 2.4, 0.0},
+                               Iso226FormulaReferenceV1{0.30, 2.4}, 80.0, low_f_spl));
+    CHECK(!iso226_spl_from_phon(Iso226FormulaPointV1{12500.0, 0.30, 2.4, 0.0},
+                                Iso226FormulaReferenceV1{0.30, 2.4}, 81.0, low_f_spl));
+    // Transition zone: 85 phon valid at exactly 4500 Hz (midpoint) but not at 5 kHz.
+    CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{4500.0, 0.30, 2.4, 0.0},
+                               Iso226FormulaReferenceV1{0.30, 2.4}, 85.0, low_f_spl));
+    CHECK(!iso226_spl_from_phon(Iso226FormulaPointV1{5000.0, 0.30, 2.4, 0.0},
+                                Iso226FormulaReferenceV1{0.30, 2.4}, 81.0, low_f_spl));
+    // Formula-level fail-closed: a reference phon above 80 exceeds the
+    // high-frequency normative limit.
+    {
+        EqualLoudnessPolicyV1 hf_policy;
+        hf_policy.reference_phon = 81.0;
+        const std::array<Iso226FormulaPointV1, 2> hf_points{{
+            {1000.0, 0.30, 2.4, 0.0}, {12500.0, 0.30, 2.4, 0.0}}};
+        CHECK(build_formula_compensation(hf_points, 60.0, hf_policy).points.empty());
+    }
+    // Remove debug print.
     const std::array<Iso226FormulaPointV1, 2> formula_points{{
         {100.0, 0.25, 50.0, 0.0}, {1000.0, 0.30, 2.4, 0.0}}};
     const auto formula_result = build_formula_compensation(formula_points, 60.0, policy);
