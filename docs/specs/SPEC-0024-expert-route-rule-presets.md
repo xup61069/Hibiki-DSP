@@ -23,7 +23,8 @@ PID、Windows session instance、Endpoint ID 或 plugin state 寫入使用者檔
 檔案為 `%LocalAppData%/Hibiki DSP/session-route-rules-v1.json`，schema version 固定為 1，
 以同資料夾暫存檔後 replace 保存；載入先完整驗證候選，錯誤或版本不符時保留上一份 catalog。
 規則 ID 為小寫英數與 `.`、`_`、`-`，最多 64 UTF-8 bytes；matcher 最多 128 bytes，lane／
-output 最多 64 bytes；至少一個 matcher 與 lane／output 必須存在。優先級由大到小排序，同值
+output 最多 64 bytes；matcher 欄位允許空字串並視同「未填」，但不得含控制字元；至少一個
+非空白 matcher 與 lane／output 必須存在。優先級由大到小排序，同值
 以 rule ID 穩定排序。容量、文字控制字元、enum、gain（-144..12 dB）與 finite 條件均 fail closed。
 
 ## 命令與套用
