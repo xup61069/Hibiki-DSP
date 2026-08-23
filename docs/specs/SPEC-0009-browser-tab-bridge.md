@@ -51,8 +51,7 @@ non-owning packet view.
 
 目前 extension 只連 `ws://127.0.0.1:17842/v1/tab` 的 loopback receiver；bridge 未啟動
 時丟棄送出 packet；capture 進行中 offscreen 會以 bounded exponential backoff（最多
-10 次、上限 15 秒）重試連線，bridge 恢復後新 packet 即送入，不需重新 Start capture。
-手動 Stop 或串流自然結束仍會完整 teardown graph 並取消重試。receiver 已限制 localhost、WebSocket frame 大小、mask、ping/close
+10 次、上限 15 秒）重試連線，bridge 恢復後新 packet 即送入，不需重新 Start capture。連線建立失敗或 `WebSocket.onerror` 觸發時走同一個有界重試計時器，offscreen 目前不輸出額外錯誤 payload 或 console diagnostic；popup 仍只能透過 capture-state / get-capture-state 看到 capturing 與 bridgeConnected 的實際狀態。因此 bridge 暫時不可用時，使用者會看到「已捕捉但 bridge 未連線」而不是失敗終止；這個 silent retry 是目前已知限制，直到另立 user-visible diagnostic slice 為止。手動 Stop 或串流自然結束仍會完整 teardown graph 並取消重試。receiver 已限制 localhost、WebSocket frame 大小、mask、ping/close
 與 decoder 驗證。`TabCaptureQueueV1` 將 validated packet 複製到四格固定 SPSC ring，
 控制執行緒可用 `enqueue_tab_capture_packet_v1` 作 callback，RT lane 再以 caller-owned
 buffer pop；滿載會回報 dropped blocks，不阻塞 WebSocket。`process_tab_capture_lane_v1`

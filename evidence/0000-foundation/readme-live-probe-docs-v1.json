@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 613,
   "scope_digest": "readme-live-probe-docs-v1",
-  "source_commit": "8f036cba7e6aac3713573bc6ec1ecb2150e4e3db",
+  "source_commit": "a8c24c381a1ef8e77c2899eb4aee6562f4b27528",
   "environment_fingerprint": "windows-26200-amd64-vs2026-dotnet-10.0.400-pwsh-7.6.4; target-machine-pending",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 613",

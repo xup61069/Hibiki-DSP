@@ -213,7 +213,7 @@ plugin bytes；它不是 crash dump capture，也不會取代 production worker 
 plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter、multi-bus/side-chain
 admission validator、bounded parameter frame、latency alignment primitive、latency graph commit
 與 optional worker executable 已有 bridge；仍未完成第三方 plugin certification、第三方 plugin
-compatibility review、RT graph lane latency wiring、side-chain/multi-bus 的實際 worker process、
+compatibility review、side-chain/multi-bus 的實際 worker process、
 完整 crash dump capture/redaction pipeline 與 production worker policy。目前
 supervisor、named pipe、passthrough worker、catalog、bounded SDK processor、handshake/process
 exchange、timeline lane 與 Scene automation scheduler 提供可測試的 process

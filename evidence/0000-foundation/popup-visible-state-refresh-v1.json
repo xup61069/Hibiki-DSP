@@ -3,7 +3,7 @@
   "slice": "popup-visible-state-refresh-v1",
   "issue": "https://github.com/xup61069/Hibiki-DSP/issues/762",
   "base_commit": "e06661027f3f4b9ff6ddcbee1b7bbd2706e4c420",
-  "source_commit": "01e1b53dbfa1d8fd916a78acf9e7426d8a35a971",
+  "source_commit": "f1502b9bf7967e91db4b583967ca37fc812f9663",
   "product_outcome": [
     "The browser popup refreshes real capture state through the existing service-worker query whenever it becomes visible again.",
     "Users no longer need to press Start or Stop just to discover whether tab capture has changed while the popup was hidden.",
