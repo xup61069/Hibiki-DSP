@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "issue": 672,
+  "scope_digest": "engine-preview-soak-v1",
+  "source_commit": "647d29c",
+  "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
+  "commands": [
+    "pwsh -NoProfile -File tools/engine-preview-soak.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/engine-preview-soak.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 672",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/engine-preview-soak.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "12 offline cases; no process started and no file written",
+        "argument bounds for iteration count and interval",
+        "IPC frame shape, correlation and oversized rejection",
+        "aggregate result calculation including empty set",
+        "cleanup decision for live and exited engine"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/engine-preview-soak.ps1 (default 3 iterations)",
+      "status": "pass",
+      "coverage": [
+        "three complete Engine Preview cycles against existing Release build",
+        "Hello/Ack request correlation each cycle",
+        "fixed Main volume command (-12 dB) queued and status convergence verified",
+        "engine stopped cleanly after every cycle",
+        "anonymous report written only under .local/engine-preview-soak/report.json"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "This soak harness exercises the user-space Engine Preview control plane only.",
+    "It does not claim physical audio output, driver loading, WaveRT, HLK or Microsoft signing evidence.",
+    "The anonymous report records duration and exit code per cycle but no endpoint IDs or private paths."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5"
+  },
+  "started_at": "2026-08-23T10:02:00+08:00",
+  "finished_at": "2026-08-23T10:06:00+08:00"
+}
