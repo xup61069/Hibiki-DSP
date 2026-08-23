@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 74,
   "scope_digest": "preview-launcher-selftest-v1",
-  "source_commit": "64748eb",
+  "source_commit": "787e682438eb055ac6e8630294aca7e6d9eb4745",
   "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "pwsh -NoProfile -File tools/run-preview.ps1 -SelfTest",
