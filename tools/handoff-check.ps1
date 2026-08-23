@@ -155,6 +155,19 @@ function Assert-SafeBranch {
   }
 }
 
+function Register-IssueBranch {
+  param(
+    [Parameter(Mandatory)] [hashtable]$SeenBranches,
+    [Parameter(Mandatory)] [string]$Branch,
+    [Parameter(Mandatory)] [int]$IssueNumber,
+    [Parameter(Mandatory)] [string]$Path
+  )
+  if ($SeenBranches.ContainsKey($Branch)) {
+    throw "Issues share branch '$Branch': $($SeenBranches[$Branch]) and $IssueNumber"
+  }
+  $SeenBranches[$Branch] = $IssueNumber
+}
+
 function Assert-SafeScopePath {
   param([string]$Value, [string]$Key, [string]$Path)
   $normalized = $Value.Replace('\', '/')
@@ -376,6 +389,26 @@ if ($SelfTest) {
 
   Assert-Throws { Assert-UniqueItems @('a/**', 'a/**') 'scope_globs' 'selftest' } 'duplicate scopes'
 
+  $seenSelfTestBranches = @{}
+  Register-IssueBranch -SeenBranches $seenSelfTestBranches `
+    -Branch 'codex/99-selftest' -IssueNumber 99 -Path 'selftest/branch-first'
+  if ($seenSelfTestBranches['codex/99-selftest'] -ne 99) {
+    throw 'handoff-check self-test failed: branch registration was not recorded.'
+  }
+  Assert-Throws {
+    Register-IssueBranch -SeenBranches $seenSelfTestBranches `
+      -Branch 'codex/99-selftest' -IssueNumber 100 -Path 'selftest/shared-branch'
+  } 'two issues sharing one branch'
+  $distinctSelfTestBranches = @{}
+  foreach ($case in @(@{ Branch = 'codex/98-first'; Issue = 98 }, @{ Branch = 'codex/97-second'; Issue = 97 })) {
+    Register-IssueBranch -SeenBranches $distinctSelfTestBranches `
+      -Branch $case.Branch -IssueNumber $case.Issue -Path 'selftest/distinct-branches'
+  }
+  if ($distinctSelfTestBranches.Count -ne 2) {
+    throw 'handoff-check self-test failed: distinct branches were rejected.'
+  }
+  $caseCount++
+
   $twoLabelsMock = New-MockIssue -Labels @('claimed', 'in-review')
   Assert-Throws {
     $labelNames = @($twoLabelsMock.labels | ForEach-Object { $_.name })
@@ -494,10 +527,8 @@ foreach ($issueData in $withHandoff) {
   Assert-SafeBranch $branch 'branch' $path
   Assert-SafeBranch $targetBranch 'target_branch' $path
   if ($branch -eq $targetBranch) { throw "Issue handoff branch and target_branch must differ: $path" }
-  if ($seenBranches.ContainsKey($branch)) {
-    throw "Issues share branch '$branch': $($seenBranches[$branch]) and $issueNumber"
-  }
-  $seenBranches[$branch] = $issueNumber
+  Register-IssueBranch -SeenBranches $seenBranches -Branch $branch `
+    -IssueNumber $issueNumber -Path $path
   $labels = @($issueData.labels | ForEach-Object { $_.name })
   Assert-LifecycleLabel -Labels $labels -IssueNumber $issueNumber -State $issueData.state -Path $path
   $ownerField = Get-Scalar $frontMatter 'owner' $path
