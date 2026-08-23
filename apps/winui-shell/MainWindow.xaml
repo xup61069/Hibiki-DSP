@@ -423,6 +423,7 @@
                                         Click="OnPrepareIrClick" />
                                 <TextBlock Text="{Binding IrPrepareStatus}"
                                            Style="{ThemeResource CaptionTextBlockStyle}"
+                                           AutomationProperties.LiveSetting="Polite"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
                         </Border>

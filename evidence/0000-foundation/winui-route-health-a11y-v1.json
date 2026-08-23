@@ -7,6 +7,8 @@
     "Formal shell route health cards expose RouteHealthCardV1.AccessibleSummary as accessible name and Detail as help text while preserving the existing visual card layout.",
     "Expert status text uses a polite live region so route/control state changes are announced without interrupting screen-reader users.",
     "The title-bar connection status pill is also polite, so connection transitions are announced consistently with other shell status text."
+    ,
+    "IR preparation status uses a polite live region, matching the shell's other user-visible status transitions."
   ],
   "verification": {
     "control_model_check": "PASS",
