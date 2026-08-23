@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "evidence_type": "documentation-only",
+  "title": "driver-control request_id non-zero schema alignment",
+  "date": "2026-08-24",
+  "issue": 962,
+  "pr": null,
+  "source_commit": null,
+  "scope": [
+    "schemas/driver-control-v1.schema.json",
+    "docs/specs/SPEC-0003-virtual-endpoints-and-routing.md"
+  ],
+  "spec_refs": ["SPEC-0003"],
+  "adr_refs": [],
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 962",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "limitations": [
+    "Schema and documentation-only contract alignment; no runtime code, IPC payload, DSP order, driver, signing or physical-audio behavior changes.",
+    "The non-zero requirement already exists in the Apache C ABI encoder/validator and SPEC-0003 text; this slice aligns the public JSON contract only."
+  ],
+  "notes": "request_id now rejects zero at the JSON contract boundary with a full uint64 range; zero remains reserved for uninitialized/no-correlation state per SPEC-0003.",
+  "started_at": null,
+  "finished_at": null
+}
