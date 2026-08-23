@@ -9,7 +9,10 @@
     "schema_version": {"const": 1},
     "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"},
     "name": {"type": "string", "minLength": 1, "maxLength": 120},
-    "lanes": {"type": "array", "items": {"type": "string"}},
+    "lanes": {
+      "type": "array", "maxItems": 32,
+      "items": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "\\S"}
+    },
     "automation_timeline_ids": {
       "type": "array", "maxItems": 16,
       "items": {"type": "string", "minLength": 1, "maxLength": 64}
