@@ -793,6 +793,7 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 （vst3-surface-remove-timeline-v1.json）；GitHub Issue intake 改為結構化表單必填：
 .github/ISSUE_TEMPLATE/config.yml 停用空白 Issue、保留安全通報聯絡連結與 GitHub
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
+evidence。
 
  第三十四波整合增量已合併：正式 WinUI VST3 時間軸編輯器新增「清除歷史」與「保存基準」；
 清除歷史只重置 undo/redo，保留時間軸資料列、dirty 狀態與開啟中的草稿，空歷史是安全 no-op。
