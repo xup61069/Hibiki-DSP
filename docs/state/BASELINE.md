@@ -795,6 +795,13 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
+第二十七波整合增量已合併：TruePeakLimiterV1 在 graph commit 時重置回 unity gain，
+前一個 graph 累積的恢復衰減不會延續到新 graph 的安靜段落；新 graph 中超過上限的
+峰值仍然立即衰減（Issue #678 / PR #678）。瀏覽器單分頁捕捉的 start/stop 回應改為
+反映真實成敗：成功啟動不再被誤報為失敗，失敗會帶回實際錯誤，policy gate 同步
+涵蓋回應邊界（Issue #681 / PR #684）。皆為 user-space source、contract test、
+extension source 與 policy gate evidence；不宣稱實體音訊、driver 安裝/載入/HLK 或
+Microsoft signing。
 第二十六波整合增量已合併：WinUI Expert shell 開放本機 VST3 時間軸編輯器，
 支援時間軸選取、草稿開始／提交／捨棄、復原／重做與事件增刪／數值編輯，
 Compatibility Preview 補上相同的選取 seam（Issue #667 / PR #669、Issue #673 /
