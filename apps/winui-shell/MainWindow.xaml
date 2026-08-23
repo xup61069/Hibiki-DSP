@@ -239,17 +239,54 @@
                         <TextBlock Text="建立最多 32 個自訂卡片；完整 DSP graph 由引擎端 Scene catalog 驗證。"
                                    TextWrapping="Wrap"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBox Header="Scene ID（英文小寫）"
-                                 Text="{Binding CustomSceneId, Mode=TwoWay}"
-                                 AutomationProperties.Name="自訂場景 ID"
-                                 AutomationProperties.HelpText="使用小寫英數、點、底線或連字號，最多 31 字元" />
-                        <TextBox Header="名稱"
-                                 Text="{Binding CustomSceneName, Mode=TwoWay}"
-                                 AutomationProperties.Name="自訂場景名稱" />
-                        <TextBox Header="說明"
-                                 Text="{Binding CustomSceneDescription, Mode=TwoWay}"
-                                 AutomationProperties.Name="自訂場景說明" />
+                        <Grid x:Name="CustomFormLayout" ColumnSpacing="16" RowSpacing="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" MinWidth="280" />
+                                <ColumnDefinition x:Name="CustomFormSecondColumn" Width="0" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup>
+                                    <VisualState x:Name="CustomFormNarrowState">
+                                        <VisualState.StateTriggers>
+                                            <AdaptiveTrigger MinWindowWidth="0" />
+                                        </VisualState.StateTriggers>
+                                        <VisualState.Setters>
+                                            <Setter Target="CustomFormDescriptionBox.(Grid.Column)" Value="0" />
+                                            <Setter Target="CustomFormDescriptionBox.(Grid.Row)" Value="2" />
+                                            <Setter Target="CustomFormSecondColumn.Width" Value="0" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="CustomFormWideState">
+                                        <VisualState.StateTriggers>
+                                            <AdaptiveTrigger MinWindowWidth="720" />
+                                        </VisualState.StateTriggers>
+                                        <VisualState.Setters>
+                                            <Setter Target="CustomFormSecondColumn.Width" Value="1*" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <TextBox Header="Scene ID（英文小寫）"
+                                     Text="{Binding CustomSceneId, Mode=TwoWay}"
+                                     AutomationProperties.Name="自訂場景 ID"
+                                     AutomationProperties.HelpText="使用小寫英數、點、底線或連字號，最多 31 字元" />
+                            <TextBox x:Name="CustomFormNameBox" Grid.Column="1"
+                                     Header="名稱"
+                                     Text="{Binding CustomSceneName, Mode=TwoWay}"
+                                     AutomationProperties.Name="自訂場景名稱" />
+                            <TextBox x:Name="CustomFormDescriptionBox" Grid.Row="2"
+                                     Header="說明"
+                                     Text="{Binding CustomSceneDescription, Mode=TwoWay}"
+                                     AutomationProperties.Name="自訂場景說明" />
+                        </Grid>
                         <Button Content="加入自訂預設" Click="OnAddCustomSceneClick"
+                                Style="{StaticResource AccentButtonStyle}"
+                                HorizontalAlignment="Stretch" MinHeight="40" FontWeight="SemiBold"
                                 AutomationProperties.Name="加入自訂預設"
                                 AutomationProperties.HelpText="加入後會保存到本機 user-space preset 檔案" />
                     </StackPanel>
@@ -569,8 +606,14 @@
             </StackPanel>
         </ScrollViewer>
 
-        <TextBlock Grid.Row="2" Text="Easy 模式只顯示安全操作；切換 Expert 才會顯示 Matrix、DSP Graph、IR 與 VST3。"
-                   Margin="0,10,0,14"
-                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+        <Border Grid.Row="2" Padding="12,5" Margin="0,10,0,14" HorizontalAlignment="Left"
+                CornerRadius="999"
+                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1">
+            <TextBlock Text="Easy 模式只顯示安全操作；切換 Expert 才會顯示 Matrix、DSP Graph、IR 與 VST3。"
+                       Style="{ThemeResource CaptionTextBlockStyle}" TextWrapping="Wrap" MaxWidth="640"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Border>
     </Grid>
 </Window>
