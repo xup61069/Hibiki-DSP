@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "issue": 703,
+  "scope_digest": "compat-mrt-evidence-audit-v1",
+  "source_commit": "d2ccb55e2d624f7baa35e9459f6399d9da286905",
+  "environment_fingerprint": "windows-11-26200-x64-dotnet-sdk-10.0.400-pwsh7-windows-app-runtime-1.7; dotnet-only host without Visual Studio Appx packaging tasks",
+  "commands": [
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat (after temporarily removing EnableCoreMrtTooling=false)",
+    "Get-ChildItem .local/preview/WinUICompat -Filter *.pri -Recurse"
+  ],
+  "results": [
+    {
+      "command": "tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
+      "status": "pass",
+      "exit_code": 0,
+      "coverage": [
+        "At base commit d2ccb55 the Compatibility Preview builds with zero warnings/errors and passes the bounded launch smoke while Core MRT tooling remains disabled.",
+        "The output directory contains no .pri: theme/control resources resolve through the existing fail-soft TryGetValue resolver, so missing resources render unstyled instead of crashing.",
+        "The historical 0xC000027B startup crash was fixed by the fail-soft resolver (#548 / PR #571), not by keeping Core MRT tooling enabled."
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "build-preview.ps1 -Target WinUICompat with EnableCoreMrtTooling=false temporarily removed",
+      "status": "expected_failure",
+      "exit_code": 1,
+      "coverage": [
+        "The dotnet-only build fails immediately with MSB4062: MrtCore.PriGen requires Microsoft.Build.AppxPackage tasks that exist only with Visual Studio on this host.",
+        "Keeping Core MRT tooling disabled is required for the documented dotnet-only Compatibility Preview path; the project change was reverted after reproduction."
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "corrections": [
+    "PR #694 and evidence/0000-foundation/compat-preview-build-v1.json state that Compatibility Preview keeps Core MRT resource tooling enabled and that this fixes the startup crash. Commit bcedc4a actually only added a UTF-8 BOM to Hibiki.WinUI.csproj; the disable flag remains present and the launch fix predates this slice (#548).",
+    "Truthful boundary: Compatibility Preview keeps Core MRT tooling disabled, emits no PRI, launches unstyled via the fail-soft resolver, and its build/launch smoke is not styling, resource-loading, accessibility or formal XAML evidence."
+  ],
+  "limitations": [
+    "Reproduction covers this dotnet-only Windows host; VS2026-class hosts may behave differently and remain outside this audit.",
+    "After reverting the experimental change, the first incremental smoke runs crashed because the failed PRI build left mixed artifacts; moving the output directory aside and rebuilding produced a passing smoke. A post-failure WinUICompat smoke must use a clean output directory.",
+    "No runtime behavior, formal XAML, accessibility or audio/driver capability is claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0.400",
+    "powershell": "PowerShell 7",
+    "windows_app_runtime": "1.7"
+  },
+  "started_at": "2026-08-23T20:05:00+08:00",
+  "finished_at": "2026-08-23T20:26:00+08:00"
+}
