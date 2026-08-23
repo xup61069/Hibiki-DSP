@@ -337,8 +337,10 @@ if ($SelfTest) {
   $caseCount++
 
   # ADR frontmatter: missing opening marker must fail.
-  try { ConvertFrom-AdrFrontmatter -RawText "no frontmatter here`njust text" | Out-Null } catch { $caseCount++; continue }
-  throw 'docs-check self-test failed: missing frontmatter opener should fail.'
+  $caughtMissingOpener = $false
+  try { ConvertFrom-AdrFrontmatter -RawText "no frontmatter here`njust text" | Out-Null } catch { $caughtMissingOpener = $true }
+  if (-not $caughtMissingOpener) { throw 'docs-check self-test failed: missing frontmatter opener should fail.' }
+  $caseCount++
 
   # ADR frontmatter: missing required field must fail.
   $missingField = "# ---`n# id: ADR-0002`n# status: accepted`n# ---`ntext"
@@ -366,8 +368,10 @@ if ($SelfTest) {
   $caseCount++
 
   # Spec frontmatter: missing opening marker must fail.
-  try { ConvertFrom-SpecFrontmatter -RawText "no frontmatter here\njust text" | Out-Null } catch { $caseCount++; continue }
-  throw 'docs-check self-test failed: missing Spec frontmatter opener should fail.'
+  $caughtSpecMissingOpener = $false
+  try { ConvertFrom-SpecFrontmatter -RawText "no frontmatter here\njust text" | Out-Null } catch { $caughtSpecMissingOpener = $true }
+  if (-not $caughtSpecMissingOpener) { throw 'docs-check self-test failed: missing Spec frontmatter opener should fail.' }
+  $caseCount++
 
   # Spec frontmatter: missing required field must fail.
   $missingSpecField = "---`nid: SPEC-0002`nstatus: accepted`n---`ntext"
