@@ -724,6 +724,43 @@ validation 陣列，記錄 Issue #518 path guard 的實際離線驗證命令與�
 （self-test 案例、docs/source/source-only 閘門與 diff check），
 滿足 evidence 驗收契約（Issue #533 / PR #535）。皆為 tooling/source evidence。
 
+第十七波 tooling 防護與文件增量已合併：control-model-check.ps1 在任何 dotnet run 前
+將 fail-closed path-guard 模式延伸到自身建置輸出，專案檔必須存在，且 BaseOutputPath／
+MSBuildProjectExtensionsPath 必須留在 repository root 內，拒絕語彙路徑外 target、
+非目錄 target 與 reparse point target／祖先，-SelfTest 新增離線合成屬性案例，並以
+evidence/0000-foundation/control-model-check-path-guard-v1.json 記錄驗證
+（Issue #536 / PR #537）；verify.ps1 在 New-Item 與 CMake 使用前重新驗證固定的
+.local/build target 與 .local parent，拒絕語彙路徑外 target、檔案與 reparse point，
+write-free self-test 從 14 案例擴充到 22 案例（Issue #531 / PR #539）；
+README 新增 opt-in live-device-catalog-check 與 live-process-loopback-check 探針文件
+（匿名彙整輸出、unavailable 時如實記錄），M0 里程碑列補記 Hyper-V VM 隔離載入測試
+環境建置中的主張而不誇大完成度，並新增
+evidence/0000-foundation/readme-live-probe-surface-v1.json（Issue #540 / PR #545）；
+probe-environment.ps1 對既有路徑的屬性檢查改為僅接受 ObjectNotFound 為
+「路徑不存在」，leaf 或 parent 的其他檢查錯誤一律 fail-closed，self-test 新增
+leaf／parent 兩個合成檢查錯誤案例（Issue #543 / PR #546）；build-engine-preview.ps1
+同步採用 Get-Item -ErrorAction Stop 檢查模式，僅 ObjectNotFound 視為缺失，建置根或
+父目錄損壞／不可存取時在 CMake 前 fail-closed，self-test 從 7 案例擴充到 9 案例
+（Issue #551 / PR #552）；live-system-volume-check.ps1／live-session-volume-check.ps1
+與 live-wasapi-handoff-check.ps1 同步採用「僅 ObjectNotFound 視為路徑不存在」的
+檢查語意並各自新增離線拒絕案例，分別以 volume-probe-inspection-guard-v1.json 與
+wasapi-handoff-inspection-guard-v1.json 記錄（Issue #554 / PR #555、
+Issue #561 / PR #562）；engine-preview-smoke.ps1 對 engine executable、工作目錄與
+IR 目錄／檔案套用同一檢查語意，損壞或不可存取時在啟動前 fail-closed
+（Issue #559 / PR #560）；docs/ai/MULTI_AGENT.md 文件化 TBD pre-claim handoff 流程
+（建立 Issue 時 issue／branch 先標 TBD，正式認領前 handoff-check 跳過該草稿）
+並附 tbd-preclaim-docs-v1.json（Issue #556 / PR #558）；
+WinUI Expert 界面完成卡片化：Expert expander 內容改用與其他介面一致的圓角描邊
+卡片，route health／App sessions／route presets／Matrix／DSP graph／VST3 lanes／
+calibration 分組進 tinted sub-panel，route health、session、Matrix gain 與 VST3
+狀態讀值改用緊湊 caption chips，route preset 欄位雙欄平衡排列，
+AutomationProperties 名稱全數保留（Issue #542 / PR #563）；
+WinUICompat 啟動崩潰修復：MainWindow.CompatibilityPreview.cs 的七個
+Application.Current.Resources 直接索引查找改為 TryGetValue-based fail-soft resolver，
+缺失 framework 主題資源不再讓視窗啟動 fail-fast（0xC000027B stowed exception），
+formal XAML 路徑與 DesktopCompat 行為不變（Issue #548 / PR #564）。
+皆為 tooling/source/UI/docs evidence。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；

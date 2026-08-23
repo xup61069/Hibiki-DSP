@@ -294,6 +294,53 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   array in evidence/0000-foundation/probe-environment-path-guard-v1.json now records the
   actual offline validation commands and results for the Issue #518 path guard, satisfying
   the evidence acceptance contract (Issue #533 / PR #535).
+- Control-model-check build-output hardening merged: before any dotnet run the gate
+  validates the project file and keeps -p:BaseOutputPath / -p:MSBuildProjectExtensionsPath
+  inside the repository root, rejecting outside lexical targets, non-directory targets and
+  reparse-point targets or ancestors, with new offline synthetic-attribute self-test cases
+  recorded in control-model-check-path-guard-v1.json (Issue #536 / PR #537).
+- Verify build-root hardening merged: verify.ps1 revalidates the fixed repository-local
+  .local/build target and .local parent immediately before New-Item and CMake use,
+  rejecting outside lexical targets, files and reparse points; the offline self-test grew
+  from 14 to 22 cases (Issue #531 / PR #539).
+- README live-probe documentation merged: README now documents the opt-in
+  live-device-catalog-check and live-process-loopback-check probes with anonymous-output
+  and unavailable-fallback wording, records evidence in readme-live-probe-surface-v1.json,
+  and aligns the M0 milestone row with the in-progress Hyper-V VM load-test environment
+  claim without overstating completion (Issue #540 / PR #545).
+- Probe-environment inspection hardening merged: existing-path attribute lookups treat only
+  ObjectNotFound as missing and fail closed on any other inspection error for both leaves
+  and ancestors, with two synthetic error cases added to the offline self-test
+  (Issue #543 / PR #546).
+- Engine-preview build-root inspection hardening merged: Test-Path-first lookups became
+  Get-Item -Force -ErrorAction Stop with only ObjectNotFound treated as missing, failing
+  closed on broken or inaccessible build roots and parents before CMake; the offline
+  self-test grew from 7 to 9 cases (Issue #551 / PR #552).
+- Volume-probe inspection hardening merged: live-system-volume-check.ps1 and
+  live-session-volume-check.ps1 adopt the canonical Get-Item -ErrorAction Stop lookup with
+  only ObjectNotFound treated as missing, each gaining one offline rejection case, recorded
+  in volume-probe-inspection-guard-v1.json (Issue #554 / PR #555).
+- MULTI_AGENT TBD pre-claim flow documented: the TBD pre-claim handoff pattern
+  (issue/branch fields marked TBD until formal claim, skipped by handoff-check) is now
+  written down in docs/ai/MULTI_AGENT.md with tbd-preclaim-docs-v1.json evidence
+  (Issue #556 / PR #558).
+- Engine-preview-smoke inspection hardening merged: engine-preview-smoke.ps1 fails closed
+  on broken or inaccessible engine, working-directory, IR directory or IR file lookups
+  before launch or file writes, treating only ObjectNotFound as missing
+  (Issue #559 / PR #560).
+- WASAPI-handoff probe inspection hardening merged: live-wasapi-handoff-check.ps1 adopts
+  the same canonical lookup semantics with one more offline case, recorded in
+  wasapi-handoff-inspection-guard-v1.json (Issue #561 / PR #562).
+- WinUI Expert card grouping merged: Expert expander content now shares the rounded
+  stroked card chrome, with route health/App sessions/route presets/Matrix/DSP graph/
+  VST3 lanes/calibration grouped into tinted sub-panels, compact caption chips for readouts,
+  balanced two-column route-preset fields, and all interactive AutomationProperties names
+  preserved (Issue #542 / PR #563).
+- WinUICompat launch-crash fix merged: the seven direct Application.Current.Resources
+  indexer lookups in MainWindow.CompatibilityPreview.cs became a fail-soft TryGetValue-based
+  resolver so missing framework theme resources can no longer crash WinUICompat window
+  activation (stowed exception 0xC000027B); the formal XAML path and DesktopCompat behavior
+  are unchanged (Issue #548 / PR #564).
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe

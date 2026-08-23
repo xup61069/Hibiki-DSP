@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+﻿// SPDX-License-Identifier: GPL-3.0-only
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -12,6 +12,11 @@ namespace Hibiki.WinUI;
 public sealed partial class MainWindow
 {
 #if HIBIKI_COMPATIBILITY_PREVIEW
+    private static T ResolveThemeResource<T>(string key) where T : class
+    {
+        return Application.Current.Resources.TryGetValue(key, out var value) ? (T)value : null;
+    }
+
     private Grid BuildCompatibilityPreview()
     {
         var root = new Grid
@@ -31,14 +36,14 @@ public sealed partial class MainWindow
         content.Children.Add(new TextBlock
         {
             Text = "Hibiki DSP",
-            Style = (Style)Application.Current.Resources["TitleTextBlockStyle"],
+            Style = ResolveThemeResource<Style>("TitleTextBlockStyle"),
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
         });
         content.Children.Add(new TextBlock
         {
             Text = "Compatibility Preview — 本機控制模型展示；不含虛擬 driver、系統攔截或正式品質驗證。",
             TextWrapping = TextWrapping.Wrap,
-            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            Foreground = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush"),
         });
 
         var connection = new Button { Content = "連接預覽引擎" };
@@ -50,7 +55,7 @@ public sealed partial class MainWindow
         content.Children.Add(new TextBlock
         {
             Text = "輸出群組",
-            Style = (Style)Application.Current.Resources["SubtitleTextBlockStyle"],
+            Style = ResolveThemeResource<Style>("SubtitleTextBlockStyle"),
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
         });
         var outputGroup = new ComboBox
@@ -72,7 +77,7 @@ public sealed partial class MainWindow
         content.Children.Add(new TextBlock
         {
             Text = "音量保護",
-            Style = (Style)Application.Current.Resources["SubtitleTextBlockStyle"],
+            Style = ResolveThemeResource<Style>("SubtitleTextBlockStyle"),
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
         });
         var volume = new Slider
@@ -87,7 +92,7 @@ public sealed partial class MainWindow
         content.Children.Add(new TextBlock
         {
             Text = "實際有效音量（dB）",
-            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            Foreground = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush"),
         });
         content.Children.Add(BoundText("EffectiveVolumeDb"));
         content.Children.Add(BoundText("SafetyStatusText"));
@@ -96,7 +101,7 @@ public sealed partial class MainWindow
         {
             Text = "正式預覽會在 Windows 11 24H2+、VS 2026 與鎖定 SDK/WDK 上重跑完整 XAML、無障礙與音訊驗收。",
             TextWrapping = TextWrapping.Wrap,
-            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            Foreground = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush"),
         });
         return root;
     }
@@ -118,7 +123,7 @@ public sealed partial class MainWindow
         var text = new TextBlock
         {
             TextWrapping = TextWrapping.Wrap,
-            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            Foreground = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush"),
         };
         text.SetBinding(TextBlock.TextProperty, new Binding
         {
