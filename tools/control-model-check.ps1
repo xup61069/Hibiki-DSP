@@ -24,14 +24,23 @@ function Test-ControlModelCheckPathUnderRoot {
 function Get-ControlModelCheckExistingAttributes {
   param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
   $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
   if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
     return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
   }
-  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
-  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+  if ($null -ne $SyntheticInspectionErrors -and $SyntheticInspectionErrors.ContainsKey($fullPath)) {
+    throw "Control model check path inspection failed: $fullPath ($($SyntheticInspectionErrors[$fullPath]))"
+  }
+  try {
+    return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop).Attributes
+  }
+  catch {
+    if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return $null }
+    throw "Control model check path inspection failed: $fullPath ($($_.Exception.Message))"
+  }
 }
 
 function Assert-ControlModelCheckPath {
@@ -40,7 +49,8 @@ function Assert-ControlModelCheckPath {
     [Parameter(Mandatory = $true)][string]$Root,
     [Parameter(Mandatory = $true)][ValidateSet('File', 'Directory')][string]$Kind,
     [switch]$AllowMissingLeaf,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
   $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
   $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
@@ -48,14 +58,16 @@ function Assert-ControlModelCheckPath {
     throw "Control model check path must remain under the repository root: $fullPath"
   }
 
-  $leafAttributes = Get-ControlModelCheckExistingAttributes -Path $fullPath -SyntheticAttributes $SyntheticAttributes
+  $leafAttributes = Get-ControlModelCheckExistingAttributes -Path $fullPath `
+    -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
   if ($null -eq $leafAttributes -and -not $AllowMissingLeaf) {
     throw "Control model check $Kind does not exist: $fullPath"
   }
 
   $cursor = $fullPath
   while ($true) {
-    $attributes = Get-ControlModelCheckExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    $attributes = Get-ControlModelCheckExistingAttributes -Path $cursor `
+      -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
     if ($null -ne $attributes) {
       if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "Control model check path or parent is a reparse point: $cursor"
@@ -86,7 +98,8 @@ function Invoke-ControlModelCheck {
     [Parameter(Mandatory = $true)][string]$BaseOutputPath,
     [Parameter(Mandatory = $true)][string]$ProjectExtensionsPath,
     [scriptblock]$CommandRunner,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   if (-not (Test-Path -LiteralPath $ProjectPath)) {
@@ -97,9 +110,9 @@ function Invoke-ControlModelCheck {
     throw 'Control model check output paths must be non-empty.'
   }
 
-  Assert-ControlModelCheckPath -Path $ProjectPath -Root $repo -Kind File -SyntheticAttributes $SyntheticAttributes
-  Assert-ControlModelCheckPath -Path $BaseOutputPath -Root $repo -Kind Directory -AllowMissingLeaf -SyntheticAttributes $SyntheticAttributes
-  Assert-ControlModelCheckPath -Path $ProjectExtensionsPath -Root $repo -Kind Directory -AllowMissingLeaf -SyntheticAttributes $SyntheticAttributes
+  Assert-ControlModelCheckPath -Path $ProjectPath -Root $repo -Kind File -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
+  Assert-ControlModelCheckPath -Path $BaseOutputPath -Root $repo -Kind Directory -AllowMissingLeaf -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
+  Assert-ControlModelCheckPath -Path $ProjectExtensionsPath -Root $repo -Kind Directory -AllowMissingLeaf -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
 
   if ($null -eq $CommandRunner) {
     dotnet run --project $ProjectPath --configuration Release --nologo `
@@ -193,6 +206,14 @@ if ($SelfTest) {
     Invoke-ControlModelCheck -ProjectPath $project -BaseOutputPath $outputRoot `
       -ProjectExtensionsPath $objRoot -CommandRunner $captureRunner `
       -SyntheticAttributes @{ $projectKey = [System.IO.FileAttributes]::Directory }
+  }
+  $caseCount++
+
+  Assert-SelfTestRejection -Label 'inspection-failure' -ExpectedPattern 'path inspection failed' -Action {
+    $objKey = [IO.Path]::GetFullPath($objRoot).TrimEnd('\', '/')
+    Invoke-ControlModelCheck -ProjectPath $project -BaseOutputPath $outputRoot `
+      -ProjectExtensionsPath $objRoot -CommandRunner $captureRunner `
+      -SyntheticInspectionErrors @{ $objKey = 'synthetic access denied' }
   }
   $caseCount++
 
