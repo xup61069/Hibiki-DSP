@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "evidence_type": "documentation-only",
+  "title": "Release manifest schema field constraints for product_version, distribution_id, and toolchain_digest",
+  "date": "2026-08-24",
+  "issue": 939,
+  "pr": null,
+  "source_commit": null,
+  "scope": [
+    "schemas/release-manifest-v1.schema.json"
+  ],
+  "spec_refs": ["SPEC-0005"],
+  "adr_refs": [],
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 939",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/installer-check.ps1"
+  ],
+  "limitations": [
+    "Schema-only change; no runtime behavior modification.",
+    "Installer strict-mode validation was already stricter than JSON schema; this aligns the schema layer."
+  ],
+  "notes": "Added minLength:1 maxLength:64 to product_version, minLength:1 to distribution_id, SHA-256 pattern to toolchain_digest. SPEC-0005 updated to document constraints matching installer strict-mode validation."
+}

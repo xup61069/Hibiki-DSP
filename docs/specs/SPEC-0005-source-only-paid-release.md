@@ -31,7 +31,9 @@ gates；任何 gate 失敗都不得視為可交付 source tag。
 5. 產生 `ReleaseManifest v1`，至少記錄 source tag、commit、toolchain、dependency lock、
    unsigned/signed hash、driver package/catalog hash 與 Microsoft signature thumbprint、
    installer hash/signer/RFC3161 timestamp、SBOM 與 test run。公開 repository 只放文字
-   manifest；實際 signed payload 仍由 Gumroad 交付。
+   manifest；實際 signed payload 仍由 Gumroad 交付。Schema 強制 `product_version`
+   為 1–64 字元的非空字串、`toolchain_digest` 必須符合 SHA-256 hex 格式（64 字元
+   [0-9a-fA-F]）、`distribution_id` 不得為空字串，與安裝程式的嚴格模式一致。
 6. 由人類手動把同一份 canonical installer 上傳 Gumroad；AI 不接觸憑證、Partner Center
    或 Gumroad 帳密。
 
