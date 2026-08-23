@@ -48,21 +48,31 @@ function Test-EnginePreviewPathUnderRoot {
 function Get-EnginePreviewExistingAttributes {
   param(
     [Parameter(Mandatory)][string]$Path,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
   if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
     return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
   }
-  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
-  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+  if ($null -ne $SyntheticInspectionErrors -and $SyntheticInspectionErrors.ContainsKey($fullPath)) {
+    throw "Engine Preview build path inspection failed: $fullPath ($($SyntheticInspectionErrors[$fullPath]))"
+  }
+  try {
+    return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop).Attributes
+  }
+  catch {
+    if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return $null }
+    throw "Engine Preview build path inspection failed: $fullPath ($($_.Exception.Message))"
+  }
 }
 
 function Assert-EnginePreviewBuildRoot {
   param(
     [Parameter(Mandatory)][pscustomobject]$Plan,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $expectedRoot = [IO.Path]::GetFullPath((Join-Path $Plan.RepositoryRoot '.local')).TrimEnd('\', '/')
@@ -73,7 +83,8 @@ function Assert-EnginePreviewBuildRoot {
 
   $cursor = $candidate
   while ($true) {
-    $attributes = Get-EnginePreviewExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    $attributes = Get-EnginePreviewExistingAttributes -Path $cursor `
+      -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
     if ($null -ne $attributes) {
       if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "Engine Preview build root or parent is a reparse point: $cursor"
@@ -195,6 +206,24 @@ function Invoke-EnginePreviewBuildSelfTest {
     }
   } catch { $nonDirectoryCaught = $_.Exception.Message -match 'not a directory' }
   if (-not $nonDirectoryCaught) { throw 'Engine Preview build self-test expected a non-directory rejection.' }
+  $caseCount++
+
+  $leafInspectionErrorCaught = $false
+  try {
+    Assert-EnginePreviewBuildRoot -Plan $plan `
+      -SyntheticAttributes @{ $localRoot = [System.IO.FileAttributes]::Directory } `
+      -SyntheticInspectionErrors @{ $buildRoot = 'synthetic access denied' }
+  } catch { $leafInspectionErrorCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $leafInspectionErrorCaught) { throw 'Engine Preview build self-test expected a leaf inspection-error rejection.' }
+  $caseCount++
+
+  $parentInspectionErrorCaught = $false
+  try {
+    Assert-EnginePreviewBuildRoot -Plan $plan `
+      -SyntheticAttributes @{ $buildRoot = [System.IO.FileAttributes]::Directory } `
+      -SyntheticInspectionErrors @{ $localRoot = 'synthetic sharing violation' }
+  } catch { $parentInspectionErrorCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $parentInspectionErrorCaught) { throw 'Engine Preview build self-test expected a parent inspection-error rejection.' }
   $caseCount++
 
   Write-Output "Engine Preview build self-test passed ($caseCount cases; offline/no-build/no-process/no-file-write)."
