@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "issue": 947,
+  "scope_digest": "audio-session-descriptor-bounds-v1",
+  "source_commit": "6529040a",
+  "environment_fingerprint": "windows-amd64-pwsh-schema-bound",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 947",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Schema-only bounded constraint addition (display_name/app_id/lane_id minLength 0, maxLength 256) with matching spec documentation; no runtime code, IPC payload, DSP, driver, signing or physical-audio behavior changes.",
+    "The runtime registry already enforces kMaxLabelLength (256); this change makes the schema contract explicit and aligned."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-24T06:15:00+08:00",
+  "finished_at": "2026-08-24T06:30:00+08:00"
+}
