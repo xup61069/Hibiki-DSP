@@ -83,22 +83,32 @@ function Test-PreviewPathUnderRoot {
 function Get-PreviewExistingAttributes {
   param(
     [Parameter(Mandatory)][string]$Path,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
   if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
     return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
   }
-  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
-  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+  if ($null -ne $SyntheticInspectionErrors -and $SyntheticInspectionErrors.ContainsKey($fullPath)) {
+    throw "Preview path inspection failed: $fullPath ($($SyntheticInspectionErrors[$fullPath]))"
+  }
+  try {
+    return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop).Attributes
+  }
+  catch {
+    if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return $null }
+    throw "Preview path inspection failed: $fullPath ($($_.Exception.Message))"
+  }
 }
 
 function Assert-PreviewBuildOutputRoot {
   param(
     [Parameter(Mandatory)][string]$OutputRoot,
     [Parameter(Mandatory)][string]$RepositoryRoot,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $expectedRoot = [IO.Path]::GetFullPath((Join-Path $RepositoryRoot '.local')).TrimEnd('\', '/')
@@ -109,7 +119,8 @@ function Assert-PreviewBuildOutputRoot {
 
   $cursor = $candidate
   while ($true) {
-    $attributes = Get-PreviewExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    $attributes = Get-PreviewExistingAttributes -Path $cursor `
+      -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
     if ($null -ne $attributes) {
       if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "Preview output root or parent is a reparse point: $cursor"
@@ -132,7 +143,8 @@ function Assert-PreviewLaunchTarget {
   param(
     [Parameter(Mandatory)][string]$LocalRoot,
     [Parameter(Mandatory)][string]$ExecutablePath,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $resolvedRoot = [IO.Path]::GetFullPath($LocalRoot).TrimEnd('\', '/')
@@ -141,7 +153,8 @@ function Assert-PreviewLaunchTarget {
     throw "Preview launch target must remain under the repository .local root: $resolvedExecutable"
   }
 
-  $targetAttributes = Get-PreviewExistingAttributes -Path $resolvedExecutable -SyntheticAttributes $SyntheticAttributes
+  $targetAttributes = Get-PreviewExistingAttributes -Path $resolvedExecutable `
+    -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
   if ($null -eq $targetAttributes) {
     throw "Preview launch target does not exist: $resolvedExecutable"
   }
@@ -154,7 +167,8 @@ function Assert-PreviewLaunchTarget {
 
   $cursor = [IO.Path]::GetFullPath((Split-Path -Parent $resolvedExecutable)).TrimEnd('\', '/')
   while ($true) {
-    $attributes = Get-PreviewExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    $attributes = Get-PreviewExistingAttributes -Path $cursor `
+      -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
     if ($null -eq $attributes) {
       throw "Preview launch target parent does not exist: $cursor"
     }
@@ -314,7 +328,23 @@ if ($SelfTest) {
   } catch { $missingLaunchTargetCaught = $_.Exception.Message -match 'target does not exist' }
   if (-not $missingLaunchTargetCaught) { throw 'Preview dispatch self-test expected a missing launch-target rejection.' }
 
-  Write-Output 'Preview target dispatch self-test passed (17 cases).'
+  $leafInspectionErrorCaught = $false
+  try {
+    Assert-PreviewLaunchTarget -LocalRoot $selfTestLocalRoot -ExecutablePath $selfTestExecutable `
+      -SyntheticAttributes @{ $selfTestOutputParent = $directory; $selfTestOutputRoot = $directory } `
+      -SyntheticInspectionErrors @{ $selfTestExecutable = 'synthetic access denied' }
+  } catch { $leafInspectionErrorCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $leafInspectionErrorCaught) { throw 'Preview dispatch self-test expected a leaf inspection-error rejection.' }
+
+  $parentInspectionErrorCaught = $false
+  try {
+    Assert-PreviewLaunchTarget -LocalRoot $selfTestLocalRoot -ExecutablePath $selfTestExecutable `
+      -SyntheticAttributes @{ $selfTestOutputParent = $directory; $selfTestOutputRoot = $directory; $selfTestExecutable = $file } `
+      -SyntheticInspectionErrors @{ $selfTestLocalRoot = 'synthetic sharing violation' }
+  } catch { $parentInspectionErrorCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $parentInspectionErrorCaught) { throw 'Preview dispatch self-test expected a parent inspection-error rejection.' }
+
+  Write-Output 'Preview target dispatch self-test passed (19 cases).'
 
   exit 0
 }
@@ -343,7 +373,6 @@ if ($Target -eq 'WinUICompat') {
   if ($SmokeTest) {
     Assert-PreviewBuildOutputRoot -OutputRoot $previewRoot -RepositoryRoot $repo
     $executable = Join-Path $previewRoot 'Hibiki.WinUI.exe'
-    if (-not (Test-Path -LiteralPath $executable)) { throw "Compatibility preview executable was not produced: $executable" }
     Assert-PreviewLaunchTarget -LocalRoot (Join-Path $repo '.local') -ExecutablePath $executable
     $process = Start-Process -FilePath $executable -WorkingDirectory $previewRoot -PassThru
     Start-Sleep -Seconds 3
@@ -366,7 +395,6 @@ if ($Target -eq 'DesktopCompat') {
   if ($SmokeTest) {
     Assert-PreviewBuildOutputRoot -OutputRoot $previewRoot -RepositoryRoot $repo
     $executable = Join-Path $previewRoot 'Hibiki.DesktopPreview.exe'
-    if (-not (Test-Path -LiteralPath $executable)) { throw "Desktop preview executable was not produced: $executable" }
     Assert-PreviewLaunchTarget -LocalRoot (Join-Path $repo '.local') -ExecutablePath $executable
     $process = Start-Process -FilePath $executable -WorkingDirectory $previewRoot -WindowStyle Hidden -PassThru
     Start-Sleep -Seconds 3
@@ -407,7 +435,6 @@ if ($SmokeTest) {
   Add-Type -AssemblyName UIAutomationTypes
   Assert-PreviewBuildOutputRoot -OutputRoot $previewRoot -RepositoryRoot $repo
   $executable = Join-Path $previewRoot 'Hibiki.WinUI.exe'
-  if (-not (Test-Path -LiteralPath $executable)) { throw "Formal WinUI preview executable was not produced: $executable" }
   Assert-PreviewLaunchTarget -LocalRoot (Join-Path $repo '.local') -ExecutablePath $executable
   $process = Start-Process -FilePath $executable -WorkingDirectory $previewRoot -PassThru
   try {
