@@ -1,26 +1,54 @@
 {
   "schema_version": 1,
-  "evidence_type": "documentation-only",
-  "title": "Schema ID field length constraints for equal-loudness anchor_id and calibration device_id",
-  "date": "2026-08-24",
   "issue": 932,
-  "pr": null,
-  "source_commit": null,
-  "scope": [
-    "schemas/equal-loudness-policy-v1.schema.json",
-    "schemas/calibration-response-v1.schema.json"
-  ],
-  "spec_refs": ["SPEC-0002", "SPEC-0011"],
-  "adr_refs": [],
+  "scope_digest": "schema-id-constraints-v1",
+  "source_commit": "ce75f507d2da898920954204813c6013a8cd3386",
+  "environment_fingerprint": "windows-local-pwsh-schema-id-constraints",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 932",
     "pwsh -NoProfile -File tools/docs-check.ps1",
     "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
     "pwsh -NoProfile -File tools/verify.ps1"
   ],
-  "limitations": [
-    "Schema-only change; no runtime behavior modification.",
-    "C++ wire-format validation was already stricter than JSON schema; this aligns the schema layer."
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass",
+      "required_paths": 85,
+      "specs": 24
+    },
+    {
+      "command": "source-policy",
+      "status": "pass",
+      "scanned_paths": 639
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass",
+      "tests_passed": 3,
+      "tests_total": 3
+    }
   ],
-  "notes": "Added minLength:1 to equal-loudness-policy-v1 anchor_id and maxLength:260 to calibration-response-v1 device_id. SPEC-0002 and SPEC-0011 updated to document the constraints."
+  "limitations": [
+    "Schema-only bounded constraint additions (anchor_id minLength, device_id maxLength) with matching spec documentation; no runtime code, IPC payload, DSP, driver, signing or physical-audio behavior changes.",
+    "The runtime C# validator does not enforce maxLength on DeviceId; this change bounds the schema contract to match the endpoint ID convention.",
+    "No driver installation, loading, TESTSIGNING, certificate purchase or real-device changes were performed."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local",
+    "cmake": "4.4.2",
+    "msvc": "14.51.36231"
+  },
+  "started_at": "2026-08-24T22:30:00+08:00",
+  "finished_at": "2026-08-24T22:45:00+08:00"
 }
