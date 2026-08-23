@@ -129,19 +129,46 @@ $null = "sbom_digest"
     $ast = [System.Management.Automation.Language.Parser]::ParseInput($installerText, [ref]$null, [ref]$null)
     $functions = @{}
     foreach ($fn in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) {
-      if ($fn.Name -in @('Get-Sha256', 'Resolve-HibikiDestination', 'Get-StagingPlan', 'Copy-HibikiFileWithHash', 'Invoke-PayloadStaging', 'Get-UninstallPlan', 'Invoke-PayloadUninstall')) {
+      if ($fn.Name -in @('Get-Sha256', 'Read-ReleaseManifest', 'Resolve-HibikiDestination', 'Get-StagingPlan', 'Copy-HibikiFileWithHash', 'Invoke-PayloadStaging', 'Get-UninstallPlan', 'Invoke-PayloadUninstall')) {
         $functions[$fn.Name] = $fn
       }
     }
 
     # Define all needed installer functions at self-test script scope.
-    foreach ($name in @('Get-Sha256', 'Resolve-HibikiDestination', 'Get-StagingPlan', 'Copy-HibikiFileWithHash', 'Invoke-PayloadStaging', 'Get-UninstallPlan', 'Invoke-PayloadUninstall')) {
+    foreach ($name in @('Get-Sha256', 'Read-ReleaseManifest', 'Resolve-HibikiDestination', 'Get-StagingPlan', 'Copy-HibikiFileWithHash', 'Invoke-PayloadStaging', 'Get-UninstallPlan', 'Invoke-PayloadUninstall')) {
       $fn = $functions[$name]
       if (-not $fn) { throw "SelfTest missing function: $name" }
       Invoke-Expression $fn.Extent.Text
     }
 
 
+    # Case 1b: Read-ReleaseManifest rejects missing product_version.
+    $missingVersionManifest = @{
+      schema_version = 1
+      source_tag = 'v1.0.0-test'
+      source_commit = ('a' * 40)
+      toolchain_digest = ('b' * 64)
+      dependency_lock_digest = ('c' * 64)
+      sbom_digest = ('d' * 64)
+      driver_package = @{ sha256 = ('e' * 64); catalog_sha256 = ('f' * 64); microsoft_signature_thumbprint = ('1' * 40) }
+      installer = @{ sha256 = ('2' * 64); signer_thumbprint = ('3' * 40); rfc3161_timestamp = '2026-08-24T00:00:00Z' }
+      unsigned_files = @()
+    }
+    $manifestPath = Join-Path $tempRoot 'missing-version-manifest.json'
+    $missingVersionManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $manifestPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected missing product_version failure.' }
+    $caseCount++
+
+    # Case 1c: Read-ReleaseManifest accepts a complete valid fixture with product_version.
+    $validFullManifest = $missingVersionManifest.Clone()
+    $validFullManifest['product_version'] = '1.0.0'
+    $validManifestPath = Join-Path $tempRoot 'valid-manifest.json'
+    $validFullManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $validManifestPath -Encoding UTF8
+    $parsed = Read-ReleaseManifest $validManifestPath
+    if ($parsed.product_version -ne '1.0.0') { throw 'SelfTest expected valid manifest to parse.' }
+    $caseCount++
     # Case 2: destination rejects blank path.
     $caught = $false
     try { Resolve-HibikiDestination '' } catch { $caught = $true }

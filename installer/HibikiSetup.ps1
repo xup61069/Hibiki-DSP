@@ -8,6 +8,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
 
 function Get-Sha256([string]$Path) {
   (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -17,6 +18,9 @@ function Read-ReleaseManifest([string]$Path) {
   if (-not (Test-Path -LiteralPath $Path)) { throw "Manifest not found: $Path" }
   $manifest = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
   if ($manifest.schema_version -ne 1) { throw 'Unsupported ReleaseManifest schema.' }
+  if ([string]::IsNullOrWhiteSpace($manifest.product_version)) {
+    throw 'Manifest product_version must be a non-empty string.'
+  }
   if ($manifest.source_tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+') {
     throw 'Manifest source_tag is not a stable version tag.'
   }
