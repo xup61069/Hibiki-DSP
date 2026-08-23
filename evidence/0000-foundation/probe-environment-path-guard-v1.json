@@ -14,7 +14,13 @@
       "path_cases_added": 8
     }
   },
-  "validation": [],
+  "validation": [
+    { "command": "pwsh -NoProfile -File tools/probe-environment.ps1 -SelfTest", "result": "pass", "notes": "12/12 document cases plus 8 path cases" },
+    { "command": "pwsh -NoProfile -File tools/docs-check.ps1", "result": "pass" },
+    { "command": "pwsh -NoProfile -File tools/source-policy.ps1", "result": "pass", "notes": "534 tracked paths" },
+    { "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1", "result": "pass" },
+    { "command": "git diff --check", "result": "pass" }
+  ],
   "scope": "tools-only gate hardening; no product/schema/DSP/driver change; identity-free probe output semantics unchanged",
   "date": "2026-08-23"
 }
