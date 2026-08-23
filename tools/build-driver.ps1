@@ -35,15 +35,24 @@ function Test-PathUnderRoot {
 function Get-DriverExistingAttributes {
   param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $resolvedPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
   if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($resolvedPath)) {
     return [System.IO.FileAttributes]$SyntheticAttributes[$resolvedPath]
   }
-  if (-not (Test-Path -LiteralPath $resolvedPath)) { return $null }
-  return [System.IO.FileAttributes](Get-Item -LiteralPath $resolvedPath -Force).Attributes
+  if ($null -ne $SyntheticInspectionErrors -and $SyntheticInspectionErrors.ContainsKey($resolvedPath)) {
+    throw "Driver path inspection failed: $resolvedPath ($($SyntheticInspectionErrors[$resolvedPath]))"
+  }
+  try {
+    return [System.IO.FileAttributes](Get-Item -LiteralPath $resolvedPath -Force -ErrorAction Stop).Attributes
+  }
+  catch {
+    if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return $null }
+    throw "Driver path inspection failed: $resolvedPath ($($_.Exception.Message))"
+  }
 }
 
 function Assert-DriverOutputDirectory {
@@ -51,7 +60,8 @@ function Assert-DriverOutputDirectory {
     [Parameter(Mandatory = $true)][string]$Path,
     [Parameter(Mandatory = $true)][string]$Root,
     [switch]$AllowMissingLeaf,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $resolvedPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
@@ -60,14 +70,16 @@ function Assert-DriverOutputDirectory {
     throw "Driver output path must remain under the repository .local root: $resolvedPath"
   }
 
-  $leafAttributes = Get-DriverExistingAttributes -Path $resolvedPath -SyntheticAttributes $SyntheticAttributes
+  $leafAttributes = Get-DriverExistingAttributes -Path $resolvedPath `
+    -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
   if ($null -eq $leafAttributes -and -not $AllowMissingLeaf) {
     throw "Driver output directory does not exist: $resolvedPath"
   }
 
   $cursor = $resolvedPath
   while ($true) {
-    $attributes = Get-DriverExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    $attributes = Get-DriverExistingAttributes -Path $cursor `
+      -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
     if ($null -ne $attributes) {
       if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "Driver output path or parent is a reparse point: $cursor"
@@ -170,6 +182,24 @@ function Invoke-DriverOutputPathSelfTest {
     }
   } catch { $missingCaught = $_.Exception.Message -match 'does not exist' }
   if (-not $missingCaught) { throw 'build-driver self-test expected a missing output rejection.' }
+  $cases++
+
+  $leafInspectionCaught = $false
+  try {
+    Assert-DriverOutputDirectory -Path $paths.ObjectRoot -Root $localRoot -AllowMissingLeaf `
+      -SyntheticAttributes @{ $localRoot = $directory; $objectParent = $directory } `
+      -SyntheticInspectionErrors @{ $objectRoot = 'synthetic access denied' }
+  } catch { $leafInspectionCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $leafInspectionCaught) { throw 'build-driver self-test expected a leaf inspection-failure rejection.' }
+  $cases++
+
+  $parentInspectionCaught = $false
+  try {
+    Assert-DriverOutputDirectory -Path $paths.ObjectRoot -Root $localRoot -AllowMissingLeaf `
+      -SyntheticAttributes @{ $localRoot = $directory; $objectRoot = $directory } `
+      -SyntheticInspectionErrors @{ $objectParent = 'synthetic sharing violation' }
+  } catch { $parentInspectionCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $parentInspectionCaught) { throw 'build-driver self-test expected a parent inspection-failure rejection.' }
   $cases++
 
   return $cases
