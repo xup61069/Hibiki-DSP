@@ -2999,6 +2999,44 @@ int main() {
         CHECK(!surface.is_attached() && !surface.has_selection() &&
               !surface.is_dirty());
         CHECK(!surface.detach());
+        CHECK(!detached_surface.remove_selected() &&
+              detached_surface.last_store_status() ==
+                  Vst3TimelineStoreStatusV1::ok);
+
+        Vst3TimelineSupervisorSurfaceV1 remove_surface;
+        CHECK(remove_surface.attach(surface_store));
+        for (auto& stale_id : surface_ids) {
+            stale_id.clear();
+        }
+        CHECK(remove_surface.refresh_ids(surface_ids, surface_id_count) ==
+                  Vst3TimelineStoreStatusV1::ok && surface_id_count == 3U &&
+              surface_ids[0] == long_but_valid_id &&
+              surface_ids[1] == "alpha" && surface_ids[2] == "beta");
+        const bool remove_unselected_refused =
+            !remove_surface.remove_selected() &&
+            remove_surface.last_store_status() ==
+                Vst3TimelineStoreStatusV1::ok;
+        CHECK(remove_unselected_refused);
+        CHECK(remove_surface.select("beta") && remove_surface.has_selection());
+        CHECK(remove_surface.begin_edit() && !remove_surface.remove_selected() &&
+              remove_surface.has_selection() &&
+              remove_surface.editor().has_edit_session());
+        CHECK(remove_surface.upsert(Vst3ParameterTimelineEventV1{5U, 48000U, 0.25}));
+        CHECK(remove_surface.commit() && remove_surface.is_dirty() &&
+              remove_surface.remove_selected());
+        CHECK(!remove_surface.is_dirty() && !remove_surface.has_selection() &&
+              !remove_surface.can_undo() && !remove_surface.can_redo() &&
+              remove_surface.selected_id().empty());
+        CHECK(remove_surface.last_store_status() == Vst3TimelineStoreStatusV1::ok);
+        CHECK(remove_surface.refresh_ids(surface_ids, surface_id_count) ==
+                  Vst3TimelineStoreStatusV1::ok && surface_id_count == 2U &&
+              surface_ids[0] == long_but_valid_id &&
+              surface_ids[1] == "alpha");
+        {
+            Vst3ParameterTimelineSnapshotV1 removed_probe{};
+            CHECK(surface_store.load("beta", removed_probe) ==
+                      Vst3TimelineStoreStatusV1::not_found);
+        }
 
         std::error_code surface_cleanup_error;
         std::filesystem::remove_all(surface_root, surface_cleanup_error);

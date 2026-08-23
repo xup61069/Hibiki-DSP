@@ -81,6 +81,13 @@ public:
     // successful save re-baselines dirty tracking.
     [[nodiscard]] Vst3TimelineStoreStatusV1 save_selected();
 
+    // Remove the currently selected timeline through the store's bounded
+    // remove path and drop selection plus editor state on success. Refused
+    // while detached, while unselected, or while an edit session is open so
+    // unsaved drafts cannot be silently lost; a failed call keeps the whole
+    // surface state untouched.
+    [[nodiscard]] bool remove_selected();
+
     // Derived dirty state: true when a selection exists and its published
     // snapshot differs from the last loaded/saved baseline. An open draft is
     // reported by editor().has_edit_session(), not by this flag.
