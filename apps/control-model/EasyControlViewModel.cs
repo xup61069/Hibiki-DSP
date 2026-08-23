@@ -56,6 +56,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public ExpertSurfaceModel Expert { get; } = new();
 
+    public Vst3TimelineEditorViewModel Vst3TimelineEditor { get; } = new();
+
     public IReadOnlyList<IrPhaseModeOption> IrPhaseModeOptions { get; } =
     [
         new(IrPhaseMode.MinimumPhase, "Game／Minimum Phase", "0 ms 額外緩衝；最低延遲"),

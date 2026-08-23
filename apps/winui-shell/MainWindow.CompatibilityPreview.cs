@@ -99,6 +99,38 @@ public sealed partial class MainWindow
 
         content.Children.Add(new TextBlock
         {
+            Text = "VST3 時間軸編輯器（本機草稿）",
+            Style = ResolveThemeResource<Style>("SubtitleTextBlockStyle"),
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+        });
+        var vst3TimelineSelector = new ComboBox { Header = "時間軸", MinWidth = 200 };
+        AutomationProperties.SetName(vst3TimelineSelector, "選取 VST3 時間軸");
+        vst3TimelineSelector.SetBinding(ItemsControl.ItemsSourceProperty, BindingFor("Vst3TimelineEditor.TimelineIds"));
+        content.Children.Add(vst3TimelineSelector);
+        var beginEditButton = new Button { Content = "開始草稿" };
+        AutomationProperties.SetName(beginEditButton, "開始時間軸草稿");
+        beginEditButton.Click += OnVst3BeginEditClick;
+        content.Children.Add(beginEditButton);
+        var commitButton = new Button { Content = "提交草稿" };
+        AutomationProperties.SetName(commitButton, "提交時間軸草稿");
+        commitButton.Click += OnVst3CommitClick;
+        content.Children.Add(commitButton);
+        var discardButton = new Button { Content = "捨棄草稿" };
+        AutomationProperties.SetName(discardButton, "捨棄時間軸草稿");
+        discardButton.Click += OnVst3DiscardClick;
+        content.Children.Add(discardButton);
+        var undoButton = new Button { Content = "復原" };
+        AutomationProperties.SetName(undoButton, "復原時間軸操作");
+        undoButton.Click += OnVst3UndoClick;
+        content.Children.Add(undoButton);
+        var redoButton = new Button { Content = "重做" };
+        AutomationProperties.SetName(redoButton, "重做時間軸操作");
+        redoButton.Click += OnVst3RedoClick;
+        content.Children.Add(redoButton);
+        content.Children.Add(BoundText("Vst3TimelineEditor.StatusText"));
+
+        content.Children.Add(new TextBlock
+        {
             Text = "正式預覽會在 Windows 11 24H2+、VS 2026 與鎖定 SDK/WDK 上重跑完整 XAML、無障礙與音訊驗收。",
             TextWrapping = TextWrapping.Wrap,
             Foreground = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush"),
