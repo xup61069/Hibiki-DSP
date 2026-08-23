@@ -4,7 +4,7 @@
   "title": "Hibiki driver control ABI v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "message_type", "request_id", "channel_count", "sample_rate", "frames_per_buffer", "generation"],
+  "required": ["schema_version", "message_type", "request_id"],
   "properties": {
     "schema_version": {"const": 1},
     "message_type": {"enum": ["hello", "volume-notification", "endpoint-state", "ack", "error"]},
@@ -18,7 +18,22 @@
     "safety_ceiling_db_q16_16": {"type": "integer"},
     "effective_db_q16_16": {"type": "integer"},
     "mute": {"type": "boolean"},
-    "generation": {"type": "integer", "minimum": 0},
+    "generation": {"type": "integer", "minimum": 1},
     "actuator": {"enum": ["internal-dsp", "device-hardware", "strict-direct"]}
+  },
+  "if": {
+    "properties": {"message_type": {"enum": ["hello", "ack", "error"]}},
+    "required": ["message_type"]
+  },
+  "then": {
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": true,
+      "message_type": true,
+      "request_id": true
+    }
+  },
+  "else": {
+    "required": ["endpoint_guid", "event_context_guid", "channel_count", "sample_rate", "frames_per_buffer", "requested_db_q16_16", "safety_ceiling_db_q16_16", "effective_db_q16_16", "mute", "generation", "actuator"]
   }
 }
