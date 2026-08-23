@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "issue": 988,
+  "scope_digest": "scene-id-schema-bounds-v1",
+  "source_commit": "cc2bc900",
+  "environment_fingerprint": "windows-amd64-pwsh-scene-id-schema-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 988",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/verify.ps1"
+  ],
+  "results": [
+    {"command": "handoff-check", "status": "pass"},
+    {"command": "docs-check", "status": "pass"},
+    {"command": "source-policy", "status": "pass"},
+    {"command": "git diff --check", "status": "pass"},
+    {"command": "verify", "status": "pass"}
+  ],
+  "limitations": [
+    "scene-profile-v1 scene id pattern tightened from 2..64 chars to 1..31 chars, matching kMaxSceneIdBytesV1, kSceneCatalogIdMaxBytesV1, C# control model checks and scene-sync-queue-v1.",
+    "Minimum length relaxed from 2 to 1 char because every runtime layer already accepted 1-char ids.",
+    "Schema/spec/evidence-only slice; no runtime, DSP or driver behavior modified."
+  ],
+  "logs": {},
+  "tool_versions": {"powershell": "pwsh local"},
+  "started_at": "2026-08-24T07:52:00+08:00",
+  "finished_at": "2026-08-24T08:05:00+08:00"
+}
