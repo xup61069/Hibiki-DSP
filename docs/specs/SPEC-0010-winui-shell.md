@@ -116,6 +116,12 @@ ViewModel 命令只使用 `IpcEnvelopeV1` 與既有 payload；新增欄位不可
 bytes。WinUI shell 可在沒有引擎時啟動，並以 Degraded 狀態呈現；control-model
 仍可在沒有 WinUI SDK 的環境由獨立 check project 驗證。
 
+Compatibility Preview 在純 .NET SDK 主機保留 `EnableDefaultApplicationDefinition=false`、
+`EnableDefaultPageItems=false`，且必須維持 Core MRT resource tooling 停用：啟用它需要
+Visual Studio 的 Appx packaging 工作，dotnet-only 建置會以 MSB4062 失敗。此模式不產生 PRI；
+缺漏的主題資源由 fail-soft resolver 忽略，視窗可啟動但呈現未套樣式的降級外觀。
+Compatibility Preview 的建置與啟動 smoke 不構成樣式、資源載入、無障礙或正式 XAML 證據。
+
 ## 驗收
 
 1. Fresh clone 的 control-model check 通過，並覆蓋固定輸出群組、連線狀態、
