@@ -149,7 +149,6 @@ pwsh -File tools/build-engine-preview.ps1
 pwsh -File tools/engine-preview-smoke.ps1
 pwsh -File tools/control-model-engine-smoke.ps1
 pwsh -File tools/winui-shell-check.ps1
-pwsh -File tools/docs-check.ps1
 pwsh -File tools/source-policy.ps1
 pwsh -File tools/distribution-check.ps1
 pwsh -File tools/driver-source-check.ps1

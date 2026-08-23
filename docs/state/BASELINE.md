@@ -775,6 +775,26 @@ workflow（事件＋排程）稽核，AI task 範本改發有效 TBD pre-claim �
 claimed，SPEC-0004 同步更新，evidence github-handoff-ci-isolation-v1.json
 （Issue #565 / PR #566）。皆為 hygiene/UI/docs/CI evidence。
 
+第十九波恢復與防護增量已合併：build-preview.ps1 與 build-driver.ps1 的既有路徑
+檢查改為只把 ObjectNotFound 視為不存在，其他檢查錯誤在建置／寫入前 fail-closed，
+各自補離線 self-test 案例（Issue #586 / PR #590、Issue #598 / PR #599）；
+README「給 AI 協作者」的必跑 gates 清單對齊 AGENTS.md 單一真值，並把工具鏈需求
+段落改為指向同一清單（Issue #591 / PR #594）；WinUI 場景卡片系統經兩次空合併後
+由 recovery PR 重新落地：新增 Styles/SceneCard.xaml 共用卡片樣式（圓角、描邊、
+tinted 背景、hover/pressed/focused 狀態），MainWindow 三組標題統一 Subtitle 層級、
+safety badge 加無障礙標籤，32 個 automation bindings 全數保留（Issue #593 /
+PR #595 空合併，Issue #603 / PR #605 re-land 完成）；live-device-catalog-check.ps1
+同樣補上 fail-closed 路徑檢查（PR #597 空合併，Issue #592 / PR #601 recovery
+完成，含 leaf/parent 檢查錯誤拒絕共 13 個離線案例）；VST3 supervisor surface
+remove_selected() 經 PR #583 空合併遺失後由 Issue #600 / PR #602 re-land：
+native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 store 移除並
+清除狀態，C# Vst3TimelineSurfaceModelV1.RemoveSelected 鏡像與 ViewModel wrapper
+同步，contract test 修正 list_ids 字典排序斷言（64 字元長 ID 排在最前）
+（vst3-surface-remove-timeline-v1.json）；GitHub Issue intake 改為結構化表單必填：
+.github/ISSUE_TEMPLATE/config.yml 停用空白 Issue、保留安全通報聯絡連結與 GitHub
+官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
+evidence。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；
