@@ -795,7 +795,22 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
-第三十四波整合增量已合併：正式 WinUI VST3 時間軸編輯器新增「清除歷史」與「保存基準」；
+- 第三十五波整合增量已合併：DesktopCompat 與 WinUI Compatibility Preview 開放 Expert per-App
+  路由預設的完整工作流程——有界清單（前 6 筆摘要＋溢出計數）、可達的移除按鈕、新增／更新的
+  草稿欄位與清除全部操作，重用既有 ViewModel 的驗證、64 筆上限、優先級排序與本機 JSON
+  持久化；控制命令仍只在引擎已同步且 Ack 後才標示為已套用，實體 per-App 重新送出仍未驗證
+  （Issue #804 / PR #808）。SPEC-0003 補上 VirtualMicDspV1 upper-only 2 dB reopening hysteresis
+  的規範文件條目，記錄 PR #795 引入的 DSP 契約行為（Issue #787 / PR #812）。wave34 全域快照
+  evidence 時間戳修正為實際 gate 完成時間（Issue #806 / PR #811）。引擎端 SceneCatalogCommandV1
+  （IPC type 20）以有界 3260-byte wire format 支援 Upsert/Remove/Clear 操作，engine control worker
+  擁有可變 scene catalog 並透過既有 `SceneCatalogV1::upsert` 原子套用驗證後定義；C# control model
+  在連線時於自訂 Scene 儲存後送 Upsert、刪除後送 Remove；contract tests 涵蓋 encode→decode
+  round-trip、engine apply、scene apply resolution、remove 與 corrupted-payload rejection
+  （Issue #768 / PR #814）。上述分別是 compatibility preview source/build/launch、文件記錄或
+  user-space contract/source/engine-smoke evidence；不宣稱 runtime screen-reader audit、實體音訊
+  量測、driver guest 安裝／載入／HLK 或 Microsoft signing。
+
+ 第三十四波整合增量已合併：正式 WinUI VST3 時間軸編輯器新增「清除歷史」與「保存基準」；
 清除歷史只重置 undo/redo，保留時間軸資料列、dirty 狀態與開啟中的草稿，空歷史是安全 no-op。
 保存基準重用 `SaveSelected()`，把目前內容設為新的未修改基準並清除 dirty 指示；沒有選取
 時間軸或草稿開啟時仍拒絕（Issue #786 / PR #791、Issue #794 / PR #798）。DesktopCompat

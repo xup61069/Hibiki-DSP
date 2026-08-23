@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "issue": 818,
+  "scope_digest": "global-snapshot-w35",
+  "base_commit": "db8efc4b68c584b9000c772dd151a180b546e52a",
+  "source_commit": null,
+  "environment_fingerprint": "windows-local-pwsh-7.6.4; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 818",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #804 / PR #808 merged at c6f2ad5d: DesktopCompat and WinUI Compatibility Previews expose bounded per-App route-rule presets (list with accessible remove actions, add/update draft fields, clear-all) reusing the existing EasyControlViewModel validation, 64-item limit, priority ordering and local JSON persistence; no engine IPC or schema change.",
+        "Issue #787 / PR #812 merged at b6549432: SPEC-0003 records the VirtualMicDspV1 upper-only 2 dB reopening hysteresis introduced by PR #795 as a normative DSP contract boundary; documentation-only change.",
+        "Issue #806 / PR #811 merged at 1344f6d7: wave34 global snapshot evidence timestamps corrected to match actual gate completion times; documentation-only change.",
+        "Issue #768 / PR #814 merged at db8efc4b: SceneCatalogCommandV1 (IPC type 20) adds a bounded 3260-byte wire format for Upsert/Remove/Clear on the engine-side scene catalog; engine control worker owns a mutable catalog and applies validated definitions atomically via existing SceneCatalogV1::upsert; C# control model sends Upsert after custom-scene save and Remove after delete when connected; contract tests cover encode-decode round-trip, engine apply, scene apply resolution, remove and corrupted-payload rejection."
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; no product source behavior changes in this PR.",
+    "Route-rule preview evidence remains compatibility-preview source/build/launch scope; no runtime screen-reader audit or physical-audio claim.",
+    "Scene-catalog IPC is user-space contract/source/contract-test/engine-smoke evidence; no physical audio delivery, driver install/load, HLK or Microsoft signing claim.",
+    "Noise-gate hysteresis spec entry is a documentation record of already-merged PR #795 behavior; no new runtime measurement."
+  ],
+  "logs": [],
+  "started_at": "2026-08-24T09:30:00+08:00",
+  "finished_at": null
+}
