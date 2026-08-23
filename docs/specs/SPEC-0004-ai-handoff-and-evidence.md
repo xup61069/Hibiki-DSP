@@ -68,6 +68,8 @@ repository-relative glob intersection 檢查。完全相同、父子路徑與 wi
 所有 open Issue 的 scope overlap、claim 完整性與 owner/assignee 一致性由獨立 `handoff-audit` workflow
 在 Issue 事件與排程執行。未指派且無 lifecycle label 的 backlog 可沒有 handoff；已有 assignee 或
 lifecycle label 的 open Issue 缺少 handoff 必須讓全域 audit fail closed，但不阻塞不相關 PR。
+Handoff 資料只存在於 issue body block；`schemas/task-handoff-v1.schema.json` 已刪除，
+`docs/ai/HANDOFF_SCHEMA.json` 保留為穩定入口，不再指向 JSON schema 檔。
 
 ## 文件閘門
 
@@ -76,8 +78,7 @@ Spec、schema、source 與 tests 改動必須同一變更更新。`docs-check.ps
 授權內容。`handoff-check.ps1` 必須能檢查指定 Issue 或枚舉所有 numeric active handoff，驗證
 Issue/branch、v2 ownership/scope/dependency、Git ancestry、必要 headings 與最多五個 resume commands。
 CI 失敗時不可宣稱該變更可交接。Handoff 檔案已由 issue body handoff block 取代；
-`schemas/task-handoff-v2.schema.json` 已刪除。`docs/ai/HANDOFF_SCHEMA.json` 保留為穩定入口，
-不再指向 JSON schema 檔。
+`schemas/task-handoff-v2.schema.json` 已刪除。
 
 ## 語言與相容性
 

@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "issue": 613,
+  "scope_digest": "readme-live-probe-docs-v1",
+  "source_commit": "8f036cba7e6aac3713573bc6ec1ecb2150e4e3db",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-dotnet-10.0.400-pwsh-7.6.4; target-machine-pending",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 613",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 613",
+      "status": "pass",
+      "detail": "AI handoff checks passed (#613@codex/613-readme-live-probe-docs; issue-based ownership, scope and Git state)."
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1",
+      "status": "pass",
+      "detail": "80 required paths, 24 specs; live measurement: 553 tracked paths, 203 repository JSON files, 35 markdown links."
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-policy.ps1",
+      "status": "pass",
+      "detail": "Source-only policy passed for 553 tracked paths."
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "detail": "Source-only CI policy passed (2 workflows, 553 tracked paths)."
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Documentation-only change; no product source, schema or behavior is modified.",
+    "README live-probe entries mirror AGENTS.md descriptions without re-running the opt-in live probes.",
+    "Repository-wide handoff-check fails while open Issue #610 also claims README.md in scope_globs; the scoped -Issue 613 check passes. Merge order for the shared path must be decided by the integrator (same precedent as evidence/0000-foundation/readme-agent-gates-v1.json)."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4 local"
+  },
+  "started_at": "2026-08-23T19:40:28+08:00",
+  "finished_at": "2026-08-23T19:40:28+08:00"
+}

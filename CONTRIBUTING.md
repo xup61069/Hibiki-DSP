@@ -24,12 +24,11 @@ points at them instead of restating them so it cannot drift.
 
 ## Before requesting review
 
-- If your slice adds or removes tracked files, refresh the verification-summary counters in
-  `docs/state/BASELINE.md` in the same commit series; `tools/docs-check.ps1` fails closed on
-  drift between claimed numbers and the measured tree.
-- Run at minimum `tools/handoff-check.ps1 -Issue <n>`, the full `tools/handoff-check.ps1`,
-  `tools/docs-check.ps1`, `tools/source-policy.ps1`, `tools/source-only-ci-check.ps1` and
-  `git diff --check`; add the gates listed in `AGENTS.md` that match your scope.
+- Baseline counters are measured live by `tools/docs-check.ps1`; slices never edit a counter
+  file (`build/baseline-counters.json` is retired since #197).
+- Run the core gates listed in `AGENTS.md` (verify, handoff-check, docs-check,
+  source-policy, source-only-ci-check) plus `git diff --check`; add the conditional gates
+  from the same table when your scope or acceptance triggers them.
 - GitHub Actions must finish green before review is requested; queued or in-progress runs do
   not count as passing.
 
