@@ -31,6 +31,7 @@ driver、永久 ID 或 release 設定。需要 build／target evidence 的切片
 
 ## 目前狀態與已完成能力
 
+- 第二十二波整合增量：noise gate 修正開／關方向，開啟速度由 attack 控制、關閉速度由 release 控制，說話開頭與尾音不再被吃掉（Issue #636 / PR #640）；共用 handoff 稽核新增同 branch 拒絕的離線自檢（Issue #643 / PR #644）；Engine Preview 同步建立 canonical pipe 後立即 stop 時可馬上取消 pending connect，不再等完整 idle timeout（Issue #637 / PR #645）；driver 端每個 endpoint 改為成對註冊 PortCls Topology 與 WaveRT filter 並接上 bridge 連線，本機 WDK 建置與 Inf2Cat 通過，待隔離 VM 重測確認先前的啟動失敗是否解決（Issue #462 / PR #638）。DSP 與 IPC 項目為 user-space/source evidence；不宣稱實體音訊、driver 安裝/載入/HLK/Microsoft signing。
 - 第二十一波整合增量：Engine Preview 的 canonical 控制管線改為單一擁有權 fail-closed，無法取得第一個 pipe instance 時新程序立即以非零結束，launcher/UI/smoke 不會再靜默連到舊引擎；PortCls adapter start path 新增 DriverEntry/AddDevice/StartDevice/endpoint 註冊/miniport Init/GetDescription 各階段的 DbgPrintEx 成敗診斷，供下一次隔離 VM 測試定位 CM_PROB_FAILED_START；仍不宣稱已安裝/載入/出聲（Issue #628 / PR #631、Issue #633 / PR #635）。
 - 第二十波整合增量：AGENTS.md 改為三層規則索引（硬性限制／流程預設／core+conditional
   驗證門檻），driver 簽章歸 release 階段；README live probe 文件補齊

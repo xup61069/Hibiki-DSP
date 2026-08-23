@@ -795,6 +795,8 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
+第二十二波整合增量已合併：BasicNoiseSuppressorV1 修正開／關增益方向——attack_ms 控制開啟速度、release_ms 控制關閉速度——並新增 closed-to-open 回歸測試（Issue #636 / PR #640）；handoff 稽核新增「多個 active Issue 共用同一 branch」fail-closed 自檢（Issue #643 / PR #644）；IpcNamedPipeServerV1 在 worker 啟動前註冊同步初始 pipe handle，stop() 可立即取消等待中的 ConnectNamedPipe 而非等 idle timeout（Issue #637 / PR #645）；driver 端每個 endpoint 成對註冊 PortCls Topology 與 WaveRT filter、INF 介面一致並接上 bridge 實體連線，本機 WDK 建置與 Inf2Cat 通過（Issue #462 / PR #638）。DSP/IPC/handoff 項目為 user-space/source evidence；WaveRT 配對為本機建置證據，不宣稱 guest 安裝/載入/PnP start/實體音訊/HLK/Microsoft signing。
+
 第二十一波整合增量已合併：Engine Preview 的 canonical 控制管線加入單一擁有權 fail-closed，無法取得管線時以離開碼 3 退出（Issue #628 / PR #631）；PortCls adapter start path 新增分階段 DbgPrintEx 診斷（Issue #633 / PR #635）；這僅為 control/start-path 診斷與 user-space 證據，不宣稱 driver 已安裝/載入/HLK/Microsoft signing。
 
 第二十波指令面與證據增量已合併：AGENTS.md 改寫為三層規則索引（硬性限制／產品與流程
