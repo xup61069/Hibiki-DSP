@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "issue": 698,
+  "scope_digest": "global-snapshot-wave28",
+  "source_commit": null,
+  "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100-pwsh-7.6; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 698",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #681 / PR #692 merged: offscreen start-tab-stream and stop-tab-stream listeners return true so Chrome keeps the async response channel open until sendResponse runs; successful tab-capture starts reach the service worker and popup instead of being reported as failures.",
+        "Wave27 (#689 / PR #691) recorded the true-peak limiter graph-commit reset and the first real start/stop response fix.",
+        "Issue #687 / PR #694 merged: Compatibility Preview WinUICompat compiles again using preview-owned detached TextBox fields for shared VST3 handlers and type-safe theme-resource lookup; enabling Core MRT resource tooling resolves the prior 0xC000027B startup failure, and bounded build plus official launch-smoke commands pass."
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; this update does not change product source behavior.",
+    "The tab-capture item remains extension source and policy-gate evidence; no vendor browser capture-control claim beyond Hibiki own response handling.",
+    "The WinUICompat item remains local compatibility-preview source/build/launch evidence, not formal XAML, accessibility, launch-stability or audio evidence.",
+    "No driver install/load/HLK/Microsoft signing claim."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-23T18:58:00+08:00",
+  "finished_at": "2026-08-23T18:58:51+08:00"
+}

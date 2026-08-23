@@ -795,6 +795,14 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
+第二十八波整合增量已合併：瀏覽器單分頁捕捉的 offscreen start／stop listener 保留非同步
+回應通道，成功啟動的回應不再因通道提早關閉而被誤報為失敗，失敗仍帶回原錯誤 payload
+（Issue #681 / PR #692）。Compatibility Preview 的 WinUICompat target 恢復編譯並通過
+啟動 smoke：preview-owned TextBox 欄位補齊共用 VST3 handler seam、保留 Core MRT 資源
+工具讓 XAML 主題／控制資源完成初始化，先前 0xC000027B 啟動失敗已修復（Issue #687 /
+PR #694）。extension 項目為 extension source 與 policy gate evidence；UI 項目為本機
+Compatibility Preview source/build/launch evidence。不宣稱正式 XAML/accessibility、
+實體音訊、driver 安裝/載入/HLK 或 Microsoft signing。
 第二十七波整合增量已合併：TruePeakLimiterV1 在 graph commit 時重置回 unity gain，
 前一個 graph 累積的恢復衰減不會延續到新 graph 的安靜段落；新 graph 中超過上限的
 峰值仍然立即衰減（Issue #678 / PR #678）。瀏覽器單分頁捕捉的 start/stop 回應改為
