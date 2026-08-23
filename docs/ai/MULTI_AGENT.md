@@ -39,6 +39,15 @@
    Issue 關閉即代表 done，不需要額外 label。沒有 orchestrator 指派的 handoff block 時，
    workers 只能做唯讀偵察，不得建立或認領 Issue。
 
+### TBD pre-claim 草稿
+
+Orchestrator 可以在正式指派前先建立 pre-claim 草稿：Issue body 已含 handoff block，但 `issue` 與
+`branch` 欄位填寫 `TBD`（例如 branch 寫 `codex/TBD-<slug>`）。`handoff-check.ps1` 會偵測 TBD 欄位並
+跳過該草稿的完整驗證（含 lifecycle label），不會阻擋其他 active claim 的檢查；這是 #439／PR
+#442 導入的行為。TBD 草稿不是指派：它沒有 assignee、沒有 claimed label、也沒有 linked draft PR。
+正式認領時必須補上實際 issue 號與 branch 名、加 assignee 與 `claimed` label、從最新 origin/main
+建立獨立 worktree，之後才適用一般 claim 的全部規則。
+
 ### #124 occupancy fallback
 
 若工具無法提供 worktree isolation，接手或推送非自己開始的 branch 前，

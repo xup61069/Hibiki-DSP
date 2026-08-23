@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "issue": 540,
+  "scope_digest": "readme-live-probe-surface-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-26100-pwsh-7.6; target-machine-pending",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 540",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "documentation review",
+      "status": "pass",
+      "coverage": [
+        "README adds an opt-in section documenting the existing live-device-catalog-check and live-process-loopback-check probes with anonymous-output and unavailable-fallback wording matching AGENTS/START_HERE limits",
+        "M0 milestone row now records the in-progress Hyper-V VM isolated driver load-test environment claim (Issue #462) without overstating completion"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation-only change; no product source, schema or behavior is modified.",
+    "Both documented probes remain opt-in; neither run was executed for this slice.",
+    "Hyper-V VM load test (Issue #462) remains open and awaiting VM provisioning."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6 local"
+  },
+  "started_at": "2026-08-23T08:35:00+08:00",
+  "finished_at": "2026-08-23T08:40:00+08:00"
+}

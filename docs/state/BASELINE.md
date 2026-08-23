@@ -715,6 +715,15 @@ package 輸出目錄 fail-closed 驗證，拒絕 repo .local 外輸出、reparse
 target／祖先與非目錄 target，write-free self-test 新增 10 個離線輸出路徑案例
 （Issue #525 / PR #528）。皆為 tooling/source evidence。
 
+第十六波 tooling 與 UI 增量已合併：WinUI 自訂場景表單改為自適應雙欄 Grid
+（Scene ID／名稱並排、說明跨欄），視窗寬度 720px 以下自動疊回單欄；「加入自訂
+預設」升級為全寬 accent 主按鈕（更高的觸控目標），頁尾提示改為呼應卡片外觀語言的
+caption chip，控制模型與引擎行為不變（Issue #529 / PR #534）；
+evidence/0000-foundation/probe-environment-path-guard-v1.json 補齊先前空白的
+validation 陣列，記錄 Issue #518 path guard 的實際離線驗證命令與結果
+（self-test 案例、docs/source/source-only 閘門與 diff check），
+滿足 evidence 驗收契約（Issue #533 / PR #535）。皆為 tooling/source evidence。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；

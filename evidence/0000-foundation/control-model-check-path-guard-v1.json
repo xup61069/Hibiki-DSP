@@ -1,0 +1,27 @@
+{
+  "schema_version": 2,
+  "issue": 536,
+  "title": "control-model check build output path guard",
+  "base_commit": "78a861c99af7768eef9b25ed71c5debdd8a0017e",
+  "summary": {
+    "tools": [
+      "tools/control-model-check.ps1"
+    ],
+    "behavior": "Before invoking dotnet run, Invoke-ControlModelCheck fails closed unless the project file is a real file and -p:BaseOutputPath / -p:MSBuildProjectExtensionsPath remain inside the repository root with no reparse-point target or ancestor among existing entries; existing ancestors must be real directories. Missing output leaves stay allowed because MSBuild creates them.",
+    "precedent": "Issue #489 sibling launcher guard; hardening family #444/#460/#455/#470/#474/#482/#492/#500/#505/#506/#512/#518/#525",
+    "selftest_cases_added": {
+      "outside-output-path rejection": 1,
+      "reparse-output-parent rejection": 1,
+      "wrong-kind-project rejection": 1
+    }
+  },
+  "validation": [
+    { "command": "pwsh -NoProfile -File tools/control-model-check.ps1 -SelfTest", "result": "pass", "notes": "7 cases passed (4 prior + 3 new offline synthetic-attribute cases); no dotnet invocation" },
+    { "command": "pwsh -NoProfile -File tools/control-model-check.ps1", "result": "pass", "notes": "live dotnet run with guards active wrote only worktree-local .local/dotnet outputs" },
+    { "command": "pwsh -NoProfile -File tools/docs-check.ps1", "result": "pass", "notes": "run on delivered branch before push" },
+    { "command": "pwsh -NoProfile -File tools/source-policy.ps1", "result": "pass", "notes": "no blocked binaries or secrets" },
+    { "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1", "result": "pass", "notes": "workflow set unchanged" }
+  ],
+  "scope": "tools-only gate hardening; no product/schema/DSP/driver change; gate remains in the AGENTS.md required-command set",
+  "date": "2026-08-23"
+}

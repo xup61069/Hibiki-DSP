@@ -9,12 +9,97 @@ $project = Join-Path $repo 'apps/control-model-check/Hibiki.ControlModel.Check.c
 $outputRoot = Join-Path $repo '.local/dotnet/'
 $objRoot = Join-Path $outputRoot 'obj/'
 
+function Test-ControlModelCheckPathUnderRoot {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Root
+  )
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  return $fullPath -eq $fullRoot -or $fullPath.StartsWith(
+    $fullRoot + [IO.Path]::DirectorySeparatorChar,
+    [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-ControlModelCheckExistingAttributes {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
+  )
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
+    return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
+  }
+  if ($null -ne $SyntheticInspectionErrors -and $SyntheticInspectionErrors.ContainsKey($fullPath)) {
+    throw "Control model check path inspection failed: $fullPath ($($SyntheticInspectionErrors[$fullPath]))"
+  }
+  try {
+    return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop).Attributes
+  }
+  catch {
+    if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return $null }
+    throw "Control model check path inspection failed: $fullPath ($($_.Exception.Message))"
+  }
+}
+
+function Assert-ControlModelCheckPath {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Root,
+    [Parameter(Mandatory = $true)][ValidateSet('File', 'Directory')][string]$Kind,
+    [switch]$AllowMissingLeaf,
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
+  )
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  if (-not (Test-ControlModelCheckPathUnderRoot -Path $fullPath -Root $fullRoot)) {
+    throw "Control model check path must remain under the repository root: $fullPath"
+  }
+
+  $leafAttributes = Get-ControlModelCheckExistingAttributes -Path $fullPath `
+    -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
+  if ($null -eq $leafAttributes -and -not $AllowMissingLeaf) {
+    throw "Control model check $Kind does not exist: $fullPath"
+  }
+
+  $cursor = $fullPath
+  while ($true) {
+    $attributes = Get-ControlModelCheckExistingAttributes -Path $cursor `
+      -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
+    if ($null -ne $attributes) {
+      if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Control model check path or parent is a reparse point: $cursor"
+      }
+      if ($cursor -eq $fullPath) {
+        if ($Kind -eq 'Directory' -and ($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+          throw "Control model check path is not a directory: $fullPath"
+        }
+        if ($Kind -eq 'File' -and ($attributes -band [System.IO.FileAttributes]::Directory) -ne 0) {
+          throw "Control model check path is not a file: $fullPath"
+        }
+      } elseif (($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+        throw "Control model check path parent is not a directory: $cursor"
+      }
+    }
+    if ($cursor -eq $fullRoot) { break }
+    $parent = [IO.Path]::GetFullPath((Split-Path -Parent $cursor)).TrimEnd('\', '/')
+    if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) {
+      throw "Control model check path could not reach the repository root: $fullPath"
+    }
+    $cursor = $parent
+  }
+}
+
 function Invoke-ControlModelCheck {
   param(
     [Parameter(Mandatory = $true)][string]$ProjectPath,
     [Parameter(Mandatory = $true)][string]$BaseOutputPath,
     [Parameter(Mandatory = $true)][string]$ProjectExtensionsPath,
-    [scriptblock]$CommandRunner
+    [scriptblock]$CommandRunner,
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   if (-not (Test-Path -LiteralPath $ProjectPath)) {
@@ -24,6 +109,10 @@ function Invoke-ControlModelCheck {
       [string]::IsNullOrWhiteSpace($ProjectExtensionsPath)) {
     throw 'Control model check output paths must be non-empty.'
   }
+
+  Assert-ControlModelCheckPath -Path $ProjectPath -Root $repo -Kind File -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
+  Assert-ControlModelCheckPath -Path $BaseOutputPath -Root $repo -Kind Directory -AllowMissingLeaf -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
+  Assert-ControlModelCheckPath -Path $ProjectExtensionsPath -Root $repo -Kind Directory -AllowMissingLeaf -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
 
   if ($null -eq $CommandRunner) {
     dotnet run --project $ProjectPath --configuration Release --nologo `
@@ -95,6 +184,36 @@ if ($SelfTest) {
   Assert-SelfTestRejection -Label 'child-process-failure' -ExpectedPattern 'exit code 23' -Action {
     Invoke-ControlModelCheck -ProjectPath $project -BaseOutputPath $outputRoot `
       -ProjectExtensionsPath $objRoot -CommandRunner { param($RunProject, $RunBaseOutputPath, $RunProjectExtensionsPath) return 23 }
+  }
+  $caseCount++
+
+  Assert-SelfTestRejection -Label 'outside-output-path' -ExpectedPattern 'must remain under the repository root' -Action {
+    Invoke-ControlModelCheck -ProjectPath $project -BaseOutputPath 'C:/hibiki-outside-control-model-check' `
+      -ProjectExtensionsPath $objRoot -CommandRunner $captureRunner
+  }
+  $caseCount++
+
+  Assert-SelfTestRejection -Label 'reparse-output-parent' -ExpectedPattern 'reparse point' -Action {
+    $reparseKey = [IO.Path]::GetFullPath((Join-Path $repo '.local/dotnet')).TrimEnd('\', '/')
+    Invoke-ControlModelCheck -ProjectPath $project -BaseOutputPath $outputRoot `
+      -ProjectExtensionsPath $objRoot -CommandRunner $captureRunner `
+      -SyntheticAttributes @{ $reparseKey = [System.IO.FileAttributes]([System.IO.FileAttributes]::Directory -bor [System.IO.FileAttributes]::ReparsePoint) }
+  }
+  $caseCount++
+
+  Assert-SelfTestRejection -Label 'wrong-kind-project' -ExpectedPattern 'is not a file' -Action {
+    $projectKey = [IO.Path]::GetFullPath($project).TrimEnd('\', '/')
+    Invoke-ControlModelCheck -ProjectPath $project -BaseOutputPath $outputRoot `
+      -ProjectExtensionsPath $objRoot -CommandRunner $captureRunner `
+      -SyntheticAttributes @{ $projectKey = [System.IO.FileAttributes]::Directory }
+  }
+  $caseCount++
+
+  Assert-SelfTestRejection -Label 'inspection-failure' -ExpectedPattern 'path inspection failed' -Action {
+    $objKey = [IO.Path]::GetFullPath($objRoot).TrimEnd('\', '/')
+    Invoke-ControlModelCheck -ProjectPath $project -BaseOutputPath $outputRoot `
+      -ProjectExtensionsPath $objRoot -CommandRunner $captureRunner `
+      -SyntheticInspectionErrors @{ $objKey = 'synthetic access denied' }
   }
   $caseCount++
 

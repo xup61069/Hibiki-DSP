@@ -1,0 +1,25 @@
+{
+  "schema_version": 2,
+  "issue": 549,
+  "title": "control-model check path inspection failure guard",
+  "base_commit": "422677aead26e81d432302116aad07a9a088061f",
+  "summary": {
+    "tools": [
+      "tools/control-model-check.ps1"
+    ],
+    "behavior": "Get-ControlModelCheckExistingAttributes now resolves entries with a single Get-Item -Force -ErrorAction Stop call: ObjectNotFound maps to missing, every other inspection error throws 'Control model check path inspection failed' so inaccessible entries can no longer be misclassified as absent leaves. SyntheticInspectionErrors enables offline self-test injection.",
+    "precedent": "Issue #543 / PR #546 canonical inspection-failure pattern",
+    "selftest_cases_added": {
+      "inspection-failure rejection": 1
+    }
+  },
+  "validation": [
+    { "command": "pwsh -NoProfile -File tools/control-model-check.ps1 -SelfTest", "result": "pass", "notes": "8 cases passed (7 prior + 1 new offline inspect-failure case); no dotnet invocation" },
+    { "command": "pwsh -NoProfile -File tools/control-model-check.ps1", "result": "pass", "notes": "live dotnet run with inspection-failure guards active" },
+    { "command": "pwsh -NoProfile -File tools/docs-check.ps1", "result": "pass", "notes": "run on delivered branch before push" },
+    { "command": "pwsh -NoProfile -File tools/source-policy.ps1", "result": "pass", "notes": "no blocked binaries or secrets" },
+    { "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1", "result": "pass", "notes": "workflow set unchanged" }
+  ],
+  "scope": "tools-only gate hardening; no product/schema/DSP/driver change; gate remains in the AGENTS.md required-command set",
+  "date": "2026-08-23"
+}

@@ -1,0 +1,27 @@
+{
+  "schema_version": 2,
+  "issue": 554,
+  "title": "volume probe path inspection failure guard",
+  "base_commit": "c406e2a159b704daed3cfecf9db17843b7758182",
+  "summary": {
+    "tools": [
+      "tools/live-system-volume-check.ps1",
+      "tools/live-session-volume-check.ps1"
+    ],
+    "behavior": "Both volume probes' Get-*ExistingAttributes helpers now resolve entries with a single Get-Item -Force -ErrorAction Stop call: ObjectNotFound maps to missing, every other inspection error throws '<prefix> path inspection failed' so inaccessible entries can no longer be misclassified as absent leaves. SyntheticInspectionErrors enables offline self-test injection. Live -WriteTest behavior is unchanged.",
+    "precedent": "Issue #543 / PR #546 canonical inspection-failure pattern; Issue #505 sibling-pair slicing",
+    "selftest_cases_added": {
+      "live-system-volume-check inspection-failure rejection": 1,
+      "live-session-volume-check inspection-failure rejection": 1
+    }
+  },
+  "validation": [
+    { "command": "pwsh -NoProfile -File tools/live-system-volume-check.ps1 -SelfTest", "result": "pass", "notes": "11 offline cases passed (10 prior + 1 new)" },
+    { "command": "pwsh -NoProfile -File tools/live-session-volume-check.ps1 -SelfTest", "result": "pass", "notes": "12 offline cases passed (11 prior + 1 new)" },
+    { "command": "pwsh -NoProfile -File tools/docs-check.ps1", "result": "pass", "notes": "run on delivered branch before push" },
+    { "command": "pwsh -NoProfile -File tools/source-policy.ps1", "result": "pass", "notes": "no blocked binaries or secrets" },
+    { "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1", "result": "pass", "notes": "workflow set unchanged" }
+  ],
+  "scope": "tools-only live probe hardening; no product/API/schema/DSP/driver change; no live volume mutation performed; no identity-bearing output introduced",
+  "date": "2026-08-23"
+}

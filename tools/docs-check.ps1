@@ -498,7 +498,8 @@ $specs = Get-ChildItem -LiteralPath (Join-Path $repo 'docs/specs') -Filter 'SPEC
 $ids = @($specs | ForEach-Object { Select-String -LiteralPath $_.FullName -Pattern '^id:\s*(\S+)' | ForEach-Object { $_.Matches.Groups[1].Value } })
 if (($ids | Sort-Object -Unique).Count -ne $ids.Count) { throw 'Duplicate Spec IDs detected.' }
 
-$adrs = Get-ChildItem -LiteralPath (Join-Path $repo 'docs/adr') -Filter '*.md' -File | Sort-Object Name
+# Exclude the navigation INDEX from ADR frontmatter validation; specs already exclude theirs via the SPEC-* filter.
+$adrs = Get-ChildItem -LiteralPath (Join-Path $repo 'docs/adr') -Filter '*.md' -File | Where-Object { $_.Name -ne 'INDEX.md' } | Sort-Object Name
 foreach ($adr in $adrs) {
   $raw = Get-Content -LiteralPath $adr.FullName -Raw -Encoding UTF8
   try {
