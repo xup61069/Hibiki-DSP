@@ -758,8 +758,22 @@ AutomationProperties 名稱全數保留（Issue #542 / PR #563）；
 WinUICompat 啟動崩潰修復：MainWindow.CompatibilityPreview.cs 的七個
 Application.Current.Resources 直接索引查找改為 TryGetValue-based fail-soft resolver，
 缺失 framework 主題資源不再讓視窗啟動 fail-fast（0xC000027B stowed exception），
-formal XAML 路徑與 DesktopCompat 行為不變（Issue #548 / PR #564）。
+formal XAML 路徑與 DesktopCompat 行為不變（Issue #548 / PR #571）。
 皆為 tooling/source/UI/docs evidence。
+
+第十八波整合與修復增量已合併：移除 PR #564 誤提交的全部 809 個
+.opencode/opencode-loop/** 檔案（loop log、session 排程狀態與 corrupt 快照），
+新增根錨定 .opencode/ 的 .gitignore 規則防止復發，不重寫歷史，純衛生切片
+（Issue #568 / PR #569）；WinUICompat 啟動崩潰修復的實際交付落地：
+CompatibilityPreview code-behind 七個主題資源直接索引查找改為 fail-soft
+TryGetValue resolver，缺失 framework 主題資源不再讓視窗啟動 fail-fast
+（0xC000027B stowed exception），本機 build-preview -Target WinUICompat -SmokeTest
+從必當機轉為通過，evidence winuicompat-launch-fix-v1.json
+（Issue #548 / PR #571）；GitHub handoff CI 可靠性改造：PR verify 只驗證該
+branch 擁有的 Issue，repository 全域 handoff 健康改由獨立 handoff-audit
+workflow（事件＋排程）稽核，AI task 範本改發有效 TBD pre-claim 且不自動加
+claimed，SPEC-0004 同步更新，evidence github-handoff-ci-isolation-v1.json
+（Issue #565 / PR #566）。皆為 hygiene/UI/docs/CI evidence。
 
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
