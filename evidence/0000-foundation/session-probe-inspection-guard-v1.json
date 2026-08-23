@@ -1,0 +1,27 @@
+{
+  "schema_version": 2,
+  "issue": 579,
+  "title": "session probe path inspection failure guard",
+  "base_commit": "ff0b1cb0c8075376959a9b6de6f3f0ea9fa5017b",
+  "summary": {
+    "tools": [
+      "tools/live-audio-session-check.ps1",
+      "tools/live-process-loopback-check.ps1"
+    ],
+    "behavior": "Both probes' Get-*ExistingAttributes helpers now resolve entries with a single Get-Item -Force -ErrorAction Stop call: ObjectNotFound maps to missing, every other inspection error throws '<prefix> path inspection failed' so inaccessible entries can no longer be misclassified as absent leaves. SyntheticInspectionErrors enables offline self-test injection. Live probe behavior is unchanged and was not executed.",
+    "precedent": "Issue #543 / PR #546 canonical inspection-failure pattern; Issue #505 sibling-pair slicing",
+    "selftest_cases_added": {
+      "live-audio-session-check inspection-failure rejection": 1,
+      "live-process-loopback-check inspection-failure rejection": 1
+    }
+  },
+  "validation": [
+    { "command": "pwsh -NoProfile -File tools/live-audio-session-check.ps1 -SelfTest", "result": "pass", "notes": "17 offline cases passed (16 prior + 1 new)" },
+    { "command": "pwsh -NoProfile -File tools/live-process-loopback-check.ps1 -SelfTest", "result": "pass", "notes": "17 offline cases passed (16 prior + 1 new)" },
+    { "command": "pwsh -NoProfile -File tools/docs-check.ps1", "result": "pass", "notes": "run on delivered branch before push" },
+    { "command": "pwsh -NoProfile -File tools/source-policy.ps1", "result": "pass", "notes": "no blocked binaries or secrets" },
+    { "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1", "result": "pass", "notes": "workflow set unchanged" }
+  ],
+  "scope": "tools-only live probe hardening; no product/API/schema/DSP/driver change; no live audio probing performed; no identity-bearing output introduced",
+  "date": "2026-08-23"
+}

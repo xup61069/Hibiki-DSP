@@ -46,15 +46,24 @@ function Test-LiveProcessLoopbackPathUnderRoot {
 function Get-LiveProcessLoopbackExistingAttributes {
   param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
   if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
     return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
   }
-  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
-  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+  if ($null -ne $SyntheticInspectionErrors -and $SyntheticInspectionErrors.ContainsKey($fullPath)) {
+    throw "Live process-loopback path inspection failed: $fullPath ($($SyntheticInspectionErrors[$fullPath]))"
+  }
+  try {
+    return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop).Attributes
+  }
+  catch {
+    if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return $null }
+    throw "Live process-loopback path inspection failed: $fullPath ($($_.Exception.Message))"
+  }
 }
 
 function Assert-LiveProcessLoopbackPath {
@@ -63,7 +72,8 @@ function Assert-LiveProcessLoopbackPath {
     [Parameter(Mandatory = $true)][string]$Root,
     [Parameter(Mandatory = $true)][ValidateSet('File', 'Directory')][string]$Kind,
     [switch]$AllowMissingLeaf,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
@@ -72,14 +82,16 @@ function Assert-LiveProcessLoopbackPath {
     throw "Live process-loopback path must remain under the expected root: $fullPath"
   }
 
-  $leafAttributes = Get-LiveProcessLoopbackExistingAttributes -Path $fullPath -SyntheticAttributes $SyntheticAttributes
+  $leafAttributes = Get-LiveProcessLoopbackExistingAttributes -Path $fullPath `
+    -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
   if ($null -eq $leafAttributes -and -not $AllowMissingLeaf) {
     throw "Live process-loopback $Kind does not exist: $fullPath"
   }
 
   $cursor = $fullPath
   while ($true) {
-    $attributes = Get-LiveProcessLoopbackExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    $attributes = Get-LiveProcessLoopbackExistingAttributes -Path $cursor `
+      -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
     if ($null -ne $attributes) {
       if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "Live process-loopback path or parent is a reparse point: $cursor"
@@ -194,6 +206,15 @@ function Invoke-LiveProcessLoopbackPathSelfTest {
     }
   } catch { $missingProbeCaught = $_.Exception.Message -match 'does not exist' }
   if (-not $missingProbeCaught) { throw 'Live process-loopback self-test expected a missing-probe rejection.' }
+  $cases++
+
+  $inspectionCaught = $false
+  try {
+    Assert-LiveProcessLoopbackPath -Path $fixture.ProbePath -Root $fixture.BuildRoot -Kind File -AllowMissingLeaf -SyntheticInspectionErrors @{
+      $probePath = 'synthetic access denied'
+    }
+  } catch { $inspectionCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $inspectionCaught) { throw 'Live process-loopback self-test expected an inspection-failure rejection.' }
   $cases++
 
   return $cases
