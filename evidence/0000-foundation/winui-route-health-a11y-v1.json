@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "slice": "winui-route-health-a11y-v1",
+  "issue": "https://github.com/xup61069/Hibiki-DSP/issues/756",
+  "base_commit": "74ee2f320b8761dc491b01557dc114625797bb4f",
+  "product_outcome": [
+    "Formal shell route health cards expose RouteHealthCardV1.AccessibleSummary as accessible name and Detail as help text while preserving the existing visual card layout.",
+    "Expert status text uses a polite live region so route/control state changes are announced without interrupting screen-reader users.",
+    "The title-bar connection status pill is also polite, so connection transitions are announced consistently with other shell status text."
+    ,
+    "IR preparation status uses a polite live region, matching the shell's other user-visible status transitions."
+  ],
+  "verification": {
+    "control_model_check": "PASS",
+    "winui_shell_check_self_test": "PASS (7 cases)",
+    "winui_shell_check": "PASS; XAML scan found 50 named interactive controls and Compatibility Preview source scan found 16 named controls.",
+    "build_preview_desktop_compat_smoke": "PASS on non-target host; compatibility launch/build evidence only.",
+    "always_run_gates": "PASS docs-check/source-policy/git diff --check and scoped handoff-check before implementation."
+  },
+  "evidence_boundary": [
+    "Static source, contract-model and non-target Desktop Compatibility Preview evidence only.",
+    "No runtime UI Automation or screen-reader audit, no formal WinUI XAML build, no physical audio, no driver install/load/HLK or Microsoft signing claim."
+  ]
+}
