@@ -538,6 +538,10 @@ Check(routeSnapshot[0].AccessibleSummary == "Process Loopback：已可用。目�
 Check(RouteHealthCatalogV1.Defaults.Single(card => card.Id == "direct-path").
       AccessibleSummary.Contains("Vendor ASIO／WASAPI Exclusive：繞過 Hibiki。"),
     "Default bypass route must expose an honest accessible summary.");
+Check(viewModel.Expert.RouteHealthAccessibleSummary.StartsWith("路由狀態：Process Loopback：已可用。目前引擎已回報可用。") &&
+      viewModel.Expert.RouteHealthAccessibleSummary.EndsWith("Chrome／Edge 單分頁：等待引擎回報。需要擴充功能。") &&
+      viewModel.Expert.RouteHealthAccessibleSummary.Contains("／"),
+      "Route health projection must compose full accessible summaries (name, state and boundary detail) per card.");
 var duplicateRoutes = new[] { routeSnapshot[0], routeSnapshot[0] };
 Check(!viewModel.ApplyRouteHealth(duplicateRoutes, out var duplicateRouteError) &&
       duplicateRouteError.Contains("重複"),

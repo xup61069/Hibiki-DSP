@@ -258,10 +258,7 @@ internal sealed class PreviewForm : Form
         _loadIr.Enabled = _viewModel.IsConnected && _viewModel.IrPhaseMode != IrPhaseMode.Bypass;
         _irStrength.Enabled = _viewModel.IrPhaseMode is IrPhaseMode.MixedPhase or IrPhaseMode.LinearPhase;
         _effective.Text = $"實際有效音量：{_viewModel.EffectiveVolumeDb:0.0} dB；{_viewModel.VolumeOriginText}；{_viewModel.VolumeActuatorText}";
-        _routes.Text = _viewModel.Expert.RouteHealth.Count == 0
-            ? "路由狀態：尚未收到引擎快照"
-            : "路由狀態：" + string.Join("／", _viewModel.Expert.RouteHealth.Select(route =>
-                $"{route.Name} {route.StateLabel}"));
+        _routes.Text = _viewModel.Expert.RouteHealthAccessibleSummary;
         _status.Text = _viewModel.StatusText;
         _irStatus.Text = $"{_viewModel.IrPhaseModeText}；實測延遲 {_viewModel.IrAddedDelayMs:0.0} ms。\r\n{_viewModel.IrPrepareStatus}";
         var requested = Math.Clamp((int)Math.Round(_viewModel.RequestedVolumeDb), _volume.Minimum, _volume.Maximum);

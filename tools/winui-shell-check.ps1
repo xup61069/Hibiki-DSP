@@ -206,6 +206,10 @@ $codeBehind = Get-Content (Join-Path $shell 'MainWindow.xaml.cs') -Raw
 Write-Output "WinUI interactive-control accessibility scan: $(Assert-InteractiveControlNames $xaml 'apps/winui-shell/MainWindow.xaml') controls."
 Write-Output "Compatibility Preview source accessibility scan: $(Assert-CompatibilityPreviewControlNames $compatPreviewSource 'apps/winui-shell/MainWindow.CompatibilityPreview.cs') controls."
 Write-Output "DesktopCompat source accessibility scan: $(Assert-DesktopCompatControlNames $desktopCompatSource 'apps/desktop-compat-preview/Program.cs') controls."
+if (-not $desktopCompatSource.Contains('Expert.RouteHealthAccessibleSummary') -or
+    -not $compatPreviewSource.Contains('Expert.RouteHealthAccessibleSummary')) {
+  throw 'Compatibility previews must bind route health to the composed RouteHealthAccessibleSummary so assistive technology reads full name/state/detail per card.'
+}
 foreach ($requiredText in @('x:Name="RootGrid"', 'ItemsSource="{Binding Scenes}"',
     'ItemsSource="{Binding OutputGroups}"', 'SelectedOutputGroup', 'IsExpert',
     'ItemsSource="{Binding PhysicalDevices}"', 'SelectedPhysicalDeviceId',
