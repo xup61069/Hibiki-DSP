@@ -26,10 +26,11 @@ Closes #
 
 ## 驗證
 
-- [ ] `pwsh -File tools/verify.ps1`
-- [ ] `pwsh -File tools/docs-check.ps1`
-- [ ] `pwsh -File tools/source-policy.ps1`
-- [ ] `pwsh -File tools/source-only-ci-check.ps1`
+依 [AGENTS.md](../AGENTS.md) 第三層執行核心 gates（verify／handoff-check／docs-check／
+source-policy／source-only-ci-check）與範圍相關的條件式 gates：
+
+- [ ] 核心 gates 全綠（命令與結果記錄在 handoff block）
+- [ ] 範圍相關的條件式 gates 已執行或明確標註不適用
 - [ ] 已附 evidence manifest 或說明為何不適用
 
 ## 開源與隱私

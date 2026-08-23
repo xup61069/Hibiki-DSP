@@ -52,5 +52,5 @@ body:
           required: true
         - label: I understand this draft is not assigned until the orchestrator fills the handoff, assigns one owner and adds `claimed`.
           required: true
-        - label: The assigned writer will use a dedicated clone/worktree, push a claim commit and open one draft PR before implementation.
+        - label: The assigned writer will use a dedicated clone/worktree, push the first reviewable commit and open one draft PR.
           required: true

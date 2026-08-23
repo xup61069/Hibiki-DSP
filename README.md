@@ -132,27 +132,26 @@ registry、私人裝置 ID 或未提交的 build output 推斷專案狀態。
 `winget install --id Microsoft.PowerShell`；本機第一次執行若被 Execution Policy
 擋下，加 `-ExecutionPolicy Bypass`。
 
-**必跑 gates**：
+**驗證門檻（core + conditional）**：每個切片必跑核心 gates；其餘依範圍觸發，完整對照表見
+[AGENTS.md](AGENTS.md) 第三層。
 
 ```powershell
 pwsh -File tools/doctor.ps1 -CheckOnly
-pwsh -File tools/handoff-check.ps1
-pwsh -File tools/build-preview.ps1 -Target DesktopCompat
-pwsh -File tools/probe-environment.ps1
 pwsh -File tools/verify.ps1
 pwsh -File tools/docs-check.ps1
+pwsh -File tools/handoff-check.ps1 -Issue <n>
 pwsh -File tools/source-only-ci-check.ps1
-pwsh -File tools/extension-check.ps1
-pwsh -File tools/installer-check.ps1
-pwsh -File tools/control-model-check.ps1
-pwsh -File tools/build-engine-preview.ps1
-pwsh -File tools/engine-preview-smoke.ps1
-pwsh -File tools/control-model-engine-smoke.ps1
-pwsh -File tools/winui-shell-check.ps1
 pwsh -File tools/source-policy.ps1
-pwsh -File tools/distribution-check.ps1
-pwsh -File tools/driver-source-check.ps1
-pwsh -File tools/driver-signability-check.ps1
+```
+
+條件式 gates（依變更範圍）：UI 用 `build-preview.ps1` 與 `winui-shell-check.ps1`；engine 整合用
+`build-engine-preview.ps1`、`engine-preview-smoke.ps1`、`control-model-check.ps1`、
+`control-model-engine-smoke.ps1`；extensions 用 `extension-check.ps1`；installer/distribution
+identity 用 `installer-check.ps1`、`distribution-check.ps1`；driver boundary 用
+`driver-source-check.ps1`（driver 簽章屬 release 階段）；live probes 一律明確 opt-in。
+
+```powershell
+pwsh -File tools/probe-environment.ps1
 ```
 
 在鎖定的 Windows 11 24H2+/VS 2026/SDK-WDK 機器上，將 Compatibility Preview 改為
