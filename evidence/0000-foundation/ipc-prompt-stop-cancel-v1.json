@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "issue": 637,
+  "scope_digest": "ipc-prompt-stop-cancel-v1",
+  "source_commit": "516213f",
+  "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100",
+  "commands": [
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/doctor.ps1 -CheckOnly",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/handoff-check.ps1 -Issue 637",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/verify.ps1",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/docs-check.ps1",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/source-policy.ps1",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/doctor.ps1 -CheckOnly",
+      "status": "pass",
+      "coverage": [
+        "Windows build and architecture",
+        "git, cmake, pwsh, Visual Studio, Windows SDK/WDK"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 6
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 637",
+      "status": "pass",
+      "coverage": ["issue ownership", "branch and base commit", "scope and lifecycle state"],
+      "compiled_artifacts": false,
+      "case_count": 1
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "hibiki_asio_transport_selftest: pass",
+        "hibiki_tab_bridge_selftest: pass",
+        "hibiki_contract_tests: pass including prompt-stop regression"
+      ],
+      "compiled_artifacts": true,
+      "case_count": 3
+    },
+    {
+      "command": "docs/source/source-only-ci/diff checks",
+      "status": "pass",
+      "coverage": [
+        "documentation links and required paths",
+        "560 tracked source-only paths",
+        "CI publication policy",
+        "no whitespace errors"
+      ],
+      "compiled_artifacts": false,
+      "case_count": 4
+    }
+  ],
+  "changes": [
+    {
+      "file": "src/hub/src/ipc_pipe.cpp",
+      "summary": "Register the synchronous initial owned-pipe handle before worker startup so immediate stop cancels pending connect; clear it on start or worker-spawn failure."
+    },
+    {
+      "file": "tests/unit/contract_tests.cpp",
+      "summary": "Add a first-instance prompt-stop regression using a process-unique pipe name and a sub-timeout shutdown assertion."
+    }
+  ],
+  "limitations": [
+    "Source-only IPC control-plane change; no RT audio thread path is affected.",
+    "No claim is made for public IPC framing changes, driver, WaveRT, HLK, Microsoft signing, or physical endpoint behavior.",
+    "The wall-clock timing assertion can vary on heavily loaded runners."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "cmake": "4.4.0",
+    "msbuild": "18.9.1.35102",
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-23T01:30:00+08:00",
+  "finished_at": "2026-08-23T02:10:00+08:00"
+}

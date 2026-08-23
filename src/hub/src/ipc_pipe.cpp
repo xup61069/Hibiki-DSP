@@ -160,6 +160,7 @@ bool IpcNamedPipeServerV1::start(const IpcNamedPipeConfigV1& config,
             1U, max_frame_bytes_, max_frame_bytes_, io_timeout_ms_, nullptr);
         if (pipe == INVALID_HANDLE_VALUE) {
             running_.store(false, std::memory_order_release);
+            pipe_handle_.store(0U, std::memory_order_release);
             pipe_name_.clear();
             max_frame_bytes_ = 0U;
             io_timeout_ms_ = 0U;
@@ -168,10 +169,15 @@ bool IpcNamedPipeServerV1::start(const IpcNamedPipeConfigV1& config,
             return false;
         }
         initial_pipe = pipe;
+        // Register the initial synchronous handle before the worker starts so
+        // stop()/cancel_current_io() can always cancel its pending connect,
+        // even when stop() races between start() and the worker's own store.
+        pipe_handle_.store(as_integer(pipe), std::memory_order_release);
     }
     try {
         worker_ = std::thread([this, initial_pipe] { run(static_cast<void*>(initial_pipe)); });
     } catch (...) {
+        pipe_handle_.store(0U, std::memory_order_release);
         if (initial_pipe != nullptr) close_pipe(initial_pipe);
         running_.store(false, std::memory_order_release);
         pipe_name_.clear();

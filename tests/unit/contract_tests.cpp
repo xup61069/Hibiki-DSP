@@ -67,6 +67,7 @@ extern "C" {
 #include "hibiki/virtual_mic.hpp"
 #include "hibiki/true_peak_limiter.hpp"
 #if defined(_WIN32)
+#include <chrono>
 #include <process.h>
 #include <windows.h>
 #include "hibiki/windows_volume_broker.hpp"
@@ -1693,6 +1694,28 @@ int main() {
     IpcNamedPipeServerV1 duplicate_owned_server;
     CHECK(!duplicate_owned_server.start(owned_config, acknowledge_ipc_request, nullptr) &&
           !duplicate_owned_server.running());
+    // Issue #637 regression: stop() immediately after a successful owned
+    // start() must cancel the worker's pending connect instead of waiting for
+    // the full idle timeout.
+    {
+        const std::wstring prompt_pipe =
+            L"\\\\.\\pipe\\HibikiDSP_contract_prompt_" + std::to_wstring(_getpid());
+        IpcNamedPipeServerV1 prompt_stop_server;
+        IpcNamedPipeConfigV1 prompt_config{};
+        prompt_config.pipe_name = prompt_pipe;
+        prompt_config.max_frame_bytes = 1024U;
+        prompt_config.io_timeout_ms = 1000U;
+        prompt_config.require_first_pipe_instance = true;
+        const auto prompt_start = std::chrono::steady_clock::now();
+        CHECK(prompt_stop_server.start(prompt_config, acknowledge_ipc_request, nullptr));
+        prompt_stop_server.stop();
+        const auto prompt_elapsed_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - prompt_start)
+                .count();
+        CHECK(prompt_elapsed_ms < prompt_config.io_timeout_ms &&
+              !prompt_stop_server.running());
+    }
     HANDLE ipc_client = INVALID_HANDLE_VALUE;
     for (int attempt = 0; attempt < 30 && ipc_client == INVALID_HANDLE_VALUE; ++attempt) {
         ipc_client = CreateFileW(kControlPipe, GENERIC_READ | GENERIC_WRITE, 0U, nullptr,
