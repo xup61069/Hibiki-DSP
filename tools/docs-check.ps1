@@ -554,9 +554,6 @@ if ($brokenLinks.Count -gt 0) {
   throw ('Broken relative markdown links detected: ' + ($brokenLinks -join '; '))
 }
 
-& (Join-Path $repo 'tools/handoff-check.ps1')
-if ($LASTEXITCODE -ne 0) { throw 'AI handoff check failed.' }
-
 $adapters = @('AGENTS.md', 'CLAUDE.md', 'GEMINI.md', '.github/copilot-instructions.md', '.cursor/rules/project.mdc')
 foreach ($adapter in $adapters) {
   if (-not (Test-Path (Join-Path $repo $adapter))) { throw "Missing AI adapter: $adapter" }

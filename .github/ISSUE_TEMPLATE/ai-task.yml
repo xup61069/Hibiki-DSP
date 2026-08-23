@@ -1,14 +1,14 @@
 name: AI task slice
-description: Claim one independently verifiable work slice for one AI writer.
+description: Draft one independently verifiable work slice for orchestrator assignment.
 title: "[AI Task] "
-labels: [claimed]
 body:
   - type: markdown
     attributes:
       value: |
-        One Issue maps to one AI writer, one dedicated clone/worktree, one branch,
-        one handoff block embedded in this Issue body, and one draft PR.
-        Split child Issues for parallel writers. Do not use a separate handoff file.
+        This form creates an unassigned TBD pre-claim. One Issue maps to one AI writer,
+        one dedicated clone/worktree, one branch, one handoff block embedded in this
+        Issue body, and one draft PR. The orchestrator fills the Issue number, branch,
+        base and owner before adding an assignee and the `claimed` label.
   - type: textarea
     id: objective
     attributes:
@@ -16,74 +16,41 @@ body:
       description: Define one independently verifiable outcome.
     validations:
       required: true
-  - type: input
-    id: owner
+  - type: textarea
+    id: handoff
     attributes:
-      label: Owner
-      description: Stable AI/person identifier used in the handoff block below.
-      placeholder: codex-primary
-    validations:
-      required: true
-  - type: markdown
-    id: handoff-block
-    attributes:
+      label: Machine-readable TBD pre-claim
+      description: Keep this block intact. Declare the proposed write scope; the orchestrator replaces every TBD/unassigned field when claiming the Issue.
+      render: markdown
       value: |
-        Append the following machine-readable handoff block at the end of the issue body.
-        Replace placeholders before saving; `handoff-check.ps1` parses this block.
-
-        \`\`\`
         <!-- hibiki:handoff-v1
         schema_version: 2
-        branch: codex/<issue>-<slug>
+        issue: TBD
+        branch: codex/TBD-short-slug
         target_branch: main
-        base_commit: <full-sha-at-claim>
-        owner: <owner>
-        scope_globs:
-          - src/hub/src/example.cpp
-          - tests/example/**
+        base_commit: TBD
+        role: worker
+        owner: unassigned
+        updated_at: TBD
+        environment_fingerprint: TBD
+        scope_globs: ["TBD"]
         shared_paths: []
         depends_on: []
-        resume_commands:
-          - pwsh -File tools/handoff-check.ps1 -Issue <issue>
+        specs: []
+        adrs: []
+        next_safe_action: "TBD: orchestrator assigns the Issue and creates the isolated worktree."
+        resume_commands: ["git fetch origin --prune", "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue TBD"]
         -->
-        \`\`\`
-    validations:
-      required: false
-  - type: textarea
-    id: scope
-    attributes:
-      label: scope_globs (also put them in the handoff block above)
-      description: Exclusive, repository-relative paths this task expects to modify.
-      placeholder: |
-        - src/hub/src/example.cpp
-        - tests/example/**
-    validations:
-      required: true
-  - type: textarea
-    id: shared
-    attributes:
-      label: Shared paths and integration owner
-      description: High-conflict files that require a named integrator; write none when empty.
-      placeholder: tests/unit/contract_tests.cpp — integrator @name
-    validations:
-      required: true
-  - type: input
-    id: dependencies
-    attributes:
-      label: Dependencies
-      description: Upstream Issues/PRs, or none.
-      placeholder: "#120, PR #121, or none"
     validations:
       required: true
   - type: checkboxes
-    id: claim
+    id: preclaim
     attributes:
-      label: Claim checks
+      label: Pre-claim checks
       options:
         - label: I checked open Issues, draft PRs and existing handoff blocks for scope overlap.
           required: true
-        - label: I will use a dedicated clone/worktree and will not share a branch with another active writer.
+        - label: I understand this draft is not assigned until the orchestrator fills the handoff, assigns one owner and adds `claimed`.
           required: true
-        - label: I will embed the handoff block in this Issue body, open a draft PR after the claim commit, and will not force-push a depended-on branch.
+        - label: The assigned writer will use a dedicated clone/worktree, push a claim commit and open one draft PR before implementation.
           required: true
-

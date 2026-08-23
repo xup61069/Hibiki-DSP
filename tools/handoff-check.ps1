@@ -189,6 +189,29 @@ function Assert-LifecycleLabel {
   }
 }
 
+function Test-IssueRequiresHandoff {
+  param([Parameter(Mandatory)] $IssueData)
+  $labelNames = @($IssueData.labels | ForEach-Object { $_.name })
+  $hasLifecycle = @($labelNames | Where-Object { $_ -in @('claimed', 'in-review', 'done') }).Count -gt 0
+  $hasAssignee = @($IssueData.assignees).Count -gt 0
+  return $hasLifecycle -or $hasAssignee
+}
+
+function Assert-OwnerAssignment {
+  param(
+    [Parameter(Mandatory)] [string]$Owner,
+    [Parameter(Mandatory)] [AllowEmptyCollection()] [string[]]$AssigneeLogins,
+    [Parameter(Mandatory)] [int]$IssueNumber,
+    [Parameter(Mandatory)] [string]$Path
+  )
+  if ($AssigneeLogins.Count -ne 1) {
+    throw "Issue #$IssueNumber must have exactly one assignee matching owner '$Owner', got $($AssigneeLogins.Count): $Path"
+  }
+  if ($AssigneeLogins[0] -ne $Owner) {
+    throw "Issue #$IssueNumber owner '$Owner' does not match assignee '$($AssigneeLogins[0])': $Path"
+  }
+}
+
 function Get-IssueHandoff {
   param([Parameter(Mandatory)] [int]$IssueNumber)
   $json = & gh issue view $IssueNumber --json number,state,title,body,labels,assignees 2>&1
@@ -294,7 +317,8 @@ if ($SelfTest) {
       [string]$Branch = 'codex/99-selftest',
       [string]$ScopeGlobs = '["src/selftest/**"]',
       [string[]]$Labels = @('claimed'),
-      [string[]]$Assignees = @('selftest-owner')
+      [string[]]$Assignees = @('selftest-owner'),
+      [string]$Owner = 'selftest-owner'
     )
     $labelText = ($Labels | ForEach-Object { '"' + $_ + '"' }) -join ', '
     $blockLines = @(
@@ -308,7 +332,7 @@ if ($SelfTest) {
       "scope_globs: $ScopeGlobs",
       'shared_paths: []',
       'depends_on: []',
-      ('owner: "' + ($Assignees -join ', ') + '"'),
+      ('owner: "' + $Owner + '"'),
       'next_safe_action: "Run the bounded self-test."',
       'resume_commands: ["pwsh -File tools/handoff-check.ps1 -SelfTest"]',
       '-->'
@@ -365,10 +389,29 @@ if ($SelfTest) {
   } 'open done label'
   $caseCount++
 
-  $ownerMismatchMock = New-MockIssue -Assignees @('actual-owner')
-  $assigneeNames = @($ownerMismatchMock.assignees | ForEach-Object { $_.login })
-  if ($assigneeNames -notcontains 'actual-owner') {
-    throw "handoff-check self-test failed: owner fixture was not created."
+  $ownerMismatchMock = New-MockIssue -Owner 'declared-owner' -Assignees @('actual-owner')
+  Assert-Throws {
+    $assigneeNames = @($ownerMismatchMock.assignees | ForEach-Object { $_.login })
+    Assert-OwnerAssignment -Owner 'declared-owner' -AssigneeLogins $assigneeNames -IssueNumber 99 -Path 'selftest/owner-mismatch'
+  } 'owner mismatch'
+  $ownerMissingMock = New-MockIssue -Owner 'declared-owner' -Assignees @()
+  Assert-Throws {
+    $assigneeNames = @($ownerMissingMock.assignees | ForEach-Object { $_.login })
+    Assert-OwnerAssignment -Owner 'declared-owner' -AssigneeLogins $assigneeNames -IssueNumber 99 -Path 'selftest/owner-missing'
+  } 'missing assignee'
+  $caseCount++
+
+  $unclaimedDraft = New-MockIssue -Labels @() -Assignees @()
+  if (Test-IssueRequiresHandoff $unclaimedDraft) {
+    throw 'handoff-check self-test failed: unassigned unlabeled draft requires a handoff.'
+  }
+  $claimedWithoutBlock = New-MockIssue -Labels @('claimed') -Assignees @()
+  if (-not (Test-IssueRequiresHandoff $claimedWithoutBlock)) {
+    throw 'handoff-check self-test failed: claimed Issue did not require a handoff.'
+  }
+  $assignedWithoutBlock = New-MockIssue -Labels @() -Assignees @('selftest-owner')
+  if (-not (Test-IssueRequiresHandoff $assignedWithoutBlock)) {
+    throw 'handoff-check self-test failed: assigned Issue did not require a handoff.'
   }
   $caseCount++
 
@@ -403,6 +446,18 @@ if ($LASTEXITCODE -ne 0) { throw "gh issue list failed: $issuesJson" }
 $issues = $issuesJson | ConvertFrom-Json
 
 $withHandoff = @($issues | Where-Object { $_.body -match 'hibiki:handoff-v1' })
+$withoutRequiredHandoff = @($issues | Where-Object {
+  $_.body -notmatch 'hibiki:handoff-v1' -and (Test-IssueRequiresHandoff $_)
+})
+
+if ($Issue -lt 0 -and $withoutRequiredHandoff.Count -gt 0) {
+  $entries = @($withoutRequiredHandoff | ForEach-Object {
+    $labels = @($_.labels | ForEach-Object { $_.name }) -join ', '
+    $assignees = @($_.assignees | ForEach-Object { $_.login }) -join ', '
+    "#$($_.number) (labels=[$labels], assignees=[$assignees])"
+  })
+  throw "Assigned or lifecycle-labeled open Issue(s) are missing hibiki:handoff-v1: $($entries -join '; ')"
+}
 
 if ($withHandoff.Count -eq 0) {
   if ($Issue -ge 0) { throw "No active handoff block exists for Issue $Issue." }
@@ -447,9 +502,7 @@ foreach ($issueData in $withHandoff) {
   Assert-LifecycleLabel -Labels $labels -IssueNumber $issueNumber -State $issueData.state -Path $path
   $ownerField = Get-Scalar $frontMatter 'owner' $path
   $assigneeLogins = @($issueData.assignees | ForEach-Object { $_.login })
-  if ($assigneeLogins.Count -gt 0 -and $assigneeLogins -notcontains $ownerField) {
-    throw "Issue #$issueNumber owner '$ownerField' does not match any assignee ($($assigneeLogins -join ', ')): $path"
-  }
+  Assert-OwnerAssignment -Owner $ownerField -AssigneeLogins $assigneeLogins -IssueNumber $issueNumber -Path $path
 
   # Label protocol is authoritative; front matter must not carry a conflicting status.
   if ($frontMatter.ContainsKey('status')) {
@@ -463,6 +516,7 @@ foreach ($issueData in $withHandoff) {
   Assert-UniqueItems $scopeGlobs 'scope_globs' $path
   foreach ($scope in $scopeGlobs) {
     Assert-SafeScopePath $scope 'scope_globs' $path
+    if ($scope -match '(?i)\bTBD\b') { throw "Issue handoff scope_globs contains unresolved TBD path '$scope': $path" }
     foreach ($previous in $seenScopes) {
       if ($previous.Issue -ne $issueNumber -and (Test-GlobIntersection $previous.Scope $scope)) {
         throw "Issue handoff scopes overlap: Issue #$($previous.Issue) '$($previous.Scope)' and Issue #$issueNumber '$scope' ($path)"
