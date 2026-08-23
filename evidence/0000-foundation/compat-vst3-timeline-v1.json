@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "issue": 815,
+  "scope_digest": "compat-vst3-timeline-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-local-pwsh-7.6.4-dotnet8",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 815",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "pwsh -NoProfile -File tools/winui-shell-check.ps1",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest"
+  ],
+  "results": [
+    {
+      "command": "all listed checks",
+      "status": "pass",
+      "coverage": [
+        "WinUI Compatibility Preview adds clear-history, save-baseline, canonical row projection and selection, three validated event fields and add-event action through Vst3TimelineEditorViewModelV1",
+        "WinUI Compatibility Preview retains timeline selection/registration/removal, draft begin/commit/discard, undo/redo and selected-row value update",
+        "DesktopCompat exposes the complete local timeline workflow with accessible ComboBox, ListBox, TextBox and Button controls",
+        "selected-row update and delete use the existing bounded ViewModel methods; no control-model, IPC or persistence changes",
+        "accessibility scans cover newly added interactive controls in both previews"
+      ]
+    }
+  ],
+  "limitations": [
+    "Compatibility preview source/build/launch evidence only.",
+    "No runtime screen-reader audit, physical audio delivery, driver install/load, HLK or Microsoft signing claim."
+  ],
+  "logs": [],
+  "started_at": "2026-08-24T00:55:00+08:00",
+  "finished_at": "2026-08-24T01:11:00+08:00"
+}
