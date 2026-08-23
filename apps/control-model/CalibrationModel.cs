@@ -14,7 +14,8 @@ public sealed record CalibrationPointV1(
 {
     public bool IsValid =>
         double.IsFinite(FrequencyHz) && FrequencyHz is > 0.0 and <= 24000.0 &&
-        double.IsFinite(MeasuredDb) && double.IsFinite(TargetDb);
+        double.IsFinite(MeasuredDb) && MeasuredDb is >= -144.0 and <= 12.0 &&
+        double.IsFinite(TargetDb) && TargetDb is >= -144.0 and <= 12.0;
 }
 
 public sealed record CalibrationResponseV1(
