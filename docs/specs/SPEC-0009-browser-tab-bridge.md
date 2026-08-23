@@ -65,3 +65,13 @@ MV3 extension source gate (`tools/extension-check.ps1`) 強制驗證最小權限
 2. Host 權限僅限 `http://127.0.0.1/*`，拒絕 wildcard remote hosts 與 `<all_urls>`。
 3. `extension_pages` CSP 必須為 `script-src 'self'; object-src 'self'; connect-src ws://127.0.0.1:17842`，
    嚴格禁止 `unsafe-eval`、`unsafe-inline`、外部 script 或 non-loopback connect-src。
+
+## Popup accessibility policy
+
+MV3 popup 的每個互動控制項（目前為 Start 與 Stop 按鈕）都必須提供非空無障礙名稱：
+直接寫 `aria-label`，或以 `aria-labelledby` 指向頁面上非空的可見文字。當
+`aria-labelledby` 列出的任一 ID 不存在、或對應元素沒有可見文字時，gate 必須
+fail closed；不得指向空字串或不存在的 anchor。`tools/extension-check.ps1` 掃描
+popup.html 的 button/input/select/textarea 控制建構，缺漏名稱會讓檢查失敗；offline
+self-test 涵蓋有效 aria-label、缺少名稱與 labelledby 目標失效的情況。此 gate 是
+source 層級政策，不宣稱瀏覽器 runtime 螢幕閱讀器實測。
