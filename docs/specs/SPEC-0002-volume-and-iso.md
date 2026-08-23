@@ -148,8 +148,8 @@ Group Master → limiter；失敗時保留既有 active attachment。SceneApply 
 production concurrent RT/control swap 仍需 epoch/RCU 驗證。
 
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
-schema 層的 `anchor_id` 在非 null 時必須是非空字串（`minLength: 1`），與專案
-ID 不可為空的慣例一致；
+schema 與 runtime validator 一致地要求 `anchor_id` 在非 null 時為非空字串且最長 64 字，
+與專案 ID 不可為空、輸出群組同為 64 字上限的慣例一致；
 `EqualLoudnessStatusV1.diagnostic` 是 bounded 文字欄位（0..256 字元），空字串合法，
 超過上限的診斷文字在 metadata contract 層即被拒絕。
 `Program-aware` 另有 `ProgramAwareLevelControllerV1` 的慢速內容音量控制：預設保留無配置的
