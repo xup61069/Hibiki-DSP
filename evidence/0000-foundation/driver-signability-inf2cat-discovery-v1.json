@@ -1,0 +1,48 @@
+{
+  "schema_version": 2,
+  "issue": 764,
+  "title": "Driver signability gate discovers Inf2Cat like build-driver",
+  "base_commit": "42076ca4fd378b951231e55dbcd5b0eb8a0dfca5",
+  "summary": {
+    "behavior": "tools/driver-signability-check.ps1 now resolves Inf2Cat.exe with explicit precedence: WDK_BIN override first, then a recursive Windows Kits bin-tree search matching build-driver.ps1, then PATH. When all locations miss, the gate still fails closed.",
+    "scope_boundary": "Host-side tooling only. No driver source behavior change, no guest installation, load, start, signing, or real-device changes.",
+    "files": [
+      "tools/driver-signability-check.ps1"
+    ]
+  },
+  "validation": [
+    {
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 764",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1",
+      "result": "pass (80 required paths; 607 tracked paths)"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-policy.ps1",
+      "result": "pass (607 tracked paths)"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/driver-signability-check.ps1 -SelfTest",
+      "result": "pass (13 cases; precedence order and all-missing fail-closed outcome covered offline)"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/build-driver.ps1",
+      "result": "pass; HibikiVirtualAudio.sys linked and Inf2Cat reported 0 errors / 0 warnings"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/driver-signability-check.ps1 -RequireInf2Cat -PackageRoot .local/driver-package (with WDK_BIN unset and Inf2Cat removed from PATH)",
+      "result": "pass for Windows 11 24H2/25H2 x64; kit-tree discovery located Inf2Cat.exe without WDK_BIN"
+    }
+  ],
+  "limits": [
+    "No guest retest, install, load, HLK or Microsoft signing evidence is claimed by this tooling slice."
+  ],
+  "next_safe_action": "Maintainer review of the draft PR; after merge, release acceptance can rerun the standalone signability gate without exporting WDK_BIN.",
+  "date": "2026-08-23"
+}
