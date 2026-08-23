@@ -3,7 +3,7 @@
   "issue": 790,
   "scope_digest": "global-snapshot-w33",
   "base_commit": "e1f55321723b778c7f0bc9443dc9187530ce21a8",
-  "source_commit": null,
+  "source_commit": "4605adb826fab88d75ba6374bc2b691640505051",
   "environment_fingerprint": "windows-local-pwsh-7.6.4; documentation-only integrator snapshot",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 790",
@@ -42,5 +42,5 @@
     "powershell": "7.6.4"
   },
   "started_at": "2026-08-24T02:50:00+08:00",
-  "finished_at": "pending-gates"
+  "finished_at": "2026-08-24T03:00:00+08:00"
 }
