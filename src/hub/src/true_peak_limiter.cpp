@@ -8,6 +8,7 @@ namespace hibiki {
 void TruePeakLimiterV1::reset() noexcept {
     previous_.fill(0.0F);
     has_previous_ = false;
+    applied_gain_ = 1.0F;
 }
 
 float TruePeakLimiterV1::limit_in_place(float* const interleaved,
@@ -37,14 +38,19 @@ float TruePeakLimiterV1::limit_in_place(float* const interleaved,
         }
         has_previous_ = true;
     }
-    if (peak <= ceiling || peak <= 0.0F) return 1.0F;
-    const auto gain = ceiling / peak;
+    const auto required_gain =
+        (peak <= ceiling || peak <= 0.0F) ? 1.0F : ceiling / peak;
+    const auto gain = required_gain >= applied_gain_
+                          ? std::min(required_gain,
+                                     applied_gain_ * kMaxRecoveryGainPerBlock)
+                          : required_gain;
     for (std::size_t index = 0U; index < frames * channels; ++index) {
         interleaved[index] *= gain;
     }
     for (std::uint32_t channel = 0U; channel < channels; ++channel) {
         previous_[channel] *= gain;
     }
+    applied_gain_ = gain;
     return gain;
 }
 
