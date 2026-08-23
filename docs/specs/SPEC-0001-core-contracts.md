@@ -49,7 +49,9 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   C++ `IpcNamedPipeServerV1` 以 4-byte little-endian length prefix、bounded overlapped I/O、
   單一 control callback 與 local-only pipe 實作 transport。canonical 單一擁有者服務可要求
   first-instance ownership：`start` 必須同步建立第一個 server handle，取得失敗時回 false，
-  後續 server-side recreate 也保留同一 ownership；Engine Preview 的 canonical control pipe
+  後續 server-side recreate 也保留同一 ownership；`stop` 必須在 worker 觀察停止前重複取消
+  當下註冊的 server handle I/O，涵蓋 connected idle 與兩次連線之間的空檔，不得讓關閉流程
+  固定等待一個完整 idle timeout。Engine Preview 的 canonical control pipe
   採用此 fail-closed 邊界。C# `NamedPipeControlClientV1`
   使用同一 logical pipe name 與 request correlation。payload schema 可在後續以 Protobuf
   或等價固定編碼替換，但 version、message type 與 Validate/Prepare/Commit 語意不可破壞。

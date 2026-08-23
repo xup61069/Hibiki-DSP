@@ -4,6 +4,7 @@
 
 #include <array>
 #include <limits>
+#include <thread>
 #include <vector>
 
 #if defined(_WIN32)
@@ -197,7 +198,18 @@ void IpcNamedPipeServerV1::cancel_current_io() noexcept {
 
 void IpcNamedPipeServerV1::stop() noexcept {
     stop_requested_.store(true, std::memory_order_release);
-    cancel_current_io();
+    // stop() races with the worker's state transitions. A single cancellation
+    // can land while no overlapped operation is armed (for example between
+    // close_pipe() and the next CreateNamedPipeW()/ConnectNamedPipeW()), after
+    // which the worker could still sleep for a full idle timeout. Repeat until
+    // the worker observes stop and clears running; CancelIoEx is harmless when
+    // there is currently no pending I/O. The loop is bounded by the worker's
+    // own bounded operations and does not introduce an audio-thread wait.
+    while (running_.load(std::memory_order_acquire)) {
+        cancel_current_io();
+        if (!running_.load(std::memory_order_acquire)) break;
+        std::this_thread::yield();
+    }
     if (worker_.joinable()) worker_.join();
     running_.store(false, std::memory_order_release);
     client_connected_.store(false, std::memory_order_release);
