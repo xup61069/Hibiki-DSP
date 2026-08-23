@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://hibiki.invalid/schema/session-route-rules-v1.schema.json",
+  "$id": "https://hibiki.example/schemas/session-route-rules-v1.schema.json",
   "title": "Hibiki Session Route Rules v1",
   "type": "object",
   "additionalProperties": false,
@@ -15,7 +15,7 @@
         "additionalProperties": false,
         "required": ["rule_id", "priority", "enabled", "gain_owner", "makeup_gain_db", "app_id", "display_name", "lane_id", "output_group"],
         "properties": {
-          "rule_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "rule_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
           "priority": { "type": "integer", "minimum": -1000000, "maximum": 1000000 },
           "enabled": { "type": "boolean" },
           "gain_owner": { "enum": [0, 1] },
@@ -23,7 +23,11 @@
           "app_id": { "type": "string", "maxLength": 128 },
           "display_name": { "type": "string", "maxLength": 128 },
           "lane_id": { "type": "string", "minLength": 1, "maxLength": 64 },
-          "output_group": { "type": "string", "minLength": 1, "maxLength": 64 }
+          "output_group": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "anyOf": [
+            { "required": ["app_id"], "properties": { "app_id": { "minLength": 1 } } },
+            { "required": ["display_name"], "properties": { "display_name": { "minLength": 1 } } }
+          ]
         }
       }
     }
