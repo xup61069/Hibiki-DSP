@@ -101,6 +101,70 @@ public sealed partial class MainWindow : Window
         await ViewModel.ApplyClearRouteRulesAsync();
     }
 
+    private void OnVst3TimelineSelect(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ComboBox { SelectedItem: string id })
+            ViewModel.Vst3TimelineEditor.Select(id);
+    }
+
+    private void OnVst3BeginEditClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.Vst3TimelineEditor.BeginEdit();
+    }
+
+    private void OnVst3CommitClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.Vst3TimelineEditor.Commit();
+    }
+
+    private void OnVst3DiscardClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.Vst3TimelineEditor.Discard();
+    }
+
+    private void OnVst3UndoClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.Vst3TimelineEditor.Undo();
+    }
+
+    private void OnVst3RedoClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.Vst3TimelineEditor.Redo();
+    }
+
+    private void OnVst3RegisterClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.Vst3TimelineEditor.RegisterTimeline(Vst3NewTimelineIdBox.Text);
+        Vst3NewTimelineIdBox.Text = string.Empty;
+    }
+
+    private void OnVst3UpsertClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.Vst3TimelineEditor.UpsertFromFields();
+    }
+
+    private void OnVst3RowSelectClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: int index })
+            ViewModel.Vst3TimelineEditor.SelectedRowIndex = index;
+    }
+
+    private void OnVst3SetRowValueClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.Vst3TimelineEditor.SetSelectedRowValue(Vst3RowValueBox.Text);
+        Vst3RowValueBox.Text = string.Empty;
+    }
+
+    private void OnVst3RemoveRowClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.Vst3TimelineEditor.RemoveSelectedRow();
+    }
+
+    private void OnVst3RemoveTimelineClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.Vst3TimelineEditor.RemoveSelectedTimeline();
+    }
+
     private async void OnClosed(object sender, WindowEventArgs e)
     {
         await ViewModel.DisconnectAsync();
