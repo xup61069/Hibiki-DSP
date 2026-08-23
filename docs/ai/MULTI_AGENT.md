@@ -12,7 +12,8 @@
 2. 一個位於其他 AI working tree 之外的 clone 或 `git worktree`。
 3. 一個 `<agent>/<issue>-<slug>` branch；不得直接在 `main` 開發。
 4. Issue body 內的 `<!-- hibiki:handoff-v1 -->` handoff block（取代舊 handoff 檔案）。
-5. 一個 draft PR；除非有明確 dependency，base 一律是 `main`。
+5. 一個 draft PR；除非有明確 dependency，base 一律是 `main`。draft PR 在首次可審閱的
+   WIP/reviewable commit push 後開啟；不需要空的認領 commit。
 
 同一時間不得有兩個 writer 共用 Issue、working tree、index、branch 或 handoff。若要把同一 branch
 交給另一個 AI，原 owner 必須先完成可重建的 WIP commit、push、更新 handoff 並停止寫入；新 owner
@@ -20,12 +21,12 @@
 
 ## 開始工作：orchestrator 指派
 
-1. Orchestrator 從 open Issue 中挑選下一個工作切片，確認目錄 lane（`driver/`、`tools/`、
-   `apps/`、`docs/`、`extensions/`、`vst-host/`、`src/`）內沒有其他 active writer。
-   每個 directory lane 同時最多一個 active writer；跨 lane 或 shared-path 衝突由 orchestrator
-   指定 owner 與合併順序，不是先 commit 者贏。
+1. Orchestrator 從 open Issue 中挑選下一個工作切片。衝突判定的權威依據是 handoff block 的
+   `scope_globs`、語意契約 ownership 與 open Issue/draft PR 狀態；目錄 lane 表（見下節）
+   只是 orchestrator 的路由提示，不是全域單寫者瓶頸。
 2. Orchestrator 在 Issue body 加入 handoff block（branch、base_commit、owner、scope_globs、
-   shared_paths、depends_on），指派 assignee 並加上 `claimed` label；同時建立 branch。
+   shared_paths、depends_on），指派 assignee 並加上 `claimed` label；branch 由 worker 建立，
+   不需要空認領 commit 佔位。
 3. Worker 收到指派後，從 handoff block 的 base/target branch 最新遠端 HEAD 建立獨立
    clone/worktree 與 branch；tool-provided worktree isolation 是標準機制。例如：
 
@@ -34,7 +35,7 @@
    git worktree add ..\Hibiki-DSP-<issue>-<slug> -b codex/<issue>-<slug> <base-or-target>
    ```
 
-4. Worker 確認 branch、base_commit 與 handoff scope，執行指定的 required gates，開 draft PR，
+4. Worker 確認 branch、base_commit 與 handoff scope，執行指定的核心 gates，開 draft PR，
    然後才修改產品檔案。Lifecycle label 使用 `claimed`（進行中）或 `in-review`（待審）；
    Issue 關閉即代表 done，不需要額外 label。沒有 orchestrator 指派的 handoff block 時，
    workers 只能做唯讀偵察，不得建立或認領 Issue。
@@ -84,9 +85,9 @@ handoff block 的 `scope_globs` 是該 Issue 的獨占預告 write-set；`shared
 或其他 lane 配合的檔案，不代表 worker 已取得寫入權。工作範圍擴張前，先更新 Issue body 並重新
 檢查 overlap。
 
-Directory lanes 是 orchestrator 分配工作的粗粒度邊界：`driver/`、`tools/`、`apps/`、
-`docs/`、`extensions/`、`vst-host/`、`src/` 各自最多一個 active writer。下列 functional lanes
-是常用細分，仍不得違反 directory-lane 上限：
+Directory lanes（`driver/`、`tools/`、`apps/`、`docs/`、`extensions/`、`vst-host/`、`src/`）
+是 orchestrator 分配工作的路由提示，不是全域單寫者瓶頸；真正的衝突判定以 `scope_globs`
+與語意契約 ownership 為準。下列 functional lanes 是常用的細分視角：
 
 | Lane | 主要範圍 |
 | --- | --- |
@@ -134,7 +135,7 @@ evidence；integrator 在合併階段單次更新全域快照。未合併 branch
 - 發布後的 branch 不 force-push、不 rewrite history；需要同步 target branch 時採可審查的 merge，
   或由唯一 owner 在未被依賴前 rebase。
 - push 前比較 `git diff --name-only <target>...HEAD` 與 `scope_globs`；超出 scope 先停下協調。
-- PR 轉 ready 前執行 handoff block 指定 gates、把 lifecycle label 從 `claimed` 改為 `in-review`、更新
+- PR 轉 ready 前執行 AGENTS.md 第三層的核心 gates 加上範圍相關的條件式 gates、把 lifecycle label 從 `claimed` 改為 `in-review`、更新
   handoff block 的驗證紀錄、限制與唯一 `Next safe action`。
 - 交接時原 owner commit + push + 停寫，新 owner readback 遠端 HEAD、更新 owner 後再修改。
 - 合併後 integrator 關閉 Issue 並記錄 merge SHA 與 evidence；lifecycle 由 issue state 表示，不再歸檔 handoff 檔案。

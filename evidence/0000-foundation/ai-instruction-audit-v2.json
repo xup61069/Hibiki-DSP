@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "issue": 610,
+  "scope_digest": "ai-instruction-audit-v2",
+  "source_commit": null,
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-pwsh-7.6; docs-only slice",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 610",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "documentation review",
+      "status": "pass",
+      "coverage": [
+        "AGENTS.md rewritten as a three-tier policy index: non-negotiable safety/legal/privacy limits, changeable product/process defaults, and core-plus-conditional validation gates; driver signing is classified as a release-stage requirement",
+        "docs/AI_HANDOFF.md reduced from a long merge changelog to a short live entry point pointing at BASELINE/PROJECT_MAP/evidence",
+        "docs/START_HERE.md claim flow now requires orchestrator assignment before work and opens the draft PR with the first reviewable commit instead of an empty claim commit",
+        "docs/ai/MULTI_AGENT.md downgrades directory lanes to advisory routing hints with scope_globs plus semantic contract ownership as authoritative conflict checks, and removes the empty-claim-commit prerequisite",
+        "CONTRIBUTING.md no longer instructs counter-refresh chores retired since #197 and defers to AGENTS.md tiered gates",
+        "README.md gate list split into core plus conditional tiers aligned with AGENTS.md",
+        "PR template validation section follows the tiered gates; AI issue form drops the empty-claim-commit wording",
+        "schemas/task-handoff-v1.schema.json deleted as unreferenced legacy; SPEC-0004 records the retirement",
+        "docs/ai/CHANGE_CONTRACT.yml gains a machine-readable validation_tiers section"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation-only change reflecting existing gate behavior; no product DSP, driver runtime, release account, signing credential or machine state is modified.",
+    "Gate scripts themselves are unchanged in this slice; tier mapping documents existing tool entry points."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6 local"
+  },
+  "started_at": "2026-08-23T11:30:00+08:00",
+  "finished_at": "2026-08-23T12:10:00+08:00"
+}
