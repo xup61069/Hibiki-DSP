@@ -62,6 +62,15 @@ function Assert-InstallerParseFile {
     throw "Installer PowerShell parse errors: $($errors -join '; ')"
   }
 }
+function Assert-NoUninstallBackupResidue {
+  param(
+    [Parameter(Mandatory)][string]$TempRoot
+  )
+  $residue = @(Get-ChildItem -LiteralPath $TempRoot -Directory -Filter '.hibiki-uninstall-backup-*' -Recurse -ErrorAction SilentlyContinue)
+  if ($residue.Count -gt 0) {
+    throw ('SelfTest expected no uninstall backup residue, found: ' + (($residue | ForEach-Object { $_.FullName }) -join '; '))
+  }
+}
 if ($SelfTest) {
   $validFixture = @'
 function Read-ReleaseManifest {}
@@ -191,6 +200,95 @@ $null = "sbom_digest"
     # After rollback, the original file has been restored from backup; the backup dir
     # may be empty but should still exist as a recovery artifact.
     if ($restoredContent.Trim() -ne 'prior-install-content') { throw 'SelfTest expected prior file restored.' }
+    $caseCount++
+
+    # Case 10: uninstall plan rejects traversal entries that escape DestinationPath.
+    $uninstallDest = Join-Path $tempRoot 'uninstall-dest'
+    New-Item -ItemType Directory -Path $uninstallDest -Force | Out-Null
+    $uninstallTraversalManifest = @{ unsigned_files = @(@{ path = '../uninstall-escape.txt'; sha256 = ('0' * 64) }) }
+    $caught = $false
+    try { Get-UninstallPlan $uninstallTraversalManifest $uninstallDest } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected uninstall-plan traversal failure.' }
+    $caseCount++
+
+    # Case 11: successful uninstall removes only planned files, preserves siblings,
+    # reports the removal count, is idempotent and leaves no backup residue.
+    $nestedPayloadDir = Join-Path $uninstallDest 'components'
+    New-Item -ItemType Directory -Path $nestedPayloadDir -Force | Out-Null
+    $firstUninstallFile = Join-Path $uninstallDest 'first.txt'
+    $secondUninstallFile = Join-Path $nestedPayloadDir 'second.txt'
+    Set-Content -LiteralPath $firstUninstallFile -Value 'remove-first' -NoNewline
+    Set-Content -LiteralPath $secondUninstallFile -Value 'remove-second' -NoNewline
+    Set-Content -LiteralPath (Join-Path $uninstallDest 'preserve.txt') -Value 'keep-sibling' -NoNewline
+    $successManifest = @{
+      unsigned_files = @(
+        @{ path = 'first.txt'; sha256 = ('0' * 64) },
+        @{ path = 'components/second.txt'; sha256 = ('0' * 64) }
+      )
+    }
+    $uninstallPlan = Get-UninstallPlan $successManifest $uninstallDest
+    if ($uninstallPlan.Count -ne 2) { throw 'SelfTest expected two uninstall-plan entries.' }
+    if (@($uninstallPlan | Where-Object { -not $_.Exists }).Count -ne 0) {
+      throw 'SelfTest expected all successful uninstall-plan files to exist.'
+    }
+    $uninstallOutput = Invoke-PayloadUninstall -Plan $uninstallPlan -Destination $uninstallDest 6>&1
+    if (($uninstallOutput -join "`n") -notmatch 'Removed 2 payload file\(s\)\.') {
+      throw 'SelfTest expected successful uninstall to report two removed payload files.'
+    }
+    if ((Test-Path -LiteralPath $firstUninstallFile) -or (Test-Path -LiteralPath $secondUninstallFile)) {
+      throw 'SelfTest expected both planned uninstall files to be removed.'
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $uninstallDest 'preserve.txt'))) {
+      throw 'SelfTest expected unplanned sibling file to be preserved.'
+    }
+    if ((Get-Content -LiteralPath (Join-Path $uninstallDest 'preserve.txt') -Raw).Trim() -ne 'keep-sibling') {
+      throw 'SelfTest expected preserved sibling content to remain unchanged.'
+    }
+    Assert-NoUninstallBackupResidue -TempRoot $tempRoot
+    $idempotentPlan = Get-UninstallPlan $successManifest $uninstallDest
+    $idempotentOutput = Invoke-PayloadUninstall -Plan $idempotentPlan -Destination $uninstallDest 6>&1
+    if (($idempotentOutput -join "`n") -notmatch 'Removed 0 payload file\(s\)\.') {
+      throw 'SelfTest expected repeated uninstall to report zero removals.'
+    }
+    Assert-NoUninstallBackupResidue -TempRoot $tempRoot
+    $caseCount++
+
+    # Case 12: failure on the second planned file restores the first removed file
+    # byte-identically, preserves the locked original and removes backup residue.
+    $rollbackDest = Join-Path $tempRoot 'uninstall-rollback'
+    New-Item -ItemType Directory -Path $rollbackDest -Force | Out-Null
+    $rollbackFirst = Join-Path $rollbackDest 'first.txt'
+    $rollbackSecond = Join-Path $rollbackDest 'second.txt'
+    Set-Content -LiteralPath $rollbackFirst -Value 'rollback-first' -NoNewline
+    Set-Content -LiteralPath $rollbackSecond -Value 'locked-original' -NoNewline
+    $rollbackManifest = @{
+      unsigned_files = @(
+        @{ path = 'first.txt'; sha256 = ('0' * 64) },
+        @{ path = 'second.txt'; sha256 = ('0' * 64) }
+      )
+    }
+    $rollbackPlan = Get-UninstallPlan $rollbackManifest $rollbackDest
+    $lockedStream = [System.IO.File]::Open($rollbackSecond, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::None)
+    try {
+      $caught = $false
+      try { Invoke-PayloadUninstall -Plan $rollbackPlan -Destination $rollbackDest } catch { $caught = $true }
+      if (-not $caught) { throw 'SelfTest expected locked-file uninstall failure.' }
+      if ((Get-Content -LiteralPath $rollbackFirst -Raw).Trim() -ne 'rollback-first') {
+        throw 'SelfTest expected first removed file to be restored after rollback.'
+      }
+      $expectedRollbackBytes = [System.Text.Encoding]::UTF8.GetBytes('rollback-first');
+      $expectedRollbackHash = (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($expectedRollbackBytes)) -Algorithm SHA256).Hash;
+      $restoredRollbackHash = (Get-FileHash -LiteralPath $rollbackFirst -Algorithm SHA256).Hash;
+      if ($restoredRollbackHash -ne $expectedRollbackHash) {
+        throw 'SelfTest expected restored first file to be byte-identical.'
+      }
+    } finally {
+      $lockedStream.Dispose()
+    }
+    if ((Get-Content -LiteralPath $rollbackSecond -Raw).Trim() -ne 'locked-original') {
+      throw 'SelfTest expected locked file content to remain unchanged.'
+    }
+    Assert-NoUninstallBackupResidue -TempRoot $tempRoot
     $caseCount++
   } finally {
     if (Test-Path -LiteralPath $tempRoot) {
