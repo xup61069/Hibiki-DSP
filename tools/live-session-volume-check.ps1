@@ -1,3 +1,4 @@
+#Requires -Version 7
 [CmdletBinding()]
 param(
     # This probe attenuates only a temporary silent session created by the
