@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "issue": 714,
+  "scope_digest": "offscreen-auto-release-v1",
+  "source_commit": "PENDING",
+  "base_commit": "e29faa1",
+  "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6",
+  "target": "extensions/offscreen.js + extensions/service-worker.js",
+  "cases_added": [
+    "offscreen notifies service worker after stream-ended teardown completes",
+    "service worker closes offscreen document idempotently on that notification",
+    "manual stop path unchanged; notification only fires on natural stream end"
+  ],
+  "commands": [
+    "node --check extensions/offscreen.js",
+    "node --check extensions/service-worker.js",
+    "pwsh -NoProfile -File tools/extension-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/extension-check.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 714"
+  ],
+  "results": [
+    {
+      "command": "node --check (both files)",
+      "status": "pass",
+      "coverage": ["JavaScript syntax validation"]
+    },
+    {
+      "command": "tools/extension-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": ["34 bounded policy cases including service-worker async response boundary"]
+    },
+    {
+      "command": "tools/extension-check.ps1",
+      "status": "pass",
+      "coverage": ["MV3 permissions, exact CSP, user-gesture and loopback source boundaries"]
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 714",
+      "status": "pass",
+      "coverage": ["Issue ownership, scope globs and Git ancestry"]
+    }
+  ],
+  "limitations": [
+    "Static source and syntax evidence only; no browser launch, MV3 runtime, real tab-close event, tabCapture, WebSocket audio flow, endpoint, driver, WaveRT, HLK, signing or release evidence."
+  ]
+}
