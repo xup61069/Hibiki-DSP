@@ -211,6 +211,12 @@ function Assert-PreviewLaunchTarget {
 }
 
 if ($SelfTest) {
+function Get-PreviewAutomationCount([object]$AutomationCollection) {
+  $countProperty = $AutomationCollection.PSObject.Properties['Count']
+  if ($null -ne $countProperty) { return [int]$countProperty.Value }
+  return @($AutomationCollection | ForEach-Object { $_ }).Count
+}
+
   $expected = [ordered]@{
     WinUI = @{ ProjectRelativePath = 'apps/winui-shell/Hibiki.WinUI.csproj'; OutputProperty = 'OutputPath'; SmokeExecutable = $null }
     WinUICompat = @{ ProjectRelativePath = 'apps/winui-shell/Hibiki.WinUI.csproj'; OutputProperty = 'OutputPath'; SmokeExecutable = 'Hibiki.WinUI.exe' }
@@ -493,20 +499,21 @@ if ($SmokeTest) {
     if ([string]::IsNullOrWhiteSpace($windowName)) { throw 'Formal WinUI preview window has no automation Name.' }
     $controls = $rootElement.FindAll([System.Windows.Automation.TreeScope]::Descendants,
                                      [System.Windows.Automation.Condition]::TrueCondition)
-    if ($controls.Count -lt 10) {
-      throw "Formal WinUI preview accessibility tree looks empty: controls=$($controls.Count)"
+    $controlCount = Get-PreviewAutomationCount $controls
+    if ($controlCount -lt 10) {
+      throw "Formal WinUI preview accessibility tree looks empty: controls=$controlCount"
     }
     $summary = [ordered]@{
       schema_version = 1
       window_name    = $windowName
       window_class   = $windowClass
-      control_count  = $controls.Count
+      control_count  = $controlCount
       captured_at    = (Get-Date).ToUniversalTime().ToString('o')
       limitations    = @('unsigned local preview', 'user-space only', 'not driver, HLK or signing evidence')
     }
     $summaryPath = Join-Path $previewRoot 'winui-launch-a11y-smoke.json'
     $summary | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $summaryPath -Encoding utf8NoBOM
-    Write-Output "Formal WinUI preview launch/accessibility smoke passed (window='$windowName' class=$windowClass controls=$($controls.Count); summary=$summaryPath)."
+    Write-Output "Formal WinUI preview launch/accessibility smoke passed (window='$windowName' class=$windowClass controls=$controlCount; summary=$summaryPath)."
   }
   finally {
     if (-not $process.HasExited) {

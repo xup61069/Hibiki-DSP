@@ -48,7 +48,7 @@ function Assert-InstallerParseInput {
   $tokens = $null
   $errors = $null
   [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$tokens, [ref]$errors) | Out-Null
-  if ($errors.Count -gt 0) {
+  if (@($errors).Count -gt 0) {
     throw "Installer PowerShell parse errors in ${SourceName}: $($errors -join '; ')"
   }
 }
@@ -60,7 +60,7 @@ function Assert-InstallerParseFile {
   $tokens = $null
   $errors = $null
   [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref]$tokens, [ref]$errors) | Out-Null
-  if ($errors.Count -gt 0) {
+  if (@($errors).Count -gt 0) {
     throw "Installer PowerShell parse errors: $($errors -join '; ')"
   }
 }
@@ -182,7 +182,7 @@ $null = "sbom_digest"
     $actualSha = (Get-FileHash -LiteralPath (Join-Path $pkgDir 'payload.txt') -Algorithm SHA256).Hash.ToLowerInvariant()
     $validManifest = @{ unsigned_files = @(@{ path = 'payload.txt'; sha256 = $actualSha }) }
     $plan = Get-StagingPlan $validManifest $pkgDir $destDir
-    if ($plan.Count -ne 1) { throw 'SelfTest expected one staging-plan entry.' }
+    if (@($plan).Count -ne 1) { throw 'SelfTest expected one staging-plan entry.' }
     Invoke-PayloadStaging -Plan $plan -Destination $destDir
     if (-not (Test-Path (Join-Path $destDir 'payload.txt'))) { throw 'SelfTest expected staged payload file.' }
     $backupDirs = @(Get-ChildItem -LiteralPath $destDir -Directory -Filter '.hibiki-backup-*' -ErrorAction SilentlyContinue)
@@ -253,7 +253,7 @@ $null = "sbom_digest"
       )
     }
     $uninstallPlan = Get-UninstallPlan $successManifest $uninstallDest
-    if ($uninstallPlan.Count -ne 2) { throw 'SelfTest expected two uninstall-plan entries.' }
+    if (@($uninstallPlan).Count -ne 2) { throw 'SelfTest expected two uninstall-plan entries.' }
     if (@($uninstallPlan | Where-Object { -not $_.Exists }).Count -ne 0) {
       throw 'SelfTest expected all successful uninstall-plan files to exist.'
     }

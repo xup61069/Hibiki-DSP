@@ -108,21 +108,21 @@ if ($SelfTest) {
         'g.cat', 'h.pdb', 'i.obj', 'j.lib', 'k.pfx', 'l.key', 'm.pem', 'n.cab', 'o.zip', 'p.7z',
         'q.bin', 'r.so', 's.dylib')
     $flagged = @(Get-BlockedTrackedPaths -Paths ($binarySamples + @('UPPER/X.EXE')))
-    if ($flagged.Count -ne ($binarySamples.Count + 1)) {
-        throw ("source-only-ci-check self-test case 'blocked-binary-extensions' flagged {0} paths but expected {1}.") -f $flagged.Count, ($binarySamples.Count + 1)
+    if (@($flagged).Count -ne @($binarySamples).Count + 1) {
+        throw ("source-only-ci-check self-test case 'blocked-binary-extensions' flagged {0} paths but expected {1}.") -f @($flagged).Count, @($binarySamples).Count + 1
     }
     $caseCount++
 
     # Case 15: multiple violations are reported together in input order.
     $joined = @(Get-BlockedTrackedPaths -Paths @('z.exe', 'keep.md', 'a.dll'))
-    if ($joined.Count -ne 2 -or $joined[0] -ne 'z.exe' -or $joined[1] -ne 'a.dll') {
+    if (@($joined).Count -ne 2 -or $joined[0] -ne 'z.exe' -or $joined[1] -ne 'a.dll') {
         throw "source-only-ci-check self-test case 'violation-join' returned an unexpected result: $($joined -join ', ')."
     }
     $caseCount++
 
     # Case 16: allowed text paths produce no rejections.
     $allowed = @(Get-BlockedTrackedPaths -Paths @('README.md', 'tools/tool.ps1', 'schemas/schema.json', 'docs/guide.yml'))
-    if ($allowed.Count -ne 0) { throw "source-only-ci-check self-test case 'allowed-text-paths' flagged: $($allowed -join ', ')." }
+    if (@($allowed).Count -ne 0) { throw "source-only-ci-check self-test case 'allowed-text-paths' flagged: $($allowed -join ', ')." }
     $caseCount++
 
     Write-Output "Source-only CI publication gate self-test passed ($caseCount cases)."
@@ -133,7 +133,7 @@ $workflowRoot = Join-Path $repo '.github/workflows'
 if (-not (Test-Path -LiteralPath $workflowRoot)) { throw 'Missing GitHub workflow directory.' }
 
 $workflows = @(Get-ChildItem -LiteralPath $workflowRoot -File -Include '*.yml', '*.yaml')
-if ($workflows.Count -eq 0) { throw 'No GitHub workflow is available for the source-only gate.' }
+if (@($workflows).Count -eq 0) { throw 'No GitHub workflow is available for the source-only gate.' }
 
 $hasSourcePolicy = $false
 foreach ($workflow in $workflows) {
@@ -145,6 +145,6 @@ Assert-WorkflowPolicyReferencePresent -Any $hasSourcePolicy
 
 $tracked = @(git -C $repo ls-files 2>$null)
 $blocked = @(Get-BlockedTrackedPaths -Paths $tracked)
-if ($blocked.Count -gt 0) { throw "Source-only CI sees tracked binary: $($blocked -join ', ')" }
+if (@($blocked).Count -gt 0) { throw "Source-only CI sees tracked binary: $($blocked -join ', ')" }
 
-Write-Output "Source-only CI policy passed ($($workflows.Count) workflows, $($tracked.Count) tracked paths)."
+Write-Output "Source-only CI policy passed ($(@($workflows).Count) workflows, $(@($tracked).Count) tracked paths)."

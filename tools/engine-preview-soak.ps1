@@ -222,8 +222,8 @@ function Get-EnginePreviewSoakAggregate {
   )
 
   $materialized = @($Results)
-  $passed = @($materialized | Where-Object { $_.result -eq 'pass' }).Count
-  $failed = @($materialized | Where-Object { $_.result -eq 'fail' }).Count
+  $passed = @(@($materialized) | Where-Object { $_.result -eq 'pass' }).Count
+  $failed = @(@($materialized) | Where-Object { $_.result -eq 'fail' }).Count
   $durations = @($materialized | ForEach-Object { [double]$_.duration_ms })
   $minimum = $null
   $maximum = $null
@@ -277,8 +277,8 @@ function Test-EnginePreviewSoakReportAggregate {
   }
   Assert-EnginePreviewSoakArguments -Iterations $RequestedIterations -IntervalMs 0
   $materialized = @($Results)
-  $passed = @($materialized | Where-Object { $_.result -eq 'pass' }).Count
-  $failed = @($materialized | Where-Object { $_.result -eq 'fail' }).Count
+  $passed = @(@($materialized) | Where-Object { $_.result -eq 'pass' }).Count
+  $failed = @(@($materialized) | Where-Object { $_.result -eq 'fail' }).Count
   if ($materialized.Count -gt $RequestedIterations) {
     throw "Engine Preview soak report completed more iterations than requested: $($materialized.Count) > $RequestedIterations"
   }

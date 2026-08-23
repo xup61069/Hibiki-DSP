@@ -57,7 +57,7 @@ function Assert-VerifyBuildPlan {
   }
 
   $configure = @($Plan.ConfigureArguments)
-  if ($configure.Count -ne 5 -or
+  if (@($configure).Count -ne 5 -or
       $configure[0] -ne '-S' -or
       $configure[1] -ne $Plan.RepositoryRoot -or
       $configure[2] -ne '-B' -or
@@ -67,7 +67,7 @@ function Assert-VerifyBuildPlan {
   }
 
   $build = @($Plan.BuildArguments)
-  if ($build.Count -ne 5 -or
+  if (@($build).Count -ne 5 -or
       $build[0] -ne '--build' -or
       $build[1] -ne $Plan.BuildRoot -or
       $build[2] -ne '--config' -or
@@ -77,7 +77,7 @@ function Assert-VerifyBuildPlan {
   }
 
   $test = @($Plan.TestArguments)
-  if ($test.Count -ne 5 -or
+  if (@($test).Count -ne 5 -or
       $test[0] -ne '--test-dir' -or
       $test[1] -ne $Plan.BuildRoot -or
       $test[2] -ne '-C' -or
