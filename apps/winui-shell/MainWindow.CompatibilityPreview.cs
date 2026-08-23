@@ -106,6 +106,8 @@ public sealed partial class MainWindow
         var vst3TimelineSelector = new ComboBox { Header = "時間軸", MinWidth = 200 };
         AutomationProperties.SetName(vst3TimelineSelector, "選取 VST3 時間軸");
         vst3TimelineSelector.SetBinding(ItemsControl.ItemsSourceProperty, BindingFor("Vst3TimelineEditor.TimelineIds"));
+        vst3TimelineSelector.SetBinding(ComboBox.SelectedItemProperty, TwoWayBindingFor("Vst3TimelineEditor.SelectedTimelineId"));
+        vst3TimelineSelector.SelectionChanged += OnVst3TimelineSelect;
         content.Children.Add(vst3TimelineSelector);
         var beginEditButton = new Button { Content = "開始草稿" };
         AutomationProperties.SetName(beginEditButton, "開始時間軸草稿");
