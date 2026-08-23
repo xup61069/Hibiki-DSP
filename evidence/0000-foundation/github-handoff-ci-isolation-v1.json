@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "issue": 573,
+  "scope_digest": "github-handoff-ci-isolation-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-26100-pwsh-7.6; target-machine-pending",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 565",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "contract review and implementation",
+      "status": "pass",
+      "coverage": [
+        "required PR verification selects only the Issue encoded in the PR branch and supports merge_group events",
+        "repository-wide handoff checks moved out of docs-check into an Issue-event and scheduled audit workflow",
+        "AI task form now emits an unassigned, unlabeled, machine-readable TBD pre-claim",
+        "global handoff audit rejects claimed or assigned Issues without a handoff and requires exactly one assignee matching owner"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "handoff-check -SelfTest / handoff-check -Issue 573 / docs-check -SelfTest / docs-check / source-policy / source-only-ci-check / verify / required preview and source gates / 27-mode self-test sweep / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "targeted handoff validated Issue #573 ownership, scope, branch and Git ancestry",
+        "aggregate verification built the C++20 source graph and passed all 3 CTest targets",
+        "DesktopCompat and Engine Preview builds passed; Engine Preview and control-model integration smokes passed",
+        "doctor, environment probe, extension, installer, WinUI source, distribution, driver source and driver signability checks passed",
+        "all 27 discovered offline gate self-test modes passed"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1",
+      "status": "expected_fail",
+      "coverage": [
+        "global audit rejected open claimed Issue #557 because it has an assignee and lifecycle label but no hibiki:handoff-v1 block"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The repository-wide audit is intentionally not a required PR check; it reports cross-Issue process debt without coupling unrelated pull requests.",
+    "PR #566 merged only the predecessor Issue #565 claim commit while implementation was still local; Issue #573 carries the implementation forward without rewriting the merged branch.",
+    "Live GitHub ruleset and repository-setting changes are applied only after this workflow change passes PR and post-merge main verification."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6 local"
+  },
+  "started_at": "2026-08-23T09:00:00+08:00",
+  "finished_at": "2026-08-23T09:16:00+08:00"
+}

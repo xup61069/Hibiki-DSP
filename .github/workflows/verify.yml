@@ -2,7 +2,9 @@ name: verify
 
 on:
   push:
+    branches: [main]
   pull_request:
+  merge_group:
   workflow_dispatch:
 
 concurrency:
@@ -11,6 +13,7 @@ concurrency:
 
 permissions:
   contents: read
+  issues: read
 
 jobs:
   verify:
@@ -21,14 +24,33 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Resolve branch-owned Issue
+        if: github.event_name == 'pull_request'
+        id: handoff
+        shell: pwsh
+        run: |
+          $branch = $env:GITHUB_HEAD_REF
+          if ([string]::IsNullOrWhiteSpace($branch)) {
+            throw 'pull_request verification requires GITHUB_HEAD_REF.'
+          }
+          if ($branch -notmatch '^(?:codex|opencode)/(?<issue>[1-9][0-9]*)-[A-Za-z0-9][A-Za-z0-9._-]*$') {
+            throw "Branch '$branch' must follow <agent>/<issue>-<slug> so CI can select its durable handoff."
+          }
+          "issue=$($Matches['issue'])" >> $env:GITHUB_OUTPUT
+
+      - name: Branch-owned handoff gate
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./tools/handoff-check.ps1 -Issue ${{ steps.handoff.outputs.issue }}
+
       - name: Configure and test unsigned source
         shell: pwsh
         run: ./tools/verify.ps1
 
       - name: Documentation gate
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: ./tools/docs-check.ps1
 
       - name: Source-only and secret gate

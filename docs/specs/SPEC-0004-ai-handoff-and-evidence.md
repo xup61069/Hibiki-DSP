@@ -3,7 +3,7 @@ id: SPEC-0004
 status: accepted
 owner: hibiki-maintainers
 authority: repository-process
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-23
 review_after_days: 30
 related_adrs: [ADR-0001]
 source_globs: ["AGENTS.md", "docs/**", "evidence/**", "tools/**"]
@@ -27,6 +27,11 @@ source_globs: ["AGENTS.md", "docs/**", "evidence/**", "tools/**"]
 每個可獨立驗收的工作切片必須對應一個 Issue、一個獨立 clone/worktree、一個唯一 branch、Issue body
 handoff block 與一個 draft PR。同一 Issue、working tree、branch 與 handoff block 同時只能有一個
 writer；需要並行時拆 child Issue。Issue/PR 是 live claim，issue body 是 durable state。
+
+Issue 建立時可先使用未指派的 TBD pre-claim：handoff block 的 `issue` 與 `branch` 含 `TBD`，且不得有
+assignee、lifecycle label 或 linked PR。正式 claim 必須原子式補齊實際 Issue、branch、base、owner 與
+write scope，指定唯一且與 `owner` 相同的 assignee，再加入 `claimed`。AI Issue form 不得在仍含 placeholder
+的 Issue 上自動加 `claimed`。
 
 handoff block 必須宣告 `branch`、`target_branch`、`base_commit`、`owner`、`scope_globs`、
 `shared_paths`、`depends_on` 與 `resume_commands`。Lifecycle 由 labels 表達：`claimed` 表示進行中，
@@ -57,6 +62,12 @@ repository-relative glob intersection 檢查。完全相同、父子路徑與 wi
 都必須 fail closed，錯誤訊息列出兩個 Issue 與兩個 scope；若 matcher 在固定狀態上限內無法
 證明不相交，也必須視為衝突。`shared_paths` 是 integrator 協調宣告，不會把重疊的獨占
 `scope_globs` 自動變成合法；不同 scope 的 claim 才能並行寫入。
+
+驗證責任必須分離：PR 的 required `verify` workflow 從 `<agent>/<issue>-<slug>` branch 取出 Issue 編號，
+只執行 `handoff-check.ps1 -Issue <id>`；`docs-check.ps1` 不得因 GitHub 上其他 Issue 的暫態狀態而失敗。
+所有 open Issue 的 scope overlap、claim 完整性與 owner/assignee 一致性由獨立 `handoff-audit` workflow
+在 Issue 事件與排程執行。未指派且無 lifecycle label 的 backlog 可沒有 handoff；已有 assignee 或
+lifecycle label 的 open Issue 缺少 handoff 必須讓全域 audit fail closed，但不阻塞不相關 PR。
 
 ## 文件閘門
 
