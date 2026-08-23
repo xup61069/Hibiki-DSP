@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "issue": 712,
+  "scope_digest": "extension-readme-lifecycle-v1",
+  "source_commit": null,
+  "base_commit": "53805fe00d75ff6e5fc99f9e2411736e9c2cd06",
+  "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6",
+  "target": "extensions/README.md",
+  "cases_added": [
+    "explicit Start/Stop lifecycle documented without silent capture claims",
+    "real state refresh and failure reporting documented",
+    "optional loopback bridge indicator and unchanged local playback boundary documented"
+  ],
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 712",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/extension-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "always-run gates plus extension source check at origin/main 53805fe",
+      "status": "pass",
+      "coverage": ["handoff ownership/scope", "required docs paths", "source-only policy", "MV3 permissions, CSP, user gesture, loopback boundaries", "whitespace"]
+    }
+  ],
+  "limitations": [
+    "Documentation-only change; no browser runtime, audio, driver or release behavior is claimed."
+  ]
+}
