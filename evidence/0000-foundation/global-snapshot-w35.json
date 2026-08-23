@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "issue": 818,
+  "scope_digest": "global-snapshot-w35",
+  "base_commit": "db8efc4b68c584b9000c772dd151a180b546e52a",
+  "source_commit": null,
+  "environment_fingerprint": "windows-local-pwsh-7.6.4; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 818",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #804 / PR #808 merged at c6f2ad5d: DesktopCompat and WinUI Compatibility Preview expose the bounded per-App route-rule workflow through existing ViewModel validation, persistence rollback, status and IPC seams.",
+        "Issue #810 / PR #812 merged at b6549432: SPEC-0003 records the shared upper-only 2 dB reopen hysteresis for BasicNoiseSuppressorV1 and VirtualMicDspV1 without changing source behavior.",
+        "Issue #809 / PR #811 merged at 1344f6d7: wave34 snapshot evidence now records actual gate timestamps, the full passing command list and an explicit post-merge correction note.",
+        "Issue #768 / PR #814 merged at db8efc4b: SceneCatalogCommandV1 adds bounded Upsert/Remove/Clear IPC; the engine owns a mutable validated scene catalog and the C# model pushes local add/remove changes when connected."
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; this update does not change product source behavior.",
+    "Compatibility route-rule evidence remains preview source/build/launch evidence; no runtime screen-reader audit or physical audio delivery is claimed.",
+    "Custom scene catalog evidence is user-space source, contract-test, control-model, engine-preview and smoke-process evidence; no physical endpoint delivery, driver install/load, HLK or Microsoft signing is claimed.",
+    "The hysteresis spec update records already merged behavior and does not add a new conformance oracle or physical measurement.",
+    "Gate timestamps are minute-level local-clock approximations recorded after the run; individual command durations are not captured."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-24T00:57:00+08:00",
+  "finished_at": "2026-08-24T01:05:00+08:00"
+}
