@@ -69,16 +69,37 @@ function Get-ExtensionInteractiveControlOpenings([string]$popupHtml) {
 
 function Assert-ExtensionPopupControlNames([string]$popupHtml, [string]$sourceName) {
   $controls = @(Get-ExtensionInteractiveControlOpenings $popupHtml)
+  $labelTargets = @{}
+  foreach ($labelMatch in [regex]::Matches(
+      $popupHtml,
+      '(?s)<(?<element>[A-Za-z][A-Za-z0-9]*)\b(?<attributes>[^>]*)>(?<text>.*?)</\k<element>>',
+      [System.Text.RegularExpressions.RegexOptions]::Singleline)) {
+    $targetIdMatch = [regex]::Match(
+      $labelMatch.Groups['attributes'].Value,
+      '(?<![A-Za-z-])id\s*=\s*["''](?<value>[^"'']+)["'']')
+    if (!$targetIdMatch.Success) { continue }
+    $targetId = $targetIdMatch.Groups['value'].Value
+    $targetText = $labelMatch.Groups['text'].Value -replace '<[^>]+>', ' '
+    if (!$labelTargets.ContainsKey($targetId)) {
+      $labelTargets[$targetId] = [string]::IsNullOrWhiteSpace($targetText) ? '' : $targetText
+    }
+  }
   $missing = @($controls | Where-Object {
       $aria = [regex]::Match($_.Attributes, 'aria-label\s*=\s*["''](?<value>[^"'']*)["'']')
-      $labelledBy = [regex]::Match($_.Attributes, 'aria-labelledby\s*=\s*["''](?<value>[^"'']*)["'']')
-      (!$aria.Success -and !$labelledBy.Success) -or
-        (($aria.Success -and [string]::IsNullOrWhiteSpace($aria.Groups['value'].Value)) -or
-        ($labelledBy.Success -and [string]::IsNullOrWhiteSpace($labelledBy.Groups['value'].Value)))
+      $labelledBy = [regex]::Match($_.Attributes, 'aria-labelledby\s*=\s*["''](?<value>[^"'']+)["'']')
+      if ($labelledBy.Success) {
+        foreach ($targetId in $labelledBy.Groups['value'].Value -split '\s+' | Where-Object { $_ }) {
+          if (!$labelTargets.ContainsKey($targetId) -or [string]::IsNullOrWhiteSpace($labelTargets[$targetId])) {
+            return $true
+          }
+        }
+        return $false
+      }
+      return !$aria.Success -or [string]::IsNullOrWhiteSpace($aria.Groups['value'].Value)
     })
   if ($missing.Count -gt 0) {
     $details = @($missing | ForEach-Object { "$($_.Type) at $($sourceName):$($_.Line)" }) -join ', '
-    throw "Extension popup interactive controls must declare a non-empty aria-label or aria-labelledby: $details"
+    throw "Extension popup interactive controls must expose a non-empty accessible name; aria-label must be non-empty and every aria-labelledby target must exist with text: $details"
   }
   return $controls.Count
 }
@@ -502,11 +523,12 @@ connect-src   ws://127.0.0.1:17842
 
   $popupValidLines = @(
     '<button type="button" aria-label="Capture this tab">Capture</button>',
-    "<input type='text' aria-label='Tab title' />"
+    "<input type='text' aria-label='Tab title' />",
+    '<button id="capture" aria-labelledby="capture">Capture</button><p id="capture">Capture</p>'
   )
   $popupValid = $popupValidLines -join [Environment]::NewLine
-  if ((Assert-ExtensionPopupControlNames $popupValid 'selftest-popup-valid.html') -ne 2) {
-    throw 'Extension accessibility self-test expected two named popup controls.'
+  if ((Assert-ExtensionPopupControlNames $popupValid 'selftest-popup-valid.html') -ne 3) {
+    throw 'Extension accessibility self-test expected three named popup controls.'
   }
 
   $popupMissing = '<button type="button">Capture</button>'
@@ -525,7 +547,23 @@ connect-src   ws://127.0.0.1:17842
   }
   if (-not $popupEmptyCaught) { throw 'Extension accessibility self-test expected an empty-name failure.' }
 
-  Write-Output 'Browser extension policy self-test passed (45 cases).'
+  $popupBrokenLabelTarget = '<button aria-label="Fallback" aria-labelledby="capture-label">Capture</button>'
+  $popupBrokenLabelTargetCaught = $false
+  try { [void](Assert-ExtensionPopupControlNames $popupBrokenLabelTarget 'selftest-popup-broken-labelledby.html') } catch {
+    $popupBrokenLabelTargetCaught = $true
+    if ($_.Exception.Message -notmatch 'button at selftest-popup-broken-labelledby\.html:1') { throw }
+  }
+  if (-not $popupBrokenLabelTargetCaught) { throw 'Extension accessibility self-test expected a missing labelledby target failure.' }
+
+  $popupEmptyLabelTarget = '<button aria-labelledby="capture-label">Capture</button><span id="capture-label"></span>'
+  $popupEmptyLabelTargetCaught = $false
+  try { [void](Assert-ExtensionPopupControlNames $popupEmptyLabelTarget 'selftest-popup-empty-labelledby.html') } catch {
+    $popupEmptyLabelTargetCaught = $true
+    if ($_.Exception.Message -notmatch 'button at selftest-popup-empty-labelledby\.html:1') { throw }
+  }
+  if (-not $popupEmptyLabelTargetCaught) { throw 'Extension accessibility self-test expected an empty labelledby target failure.' }
+
+  Write-Output 'Browser extension policy self-test passed (47 cases).'
   exit 0
 }
 
