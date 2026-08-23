@@ -15,19 +15,23 @@ namespace hibiki {
 // fixed boundary without changing the graph contract.
 //
 // Attenuation is immediate whenever a block needs it. Recovery after that
-// attenuation is deliberately capped at +6 dB per processed block so a
-// transient cannot make the guard itself jump back audibly.
+// attenuation is capped at +6.02 dB per millisecond of audio processed, so a
+// transient cannot make the guard itself jump back audibly, and the effective
+// release time is the same regardless of how large each render callback is.
 class TruePeakLimiterV1 final {
 public:
     [[nodiscard]] float limit_in_place(float* interleaved,
                                        std::size_t frames,
                                        std::uint32_t channels,
-                                       double ceiling_dbtp) noexcept;
+                                       double ceiling_dbtp,
+                                       std::uint32_t sample_rate) noexcept;
     void reset() noexcept;
+    [[nodiscard]] float applied_gain_for_test() const noexcept
+    {
+        return applied_gain_;
+    }
 
 private:
-    static constexpr float kMaxRecoveryGainPerBlock{2.0F};
-
     std::array<float, 8> previous_{};
     bool has_previous_{false};
     float applied_gain_{1.0F};

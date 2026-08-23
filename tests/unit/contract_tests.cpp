@@ -431,24 +431,95 @@ int main() {
 
     TruePeakLimiterV1 limiter;
     float limiter_samples[] = {1.2F, -1.1F, 0.8F, -0.8F};
-    const auto limiter_gain = limiter.limit_in_place(limiter_samples, 2U, 2U, -1.0);
+    const auto limiter_gain = limiter.limit_in_place(limiter_samples, 2U, 2U, -1.0, 48000U);
     CHECK(limiter_gain < 1.0F && std::abs(limiter_samples[0]) <= 0.891251F + 1e-5F &&
           std::abs(limiter_samples[1]) <= 0.891251F + 1e-5F);
     limiter.reset();
     float finite_guard[] = {std::numeric_limits<float>::quiet_NaN(), 0.25F};
-    CHECK(limiter.limit_in_place(finite_guard, 1U, 2U, -1.0) == 1.0F &&
+    CHECK(limiter.limit_in_place(finite_guard, 1U, 2U, -1.0, 48000U) == 1.0F &&
           finite_guard[0] == 0.0F);
     limiter.reset();
     float limiter_loud[] = {2.0F, -2.0F};
-    const auto loud_gain = limiter.limit_in_place(limiter_loud, 1U, 2U, -1.0);
+    const auto loud_gain = limiter.limit_in_place(limiter_loud, 1U, 2U, -1.0, 48000U);
     CHECK(loud_gain < 1.0F);
     float limiter_quiet[] = {0.001F, -0.001F};
     const auto recovery_gain =
-        limiter.limit_in_place(limiter_quiet, 1U, 2U, -1.0);
+        limiter.limit_in_place(limiter_quiet, 1U, 2U, -1.0, 48000U);
     CHECK(recovery_gain > loud_gain && recovery_gain < 1.0F &&
           recovery_gain <= loud_gain * 2.0F + 1.0e-6F);
-    const auto settled_gain = limiter.limit_in_place(limiter_quiet, 1U, 2U, -1.0);
-    CHECK(settled_gain == 1.0F);
+    const auto settled_gain = limiter.limit_in_place(limiter_quiet, 1U, 2U, -1.0, 48000U);
+    CHECK(settled_gain > recovery_gain && settled_gain < 1.0F);
+
+    // Regression: recovery rate must be independent of render block size.
+    // Two limiters engage on a loud block, then recover over the same total
+    // frame span using different block sizes; gains must match throughout.
+    TruePeakLimiterV1 limiter_small_blocks;
+    TruePeakLimiterV1 limiter_large_blocks;
+    float engage_small[] = {2.0F, -2.0F};
+    float engage_large[] = {2.0F, -2.0F};
+    const auto engage_gain_small =
+        limiter_small_blocks.limit_in_place(engage_small, 1U, 2U, -1.0, 48000U);
+    const auto engage_gain_large =
+        limiter_large_blocks.limit_in_place(engage_large, 1U, 2U, -1.0, 48000U);
+    CHECK(std::abs(engage_gain_small - engage_gain_large) < 1e-6F);
+
+    // Recover over the same 960-frame span using 20 x 48-frame blocks versus
+    // one 960-frame block; the applied gain must match because release is
+    // per-ms, not per-block.  Both limiters start from a fresh loud block, so
+    // their initial attenuation is identical.
+    static float quiet_small[96];   // 48 frames x 2 channels per call
+    static float quiet_large[1920]; // 960 frames x 2 channels in one call
+    for (auto& f : quiet_small) f = 0.001F;
+    for (auto& f : quiet_large) f = 0.001F;
+    for (std::size_t b = 0; b < 20; ++b) {
+        (void)limiter_small_blocks.limit_in_place(quiet_small, 48U, 2U,
+                                                  -1.0, 48000U);
+    }
+    const auto small_final =
+        limiter_small_blocks.applied_gain_for_test();
+
+    (void)limiter_large_blocks.limit_in_place(quiet_large, 960U, 2U,
+                                              -1.0, 48000U);
+    const auto large_final =
+        limiter_large_blocks.applied_gain_for_test();
+
+    // Compare in dB domain; pow accumulation differs slightly between paths.
+    const auto small_db = 20.0 * std::log10(static_cast<double>(small_final));
+    const auto large_db = 20.0 * std::log10(static_cast<double>(large_final));
+    CHECK(std::abs(small_db - large_db) < 0.01);
+
+    // Regression: recovery must be equivalent across sample rates over the
+    // same elapsed time.  480 frames at 48 kHz and 960 frames at 96 kHz are
+    // both 10 ms; after one quiet block each limiter should have recovered
+    // by approximately the same number of dB.
+    TruePeakLimiterV1 limiter_48k;
+    TruePeakLimiterV1 limiter_96k;
+    float engage_48k[] = {2.0F, -2.0F};
+    float engage_96k[] = {2.0F, -2.0F};
+    const auto engage_48k_gain =
+        limiter_48k.limit_in_place(engage_48k, 1U, 2U, -1.0, 48000U);
+    const auto engage_96k_gain =
+        limiter_96k.limit_in_place(engage_96k, 1U, 2U, -1.0, 96000U);
+    CHECK(std::abs(engage_48k_gain - engage_96k_gain) < 1e-6F);
+
+    static float quiet_48k[960];   // 480 frames x 2 channels
+    static float quiet_96k[1920];  // 960 frames x 2 channels
+    for (auto& f : quiet_48k) f = 0.001F;
+    for (auto& f : quiet_96k) f = 0.001F;
+    (void)limiter_48k.limit_in_place(quiet_48k, 480U, 2U, -1.0, 48000U);
+    (void)limiter_96k.limit_in_place(quiet_96k, 960U, 2U, -1.0, 96000U);
+    const auto gain_48k = limiter_48k.applied_gain_for_test();
+    const auto gain_96k = limiter_96k.applied_gain_for_test();
+
+    // Both should have recovered by ~6 dB/ms * 10 ms = ~60 dB from their
+    // engaged level.  Compare the amount recovered in dB domain.
+    const auto recovered_48k_db =
+        20.0 * std::log10(static_cast<double>(gain_48k)) -
+        20.0 * std::log10(static_cast<double>(engage_48k_gain));
+    const auto recovered_96k_db =
+        20.0 * std::log10(static_cast<double>(gain_96k)) -
+        20.0 * std::log10(static_cast<double>(engage_96k_gain));
+    CHECK(std::abs(recovered_48k_db - recovered_96k_db) < 0.01);
 
     std::vector<IsoContourPoint> current{{100.0, 60.0}, {1000.0, 40.0}};
     std::vector<IsoContourPoint> reference{{100.0, 50.0}, {1000.0, 40.0}};

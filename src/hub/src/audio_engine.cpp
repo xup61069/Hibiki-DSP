@@ -171,7 +171,8 @@ bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
     if (!apply_group_master("main", output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
         (void)rt_true_peak_limiter_.limit_in_place(
-            output_interleaved, frames, active_graph_.output_channels, -1.0);
+            output_interleaved, frames, active_graph_.output_channels, -1.0,
+            sample_rate_.load(std::memory_order_relaxed));
     }
     return true;
 }
@@ -189,7 +190,8 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
     if (!apply_group_master(output_group, output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
         (void)rt_true_peak_limiter_.limit_in_place(
-            output_interleaved, frames, active_graph_.output_channels, -1.0);
+            output_interleaved, frames, active_graph_.output_channels, -1.0,
+            sample_rate_.load(std::memory_order_relaxed));
     }
     return true;
 }
