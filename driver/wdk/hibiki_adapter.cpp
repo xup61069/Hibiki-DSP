@@ -312,12 +312,15 @@ extern "C" NTSTATUS DriverEntry(
 }
 
 
+// ExAllocatePool2/3 require an NTDDI_VERSION bump above the current Win10 RTM
+// target; until that coordinated change lands, keep the tagged allocator and
+// silence its deprecation annotation at this call site.
+#pragma warning(push)
+#pragma warning(disable : 4996)
 void* __cdecl operator new(size_t size, POOL_TYPE pool_type) {
-    if (pool_type == NonPagedPoolNx) {
-        return ExAllocatePoolWithTag(NonPagedPoolNx, size, 'ibiH');
-    }
     return ExAllocatePoolWithTag(pool_type, size, 'ibiH');
 }
+#pragma warning(pop)
 
 void* __cdecl operator new[](size_t size, POOL_TYPE pool_type) {
     return operator new(size, pool_type);
