@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "issue": 728,
+  "scope_digest": "global-snapshot-w29",
+  "source_commit": null,
+  "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100-pwsh-7.6; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 728",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #703 / PR #709 merged: the Compatibility Preview record now states the WinUICompat build runs without Core MRT resource tooling; theme resources resolve through the existing fail-soft path and launch stays unstyled-but-alive instead of claiming a Core MRT crash fix.",
+        "Issue #702 / PR #704 merged: popup Start/Stop handlers catch messaging failures, surface the actual error text and re-query live capture state before re-enabling controls, so an invalidated message channel no longer leaves buttons stuck on a busy label.",
+        "Issue #706 / PR #707 merged: offscreen releases the capture graph when the source stream ends and reports the natural stop to the service worker.",
+        "Issue #710 / PR #711 merged: SPEC-0009 documents the failure-response and stream-ended boundaries enforced by the extension gate.",
+        "Issue #712 / PR #718 merged: README documents the tab-capture lifecycle and bridge-state reporting for users.",
+        "Issue #715 / PR #719 merged: extension gate requires popup start/stop handlers to test response.ok and surface response errors; self-test fails closed when that honest-response boundary is dropped.",
+        "Issue #713 / PR #717 merged: compat preview smoke now runs from a clean output directory so stale binaries cannot fake a pass.",
+        "Issue #714 / PR #716 merged: offscreen closes its document automatically after natural stream end, freeing audio resources without user interaction.",
+        "Issue #720 / PR #721 merged: audit wording corrected - VS2026 Appx packaging tasks exist on this host but dotnet CLI builds do not load them."
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; this update does not change product source behavior.",
+    "Extension items remain extension source and policy-gate evidence; no vendor browser capture-control claim beyond Hibiki own response handling.",
+    "Compat preview items remain local compatibility-preview source/build/launch evidence, not formal XAML, accessibility, launch-stability or audio evidence.",
+    "No driver install/load/HLK/Microsoft signing claim."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-23T20:05:00+08:00",
+  "finished_at": "pending-gates"
+}
+
