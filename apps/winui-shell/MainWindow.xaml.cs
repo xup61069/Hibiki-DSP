@@ -46,6 +46,20 @@ public sealed partial class MainWindow : Window
         await ViewModel.OneTapEnhanceAsync();
     }
 
+    private async void OnPrepareIrClick(object sender, RoutedEventArgs e)
+    {
+        var picker = new Windows.Storage.Pickers.FileOpenPicker();
+
+        var handle = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, handle);
+
+        picker.FileTypeFilter.Add(".wav");
+        var file = await picker.PickSingleFileAsync();
+
+        if (file is not null)
+            await ViewModel.PrepareIrAsync(file.Path);
+    }
+
     private async void OnSwitchDeviceClick(object sender, RoutedEventArgs e)
     {
         if (ViewModel.SelectedPhysicalDeviceId is { Length: > 0 } endpointId)
