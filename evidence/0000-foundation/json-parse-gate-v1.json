@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "issue": 923,
+  "scope_digest": "json-parse-gate-v1",
+  "source_commit": "9947a7a4316652dfc65ce8823aa8b92ad211b5b3",
+  "environment_fingerprint": "windows-local-pwsh-docs-check-audit",
+  "commands": [
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 923",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "empty input returns no errors",
+        "valid JSON passes",
+        "malformed JSON is reported with path context"
+      ]
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 923",
+      "status": "pass",
+      "coverage": [
+        "issue ownership, scope and git state"
+      ]
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1",
+      "status": "pending",
+      "coverage": [
+        "all tracked JSON files parse successfully"
+      ]
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-policy.ps1",
+      "status": "pending",
+      "coverage": [
+        "no blocked binary or secret"
+      ]
+    },
+    {
+      "command": "git diff --check",
+      "status": "pending",
+      "coverage": [
+        "no whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "This is a documentation gate hardening slice.",
+    "No product behavior, DSP, driver, or physical audio change.",
+    "The docs-check full run result will be updated after all gates pass."
+  ]
+}
