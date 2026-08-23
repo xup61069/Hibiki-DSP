@@ -77,15 +77,15 @@ public sealed partial class MainWindow : Window
             await ViewModel.SelectSceneAsync(sceneId);
     }
 
-    private void OnAddCustomSceneClick(object sender, RoutedEventArgs e)
+    private async void OnAddCustomSceneClick(object sender, RoutedEventArgs e)
     {
-        ViewModel.AddCustomScene();
+        await ViewModel.AddCustomSceneAsync();
     }
 
-    private void OnRemoveCustomSceneClick(object sender, RoutedEventArgs e)
+    private async void OnRemoveCustomSceneClick(object sender, RoutedEventArgs e)
     {
         if (sender is Button { Tag: string sceneId })
-            ViewModel.RemoveCustomScene(sceneId);
+            await ViewModel.RemoveCustomSceneAsync(sceneId);
     }
 
     private async void OnVolumeChanged(object sender, RangeBaseValueChangedEventArgs e)

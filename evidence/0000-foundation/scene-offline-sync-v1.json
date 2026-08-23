@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "issue": 823,
+  "scope_digest": "scene-offline-sync-v1",
+  "source_commit": "pending",
+  "environment_fingerprint": "windows-local-pwsh-7.6.4-dotnet8",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 823",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
+    "pwsh -NoProfile -File tools/winui-shell-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "offline scene add enqueues bounded op and reports deferred honestly",
+        "local in-process pipe engine Ack: connect flush drains queue with real round-trip",
+        "connected add/remove round-trip with per-command Ack before sync claim",
+        "engine NACK keeps queue and degrades state instead of silent drop",
+        "unknown/built-in ID removal still fails closed"
+      ]
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
+      "status": "pass",
+      "coverage": ["async custom-scene handlers build and launch smoke passes"]
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+      "status": "pass",
+      "coverage": ["async custom-scene handlers build and launch smoke passes"]
+    },
+    {
+      "command": "tools/winui-shell-check.ps1",
+      "status": "pass",
+      "coverage": ["42 WinUICompat controls unchanged", "26 DesktopCompat controls unchanged"]
+    }
+  ],
+  "limitations": [
+    "Local check-pipe evidence only; no Engine Preview process or physical audio claim.",
+    "Queue capacity pressure path (64-op eviction) is enforced by bounded dequeues but not yet covered by a dedicated self-test."
+  ],
+  "logs": [],
+  "started_at": "2026-08-24T01:30:00+08:00",
+  "finished_at": "2026-08-24T01:32:51+08:00"
+}

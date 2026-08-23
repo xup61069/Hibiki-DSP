@@ -431,15 +431,15 @@ public sealed partial class MainWindow
         }
     }
 
-    private void OnCompatibilityAddCustomSceneClick(object sender, RoutedEventArgs e)
+    private async void OnCompatibilityAddCustomSceneClick(object sender, RoutedEventArgs e)
     {
-        ViewModel.AddCustomScene();
+        await ViewModel.AddCustomSceneAsync();
     }
 
-    private void OnCompatibilityRemoveCustomSceneClick(object sender, RoutedEventArgs e)
+    private async void OnCompatibilityRemoveCustomSceneClick(object sender, RoutedEventArgs e)
     {
         if (sender is Button { Tag: string sceneId })
-            ViewModel.RemoveCustomScene(sceneId);
+            await ViewModel.RemoveCustomSceneAsync(sceneId);
     }
 
     private async void OnCompatibilityApplyRouteRuleClick(object sender, RoutedEventArgs e)
