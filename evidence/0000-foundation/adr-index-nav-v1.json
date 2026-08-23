@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "issue": 547,
+  "scope_digest": "adr-index-nav-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-26100-pwsh-7.6; target-machine-pending",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 547",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "documentation review",
+      "status": "pass",
+      "coverage": [
+        "docs/adr/INDEX.md added with relative links to all five accepted ADRs, resolving the README.md docs/adr/ reference that previously pointed to a missing target",
+        "tools/docs-check.ps1 now excludes INDEX.md from ADR frontmatter validation (mirroring how specs exclude their INDEX via the SPEC-* filter); -SelfTest still passes"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation-only change; no ADR content, schema or product behavior is modified."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6 local"
+  },
+  "started_at": "2026-08-23T09:02:00+08:00",
+  "finished_at": "2026-08-23T09:03:00+08:00"
+}
