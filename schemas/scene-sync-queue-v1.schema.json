@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/scene-sync-queue-v1.schema.json",
+  "title": "Hibiki offline scene sync replay queue v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "dropped_operations", "operations"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "dropped_operations": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2147483647
+    },
+    "operations": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["is_upsert", "scene_id", "name", "output_group"],
+        "properties": {
+          "is_upsert": {"type": "boolean"},
+          "scene_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,30}$"},
+          "name": {
+            "anyOf": [
+              {"type": "string", "minLength": 1, "maxLength": 120},
+              {"const": ""}
+            ]
+          },
+          "output_group": {
+            "anyOf": [
+              {"type": "string", "minLength": 1, "maxLength": 64},
+              {"const": ""}
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$comment": "Upsert operations require non-empty name and output group; remove operations must leave both empty. The runtime parser additionally validates complete candidates before replacing the in-memory queue."
+}
