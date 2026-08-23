@@ -59,6 +59,10 @@ bool AudioEngineModel::commit_graph() noexcept {
         return false;
     }
     active_graph_ = pending_graph_;
+    // A committed graph is a new listening context. Start the bounded
+    // true-peak guard from unity gain so attenuation accumulated by the
+    // previous graph cannot keep ducking quiet audio after the switch.
+    rt_true_peak_limiter_.reset();
     active_latency_bank_ = std::move(pending_latency_bank_);
     has_active_graph_ = true;
     has_pending_graph_ = false;
