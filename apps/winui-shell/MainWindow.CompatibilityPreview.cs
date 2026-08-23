@@ -122,6 +122,10 @@ public sealed partial class MainWindow
         AutomationProperties.SetName(beginEditButton, "開始時間軸草稿");
         beginEditButton.Click += OnVst3BeginEditClick;
         content.Children.Add(beginEditButton);
+        var removeTimelineButton = new Button { Content = "刪除時間軸" };
+        AutomationProperties.SetName(removeTimelineButton, "刪除目前時間軸");
+        removeTimelineButton.Click += OnVst3RemoveTimelineClick;
+        content.Children.Add(removeTimelineButton);
         var commitButton = new Button { Content = "提交草稿" };
         AutomationProperties.SetName(commitButton, "提交時間軸草稿");
         commitButton.Click += OnVst3CommitClick;

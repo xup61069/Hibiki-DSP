@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "issue": 723,
+  "branch": "codex/723-compat-timeline-removal",
+  "base_commit": "73fca86afe9f268ca3a3c7c288dcd28b18fce901",
+  "captured_at": "2026-08-23T20:13:00+08:00",
+  "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6",
+  "scope_boundary": "Compatibility Preview source seam only; not formal XAML accessibility evidence and no engine or physical audio claim.",
+  "checks": [
+    {
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 723",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-policy.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/build-preview.ps1 -SelfTest",
+      "result": "pass",
+      "detail": "22 cases"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/control-model-check.ps1 -SelfTest",
+      "result": "pass",
+      "detail": "8 cases"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/control-model-check.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
+      "result": "pass",
+      "detail": "Release build succeeded with 0 warnings and 0 errors; launch smoke passed."
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/winui-shell-check.ps1 -SelfTest",
+      "result": "pass",
+      "detail": "4 cases"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/winui-shell-check.ps1",
+      "result": "pass",
+      "detail": "49 interactive controls scanned; all names non-empty."
+    }
+  ],
+  "implementation": [
+    "apps/winui-shell/MainWindow.CompatibilityPreview.cs: add 刪除目前時間軸 button with AutomationProperties.Name, wired to the existing OnVst3RemoveTimelineClick handler."
+  ],
+  "limitations": [
+    "Compatibility Preview build/launch is degraded-UI evidence only.",
+    "No driver installation/load, HLK, Microsoft signing, engine commit, persistence, or audible playback claim."
+  ]
+}
