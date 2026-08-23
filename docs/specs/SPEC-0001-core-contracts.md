@@ -38,6 +38,8 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   額外延遲預算，不攜帶未授權 IR 或 ISO 係數。
 - `AudioSessionDescriptor v1`：endpoint/session-instance identity、lane/output group、gain
   owner 與 per-session makeup dB；JSON schema 是跨語言／跨 AI 的欄位真值。
+  `display_name`／`app_id`／`lane_id` 是有界 optional labels：schema 允許空字串，但最長
+  256 字元，與 runtime `kMaxLabelLength` 一致。
 - `OutputGroupVolumeState v1`：requested/effective/safety dB、mute、generation、origin、actuator。
 - `DistributionProfile v1`：driver hardware ID、endpoint GUID、ASIO CLSID、IPC namespace、schema version。
   `config/distribution-profile.yml` 是唯一 canonical source；`tools/distribution-check.ps1` 以
