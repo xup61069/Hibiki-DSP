@@ -820,6 +820,23 @@ schema version 1、harness identity、completed <= requested 且 iteration resul
 contract-model、source-gate、compatibility preview build/launch 或離線 self-test evidence；
 不宣稱 runtime screen-reader audit、實體音訊量測、driver guest 安裝／載入／HLK 或 Microsoft signing。
 
+第三十六波整合增量已合併：瀏覽器單分頁捕捉在 bridge 啟動晚或暫時掉線時，offscreen 以有界指數退避重試
+連線（最多 10 次、上限 15 秒）；bridge 恢復後新封包自動送入，不需重新 Start capture。手動 Stop 或串流
+自然結束仍完整 teardown graph 並取消重試；extension-check 追加對 connectBridge、scheduleBridgeRetry、
+cancelBridgeRetry 與 bounded attempt 常數的 source-boundary 斷言（Issue #826 / PR #834）。自訂 Scene catalog
+加入離線操作的有界重播：未連線時新增／移除仍立即作用於 UI mirror 與本機檔案，同時把操作記入最多 64 筆的
+FIFO 佇列；超過容量時捨棄最舊並顯示壓力訊息。重新連線成功後依原順序補送 Upsert／Remove 到引擎，全部 Ack
+才回報「引擎已同步」；中途失敗保留剩餘操作並誠實顯示降級狀態，待下次連線再補送。重播只使用既有
+SceneCatalogCommandV1 wire format 與 Ack 語意，不改變引擎驗證或 catalog 容量契約；control-model-check 的
+契約案例涵蓋離線排隊→連線 flush、部分失敗保留與 connected add 不殘留佇列 (Issue #823 / PR #832)。
+VST3 host README 能力圖刷新：明確標示 bounded 參數自動化（最多 16 ID × 5 sample-accurate points）、
+timeline 持久化／編輯交易／undo-redo history 及 C# Compatibility Preview 編輯面已在 source baseline scope；
+補上 LatencyGraphCommitV1/LaneLatencyBankV1 的 graph-side commit 契約摘要——lane token/revision 驗證、
+Prepare 期配置 scratch/ring、Commit 期原子 swap，RT mixer 只讀 bank 不在 callback 配置。仍明確不宣稱
+third-party certification、crash-dump redaction pipeline、multi-bus worker process 或實體端到端延遲驗收
+(Issue #836 / PR #837)。上述分別為 extension source/gate evidence、source+contract test/control-model evidence
+與 documentation-only evidence；不宣稱瀏覽器 runtime automation、實體音訊量測、driver guest 安裝／載入／HLK
+或 Microsoft signing。
 第三十五波整合增量已合併：Desktop Compatibility Preview 新增完整的每-App 路由規則編輯面，
 WinUI Compatibility Preview 以可達 TextBox／NumberBox／CheckBox／ComboBox 提供同一流程；使用者
 可管理有界規則清單中的 ID、App ID、顯示名稱、Lane、output group、priority、makeup gain、
