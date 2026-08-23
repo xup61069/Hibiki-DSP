@@ -245,7 +245,7 @@ extern "C" NTSTATUS HibikiAddDevice(
         DriverObject,
         PhysicalDeviceObject,
         HibikiStartDevice,
-        HIBIKI_MAX_SUBDEVICES_V1,
+        HIBIKI_MAX_SUBDEVICES_V1 * 2, /* 4 subdevices x 2 filters each */
         0);
     if (NT_SUCCESS(ntStatus)) {
         DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL, "HIBIKI: AddDevice ok\n");
