@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "issue": 747,
+  "scope_digest": "desktopcompat-a11y-names-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6; DesktopCompat source + build + launch smoke",
+  "commands": [
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 747",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "DesktopCompat accessibility name audit",
+      "status": "pass",
+      "coverage": [
+        "All 14 interactive controls in apps/desktop-compat-preview/Program.cs declare non-empty AccessibleName at construction or immediately after local creation.",
+        "Covered controls: _sessionSelector (ComboBox), _sessionVolume (TrackBar), _applySessionVolume (Button), _sessionLane (TextBox), _sessionOutput (TextBox), _applySessionRoute (Button), _scenes (ComboBox), _irModes (ComboBox), _irStrength (TrackBar), _loadIr (Button), _volume (TrackBar), _enhance (Button).",
+        "Also covered: the locally constructed output-group ComboBox and engine-connect Button; their names match the visible Traditional Chinese section wording and button text.",
+        "Names use the same user-facing Traditional Chinese wording as visible labels or placeholder text; TrackBars and ComboBoxes that have no visible label receive descriptive names."
+      ],
+      "compiled_artifacts": true
+    },
+    {
+      "command": "tools/build-preview.ps1 -Target DesktopCompat -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "Desktop compatibility preview launched and closed cleanly; no crash or hang introduced by the accessible-name additions."
+      ],
+      "compiled_artifacts": true
+    },
+    {
+      "command": "Always-run gates",
+      "status": "pass",
+      "coverage": [
+        "handoff-check.ps1 -Issue 747: schema v2 ownership, scope and Git ancestry pass.",
+        "docs-check.ps1: 80 required paths, 24 specs; live measurement 599 tracked paths.",
+        "source-policy.ps1: no blocked binary or secret across 599 tracked paths.",
+        "git diff --check: no whitespace errors."
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "AccessibleName is set at WinForms control construction; no screen-reader or UI Automation runtime automation was exercised on this machine.",
+    "This is Compatibility Preview source/build/launch evidence only; it makes no claim about formal XAML accessibility runtime audit, browser runtime automation, physical audio, driver installation/loading/HLK or Microsoft signing."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.0",
+    "powershell": "7.6"
+  },
+  "started_at": "2026-08-23T21:11:00+08:00",
+  "finished_at": "2026-08-23T21:14:23+08:00"
+}
