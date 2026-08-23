@@ -1,0 +1,42 @@
+{
+  "schema_version": 2,
+  "issue": 462,
+  "title": "WaveRT/topology subdevice pair source and package build",
+  "base_commit": "81308569eb26f6c068d014e99bfc59e7cfa8e49f",
+  "summary": {
+    "behavior": "Each endpoint now registers a paired PortCls Topology and WaveRT filter with matching INF interfaces, then registers their bridge physical connection. This addresses the prior single-WaveRT-filter start path.",
+    "scope_boundary": "Source, local WDK build and Inf2Cat signability only. No guest installation, driver load, PnP start, endpoint visibility, audio delivery, HLK, or Microsoft signing claim.",
+    "files": [
+      "driver/wdk/hibiki_adapter.cpp",
+      "driver/wdk/hibiki_filter_tables.cpp",
+      "driver/wdk/hibiki_filter_tables.h",
+      "driver/wdk/hibiki_miniport_topology.cpp",
+      "driver/wdk/hibiki_miniport_topology.h",
+      "driver/inf/HibikiVirtualAudio.inf"
+    ]
+  },
+  "validation": [
+    {
+      "command": "pwsh -NoProfile -File tools/driver-source-check.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1",
+      "result": "pass (80 required paths; 560 tracked paths)"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-policy.ps1",
+      "result": "pass (560 tracked paths)"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/build-driver.ps1",
+      "result": "pass; HibikiVirtualAudio.sys linked and Inf2Cat reported 0 errors / 0 warnings"
+    }
+  ],
+  "limits": [
+    "Guest retest is required to determine whether the previous CM_PROB_FAILED_START / 0xC000000D is resolved.",
+    "The isolated VM remains intentionally unchanged by this host-side build."
+  ],
+  "next_safe_action": "With explicit user consent, stage and start this rebuilt pair in the existing isolated VM and capture staged debug logs.",
+  "date": "2026-08-23"
+}

@@ -439,3 +439,113 @@ extern "C" NTSTATUS HibikiDataRangeIntersectionEndpointV1(
 
 
 
+
+//=============================================================================
+// Topology Filter Tables (bridge half of each WaveRT/Topology pair)
+//=============================================================================
+
+static const KSDATARANGE TopologyBridgeDataRange = {
+    sizeof(KSDATARANGE),
+    0, 0, 0,
+    STATICGUIDOF(KSDATAFORMAT_TYPE_AUDIO),
+    STATICGUIDOF(KSDATAFORMAT_SUBTYPE_ANALOG),
+    STATICGUIDOF(KSDATAFORMAT_SPECIFIER_NONE)
+};
+
+static const PKSDATARANGE TopologyBridgeDataRangePointers[] = {
+    const_cast<PKSDATARANGE>(&TopologyBridgeDataRange)
+};
+
+#define DEFINE_RENDER_TOPOLOGY_PINS(Name)                                       \
+static const PCPIN_DESCRIPTOR TopoPins_##Name[] = {                             \
+    /* Pin 0: Wave bridge input */                                              \
+    {                                                                           \
+        0, 0, 0,                                                               \
+        NULL,                                                                  \
+        {                                                                      \
+            0, NULL,                                                           \
+            0, NULL,                                                           \
+            SIZEOF_ARRAY(TopologyBridgeDataRangePointers),                     \
+            TopologyBridgeDataRangePointers,                                   \
+            KSPIN_DATAFLOW_IN,                                                 \
+            KSPIN_COMMUNICATION_NONE,                                          \
+            &KSCATEGORY_AUDIO,                                                 \
+            NULL,                                                              \
+            0                                                                  \
+        }                                                                      \
+    },                                                                         \
+    /* Pin 1: Physical destination (speaker) */                                \
+    {                                                                           \
+        0, 0, 0,                                                               \
+        NULL,                                                                  \
+        {                                                                      \
+            0, NULL,                                                           \
+            0, NULL,                                                           \
+            SIZEOF_ARRAY(TopologyBridgeDataRangePointers),                     \
+            TopologyBridgeDataRangePointers,                                   \
+            KSPIN_DATAFLOW_OUT,                                                \
+            KSPIN_COMMUNICATION_NONE,                                          \
+            &KSNODETYPE_SPEAKER,                                               \
+            NULL,                                                              \
+            0                                                                  \
+        }                                                                      \
+    }                                                                          \
+};
+
+DEFINE_RENDER_TOPOLOGY_PINS(TopoMain);
+DEFINE_RENDER_TOPOLOGY_PINS(TopoLowLatency);
+DEFINE_RENDER_TOPOLOGY_PINS(TopoSurround);
+
+/* Capture topology pins: pin 0 = physical microphone; pin 1 = wave bridge. */
+static const PCPIN_DESCRIPTOR TopoPins_TopoVirtualMic[] = {
+    { 0, 0, 0, NULL,
+      { 0, NULL, 0, NULL,
+        SIZEOF_ARRAY(TopologyBridgeDataRangePointers), TopologyBridgeDataRangePointers,
+        KSPIN_DATAFLOW_IN, KSPIN_COMMUNICATION_NONE, &KSNODETYPE_MICROPHONE, NULL, 0 } },
+    { 0, 0, 0, NULL,
+      { 0, NULL, 0, NULL,
+        SIZEOF_ARRAY(TopologyBridgeDataRangePointers), TopologyBridgeDataRangePointers,
+        KSPIN_DATAFLOW_OUT, KSPIN_COMMUNICATION_NONE, &KSCATEGORY_AUDIO, NULL, 0 } }
+};
+
+/* Internal connection within the topology filter. */
+static const PCCONNECTION_DESCRIPTOR TopoRenderConnections[] = {
+    { PCFILTER_NODE, 0, PCFILTER_NODE, 1 }
+};
+static const PCCONNECTION_DESCRIPTOR TopoCaptureConnections[] = {
+    { PCFILTER_NODE, 0, PCFILTER_NODE, 1 }
+};
+
+#define DEFINE_TOPOLOGY_FILTER_DESCRIPTOR(Name, PinsTable, ConnectionsTable)     \
+static const PCFILTER_DESCRIPTOR TopoFilterDescriptor_##Name = {                  \
+    0,                                      /* Version */                         \
+    NULL,                                   /* AutomationTable */                 \
+    sizeof(PCPIN_DESCRIPTOR),               /* PinSize */                         \
+    SIZEOF_ARRAY(PinsTable),                /* PinCount */                        \
+    PinsTable,                              /* Pins */                            \
+    sizeof(PCNODE_DESCRIPTOR),              /* NodeSize */                        \
+    0,                                      /* NodeCount */                       \
+    nullptr,                                /* Nodes */                           \
+    SIZEOF_ARRAY(ConnectionsTable),         /* ConnectionCount */                 \
+    ConnectionsTable,                       /* Connections */                     \
+    0,                                      /* CategoryCount */                   \
+    nullptr                                 /* Categories */                      \
+};
+
+DEFINE_TOPOLOGY_FILTER_DESCRIPTOR(TopoMain, TopoPins_TopoMain, TopoRenderConnections);
+DEFINE_TOPOLOGY_FILTER_DESCRIPTOR(TopoLowLatency, TopoPins_TopoLowLatency, TopoRenderConnections);
+DEFINE_TOPOLOGY_FILTER_DESCRIPTOR(TopoSurround, TopoPins_TopoSurround, TopoRenderConnections);
+DEFINE_TOPOLOGY_FILTER_DESCRIPTOR(TopoVirtualMic, TopoPins_TopoVirtualMic, TopoCaptureConnections);
+
+extern "C" NTSTATUS HibikiGetTopologyFilterDescriptorEndpointV1(
+    _In_  ULONG                     EndpointIndex,
+    _Out_ const PCFILTER_DESCRIPTOR** Description) {
+    if (Description == nullptr) return STATUS_INVALID_PARAMETER;
+    switch (EndpointIndex) {
+        case 0: *Description = &TopoFilterDescriptor_TopoMain; return STATUS_SUCCESS;
+        case 1: *Description = &TopoFilterDescriptor_TopoLowLatency; return STATUS_SUCCESS;
+        case 2: *Description = &TopoFilterDescriptor_TopoSurround; return STATUS_SUCCESS;
+        case 3: *Description = &TopoFilterDescriptor_TopoVirtualMic; return STATUS_SUCCESS;
+        default: *Description = nullptr; return STATUS_INVALID_PARAMETER;
+    }
+}

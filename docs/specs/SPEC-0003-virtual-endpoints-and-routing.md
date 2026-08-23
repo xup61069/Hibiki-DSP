@@ -165,6 +165,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
 - `process_virtual_mic_lane_to_wasapi_v1` 在 privacy gate／optional DSP 後共用 lane-to-WASAPI
   adapter；capture、reference、graph 或 sink 任一邊界失敗都不提交。這只提供 user-space
   monitor/output path，不能取代真正的 signed Virtual Mic capture driver。
+- `HibikiMiniportTopologyV1`、topology filter tables、WaveRT/topology subdevice pair 與 INF
+  per-subdevice interfaces 提供 local WDK build／Inf2Cat 的 PortCls start-path wiring。這仍是
+  source/build evidence：不新增 guest 安裝、載入、實體 endpoint、HLK 或 Microsoft-signing
+  證據；下一次 guest 測試必須重新驗證 PnP start。
 
 ## 未解問題（阻擋完整 driver 實作）
 
