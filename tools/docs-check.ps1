@@ -110,6 +110,41 @@ function Get-MissingRequiredSchemas {
   return ,@($trackedSchemas | Where-Object { -not $requiredSet.ContainsKey($_) })
 }
 
+function Get-SchemaStructureErrors {
+  # Validates that every tracked contract schema has the required top-level
+  # properties ($schema, $id, title, type) and that no $id value is duplicated.
+  # Keep this pure so -SelfTest can cover it without touching real files.
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()]$SchemaEntries
+  )
+  $errors = @()
+  $seenIds = @{ }
+  foreach ($entry in $SchemaEntries) {
+    try {
+      $parsed = $entry.Content | ConvertFrom-Json
+    } catch {
+      $errors += ($entry.Path + ': invalid JSON (' + $_.Exception.Message + ')')
+      continue
+    }
+    foreach ($key in @('$schema', '$id', 'title', 'type')) {
+      if (-not $parsed.PSObject.Properties[$key]) {
+        $errors += ($entry.Path + ': missing required top-level property: ' + $key)
+      }
+    }
+    if ($parsed.PSObject.Properties['$id']) {
+      $idValue = [string]$parsed.'$id'
+      if ([string]::IsNullOrWhiteSpace($idValue)) {
+        $errors += ($entry.Path + ': $id must be a non-empty string')
+      } elseif ($seenIds.ContainsKey($idValue)) {
+        $errors += ($entry.Path + ': duplicate $id ' + $idValue + ' (first seen in ' + $seenIds[$idValue] + ')')
+      } else {
+        $seenIds[$idValue] = $entry.Path
+      }
+    }
+  }
+  return ,@($errors)
+}
+
 function ConvertFrom-AdrFrontmatter([string]$RawText) {
   # Parse the comment-style frontmatter block used by all ADR files.
   # Returns a hashtable of key -> string value, or throws on structural errors.
@@ -315,6 +350,54 @@ if ($SelfTest) {
     throw 'docs-check self-test failed: an uncovered schema was not reported.'
   }
   $caseCount++
+
+  # Schema structure validation: valid schema passes.
+  $validSchemaEntry = [pscustomobject]@{
+    Path    = 'schemas/test-valid-v1.schema.json'
+    Content = '{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://example.com/test-valid-v1.schema.json","title":"Test","type":"object"}'
+  }
+  if ((Get-SchemaStructureErrors -SchemaEntries @($validSchemaEntry)).Count -ne 0) {
+    throw 'docs-check self-test failed: a valid schema was reported as invalid.'
+  }
+  $caseCount++
+
+  # Schema structure validation: missing required field is reported.
+  $missingIdEntry = [pscustomobject]@{
+    Path    = 'schemas/test-missing-id-v1.schema.json'
+    Content = '{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"No ID","type":"object"}'
+  }
+  $missingIdErrors = Get-SchemaStructureErrors -SchemaEntries @($missingIdEntry)
+  if ($missingIdErrors.Count -ne 1 -or $missingIdErrors[0] -notmatch [regex]::Escape("missing required top-level property: " + [char]36 + "id")) {
+    throw 'docs-check self-test failed: a schema without required id was not reported.'
+  }
+  $caseCount++
+
+  # Schema structure validation: malformed JSON is reported.
+  $malformedEntry = [pscustomobject]@{
+    Path    = 'schemas/test-malformed-v1.schema.json'
+    Content = '{not valid json}'
+  }
+  $malformedErrors = Get-SchemaStructureErrors -SchemaEntries @($malformedEntry)
+  if ($malformedErrors.Count -ne 1 -or $malformedErrors[0] -notmatch 'invalid JSON') {
+    throw 'docs-check self-test failed: malformed JSON was not reported.'
+  }
+  $caseCount++
+
+  # Schema structure validation: duplicate $id across entries is reported.
+  $dupA = [pscustomobject]@{
+    Path    = 'schemas/test-dup-a-v1.schema.json'
+    Content = '{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://example.com/same","title":"A","type":"object"}'
+  }
+  $dupB = [pscustomobject]@{
+    Path    = 'schemas/test-dup-b-v1.schema.json'
+    Content = '{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://example.com/same","title":"B","type":"object"}'
+  }
+  $dupErrors = Get-SchemaStructureErrors -SchemaEntries @($dupA, $dupB)
+  $expectedDupId = [regex]::Escape("duplicate " + [char]36 + "id")
+  if ($dupErrors.Count -ne 1 -or $dupErrors[0] -notmatch $expectedDupId) {
+  }
+  $caseCount++
+
   if (-not (Test-BaselineChangedByHead -ChangedPaths @('docs/state/BASELINE.md'))) {
     throw 'docs-check self-test failed: a head BASELINE edit was not detected.'
   }
@@ -532,6 +615,18 @@ $missingRequiredSchemas = Get-MissingRequiredSchemas -TrackedPaths $trackedSchem
 if ($missingRequiredSchemas.Count -gt 0) {
   throw ('Contract schemas must be required docs-check entries; missing: ' +
          ($missingRequiredSchemas -join ', '))
+}
+
+$schemaEntries = @()
+foreach ($schemaPath in ($trackedSchemas | Sort-Object)) {
+  $schemaEntries += [pscustomobject]@{
+    Path    = $schemaPath
+    Content = Get-Content -LiteralPath (Join-Path $repo $schemaPath) -Raw
+  }
+}
+$schemaStructureErrors = Get-SchemaStructureErrors -SchemaEntries $schemaEntries
+if ($schemaStructureErrors.Count -gt 0) {
+  throw ('Contract schema structure validation failed: ' + ($schemaStructureErrors -join '; '))
 }
 
 $handoffSchemaIndex = Get-Content -LiteralPath (Join-Path $repo 'docs/ai/HANDOFF_SCHEMA.json') -Raw |
