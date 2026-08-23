@@ -12,6 +12,14 @@ optional localhost bridge (`ws://127.0.0.1:17842/v1/tab`). If that bridge is
 not running, the browser stream still plays normally and packets are dropped;
 the extension never silently captures a tab or microphone.
 
+The popup exposes explicit Start and Stop controls. It queries the real capture
+state when opened, reports start/stop failures instead of pretending success,
+and shows whether the optional loopback native bridge is currently connected.
+If the bridge is absent, local tab playback remains unchanged; the indicator is
+diagnostic only and does not imply browser or vendor control. Stop releases the
+user-selected stream and capture graph. Closing or navigating away from the
+captured tab also ends the source stream and releases that graph.
+
 Packet header: magic `HIBT`, version `1`, channel count, frame count and
 sample rate (all little-endian), followed by interleaved Float32 samples. The
 source-only `hibiki_tab_bridge_contract` library now performs that packet
