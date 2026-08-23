@@ -42,6 +42,10 @@ bounded guard；它以三個線性 inter-sample probes 作保守估算並採 blo
 這是預期行為而非缺陷。取樣率改變時，相同經過時間內的恢復量等價。
 graph commit 會把 limiter 狀態重置回 unity gain：前一個 graph 累積的恢復衰減不會
 延續到新 graph 的安靜段落，新 graph 中超過上限的峰值仍然立即衰減。
+limiter 狀態也屬於單一 output group：每個已註冊 group 的固定容量 slot 內嵌自己的
+bounded guard，RT lookup 不配置；一個 sink 的峰值觸發保護後，另一個 sink 的下一個
+安靜區塊不會繼承該恢復衰減。`process()` 仍使用 main 專屬 limiter，group render 使用
+該 group 的 limiter。
 目前不宣稱 ITU/BS.1770 conformance，正式 meter oracle 仍是 release gate。
 
 目前 user-space contract 已提供 `apply_windows_notification`：只接受有限 dB 範圍與不倒退

@@ -4086,6 +4086,73 @@ int main() {
     CHECK(std::abs(group_engine_output[254] - 0.25F) < 1e-5F &&
           std::abs(group_engine_output[255] + 0.25F) < 1e-5F);
 
+    // Per-group limiter isolation: a loud transient in movie must leave its
+    // bounded recovery state attached to movie only, so the next quiet main
+    // block is not ducked by protection engaged for a different sink.
+    auto isolated_limiter_engine = std::make_unique<AudioEngineModel>();
+    GraphConfigV1 isolated_limiter_graph;
+    isolated_limiter_graph.lanes.push_back(
+        LaneConfigV1{"isolated-main-lane", "main", 2, 0.0, true});
+    isolated_limiter_graph.lanes.push_back(
+        LaneConfigV1{"isolated-movie-lane", "movie", 2, 0.0, true});
+    CHECK(isolated_limiter_engine->prepare_graph(isolated_limiter_graph, 1U) &&
+          isolated_limiter_engine->commit_graph());
+    isolated_limiter_engine->set_sample_rate(48000U);
+    CHECK(isolated_limiter_engine->apply_windows_volume(
+              "main", VolumeNotificationV1{0.0, false, 1U}) ==
+          VolumeNotificationResult::Accepted);
+    CHECK(isolated_limiter_engine->apply_windows_volume(
+              "movie", VolumeNotificationV1{0.0, false, 1U}) ==
+          VolumeNotificationResult::Accepted);
+    std::array<float, 8> isolated_quiet_input{};
+    for (std::size_t index = 0U; index < isolated_quiet_input.size(); index += 2U) {
+        isolated_quiet_input[index] = 0.001F;
+        isolated_quiet_input[index + 1U] = -0.001F;
+    }
+    std::array<float, 8> isolated_quiet_output{};
+    const RtLaneInputV1 isolated_main_view{isolated_quiet_input.data(), 2U};
+    const RtLaneInputV1 isolated_movie_view{isolated_quiet_input.data(), 2U};
+    const std::array<RtLaneInputV1, 2> isolated_quiet_views{{
+        isolated_main_view,
+        isolated_movie_view,
+    }};
+    // The bank starts at -60 dB; consume the full 8 ms ramp so any remaining
+    // attenuation can come only from the true-peak guard.
+    for (int ramp_pass = 0; ramp_pass < 100; ++ramp_pass) {
+        CHECK(isolated_limiter_engine->process_output_group(
+            "main", isolated_quiet_views,
+            isolated_quiet_output.data(), 4U));
+        CHECK(isolated_limiter_engine->process_output_group(
+            "movie", isolated_quiet_views,
+            isolated_quiet_output.data(), 4U));
+    }
+
+    std::array<float, 8> isolated_loud_input{};
+    std::array<float, 8> isolated_movie_after_loud{};
+    for (std::size_t index = 0U; index < isolated_loud_input.size(); index += 2U) {
+        isolated_loud_input[index] = 2.0F;
+        isolated_loud_input[index + 1U] = -2.0F;
+    }
+    const RtLaneInputV1 isolated_loud_view{isolated_loud_input.data(), 2U};
+    const std::array<RtLaneInputV1, 2> isolated_loud_views{{
+        isolated_main_view,
+        isolated_loud_view,
+    }};
+    CHECK(isolated_limiter_engine->process_output_group(
+        "movie", isolated_loud_views,
+        isolated_movie_after_loud.data(), 4U));
+    CHECK(std::abs(isolated_movie_after_loud[0]) < 1.0F);
+
+    std::array<float, 8> isolated_main_after_movie_loud{};
+    CHECK(isolated_limiter_engine->process_output_group(
+        "main", isolated_quiet_views,
+        isolated_main_after_movie_loud.data(), 4U));
+    for (std::size_t index = 0U; index < isolated_main_after_movie_loud.size();
+         ++index) {
+        CHECK(isolated_main_after_movie_loud[index] ==
+              isolated_quiet_input[index]);
+    }
+
     // Multi-group render clock: a delayed lane must advance once per render,
     // even while another output group is selected, so its fixed ring stays on
     // the shared audio timeline instead of returning stale alignment.
