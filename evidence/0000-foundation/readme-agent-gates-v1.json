@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 591,
   "scope_digest": "readme-agent-gates-v1",
-  "source_commit": null,
+  "source_commit": "4c25fa7b42f29d0521aac51a7b7c19c1d2bfda3d",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-26100-pwsh-7.6; target-machine-pending",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 591",
@@ -12,15 +12,41 @@
     "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
     "git diff --check"
   ],
-  "results": [],
+  "results": [
+    {
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 591",
+      "status": "pass",
+      "detail": "AI handoff checks passed (#591@codex/591-readme-agent-gates; issue-based ownership, scope and Git state)."
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1",
+      "status": "pass",
+      "detail": "80 required paths, 24 specs; live measurement: 548 tracked paths, 201 repository JSON files, 35 markdown links."
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-policy.ps1",
+      "status": "pass",
+      "detail": "Source-only policy passed for 548 tracked paths."
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "status": "pass",
+      "detail": "Source-only CI policy passed (2 workflows, 548 tracked paths)."
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
   "limitations": [
     "Documentation-only change; no product source, schema or behavior is modified.",
-    "The required-gate list mirrors AGENTS.md; individual gates are executed by CI and the listed validation commands, not re-run here as product evidence."
+    "The required-gate list mirrors AGENTS.md; individual gates are executed by CI and the listed validation commands, not re-run here as product evidence.",
+    "A repository-wide handoff-check run during this slice failed on an unrelated concurrent claim (Issue #598 with issue field still PENDING); the scoped -Issue 591 check passed."
   ],
   "logs": [],
   "tool_versions": {
     "powershell": "pwsh 7.6 local"
   },
-  "started_at": null,
-  "finished_at": null
+  "started_at": "2026-08-23T09:30:00+08:00",
+  "finished_at": "2026-08-23T09:55:00+08:00"
 }
