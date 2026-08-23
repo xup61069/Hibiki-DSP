@@ -1,0 +1,44 @@
+{
+  "schema_version": 2,
+  "issue": 633,
+  "title": "PortCls adapter start-path diagnostic logging",
+  "base_commit": "81308569eb26f6c068d014e99bfc59e7cfa8e49f",
+  "summary": {
+    "files": [
+      "driver/wdk/hibiki_adapter.cpp",
+      "driver/wdk/hibiki_miniport_wavert.cpp"
+    ],
+    "behavior": "StartDevice now logs entry/exit and null-parameter failures; RegisterSubdevices logs per-endpoint register begin and failure with endpoint index; PcRegisterSubdevice success logs at TRACE level instead of ERROR; AddDevice logs PcAddAdapterDevice result; miniport InitEndpoint and GetDescription log stage entry, failure cause and success. All logging is DbgPrintEx on the control/start path only; no RT-path allocation, lock, wait, file, COM or UI was added.",
+    "motivation": "Isolated VM load test recorded reproducible CM_PROB_FAILED_START / 0xC000000D without stage localization (driver-vm-load-test-v1.json); its next_safe_action asked for PortCls start-path diagnosis against the merged descriptor fixes."
+  },
+  "validation": [
+    {
+      "command": "pwsh -NoProfile -File tools/build-driver.ps1",
+      "result": "pass",
+      "notes": "HibikiVirtualAudio.sys linked; Inf2Cat signability complete with 0 errors. Warnings are pre-existing only: C4083 vcruntime/stdint headers, C4996 ExAllocatePoolWithTag deprecation, C4189 unused latency_100ns, LNK4042 duplicate guids.obj."
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/driver-source-check.ps1",
+      "result": "pass",
+      "notes": "source-only boundary check"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1",
+      "result": "pass",
+      "notes": "560 tracked paths live measurement"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-policy.ps1",
+      "result": "pass",
+      "notes": "560 tracked paths"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass",
+      "notes": "no whitespace errors"
+    }
+  ],
+  "scope": "driver start/control-path diagnostics only; no ABI, topology, DSP or streaming behavior change; no live probe executed and no machine-state change",
+  "limits": "Build and offline gates do not prove successful device start; the next isolated VM load test consumes these DbgPrintEx stages to localize any remaining CM_PROB_FAILED_START cause.",
+  "date": "2026-08-23"
+}

@@ -463,26 +463,40 @@ STDMETHODIMP HibikiMiniportWaveRtV1::Init(
 NTSTATUS HibikiMiniportWaveRtV1::InitEndpoint(
     _In_ ULONG                     EndpointIndex,
     _In_ ULONG                     Actuator) {
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
+               "HIBIKI: miniport InitEndpoint idx=%lu actuator=%lu enter\n",
+               EndpointIndex, Actuator);
     if (hibiki_endpoint_topology_get_v1(EndpointIndex, &m_Topology) == 0 ||
         hibiki_endpoint_topology_validate_v1(&m_Topology) == 0) {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+                   "HIBIKI: miniport InitEndpoint idx=%lu topology invalid\n", EndpointIndex);
         return STATUS_INVALID_PARAMETER;
     }
 
     const NTSTATUS ntStatus = HibikiPropertyContextInitializeEndpointV1(
         &m_PropertyContext, EndpointIndex, Actuator);
     if (!NT_SUCCESS(ntStatus)) {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+                   "HIBIKI: miniport InitEndpoint idx=%lu property ctx failed 0x%08X\n",
+                   EndpointIndex, ntStatus);
         return ntStatus;
     }
 
     m_EndpointIndex = EndpointIndex;
     m_Initialized = TRUE;
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
+               "HIBIKI: miniport InitEndpoint idx=%lu ok\n", EndpointIndex);
     return STATUS_SUCCESS;
 }
 
 STDMETHODIMP HibikiMiniportWaveRtV1::GetDescription(
     _Out_ PPCFILTER_DESCRIPTOR*    Description) {
     if (Description == nullptr) return STATUS_INVALID_PARAMETER;
-    if (!m_Initialized) return STATUS_INVALID_DEVICE_STATE;
+    if (!m_Initialized) {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
+                   "HIBIKI: GetDescription before init\n");
+        return STATUS_INVALID_DEVICE_STATE;
+    }
 
     const PCFILTER_DESCRIPTOR* filterDescriptor = nullptr;
     const NTSTATUS ntStatus = HibikiGetFilterDescriptorEndpointV1(
