@@ -59,10 +59,12 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   與 uint64 generation；C++ `control_payloads.hpp` 與 C# `ControlPayloadsV1` 必須保持相同
   little-endian bytes，超出 -144..12 dB 或 reserved 非零一律拒絕。
 - C++ `decode_control_command_v1` 只接受 Hello、VolumeNotification、GraphCommit 與
-  GraphRollback、SceneApply、DeviceSwitch、DeviceCatalogRequest request；Ack/Error 與
-  DeviceCatalogSnapshot 只能作 response，未知或 GraphPrepare 未定義
-  payload 一律回 Error，避免 UI 任意注入未驗證 graph。SceneApply payload 固定 64 bytes，
-  以兩段 length-prefixed printable UTF-8（scene ID、output group）及 zero padding 表示。
+GraphRollback、SceneApply、DeviceSwitch、DeviceCatalogRequest、ControlStatusRequest、
+SessionCatalogRequest、SessionVolumeCommand、SessionRouteCommand、SessionRouteRuleCommand、
+IrPrepareCommand 與 SceneCatalogCommand request；Ack/Error、DeviceCatalogSnapshot、
+ControlStatusSnapshot 與 SessionCatalogSnapshot 只能作 response，未知或 GraphPrepare 未定義
+payload 一律回 Error，避免 UI 任意注入未驗證 graph。SceneApply payload 固定 64 bytes，
+以兩段 length-prefixed printable UTF-8（scene ID、output group）及 zero padding 表示。
 - `handle_control_frame_v1` 是 pipe worker 到 host control queue 的唯一 typed adapter；sink
   必須自行 enqueue／排程，不能在 pipe callback 直接跑 RT DSP 或等待 UI/COM。
 - `ControlPlaneHostV1` 是 host 的組合入口：它擁有 named-pipe server 與 64-slot queue，將
