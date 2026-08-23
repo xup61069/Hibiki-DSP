@@ -1,17 +1,20 @@
 ﻿// SPDX-License-Identifier: GPL-3.0-only
 
+using System.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Media;
+using Hibiki.ControlModel;
 
 namespace Hibiki.WinUI;
 
 public sealed partial class MainWindow
 {
 #if HIBIKI_COMPATIBILITY_PREVIEW
+    private readonly StackPanel _compatibilityCustomSceneList = new() { Spacing = 8 };
 
     private static T ResolveThemeResource<T>(string key) where T : class
     {
@@ -68,6 +71,47 @@ public sealed partial class MainWindow
         outputGroup.SetBinding(ItemsControl.ItemsSourceProperty, BindingFor("OutputGroups"));
         outputGroup.SetBinding(Selector.SelectedValueProperty, TwoWayBindingFor("SelectedOutputGroup"));
         content.Children.Add(outputGroup);
+
+        content.Children.Add(new TextBlock
+        {
+            Text = "場景",
+            Style = ResolveThemeResource<Style>("SubtitleTextBlockStyle"),
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+        });
+        var sceneSelector = new ComboBox
+        {
+            DisplayMemberPath = "Name",
+            SelectedValuePath = "Id",
+            MinWidth = 280,
+        };
+        AutomationProperties.SetName(sceneSelector, "選取情境設定檔");
+        sceneSelector.SetBinding(ItemsControl.ItemsSourceProperty, BindingFor("Scenes"));
+        sceneSelector.SetBinding(ComboBox.SelectedItemProperty, BindingFor("SelectedScene"));
+        sceneSelector.SelectionChanged += OnCompatibilitySceneSelect;
+        content.Children.Add(sceneSelector);
+
+        AutomationProperties.SetName(_compatibilityCustomSceneList, "自訂場景列表");
+        content.Children.Add(_compatibilityCustomSceneList);
+        var customSceneIdBox = new TextBox { Header = "Scene ID（英文小寫）", PlaceholderText = "例如 game-bgm" };
+        AutomationProperties.SetName(customSceneIdBox, "自訂場景 ID");
+        customSceneIdBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("CustomSceneId"));
+        content.Children.Add(customSceneIdBox);
+        var customSceneNameBox = new TextBox { Header = "名稱" };
+        AutomationProperties.SetName(customSceneNameBox, "自訂場景名稱");
+        customSceneNameBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("CustomSceneName"));
+        content.Children.Add(customSceneNameBox);
+        var customSceneDescriptionBox = new TextBox { Header = "說明" };
+        AutomationProperties.SetName(customSceneDescriptionBox, "自訂場景說明");
+        customSceneDescriptionBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("CustomSceneDescription"));
+        content.Children.Add(customSceneDescriptionBox);
+        var addCustomSceneButton = new Button { Content = "加入自訂場景" };
+        AutomationProperties.SetName(addCustomSceneButton, "加入自訂場景");
+        addCustomSceneButton.Click += OnCompatibilityAddCustomSceneClick;
+        content.Children.Add(addCustomSceneButton);
+        content.Children.Add(BoundText("StatusText"));
+        ViewModel.PropertyChanged += OnCompatibilityViewModelPropertyChanged;
+        Closed += OnCompatibilityPreviewClosed;
+        SyncCompatibilityCustomScenes();
 
         var enhance = new Button { Content = "一鍵改善" };
         AutomationProperties.SetName(enhance, "一鍵改善聲音");
@@ -173,6 +217,69 @@ public sealed partial class MainWindow
             Foreground = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush"),
         });
         return root;
+    }
+
+    private void OnCompatibilitySceneSelect(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ComboBox { SelectedItem: SceneCard scene })
+            _ = SelectCompatibilitySceneAsync(scene.Id);
+    }
+
+    private async Task SelectCompatibilitySceneAsync(string sceneId)
+    {
+        await ViewModel.SelectSceneAsync(sceneId);
+    }
+
+    private void OnCompatibilityViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(EasyControlViewModel.CustomSceneCards))
+            SyncCompatibilityCustomScenes();
+    }
+
+    private void OnCompatibilityPreviewClosed(object sender, WindowEventArgs e)
+    {
+        ViewModel.PropertyChanged -= OnCompatibilityViewModelPropertyChanged;
+    }
+
+    private void SyncCompatibilityCustomScenes()
+    {
+        _compatibilityCustomSceneList.Children.Clear();
+        var secondaryBrush = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush");
+        foreach (var scene in ViewModel.CustomSceneCards)
+        {
+            var row = new Grid { ColumnSpacing = 8 };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var details = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
+            var name = new TextBlock
+            {
+                Text = scene.Name,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                TextWrapping = TextWrapping.Wrap,
+            };
+            var id = new TextBlock { Text = scene.Id, TextWrapping = TextWrapping.Wrap, Foreground = secondaryBrush };
+            details.Children.Add(name);
+            details.Children.Add(id);
+            Grid.SetColumn(details, 0);
+            var removeButton = new Button { Content = "移除", Tag = scene.Id };
+            AutomationProperties.SetName(removeButton, "移除自訂場景");
+            removeButton.Click += OnCompatibilityRemoveCustomSceneClick;
+            Grid.SetColumn(removeButton, 1);
+            row.Children.Add(details);
+            row.Children.Add(removeButton);
+            _compatibilityCustomSceneList.Children.Add(row);
+        }
+    }
+
+    private void OnCompatibilityAddCustomSceneClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.AddCustomScene();
+    }
+
+    private void OnCompatibilityRemoveCustomSceneClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string sceneId })
+            ViewModel.RemoveCustomScene(sceneId);
     }
 
     private static Binding BindingFor(string property) => new()
