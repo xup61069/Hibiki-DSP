@@ -60,6 +60,33 @@ function Assert-InfSourcePolicy([string]$infText, [string]$sourceName) {
   }
 }
 
+function Find-KitsInf2Cat([string]$KitsRoot) {
+  if ([string]::IsNullOrWhiteSpace($KitsRoot)) { return $null }
+  if (-not (Test-Path -LiteralPath $KitsRoot)) { return $null }
+  return Get-ChildItem -LiteralPath $KitsRoot -Recurse -Filter Inf2Cat.exe -ErrorAction SilentlyContinue |
+    Sort-Object FullName -Descending |
+    Select-Object -First 1 -ExpandProperty FullName
+}
+
+function Resolve-Inf2Cat {
+  param(
+    [AllowEmptyString()][string]$WdkBin,
+    [AllowEmptyString()][string]$KitsRoot,
+    [scriptblock]$GetCommandSource
+  )
+  if (-not [string]::IsNullOrWhiteSpace($WdkBin)) {
+    $candidate = Join-Path $WdkBin 'Inf2Cat.exe'
+    if (Test-Path -LiteralPath $candidate) { return $candidate }
+  }
+  $kitCandidate = Find-KitsInf2Cat -KitsRoot $KitsRoot
+  if ($kitCandidate) { return $kitCandidate }
+  if ($GetCommandSource) {
+    $pathCandidate = @(& $GetCommandSource) | Select-Object -First 1
+    if ($pathCandidate) { return $pathCandidate }
+  }
+  return $null
+}
+
 if ($SelfTest) {
   $valid = @'
 [Version]
@@ -100,7 +127,48 @@ HibikiVirtualAudio.sys=1
     try { Assert-InfSourcePolicy $fixture.Text "selftest-$($fixture.Name).inf" } catch { $caught = $true }
     if (-not $caught) { throw "INF section self-test expected rejection: $($fixture.Name)" }
   }
-  Write-Output 'Driver INF section self-test passed (9 cases).'
+  $resolverRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('hibiki-signability-selftest-' + [guid]::NewGuid().ToString('N'))
+  try {
+    $wdkBinDir = Join-Path $resolverRoot 'wdk-bin'
+    $kitsBinDir = Join-Path (Join-Path $resolverRoot 'kits') 'bin'
+    $pathToolDir = Join-Path $resolverRoot 'path-tools'
+    foreach ($dir in @($wdkBinDir, $kitsBinDir, $pathToolDir)) {
+      New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+    $overrideTool = Join-Path $wdkBinDir 'Inf2Cat.exe'
+    $kitTreeTool = Join-Path (Join-Path (Join-Path $kitsBinDir '10.0.99999.0') 'x64') 'Inf2Cat.exe'
+    $pathTool = Join-Path $pathToolDir 'Inf2Cat.exe'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $kitTreeTool) -Force | Out-Null
+    foreach ($tool in @($overrideTool, $kitTreeTool, $pathTool)) {
+      Set-Content -LiteralPath $tool -Value 'selftest stub' -NoNewline
+    }
+
+    $pathLookup = { $pathTool }
+    $resolvedOverride = Resolve-Inf2Cat -WdkBin $wdkBinDir -KitsRoot $kitsBinDir -GetCommandSource $pathLookup
+    if ($resolvedOverride -ne $overrideTool) { throw 'signability self-test failed: WDK_BIN override did not win.' }
+    $caseCount++
+
+    $missingOverrideDir = Join-Path $resolverRoot 'missing-wdk-bin'
+    $resolvedKitTree = Resolve-Inf2Cat -WdkBin $missingOverrideDir -KitsRoot $kitsBinDir -GetCommandSource $pathLookup
+    if ($resolvedKitTree -ne $kitTreeTool) { throw 'signability self-test failed: kit-tree search did not beat PATH.' }
+    $caseCount++
+
+    $missingKitsDir = Join-Path $resolverRoot 'missing-kits'
+    $resolvedPath = Resolve-Inf2Cat -WdkBin $missingOverrideDir -KitsRoot $missingKitsDir -GetCommandSource $pathLookup
+    if ($resolvedPath -ne $pathTool) { throw 'signability self-test failed: PATH fallback was skipped.' }
+    $caseCount++
+
+    $emptyLookup = { $null }
+    $resolvedMissing = Resolve-Inf2Cat -WdkBin $missingOverrideDir -KitsRoot $missingKitsDir -GetCommandSource $emptyLookup
+    if ($null -ne $resolvedMissing) { throw 'signability self-test failed: all-missing lookup did not stay null.' }
+    $caseCount++
+  }
+  finally {
+    if (Test-Path -LiteralPath $resolverRoot) {
+      Remove-Item -LiteralPath $resolverRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+  Write-Output 'Driver signability self-test passed (13 cases).'
   exit 0
 }
 
@@ -132,14 +200,9 @@ foreach ($required in @('Root\HibikiDSP', 'HibikiVirtualAudio.sys', 'PnpLockdown
   if (-not $packageInfText.Contains($required)) { throw "Built INF missing stable value: $required" }
 }
 
-$inf2cat = $null
-if ($env:WDK_BIN) {
-  $candidate = Join-Path $env:WDK_BIN 'Inf2Cat.exe'
-  if (Test-Path -LiteralPath $candidate) { $inf2cat = $candidate }
-}
-if ($null -eq $inf2cat) {
-  $command = Get-Command Inf2Cat.exe -ErrorAction SilentlyContinue
-  if ($null -ne $command) { $inf2cat = $command.Source }
+$kitsRoot = 'C:\Program Files (x86)\Windows Kits\10'
+$inf2cat = Resolve-Inf2Cat -WdkBin $env:WDK_BIN -KitsRoot $kitsRoot -GetCommandSource {
+  (Get-Command Inf2Cat.exe -ErrorAction SilentlyContinue).Source
 }
 if ($null -eq $inf2cat) {
   throw 'Inf2Cat.exe not found; install the locked WDK or set WDK_BIN.'

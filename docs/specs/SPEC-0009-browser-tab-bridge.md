@@ -32,6 +32,9 @@ capture 狀態後才恢復控制項。被擷取分頁關閉或導航導致 sourc
 offscreen 必須立即釋放整個 capture graph（stream、AudioContext、WebSocket）並廣播
 新的 capture-state，popup 不得繼續顯示「Capturing」。手動 Stop 仍是唯一主動
 `track.stop()` 擁有者，ended 監聽器只負責自然結束路徑，不得重複 teardown。
+popup 重新可見時必須再次查詢真實 capture 狀態；此 visibility refresh 只更新狀態，
+不得清除既有錯誤訊息。`tools/extension-check.ps1` 驗證 visible-only refresh 邊界，
+self-test 涵蓋缺少 listener、visible check 或 `refreshState` 呼叫的情況。
 
 ## HIBT packet
 
