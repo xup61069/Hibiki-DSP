@@ -50,7 +50,9 @@ that validates all fields and rejects non-finite samples before exposing a
 non-owning packet view.
 
 目前 extension 只連 `ws://127.0.0.1:17842/v1/tab` 的 loopback receiver；bridge 未啟動
-時丟棄送出 packet。receiver 已限制 localhost、WebSocket frame 大小、mask、ping/close
+時丟棄送出 packet；capture 進行中 offscreen 會以 bounded exponential backoff（最多
+10 次、上限 15 秒）重試連線，bridge 恢復後新 packet 即送入，不需重新 Start capture。
+手動 Stop 或串流自然結束仍會完整 teardown graph 並取消重試。receiver 已限制 localhost、WebSocket frame 大小、mask、ping/close
 與 decoder 驗證。`TabCaptureQueueV1` 將 validated packet 複製到四格固定 SPSC ring，
 控制執行緒可用 `enqueue_tab_capture_packet_v1` 作 callback，RT lane 再以 caller-owned
 buffer pop；滿載會回報 dropped blocks，不阻塞 WebSocket。`process_tab_capture_lane_v1`

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "issue": 826,
+  "title": "Tab bridge reconnect with bounded retry while capture stays active",
+  "date": "2026-08-24",
+  "scope": [
+    "extensions/offscreen.js",
+    "tools/extension-check.ps1",
+    "docs/specs/SPEC-0009-browser-tab-bridge.md"
+  ],
+  "product_outcome": "When a tab-capture session is active and the native bridge starts late or drops, offscreen reconnects ws://127.0.0.1:17842/v1/tab with bounded exponential backoff (max 10 attempts, cap 15s). New packets flow once the bridge returns without restarting capture. Manual stop and natural stream end still tear down the full graph and cancel retries.",
+  "verification": {
+    "extension_check": "pass (includes new source-boundary assertions for connectBridge, scheduleBridgeRetry, cancelBridgeRetry, capturing flag, BRIDGE_RETRY_MAX_ATTEMPTS)",
+    "handoff_check": "pass (#826@codex/826-tab-bridge-reconnect)",
+    "docs_check": "pass (631 tracked paths, 24 specs)",
+    "source_policy": "pass",
+    "diff_check": "pass"
+  },
+  "boundary": "Source/self-test evidence only. No browser runtime automation, no physical audio measurement, no driver install/load/HLK or Microsoft signing claim."
+}

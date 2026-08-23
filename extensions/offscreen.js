@@ -5,9 +5,56 @@ let destination = null;
 let bridge = null;
 let bridgeConnected = false;
 let activeStream = null;
+let capturing = false;
+let bridgeRetryTimer = null;
+let bridgeRetryAttempt = 0;
+
+const BRIDGE_RETRY_MAX_ATTEMPTS = 10;
+const BRIDGE_RETRY_BASE_MS = 1000;
+const BRIDGE_RETRY_CAP_MS = 15000;
 
 function reportState() {
   chrome.runtime.sendMessage({type: 'capture-state', capturing: context !== null, bridgeConnected});
+}
+
+function connectBridge() {
+  if (!capturing || bridge) return;
+  try {
+    bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab');
+    bridge.binaryType = 'arraybuffer';
+    bridge.onopen = () => {
+      bridgeRetryAttempt = 0;
+      setBridgeConnected(true);
+    };
+    bridge.onclose = () => {
+      bridge = null;
+      setBridgeConnected(false);
+      scheduleBridgeRetry();
+    };
+    bridge.onerror = () => {};
+  } catch (_) {
+    bridge = null;
+    scheduleBridgeRetry();
+  }
+}
+
+function scheduleBridgeRetry() {
+  if (!capturing || bridgeRetryTimer !== null) return;
+  if (bridgeRetryAttempt >= BRIDGE_RETRY_MAX_ATTEMPTS) return;
+  const delay = Math.min(BRIDGE_RETRY_BASE_MS * Math.pow(2, bridgeRetryAttempt), BRIDGE_RETRY_CAP_MS);
+  bridgeRetryAttempt++;
+  bridgeRetryTimer = setTimeout(() => {
+    bridgeRetryTimer = null;
+    connectBridge();
+  }, delay);
+}
+
+function cancelBridgeRetry() {
+  if (bridgeRetryTimer !== null) {
+    clearTimeout(bridgeRetryTimer);
+    bridgeRetryTimer = null;
+  }
+  bridgeRetryAttempt = 0;
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -35,6 +82,8 @@ function setBridgeConnected(connected) {
 }
 
 async function startCapture(message) {
+  capturing = true;
+  cancelBridgeRetry();
   bridge?.close();
   bridge = null;
   setBridgeConnected(false);
@@ -57,22 +106,12 @@ async function startCapture(message) {
     packetizer = new AudioWorkletNode(context, 'hibiki-tab-packetizer');
     destination = context.createMediaStreamDestination();
     source.connect(packetizer).connect(destination);
-    try {
-      bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab');
-      bridge.binaryType = 'arraybuffer';
-      bridge.onopen = () => setBridgeConnected(true);
-      bridge.onclose = () => setBridgeConnected(false);
-      bridge.onerror = () => setBridgeConnected(false);
-      packetizer.port.onmessage = (event) => {
-        if (bridge?.readyState === WebSocket.OPEN && event.data instanceof ArrayBuffer) {
-          bridge.send(event.data);
-        }
-      };
-    } catch (_) {
-      // The optional native bridge may not be running. Local playback remains
-      // connected through MediaStreamDestination in that case.
-      bridge = null;
-    }
+    connectBridge();
+    packetizer.port.onmessage = (event) => {
+      if (bridge?.readyState === WebSocket.OPEN && event.data instanceof ArrayBuffer) {
+        bridge.send(event.data);
+      }
+    };
     await context.resume();
     reportState();
   } catch (error) {
@@ -97,6 +136,8 @@ async function closeExistingContext() {
 }
 
 async function teardownCaptureGraph() {
+  capturing = false;
+  cancelBridgeRetry();
   activeStream?.getTracks().forEach(track => track.stop());
   activeStream = null;
   source?.disconnect();
