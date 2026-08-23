@@ -229,7 +229,9 @@ foreach ($requiredText in @('x:Name="RootGrid"', 'ItemsSource="{Binding Scenes}"
     'ItemsSource="{Binding CustomSceneCards}"', 'OnRemoveCustomSceneClick',
     'AutomationProperties.Name="準備 IR WAV 檔案"', 'OnPrepareIrClick',
     'OnVst3ClearHistoryClick',
-    'AutomationProperties.Name="清除時間軸編輯歷史"')) {
+    'OnVst3SaveBaselineClick',
+    'AutomationProperties.Name="清除時間軸編輯歷史"',
+    'AutomationProperties.Name="保存時間軸基準"')) {
   if (-not $xaml.Contains($requiredText)) { throw "WinUI shell binding missing: $requiredText" }
 }
 if (-not $codeBehind.Contains('RootGrid.DataContext = ViewModel') -or

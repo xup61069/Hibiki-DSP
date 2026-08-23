@@ -1259,6 +1259,38 @@ Check(uiTimeline.Commit() && !uiTimeline.HasEditSession && uiTimeline.IsDirty &&
 Check(uiTimeline.SaveSelected() && !uiTimeline.IsDirty &&
       uiTimeline.StatusText.Contains("已保存"),
     "The V1 seam must expose save re-baselining.");
+var saveBoundaryViewModel = new Vst3TimelineEditorViewModelV1();
+var saveBoundaryNotifications = new List<string>();
+saveBoundaryViewModel.PropertyChanged += (_, args) =>
+    saveBoundaryNotifications.Add(args.PropertyName ?? string.Empty);
+Check(!saveBoundaryViewModel.SaveSelected() &&
+      saveBoundaryViewModel.StatusText.Contains("保存失敗"),
+    "Editor ViewModel baseline save must refuse without a selected timeline.");
+Check(saveBoundaryViewModel.RegisterTimeline("baseline-boundary") &&
+      saveBoundaryViewModel.Select("baseline-boundary") &&
+      saveBoundaryViewModel.BeginEdit(),
+    "Editor ViewModel baseline-save fixture failed to prepare.");
+saveBoundaryNotifications.Clear();
+Check(!saveBoundaryViewModel.SaveSelected() &&
+      saveBoundaryViewModel.HasEditSession &&
+      saveBoundaryViewModel.StatusText.Contains("保存失敗"),
+    "Editor ViewModel baseline save must refuse while a draft is open.");
+Check(saveBoundaryViewModel.Discard(),
+    "Editor ViewModel baseline-save draft discard failed.");
+saveBoundaryViewModel.NewParameterIdText = "7";
+saveBoundaryViewModel.NewPositionText = "90";
+saveBoundaryViewModel.NewValueText = "0.25";
+Check(saveBoundaryViewModel.BeginEdit() &&
+      saveBoundaryViewModel.UpsertFromFields() &&
+      saveBoundaryViewModel.Commit() &&
+      saveBoundaryViewModel.IsDirty,
+    "Editor ViewModel baseline-save dirty fixture failed.");
+saveBoundaryNotifications.Clear();
+Check(saveBoundaryViewModel.SaveSelected() &&
+      !saveBoundaryViewModel.IsDirty &&
+      saveBoundaryViewModel.StatusText.Contains("已保存") &&
+      saveBoundaryNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.IsDirty)),
+    "Editor ViewModel baseline-save success must re-baseline and notify dirty state.");
 Check(uiTimeline.RemoveSelectedTimeline() && !uiTimeline.HasSelection &&
       uiTimeline.TimelineIds.Count == 0 && uiTimeline.Rows.Count == 0 &&
       uiTimeline.SelectedRowIndex == -1 &&
