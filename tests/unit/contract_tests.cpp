@@ -1678,8 +1678,18 @@ int main() {
     const std::wstring control_pipe =
         L"\\\\.\\pipe\\HibikiDSP_contract_control_" + std::to_wstring(_getpid());
     const wchar_t* const kControlPipe = control_pipe.c_str();
-    CHECK(ipc_server.start(IpcNamedPipeConfigV1{kControlPipe, 1024U, 1000U},
+    IpcNamedPipeConfigV1 owned_config{};
+    owned_config.pipe_name = control_pipe;
+    owned_config.max_frame_bytes = 1024U;
+    owned_config.io_timeout_ms = 1000U;
+    owned_config.require_first_pipe_instance = true;
+    CHECK(ipc_server.start(owned_config,
                            acknowledge_ipc_request, nullptr));
+    // Issue #628 regression: a canonical single-owner pipe must fail closed
+    // when another server already owns the first instance of the same name.
+    IpcNamedPipeServerV1 duplicate_owned_server;
+    CHECK(!duplicate_owned_server.start(owned_config, acknowledge_ipc_request, nullptr) &&
+          !duplicate_owned_server.running());
     HANDLE ipc_client = INVALID_HANDLE_VALUE;
     for (int attempt = 0; attempt < 30 && ipc_client == INVALID_HANDLE_VALUE; ++attempt) {
         ipc_client = CreateFileW(kControlPipe, GENERIC_READ | GENERIC_WRITE, 0U, nullptr,
