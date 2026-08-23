@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "issue": 964,
+  "scope_digest": "baseline-wave-39-calibration-response-bounds",
+  "source_commit": "acf5f3182028f00594a6067050b72f3ef6dccbfd",
+  "environment_fingerprint": "windows-amd64-pwsh-baseline-wave-39",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 964",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "limitations": [
+    "Global snapshot documentation-only update recording merged calibration-response dB bounds from PR #960.",
+    "No runtime, DSP, driver, signing or physical-audio behavior changes."
+  ],
+  "logs": {},
+  "tool_versions": {},
+  "started_at": "2026-08-24T07:02:00+08:00",
+  "finished_at": "2026-08-24T07:15:00+08:00"
+}
