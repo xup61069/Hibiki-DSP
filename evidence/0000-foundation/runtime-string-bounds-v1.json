@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "issue": 980,
+  "scope_digest": "runtime-string-bounds-v1",
+  "source_commit": "61cf2f3f",
+  "environment_fingerprint": "windows-amd64-pwsh-runtime-string-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 980",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {"command": "handoff-check", "status": "pass"},
+    {"command": "docs-check", "status": "pass"},
+    {"command": "source-policy", "status": "pass"},
+    {"command": "verify", "status": "pass", "log": ".local/verify-980.log"},
+    {"command": "git diff --check", "status": "pass"}
+  ],
+  "limitations": [
+    "validate_scene now rejects output_group longer than 64 chars, matching scene-profile-v1.schema.json and the wire-layer 64-byte cap.",
+    "validate_policy now rejects calibrated-mode anchor_id longer than 64 chars, matching equal-loudness-policy-v1.schema.json.",
+    "SPEC-0002 anchor_id sentence updated to the bounded contract; contract tests cover 64/65-char boundaries."
+  ],
+  "logs": {},
+  "tool_versions": {"powershell": "pwsh local"},
+  "started_at": "2026-08-24T07:32:00+08:00",
+  "finished_at": "2026-08-24T07:36:00+08:00"
+}

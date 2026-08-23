@@ -4,7 +4,8 @@ namespace hibiki {
 
 bool validate_scene(const SceneProfileV1& scene) noexcept {
     if (scene.schema_version != 1 || scene.id.empty() || scene.name.empty() ||
-        scene.output_group.empty() || scene.limiter_dbtp > -1.0 || scene.limiter_dbtp < -20.0 ||
+        scene.output_group.empty() || scene.output_group.size() > 64U ||
+        scene.limiter_dbtp > -1.0 || scene.limiter_dbtp < -20.0 ||
         scene.lanes.size() > 32U ||
         scene.automation_timeline_ids.size() > 16U ||
         scene.ir_reference.size() > 64U ||

@@ -53,7 +53,8 @@ bool validate_policy(const EqualLoudnessPolicyV1& policy) noexcept {
         policy.measured_f3_hz < 0.0 || policy.measured_f3_hz > 20000.0) {
         return false;
     }
-    if (policy.mode == EqualLoudnessMode::Calibrated && policy.anchor_id.empty()) {
+    if (policy.mode == EqualLoudnessMode::Calibrated &&
+        (policy.anchor_id.empty() || policy.anchor_id.size() > 64U)) {
         return false;
     }
     if (policy.mode == EqualLoudnessMode::Calibrated &&
