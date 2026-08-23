@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "issue": 937,
+  "scope_digest": "driver-control-q1616-bounds-v1",
+  "source_commit": "6aca8c748e0e5a1c0f2b3d4e5f6a7b8c9d0e1f2a",
+  "environment_fingerprint": "windows-amd64-pwsh-schema-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 937",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass",
+      "required_paths": 85,
+      "specs": 24
+    },
+    {
+      "command": "source-policy",
+      "status": "pass",
+      "scanned_paths": 639
+    },
+    {
+      "command": "verify",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Schema-only contract tightening; no runtime code, IPC payload, DSP, driver, signing or physical-audio behavior changes.",
+    "The C++ int32_t wire format already enforces the same range at runtime; this change aligns the schema contract to match."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-24T23:30:00+08:00",
+  "finished_at": "2026-08-24T23:40:00+08:00"
+}
+
