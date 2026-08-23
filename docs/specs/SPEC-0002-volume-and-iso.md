@@ -85,6 +85,8 @@ Driver ABI 另外使用 Q16.16 dB；`db_to_q16_16`／`q16_16_to_db` 將量化集
 schema 與 runtime validator 一致地把相對增益 `endpoint_gain_db` 限制在 -144..+12 dB，
 並把絕對音壓級 `measured_1k_spl_db` 限制在 0..140 dB SPL，超出範圍的錨點
 在 metadata contract 層即被拒絕；
+`measured_f3_hz` 允許 0 作為「未量測」sentinel（schema 與 runtime 一致），上限 20000 Hz；
+`uncertainty_db` 上限 36 dB；`EqualLoudnessPolicyV1.measured_f3_hz` 同樣限制在 0..20000 Hz。
 JSON schema 的 `anchor_id` 欄位要求非空字串或 null，空字串一律拒絕。
 只有 speaker／headphone-coupler 才能回報 calibrated phon，`headphone-estimated` 永遠
 標示為估算，不能包裝成 HATS/coupler 測量。

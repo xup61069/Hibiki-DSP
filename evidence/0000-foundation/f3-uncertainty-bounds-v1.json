@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "issue": 970,
+  "scope_digest": "f3-uncertainty-bounds-v1",
+  "source_commit": "",
+  "environment_fingerprint": "windows-local-pwsh-f3-uncertainty-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 970",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/verify.ps1"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass",
+      "required_paths": 86,
+      "specs": 24
+    },
+    {
+      "command": "source-policy",
+      "status": "pass",
+      "scanned_paths": 651
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass",
+      "tests_passed": 3,
+      "tests_total": 3
+    }
+  ],
+  "limitations": [
+    "Schema+runtime F3 zero-semantics alignment and upper bounds (F3 max 20000 Hz, uncertainty_db max 36 dB) with contract tests and SPEC-0002 documentation; no product behavior or DSP order change.",
+    "No driver installation, loading, TESTSIGNING, certificate purchase or real-device changes were performed."
+  ],
+  "logs": {},
+  "tool_versions": {},
+  "started_at": "2026-08-25T01:30:00+08:00",
+  "finished_at": "2026-08-25T02:10:00+08:00"
+}
+
