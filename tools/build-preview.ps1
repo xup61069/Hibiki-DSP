@@ -1,3 +1,4 @@
+#Requires -Version 7
 [CmdletBinding()]
 param(
   [ValidateSet('WinUI', 'WinUICompat', 'DesktopCompat', 'ControlModel')][string]$Target = 'DesktopCompat',

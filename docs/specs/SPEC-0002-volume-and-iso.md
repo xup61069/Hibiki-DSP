@@ -82,6 +82,7 @@ Driver ABI 另外使用 Q16.16 dB；`db_to_q16_16`／`q16_16_to_db` 將量化集
 來源 context 做 ACK/read-back，而不靠浮點相等或時間猜測 feedback loop。
 
 `AcousticAnchorV1` 會保存 test signal、endpoint gain、1 kHz SPL、uncertainty 與 F3；
+JSON schema 的 `anchor_id` 欄位要求非空字串或 null，空字串一律拒絕。
 只有 speaker／headphone-coupler 才能回報 calibrated phon，`headphone-estimated` 永遠
 標示為估算，不能包裝成 HATS/coupler 測量。
 
