@@ -795,6 +795,16 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
+第三十一波整合增量已合併：Desktop Compatibility Preview 的 14 個互動控制項全部補上非空
+AccessibleName，涵蓋 session 選擇器、音量滑桿、路由欄位、場景與 IR 控制以及本機建立的
+output-group 下拉和連線按鈕；名稱沿用可見的繁中介面用語，Release build 與啟動 smoke 通過
+（Issue #747 / PR #749）。extension popup gate 追加 aria-labelledby 目標解析檢查：引用 ID
+必須存在於 popup markup 且解析到非空文字，壞引用即使同時提供 aria-label 也會 fail-closed，
+離線自檢覆蓋有效引用、缺失目標與空文字目標（Issue #748 / PR #750）。前者為 compat preview
+source/build/launch evidence，後者為 extension source/policy evidence。不宣稱正式
+XAML/accessibility runtime audit、螢幕閱讀器 runtime automation、實體音訊、driver
+安裝/載入/HLK 或 Microsoft signing。
+
 第三十波整合增量已合併：瀏覽器單分頁捕捉的 Start／Stop 失敗訊息保留到下一次使用者操作，
 不會被立即的狀態重繪蓋成 Idle；extension gate 同步要求 status.dataset.error 邊界並在
 自檢中驗證（Issue #724 / PR #727）。Compatibility Preview 開放與正式 shell 相同的
