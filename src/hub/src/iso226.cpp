@@ -50,7 +50,7 @@ bool validate_policy(const EqualLoudnessPolicyV1& policy) noexcept {
         !std::isfinite(policy.strength) || policy.strength < 0.0 || policy.strength > 1.0 ||
         !std::isfinite(policy.max_boost_db) || policy.max_boost_db < 0.0 ||
         policy.max_boost_db > 12.0 || !std::isfinite(policy.measured_f3_hz) ||
-        policy.measured_f3_hz < 0.0) {
+        policy.measured_f3_hz < 0.0 || policy.measured_f3_hz > 20000.0) {
         return false;
     }
     if (policy.mode == EqualLoudnessMode::Calibrated && policy.anchor_id.empty()) {
