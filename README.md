@@ -160,7 +160,8 @@ pwsh -File tools/driver-signability-check.ps1
 Desktop Compatibility Preview 只能驗證本機 ViewModel／啟動 smoke，不得代替 XAML、
 無障礙、driver 或發行驗收。
 
-多個 gate 另提供 `-SelfTest`（不碰機器即可驗證 gate 自身邏輯）。工作切片必須
+多個 gate 另提供 `-SelfTest`（不碰機器、不寫檔即可驗證 gate 自身邏輯，例：
+`pwsh -File tools/docs-check.ps1 -SelfTest`）。工作切片必須
 Issue／worktree／branch／handoff／draft PR 一對一，認領前檢查 branch 佔位；細節見
 `docs/ai/MULTI_AGENT.md`。
 
@@ -289,6 +290,16 @@ WaveRT driver、per-App capture/re-send、ASIO physical delivery 或完整音訊
 會啟動 sink。裝置切換的 handoff/crossfade 核心已在 `AudioEngineModel`，Engine Preview 目前
 只綁定明確 opt-in 的預設端點，避免把未驗證的實體交付誤報成完成。
 
+若要驗證 shared-mode sink 的實際 handoff，可執行額外的 opt-in live check：
+
+```powershell
+pwsh -File tools/live-wasapi-handoff-check.ps1
+```
+
+它只送靜音 block，輸出 mix format 與 aggregate worker counters；沒有可用 endpoint 時會如實
+記錄 `wasapi=unavailable`。這是 user-space handoff 邊界證據，不能當成已完成的 WaveRT driver、
+HLK 或 Microsoft signing 驗收。
+
 ### Per-App session routing（opt-in）
 
 若要在 Expert 預覽中查看 Windows App／工作階段清單與測試 per-App 控制，必須明確啟用 session
@@ -321,6 +332,16 @@ queue/COM worker 使用 bounded catalog handle 暫時衰減約 3 dB、讀回並�
 `evidence/0000-foundation/session-volume-live-v1.json`。
 同一個 probe 也會送出一個暫時的 `SessionRouteCommand`，確認 route catalog 回報 `Ready`；這是
 控制面 graph transaction 證據，不代表實體音訊已完成 per-App 重送。
+
+另有獨立的 App/session enumeration 探針，只讀取目前的工作階段清單：
+
+```powershell
+pwsh -File tools/live-audio-session-check.ps1
+```
+
+它只輸出 session／active 數量與固定 identity 語意，不輸出 PID、session ID、endpoint ID 或顯示
+名稱；這代表 enumeration boundary 可重跑，不代表每個 App 已完成實際 Lane routing 或 DSP
+delivery。
 
 ### 裝置目錄與 process-loopback 探針（opt-in）
 
