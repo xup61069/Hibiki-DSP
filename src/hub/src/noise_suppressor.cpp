@@ -39,6 +39,11 @@ bool BasicNoiseSuppressorV1::configure(const BasicNoiseSuppressorPolicyV1& polic
     sample_rate_ = sample_rate;
     channels_ = channels;
     threshold_linear_ = static_cast<float>(std::pow(10.0, policy.threshold_dbfs / 20.0));
+    // Upper-only hysteresis: the gate closes at the configured threshold
+    // (identical to prior behavior) but requires a 2 dB higher envelope to
+    // reopen. This prevents chatter when the signal hovers near threshold.
+    threshold_open_linear_ =
+        static_cast<float>(threshold_linear_ * std::pow(10.0, 2.0 / 20.0));
     floor_linear_ = static_cast<float>(std::pow(10.0, policy.floor_db / 20.0));
     highpass_alpha_ = policy.highpass_hz <= 0.0
                           ? 0.0F
@@ -57,6 +62,7 @@ bool BasicNoiseSuppressorV1::configure(const BasicNoiseSuppressorPolicyV1& polic
 void BasicNoiseSuppressorV1::reset() noexcept {
     envelope_.fill(0.0F);
     gain_.fill(1.0F);
+    gate_open_.fill(false);
     previous_input_.fill(0.0F);
     highpass_state_.fill(0.0F);
 }
@@ -81,7 +87,14 @@ bool BasicNoiseSuppressorV1::process_interleaved(float* const interleaved,
                                             ? envelope_attack_coeff_
                                             : envelope_release_coeff_;
             envelope_[channel] += envelope_coeff * (magnitude - envelope_[channel]);
-            const auto desired_gain = envelope_[channel] < threshold_linear_ ? floor_linear_ : 1.0F;
+            // Upper-only hysteresis prevents chatter: close at the configured
+            // threshold, reopen only 2 dB higher; hold between.
+            if (!gate_open_[channel] && envelope_[channel] >= threshold_open_linear_) {
+                gate_open_[channel] = true;
+            } else if (gate_open_[channel] && envelope_[channel] < threshold_linear_) {
+                gate_open_[channel] = false;
+            }
+            const auto desired_gain = gate_open_[channel] ? 1.0F : floor_linear_;
             // Attack (attack_ms) controls how fast the gate OPENS as the signal
             // rises above threshold; release (release_ms) controls how fast it
             // CLOSES after the signal falls below threshold.
