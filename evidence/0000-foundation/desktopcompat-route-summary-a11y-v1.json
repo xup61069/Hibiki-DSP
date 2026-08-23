@@ -1,0 +1,30 @@
+{
+  "$schema": "evidence/0000-foundation/schema/evidence-entry-v1.json",
+  "id": "desktopcompat-route-summary-a11y-v1",
+  "title": "Preview route health projects full AccessibleSummary (name + state + boundary detail)",
+  "source_commit": null,
+  "date": "2026-08-23",
+  "scope": [
+    "apps/control-model/ExpertSurfaceModel.cs",
+    "apps/control-model-check/Program.cs",
+    "apps/desktop-compat-preview/Program.cs",
+    "apps/winui-shell/MainWindow.CompatibilityPreview.cs",
+    "tools/winui-shell-check.ps1"
+  ],
+  "what_it_proves": [
+    "ExpertSurfaceModel.RouteHealthAccessibleSummary composes 'name：state。detail' per card with the same prefix/empty-snapshot wording as DesktopCompat; ApplyRouteHealth raises change notification so bindings refresh.",
+    "DesktopCompat renders _routes.Text directly from RouteHealthAccessibleSummary instead of Name/StateLabel fragments.",
+    "Compatibility Preview exposes a read-only route status TextBlock bound to Expert.RouteHealthAccessibleSummary with AutomationProperties.Name='路由健康狀態摘要'.",
+    "control-model-check asserts the composed summary includes full boundary detail for both snapshot cards.",
+    "winui-shell-check fails closed if either preview stops referencing Expert.RouteHealthAccessibleSummary."
+  ],
+  "verification_commands": [
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "pwsh -NoProfile -File tools/winui-shell-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/winui-shell-check.ps1"
+  ],
+  "limitations": [
+    "Source-level and contract-model evidence only; no screen-reader/UIA runtime session was exercised.",
+    "No physical audio, driver install/load, HLK or Microsoft signing claim."
+  ]
+}
