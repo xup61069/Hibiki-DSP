@@ -8,7 +8,7 @@
   "properties": {
     "schema_version": {"const": 1},
     "message_type": {"enum": ["hello", "volume-notification", "endpoint-state", "ack", "error"]},
-    "request_id": {"type": "integer", "minimum": 0},
+    "request_id": {"type": "integer", "minimum": 1, "maximum": 18446744073709551615},
     "endpoint_guid": {"type": "string", "minLength": 1, "maxLength": 39},
     "event_context_guid": {"type": "string", "maxLength": 39},
     "channel_count": {"enum": [2, 6, 8]},

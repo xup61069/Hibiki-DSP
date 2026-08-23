@@ -87,7 +87,8 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   以 request ID 建立 driver/user-space correlation；v1 不攜帶自由格式錯誤文字或未界定
   payload，避免把 kernel IPC 變成隱含的變長配置協定。`schemas/driver-control-v1.schema.json`
   以條件式規則強制同一 split：Hello／Ack／Error 只允許 `schema_version`、`message_type` 與
-  `request_id`；volume-notification 與 endpoint-state 必須攜帶完整 state 欄位組
+  `request_id`；volume-notification 與 endpoint-state 必須攜帶完整 state 欄位組，
+  且兩者的 correlation `request_id` 同樣必須非零
   （非空 GUID、LPCM 格式、Q16.16 dB、mute、非零 generation、actuator）。schema 的
   `endpoint_guid` 必須至少一個字元，與 GPL engine 拒絕空 endpoint GUID 的行為一致；
   `event_context_guid` 允許空字串，代表「沒有要忽略的 event context」。
