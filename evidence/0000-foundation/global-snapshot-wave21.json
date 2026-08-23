@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "issue": 642,
+  "scope_digest": "global-snapshot-wave21",
+  "source_commit": null,
+  "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-wdk-26100-pwsh-7.6; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 642",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #628 / PR #631 merged: Engine Preview exits code 3 when it cannot own the canonical control pipe (FILE_FLAG_FIRST_PIPE_INSTANCE fail-closed boundary)",
+        "Issue #633 / PR #635 merged: staged DbgPrintEx diagnostics across PortCls adapter start path with explicit no-load/no-runtime-audio limits"
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; no product source, driver runtime, installer or machine state is changed.",
+    "Driver install/load/HLK/Microsoft signing and runtime audio remain release-stage evidence and are not claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6 local"
+  },
+  "started_at": "2026-08-23T15:35:00+08:00",
+  "finished_at": "2026-08-23T15:40:00+08:00"
+}
