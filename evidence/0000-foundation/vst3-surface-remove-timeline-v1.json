@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 600,
   "scope_digest": "vst3-surface-remove-timeline-v1",
-  "source_commit": null,
+  "source_commit": "f037343e5d1d09785fa5a13910d53bf54a9cf820",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-dotnet-10.0.400-pwsh-7.6.4",
   "commands": [
     "pwsh -NoProfile -File tools/control-model-check.ps1",
@@ -10,7 +10,8 @@
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 600",
     "pwsh -NoProfile -File tools/docs-check.ps1",
     "pwsh -NoProfile -File tools/source-policy.ps1",
-    "pwsh -NoProfile -File tools/source-only-ci-check.ps1"
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
   ],
   "results": [],
   "validation": [
@@ -28,6 +29,13 @@
       "coverage": [
         "Vst3TimelineSurfaceModelV1.RemoveSelected refuses during an open draft, clears selection/published/baseline/history on success and keeps other stored timelines",
         "Vst3TimelineEditorViewModel.RemoveSelectedTimeline refreshes ids/rows, clears the stale row index and reports the outcome through status text and notifications"
+      ]
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 600 / docs-check / source-policy / source-only-ci-check / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "Scoped handoff ownership/scope validation, document freshness (80 required paths), source-only policy over 549 tracked paths and whitespace checks all passed on the recovery branch"
       ]
     }
   ],
