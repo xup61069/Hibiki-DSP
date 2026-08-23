@@ -1,0 +1,62 @@
+{
+  "schema_version": 2,
+  "issue": 679,
+  "title": "Align VST3 timeline editor naming and bindable fields",
+  "base_commit": "48838efe2805f2cc722b5db6261791bb8169c55c",
+  "summary": {
+    "tools": [
+      "apps/control-model-check/Program.cs",
+      "tools/control-model-check.ps1",
+      "tools/build-preview.ps1",
+      "tools/winui-shell-check.ps1",
+      "tools/verify.ps1"
+    ],
+    "behavior": "The merged Expert WinUI surface and compatibility preview now use Vst3TimelineEditorViewModelV1. Timeline registration and selected-row value editing use observable two-way fields; safe selection bindings reuse the fail-closed Select path. The seam remains local control-model work and sends no engine IPC or RT-thread work.",
+    "api_change": "Renamed the editor ViewModel to the #667 acceptance name and added observable NewTimelineIdText/SelectedRowValueText plus a safe writable SelectedTimelineId projection.",
+    "scope_boundary": "No native supervisor persistence, plugin application, engine synchronization or host automation is claimed."
+  },
+  "validation": [
+    {
+      "notes": "",
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 679",
+      "result": "pass"
+    },
+    {
+      "notes": "80 required paths / 24 specs",
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1",
+      "result": "pass"
+    },
+    {
+      "notes": "",
+      "command": "pwsh -NoProfile -File tools/source-policy.ps1",
+      "result": "pass"
+    },
+    {
+      "notes": "",
+      "command": "git diff --check",
+      "result": "pass"
+    },
+    {
+      "notes": "includes V1 observable-field and safe-selection cases",
+      "command": "pwsh -NoProfile -File tools/control-model-check.ps1",
+      "result": "pass"
+    },
+    {
+      "notes": "49 interactive controls with accessibility names",
+      "command": "pwsh -NoProfile -File tools/winui-shell-check.ps1",
+      "result": "pass"
+    },
+    {
+      "notes": "compatibility preview compiled with the V1 seam",
+      "command": "pwsh -NoProfile -File tools/build-preview.ps1 -Target DesktopCompat",
+      "result": "pass"
+    },
+    {
+      "notes": "3/3 native contract tests passed",
+      "command": "pwsh -NoProfile -File tools/verify.ps1",
+      "result": "pass"
+    }
+  ],
+  "scope": "WinUI Expert local timeline editor binding, compatibility preview seam, control-model checks and SPEC-0010 boundary update.",
+  "date": "2026-08-23"
+}

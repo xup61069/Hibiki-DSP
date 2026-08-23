@@ -134,8 +134,8 @@ public sealed partial class MainWindow : Window
 
     private void OnVst3RegisterClick(object sender, RoutedEventArgs e)
     {
-        ViewModel.Vst3TimelineEditor.RegisterTimeline(Vst3NewTimelineIdBox.Text);
-        Vst3NewTimelineIdBox.Text = string.Empty;
+        ViewModel.Vst3TimelineEditor.RegisterTimeline(ViewModel.Vst3TimelineEditor.NewTimelineIdText);
+        ViewModel.Vst3TimelineEditor.NewTimelineIdText = string.Empty;
     }
 
     private void OnVst3UpsertClick(object sender, RoutedEventArgs e)
@@ -151,8 +151,8 @@ public sealed partial class MainWindow : Window
 
     private void OnVst3SetRowValueClick(object sender, RoutedEventArgs e)
     {
-        ViewModel.Vst3TimelineEditor.SetSelectedRowValue(Vst3RowValueBox.Text);
-        Vst3RowValueBox.Text = string.Empty;
+            ViewModel.Vst3TimelineEditor.SetSelectedRowValue(ViewModel.Vst3TimelineEditor.SelectedRowValueText);
+        ViewModel.Vst3TimelineEditor.SelectedRowValueText = string.Empty;
     }
 
     private void OnVst3RemoveRowClick(object sender, RoutedEventArgs e)

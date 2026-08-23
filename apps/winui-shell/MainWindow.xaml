@@ -555,7 +555,7 @@
                                                 Style="{StaticResource AccentButtonStyle}"
                                                 AutomationProperties.Name="加入時間軸事件" />
                                         <TextBox Header="更新值" Width="120"
-                                                 x:Name="Vst3RowValueBox"
+                                                 Text="{Binding Vst3TimelineEditor.SelectedRowValueText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                  AutomationProperties.Name="修改選取列的值" />
                                         <Button Content="更新選取列" Click="OnVst3SetRowValueClick"
                                                 AutomationProperties.Name="更新選取列數值" />
@@ -564,7 +564,8 @@
                                         <Button Content="註冊新時間軸" Click="OnVst3RegisterClick"
                                                 AutomationProperties.Name="註冊新時間軸" />
                                     </StackPanel>
-                                    <TextBox x:Name="Vst3NewTimelineIdBox" Header="新時間軸 ID" PlaceholderText="例如 game-bgm"
+                                    <TextBox Header="新時間軸 ID" PlaceholderText="例如 game-bgm"
+                                             Text="{Binding Vst3TimelineEditor.NewTimelineIdText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                              AutomationProperties.Name="新時間軸 ID" />
                                     <Border CornerRadius="999" Padding="12,5" HorizontalAlignment="Left"
                                             Background="{ThemeResource SubtleFillColorSecondaryBrush}"
