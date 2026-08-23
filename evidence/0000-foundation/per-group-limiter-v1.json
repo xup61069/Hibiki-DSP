@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "issue": 683,
+  "scope_digest": "per-group-limiter-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6",
+  "commands": [
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/verify.ps1",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/handoff-check.ps1 -Issue 683",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/docs-check.ps1",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "hibiki_asio_transport_selftest: pass",
+        "hibiki_tab_bridge_selftest: pass",
+        "hibiki_contract_tests: pass including per-output-group limiter isolation regression"
+      ],
+      "compiled_artifacts": true,
+      "case_count": 3
+    }
+  ],
+  "changes": [
+    {
+      "file": "src/hub/include/hibiki/volume_state.hpp",
+      "summary": "Embed a fixed-capacity true-peak limiter in every output group slot."
+    },
+    {
+      "file": "src/hub/src/volume_state.cpp",
+      "summary": "Resolve the per-slot limiter without allocation and reset all registered groups on graph commit."
+    },
+    {
+      "file": "src/hub/include/hibiki/audio_engine.hpp",
+      "summary": "Name the engine-level limiter as main-only."
+    },
+    {
+      "file": "src/hub/src/audio_engine.cpp",
+      "summary": "Route main renders to the main limiter and grouped renders to their own limiter; reset all per-group limiters on commit."
+    },
+    {
+      "file": "tests/unit/contract_tests.cpp",
+      "summary": "Add regression proving movie loud engagement does not duck the next quiet main block."
+    },
+    {
+      "file": "docs/specs/SPEC-0002-volume-and-iso.md",
+      "summary": "Document the fixed-storage per-output-group limiter boundary."
+    }
+  ],
+  "limitations": [
+    "User-space contract only; no physical endpoint, driver, HLK, Microsoft-signing, or listening-test claim is made.",
+    "The guard remains a bounded estimator, not an ITU/BS.1770 conformance meter."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "cmake": "4.4.0",
+    "msbuild": "18.9.1.35102",
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-24T02:35:00+08:00",
+  "finished_at": "2026-08-24T03:20:00+08:00"
+}

@@ -167,6 +167,19 @@ bool OutputGroupVolumeBankV1::has_group(const std::string_view output_group) con
     return find_slot(output_group) != nullptr;
 }
 
+TruePeakLimiterV1* OutputGroupVolumeBankV1::limiter_for_group(
+    const std::string_view output_group) const noexcept {
+    auto* const slot = const_cast<OutputGroupVolumeBankV1::Slot*>(
+        find_slot(output_group));
+    return slot != nullptr ? &slot->limiter : nullptr;
+}
+
+void OutputGroupVolumeBankV1::reset_limiters() const noexcept {
+    for (auto& slot : slots_) {
+        if (slot.used) slot.limiter.reset();
+    }
+}
+
 VolumeNotificationResult OutputGroupVolumeBankV1::apply_windows_notification(
     const std::string_view output_group,
     const VolumeNotificationV1& notification) noexcept {
