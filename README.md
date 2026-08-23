@@ -49,7 +49,7 @@ Hibiki DSP 是一個公開開發中的 Windows 音訊平台。長期目標是「
 | Windows 音量 | `IAudioEndpointVolume` dB/mute bridge、safety state 與 Group Master 單次增益 contract | target 24H2 的長時間實機／服務重啟 soak |
 | per-App | session catalog、暫時 handle、volume／route／route-rule command、Expert 預設與歧義 fail-closed | 所有 App 的實體 capture/re-send、Chrome 單分頁自動攔截 |
 | UX | UI-independent control model、source-only WinUI shell、本機 formal XAML build／UIA smoke | target 環境完整無障礙實測與長時間 preview 驗收 |
-| Driver／發行 | MS-PL SYSVAD-derived source boundary、本機 WDK `.sys` 建置＋Inf2Cat 封裝、self-signed test-sign evidence、INF source、installer/manifest policy | 可安裝／載入的 WaveRT driver、runtime audio、HLK、Microsoft 簽章、Gumroad 正式交付 |
+| Driver／發行 | MS-PL SYSVAD-derived source boundary、本機 WDK `.sys` 建置＋Inf2Cat 封裝、self-signed test-sign evidence、INF source、installer/manifest policy；隔離 Hyper-V guest 已完成 test-signed 套件安裝與穩定重啟（PnP start PASS、ProblemCode 0） | 實體音訊播放／WaveRT streaming 行為、HLK 認證、Microsoft 簽章、Gumroad 正式交付 |
 
 詳細已完成項目、證據與限制看 [baseline](docs/state/BASELINE.md)。不要把 contract test 或
 source gate 誤解為已完成硬體驗收。
@@ -90,7 +90,7 @@ Authenticode 簽章 installer，經 Gumroad 交付。
 
 | 類型 | 內容 | 能不能靠寫程式解決？ |
 | --- | --- | --- |
-| **工程** | driver 的 install/load/runtime-audio 接線與實機驗證（本機已能建置並測試簽署 PortCls adapter `.sys`，但尚未安裝／出聲）；WinUI target 環境複驗；長時間 soak 工具；installer 打包整合 | ✅ 可以，已在進行 |
+| **工程** | driver 的 runtime-audio 接線與實機驗證（隔離 guest 已完成 test-signed 安裝與穩定重啟，實體音訊尚未出聲）；WinUI target 環境複驗；長時間 soak 工具；installer 打包整合 | ✅ 可以，已在進行 |
 | **環境** | 一台鎖定規格的目標機器（Windows 11 24H2+ x64、VS 2026、SDK/WDK >= 10.0.26100 最低基線）；測試用實體音訊裝置 | ❌ 要準備機器 |
 | **行政／法務** | Microsoft 硬體開發者帳號與驅動簽章流程；Authenticode 憑證；Gumroad 帳號；ISO 226 係數授權確認 | ❌ 要申請與等待 |
 
@@ -98,9 +98,9 @@ Authenticode 簽章 installer，經 Gumroad 交付。
 
 | # | 里程碑 | 目前狀態 | 主要卡點 |
 | --- | --- | --- | --- |
-| M0 | 目標機器 toolchain 就位（`doctor.ps1` 全綠） | 本機已符合 ADR-0005 的 SDK/WDK >= 10.0.26100 最低基線；driver 的 Hyper-V VM 隔離載入測試環境建置中（Issue #462）；正式 target 機器仍待指定與複驗 | 環境：鎖定 target 機器尚未到位 |
+| M0 | 目標機器 toolchain 就位（`doctor.ps1` 全綠） | 本機已符合 ADR-0005 的 SDK/WDK >= 10.0.26100 最低基線；driver 已在隔離 Hyper-V guest 完成同意重測（test-signed 安裝＋穩定重啟通過，Issue #462 / PR #850）；正式 target 機器仍待指定與複驗 | 環境：鎖定 target 機器尚未到位 |
 | M1 | WinUI XAML 正式建置＋無障礙 smoke | 本機 VS2026 已完成 formal XAML build 與 UIA smoke；target 環境複驗待 M0 | 工程（小）：target 複驗＋M0 |
-| M2 | 第一個可安裝的簽章 WaveRT 虛擬端點 | 本機已有第一次 kernel-mode PortCls adapter `.sys` build、Inf2Cat 封裝與 self-signed test-sign evidence；仍未安裝／載入，離 Microsoft-signed installable endpoint 還差 runtime 接線與行政流程 | **工程：install/load/runtime 接線與實機驗證** ＋ 簽章帳號（行政） |
+| M2 | 第一個可安裝的簽章 WaveRT 虛擬端點 | 本機已有 kernel-mode PortCls adapter `.sys` build、Inf2Cat 封裝與 self-signed test-sign evidence；隔離 guest 已完成安裝與穩定重啟（PnP start PASS）；實體音訊播放、真實裝置 soak 與 Microsoft-signed installable endpoint 仍待完成 | **工程：runtime audio 接線與實機驗證** ＋ 簽章帳號（行政） |
 | M3 | 引擎 → 虛擬端點實際出聲＋長時間 soak | driver 已有 local build/test-sign evidence；引擎到虛擬端點的實機音訊一次都沒跑過 | M2 ＋ 環境 |
 | M4 | 簽章 installer＋Gumroad 正式交付 | ReleaseManifest 政策與 installer 來源已定義 | M3 ＋ 憑證／帳號（行政） |
 
@@ -108,15 +108,17 @@ Authenticode 簽章 installer，經 Gumroad 交付。
 
 - **控制面與 DSP 的程式大致就緒**：今天為止已有數十個 fail-closed 合約切片與
   user-space live probe（音量聯動、per-App 控制、裝置目錄、自動化時間軸鏈）。
-- **最大的單一工程缺口是 driver 的 install/load/runtime 驗證**——本機已能把通過合約測試的
-  原始碼建成本地 kernel-mode `.sys`、封裝並做 self-signed test-sign；但「真的能安裝、載入、
-  出聲且通過長時間 soak」還沒發生。
+- **最大的單一工程缺口是 driver 的 runtime audio 驗證**——本機已能把通過合約測試的
+  原始碼建成本地 kernel-mode `.sys`、封裝並做 self-signed test-sign；隔離 guest 也已
+  證明「真的能安裝、載入並穩定重啟」（匿名 PnP-start evidence），但「出聲且通過長時間
+  soak」還沒發生。
 - **近期非工程前置是 M0 的 target 機器**；Microsoft Hardware Program／正式簽章不阻擋
   source、DSP、UI、一般 CI 或本機 test-signing，只在 consumer driver／installer release
   進入 M2/M4 驗收時成為必要行政流程。
-- 所以誠實的答案是：**V1 沒有日期**。瓶頸不在「能不能編出 `.sys`」，而在實機 install/load/
-  runtime audio 驗證的環境到位與簽章／發行帳號的行政流程。M0 到位後，driver 要從現有的
-  build/test-sign evidence 繼續往可載入端點推進；M3/M4 再疊上實機 soak 與簽章等待期。
+- 所以誠實的答案是：**V1 沒有日期**。瓶頸不在「能不能編出 `.sys`」或「能不能在測試環境
+  安裝載入」（兩者都已有 evidence），而在實體音訊驗證環境到位與簽章／發行帳號的行政流程。
+  M0 到位後，driver 要從現有的 isolated-guest evidence 繼續往實際出聲推進；M3/M4 再疊上
+  實機 soak 與簽章等待期。
 
 ---
 
