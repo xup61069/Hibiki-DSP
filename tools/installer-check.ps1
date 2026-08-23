@@ -95,8 +95,22 @@ $null = "sbom_digest"
 
   $caseCount = 0
   $tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("hibiki-installer-selftest-" + [Guid]::NewGuid().ToString("N"))
+  $originalTempEnvironment = $env:TEMP
+  $originalTmpEnvironment = $env:TMP
 
   try {
+    New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+    # Invoke-PayloadUninstall creates its backup directly below GetTempPath().
+    # Redirect only this pwsh process so residue assertions observe the exact
+    # root exercised by the production function, then restore it in finally.
+    $env:TEMP = $tempRoot
+    $env:TMP = $tempRoot
+    $expectedTempRoot = [IO.Path]::GetFullPath($tempRoot).TrimEnd([char[]]@('\', '/'))
+    $actualTempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([char[]]@('\', '/'))
+    if (-not $actualTempRoot.Equals($expectedTempRoot, [StringComparison]::OrdinalIgnoreCase)) {
+      throw "SelfTest process temp redirect failed: expected '$expectedTempRoot', got '$actualTempRoot'."
+    }
+
     # Case 1: valid fixture parses and satisfies all boundaries.
     Assert-InstallerParseInput -Text $validFixture -SourceName 'selftest-valid'
     Assert-InstallerSourcePolicy -Text $validFixture -SourceName 'selftest-valid'
@@ -145,7 +159,6 @@ $null = "sbom_digest"
     $caseCount++
 
     # Case 5: destination accepts valid absolute path and canonicalizes it.
-    New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
     $destDir = Join-Path $tempRoot 'dest'
     $resolved = Resolve-HibikiDestination $destDir
     if (-not ([IO.Path]::IsPathRooted($resolved))) { throw 'SelfTest expected rooted resolved destination.' }
@@ -202,7 +215,18 @@ $null = "sbom_digest"
     if ($restoredContent.Trim() -ne 'prior-install-content') { throw 'SelfTest expected prior file restored.' }
     $caseCount++
 
-    # Case 10: uninstall plan rejects traversal entries that escape DestinationPath.
+    # Case 10: the residue assertion fails closed against the same process temp
+    # root used by Invoke-PayloadUninstall, then passes after fixture cleanup.
+    $retainedBackup = Join-Path $tempRoot '.hibiki-uninstall-backup-retained-selftest'
+    New-Item -ItemType Directory -Path $retainedBackup -Force | Out-Null
+    $caught = $false
+    try { Assert-NoUninstallBackupResidue -TempRoot $actualTempRoot } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected retained uninstall backup detection.' }
+    Remove-Item -LiteralPath $retainedBackup -Recurse -Force
+    Assert-NoUninstallBackupResidue -TempRoot $actualTempRoot
+    $caseCount++
+
+    # Case 11: uninstall plan rejects traversal entries that escape DestinationPath.
     $uninstallDest = Join-Path $tempRoot 'uninstall-dest'
     New-Item -ItemType Directory -Path $uninstallDest -Force | Out-Null
     $uninstallTraversalManifest = @{ unsigned_files = @(@{ path = '../uninstall-escape.txt'; sha256 = ('0' * 64) }) }
@@ -211,7 +235,7 @@ $null = "sbom_digest"
     if (-not $caught) { throw 'SelfTest expected uninstall-plan traversal failure.' }
     $caseCount++
 
-    # Case 11: successful uninstall removes only planned files, preserves siblings,
+    # Case 12: successful uninstall removes only planned files, preserves siblings,
     # reports the removal count, is idempotent and leaves no backup residue.
     $nestedPayloadDir = Join-Path $uninstallDest 'components'
     New-Item -ItemType Directory -Path $nestedPayloadDir -Force | Out-Null
@@ -244,16 +268,16 @@ $null = "sbom_digest"
     if ((Get-Content -LiteralPath (Join-Path $uninstallDest 'preserve.txt') -Raw).Trim() -ne 'keep-sibling') {
       throw 'SelfTest expected preserved sibling content to remain unchanged.'
     }
-    Assert-NoUninstallBackupResidue -TempRoot $tempRoot
+    Assert-NoUninstallBackupResidue -TempRoot $actualTempRoot
     $idempotentPlan = Get-UninstallPlan $successManifest $uninstallDest
     $idempotentOutput = Invoke-PayloadUninstall -Plan $idempotentPlan -Destination $uninstallDest 6>&1
     if (($idempotentOutput -join "`n") -notmatch 'Removed 0 payload file\(s\)\.') {
       throw 'SelfTest expected repeated uninstall to report zero removals.'
     }
-    Assert-NoUninstallBackupResidue -TempRoot $tempRoot
+    Assert-NoUninstallBackupResidue -TempRoot $actualTempRoot
     $caseCount++
 
-    # Case 12: failure on the second planned file restores the first removed file
+    # Case 13: failure on the second planned file restores the first removed file
     # byte-identically, preserves the locked original and removes backup residue.
     $rollbackDest = Join-Path $tempRoot 'uninstall-rollback'
     New-Item -ItemType Directory -Path $rollbackDest -Force | Out-Null
@@ -288,12 +312,18 @@ $null = "sbom_digest"
     if ((Get-Content -LiteralPath $rollbackSecond -Raw).Trim() -ne 'locked-original') {
       throw 'SelfTest expected locked file content to remain unchanged.'
     }
-    Assert-NoUninstallBackupResidue -TempRoot $tempRoot
+    Assert-NoUninstallBackupResidue -TempRoot $actualTempRoot
     $caseCount++
   } finally {
+    $env:TEMP = $originalTempEnvironment
+    $env:TMP = $originalTmpEnvironment
     if (Test-Path -LiteralPath $tempRoot) {
       Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
+  }
+  if (-not [object]::Equals($env:TEMP, $originalTempEnvironment) -or
+      -not [object]::Equals($env:TMP, $originalTmpEnvironment)) {
+    throw 'SelfTest failed to restore the original process TEMP/TMP environment.'
   }
 
   Write-Output "Installer source gate self-test passed ($caseCount cases)."
