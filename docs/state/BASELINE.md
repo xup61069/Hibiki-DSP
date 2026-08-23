@@ -795,6 +795,19 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
+第二十九波整合增量已合併：瀏覽器單分頁捕捉在 popup 訊息失敗時保留真實錯誤，直到使用者
+下一次操作才更新；popup 只接受帶成功標記的回應，其他情況顯示誠實的 fallback 錯誤
+（Issue #702 / PR #704、Issue #715 / PR #719）。來源音訊自然結束時，捕捉 graph 完整
+teardown 並廣播 Idle，service worker 會冪等地關閉隱藏 offscreen 文件，避免殘留背景狀態
+（Issue #706 / PR #707、Issue #714 / PR #716）。extension gate 強制 service worker 非同步
+回應通道保持開啟（Issue #708）。Compatibility Preview launch smoke 建置前先把過期輸出
+移到 .local/preview/_trash，減少舊檔被誤認為新結果（Issue #713 / PR #717）。SPEC-0009
+記錄 failure 與 stream-ended 邊界；extensions README 說明 Start/Stop 生命週期與 bridge
+indicator（Issue #710 / PR #711、Issue #712 / PR #718）。dotnet CLI MSBuild host boundary
+澄清為本機工具鏈稽核事實：VS 2026 已安裝，但 dotnet CLI 本身不載入 VS Appx tasks
+（Issue #720 / PR #721）。皆為 extension source/policy/docs、compat preview tooling 與
+documentation evidence。不宣稱實體音訊、driver 安裝/載入/HLK 或 Microsoft signing。
+
 第二十八波整合增量已合併：瀏覽器單分頁捕捉的 offscreen start／stop listener 保留非同步
 回應通道，成功啟動不再因回應通道提早關閉而被誤報為失敗（Issue #681 / PR #692）。
 Compatibility Preview 的 WinUICompat target 恢復編譯與啟動 smoke，Core MRT 資源初始化修復

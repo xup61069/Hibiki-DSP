@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "issue": 725,
+  "scope_digest": "global-snapshot-wave29",
+  "source_commit": null,
+  "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100-pwsh-7.6; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 725",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #702 / PR #704 merged: popup error recovery keeps the real capture-failure message visible until the next user action instead of replacing it with stale or misleading state.",
+        "Wave28 snapshot (#698 / PR #700) recorded the async start/stop response fix, per-group limiter state and Engine Preview soak harness before this wave.",
+        "Issue #708 merged: extension policy enforces that offscreen service-worker response channels stay open for asynchronous replies.",
+        "Issue #706 / PR #707 merged: when the captured source stream ends naturally, the tab-capture graph is fully released and Idle is broadcast to listeners.",
+        "Issue #714 / PR #716 merged: after natural stream end the service worker idempotently closes the hidden offscreen document so no hidden page lingers behind the popup.",
+        "Issue #715 / PR #719 merged: popup control accepts only responses with an explicit success flag and otherwise surfaces an honest fallback error; policy checks cover the response boundary.",
+        "Issue #713 / PR #717 merged: Compatibility Preview launch smoke stages stale build outputs into .local/preview/_trash before building, reducing false verification results from old files.",
+        "Issue #710 / PR #711 merged: SPEC-0009 records tab-capture failure and stream-ended boundaries.",
+        "Issue #712 / PR #718 merged: extensions README documents the Start/Stop lifecycle and bridge indicator behavior.",
+        "Issue #720 / PR #721 merged: MRT toolchain audit wording now states as a local audit fact that VS 2026 is installed while the dotnet CLI itself does not load Visual Studio Appx tasks."
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; this update does not change product source behavior.",
+    "The popup/offscreen items remain extension source and policy-gate evidence; no vendor browser capture-control claim beyond Hibiki's own response handling.",
+    "The clean-smoke item remains local compatibility-preview tooling evidence; no formal XAML, accessibility, launch-stability, audio or driver claim.",
+    "The SPEC/README items are documentation updates; they do not by themselves prove runtime behavior on every browser or Windows configuration.",
+    "The toolchain item remains a local audit observation about the dotnet CLI MSBuild host boundary; it is not Microsoft signing evidence.",
+    "No driver install/load/HLK/Microsoft signing claim."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-23T20:12:00+08:00",
+  "finished_at": "2026-08-23T20:19:26+08:00"
+}
