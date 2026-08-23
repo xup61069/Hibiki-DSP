@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "slice": "driver-vm-load-test",
+  "issue": 462,
+  "date": "2026-08-23T03:30:00Z",
+  "machine_fingerprint": "windows-26200-amd64-hyperv-gen2-4-vcpu-4gb",
+  "scope_boundary": {
+    "purpose": "Isolated VM load test of the locally signed WaveRT adapter package using official Windows 11 Enterprise Evaluation media.",
+    "not_claimed": [
+      "physical audio playback",
+      "WaveRT streaming behavior",
+      "HLK certification",
+      "Microsoft signing or consumer release readiness"
+    ]
+  },
+  "environment": {
+    "media_source": "official Win11 25H2 Enterprise Evaluation ISO",
+    "vm_configuration": [
+      "Generation 2 VM",
+      "4 fixed GB memory",
+      "4 vCPU",
+      "Default Switch",
+      "Secure Boot disabled for local test-signing evaluation"
+    ],
+    "test_signing_enabled": true
+  },
+  "steps": [
+    {
+      "command": "DISM /Apply-Image to a fresh VHDX; bcdboot EFI repair",
+      "result": "Windows booted successfully in the isolated VM."
+    },
+    {
+      "command": "bcdedit /set testsigning yes (offline BCD then in-guest verification)",
+      "result": "testsigning=Yes confirmed inside the guest."
+    },
+    {
+      "command": "certutil -addstore Root C:\HibikiDriverPackage\hibiki-test-sign.cer during SetupComplete",
+      "result": "Root certificate import succeeded."
+    },
+    {
+      "command": "certutil -addstore TrustedPublisher C:\HibikiDriverPackage\hibiki-test-sign.cer during SetupComplete",
+      "result": "FAILED with store-not-found; Driver Store consequently rejected the catalog with 0xE0000242 and reported an untrusted publisher.",
+      "diagnostic": "setupapi.dev.log recorded catalog validation, root trust, then publisher-trust failure."
+    },
+    {
+      "command": "Import-Certificate -CertStoreLocation Cert:\LocalMachine\TrustedPublisher followed by pnputil /add-driver ... /install",
+      "result": "TrustedPublisher certificate imported; driver package staged successfully as oem2.inf.",
+      "diagnostic": "pnputil exit code 0. This command stages the package but does not create a Root-enumerated device."
+    },
+    {
+      "command": "devcon install C:\HibikiDriverPackage\HibikiVirtualAudio.inf Root\HibikiDSP",
+      "result": "Root device node created; service installed; drivers copied from Driver Store.",
+      "diagnostic": "Device entered CM_PROB_FAILED_START with problem status 0xC000000D after PnP start."
+    },
+    {
+      "command": "Disable-PnpDevice / Enable-PnpDevice restart cycle",
+      "result": "Failure remained reproducible, confirming this was not transient boot state."
+    }
+  ],
+  "final_state": {
+    "driver_store": "HibikiVirtualAudio.inf staged as oem2.inf",
+    "device_node": "ROOT\MEDIA\0000 present with MEDIA class",
+    "service": "HibikiVirtualAudio installed but stopped",
+    "pnp_status": "CM_PROB_FAILED_START (code 10), NTSTATUS 0xC000000D",
+    "sound_device_visible": false,
+    "interpretation": "Package installation and signature trust are proven; runtime adapter start is not yet successful."
+  },
+  "claims": "Anonymous VM provisioning, test-signing configuration, package staging, publisher-trust recovery and reproducible failed-start evidence only. No endpoint/audio behavior, physical-device, HLK or release claim.",
+  "next_safe_action": "Diagnose the PortCls adapter start path against the existing WDK descriptor fixes before another guest installation attempt."
+}
