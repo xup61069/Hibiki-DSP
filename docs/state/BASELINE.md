@@ -795,6 +795,17 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
+第二十八波整合增量已合併：瀏覽器單分頁捕捉的 offscreen start／stop listener 保留非同步
+回應通道，成功啟動不再因回應通道提早關閉而被誤報為失敗（Issue #681 / PR #692）。
+Compatibility Preview 的 WinUICompat target 恢復編譯與啟動 smoke，Core MRT 資源初始化修復
+0xC000027B，隨後清除暫時 dead-code TextBox seam 且無運行行為變化（Issue #687 / PR #694、
+Issue #697 / PR #699）。每個註冊 output sink 現在擁有獨立 TruePeakLimiterV1 狀態，一個輸出
+群的尖峰不會壓低另一群後續安靜區塊；graph commit 仍重置所有 limiter（Issue #683 / PR #695）。
+Engine Preview 新增有界 opt-in soak harness，離線 SelfTest 覆蓋參數邊界、IPC frame、聚合結果
+與清理決策；預設三循環 smoke 以 Hello/Ack 加 Main volume 往返驗證並產生匿名報告（Issue #672 /
+PR #685）。extension/UI/DSP 項目分別為 source、policy/build/contract evidence；soak 為本機
+user-space process evidence。不宣稱正式 XAML/accessibility、實體音訊、driver 安裝/載入/HLK 或
+Microsoft signing。
 第二十七波整合增量已合併：TruePeakLimiterV1 在 graph commit 時重置回 unity gain，
 前一個 graph 累積的恢復衰減不會延續到新 graph 的安靜段落；新 graph 中超過上限的
 峰值仍然立即衰減（Issue #678 / PR #678）。瀏覽器單分頁捕捉的 start/stop 回應改為
