@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "issue": 741,
+  "title": "WinUI IR WAV load entry point",
+  "date": "2026-08-23",
+  "scope": [
+    "apps/winui-shell/MainWindow.xaml",
+    "apps/winui-shell/MainWindow.xaml.cs",
+    "apps/winui-shell/MainWindow.CompatibilityPreview.cs",
+    "docs/specs/SPEC-0010-winui-shell.md"
+  ],
+  "claims": [
+    "Formal WinUI shell exposes an explicit file picker entry point that calls the existing PrepareIrAsync contract.",
+    "Compatibility Preview mirrors the same entry point through the shared code-behind handler.",
+    "Bypass mode, missing or oversized files and a disconnected engine remain fail-closed with existing ViewModel status text.",
+    "New controls have AutomationProperties.Name set."
+  ],
+  "non_claims": [
+    "No physical sink, audible playback, driver install/load, HLK or Microsoft signing evidence is claimed.",
+    "The prepare Ack is not a graph commit or physical audio delivery."
+  ],
+  "verification": [
+    "tools/handoff-check.ps1 -Issue 741",
+    "tools/docs-check.ps1",
+    "tools/source-policy.ps1",
+    "git diff --check",
+    "tools/winui-shell-check.ps1",
+    "tools/control-model-check.ps1",
+    "tools/build-preview.ps1 -SelfTest"
+  ],
+  "status": "pending-gates"
+}
