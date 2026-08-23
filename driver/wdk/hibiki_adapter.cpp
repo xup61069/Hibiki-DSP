@@ -12,6 +12,7 @@
 #include <initguid.h>
 #include "hibiki_adapter.h"
 #include "hibiki_miniport_wavert.h"
+#include "hibiki_miniport_topology.h"
 #include "hibiki_filter_tables.h"
 
 // Endpoint name lookup table
@@ -44,60 +45,143 @@ extern "C" NTSTATUS HibikiRegisterSingleSubdeviceV1(
         return STATUS_INVALID_PARAMETER;
     }
 
-    // 1. Create PortWaveRT object
-    PPORT port = nullptr;
-    NTSTATUS ntStatus = PcNewPort(&port, CLSID_PortWaveRT);
-    if (!NT_SUCCESS(ntStatus) || port == nullptr) {
-        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] PcNewPort failed 0x%08X\n", SubdeviceName, ntStatus);
+    /* Build subdevice names for both halves of the endpoint pair. */
+    WCHAR topoName[64];
+    WCHAR waveName[64];
+
+    /* Simple concatenation without CRT. */
+    const SIZE_T nameLen = wcslen(SubdeviceName);
+    if (nameLen == 0 || nameLen > 32) { return STATUS_INVALID_PARAMETER; }
+
+    RtlCopyMemory(topoName, L"Topology", 8 * sizeof(WCHAR));
+    RtlCopyMemory(&topoName[8], SubdeviceName, (nameLen + 1) * sizeof(WCHAR));
+    RtlCopyMemory(waveName, L"Wave", 5 * sizeof(WCHAR));
+    RtlCopyMemory(&waveName[5], SubdeviceName, (nameLen + 1) * sizeof(WCHAR));
+
+    /* 1. Create the Topology port and miniport pair first. */
+    PPORT topoPort = nullptr;
+    NTSTATUS ntStatus = PcNewPort(&topoPort, CLSID_PortTopology);
+    if (!NT_SUCCESS(ntStatus) || topoPort == nullptr) {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] PcNewPort(topo) failed 0x%08X\n", SubdeviceName, ntStatus);
         return ntStatus;
     }
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL, "HIBIKI: [%ws] PcNewPort ok\n", SubdeviceName);
 
-    // 2. Create and initialize Miniport WaveRT
-    auto* miniport = new (NonPagedPoolNx) HibikiMiniportWaveRtV1();
-    if (miniport == nullptr) {
-        port->Release();
-        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] alloc miniport failed\n", SubdeviceName);
+    const PCFILTER_DESCRIPTOR* topoFilterDesc = nullptr;
+    ntStatus = HibikiGetTopologyFilterDescriptorEndpointV1(EndpointIndex, &topoFilterDesc);
+    if (!NT_SUCCESS(ntStatus) || topoFilterDesc == nullptr) {
+        topoPort->Release();
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] GetTopologyFilter failed 0x%08X\n", SubdeviceName, ntStatus);
+        return ntStatus;
+    }
+
+    auto* topoMiniport = new (NonPagedPoolNx) HibikiMiniportTopologyV1();
+    if (topoMiniport == nullptr) {
+        topoPort->Release();
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] alloc topo miniport\n", SubdeviceName);
+        return STATUS_INSUFFICIENT_RESOURCES;
+    }
+    topoMiniport->InitDescriptor(const_cast<PCFILTER_DESCRIPTOR*>(topoFilterDesc));
+
+    ntStatus = topoPort->Init(DeviceObject, Irp, topoMiniport, nullptr, ResourceList);
+    if (!NT_SUCCESS(ntStatus)) {
+        topoMiniport->Release();
+        topoPort->Release();
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] topo Init failed 0x%08X\n", SubdeviceName, ntStatus);
+        return ntStatus;
+    }
+
+    PUNKNOWN unknownTopology = nullptr;
+    ntStatus = topoPort->QueryInterface(IID_IUnknown, reinterpret_cast<PVOID*>(&unknownTopology));
+    if (!NT_SUCCESS(ntStatus) || unknownTopology == nullptr) {
+        topoMiniport->Release();
+        topoPort->Release();
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] topo QI failed 0x%08X\n", SubdeviceName, ntStatus);
+        return ntStatus;
+    }
+
+    ntStatus = PcRegisterSubdevice(DeviceObject, topoName, topoPort);
+    if (!NT_SUCCESS(ntStatus)) {
+        unknownTopology->Release();
+        topoMiniport->Release();
+        topoPort->Release();
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] RegisterSubdevice(%ws) failed 0x%08X\n", SubdeviceName, topoName, ntStatus);
+        return ntStatus;
+    }
+    topoMiniport->Release();
+    topoPort->Release();
+
+    /* 2. Create the WaveRT port and miniport pair. */
+    PPORT wavePort = nullptr;
+    ntStatus = PcNewPort(&wavePort, CLSID_PortWaveRT);
+    if (!NT_SUCCESS(ntStatus) || wavePort == nullptr) {
+        unknownTopology->Release();
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] PcNewPort(wave) failed 0x%08X\n", SubdeviceName, ntStatus);
+        return ntStatus;
+    }
+
+    auto* waveMiniport = new (NonPagedPoolNx) HibikiMiniportWaveRtV1();
+    if (waveMiniport == nullptr) {
+        wavePort->Release();
+        unknownTopology->Release();
         return STATUS_INSUFFICIENT_RESOURCES;
     }
 
-    const ULONG default_actuator = 0; // Default actuator identity
-    ntStatus = miniport->InitEndpoint(EndpointIndex, default_actuator);
+    const ULONG default_actuator = 0;
+    ntStatus = waveMiniport->InitEndpoint(EndpointIndex, default_actuator);
     if (!NT_SUCCESS(ntStatus)) {
-        miniport->Release();
-        port->Release();
-        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] InitEndpoint failed 0x%08X\n", SubdeviceName, ntStatus);
+        waveMiniport->Release();
+        wavePort->Release();
+        unknownTopology->Release();
         return ntStatus;
     }
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL, "HIBIKI: [%ws] InitEndpoint ok\n", SubdeviceName);
 
-    // 3. Initialize Port with Miniport. Pass the start-device IRP through;
-    // PortCls requires the initiating IRP during subdevice installation.
-    ntStatus = port->Init(DeviceObject, Irp, miniport, nullptr, ResourceList);
+    ntStatus = wavePort->Init(DeviceObject, Irp, waveMiniport, nullptr, ResourceList);
     if (!NT_SUCCESS(ntStatus)) {
-        miniport->Release();
-        port->Release();
-        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] port->Init failed 0x%08X\n", SubdeviceName, ntStatus);
+        waveMiniport->Release();
+        wavePort->Release();
+        unknownTopology->Release();
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] wave Init failed 0x%08X\n", SubdeviceName, ntStatus);
         return ntStatus;
     }
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL, "HIBIKI: [%ws] port->Init ok\n", SubdeviceName);
 
-    // 4. Register Subdevice with PortCls
-    ntStatus = PcRegisterSubdevice(DeviceObject, const_cast<PWSTR>(SubdeviceName), port);
-    if (NT_SUCCESS(ntStatus)) {
-        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL, "HIBIKI: [%ws] PcRegisterSubdevice ok\n", SubdeviceName);
+    PUNKNOWN unknownWave = nullptr;
+    ntStatus = wavePort->QueryInterface(IID_IUnknown, reinterpret_cast<PVOID*>(&unknownWave));
+    if (!NT_SUCCESS(ntStatus) || unknownWave == nullptr) {
+        waveMiniport->Release();
+        wavePort->Release();
+        unknownTopology->Release();
+        return ntStatus;
     }
-    else {
-        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] PcRegisterSubdevice failed 0x%08X\n", SubdeviceName, ntStatus);
+
+    ntStatus = PcRegisterSubdevice(DeviceObject, waveName, wavePort);
+    if (!NT_SUCCESS(ntStatus)) {
+        unknownWave->Release();
+        waveMiniport->Release();
+        wavePort->Release();
+        unknownTopology->Release();
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] RegisterSubdevice(%ws) failed 0x%08X\n", SubdeviceName, waveName, ntStatus);
+        return ntStatus;
     }
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL, "HIBIKI: [%ws] PcRegisterSubdevice ok\n", SubdeviceName);
+    waveMiniport->Release();
+    wavePort->Release();
 
-    // Release local COM references (PortCls retains registered references)
-    miniport->Release();
-    port->Release();
+    /* 3. Connect bridge pins between WaveRT and Topology filters.
+     * Render: Wave pin 1 -> Topology pin 0.
+     * Capture: Topology pin 1 -> Wave pin 0. */
+    const bool is_capture = (topology.direction == HIBIKI_ENDPOINT_DIRECTION_CAPTURE_V1);
+    if (is_capture) {
+        ntStatus = PcRegisterPhysicalConnection(DeviceObject, unknownTopology, 1U, unknownWave, 0U);
+    } else {
+        ntStatus = PcRegisterPhysicalConnection(DeviceObject, unknownWave, 1U, unknownTopology, 0U);
+    }
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL, "HIBIKI: [%ws] PhysicalConnection -> 0x%08X\n", SubdeviceName, ntStatus);
 
+    /* Release our local COM references; PortCls retains its own. */
+    unknownWave->Release();
+    unknownTopology->Release();
     return ntStatus;
 }
-
 extern "C" NTSTATUS HibikiRegisterSubdevicesV1(
     _In_ PDEVICE_OBJECT   DeviceObject,
     _In_ PRESOURCELIST    ResourceList,

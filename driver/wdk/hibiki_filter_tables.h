@@ -23,6 +23,11 @@ extern "C" NTSTATUS HibikiGetFilterDescriptorEndpointV1(
     _In_  ULONG                     EndpointIndex,
     _Out_ const PCFILTER_DESCRIPTOR** Description);
 
+// Retrieve the topology-half filter descriptor paired with each endpoint.
+extern "C" NTSTATUS HibikiGetTopologyFilterDescriptorEndpointV1(
+    _In_  ULONG                     EndpointIndex,
+    _Out_ const PCFILTER_DESCRIPTOR** Description);
+
 // Validate data range intersection for a specific endpoint pin
 extern "C" NTSTATUS HibikiDataRangeIntersectionEndpointV1(
     _In_        ULONG              EndpointIndex,
