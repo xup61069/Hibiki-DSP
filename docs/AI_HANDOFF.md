@@ -27,6 +27,12 @@ handoff block 記錄事實；不要直接改 DSP、driver、永久 ID 或 releas
 
 ## 目前狀態與已完成能力
 
+- 第二十波整合增量：AGENTS.md 改為三層規則索引（硬性限制／流程預設／core+conditional
+  驗證門檻），driver 簽章歸 release 階段；README live probe 文件補齊
+  live-wasapi-handoff-check 與 live-audio-session-check 的 opt-in 說明與 docs-check
+  -SelfTest 範例（Issue #613 / PR #615）；隔離 VM WaveRT 載入測試記錄 TrustedPublisher
+  恢復後 pnputil staging 成功、但 PnP start 仍以 CM_PROB_FAILED_START (0xC000000D)
+  可重現失敗，下一步是診斷 PortCls adapter start path（Issue #462 / PR #614）。
 - main 已合併的能力、限制與最新整合紀錄：見 [baseline](state/BASELINE.md)。
 - 子系統地圖（driver/src/apps/vst-host/extensions/tools）：見 [PROJECT_MAP](PROJECT_MAP.md)。
 - 各切片的測試命令、環境指紋與證據範圍：見 [evidence](../evidence/0000-foundation/)。
