@@ -18,13 +18,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     stopCapture()
       .then(() => sendResponse({ok: true}))
       .catch((error) => sendResponse({ok: false, error: String(error)}));
-    return false;
+    return true;
   }
   if (message?.type !== 'start-tab-stream' || typeof message.streamId !== 'string') return false;
   startCapture(message)
     .then(() => sendResponse({ok: true}))
     .catch((error) => sendResponse({ok: false, error: String(error)}));
-  return false;
+  return true;
 });
 
 async function startCapture(message) {
