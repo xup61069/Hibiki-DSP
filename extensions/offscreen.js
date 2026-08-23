@@ -3,30 +3,41 @@ let source = null;
 let packetizer = null;
 let destination = null;
 let bridge = null;
+let bridgeConnected = false;
 let activeStream = null;
 
 function reportState() {
-  chrome.runtime.sendMessage({type: 'capture-state', capturing: context !== null});
+  chrome.runtime.sendMessage({type: 'capture-state', capturing: context !== null, bridgeConnected});
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'get-capture-state') {
-    sendResponse({capturing: context !== null});
+    sendResponse({capturing: context !== null, bridgeConnected});
     return false;
   }
   if (message?.type === 'stop-tab-stream') {
-    stopCapture();
-    sendResponse({ok: true});
+    stopCapture()
+      .then(() => sendResponse({ok: true}))
+      .catch((error) => sendResponse({ok: false, error: String(error)}));
     return false;
   }
   if (message?.type !== 'start-tab-stream' || typeof message.streamId !== 'string') return false;
-  startCapture(message);
+  startCapture(message)
+    .then(() => sendResponse({ok: true}))
+    .catch((error) => sendResponse({ok: false, error: String(error)}));
   return false;
 });
+
+function setBridgeConnected(connected) {
+  const changed = bridgeConnected !== connected;
+  bridgeConnected = connected;
+  if (changed) reportState();
+}
 
 async function startCapture(message) {
   bridge?.close();
   bridge = null;
+  setBridgeConnected(false);
   context?.close();
   await closeExistingContext();
   context = new AudioContext();
@@ -47,6 +58,9 @@ async function startCapture(message) {
     try {
       bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab');
       bridge.binaryType = 'arraybuffer';
+      bridge.onopen = () => setBridgeConnected(true);
+      bridge.onclose = () => { bridgeConnected = false; reportState(); };
+      bridge.onerror = () => { bridgeConnected = false; reportState(); };
       packetizer.port.onmessage = (event) => {
         if (bridge?.readyState === WebSocket.OPEN && event.data instanceof ArrayBuffer) {
           bridge.send(event.data);
@@ -84,6 +98,7 @@ async function teardownCaptureGraph() {
   destination = null;
   bridge?.close();
   bridge = null;
+  bridgeConnected = false;
   if (context) {
     try { await context.close(); } catch (_) {}
     context = null;
