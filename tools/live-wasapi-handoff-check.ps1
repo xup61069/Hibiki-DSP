@@ -83,15 +83,24 @@ function Test-LiveWasapiHandoffPathUnderRoot {
 function Get-LiveWasapiHandoffExistingAttributes {
   param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
   if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
     return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
   }
-  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
-  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+  if ($null -ne $SyntheticInspectionErrors -and $SyntheticInspectionErrors.ContainsKey($fullPath)) {
+    throw "Live WASAPI handoff path inspection failed: $fullPath ($($SyntheticInspectionErrors[$fullPath]))"
+  }
+  try {
+    return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop).Attributes
+  }
+  catch {
+    if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return $null }
+    throw "Live WASAPI handoff path inspection failed: $fullPath ($($_.Exception.Message))"
+  }
 }
 
 function Assert-LiveWasapiHandoffPath {
@@ -100,7 +109,8 @@ function Assert-LiveWasapiHandoffPath {
     [Parameter(Mandatory = $true)][string]$Root,
     [Parameter(Mandatory = $true)][ValidateSet('File', 'Directory')][string]$Kind,
     [switch]$AllowMissingLeaf,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
@@ -109,14 +119,16 @@ function Assert-LiveWasapiHandoffPath {
     throw "Live WASAPI handoff path must remain under the expected root: $fullPath"
   }
 
-  $leafAttributes = Get-LiveWasapiHandoffExistingAttributes -Path $fullPath -SyntheticAttributes $SyntheticAttributes
+  $leafAttributes = Get-LiveWasapiHandoffExistingAttributes -Path $fullPath `
+    -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
   if ($null -eq $leafAttributes -and -not $AllowMissingLeaf) {
     throw "Live WASAPI handoff $Kind does not exist: $fullPath"
   }
 
   $cursor = $fullPath
   while ($true) {
-    $attributes = Get-LiveWasapiHandoffExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    $attributes = Get-LiveWasapiHandoffExistingAttributes -Path $cursor `
+      -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
     if ($null -ne $attributes) {
       if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "Live WASAPI handoff path or parent is a reparse point: $cursor"
@@ -231,6 +243,15 @@ function Invoke-LiveWasapiHandoffPathSelfTest {
     }
   } catch { $missingProbeCaught = $_.Exception.Message -match 'does not exist' }
   if (-not $missingProbeCaught) { throw 'Live WASAPI handoff self-test expected a missing-probe rejection.' }
+  $cases++
+
+  $inspectionCaught = $false
+  try {
+    Assert-LiveWasapiHandoffPath -Path $fixture.probe_path -Root $fixture.build_root -Kind File -AllowMissingLeaf -SyntheticInspectionErrors @{
+      $probePath = 'synthetic access denied'
+    }
+  } catch { $inspectionCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $inspectionCaught) { throw 'Live WASAPI handoff self-test expected an inspection-failure rejection.' }
   $cases++
 
   return $cases
