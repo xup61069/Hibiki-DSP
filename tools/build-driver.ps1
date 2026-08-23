@@ -32,6 +32,149 @@ function Test-PathUnderRoot {
   )
 }
 
+function Get-DriverExistingAttributes {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [hashtable]$SyntheticAttributes
+  )
+
+  $resolvedPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($resolvedPath)) {
+    return [System.IO.FileAttributes]$SyntheticAttributes[$resolvedPath]
+  }
+  if (-not (Test-Path -LiteralPath $resolvedPath)) { return $null }
+  return [System.IO.FileAttributes](Get-Item -LiteralPath $resolvedPath -Force).Attributes
+}
+
+function Assert-DriverOutputDirectory {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Root,
+    [switch]$AllowMissingLeaf,
+    [hashtable]$SyntheticAttributes
+  )
+
+  $resolvedPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  $resolvedRoot = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  if (-not (Test-PathUnderRoot -Root $resolvedRoot -Candidate $resolvedPath)) {
+    throw "Driver output path must remain under the repository .local root: $resolvedPath"
+  }
+
+  $leafAttributes = Get-DriverExistingAttributes -Path $resolvedPath -SyntheticAttributes $SyntheticAttributes
+  if ($null -eq $leafAttributes -and -not $AllowMissingLeaf) {
+    throw "Driver output directory does not exist: $resolvedPath"
+  }
+
+  $cursor = $resolvedPath
+  while ($true) {
+    $attributes = Get-DriverExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    if ($null -ne $attributes) {
+      if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Driver output path or parent is a reparse point: $cursor"
+      }
+      if (($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+        throw "Driver output path or parent is not a directory: $cursor"
+      }
+    }
+
+    if ($cursor -eq $resolvedRoot) { break }
+    $parent = [System.IO.Path]::GetFullPath((Split-Path -Parent $cursor)).TrimEnd('\', '/')
+    if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) {
+      throw "Driver output path could not reach the repository .local root: $resolvedPath"
+    }
+    $cursor = $parent
+  }
+}
+
+function Invoke-DriverOutputPathSelfTest {
+  $repositoryRoot = [System.IO.Path]::GetFullPath('C:\hibiki-driver-build-selftest').TrimEnd('\', '/')
+  $paths = Get-DriverBuildPaths -RepoRoot $repositoryRoot
+  $localRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot '.local')).TrimEnd('\', '/')
+  $objectRoot = [System.IO.Path]::GetFullPath($paths.ObjectRoot).TrimEnd('\', '/')
+  $objectParent = [System.IO.Path]::GetFullPath((Split-Path -Parent $objectRoot)).TrimEnd('\', '/')
+  $packageRoot = [System.IO.Path]::GetFullPath($paths.PackageRoot).TrimEnd('\', '/')
+  $directory = [System.IO.FileAttributes]::Directory
+  $file = [System.IO.FileAttributes]::Archive
+  $cases = 0
+
+  Assert-DriverOutputDirectory -Path $paths.ObjectRoot -Root $localRoot -AllowMissingLeaf -SyntheticAttributes @{}
+  $cases++
+  Assert-DriverOutputDirectory -Path $paths.PackageRoot -Root $localRoot -AllowMissingLeaf -SyntheticAttributes @{}
+  $cases++
+  Assert-DriverOutputDirectory -Path $paths.ObjectRoot -Root $localRoot -SyntheticAttributes @{
+    $localRoot = $directory
+    $objectParent = $directory
+    $objectRoot = $directory
+  }
+  $cases++
+  Assert-DriverOutputDirectory -Path $paths.PackageRoot -Root $localRoot -SyntheticAttributes @{
+    $localRoot = $directory
+    $packageRoot = $directory
+  }
+  $cases++
+
+  $outsideCaught = $false
+  try {
+    Assert-DriverOutputDirectory -Path (Join-Path $repositoryRoot 'build') -Root $localRoot -AllowMissingLeaf -SyntheticAttributes @{}
+  } catch { $outsideCaught = $_.Exception.Message -match 'under the repository \.local root' }
+  if (-not $outsideCaught) { throw 'build-driver self-test expected an outside-root rejection.' }
+  $cases++
+
+  $reparseParentCaught = $false
+  try {
+    Assert-DriverOutputDirectory -Path $paths.ObjectRoot -Root $localRoot -SyntheticAttributes @{
+      $localRoot = $directory
+      $objectParent = $directory -bor [System.IO.FileAttributes]::ReparsePoint
+      $objectRoot = $directory
+    }
+  } catch { $reparseParentCaught = $_.Exception.Message -match 'reparse point' }
+  if (-not $reparseParentCaught) { throw 'build-driver self-test expected a reparse-parent rejection.' }
+  $cases++
+
+  $reparseTargetCaught = $false
+  try {
+    Assert-DriverOutputDirectory -Path $paths.PackageRoot -Root $localRoot -SyntheticAttributes @{
+      $localRoot = $directory
+      $packageRoot = $directory -bor [System.IO.FileAttributes]::ReparsePoint
+    }
+  } catch { $reparseTargetCaught = $_.Exception.Message -match 'reparse point' }
+  if (-not $reparseTargetCaught) { throw 'build-driver self-test expected a reparse-target rejection.' }
+  $cases++
+
+  $nonDirectoryTargetCaught = $false
+  try {
+    Assert-DriverOutputDirectory -Path $paths.PackageRoot -Root $localRoot -SyntheticAttributes @{
+      $localRoot = $directory
+      $packageRoot = $file
+    }
+  } catch { $nonDirectoryTargetCaught = $_.Exception.Message -match 'not a directory' }
+  if (-not $nonDirectoryTargetCaught) { throw 'build-driver self-test expected a non-directory target rejection.' }
+  $cases++
+
+  $nonDirectoryParentCaught = $false
+  try {
+    Assert-DriverOutputDirectory -Path $paths.ObjectRoot -Root $localRoot -SyntheticAttributes @{
+      $localRoot = $directory
+      $objectParent = $file
+      $objectRoot = $directory
+    }
+  } catch { $nonDirectoryParentCaught = $_.Exception.Message -match 'not a directory' }
+  if (-not $nonDirectoryParentCaught) { throw 'build-driver self-test expected a non-directory parent rejection.' }
+  $cases++
+
+  $missingCaught = $false
+  try {
+    Assert-DriverOutputDirectory -Path $paths.ObjectRoot -Root $localRoot -SyntheticAttributes @{
+      $localRoot = $directory
+      $objectParent = $directory
+    }
+  } catch { $missingCaught = $_.Exception.Message -match 'does not exist' }
+  if (-not $missingCaught) { throw 'build-driver self-test expected a missing output rejection.' }
+  $cases++
+
+  return $cases
+}
+
 $paths = Get-DriverBuildPaths -RepoRoot $repo
 if ($SelfTest) {
   $expectedRepo = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\', '/')
@@ -57,8 +200,14 @@ if ($SelfTest) {
   }
 
   Write-Output 'Driver build path self-test passed (script-root discovery, .local outputs, source boundaries).'
+  $pathCases = Invoke-DriverOutputPathSelfTest
+  Write-Output "Driver output path self-test: $pathCases cases passed (offline/no-wdk/no-compiler/no-file-write)."
   exit 0
 }
+
+$localRoot = Join-Path $paths.RepoRoot '.local'
+Assert-DriverOutputDirectory -Path $paths.ObjectRoot -Root $localRoot -AllowMissingLeaf
+Assert-DriverOutputDirectory -Path $paths.PackageRoot -Root $localRoot -AllowMissingLeaf
 
 $kits = 'C:\Program Files (x86)\Windows Kits\10'
 $kver = Get-ChildItem (Join-Path $kits 'Include') -Directory |
@@ -104,6 +253,8 @@ $objDir = $paths.ObjectRoot
 $pkgDir = $paths.PackageRoot
 New-Item -ItemType Directory -Path $objDir -Force | Out-Null
 New-Item -ItemType Directory -Path $pkgDir -Force | Out-Null
+Assert-DriverOutputDirectory -Path $objDir -Root $localRoot
+Assert-DriverOutputDirectory -Path $pkgDir -Root $localRoot
 
 # --- Compile kernel-mode x64 ----------------------------------------------
 $clDir = Split-Path -Parent $cl
@@ -140,6 +291,8 @@ foreach ($cpp in (Get-ChildItem (Join-Path $repo 'driver/wdk') -Filter *.cpp)) {
 
 # --- Link .sys ------------------------------------------------------------
 $sysPath = Join-Path $pkgDir 'HibikiVirtualAudio.sys'
+Assert-DriverOutputDirectory -Path $objDir -Root $localRoot
+Assert-DriverOutputDirectory -Path $pkgDir -Root $localRoot
 $env:LIB = "$kmLib"
 $env:WDK_BIN = Split-Path -Parent $inf2cat
 & $link /nologo /DRIVER /SUBSYSTEM:NATIVE,10.00 /ENTRY:GsDriverEntry /NODEFAULTLIB /INTEGRITYCHECK `
@@ -150,6 +303,7 @@ if (-not (Test-Path $sysPath)) { throw 'HibikiVirtualAudio.sys was not produced.
 Write-Output "linked $sysPath"
 
 # --- Package + Inf2Cat ----------------------------------------------------
+Assert-DriverOutputDirectory -Path $pkgDir -Root $localRoot
 Copy-Item (Join-Path $repo 'driver/inf/HibikiVirtualAudio.inf') $pkgDir -Force
 & $inf2cat /driver:$pkgDir /os:10_X64
 if ($LASTEXITCODE -ne 0) { throw 'Inf2Cat failed producing HibikiVirtualAudio.cat.' }
