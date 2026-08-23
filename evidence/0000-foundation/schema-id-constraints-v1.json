@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "issue": 932,
+  "scope_digest": "schema-id-constraints-v1",
+  "source_commit": "ce75f507d2da898920954204813c6013a8cd3386",
+  "environment_fingerprint": "windows-local-pwsh-schema-id-constraints",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 932",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/verify.ps1"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass",
+      "required_paths": 85,
+      "specs": 24
+    },
+    {
+      "command": "source-policy",
+      "status": "pass",
+      "scanned_paths": 639
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass",
+      "tests_passed": 3,
+      "tests_total": 3
+    }
+  ],
+  "limitations": [
+    "Schema-only bounded constraint additions (anchor_id minLength, device_id maxLength) with matching spec documentation; no runtime code, IPC payload, DSP, driver, signing or physical-audio behavior changes.",
+    "The runtime C# validator does not enforce maxLength on DeviceId; this change bounds the schema contract to match the endpoint ID convention.",
+    "No driver installation, loading, TESTSIGNING, certificate purchase or real-device changes were performed."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local",
+    "cmake": "4.4.2",
+    "msvc": "14.51.36231"
+  },
+  "started_at": "2026-08-24T22:30:00+08:00",
+  "finished_at": "2026-08-24T22:45:00+08:00"
+}
