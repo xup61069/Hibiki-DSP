@@ -795,6 +795,8 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
+第二十四波整合增量已合併：driver adapter 配置改為 ExAllocatePool3，paged／non-paged pool 類別與 'ibiH' tag 不變，建置定義升至 NTDDI_WIN10_VB 以取得宣告；GetHWLatency 把每 buffer 延遲估計寫入 HWLatency->CodecDelay，PortCls 讀到有效硬體延遲而不是被丟棄（Issue #652 / PR #660）。NODE_MUTE 名稱改指向 WDK 既有 KSAUDFNAME_MASTER_MUTE，移除未用的 null fallback，讓系統屬性頁與音效工具顯示標準「靜音」名稱（Issue #662 / PR #663）。皆為 source／local WDK build／Inf2Cat evidence；不宣稱 guest 安裝／載入／PnP start／實體音訊／HLK／Microsoft signing。
+
 第二十三波整合增量已合併：TruePeakLimiterV1 記錄上一區塊套用增益，恢復上限固定為 2x/區塊（約 +6 dB），attenuation 仍立即套用；reset() 一併重置 recovery 狀態，並新增連續區塊回歸測試確保安靜後不會瞬間跳回（Issue #647 / PR #648）。屬 user-space DSP 契約證據，不宣稱 ITU/BS.1770 或 certified true-peak conformance、實體音訊、driver 安裝/載入/HLK/Microsoft signing。
 
 第二十二波整合增量已合併：BasicNoiseSuppressorV1 修正開／關增益方向——attack_ms 控制開啟速度、release_ms 控制關閉速度——並新增 closed-to-open 回歸測試（Issue #636 / PR #640）；handoff 稽核新增「多個 active Issue 共用同一 branch」fail-closed 自檢（Issue #643 / PR #644）；IpcNamedPipeServerV1 在 worker 啟動前註冊同步初始 pipe handle，stop() 可立即取消等待中的 ConnectNamedPipe 而非等 idle timeout（Issue #637 / PR #645）；driver 端每個 endpoint 成對註冊 PortCls Topology 與 WaveRT filter、INF 介面一致並接上 bridge 實體連線，本機 WDK 建置與 Inf2Cat 通過（Issue #462 / PR #638）。DSP/IPC/handoff 項目為 user-space/source evidence；WaveRT 配對為本機建置證據，不宣稱 guest 安裝/載入/PnP start/實體音訊/HLK/Microsoft signing。
