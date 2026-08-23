@@ -660,6 +660,19 @@ int main() {
           std::abs(calibration_result.filters[0].gain_db - 4.0) < 1e-12 &&
           calibration_result.maximum_requested_correction_db == 10.0);
     CHECK(validate_calibration_response_v1(calibration_response, calibration_policy));
+    {
+        std::vector<CalibrationResponsePointV1> out_of_range(
+            calibration_response.begin(), calibration_response.end());
+        out_of_range[0].measured_db = -144.5;
+        CHECK(!validate_calibration_response_v1(out_of_range, calibration_policy));
+        out_of_range[0] = calibration_response[0];
+        out_of_range[0].target_db = 12.5;
+        CHECK(!validate_calibration_response_v1(out_of_range, calibration_policy));
+        out_of_range[0] = calibration_response[0];
+        out_of_range[0].measured_db = -144.0;
+        out_of_range[0].target_db = 12.0;
+        CHECK(validate_calibration_response_v1(out_of_range, calibration_policy));
+    }
     auto unsorted_response = calibration_response;
     std::swap(unsorted_response[0], unsorted_response[1]);
     CHECK(!validate_calibration_response_v1(unsorted_response, calibration_policy));

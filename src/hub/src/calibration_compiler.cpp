@@ -81,6 +81,8 @@ bool validate_calibration_response_v1(
     for (const auto& point : response) {
         if (!std::isfinite(point.frequency_hz) || !std::isfinite(point.measured_db) ||
             !std::isfinite(point.target_db) || point.frequency_hz < policy.min_frequency_hz ||
+            point.measured_db < -144.0 || point.measured_db > 12.0 ||
+            point.target_db < -144.0 || point.target_db > 12.0 ||
             point.frequency_hz > policy.max_frequency_hz ||
             (previous_frequency > 0.0 && point.frequency_hz <= previous_frequency)) {
             return false;
