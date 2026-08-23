@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "issue": 732,
+  "scope_digest": "compat-preview-a11y-gate-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6; compatibility-preview source-only gate",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 732",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/winui-shell-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/winui-shell-check.ps1"
+  ],
+  "results": [
+    {
+      "command": "Compatibility Preview accessibility source gate",
+      "status": "pass",
+      "coverage": [
+        "winui-shell-check scans var-based Button, ComboBox, Slider, ToggleSwitch, CheckBox, TextBox and NumberBox construction in MainWindow.CompatibilityPreview.cs.",
+        "The gate requires a non-empty AutomationProperties.SetName call for each detected control and reports the control type, variable, source and line on failure.",
+        "Offline self-tests cover valid, missing-name and empty-name C# cases alongside the existing four XAML cases; the real Compatibility Preview source passes at 14 detected controls."
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The source scan recognizes the documented var construction pattern and literal SetName calls; it is not a compiled XAML or UI Automation runtime audit.",
+    "Compatibility Preview remains non-formal UI evidence; this change adds source-gate coverage only and makes no physical-audio or driver claim."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6"
+  },
+  "started_at": "2026-08-23T20:20:24+08:00",
+  "finished_at": "2026-08-23T20:36:00+08:00"
+}
