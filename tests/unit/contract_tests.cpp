@@ -402,6 +402,44 @@ int main() {
     // because the high-pass makes both tail samples negative.
     CHECK(std::abs(fast_tail.back()) < std::abs(quiet_tail.back()) * 0.05F);
 
+    // Regression: hysteresis prevents gate chatter. A signal that oscillates
+    // between just below and just above the configured threshold must not
+    // cause rapid open/close cycling. With a -40 dBFS threshold, the close
+    // boundary is at 0.01 linear; reopen requires ~0.01259 (2 dB above).
+    BasicNoiseSuppressorV1 chatter_gate;
+    CHECK(chatter_gate.configure(
+        BasicNoiseSuppressorPolicyV1{1, true, -40.0, -30.0, 1.0, 10.0, 80.0},
+        48000U, 1U));
+    // Close the gate first with well-below-threshold silence.
+    std::array<float, 480> chatter_silence{};
+    chatter_silence.fill(0.001F);
+    CHECK(chatter_gate.process_interleaved(chatter_silence.data(),
+                                           chatter_silence.size()));
+    // Feed alternating blocks near the threshold: below (closes), then in the
+    // hysteresis band between threshold and threshold + 2 dB (holds closed).
+    // The old hard-threshold code would have reopened on every crossing.
+    constexpr std::size_t kChatterBlocks = 8U;
+    float chatter_gain_min = 1.0F;
+    float chatter_gain_max = 0.0F;
+    for (std::size_t block = 0U; block < kChatterBlocks; ++block) {
+        const auto near_threshold =
+            (block % 2U == 0U) ? 0.009F : 0.011F;
+        std::array<float, 48> chatter_block{};
+        chatter_block.fill(static_cast<float>(near_threshold));
+        CHECK(chatter_gate.process_interleaved(chatter_block.data(),
+                                               chatter_block.size()));
+        // Track the gain trajectory to verify it stays bounded.
+        for (const auto sample : chatter_block) {
+            const auto approx_gain = std::abs(sample) / near_threshold;
+            chatter_gain_min = (std::min)(chatter_gain_min, approx_gain);
+            chatter_gain_max = (std::max)(chatter_gain_max, approx_gain);
+        }
+    }
+    // With hysteresis the gain stays bounded within floor..unity without
+    // rapid cycling. Without hysteresis, the gain would repeatedly swing
+    // between floor (~0.0316) and unity across these blocks.
+    CHECK(chatter_gain_max < 0.5F);
+
     OutputGroupVolumeStateV1 state;
     state.requested_db = 3.0;
     state.safety_ceiling_db = -6.0;

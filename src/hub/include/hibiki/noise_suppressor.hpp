@@ -41,10 +41,12 @@ private:
     std::array<float, 8U> gain_{};
     std::array<float, 8U> previous_input_{};
     std::array<float, 8U> highpass_state_{};
+    std::array<bool, 8U> gate_open_{};
     std::uint32_t sample_rate_{0U};
     std::uint32_t channels_{0U};
     float highpass_alpha_{0.0F};
     float threshold_linear_{0.0F};
+    float threshold_open_linear_{0.0F};
     float floor_linear_{1.0F};
     float envelope_attack_coeff_{1.0F};
     float envelope_release_coeff_{1.0F};
