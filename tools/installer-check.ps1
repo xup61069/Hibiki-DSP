@@ -11,7 +11,9 @@ $script:RequiredBoundaries = @(
   'Resolve-HibikiDestination',
   'Get-StagingPlan',
   'Copy-HibikiFileWithHash',
-  'Invoke-PayloadStaging',
+  'Get-UninstallPlan',
+  'Invoke-PayloadUninstall',
+  'Invoke-HibikiUninstall',
   'Invoke-HibikiInstall',
   '-Apply',
   'pnputil.exe',
@@ -66,8 +68,10 @@ function Read-ReleaseManifest {}
 function Test-ManifestFiles {}
 function Resolve-HibikiDestination {}
 function Get-StagingPlan {}
-function Copy-HibikiFileWithHash { param([string]$Source, [string]$Target, [string]$ExpectedSha256) }
-function Invoke-PayloadStaging { param([array]$Plan, [string]$Destination) }
+function Copy-HibikiFileWithHash {}
+function Get-UninstallPlan {}
+function Invoke-PayloadUninstall {}
+function Invoke-HibikiUninstall {}
 function Invoke-HibikiInstall { param([switch]$Apply) }
 $null = "-Apply"
 $null = "pnputil.exe"
@@ -100,13 +104,13 @@ $null = "sbom_digest"
     $ast = [System.Management.Automation.Language.Parser]::ParseInput($installerText, [ref]$null, [ref]$null)
     $functions = @{}
     foreach ($fn in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) {
-      if ($fn.Name -in @('Get-Sha256', 'Resolve-HibikiDestination', 'Get-StagingPlan', 'Copy-HibikiFileWithHash', 'Invoke-PayloadStaging')) {
+      if ($fn.Name -in @('Get-Sha256', 'Resolve-HibikiDestination', 'Get-StagingPlan', 'Copy-HibikiFileWithHash', 'Invoke-PayloadStaging', 'Get-UninstallPlan', 'Invoke-PayloadUninstall')) {
         $functions[$fn.Name] = $fn
       }
     }
 
     # Define all needed installer functions at self-test script scope.
-    foreach ($name in @('Get-Sha256', 'Resolve-HibikiDestination', 'Get-StagingPlan', 'Copy-HibikiFileWithHash', 'Invoke-PayloadStaging')) {
+    foreach ($name in @('Get-Sha256', 'Resolve-HibikiDestination', 'Get-StagingPlan', 'Copy-HibikiFileWithHash', 'Invoke-PayloadStaging', 'Get-UninstallPlan', 'Invoke-PayloadUninstall')) {
       $fn = $functions[$name]
       if (-not $fn) { throw "SelfTest missing function: $name" }
       Invoke-Expression $fn.Extent.Text

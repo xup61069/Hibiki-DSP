@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "issue": 766,
+  "scope_digest": "installer-uninstall-v1",
+  "source_commit": "42076ca4fd378b951231e55dbcd5b0eb8a0dfca5",
+  "environment_fingerprint": "windows-local-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/installer-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/installer-check.ps1",
+    "pwsh -NoProfile -File tools/distribution-check.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 766",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/installer-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "all required boundaries present including Get-UninstallPlan, Invoke-PayloadUninstall, Invoke-HibikiUninstall"
+      ],
+      "case_count": 8,
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/installer-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "real installer/HibikiSetup.ps1 parsed via Parser.ParseFile with zero errors",
+        "uninstall capability boundaries present: Get-UninstallPlan, Invoke-PayloadUninstall, Invoke-HibikiUninstall"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/distribution-check.ps1",
+      "status": "pass",
+      "coverage": ["distribution profile stable GUID and identity checks"]
+    },
+    {
+      "command": "always-run gates",
+      "status": "pass",
+      "coverage": [
+        "handoff-check Issue 766 ownership scope and Git state",
+        "docs-check 607 tracked paths 253 repository JSON files",
+        "source-policy 607 tracked paths no blocked binary or secret",
+        "git diff --check no whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "Source-level design and offline verification only; no -Apply or -Uninstall execution.",
+    "Does not claim install, load, runtime audio, driver, HLK, Microsoft signing, or Authenticode execution evidence."
+  ],
+  "logs": [],
+  "tool_versions": { "powershell": "pwsh 7.6.4" }
+}
