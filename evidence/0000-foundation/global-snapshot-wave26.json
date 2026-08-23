@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "issue": 680,
+  "scope_digest": "global-snapshot-wave26",
+  "source_commit": null,
+  "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100-pwsh-7.6; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 680",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #667 / PR #669 merged: the WinUI Expert shell exposes the bounded VST3 parameter-timeline editor with selection, begin/commit/discard draft lifecycle, undo/redo, row add/remove and value editing.",
+        "Issue #673 / PR #677 merged: Compatibility Preview timeline ComboBox now binds SelectedItem two-way to the editor view model and forwards SelectionChanged to the same handler as the formal shell; control-model coverage covers the selection seam.",
+        "Issue #671 / PR #676 merged: browser tab capture gains a user-controlled Stop, popup reports real stream state when opened, and start failures surface as errors instead of false success; SPEC-0009 and extension policy checks cover the boundaries.",
+        "Wave25 snapshot (#668 / PR #670) recorded IPC between-connection stop cancel and block-size-independent limiter recovery before this UI wave."
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; this update does not change product source behavior.",
+    "UI items remain control-model/shell source and gate evidence; the Compatibility Preview is a local non-formal surface.",
+    "Extension item remains source/policy evidence; no physical-audio delivery or driver install/load/HLK/Microsoft signing claim."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-23T18:20:00+08:00",
+  "finished_at": "2026-08-23T18:30:00+08:00"
+}
