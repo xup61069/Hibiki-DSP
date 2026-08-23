@@ -33,12 +33,18 @@ UID preserves the existing passthrough worker, and invalid launch fields are
 rejected before process creation. Parameter automation, latency-compensation
 policy, crash-dump redaction and real plugin certification remain separate gates.
 
+Bounded parameter automation itself is present: up to 16 parameter IDs and five
+sample-accurate points per ID are accepted by the processor API and optional
+SDK worker. The bounded timeline and Scene scheduler are also part of this
+source baseline, including persistence, editing transactions, undo/redo history
+and the C# Compatibility Preview editing surfaces; full end-to-end device
+validation, crash-dump redaction and third-party certification remain separate
+gates.
+
 The processor API and optional SDK worker accept up to 16 parameter IDs, five
 sample-accurate points per ID and normalized values in `[0,1]`; the bounded
 `ProcessBlockWithParameters` frame converts them to the SDK's
-`IParameterChanges` before `process`. The bounded timeline and Scene scheduler
-are part of this source baseline; supervisor UI editing and full end-to-end
-automation remain separate gates.
+`IParameterChanges` before `process`.
 
 The supervisor now exposes `handshake_worker` and `process_worker_block` as the
 only control-plane exchange calls. They validate HelloAck/response IDs, channel
@@ -89,3 +95,12 @@ unsigned/local and is not a third-party compatibility certification.
 alignment plan and fixed 8-channel delay primitive. They are tested separately
 from supervisor and graph lane commit, so plugin certification and full latency
 policy are still pending.
+
+The graph-side commit path is bounded too. `LatencyGraphCommitV1` /
+`LatencyGraphCommitterV1` validate lane tokens and revisions, prepare a fixed
+capacity snapshot on the control plane, then atomically commit or roll back.
+`LaneLatencyBankV1` allocates its scratch/ring during graph Prepare and swaps it
+with the graph snapshot at Commit; the RT mixer reads only that bank and does
+not allocate in the callback. This is source and contract-test evidence, not
+third-party plugin certification or physical end-to-end latency acceptance;
+device rebind, sink clock and third-party reporting tests remain pending.
