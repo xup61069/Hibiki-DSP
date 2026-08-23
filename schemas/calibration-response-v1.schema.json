@@ -20,8 +20,8 @@
         "required": ["frequency_hz", "measured_db", "target_db"],
         "properties": {
           "frequency_hz": {"type": "number", "exclusiveMinimum": 0, "maximum": 24000},
-          "measured_db": {"type": "number"},
-          "target_db": {"type": "number"}
+          "measured_db": {"type": "number", "minimum": -144, "maximum": 12},
+          "target_db": {"type": "number", "minimum": -144, "maximum": 12}
         }
       }
     }

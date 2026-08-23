@@ -20,7 +20,8 @@ peaking filters。超出 boost/cut 或 filter capacity 時必須標示 `limited`
 
 ## 介面與資料流
 
-`CalibrationResponsePointV1` 對應 `measured_db` 與 `target_db`；
+`CalibrationResponsePointV1` 對應 `measured_db` 與 `target_db`；兩個 dB 值的
+schema contract 限制在 -144..12，先拒絕超出實際音量與安全 headroom 範圍的量測值。
 `compile_bounded_peq_correction_v1` 在 control plane 以最大殘差優先、log-frequency
 spacing 選點，輸出 `PeqFilterV1`。結果可直接送至 Equalizer APO、CamillaDSP、REW、
 Hibiki JSON exporter；IR exporter 仍接受另外量測的 caller-owned impulse samples。
@@ -29,6 +30,8 @@ C# control model 以 `CalibrationModel.cs` 提供對應的強型別 `Calibration
 `CalibrationResponseV1`、`PeqFilterV1`、`PeqPresetV1`、`CalibrationCompilePolicyV1` 與
 `CalibrationCompilerV1`，支援 `schemas/calibration-response-v1.schema.json` 與
 `device_id` 欄位限制最長 260 bytes，避免無限長字串進入控制平面。
+schema 層對 `measured_db` 與 `target_db` 限制為 -144 至 +12 dB，與系統
+volume floor 和 safety ceiling 一致，拒絕不合理量測值進入控制平面。
 `schemas/peq-filter-v1.schema.json` 的原子 JSON 載入／保存及相同演算法的編譯與匯出。
 schema 層的 `device_id` 上限為 260 字元（`maxLength: 260`），與
 `device-switch-request-v1.schema.json` 的 endpoint ID 邊界一致。

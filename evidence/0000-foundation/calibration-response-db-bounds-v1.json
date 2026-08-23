@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "issue": 957,
+  "scope_digest": "calibration-response-db-bounds-v1",
+  "source_commit": "",
+  "environment_fingerprint": "windows-local-pwsh-calibration-response-db-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 957",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass",
+      "required_paths": 86,
+      "specs": 24
+    },
+    {
+      "command": "source-policy",
+      "status": "pass",
+      "scanned_paths": 648
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Schema-only dB bound constraints (measured_db and target_db minimum:-144, maximum:12) with matching spec documentation; no runtime code, IPC payload, DSP, driver, signing or physical-audio behavior changes.",
+    "No driver installation, loading, TESTSIGNING, certificate purchase or real-device changes were performed."
+  ],
+  "logs": {},
+  "tool_versions": {},
+  "started_at": "2026-08-24T06:35:00+08:00",
+  "finished_at": "2026-08-24T06:40:16+08:00"
+}
