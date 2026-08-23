@@ -3,6 +3,8 @@ param(
   [switch]$SelfTest
 )
 
+Set-StrictMode -Version Latest
+
 $ErrorActionPreference = 'Stop'
 
 $script:BlockedExtensions = @('.exe', '.dll', '.sys', '.msi', '.msix', '.vst3', '.cat', '.pdb', '.obj', '.lib', '.pfx', '.key', '.pem', '.cab', '.zip', '.7z', '.bin', '.so', '.dylib')
@@ -105,7 +107,7 @@ if ($tracked.Count -eq 0) {
   })
 }
 
-$blocked = Get-SourcePolicyBlockedPaths -Paths $tracked
+$blocked = @(Get-SourcePolicyBlockedPaths -Paths $tracked)
 if ($blocked.Count -gt 0) { throw "Source-only policy violation: $($blocked -join ', ')" }
 
 foreach ($path in $tracked) {
