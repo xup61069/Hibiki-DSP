@@ -795,7 +795,7 @@ notificationCount = notifications.Count;
 Check(!bindingSurface.Upsert(new Vst3TimelineSurfaceModelV1.TimelineEvent(5, 30, 0.5)) &&
       notifications.Count == notificationCount,
     "Rejected edit without a draft must not notify bindings.");
-var editorViewModel = new Vst3TimelineEditorViewModel();
+var editorViewModel = new Vst3TimelineEditorViewModelV1();
 var editorNotifications = new List<string>();
 editorViewModel.PropertyChanged += (_, args) =>
     editorNotifications.Add(args.PropertyName ?? string.Empty);
@@ -804,25 +804,25 @@ Check(!editorViewModel.RegisterTimeline("bad id") &&
     "Editor ViewModel must fail closed on invalid timeline registration.");
 Check(editorViewModel.RegisterTimeline("editor-timeline") &&
       editorViewModel.TimelineIds.SequenceEqual(["editor-timeline"]) &&
-      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.TimelineIds)) &&
-      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.StatusText)),
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.TimelineIds)) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.StatusText)),
     "Editor ViewModel must project accepted timeline registration.");
 editorNotifications.Clear();
 Check(!editorViewModel.Select("missing") &&
       editorViewModel.StatusText.Contains("選取失敗") &&
-      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.StatusText)),
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.StatusText)),
     "Editor ViewModel must reject selection of an unknown timeline.");
 editorNotifications.Clear();
 Check(editorViewModel.Select("editor-timeline") &&
       editorViewModel.SelectedTimelineId == "editor-timeline" &&
       editorViewModel.Rows.Count == 0 && !editorViewModel.IsDirty &&
-      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.SelectedTimelineId)) &&
-      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.Rows)),
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.SelectedTimelineId)) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.Rows)),
     "Editor ViewModel must project an empty selected timeline.");
 editorNotifications.Clear();
 Check(editorViewModel.BeginEdit() && editorViewModel.HasEditSession &&
       editorViewModel.Rows.Count == 0 &&
-      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.HasEditSession)),
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.HasEditSession)),
     "Editor ViewModel must expose the accepted draft transition.");
 Check(!editorViewModel.Select("missing") && editorViewModel.HasEditSession &&
       editorViewModel.StatusText.Contains("草稿進行中"),
@@ -832,10 +832,10 @@ editorViewModel.NewPositionText = "480";
 editorViewModel.NewValueText = "0.25";
 editorNotifications.Clear();
 Check(editorViewModel.UpsertFromFields() && editorViewModel.Rows.Count == 1 &&
-      editorViewModel.Rows[0] == new Vst3TimelineEditorViewModel.TimelineEventRow(
+      editorViewModel.Rows[0] == new Vst3TimelineEditorViewModelV1.TimelineEventRow(
           0, 7U, 480UL, 0.25) &&
       editorViewModel.StatusText.Contains("事件已加入") &&
-      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.Rows)),
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.Rows)),
     "Editor ViewModel must parse and project a valid event.");
 editorViewModel.NewParameterIdText = "3";
 editorViewModel.NewPositionText = "240";
@@ -894,8 +894,8 @@ editorNotifications.Clear();
 Check(editorViewModel.Commit() && !editorViewModel.HasEditSession &&
       editorViewModel.IsDirty && editorViewModel.UndoDepth == 1 &&
       editorViewModel.CanUndo && !editorViewModel.CanRedo &&
-      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.IsDirty)) &&
-      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.UndoDepth)),
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.IsDirty)) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.UndoDepth)),
     "Editor ViewModel commit must publish rows and history projections.");
 Check(editorViewModel.SaveSelected() && !editorViewModel.IsDirty &&
       editorViewModel.StatusText.Contains("已保存"),
@@ -968,14 +968,14 @@ Check(editorViewModel.ClearHistory() && !editorViewModel.CanUndo &&
       editorViewModel.IsDirty == dirtyBeforeViewModelHistoryClear &&
       !editorViewModel.HasEditSession &&
       editorViewModel.StatusText.Contains("編輯歷史已清除") &&
-      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.UndoDepth)) &&
-      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.RedoDepth)) &&
-      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.StatusText)),
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.UndoDepth)) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.RedoDepth)) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.StatusText)),
     "Editor ViewModel clear-history must preserve rows/dirty state and notify history bindings.");
 editorNotifications.Clear();
 Check(editorViewModel.ClearHistory() && !editorViewModel.CanUndo &&
       !editorViewModel.CanRedo &&
-      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.StatusText)),
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.StatusText)),
     "Editor ViewModel clear-history must remain safe with empty history.");
 Check(editorViewModel.BeginEdit(), "Editor ViewModel open-draft clear-history fixture failed.");
 var viewModelDraftBeforeHistoryClear = editorViewModel.Rows.ToArray();
@@ -1002,14 +1002,14 @@ Check(editorViewModel.Rows.Count == 2,
     "Editor ViewModel removal must leave two rows.");
 Check(editorViewModel.Rows[0] == rowsBeforeRemoval[0],
     "Editor ViewModel removal must keep the leading row.");
-Check(editorViewModel.Rows[1] == new Vst3TimelineEditorViewModel.TimelineEventRow(
+Check(editorViewModel.Rows[1] == new Vst3TimelineEditorViewModelV1.TimelineEventRow(
           1, 8U, 720UL, 0.15),
     "Editor ViewModel removal must renumber the trailing row.");
 Check(editorViewModel.StatusText.Contains("已刪除選取列"),
     "Editor ViewModel removal must publish a status message.");
-Check(editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.SelectedRowIndex)) &&
-      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.Rows)) &&
-      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.StatusText)),
+Check(editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.SelectedRowIndex)) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.Rows)) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.StatusText)),
     "Editor ViewModel removal must renumber rows and publish observable changes.");
 Check(editorViewModel.Commit() && editorViewModel.Rows.Count == 2 &&
       !editorViewModel.HasEditSession,
@@ -1037,14 +1037,14 @@ Check(editorViewModel.Rows[1] == rowsBeforeRemoval[1],
     "Editor ViewModel removal undo must restore the removed row.");
 Check(editorViewModel.IsDirty && editorViewModel.CanRedo,
     "Editor ViewModel removal undo must expose dirty and redo state.");
-Check(editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.Rows)) &&
-      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModel.StatusText)),
+Check(editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.Rows)) &&
+      editorNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.StatusText)),
     "Editor ViewModel removal undo must publish observable changes.");
 Check(editorViewModel.Redo() &&
       editorViewModel.SelectedRowIndex == -1 &&
       editorViewModel.Rows.Count == 2 &&
       editorViewModel.Rows[0] == rowsBeforeRemoval[0] &&
-      editorViewModel.Rows[1] == new Vst3TimelineEditorViewModel.TimelineEventRow(
+      editorViewModel.Rows[1] == new Vst3TimelineEditorViewModelV1.TimelineEventRow(
           1, 8U, 720UL, 0.15),
     "Editor ViewModel removal redo must re-apply the row deletion.");
 var removeMirror = new Vst3TimelineSurfaceModelV1();
@@ -1076,7 +1076,7 @@ Check(removeMirror.RemoveSelected() && !removeMirror.HasSelection &&
     "Managed remove-selected must clear selection/history and keep other stored timelines.");
 Check(!removeMirror.RemoveSelected(),
     "Managed remove-selected without a selection must fail closed.");
-var removeViewModel = new Vst3TimelineEditorViewModel();
+var removeViewModel = new Vst3TimelineEditorViewModelV1();
 var removeViewModelNotifications = new List<string>();
 removeViewModel.PropertyChanged += (_, args) =>
     removeViewModelNotifications.Add(args.PropertyName ?? string.Empty);
@@ -1097,12 +1097,12 @@ Check(removeViewModel.RemoveSelectedTimeline() &&
       removeViewModel.SelectedRowIndex == -1 && !removeViewModel.IsDirty &&
       removeViewModel.UndoDepth == 0 && removeViewModel.RedoDepth == 0 &&
       removeViewModel.StatusText.Contains("已刪除選取時間軸") &&
-      removeViewModelNotifications.Contains(nameof(Vst3TimelineEditorViewModel.TimelineIds)) &&
-      removeViewModelNotifications.Contains(nameof(Vst3TimelineEditorViewModel.SelectedTimelineId)) &&
-      removeViewModelNotifications.Contains(nameof(Vst3TimelineEditorViewModel.Rows)) &&
-      removeViewModelNotifications.Contains(nameof(Vst3TimelineEditorViewModel.StatusText)),
+      removeViewModelNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.TimelineIds)) &&
+      removeViewModelNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.SelectedTimelineId)) &&
+      removeViewModelNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.Rows)) &&
+      removeViewModelNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.StatusText)),
     "Editor ViewModel timeline removal must refresh projections and notify bindings.");
-var selectionSeamViewModel = new Vst3TimelineEditorViewModel();
+var selectionSeamViewModel = new Vst3TimelineEditorViewModelV1();
 Check(selectionSeamViewModel.RegisterTimeline("compat-selection") &&
       selectionSeamViewModel.SelectedTimelineId is null,
     "Compatibility Preview selection seam must start with no timeline selected.");
@@ -1117,5 +1117,68 @@ Check(selectionSeamViewModel.BeginEdit() && selectionSeamViewModel.HasEditSessio
 Check(!selectionSeamViewModel.Select("missing") &&
       selectionSeamViewModel.SelectedTimelineId == "compat-selection",
     "Selection seam must keep the selected timeline after a rejected change.");
+
+var shellViewModel = new EasyControlViewModel();
+Check(ReferenceEquals(shellViewModel.Vst3TimelineEditor, shellViewModel.Vst3TimelineEditor),
+    "Easy control ViewModel must expose a stable VST3 timeline binding surface.");
+var uiTimeline = shellViewModel.Vst3TimelineEditor;
+var uiTimelineNotifications = new List<string>();
+uiTimeline.PropertyChanged += (_, args) => uiTimelineNotifications.Add(args.PropertyName ?? string.Empty);
+uiTimeline.NewTimelineIdText = "ui-timeline";
+uiTimeline.SelectedRowValueText = "ignored";
+Check(uiTimelineNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.NewTimelineIdText)) &&
+      uiTimelineNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.SelectedRowValueText)),
+    "Timeline registration and selected-row fields must be observable two-way binding sources.");
+uiTimelineNotifications.Clear();
+Check(uiTimeline.RegisterTimeline(uiTimeline.NewTimelineIdText) &&
+      uiTimeline.TimelineIds.SequenceEqual(["ui-timeline"]) &&
+      uiTimeline.StatusText.Contains("已註冊"),
+    "The V1 seam must register a timeline from its observable ID field.");
+Check(uiTimeline.Select(uiTimeline.NewTimelineIdText) && uiTimeline.HasSelection &&
+      uiTimeline.SelectedTimelineId == "ui-timeline" && !uiTimeline.HasEditSession,
+    "The V1 seam must select the registered timeline fail-closed.");
+Check(uiTimeline.BeginEdit() && uiTimeline.NewParameterIdText.Length == 0 &&
+      uiTimeline.UpsertFromFields() == false,
+    "The V1 seam must reject an empty parsed event without changing state.");
+uiTimeline.NewParameterIdText = "11";
+uiTimeline.NewPositionText = "220";
+uiTimeline.NewValueText = "0.45";
+uiTimelineNotifications.Clear();
+Check(uiTimeline.UpsertFromFields() && uiTimeline.Rows.Count == 1 &&
+      uiTimeline.Rows[0] == new Vst3TimelineEditorViewModelV1.TimelineEventRow(0, 11U, 220UL, 0.45) &&
+      uiTimelineNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.Rows)),
+    "The V1 seam must add parsed events through bound fields.");
+uiTimeline.SelectedRowIndex = 0;
+uiTimeline.SelectedRowValueText = "0.65";
+Check(uiTimeline.SetSelectedRowValue(uiTimeline.SelectedRowValueText) &&
+      uiTimeline.Rows[0] == new Vst3TimelineEditorViewModelV1.TimelineEventRow(0, 11U, 220UL, 0.65),
+    "The V1 seam must update the selected row through its bound value field.");
+uiTimelineNotifications.Clear();
+Check(uiTimeline.Commit() && !uiTimeline.HasEditSession && uiTimeline.IsDirty &&
+      uiTimeline.CanUndo && uiTimeline.UndoDepth == 1 &&
+      uiTimelineNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.IsDirty)),
+    "The V1 seam must expose bounded publish/history projections.");
+Check(uiTimeline.SaveSelected() && !uiTimeline.IsDirty &&
+      uiTimeline.StatusText.Contains("已保存"),
+    "The V1 seam must expose save re-baselining.");
+Check(uiTimeline.RemoveSelectedTimeline() && !uiTimeline.HasSelection &&
+      uiTimeline.TimelineIds.Count == 0 && uiTimeline.Rows.Count == 0 &&
+      uiTimeline.SelectedRowIndex == -1 &&
+      uiTimelineNotifications.Contains(nameof(Vst3TimelineEditorViewModelV1.TimelineIds)),
+    "The V1 seam must remove the selected timeline fail-closed.");
+var writableSelectionViewModel = new Vst3TimelineEditorViewModelV1();
+Check(writableSelectionViewModel.RegisterTimeline("writable-selection"),
+    "The writable-selection fixture must register successfully.");
+writableSelectionViewModel.SelectedTimelineId = "writable-selection";
+Check(writableSelectionViewModel.SelectedTimelineId == "writable-selection" &&
+      writableSelectionViewModel.HasSelection,
+    "The safe SelectedTimelineId setter must support two-way selection bindings.");
+writableSelectionViewModel.BeginEdit();
+writableSelectionViewModel.SelectedTimelineId = "missing";
+Check(writableSelectionViewModel.SelectedTimelineId == "writable-selection" &&
+      writableSelectionViewModel.HasSelection &&
+      writableSelectionViewModel.StatusText.Contains("選取失敗") &&
+      writableSelectionViewModel.HasEditSession,
+    "A rejected selection change must keep the prior selection and open draft.");
 
 Console.WriteLine("Control model checks passed.");
