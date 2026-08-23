@@ -99,11 +99,11 @@ function Assert-ExtensionPopupControlNames([string]$popupHtml, [string]$sourceNa
       }
       return !$aria.Success -or [string]::IsNullOrWhiteSpace($aria.Groups['value'].Value)
     })
-  if ($missing.Count -gt 0) {
+  if (@($missing).Count -gt 0) {
     $details = @($missing | ForEach-Object { "$($_.Type) at $($sourceName):$($_.Line)" }) -join ', '
     throw "Extension popup interactive controls must expose a non-empty accessible name; aria-label must be non-empty and every aria-labelledby target must exist with text: $details"
   }
-  return $controls.Count
+  return @($controls).Count
 }
 
 function Assert-ExtensionSourcePolicy(
@@ -235,7 +235,7 @@ function Assert-ExtensionSourcePolicy(
     $offscreenSource,
     'new\s+WebSocket\s*\(\s*(?:\x27|\x22)(?<url>[^\x27\x22\)]+)(?:\x27|\x22)'
   )
-  if ($webSocketMatches.Count -ne 1 -or
+  if (@($webSocketMatches).Count -ne 1 -or
       $webSocketMatches[0].Groups['url'].Value -cne 'ws://127.0.0.1:17842/v1/tab') {
     throw "Offscreen source must use exactly the fixed loopback bridge in $sourceName."
   }
@@ -305,15 +305,15 @@ function Assert-ExtensionManifestPolicy($manifest, [string]$sourceName) {
     throw "CSP contains unsafe-inline in $sourceName."
   }
   $scriptSources = @(Get-CspDirectiveSources $csp 'script-src' $sourceName)
-  if ($scriptSources.Count -ne 1 -or $scriptSources[0] -cne "'self'") {
+  if (@($scriptSources).Count -ne 1 -or $scriptSources[0] -cne "'self'") {
     throw "CSP script-src must contain only 'self' in $sourceName."
   }
   $objectSources = @(Get-CspDirectiveSources $csp 'object-src' $sourceName)
-  if ($objectSources.Count -ne 1 -or $objectSources[0] -cnotin @("'self'", "'none'")) {
+  if (@($objectSources).Count -ne 1 -or $objectSources[0] -cnotin @("'self'", "'none'")) {
     throw "CSP object-src must contain only 'self' or 'none' in $sourceName."
   }
   $connectSources = @(Get-CspDirectiveSources $csp 'connect-src' $sourceName)
-  if ($connectSources.Count -ne 1 -or $connectSources[0] -cne 'ws://127.0.0.1:17842') {
+  if (@($connectSources).Count -ne 1 -or $connectSources[0] -cne 'ws://127.0.0.1:17842') {
     throw "CSP connect-src must contain only ws://127.0.0.1:17842 without wildcard origins in $sourceName."
   }
 }

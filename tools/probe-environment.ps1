@@ -421,7 +421,7 @@ function Assert-EnvironmentProbeDocument {
   }
 
   $formats = @(Get-EnvironmentProbeProperty -Object $audio -Name 'supported_formats')
-  if ($formats.Count -lt 1) {
+  if (@($formats).Count -lt 1) {
     throw 'Probe document audio.supported_formats must contain at least one format.'
   }
 
@@ -431,7 +431,7 @@ function Assert-EnvironmentProbeDocument {
     }
   }
 
-  if (@($formats | Select-Object -Unique).Count -ne $formats.Count) {
+  if (@(@($formats) | Select-Object -Unique).Count -ne @($formats).Count) {
     throw 'Probe document audio.supported_formats contains duplicates.'
   }
 
@@ -531,7 +531,7 @@ function Invoke-EnvironmentProbeSelfTest {
     $passed++
   }
 
-  Write-Output ("Environment probe self-test: {0}/{1} cases passed." -f $passed, $cases.Count)
+  Write-Output ("Environment probe self-test: {0}/{1} cases passed." -f $passed, @($cases).Count)
 }
 
 if ($SelfTest) {

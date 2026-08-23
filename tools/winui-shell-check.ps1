@@ -29,11 +29,11 @@ function Assert-InteractiveControlNames([string]$xaml, [string]$sourceName) {
         (($doubleQuoted.Success -and [string]::IsNullOrWhiteSpace($doubleQuoted.Groups['value'].Value)) -or
         ($singleQuoted.Success -and [string]::IsNullOrWhiteSpace($singleQuoted.Groups['value'].Value)))
     })
-  if ($missing.Count -gt 0) {
+  if (@($missing).Count -gt 0) {
     $details = @($missing | ForEach-Object { "$($_.Type) at $($sourceName):$($_.Line)" }) -join ', '
     throw "Interactive WinUI controls must declare a non-empty AutomationProperties.Name: $details"
   }
-  return $controls.Count
+  return @($controls).Count
 }
 
 function Get-CompatibilityPreviewControlOpenings([string]$source) {
@@ -59,7 +59,7 @@ function Assert-CompatibilityPreviewControlNames([string]$source, [string]$sourc
        throw "Compatibility Preview interactive control must declare a non-empty AutomationProperties.Name: $($control.Type) $($control.Variable) at $($sourceName):$($control.Line)"
      }
    }
-   return $controls.Count
+   return @($controls).Count
 }
 
 function Get-DesktopCompatControlOpenings([string]$source) {
@@ -85,7 +85,7 @@ function Assert-DesktopCompatControlNames([string]$source, [string]$sourceName) 
       throw "DesktopCompat interactive control must declare a non-empty AccessibleName: $($control.Type) $($control.Variable) at $($sourceName):$($control.Line)"
     }
   }
-  return $controls.Count
+  return @($controls).Count
 }
 
 if ($SelfTest) {
@@ -187,7 +187,7 @@ $compatPreviewSource = Get-Content (Join-Path $shell 'MainWindow.CompatibilityPr
 $desktopCompatSource = Get-Content (Join-Path $repo 'apps/desktop-compat-preview/Program.cs') -Raw
 $required = @('Hibiki.WinUI.csproj', 'App.xaml', 'App.xaml.cs', 'MainWindow.xaml', 'MainWindow.xaml.cs')
 $missing = @($required | Where-Object { -not (Test-Path (Join-Path $shell $_)) })
-if ($missing.Count -gt 0) { throw "WinUI shell files missing: $($missing -join ', ')" }
+if (@($missing).Count -gt 0) { throw "WinUI shell files missing: $($missing -join ', ')" }
 
 $project = Get-Content (Join-Path $shell 'Hibiki.WinUI.csproj') -Raw
 $lock = Get-Content (Join-Path $repo 'build/toolchain-lock.yml') -Raw

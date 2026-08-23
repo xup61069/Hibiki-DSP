@@ -122,7 +122,7 @@ function Invoke-ControlModelCheck {
     $exitCode = $LASTEXITCODE
   }
   else {
-    $runnerResult = @(& $CommandRunner $ProjectPath $BaseOutputPath $ProjectExtensionsPath)
+    $runnerResult = @(@(& $CommandRunner $ProjectPath $BaseOutputPath $ProjectExtensionsPath))
     $exitCode = if ($runnerResult.Count -eq 0) { 0 } else { [int]$runnerResult[-1] }
   }
 

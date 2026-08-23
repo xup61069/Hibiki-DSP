@@ -78,8 +78,8 @@ function Get-DriverCompilePlan {
       Object = Join-Path $ObjectRoot ($_.BaseName + '.obj')
     }
   })
-  $duplicateSources = @($plan | Group-Object Source | Where-Object Count -gt 1)
-  $duplicateObjects = @($plan | Group-Object Object | Where-Object Count -gt 1)
+  $duplicateSources = @(@($plan | Group-Object Source) | Where-Object Count -gt 1)
+  $duplicateObjects = @(@($plan | Group-Object Object) | Where-Object Count -gt 1)
   if ($duplicateSources.Count -ne 0 -or $duplicateObjects.Count -ne 0) {
     $details = @($duplicateSources.Name) + @($duplicateObjects.Name)
     throw "Driver compile plan contains duplicate source/object inputs: $($details -join ', ')"
@@ -320,7 +320,7 @@ if ($SelfTest) {
   }
   $compilePlan = @(Get-DriverCompilePlan -RepoRoot $paths.RepoRoot -ObjectRoot $paths.ObjectRoot)
   if (@($compilePlan | Where-Object { [System.IO.Path]::GetFileName($_.Source) -eq 'guids.cpp' }).Count -ne 1 -or
-      @($compilePlan.Object | Select-Object -Unique).Count -ne $compilePlan.Count) {
+      @(@($compilePlan.Object) | Select-Object -Unique).Count -ne $compilePlan.Count) {
     throw 'build-driver self-test requires one source per unique object, including guids.cpp exactly once.'
   }
   Write-Output "Driver build plan self-test passed ($($compilePlan.Count) unique source/object mappings, compatible include order, warnings-as-errors)."

@@ -129,7 +129,7 @@ function Assert-DistributionProfile([hashtable]$values, [string]$sourceName) {
     }
     $guidValues += $value.ToLowerInvariant()
   }
-  if (($guidValues | Sort-Object -Unique).Count -ne $guidValues.Count) {
+  if (@(@($guidValues) | Sort-Object -Unique).Count -ne @($guidValues).Count) {
     throw "Distribution GUIDs must be unique: $sourceName"
   }
 
