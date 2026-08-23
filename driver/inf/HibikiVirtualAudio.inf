@@ -23,6 +23,28 @@ Needs=KS.Registration,WDMAUDIO.Registration
 CopyFiles=HibikiDriver.CopyFiles
 AddReg=HibikiMain.AddReg
 
+[HibikiMain_Install.Interfaces]
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_TopologyMain%,Hibiki.I.TopologyMain,
+AddInterface=%KSCATEGORY_TOPOLOGY%,%KSNAME_TopologyMain%,Hibiki.I.TopologyMain,
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_WaveMain%,Hibiki.I.WaveMain,
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_WaveMain%,Hibiki.I.WaveMainRender,
+AddInterface=%KSCATEGORY_REALTIME%,%KSNAME_WaveMain%,Hibiki.I.WaveMain,
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_TopologyLowLatency%,Hibiki.I.TopologyLowLatency,
+AddInterface=%KSCATEGORY_TOPOLOGY%,%KSNAME_TopologyLowLatency%,Hibiki.I.TopologyLowLatency,
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_WaveLowLatency%,Hibiki.I.WaveLowLatency,
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_WaveLowLatency%,Hibiki.I.WaveLowLatencyRender,
+AddInterface=%KSCATEGORY_REALTIME%,%KSNAME_WaveLowLatency%,Hibiki.I.WaveLowLatency,
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_TopologySurround%,Hibiki.I.TopologySurround,
+AddInterface=%KSCATEGORY_TOPOLOGY%,%KSNAME_TopologySurround%,Hibiki.I.TopologySurround,
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_WaveSurround%,Hibiki.I.WaveSurround,
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_WaveSurround%,Hibiki.I.WaveSurroundRender,
+AddInterface=%KSCATEGORY_REALTIME%,%KSNAME_WaveSurround%,Hibiki.I.WaveSurround,
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_TopologyVirtualMic%,Hibiki.I.TopologyVirtualMic,
+AddInterface=%KSCATEGORY_TOPOLOGY%,%KSNAME_TopologyVirtualMic%,Hibiki.I.TopologyVirtualMic,
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_WaveVirtualMic%,Hibiki.I.WaveVirtualMic,
+AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_WaveVirtualMic%,Hibiki.I.WaveVirtualMicCapture,
+AddInterface=%KSCATEGORY_REALTIME%,%KSNAME_WaveVirtualMic%,Hibiki.I.WaveVirtualMic,
+
 [HibikiMain_Install.Services]
 AddService=HibikiVirtualAudio,0x00000002,HibikiVirtualAudio.Service
 
@@ -53,8 +75,68 @@ HibikiVirtualAudio.sys=1
 [DestinationDirs]
 HibikiDriver.CopyFiles=12
 
+; Per-subdevice interface registrations (proxy CLSID for PortCls KS filters)
+[Hibiki.I.TopologyMain]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%TopologyMain.DeviceDesc%
+
+[Hibiki.I.WaveMain]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%WaveMain.DeviceDesc%
+
+[Hibiki.I.TopologyLowLatency]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%TopologyLowLatency.DeviceDesc%
+
+[Hibiki.I.WaveLowLatency]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%WaveLowLatency.DeviceDesc%
+
+[Hibiki.I.TopologySurround]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%TopologySurround.DeviceDesc%
+
+[Hibiki.I.WaveSurround]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%WaveSurround.DeviceDesc%
+
+[Hibiki.I.TopologyVirtualMic]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%TopologyVirtualMic.DeviceDesc%
+
+[Hibiki.I.WaveVirtualMic]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%WaveVirtualMic.DeviceDesc%
+
 [Strings]
 HibikiProvider="Hibiki DSP"
 HibikiMain.DeviceDesc="Hibiki Virtual Audio (source-only package)"
 HibikiServiceDesc="Hibiki Virtual Audio"
 DiskName="Hibiki Virtual Audio Driver"
+
+; KS proxy CLSID and categories
+Proxy.CLSID="{17CCA71B-ECD7-11D0-B908-00A0C9223196}"
+KSCATEGORY_AUDIO="{6994AD04-93EF-11D0-A3CC-00A0C9223196}"
+KSCATEGORY_RENDER="{65E8773E-8F56-11D0-A3B9-00A0C9223196}"
+KSCATEGORY_CAPTURE="{65E8773D-8F56-11D0-A3B9-00A0C9223196}"
+KSCATEGORY_REALTIME="{EB115FFC-10C8-4964-831D-6DCB02E6F23F}"
+KSCATEGORY_TOPOLOGY="{DDA54A40-1E4C-11D1-A050-405705C10000}"
+
+; Subdevice names must exactly match PcRegisterSubdevice calls.
+KSNAME_TopologyMain="TopologyMain"
+KSNAME_WaveMain="WaveMain"
+KSNAME_TopologyLowLatency="TopologyLowLatency"
+KSNAME_WaveLowLatency="WaveLowLatency"
+KSNAME_TopologySurround="TopologySurround"
+KSNAME_WaveSurround="WaveSurround"
+KSNAME_TopologyVirtualMic="TopologyVirtualMic"
+KSNAME_WaveVirtualMic="WaveVirtualMic"
+
+TopologyMain.DeviceDesc="Hibiki Main Topology"
+WaveMain.DeviceDesc="Hibiki Main Wave"
+TopologyLowLatency.DeviceDesc="Hibiki Low Latency Topology"
+WaveLowLatency.DeviceDesc="Hibiki Low Latency Wave"
+TopologySurround.DeviceDesc="Hibiki Surround 7.1 Topology"
+WaveSurround.DeviceDesc="Hibiki Surround 7.1 Wave"
+TopologyVirtualMic.DeviceDesc="Hibiki Virtual Mic Topology"
+WaveVirtualMic.DeviceDesc="Hibiki Virtual Mic Wave"
