@@ -437,7 +437,8 @@
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1">
                         <StackPanel Spacing="16">
-                            <TextBlock Text="{Binding Expert.StatusText}" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding Expert.StatusText}" TextWrapping="Wrap"
+                                       AutomationProperties.LiveSetting="Polite" />
 
                             <Border Padding="16" CornerRadius="8"
                                     Background="{ThemeResource SubtleFillColorTertiaryBrush}"
@@ -450,6 +451,8 @@
                                         <controls:ItemsRepeater.ItemTemplate>
                                             <DataTemplate>
                                                 <StackPanel Padding="12" Spacing="4" CornerRadius="8"
+                                                            AutomationProperties.Name="{Binding AccessibleSummary}"
+                                                            AutomationProperties.HelpText="{Binding Detail}"
                                                             Background="{ThemeResource SubtleFillColorSecondaryBrush}"
                                                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                                             BorderThickness="1">
