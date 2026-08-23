@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "evidence_type": "documentation-only",
+  "title": "Schema-runtime numeric bounds alignment for acoustic anchor and virtual mic policy",
+  "date": "2026-08-24",
+  "issue": 949,
+  "pr": null,
+  "source_commit": null,
+  "scope": [
+    "schemas/acoustic-anchor-v1.schema.json",
+    "schemas/virtual-mic-policy-v1.schema.json"
+  ],
+  "spec_refs": ["SPEC-0001"],
+  "adr_refs": [],
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 949",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "limitations": [
+    "JSON-schema-only change; no runtime behavior modification.",
+    "Runtime bounds already existed and remain authoritative for execution.",
+    "No physical audio measurement, driver installation, HLK, or Microsoft signing claim."
+  ],
+  "notes": "Aligned acoustic-anchor test_signal_dbfs to runtime -144..0 dBFS; aligned virtual-mic attack_ms to 0.1..2000 ms and release_ms to 1..5000 ms, matching existing noise-suppressor runtime validation."
+}
