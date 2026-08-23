@@ -577,6 +577,20 @@ int main() {
     CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{1000.0, 0.25, 2.4, 0.0},
                                Iso226FormulaReferenceV1{0.25, 2.4}, 60.0, one_k_spl));
     CHECK(std::abs(one_k_spl - 60.0) < 1e-10);
+    CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{4000.0, 0.25, 50.0, 0.0},
+                               Iso226FormulaReferenceV1{0.30, 2.4}, 90.0, one_k_spl));
+    CHECK(!iso226_spl_from_phon(Iso226FormulaPointV1{4000.0, 0.25, 50.0, 0.0},
+                                Iso226FormulaReferenceV1{0.30, 2.4}, 90.5, one_k_spl));
+    CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{5000.0, 0.25, 50.0, 0.0},
+                               Iso226FormulaReferenceV1{0.30, 2.4}, 20.0, one_k_spl));
+    CHECK(!iso226_spl_from_phon(Iso226FormulaPointV1{5000.0, 0.25, 50.0, 0.0},
+                                Iso226FormulaReferenceV1{0.30, 2.4}, 19.5, one_k_spl));
+    CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{12500.0, 0.25, 50.0, 0.0},
+                               Iso226FormulaReferenceV1{0.30, 2.4}, 80.0, one_k_spl));
+    CHECK(!iso226_spl_from_phon(Iso226FormulaPointV1{12500.0, 0.25, 50.0, 0.0},
+                                Iso226FormulaReferenceV1{0.30, 2.4}, 80.5, one_k_spl));
+    CHECK(!iso226_spl_from_phon(Iso226FormulaPointV1{1000.0, 0.30, 2.4, 0.0},
+                                Iso226FormulaReferenceV1{0.30, 2.4}, 0.0, one_k_spl));
     const std::array<Iso226FormulaPointV1, 2> formula_points{{
         {100.0, 0.25, 50.0, 0.0}, {1000.0, 0.30, 2.4, 0.0}}};
     const auto formula_result = build_formula_compensation(formula_points, 60.0, policy);
@@ -585,6 +599,17 @@ int main() {
           std::isfinite(formula_result.points[0].gain_db));
     const std::array<Iso226FormulaPointV1, 1> no_anchor{{{100.0, 0.25, 50.0, 0.0}}};
     CHECK(build_formula_compensation(no_anchor, 60.0, policy).points.empty());
+    const EqualLoudnessPolicyV1 full_range_policy{};
+    const std::array<Iso226FormulaPointV1, 3> valid_high_band_points{{
+        {4000.0, 0.25, 50.0, 0.0},
+        {5000.0, 0.25, 50.0, 0.0},
+        {1000.0, 0.30, 2.4, 0.0}}};
+    CHECK(build_formula_compensation(valid_high_band_points, 80.0, full_range_policy)
+              .points.size() == 3U);
+    const std::array<Iso226FormulaPointV1, 2> invalid_high_band_points{{
+        {1000.0, 0.30, 2.4, 0.0}, {12500.0, 0.25, 50.0, 0.0}}};
+    CHECK(build_formula_compensation(invalid_high_band_points, 85.0,
+                                     full_range_policy).points.empty());
 
     EqualLoudnessPolicyV1 calibrated;
     calibrated.mode = EqualLoudnessMode::Calibrated;

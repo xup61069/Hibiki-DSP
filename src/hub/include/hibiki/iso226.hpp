@@ -70,8 +70,10 @@ struct EqualLoudnessStatusV1 {
 };
 
 [[nodiscard]] bool validate_policy(const EqualLoudnessPolicyV1& policy) noexcept;
-// ISO 226:2023 formula with caller-supplied, legally obtained parameters. No
-// standard coefficient table is embedded in this repository.
+// ISO 226:2023 formula with caller-supplied, legally obtained parameters. The
+// normative phon domain is frequency dependent: 20..90 through 4 kHz and
+// 20..80 from just above 4 kHz through 12.5 kHz. Informative 0/10-phon values
+// are rejected. No standard coefficient table is embedded in this repository.
 [[nodiscard]] bool iso226_spl_from_phon(const Iso226FormulaPointV1& point,
                                         const Iso226FormulaReferenceV1& reference,
                                         double phon,
@@ -86,8 +88,9 @@ struct EqualLoudnessStatusV1 {
 
 // Compute the normalized ISO compensation directly from caller-supplied
 // ISO-226 formula points. The point table is intentionally not embedded here:
-// the caller must provide legally obtained standard data. `current_phon` and
-// `policy.reference_phon` are restricted to the formal 20–90 phon domain.
+// the caller must provide legally obtained standard data. Each
+// current/reference evaluation is restricted to the frequency-dependent
+// normative phon domain; any out-of-range point fails the complete result.
 [[nodiscard]] CompensationResult build_formula_compensation(
     std::span<const Iso226FormulaPointV1> points,
     double current_phon,
