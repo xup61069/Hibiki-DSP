@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "issue": 974,
+  "scope_digest": "f3-uncertainty-bounds-v1",
+  "source_commit": "4ccc8cb8",
+  "environment_fingerprint": "windows-amd64-pwsh-f3-uncertainty-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 974",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass",
+      "log": ".local/wt-974-verify.log"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "measured_f3_hz is now bounded to [0, 20000] Hz in acoustic-anchor and equal-loudness schemas plus the runtime validator; 0 keeps its unmeasured/no-roll-off-limit sentinel meaning.",
+    "uncertainty_db gains an upper bound of 40 dB in both schema and runtime validator; existing in-range anchors and policies continue to validate."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-24T07:05:00+08:00",
+  "finished_at": "2026-08-24T07:19:00+08:00"
+}
