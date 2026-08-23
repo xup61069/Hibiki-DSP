@@ -1,0 +1,23 @@
+{
+  "schema_version": 2,
+  "issue": 548,
+  "title": "WinUICompat launch crash fix: fail-soft theme resource resolver",
+  "base_commit": "36a2f45",
+  "summary": {
+    "files": [
+      "apps/winui-shell/MainWindow.CompatibilityPreview.cs"
+    ],
+    "behavior": "All direct Application.Current.Resources[key] indexer lookups in the compatibility-preview code-behind are replaced by a fail-soft TryGetValue-based ResolveThemeResource<T> helper that returns null on a miss, so missing framework theme resources can no longer throw KeyNotFoundException during window activation and surface as fail-fast 0xC000027B in Microsoft.UI.Xaml.dll.",
+    "diagnosis": "Issue #548 body: launch bisect pinned the regression to 1875e18 (PR #450); faulting module Microsoft.UI.Xaml.dll 3.1.7.0 offset 0x39ce55; DesktopCompat unaffected; offline patch validation isolated the indexer lookups as the cause with the Mica backdrop line innocent.",
+    "false_close_note": "PR #564 (6684a11) closed this issue without touching the file (its diff was accidentally committed .opencode state, removed separately via Issue #568). This delivery contains the actual fix."
+  },
+  "validation": [
+    { "command": "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest", "result": "pass", "notes": "launch smoke passed on the delivered tree; crashed reproducibly before the fix" },
+    { "command": "pwsh -NoProfile -File tools/winui-shell-check.ps1", "result": "pass", "notes": "required bindings present" },
+    { "command": "pwsh -NoProfile -File tools/docs-check.ps1", "result": "pass", "notes": "run on delivered branch before push" },
+    { "command": "pwsh -NoProfile -File tools/source-policy.ps1", "result": "pass", "notes": "no blocked binaries or secrets" },
+    { "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1", "result": "pass", "notes": "workflow set unchanged" }
+  ],
+  "scope": "winui-shell compatibility code-behind only; formal XAML path and DesktopCompat behavior unchanged",
+  "date": "2026-08-23"
+}
