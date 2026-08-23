@@ -3769,6 +3769,35 @@ int main() {
     CHECK(vm_gate.process(vm_open.data(), nullptr, vm_open.data(), vm_open.size()));
     CHECK(vm_open.back() > 0.1F);
 
+    // Regression: hysteresis prevents gate chatter. With a -50 dBFS threshold
+    // the close boundary is ~0.00316 linear; reopen requires ~0.00398 (+2 dB).
+    // A signal oscillating inside that band must hold the gate closed instead
+    // of cycling open/closed every block.
+    VirtualMicDspPolicyV1 vm_chatter_policy{};
+    vm_chatter_policy.noise_gate_enabled = true;
+    vm_chatter_policy.noise_gate_threshold_dbfs = -50.0F;
+    vm_chatter_policy.noise_gate_floor = 0.08F;
+    vm_chatter_policy.attack_ms = 1.0F;
+    vm_chatter_policy.release_ms = 10.0F;
+    VirtualMicDspV1 vm_chatter;
+    CHECK(vm_chatter.prepare(vm_chatter_policy, 1U, 48000U));
+    std::array<float, 960> vm_chatter_silence{};
+    vm_chatter_silence.fill(0.0005F);
+    CHECK(vm_chatter.process(vm_chatter_silence.data(), nullptr,
+                             vm_chatter_silence.data(), vm_chatter_silence.size()));
+    float vm_chatter_gain_max = 0.0F;
+    for (std::size_t block = 0U; block < 8U; ++block) {
+        const auto near_threshold = (block % 2U == 0U) ? 0.0028F : 0.0035F;
+        std::array<float, 96> vm_chatter_block{};
+        vm_chatter_block.fill(static_cast<float>(near_threshold));
+        CHECK(vm_chatter.process(vm_chatter_block.data(), nullptr,
+                                 vm_chatter_block.data(), vm_chatter_block.size()));
+        for (const auto sample : vm_chatter_block) {
+            vm_chatter_gain_max = (std::max)(vm_chatter_gain_max, std::abs(sample) / near_threshold);
+        }
+    }
+    CHECK(vm_chatter_gain_max < 0.5F);
+
     const std::vector<PeqFilterV1> filters{{1000.0, 3.0, 1.0}, {100.0, -2.0, 0.7}};
     const auto apo = export_equalizer_apo(filters);
     const auto camilla = export_camilladsp_yaml(filters);
