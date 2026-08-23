@@ -25,19 +25,18 @@
     },
     {
       "command": "tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
-      "status": "documented_runtime_blocker",
+      "status": "pass",
       "coverage": [
-        "The bounded launch smoke repeatedly reaches a live process for about two seconds, then exits with 0xC000027B / -1073741189.",
-        "Windows Application event records the faulting module as Microsoft.UI.Xaml.dll 3.1.7.0 at offset 0x39ce55.",
-        "Temporary user-space instrumentation recorded an unspecified COMException; explicitly adding XamlControlsResources without App.xaml fails immediately because AcrylicBackgroundFillColorDefaultBrush is unavailable.",
-        "The temporary diagnostic change was reverted; no runtime fix is claimed."
+        "The Compatibility Preview keeps its XAML compiler disabled but no longer disables Windows App SDK Core MRT resource tooling.",
+        "Restoring resource tooling lets the runtime initialize theme/control resources without App.xaml, resolving the prior 0xC000027B startup failure.",
+        "The bounded official launch smoke passes; a manual observation also remained live beyond 12 seconds."
       ],
       "compiled_artifacts": false
     }
   ],
   "limitations": [
     "This is source-level Compatibility Preview support, not formal XAML, accessibility, launch-stability or audio evidence.",
-    "WinUICompat startup remains blocked by a Windows App SDK/XAML runtime initialization failure that predates this compile repair.",
+    "Launch stability is bounded local preview evidence only; formal accessibility validation remains separate.",
     "Formal target-machine WinUI validation remains separate; no driver, physical audio, HLK or signing claim is made."
   ],
   "logs": [],
