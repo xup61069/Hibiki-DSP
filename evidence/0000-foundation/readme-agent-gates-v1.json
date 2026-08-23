@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "issue": 591,
+  "scope_digest": "readme-agent-gates-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-26100-pwsh-7.6; target-machine-pending",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 591",
+    "pwsh -NoProfile -File tools/handoff-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [],
+  "limitations": [
+    "Documentation-only change; no product source, schema or behavior is modified.",
+    "The required-gate list mirrors AGENTS.md; individual gates are executed by CI and the listed validation commands, not re-run here as product evidence."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6 local"
+  },
+  "started_at": null,
+  "finished_at": null
+}
