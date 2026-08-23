@@ -1,82 +1,50 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "issue": 652,
-  "scope_digest": "driver-build-clean-warnings-v1",
-  "source_commit": "44e5f5b",
-  "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100-pwsh-7.6",
-  "commands": [
-    "pwsh -NoProfile -File tools/build-driver.ps1",
-    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 652",
-    "pwsh -NoProfile -File tools/docs-check.ps1",
-    "pwsh -NoProfile -File tools/source-policy.ps1",
-    "pwsh -NoProfile -File tools/driver-source-check.ps1",
-    "git diff --check"
-  ],
-  "results": [
-    {
-      "command": "tools/build-driver.ps1",
-      "status": "pass",
-      "coverage": [
-        "WDK Release build links HibikiVirtualAudio.sys and Inf2Cat signability reports zero errors/zero warnings",
-        "no C4996 deprecation warning from the pool allocator call site (suppressed with documented rationale)",
-        "no C4189 unused-variable warning in GetHWLatency; CodecDelay now reports the FIFO latency estimate"
-      ],
-      "compiled_artifacts": true,
-      "case_count": 3
-    },
-    {
-      "command": "tools/handoff-check.ps1 -Issue 652",
-      "status": "pass",
-      "coverage": [
-        "issue ownership",
-        "branch/base",
-        "scope"
-      ],
-      "compiled_artifacts": false,
-      "case_count": 1
-    },
-    {
-      "command": "tools/docs-check.ps1 / tools/source-policy.ps1",
-      "status": "pass",
-      "coverage": [
-        "required paths",
-        "source-only publication policy"
-      ],
-      "compiled_artifacts": false,
-      "case_count": 2
-    },
-    {
-      "command": "tools/driver-source-check.ps1 + git diff --check",
-      "status": "pass",
-      "coverage": [
-        "WDK source boundary",
-        "whitespace"
-      ],
-      "compiled_artifacts": false,
-      "case_count": 2
-    }
-  ],
-  "changes": [
-    {
-      "file": "driver/wdk/hibiki_adapter.cpp",
-      "summary": "Collapse duplicate NonPagedPoolNx branch and suppress C4996 at the tagged allocator call site with a documented NTDDI_VERSION upgrade path."
-    },
-    {
-      "file": "driver/wdk/hibiki_miniport_wavert.cpp",
-      "summary": "GetHWLatency now assigns HWLatency->CodecDelay from the computed 100 ns latency estimate instead of leaving it unused."
-    }
-  ],
-  "limitations": [
-    "Source/build evidence only: no guest install/load, physical endpoint, HLK, or Microsoft-signing claim.",
-    "ExAllocatePoolWithTag remains deprecated upstream; full migration to ExAllocatePool2 requires a coordinated NTDDI_VERSION bump to Win11 constants and is intentionally out of scope for this slice.",
-    "CodecDelay now reflects an estimate derived from frames_per_buffer and sample_rate; it is not a measured hardware delay."
-  ],
-  "logs": [],
-  "tool_versions": {
-    "cmake": "n/a-driver-build",
-    "msbuild": "18.9.1.35102",
-    "powershell": "7.6.4"
+  "title": "Driver pool allocator and WaveRT CodecDelay warning cleanup",
+  "base_commit": "1d05a5e",
+  "summary": {
+    "behavior": "operator new now uses ExAllocatePool3 with POOL_FLAG_PAGED / POOL_FLAG_NON_PAGED (default non-executable, same pool class and 'ibiH' tag); GetHWLatency reports the per-buffer latency estimate in HWLatency->CodecDelay instead of discarding it.",
+    "scope_boundary": "Source + local WDK build + Inf2Cat signability only. No guest installation, driver load, PnP start, audio delivery, HLK or Microsoft signing claim.",
+    "files": [
+      "driver/wdk/hibiki_adapter.cpp",
+      "driver/wdk/hibiki_miniport_wavert.cpp"
+    ]
   },
-  "started_at": "2026-08-23T16:52:00+08:00",
-  "finished_at": "2026-08-23T17:06:00+08:00"
+  "validation": [
+    {
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 652",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1",
+      "result": "pass (80 required paths; 570 tracked paths)"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-policy.ps1",
+      "result": "pass (570 tracked paths)"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/driver-source-check.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/build-driver.ps1",
+      "result": "pass; HibikiVirtualAudio.sys linked; Inf2Cat 0 errors / 0 warnings"
+    }
+  ],
+  "warning_targets": {
+    "C4996 ExAllocatePoolWithTag deprecated": "eliminated (ExAllocatePoolWithTag no longer referenced)",
+    "unused variable latency_100ns": "eliminated (value assigned to HWLatency->CodecDelay)"
+  },
+  "limits": [
+    "Remaining build output shows C4083 warnings from MSVC 18 vcruntime.h/stdint.h headers and one pre-existing LNK4042 duplicate guids.obj note; both are toolchain noise present across all files, unrelated to this change.",
+    "CodecDelay is a per-buffer estimate at buffer granularity; it does not claim measured end-to-end device latency."
+  ],
+  "next_safe_action": "Open PR for maintainer review; optional follow-up to suppress toolchain-header C4083 noise in build flags if desired.",
+  "date": "2026-08-23"
 }
