@@ -31,6 +31,7 @@ driver、永久 ID 或 release 設定。需要 build／target evidence 的切片
 
 ## 目前狀態與已完成能力
 
+- 第二十六波整合增量：WinUI Expert shell 開放本機 VST3 時間軸編輯器（選取、草稿開始／提交／捨棄、復原／重做、事件增刪與數值編輯），Compatibility Preview 同步補上時間軸選取 seam（Issue #667 / PR #669、Issue #673 / PR #677）；瀏覽器單分頁捕捉新增使用者控制的 Stop、開啟 popup 會反映真實捕捉狀態、啟動失敗如實回報錯誤，不再假裝成功（Issue #671 / PR #676）。UI 項目為 control-model／shell source 與 gate 證據；extension 項目含 SPEC-0009 更新與 policy check。不宣稱實體音訊或 driver 能力。
 - 第二十五波整合增量：IPC 控制管線在兩次 client 連線之間的空檔收到 stop() 時，會重複取消當下註冊的 server handle I/O 直到 worker 觀察到停止，Engine Preview 關閉不再固定等待完整 idle timeout，framing 與 ownership 語意不變（Issue #655 / PR #661）；TruePeakLimiterV1 恢復速率改為以經過音訊時間（約 +6 dB 每毫秒）計算並跟隨引擎取樣率，限制器放開的速度不再隨回呼區塊大小改變（Issue #659 / PR #666）。兩者皆為 user-space source 與 contract test 證據；不宣稱實體音訊、driver 安裝/載入/HLK 或 Microsoft signing。
 - 第二十四波整合增量：driver 端 `operator new` 改用現代 ExAllocatePool3 分配 API，並把 GetHardwareLatency 的每 buffer 延遲估計填入 CodecDelay，讓 PortCls 收到有意義的硬體延遲值（Issue #652 / PR #660）；主靜音控制節點改用標準 KSAUDFNAME_MASTER_MUTE 命名，音效工具或系統屬性頁不再看到匿名靜音節點（Issue #662 / PR #663）。兩者皆為本機 WDK 建置與 Inf2Cat source/build 證據；不宣稱 guest 安裝、載入、PnP start、實體音訊、HLK 或 Microsoft signing。
 - 第二十三波整合增量：TruePeakLimiterV1 恢復期改為每區塊最多放寬約 +6 dB 的有界增益回升，需要壓低時仍然立即反應，限制器本身不再產生突兀的 click/pumping（Issue #647 / PR #648）。屬 user-space DSP 契約證據；不宣稱 ITU/BS.1770 認證、實體端點、driver 或 HLK/Microsoft signing。
