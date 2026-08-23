@@ -795,11 +795,24 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
+第二十九波整合增量已合併：Compatibility Preview 的 MRT 紀錄修正為 fail-soft 邊界——
+WinUICompat 建置不啟用 Core MRT 資源工具，主題資源走既有 TryGetValue 回退路徑，
+預覽以無樣式但可啟動的方式執行；審計文字同時澄清 VS2026 Appx packaging tasks 存在於
+本機而 dotnet CLI build 不會載入它們（Issue #703 / PR #709、Issue #720 / PR #721）。
+瀏覽器單分頁捕捉的 popup Start／Stop handler 攔截訊息通道錯誤，顯示實際錯誤並重新
+查詢真實捕捉狀態後才恢復控制項（Issue #702 / PR #704）；extension gate 強制 popup 檢查
+response.ok 並如實回報錯誤，自檢在缺少此邊界時 fail-closed（Issue #715 / PR #719）。
+offscreen 在來源串流自然結束時釋放捕捉 graph、通知 service worker 並自動關閉 document，
+不需要使用者手動停止（Issue #706 / PR #707、Issue #714 / PR #716）。SPEC-0009 記錄失敗回應與
+stream-ended 邊界，README 補上捕捉生命週期與 bridge 狀態說明；compat preview smoke 改為從
+乾淨輸出目錄執行，避免殘留 binary 造成假通過（Issue #710 / PR #711、Issue #712 / PR #718、
+Issue #713 / PR #717）。extension/UI 項目分別為 extension source/policy evidence 與 compat
+preview source/build/launch evidence。不宣稱正式 XAML/accessibility、實體音訊、driver
+安裝/載入/HLK 或 Microsoft signing。
 第二十八波整合增量已合併：瀏覽器單分頁捕捉的 offscreen start／stop listener 保留非同步
 回應通道，成功啟動不再因回應通道提早關閉而被誤報為失敗（Issue #681 / PR #692）。
-Compatibility Preview 的 WinUICompat target 恢復編譯與啟動 smoke，Core MRT 資源初始化修復
-0xC000027B，隨後清除暫時 dead-code TextBox seam 且無運行行為變化（Issue #687 / PR #694、
-Issue #697 / PR #699）。每個註冊 output sink 現在擁有獨立 TruePeakLimiterV1 狀態，一個輸出
+Compatibility Preview 的 WinUICompat target 恢復編譯與啟動 smoke，隨後清除暫時 dead-code
+TextBox seam 且無運行行為變化（Issue #687 / PR #694、Issue #697 / PR #699）。每個註冊 output sink 現在擁有獨立 TruePeakLimiterV1 狀態，一個輸出
 群的尖峰不會壓低另一群後續安靜區塊；graph commit 仍重置所有 limiter（Issue #683 / PR #695）。
 Engine Preview 新增有界 opt-in soak harness，離線 SelfTest 覆蓋參數邊界、IPC frame、聚合結果
 與清理決策；預設三循環 smoke 以 Hello/Ack 加 Main volume 往返驗證並產生匿名報告（Issue #672 /
