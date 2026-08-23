@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 466,
   "scope_digest": "contract-test-resource-isolation-v1",
-  "source_commit": "e7755e9 (base) + working tree slice",
+  "source_commit": "e7755e97294e920e1e8ff12d31f6f1043eb5b8c4",
   "environment_fingerprint": "windows-26200-amd64-msvc-19.51.36256-cmake-4.4.0-dotnet-10.0.400-pwsh-7.6.5",
   "commands": [
     "cmake --preset windows-dev",

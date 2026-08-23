@@ -3,7 +3,7 @@
   "issue": 394,
   "scope_digest": "driver-sys-build-v1",
   "base_commit": "248f819",
-  "source_commit": "final reconciliation after merge commit 92aa986; results record the post-reconciliation gate re-run",
+  "source_commit": "92aa98669a777ca62e1d96e954c643a42946f887",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-msvc-19.51.36256-wdk-10.0.26100.0-pwsh-7.6.4",
   "commands": [
     "pwsh -NoProfile -File tools/driver-source-check.ps1",
