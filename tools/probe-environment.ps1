@@ -176,15 +176,24 @@ function Test-EnvironmentProbePathUnderRoot {
 function Get-EnvironmentProbeExistingAttributes {
   param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
   if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
     return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
   }
-  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
-  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+  if ($null -ne $SyntheticInspectionErrors -and $SyntheticInspectionErrors.ContainsKey($fullPath)) {
+    throw "Environment probe path inspection failed: $fullPath ($($SyntheticInspectionErrors[$fullPath]))"
+  }
+  try {
+    return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop).Attributes
+  }
+  catch {
+    if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return $null }
+    throw "Environment probe path inspection failed: $fullPath ($($_.Exception.Message))"
+  }
 }
 
 function Assert-EnvironmentProbePath {
@@ -193,7 +202,8 @@ function Assert-EnvironmentProbePath {
     [Parameter(Mandatory = $true)][string]$Root,
     [Parameter(Mandatory = $true)][ValidateSet('File', 'Directory')][string]$Kind,
     [switch]$AllowMissingLeaf,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
@@ -202,14 +212,16 @@ function Assert-EnvironmentProbePath {
     throw "Environment probe path must remain under the expected root: $fullPath"
   }
 
-  $leafAttributes = Get-EnvironmentProbeExistingAttributes -Path $fullPath -SyntheticAttributes $SyntheticAttributes
+  $leafAttributes = Get-EnvironmentProbeExistingAttributes -Path $fullPath `
+    -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
   if ($null -eq $leafAttributes -and -not $AllowMissingLeaf) {
     throw "Environment probe $Kind does not exist: $fullPath"
   }
 
   $cursor = $fullPath
   while ($true) {
-    $attributes = Get-EnvironmentProbeExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    $attributes = Get-EnvironmentProbeExistingAttributes -Path $cursor `
+      -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
     if ($null -ne $attributes) {
       if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "Environment probe path or parent is a reparse point: $cursor"
@@ -301,6 +313,24 @@ function Invoke-EnvironmentProbePathSelfTest {
     }
   } catch { $fileParentCaught = $_.Exception.Message -match 'parent is not a directory' }
   if (-not $fileParentCaught) { throw 'Environment probe self-test expected a file-parent rejection.' }
+  $cases++
+
+  $leafInspectionErrorCaught = $false
+  try {
+    Assert-EnvironmentProbePath -Path $contextPath -Root $localRoot -Kind File -AllowMissingLeaf `
+      -SyntheticAttributes @{ $repositoryRoot = $directory; $localRoot = $directory } `
+      -SyntheticInspectionErrors @{ $contextPath = 'synthetic access denied' }
+  } catch { $leafInspectionErrorCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $leafInspectionErrorCaught) { throw 'Environment probe self-test expected a leaf inspection-error rejection.' }
+  $cases++
+
+  $parentInspectionErrorCaught = $false
+  try {
+    Assert-EnvironmentProbePath -Path $contextPath -Root $localRoot -Kind File -AllowMissingLeaf `
+      -SyntheticAttributes @{ $repositoryRoot = $directory } `
+      -SyntheticInspectionErrors @{ $localRoot = 'synthetic sharing violation' }
+  } catch { $parentInspectionErrorCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $parentInspectionErrorCaught) { throw 'Environment probe self-test expected a parent inspection-error rejection.' }
   $cases++
 
   Write-Output ("Environment probe path self-test: {0} cases passed." -f $cases)
