@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 112,
   "scope_digest": "live-process-loopback-selftest-v1",
-  "source_commit": "105bca3",
+  "source_commit": "69d61b26dd3759d497dd84bd9c6ead1c7679f823",
   "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "pwsh -NoProfile -File tools/live-process-loopback-check.ps1 -SelfTest",

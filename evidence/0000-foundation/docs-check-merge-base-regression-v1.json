@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 64,
   "scope_digest": "docs-check-merge-base-regression-v1",
-  "source_commit": "97072f5",
+  "source_commit": "07b467042772bfe8f7b3439833db6152eb596e06",
   "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",

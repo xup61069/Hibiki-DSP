@@ -3,7 +3,7 @@
   "issue": 781,
   "title": "Read-only anonymized driver PnP inspection bundle",
   "base_commit": "5e4e60ea017e1f732bb146a5d8b7673d99be5c3a",
-  "source_commit": "74c9492a",
+  "source_commit": "c8de4cc76e6fe6ff537e9275a3204e7ced85af6c",
   "summary": {
     "behavior": "A PowerShell 7 collector targets only ROOT\\HIBIKIDSP and HibikiVirtualAudio, reads typed PnP problem/service/driver properties plus a bounded SetupAPI tail, redacts local identifiers and writes JSON only below repository .local.",
     "user_impact": "The next consent-gated VM retest can distinguish missing-device, service, problem-code and problem-status states and retain a comparable sanitized install excerpt instead of reporting only a generic Code 10.",
