@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 823,
   "scope_digest": "scene-offline-sync-v1",
-  "source_commit": "8b3b5a380752",
+  "source_commit": "cb84a0a1ecb2616f228f1ddaa32ebd8f5c02fbbf",
   "environment_fingerprint": "windows-local-pwsh-7.6.4-dotnet8",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 823",
@@ -43,11 +43,9 @@
     }
   ],
   "limitations": [
-    "Local check-pipe evidence only; no Engine Preview process or physical audio claim.",
-    "Queue capacity pressure path (64-op eviction) is enforced by bounded dequeues but not yet covered by a dedicated self-test."
+    "Local check-pipe evidence only; no Engine Preview process or physical audio claim."
   ],
   "logs": [],
   "started_at": "2026-08-24T01:30:00+08:00",
   "finished_at": "2026-08-24T01:32:51+08:00"
 }
-
