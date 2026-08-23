@@ -795,6 +795,41 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
+第三十三波整合增量已合併：官方 bootstrapper 新增經 manifest 與 SHA-256 驗證的交易式
+user-space payload staging，失敗會回復既有安裝且不碰 `%LocalAppData%/Hibiki DSP` 使用者
+資料；9 個離線功能案例涵蓋有效 staging、路徑逃逸拒絕、hash mismatch、rollback 與 backup
+清理。另新增只移除 manifest 所列 payload、失敗時回復、保留使用者資料的 uninstall 路徑；
+後者目前仍是 source/boundary evidence，尚未執行真實 `-Apply`／`-Uninstall`，交易式 uninstall
+功能自檢由後續 Issue #785 補強（Issue #745 / PR #759、PR #770；Issue #766 / PR #777）。
+
+driver host 工具統一 Inf2Cat 探測順序（明確 `WDK_BIN`、Windows Kits tree、PATH），本機已建置
+package 可在不手動設定環境變數時重跑 signability；build-driver 使用唯一 source/object plan，
+`guids.cpp` 只編譯一次，compiler 與 linker warning 都以 `/WX` fail-closed（Issue #764 /
+PR #769、Issue #774 / PR #776）。PortCls adapter 原本把四組 endpoint pair 數量誤當成
+可註冊 filter object 上限，`PcAddAdapterDevice` 只預留 4 個 slot 卻需註冊 8 個
+Topology/WaveRT filter；`MaxObjects` 已修為 8，本機 WDK build、Inf2Cat 與 CI 通過
+（Issue #462 / PR #782）。另新增只讀匿名 PnP 診斷工具，只鎖定
+`ROOT\HIBIKIDSP`／`HibikiVirtualAudio`，記錄 typed problem/service/driver 欄位及有界、遮蔽後的
+SetupAPI 摘要到 `.local/`；AST 自檢拒絕安裝、啟停、移除裝置或修改開機設定的命令
+（Issue #781 / PR #783）。上述皆為 host-side source/build/self-test 或 unavailable-path evidence，
+不代表 driver 已在 guest 安裝、載入、PnP start、出聲、通過 HLK 或取得 Microsoft signing；
+Issue #462 因重建 package 的隔離 VM PnP start 重測尚未完成而保持開啟。
+
+瀏覽器 popup 從隱藏回到可見時，會透過既有 service-worker query 重新取得實際捕捉狀態，且
+不覆蓋先前需保留到下一次使用者操作的錯誤（Issue #762 / PR #773）。DesktopCompat 與
+Compatibility Preview 都改用 control model 組合出的完整 route-health accessible summary，
+不再只顯示名稱與短狀態（Issue #765 / PR #771）。正式 WinUI 的本機自訂 Scene 卡加入具名的
+移除操作，儲存失敗會回復卡片與選取；實體輸出 picker 加入重新掃描操作，只送出既有 bounded
+`DeviceCatalogRequest`，未連線、逾時、錯誤或 stale snapshot 都保留上一份清單
+（Issue #767 / PR #775、Issue #779 / PR #784）。這些是 source、contract-model、source-gate
+或非目標 preview evidence；未執行正式 runtime UIA／螢幕閱讀器或瀏覽器自動化，也不代表
+實體音訊已送達。
+
+Basic noise gate 在原關閉 threshold 上加入 2 dB reopening hysteresis；訊號在 threshold 附近
+擺動時不再每個區塊快速重開，既有 attack/release 語意維持不變。實作保持 `noexcept`、每聲道
+固定狀態且 RT thread 無配置、鎖、等待或 I/O，contract regression 與完整 verify 通過
+（Issue #778 / PR #780）。這是 user-space DSP source/contract evidence，不是實體音訊量測。
+
 第三十二波整合增量已合併：SPEC-0009 補上 popup 無障礙政策的權威文件條目，記錄 PR #744
 引入並由 PR #750 擴充的 aria-label／aria-labelledby 強制檢查與 fail-closed 行為
 （Issue #753 / PR #755）。winui-shell-check 新增兩個回歸防護：DesktopCompat Preview 的
