@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "issue": 840,
+  "scope_digest": "scene-sync-capacity-v1",
+  "source_commit": "997d136a1dea",
+  "environment_fingerprint": "windows-local-pwsh-7.6.4-dotnet8",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 840",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "65 ordered offline operations leave exactly 64 retained and evict only the oldest",
+        "capacity-loss warning remains visible through later offline operations",
+        "successful reconnect replay preserves both the replayed count and the dropped count",
+        "existing offline enqueue/connect-flush/failure-retention/built-in-ID coverage stays green"
+      ]
+    }
+  ],
+  "limitations": [
+    "Local check-pipe evidence only; no Engine Preview process or physical audio claim.",
+    "Capacity-pressure reporting covers this control-model lifetime; persistence across process restart is out of scope."
+  ],
+  "logs": [],
+  "started_at": "2026-08-24T01:55:00+08:00",
+  "finished_at": "2026-08-24T02:04:00+08:00"
+}

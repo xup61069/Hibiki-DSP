@@ -57,6 +57,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Hibiki DSP", "scene-cards-v1.json");
     private readonly Queue<PendingSceneCatalogOp> _pendingSceneCatalogOps = new();
+    private int _droppedSceneCatalogOperations;
 
     public ExpertSurfaceModel Expert { get; } = new();
 
@@ -496,6 +497,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     public const int MaxPendingSceneCatalogOps = 64;
 
     public int PendingSceneCatalogOpsCount => _pendingSceneCatalogOps.Count;
+    public int DroppedSceneCatalogOperations => _droppedSceneCatalogOperations;
 
     private sealed record PendingSceneCatalogOp(
         bool IsUpsert, string SceneId, string Name, string OutputGroup);
@@ -575,7 +577,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
         EnqueueSceneCatalogOp(new PendingSceneCatalogOp(
             true, scene.Id, scene.Name, _session.ActiveOutputGroup ?? "main"));
-        StatusText = $"已加入自訂場景：{scene.Name}（離線；連線後自動同步）";
+        ReportSceneCatalogStatus(
+            $"已加入自訂場景：{scene.Name}（離線；連線後自動同步）");
         return true;
     }
 
@@ -1308,19 +1311,39 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         else
         {
             EnqueueSceneCatalogOp(new PendingSceneCatalogOp(false, previous.Id, "", ""));
-            StatusText += "（離線；連線後自動同步）";
+            ReportSceneCatalogStatus(
+                $"已移除自訂場景：{previous.Name}（離線；連線後自動同步）");
         }
         return true;
     }
 
-    private void EnqueueSceneCatalogOp(PendingSceneCatalogOp operation)
+    private bool EnqueueSceneCatalogOp(PendingSceneCatalogOp operation)
     {
+        var droppedNow = false;
         while (_pendingSceneCatalogOps.Count >= MaxPendingSceneCatalogOps)
         {
             _pendingSceneCatalogOps.Dequeue();
-            StatusText = "離線場景同步佇列已滿；捨棄最舊的變更以維持有界容量";
+            _droppedSceneCatalogOperations++;
+            droppedNow = true;
         }
         _pendingSceneCatalogOps.Enqueue(operation);
+        if (droppedNow)
+        {
+            StatusText =
+                $"離線場景同步佇列已滿；已捨棄最舊的 {_droppedSceneCatalogOperations} 筆變更以維持有界容量";
+        }
+        return droppedNow;
+    }
+
+    // Dropping the oldest queued op is a durable user-visible fact for this
+    // control-model lifetime. Later success messages may complete, but they
+    // must not silently erase the earlier capacity loss.
+    private void ReportSceneCatalogStatus(string status)
+    {
+        StatusText = _droppedSceneCatalogOperations == 0 ||
+                     status.Contains("捨棄最舊", StringComparison.Ordinal)
+            ? status
+            : $"{status}；離線場景同步佇列已滿，已捨棄最舊的 {_droppedSceneCatalogOperations} 筆變更";
     }
 
     // Scene catalog sync is honest by construction: the engine must Ack the
@@ -1358,13 +1381,15 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             if (!await SendSceneCatalogCommandAsync(command, cancellationToken)
                     .ConfigureAwait(true))
             {
-                StatusText = "離線場景同步未完成；保留佇列，稍後重新連線再試";
+                ReportSceneCatalogStatus(
+                    "離線場景同步未完成；保留佇列，稍後重新連線再試");
                 return false;
             }
             _pendingSceneCatalogOps.Dequeue();
         }
         if (total > 0)
-            StatusText = $"離線場景變更已補送（{total} 筆）；引擎已同步";
+            ReportSceneCatalogStatus(
+                $"離線場景變更已補送（{total} 筆）；引擎已同步");
         return true;
     }
 
@@ -1397,7 +1422,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             {
                 if (!await FlushPendingSceneCatalogOpsAsync(cancellationToken)
                         .ConfigureAwait(true))
-                    StatusText = "引擎已連線；離線期間的場景變更尚未全部同步，音訊保持安全狀態";
+                    ReportSceneCatalogStatus(
+                        "引擎已連線；離線期間的場景變更尚未全部同步，音訊保持安全狀態");
             }
             return true;
         }
