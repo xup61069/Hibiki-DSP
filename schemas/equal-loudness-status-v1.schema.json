@@ -11,7 +11,7 @@
     "calibrated": {"type": "boolean"},
     "limited": {"type": "boolean"},
     "maximum_fit_error_db": {"type": "number", "minimum": 0},
-    "realized_peak_db": {"type": "number"},
+    "realized_peak_db": {"type": "number", "minimum": -120, "maximum": 12},
     "diagnostic": {"type": "string", "minLength": 0, "maxLength": 256}
   }
 }
