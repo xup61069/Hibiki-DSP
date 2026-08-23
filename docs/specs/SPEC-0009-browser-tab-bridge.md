@@ -3,7 +3,7 @@ id: SPEC-0009
 status: accepted
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-23
 review_after_days: 30
 related_adrs: [ADR-0002]
 source_globs: ["extensions/**", "tools/extension-check.ps1"]
@@ -25,6 +25,13 @@ self-test 涵蓋缺少 handler 的情況。offscreen 的 onMessage listener 必�
 路徑 `return true`，讓 Chrome 保持訊息通道開啟直到 `sendResponse` 完成；
 `tools/extension-check.ps1` 強制此邊界，self-test 涵蓋缺少 `return true` 或回傳
 值不是 `return true;` 陳述式的情況。
+
+messaging 失敗（例如 popup 與 service worker 的訊息通道拋錯）不得讓 popup 卡在
+busy 狀態：Start／Stop handler 必須攔截錯誤、顯示實際錯誤文字，並重新查詢真實
+capture 狀態後才恢復控制項。被擷取分頁關閉或導航導致 source track 自然結束時，
+offscreen 必須立即釋放整個 capture graph（stream、AudioContext、WebSocket）並廣播
+新的 capture-state，popup 不得繼續顯示「Capturing」。手動 Stop 仍是唯一主動
+`track.stop()` 擁有者，ended 監聽器只負責自然結束路徑，不得重複 teardown。
 
 ## HIBT packet
 
