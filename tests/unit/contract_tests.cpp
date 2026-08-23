@@ -3591,6 +3591,36 @@ int main() {
                            aec_capture.size()));
     CHECK(aec_clean[0] == 0.0F && aec_clean.back() == 0.0F);
 
+    // Regression: the virtual mic gate must close with release_ms (slow) and
+    // open with attack_ms (fast). A fresh instance starts with the gate open,
+    // so sub-threshold input exercises the closing direction first.
+    VirtualMicDspPolicyV1 vm_gate_policy{};
+    vm_gate_policy.noise_gate_enabled = true;
+    vm_gate_policy.noise_gate_threshold_dbfs = -50.0F;
+    vm_gate_policy.noise_gate_floor = 0.08F;
+    vm_gate_policy.attack_ms = 1.0F;
+    vm_gate_policy.release_ms = 10.0F;
+    VirtualMicDspV1 vm_gate;
+    CHECK(vm_gate.prepare(vm_gate_policy, 1U, 48000U));
+    std::array<float, 960> vm_close{};
+    vm_close.fill(0.0005F);
+    CHECK(vm_gate.process(vm_close.data(), nullptr, vm_close.data(), vm_close.size()));
+    // With release_ms=10 ms (a 480-sample time constant), 960 frames leave the
+    // closed gain near 0.205, so the output tail is near 1.02e-4. The reversed
+    // mapping would close with attack_ms instead and settle at the 0.08 floor
+    // (output near 4.0e-5).
+    CHECK(std::abs(vm_close.back()) > 9.0e-5F);
+    CHECK(std::abs(vm_close.back()) < 1.5e-4F);
+
+    // Feed an above-threshold signal without resetting. With attack_ms=1 ms at
+    // 48 kHz (~48 samples per time constant), the gate is well open after 48
+    // frames. The reversed mapping (opening with release_ms) only reaches about
+    // 0.07 here.
+    std::array<float, 48> vm_open{};
+    vm_open.fill(0.25F);
+    CHECK(vm_gate.process(vm_open.data(), nullptr, vm_open.data(), vm_open.size()));
+    CHECK(vm_open.back() > 0.1F);
+
     const std::vector<PeqFilterV1> filters{{1000.0, 3.0, 1.0}, {100.0, -2.0, 0.7}};
     const auto apo = export_equalizer_apo(filters);
     const auto camilla = export_camilladsp_yaml(filters);
