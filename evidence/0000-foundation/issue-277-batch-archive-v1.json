@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 277,
   "scope_digest": "issue-277-batch-archive-v1",
-  "source_commit": "d135a32",
+  "source_commit": "d135a3269ef8f090ac952d7dae9938a52bc07d3f",
   "archive_commit": "d135a32",
   "main_sync_commit": "20b6bc1",
   "archived_issues": [149, 187, 211, 250],

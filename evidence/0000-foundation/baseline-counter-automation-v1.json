@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 51,
   "scope_digest": "baseline-counter-automation-v1",
-  "source_commit": "608c568",
+  "source_commit": "608c5683a5c1ea1aba81e3ab0613c4d1f8fa4d44",
   "environment_fingerprint": "windows-26200-amd64-git-2.x-pwsh-7.6.5-cmake-4.4.0-msvc-buildtools-17.14; github-actions-windows-2025-fetch-depth-0; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/docs-check.ps1 -SelfTest",

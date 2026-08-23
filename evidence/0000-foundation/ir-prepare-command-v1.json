@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "ir-prepare-command-v1",
-  "source_commit": "d73a200",
+  "source_commit": "d73a200973f1eeac7e82835412909fdc86dc9420",
   "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/verify.ps1",

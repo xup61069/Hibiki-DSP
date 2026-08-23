@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 348,
   "scope_digest": "winui-m1-formal-build-v1",
-  "source_commit": "b15e3c7",
+  "source_commit": "b15e3c79163585017fac6b1bf3fb1eb379100547",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.12112.369-sdk-wdk-qfe-10.1.28000.2526-winapp-runtime-1.7-pwsh-7.6.5",
   "formal_winui_build": {
     "command": "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUI -SmokeTest",

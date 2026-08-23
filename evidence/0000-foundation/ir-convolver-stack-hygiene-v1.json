@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 332,
   "scope_digest": "ir-convolver-stack-hygiene-v1",
-  "source_commit": "9219697",
+  "source_commit": "9219697fdb8d9fbf71ac0c960da0bd2a512634e7",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-qfe-10.1.28000.2526-pwsh-7.6.5",
   "change_summary": [
     "AudioEngineModel::prepare_ir now heap-allocates the IrConvolverV1 candidate via std::make_unique with fail-closed allocation handling instead of materializing a fixed ~256 KB stack local inside a noexcept control-plane transaction.",
