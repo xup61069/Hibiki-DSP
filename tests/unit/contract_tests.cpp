@@ -1727,6 +1727,79 @@ int main() {
     CHECK(decode_scene_apply_payload_v1(scene_payload, custom_scene_command.scene));
     CHECK(custom_scene_worker.consume(custom_scene_command) == EngineControlResultV1::Invalid);
 
+    // The UI sends the bounded wire form; the owning engine worker must turn
+    // that command into a validated complete SceneDefinition before applying it.
+    SceneCatalogCommandV1 catalog_command{};
+    catalog_command.operation = SessionRouteRuleOperationV1::Upsert;
+    catalog_command.id_bytes = 10;
+    std::copy_n("quiet-game", 10, catalog_command.id.data());
+    catalog_command.name_bytes = 10;
+    std::copy_n("Quiet Game", 10, catalog_command.name.data());
+    catalog_command.output_group_bytes = 13;
+    std::copy_n("custom-output", 13, catalog_command.output_group.data());
+    catalog_command.standard_id = 1U;
+    catalog_command.lanes[0].id_bytes = 15;
+    std::copy_n("quiet-game-lane", 15, catalog_command.lanes[0].id.data());
+    catalog_command.lanes[0].output_group_bytes = 13;
+    std::copy_n("custom-output", 13, catalog_command.lanes[0].output_group.data());
+    std::vector<std::uint8_t> catalog_payload;
+    CHECK(encode_scene_catalog_command_v1(catalog_command, catalog_payload));
+    IpcFrameV1 catalog_frame;
+    catalog_frame.header.type = IpcMessageType::SceneCatalogCommand;
+    catalog_frame.header.request_id = 555U;
+    catalog_frame.payload.assign(catalog_payload.begin(), catalog_payload.end());
+    ControlCommandV1 decoded_catalog_command{};
+    CHECK(decode_control_command_v1(catalog_frame, decoded_catalog_command) &&
+          decoded_catalog_command.type == IpcMessageType::SceneCatalogCommand &&
+          decoded_catalog_command.request_id == 555U);
+    auto owned_scene_catalog_engine = std::make_unique<AudioEngineModel>();
+    EngineControlWorkerV1 scene_catalog_worker(*owned_scene_catalog_engine);
+    scene_catalog_worker.ensure_owned_scene_catalog();
+    CHECK(scene_catalog_worker.consume(decoded_catalog_command) == EngineControlResultV1::Applied);
+    const auto* const stored_definition =
+        scene_catalog_worker.mutable_scene_catalog()->find("quiet-game");
+    CHECK(stored_definition != nullptr &&
+          stored_definition->scene.name == "Quiet Game" &&
+          stored_definition->scene.output_group == "custom-output" &&
+          stored_definition->graph.lanes.size() == 1U &&
+          stored_definition->graph.lanes[0].id == "quiet-game-lane");
+
+    ControlCommandV1 catalog_apply_command{};
+    catalog_apply_command.type = IpcMessageType::SceneApply;
+    std::array<std::uint8_t, kSceneApplyPayloadBytesV1> catalog_scene_payload{};
+    CHECK(encode_scene_apply_payload_v1("quiet-game", "custom-output",
+                                        catalog_scene_payload));
+    CHECK(decode_scene_apply_payload_v1(catalog_scene_payload,
+                                        catalog_apply_command.scene));
+    CHECK(scene_catalog_worker.consume(catalog_apply_command) == EngineControlResultV1::Applied &&
+          scene_catalog_worker.active_scene().id == "quiet-game" &&
+          scene_catalog_worker.active_scene().output_group == "custom-output");
+
+    SceneCatalogCommandV1 remove_catalog_command{};
+    remove_catalog_command.operation = SessionRouteRuleOperationV1::Remove;
+    remove_catalog_command.lane_count = 0U;
+    remove_catalog_command.id_bytes = 10;
+    std::copy_n("quiet-game", 10, remove_catalog_command.id.data());
+    CHECK(encode_scene_catalog_command_v1(remove_catalog_command, catalog_payload));
+    IpcFrameV1 remove_catalog_frame;
+    remove_catalog_frame.header.type = IpcMessageType::SceneCatalogCommand;
+    remove_catalog_frame.payload.assign(catalog_payload.begin(), catalog_payload.end());
+    ControlCommandV1 decoded_remove_catalog_command{};
+    CHECK(decode_control_command_v1(remove_catalog_frame,
+                                    decoded_remove_catalog_command));
+    CHECK(scene_catalog_worker.consume(decoded_remove_catalog_command) ==
+          EngineControlResultV1::Applied &&
+          scene_catalog_worker.mutable_scene_catalog()->find("quiet-game") == nullptr);
+
+    std::vector<std::uint8_t> corrupted_catalog_payload = catalog_payload;
+    corrupted_catalog_payload[15U] = kSceneCatalogLaneCountV1 + 1U;
+    IpcFrameV1 corrupted_catalog_frame;
+    corrupted_catalog_frame.header.type = IpcMessageType::SceneCatalogCommand;
+    corrupted_catalog_frame.payload = corrupted_catalog_payload;
+    ControlCommandV1 corrupted_catalog_command{};
+    CHECK(!decode_control_command_v1(corrupted_catalog_frame,
+                                     corrupted_catalog_command));
+
     AudioEngineModel control_engine;
     EngineControlWorkerV1 control_worker(control_engine);
     ControlCommandQueueV1 control_queue;

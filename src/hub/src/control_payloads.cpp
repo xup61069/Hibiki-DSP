@@ -260,6 +260,425 @@ bool decode_ir_prepare_command_v1(const std::span<const std::uint8_t> payload,
     return true;
 }
 
+// ---- Scene catalog command (bounded v1 wire format) ----
+
+namespace {
+
+// Wire layout is little-endian and fully positional:
+//   [0]         schema version (zero on the wire; decoded schema stays 1)
+//   [1]         operation
+//   [2..3]      reserved zero
+//   [4..7]      latency mode
+//   [8..11]     IR phase mode
+//   [12..14]    auto attenuate / strict direct / graph output channels
+//   [15..23]    lane count, timeline count and bounded-text lengths
+//   [24..79]    finite f64 scene/loudness policies
+//   [80..83]    loudness mode
+//   [84..95]    reserved zero
+//   [96..127]   scene ID
+//   [128..247]  scene name
+//   [248..311]  output group
+//   [312..375]  optional IR reference
+//   [376..439]  optional loudness anchor ID
+//   [440..1463] NUL-terminated timeline IDs; unused entries stay zero
+//   [1464...]   fixed-size lane records
+constexpr std::size_t kSceneCatalogLaneWireBytesV1 = 448U;
+constexpr std::size_t kSceneCatalogTimelineBaseV1 = 440U;
+constexpr std::size_t kSceneCatalogLaneBaseV1 =
+    kSceneCatalogTimelineBaseV1 +
+    kSceneCatalogTimelineCapacityV1 * kSceneCatalogTimelineIdBytesV1;
+
+void write_f64_bits(std::uint8_t* bytes, const double value) noexcept {
+    std::uint64_t bits = 0U;
+    static_assert(sizeof(bits) == sizeof(value));
+    std::memcpy(&bits, &value, sizeof(bits));
+    write_u64(bytes, bits);
+}
+
+double read_f64_bits(const std::uint8_t* bytes) noexcept {
+    const std::uint64_t bits = read_u64(bytes);
+    double value = 0.0;
+    std::memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+
+void write_f32_bits(std::uint8_t* bytes, const float value) noexcept {
+    std::uint32_t bits = 0U;
+    static_assert(sizeof(bits) == sizeof(value));
+    std::memcpy(&bits, &value, sizeof(bits));
+    write_u32(bytes, bits);
+}
+
+float read_f32_bits(const std::uint8_t* bytes) noexcept {
+    const std::uint32_t bits = read_u32(bytes);
+    float value = 0.0F;
+    std::memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+
+}  // namespace
+
+bool encode_scene_catalog_command_v1(
+    const SceneCatalogCommandV1& command,
+    std::vector<std::uint8_t>& payload) noexcept {
+    payload.clear();
+    const auto raw_operation = static_cast<std::uint8_t>(command.operation);
+    if (command.schema_version != 1U || raw_operation == 0U || raw_operation > 3U) {
+        return false;
+    }
+
+    const auto text_is_valid = [](const auto& field, const std::size_t used,
+                                  const bool required) noexcept {
+        if (used > field.size() || (required && used == 0U)) return false;
+        for (std::size_t index = used; index < field.size(); ++index) {
+            if (field[index] != '\0') return false;
+        }
+        return used == 0U ||
+               is_printable_utf8(std::string_view(field.data(), used));
+    };
+
+    if (command.operation == SessionRouteRuleOperationV1::Clear) {
+        if (command.lane_count != 0U || command.timeline_count != 0U ||
+            command.id_bytes != 0U || command.name_bytes != 0U ||
+            command.output_group_bytes != 0U || command.ir_reference_bytes != 0U ||
+            command.anchor_id_bytes != 0U) {
+            return false;
+        }
+    } else if (command.operation == SessionRouteRuleOperationV1::Remove) {
+        if (command.lane_count != 0U || command.timeline_count != 0U ||
+            command.name_bytes != 0U || command.output_group_bytes != 0U ||
+            command.ir_reference_bytes != 0U || command.anchor_id_bytes != 0U ||
+            !text_is_valid(command.id, command.id_bytes, true)) {
+            return false;
+        }
+    } else {
+        if (command.lane_count == 0U ||
+            command.lane_count > kSceneCatalogLaneCountV1 ||
+            command.graph_output_channels != 2U &&
+                command.graph_output_channels != 6U &&
+                command.graph_output_channels != 8U ||
+            command.auto_attenuate > 1U || command.strict_direct > 1U ||
+            command.standard_id > 2U || command.calibrated_flag > 1U ||
+            command.timeline_count > kSceneCatalogTimelineCapacityV1 ||
+            command.ir_reference_bytes > command.ir_reference.size() ||
+            (command.ir_reference_bytes > 0U && command.ir_reference_bytes < 8U) ||
+            command.anchor_id_bytes > command.anchor_id.size() ||
+            !text_is_valid(command.id, command.id_bytes, true) ||
+            !text_is_valid(command.name, command.name_bytes, true) ||
+            !text_is_valid(command.output_group, command.output_group_bytes, true) ||
+            (command.ir_reference_bytes != 0U &&
+             !text_is_valid(command.ir_reference, command.ir_reference_bytes, true)) ||
+            (command.anchor_id_bytes != 0U &&
+             !text_is_valid(command.anchor_id, command.anchor_id_bytes, true))) {
+            return false;
+        }
+        for (std::size_t item = 0U; item < kSceneCatalogTimelineCapacityV1; ++item) {
+            const auto& source = command.timeline_ids[item];
+            const auto terminator = std::find(source.begin(), source.end(), '\0');
+            const auto length =
+                static_cast<std::size_t>(terminator - source.begin());
+            if ((item < command.timeline_count &&
+                 (length == 0U || length >= kSceneCatalogTimelineIdBytesV1 ||
+                  !is_printable_utf8(std::string_view(source.data(), length)))) ||
+                (item >= command.timeline_count && length != 0U)) {
+                return false;
+            }
+        }
+        for (std::size_t lane_index = 0U; lane_index < command.lane_count;
+             ++lane_index) {
+            const auto& lane = command.lanes[lane_index];
+            if (lane.enabled > 1U || lane.matrix_enabled > 1U ||
+                lane.channel_count != 2U && lane.channel_count != 6U &&
+                    lane.channel_count != 8U ||
+                !text_is_valid(lane.id, lane.id_bytes, true) ||
+                !text_is_valid(lane.output_group, lane.output_group_bytes, true)) {
+                return false;
+            }
+        }
+    }
+
+    try {
+        std::vector<std::uint8_t> bytes(kSceneCatalogCommandPayloadBytesV1, 0U);
+        auto* p = bytes.data();
+        p[1] = raw_operation;
+        if (command.operation != SessionRouteRuleOperationV1::Clear) {
+            std::copy_n(command.id.data(), command.id_bytes, p + 96U);
+        }
+        if (command.operation == SessionRouteRuleOperationV1::Upsert) {
+            std::copy_n(command.name.data(), command.name_bytes, p + 128U);
+            std::copy_n(command.output_group.data(), command.output_group_bytes,
+                        p + 248U);
+            if (command.ir_reference_bytes != 0U) {
+                std::copy_n(command.ir_reference.data(), command.ir_reference_bytes,
+                            p + 312U);
+            }
+            if (command.anchor_id_bytes != 0U) {
+                std::copy_n(command.anchor_id.data(), command.anchor_id_bytes,
+                            p + 376U);
+            }
+            write_u32(p + 4U, static_cast<std::uint32_t>(command.latency_mode));
+            write_u32(p + 8U, static_cast<std::uint32_t>(command.ir_phase_mode));
+            write_u32(p + 80U, static_cast<std::uint32_t>(command.loudness_mode));
+            p[12] = command.auto_attenuate;
+            p[13] = command.strict_direct;
+            p[14] = command.graph_output_channels;
+            write_f64_bits(p + 24U, command.limiter_dbtp);
+            write_f64_bits(p + 32U, command.auto_attenuate_gain);
+            write_f64_bits(p + 40U, command.reference_phon);
+            write_f64_bits(p + 48U, command.strength);
+            write_f64_bits(p + 56U, command.max_boost_db);
+            write_f64_bits(p + 64U, command.measured_f3_hz);
+            write_f64_bits(p + 72U, command.ir_phase_strength);
+            auto* timeline_base = p + kSceneCatalogTimelineBaseV1;
+            for (std::size_t item = 0U; item < command.timeline_count; ++item) {
+                const auto& source = command.timeline_ids[item];
+                const auto terminator = std::find(source.begin(), source.end(), '\0');
+                std::copy_n(source.data(),
+                            static_cast<std::size_t>(terminator - source.begin()),
+                            timeline_base + item * kSceneCatalogTimelineIdBytesV1);
+            }
+            auto* lane_base = p + kSceneCatalogLaneBaseV1;
+            for (std::size_t lane_index = 0U; lane_index < command.lane_count;
+                 ++lane_index) {
+                const auto& lane = command.lanes[lane_index];
+                auto* out = lane_base + lane_index * kSceneCatalogLaneWireBytesV1;
+                std::copy_n(lane.id.data(), lane.id_bytes, out);
+                std::copy_n(lane.output_group.data(), lane.output_group_bytes,
+                            out + 31U);
+                write_u32(out + 95U, lane.channel_count);
+                write_u32(out + 99U,
+                          static_cast<std::uint32_t>(db_to_q16_16(
+                              static_cast<double>(lane.makeup_gain_db))));
+                out[103] = lane.enabled;
+                out[104] = lane.matrix_enabled;
+                std::copy(lane.channel_map.begin(), lane.channel_map.end(),
+                          out + 105U);
+                write_u32(out + 113U, lane.reported_latency_samples);
+                write_u16(out + 117U, static_cast<std::uint16_t>(lane.id_bytes));
+                write_u16(out + 119U,
+                          static_cast<std::uint16_t>(lane.output_group_bytes));
+                auto* matrix_base = out + 135U;
+                for (std::size_t row = 0U; row < 8U; ++row) {
+                    for (std::size_t column = 0U; column < 8U; ++column) {
+                        write_f32_bits(matrix_base + (row * 8U + column) * 4U,
+                                       lane.channel_matrix[row][column]);
+                    }
+                }
+            }
+            p[15] = command.lane_count;
+            p[16] = command.timeline_count;
+            p[18] = command.name_bytes;
+            p[19] = command.output_group_bytes;
+            p[20] = command.ir_reference_bytes;
+            p[21] = command.anchor_id_bytes;
+            p[22] = command.standard_id;
+            p[23] = command.calibrated_flag;
+        }
+        p[17] = command.id_bytes;
+        payload.swap(bytes);
+        return true;
+    } catch (...) {
+        payload.clear();
+        return false;
+    }
+}
+
+bool decode_scene_catalog_command_v1(
+    const std::span<const std::uint8_t> payload,
+    SceneCatalogCommandV1& command) noexcept {
+    command = {};
+    if (payload.size() != kSceneCatalogCommandPayloadBytesV1 || payload[0] != 0U ||
+        payload[2] != 0U || payload[3] != 0U) {
+        return false;
+    }
+    const auto raw_operation = payload[1];
+    if (raw_operation == 0U || raw_operation > 3U) return false;
+    const auto operation = static_cast<SessionRouteRuleOperationV1>(raw_operation);
+
+    const auto check_text = [](const std::uint8_t* bytes, const std::size_t capacity,
+                               const std::size_t used,
+                               const bool allow_empty) noexcept {
+        if (used > capacity || (!allow_empty && used == 0U)) return false;
+        for (std::size_t index = used; index < capacity; ++index) {
+            if (bytes[index] != 0U) return false;
+        }
+        return used == 0U ||
+               is_printable_utf8(
+                   std::string_view(reinterpret_cast<const char*>(bytes), used));
+    };
+
+    if (operation == SessionRouteRuleOperationV1::Clear) {
+        for (std::size_t index = 4U; index < payload.size(); ++index) {
+            if (payload[index] != 0U) return false;
+        }
+        command.operation = operation;
+        return true;
+    }
+
+    const auto id_bytes = payload[17];
+    if (!check_text(payload.data() + 96U, kSceneCatalogIdMaxBytesV1, id_bytes,
+                    false)) {
+        return false;
+    }
+    if (operation == SessionRouteRuleOperationV1::Remove) {
+        for (std::size_t index = 24U; index < 96U; ++index) {
+            if (payload[index] != 0U) return false;
+        }
+        if (payload[15] != 0U || payload[16] != 0U || payload[18] != 0U ||
+            payload[19] != 0U || payload[20] != 0U || payload[21] != 0U ||
+            payload[22] != 0U || payload[23] != 0U) {
+            return false;
+        }
+        for (std::size_t index = 128U; index < payload.size(); ++index) {
+            if (payload[index] != 0U) return false;
+        }
+        command.operation = operation;
+        command.id_bytes = id_bytes;
+        std::copy_n(payload.data() + 96U, id_bytes, command.id.data());
+        return true;
+    }
+
+    // Upsert.
+    const auto latency_raw = read_u32(payload.data() + 4U);
+    const auto ir_phase_raw = read_u32(payload.data() + 8U);
+    const auto loudness_raw = read_u32(payload.data() + 80U);
+    if (latency_raw > 3U || ir_phase_raw > 3U || loudness_raw > 2U) {
+        return false;
+    }
+    command.latency_mode = static_cast<LatencyMode>(latency_raw);
+    command.ir_phase_mode = static_cast<IrPhaseMode>(ir_phase_raw);
+    command.loudness_mode = static_cast<EqualLoudnessMode>(loudness_raw);
+    command.limiter_dbtp = read_f64_bits(payload.data() + 24U);
+    command.auto_attenuate_gain = read_f64_bits(payload.data() + 32U);
+    command.reference_phon = read_f64_bits(payload.data() + 40U);
+    command.strength = read_f64_bits(payload.data() + 48U);
+    command.max_boost_db = read_f64_bits(payload.data() + 56U);
+    command.measured_f3_hz = read_f64_bits(payload.data() + 64U);
+    command.ir_phase_strength = read_f64_bits(payload.data() + 72U);
+    command.auto_attenuate = payload[12];
+    command.strict_direct = payload[13];
+    command.graph_output_channels = payload[14];
+    command.lane_count = payload[15];
+    command.timeline_count = payload[16];
+    command.id_bytes = id_bytes;
+    command.name_bytes = payload[18];
+    command.output_group_bytes = payload[19];
+    command.ir_reference_bytes = payload[20];
+    command.anchor_id_bytes = payload[21];
+    command.standard_id = payload[22];
+    command.calibrated_flag = payload[23];
+
+    if (command.lane_count == 0U ||
+        command.lane_count > kSceneCatalogLaneCountV1 ||
+        command.timeline_count > kSceneCatalogTimelineCapacityV1 ||
+        command.graph_output_channels != 2U &&
+            command.graph_output_channels != 6U &&
+            command.graph_output_channels != 8U ||
+        command.auto_attenuate > 1U || command.strict_direct > 1U ||
+        command.standard_id > 2U || command.calibrated_flag > 1U ||
+        command.ir_reference_bytes > command.ir_reference.size() ||
+        (command.ir_reference_bytes > 0U && command.ir_reference_bytes < 8U) ||
+        command.anchor_id_bytes > command.anchor_id.size() ||
+        !std::isfinite(command.limiter_dbtp) ||
+        !std::isfinite(command.auto_attenuate_gain) ||
+        !std::isfinite(command.reference_phon) ||
+        !std::isfinite(command.strength) ||
+        !std::isfinite(command.max_boost_db) ||
+        !std::isfinite(command.measured_f3_hz) ||
+        !std::isfinite(command.ir_phase_strength) ||
+        !check_text(payload.data() + 128U, kSceneCatalogNameMaxBytesV1,
+                    command.name_bytes, false) ||
+        !check_text(payload.data() + 248U, kSceneCatalogOutputGroupMaxBytesV1,
+                    command.output_group_bytes, false) ||
+        !check_text(payload.data() + 312U, command.ir_reference.size(),
+                    command.ir_reference_bytes, true) ||
+        !check_text(payload.data() + 376U, command.anchor_id.size(),
+                    command.anchor_id_bytes, true)) {
+        command = {};
+        return false;
+    }
+    std::copy_n(payload.data() + 96U, id_bytes, command.id.data());
+    std::copy_n(payload.data() + 128U, command.name_bytes, command.name.data());
+    std::copy_n(payload.data() + 248U, command.output_group_bytes,
+                command.output_group.data());
+    if (command.ir_reference_bytes != 0U) {
+        std::copy_n(payload.data() + 312U, command.ir_reference_bytes,
+                    command.ir_reference.data());
+    }
+    if (command.anchor_id_bytes != 0U) {
+        std::copy_n(payload.data() + 376U, command.anchor_id_bytes,
+                    command.anchor_id.data());
+    }
+
+    const auto* timeline_base = payload.data() + kSceneCatalogTimelineBaseV1;
+    for (std::size_t item = 0U; item < kSceneCatalogTimelineCapacityV1; ++item) {
+        const auto* entry = timeline_base + item * kSceneCatalogTimelineIdBytesV1;
+        std::size_t used = 0U;
+        while (used < kSceneCatalogTimelineIdBytesV1 && entry[used] != 0U) ++used;
+        if (used == kSceneCatalogTimelineIdBytesV1) { command = {}; return false; }
+        if (item < command.timeline_count) {
+            if (used == 0U ||
+                !is_printable_utf8(
+                    std::string_view(reinterpret_cast<const char*>(entry), used))) {
+                command = {};
+                return false;
+            }
+            std::copy_n(entry, used, command.timeline_ids[item].data());
+        } else if (used != 0U) {
+            command = {};
+            return false;
+        }
+    }
+
+    const auto* lane_base = payload.data() + kSceneCatalogLaneBaseV1;
+    for (std::size_t lane_index = 0U; lane_index < command.lane_count; ++lane_index) {
+        const auto* in = lane_base + lane_index * kSceneCatalogLaneWireBytesV1;
+        auto& lane = command.lanes[lane_index];
+        lane.id_bytes =
+            static_cast<std::uint16_t>(in[117]) |
+            static_cast<std::uint16_t>(static_cast<std::uint16_t>(in[118]) << 8U);
+        lane.output_group_bytes =
+            static_cast<std::uint16_t>(in[119]) |
+            static_cast<std::uint16_t>(static_cast<std::uint16_t>(in[120]) << 8U);
+        if (!check_text(in, kSceneCatalogIdMaxBytesV1, lane.id_bytes, false) ||
+            !check_text(in + 31U, kSceneCatalogOutputGroupMaxBytesV1,
+                        lane.output_group_bytes, false)) {
+            command = {};
+            return false;
+        }
+        std::copy_n(in, lane.id_bytes, lane.id.data());
+        std::copy_n(in + 31U, lane.output_group_bytes, lane.output_group.data());
+        lane.channel_count = read_u32(in + 95U);
+        lane.makeup_gain_db = static_cast<float>(q16_16_to_db(
+            static_cast<std::int32_t>(read_u32(in + 99U))));
+        lane.enabled = in[103];
+        lane.matrix_enabled = in[104];
+        std::copy_n(in + 105U, lane.channel_map.size(), lane.channel_map.begin());
+        lane.reported_latency_samples = read_u32(in + 113U);
+        if (lane.channel_count != 2U && lane.channel_count != 6U &&
+                lane.channel_count != 8U ||
+            lane.enabled > 1U || lane.matrix_enabled > 1U) {
+            command = {};
+            return false;
+        }
+        const auto* matrix_base = in + 135U;
+        for (std::size_t row = 0U; row < 8U; ++row) {
+            for (std::size_t column = 0U; column < 8U; ++column) {
+                lane.channel_matrix[row][column] = read_f32_bits(
+                    matrix_base + (row * 8U + column) * 4U);
+            }
+        }
+    }
+    for (std::size_t lane_index = command.lane_count;
+         lane_index < kSceneCatalogLaneCountV1; ++lane_index) {
+        const auto* in = lane_base + lane_index * kSceneCatalogLaneWireBytesV1;
+        for (std::size_t index = 0U; index < kSceneCatalogLaneWireBytesV1; ++index) {
+            if (in[index] != 0U) { command = {}; return false; }
+        }
+    }
+    return true;
+}
+
 bool decode_session_route_command_v1(
     const std::span<const std::uint8_t> payload,
     SessionRouteCommandV1& command) noexcept {
@@ -736,6 +1155,8 @@ bool decode_control_command_v1(const IpcFrameV1& frame,
             return decode_ir_prepare_command_v1(frame.payload, command.ir_prepare);
         case IpcMessageType::SceneApply:
             return decode_scene_apply_payload_v1(frame.payload, command.scene);
+        case IpcMessageType::SceneCatalogCommand:
+            return decode_scene_catalog_command_v1(frame.payload, command.scene_catalog);
         case IpcMessageType::DeviceSwitch:
             return decode_device_switch_payload_v1(frame.payload, command.device_switch);
         case IpcMessageType::GraphPrepare:

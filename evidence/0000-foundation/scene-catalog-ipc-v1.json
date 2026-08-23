@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "issue": 768,
+  "scope_digest": "scene-catalog-ipc-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-vs2026",
+  "commands": [
+    "pwsh -NoProfile -File tools/verify.ps1 (clean rebuild)",
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "pwsh -NoProfile -File tools/build-engine-preview.ps1",
+    "pwsh -NoProfile -File tools/engine-preview-smoke.ps1",
+    "pwsh -NoProfile -File tools/control-model-engine-smoke.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 768",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1 (clean rebuild)",
+      "status": "pass",
+      "coverage": [
+        "CMake clean configure and build all targets including control_payloads.cpp and engine_control.cpp",
+        "CTest 3 of 3 passed: asio_transport_selftest, tab_bridge_selftest, contract_tests"
+      ],
+      "compiled_artifacts": true,
+      "artifacts_ignored": true
+    },
+    {
+      "command": "tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "C# control model build with updated IpcProtocol.cs SceneCatalogPayloadBytes=3260 and EncodeSceneCatalogCommand()",
+        "EasyControlViewModel AddCustomScene/RemoveCustomScene IPC push when connected"
+      ],
+      "compiled_artifacts": true,
+      "artifacts_ignored": true
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 768",
+      "status": "pass",
+      "coverage": [
+        "issue-based ownership, scope_globs validation, branch codex/761-scene-catalog-ipc"
+      ]
+    },
+    {
+      "command": "tools/build-engine-preview.ps1 + engine-preview-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "Engine preview Release build including updated control_payloads.cpp and engine_control.cpp",
+        "Physical catalog snapshot, Hello/Ack volume round-trip, status snapshot, IR prepare smoke"
+      ]
+    },
+    {
+      "command": "tools/control-model-engine-smoke.ps1",
+      "status": "pass",
+      "coverage": [
+        "C# control model connects to engine preview over IPC; scene apply, device catalog refresh and IR clear-on-switch verified end-to-end"
+      ]
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "80 required documentation paths",
+        "24 specs",
+        "619 tracked paths"
+      ]
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": [
+        "619 tracked paths, no blocked binary or secret"
+      ]
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": [
+        "no whitespace errors"
+      ]
+    }
+  ],
+  "ci_runs": [],
+  "limitations": [
+    "Source-only build/test verification; no physical audio endpoint, driver, WaveRT, HLK, Microsoft signing claim.",
+    "SceneCatalogCommandV1 wire format is validated by contract tests only; no live engine-to-engine smoke on this machine.",
+    "UI push to engine is triggered on AddCustomScene/RemoveCustomScene but not yet exercised in a live WinUI preview."
+  ],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.5"
+  },
+  "started_at": "2026-08-23T00:00:00+08:00",
+  "finished_at": "2026-08-23T01:30:00+08:00"
+}
