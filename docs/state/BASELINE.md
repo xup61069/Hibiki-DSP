@@ -795,6 +795,8 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
+第二十一波整合增量已合併：Engine Preview 的 canonical 控制管線加入單一擁有權 fail-closed，無法取得管線時以離開碼 3 退出（Issue #628 / PR #631）；PortCls adapter start path 新增分階段 DbgPrintEx 診斷（Issue #633 / PR #635）；這僅為 control/start-path 診斷與 user-space 證據，不宣稱 driver 已安裝/載入/HLK/Microsoft signing。
+
 第二十波指令面與證據增量已合併：AGENTS.md 改寫為三層規則索引（硬性限制／產品與流程
 預設／core+conditional 驗證門檻），driver 安裝、載入、HLK 與 Microsoft 簽章明確歸屬
 release 階段，README gates 清單同步拆分核心與條件式兩層，AI_HANDOFF 從長文壓縮為短入口、
