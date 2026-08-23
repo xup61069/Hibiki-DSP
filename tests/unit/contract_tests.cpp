@@ -252,6 +252,25 @@ int main() {
     scene.id = "game";
     scene.name = "Game";
     scene.output_group = "main";
+    scene.lanes.push_back("game-lane");
+    CHECK(validate_scene(scene));
+    scene.lanes.clear();
+    CHECK(validate_scene(scene));
+    scene.lanes.push_back("");
+    CHECK(!validate_scene(scene));
+    scene.lanes[0] = std::string(65, 'x');
+    CHECK(!validate_scene(scene));
+    scene.lanes[0] = "game-lane";
+    scene.lanes.push_back(std::string("lane\0hidden", 11U));
+    CHECK(!validate_scene(scene));
+    scene.lanes.clear();
+    for (std::size_t i = 0U; i < 32U; ++i) {
+        scene.lanes.push_back("lane-" + std::to_string(i));
+    }
+    CHECK(validate_scene(scene));
+    scene.lanes.push_back("one-too-many");
+    CHECK(!validate_scene(scene));
+    scene.lanes.pop_back();
     scene.automation_timeline_ids.push_back("game-vst3-default");
     CHECK(validate_scene(scene));
     scene.automation_timeline_ids.push_back(std::string(65, 'x'));

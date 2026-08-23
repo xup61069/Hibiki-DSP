@@ -24,6 +24,8 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   執行與 plugin state 不內嵌於 Scene JSON。需要跨版本的 plugin state 時，只能以
   `scene-vst3-state-binding-v1` metadata reference 經 identity／version／migration preflight，
   opaque bytes 仍留在 private caller-owned store。
+  `lanes` 是 bounded ID 陣列（最多 32 個；每個名稱 1..64 bytes、非空且不含 NUL），
+  JSON schema 與 runtime validator 會一致地拒絕超界或格式不合法的 lane 名稱。
   `ir_reference` 是 bounded UTF-8 calibration label（空值或 8..64 bytes，不含 NUL），
   用來比對「同一份已準備的 IR」。它只是 opaque 比對 token：不內嵌 IR samples、檔案路徑或
   ISO 226 係數，也不代表任何實體播放或 driver 證據。SceneApply 在新場景帶有與 active scene
