@@ -11,6 +11,9 @@ $script:RequiredBoundaries = @(
   'Resolve-HibikiDestination',
   'Get-StagingPlan',
   'Copy-HibikiFileWithHash',
+  'Get-UninstallPlan',
+  'Invoke-PayloadUninstall',
+  'Invoke-HibikiUninstall',
   'Invoke-HibikiInstall',
   '-Apply',
   'pnputil.exe',
@@ -67,6 +70,9 @@ function Test-ManifestFiles {}
 function Resolve-HibikiDestination {}
 function Get-StagingPlan {}
 function Copy-HibikiFileWithHash {}
+function Get-UninstallPlan {}
+function Invoke-PayloadUninstall {}
+function Invoke-HibikiUninstall {}
 function Invoke-HibikiInstall { param([switch]$Apply) }
 $null = "-Apply"
 $null = "pnputil.exe"

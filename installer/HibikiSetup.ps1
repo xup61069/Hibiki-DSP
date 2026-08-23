@@ -3,7 +3,8 @@ param(
   [Parameter(Mandatory = $true)][string]$PackageRoot,
   [Parameter(Mandatory = $true)][string]$ManifestPath,
   [string]$DestinationPath = "%ProgramFiles%\Hibiki DSP",
-  [switch]$Apply
+  [switch]$Apply,
+  [switch]$Uninstall
 )
 
 $ErrorActionPreference = 'Stop'
@@ -263,33 +264,135 @@ function Invoke-HibikiInstall {
   Write-Output "Hibiki $($Manifest.product_version) driver and payload installation completed."
 }
 
+function Get-UninstallPlan($Manifest, [string]$Destination) {
+  $resolvedDest = ([IO.Path]::GetFullPath($Destination)).TrimEnd('\') + '\'
+  $plan = @()
+  foreach ($entry in @($Manifest.unsigned_files)) {
+    $destPath = Join-Path $Destination $entry.path
+    $resolvedDestFile = [IO.Path]::GetFullPath($destPath)
+    if (-not $resolvedDestFile.StartsWith($resolvedDest, [StringComparison]::OrdinalIgnoreCase)) {
+      throw "Uninstall destination escapes DestinationPath: $($entry.path)"
+    }
+    $plan += @{
+      RelativePath = $entry.path
+      Destination  = $resolvedDestFile
+      Exists       = (Test-Path -LiteralPath $resolvedDestFile)
+    }
+  }
+  return ,$plan
+}
+
+function Invoke-PayloadUninstall {
+  [CmdletBinding()]
+  param(
+    [AllowEmptyCollection()][array]$Plan,
+    [Parameter(Mandatory)][string]$Destination
+  )
+  $backupDirName = '.hibiki-uninstall-backup-' + [Guid]::NewGuid().ToString('N')
+  $tempRoot = [IO.Path]::GetTempPath()
+  $backupDir = Join-Path $tempRoot $backupDirName
+  $removedFiles = @()
+  $backedUpFiles = @()
+  try {
+    foreach ($item in $Plan) {
+      if (-not $item.Exists) { continue }
+      $backupSubPath = Join-Path $backupDir $item.RelativePath
+      $backupSubDir = Split-Path -Parent $backupSubPath
+      if (-not (Test-Path -LiteralPath $backupSubDir)) {
+        New-Item -ItemType Directory -Path $backupSubDir -Force | Out-Null
+      }
+      Copy-Item -LiteralPath $item.Destination -Destination $backupSubPath -Force
+      $backedUpFiles += @{ Original = $item.Destination; Backup = $backupSubPath }
+      Remove-Item -LiteralPath $item.Destination -Force
+      $removedFiles += $item.Destination
+    }
+    if ($removedFiles.Count -gt 0) {
+      Remove-Item -LiteralPath $backupDir -Recurse -Force
+    }
+    Write-Output ("Removed $($removedFiles.Count) payload file(s).")
+  } catch {
+    for ($i = $removedFiles.Count - 1; $i -ge 0; $i--) {
+      $bkEntry = $backedUpFiles | Where-Object { $_.Original -eq $removedFiles[$i] }
+      if ($bkEntry -and (Test-Path -LiteralPath $bkEntry.Backup)) {
+        $origParent = Split-Path -Parent $bkEntry.Original
+        if (-not (Test-Path -LiteralPath $origParent)) {
+          New-Item -ItemType Directory -Path $origParent -Force | Out-Null
+        }
+        Copy-Item -LiteralPath $bkEntry.Backup -Destination $bkEntry.Original -Force
+      }
+    }
+    throw
+  } finally {
+    if (Test-Path -LiteralPath $backupDir) {
+      Remove-Item -LiteralPath $backupDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+}
+
+function Invoke-HibikiUninstall {
+  [CmdletBinding(SupportsShouldProcess)]
+  param(
+    [Parameter(Mandatory)]$Manifest,
+    [Parameter(Mandatory)][string]$Destination
+  )
+  $plan = Get-UninstallPlan $Manifest $Destination
+  Invoke-PayloadUninstall -Plan $plan -Destination $Destination
+  Write-Output "Hibiki $($Manifest.product_version) payload uninstall completed. User data preserved."
+}
+
 $manifest = Read-ReleaseManifest $ManifestPath
-Test-ManifestFiles $manifest $PackageRoot | Out-Null
-Write-Output "Verified source tag $($manifest.source_tag), commit $($manifest.source_commit)."
 
-$destination = Resolve-HibikiDestination $DestinationPath
-$stagingPlan = Get-StagingPlan $manifest $PackageRoot $destination
-$preservedPaths = Get-PreservedDataPaths
-
-Write-Output "Destination: $destination"
-Write-Output "Planned payload files:"
-foreach ($item in $stagingPlan) {
-  Write-Output "  $($item.RelativePath)"
+if ($Uninstall) {
+  Test-ManifestFiles $manifest $PackageRoot | Out-Null
+  Write-Output "Verified source tag $($manifest.source_tag), commit $($manifest.source_commit)."
+  $destination = Resolve-HibikiDestination $DestinationPath
+  $uninstallPlan = Get-UninstallPlan $manifest $destination
+  $preservedPaths = Get-PreservedDataPaths
+  Write-Output "Destination: $destination"
+  Write-Output "Planned payload removals:"
+  foreach ($item in $uninstallPlan) {
+    $status = if ($item.Exists) { '(present)' } else { '(not installed)' }
+    Write-Output "  $($item.RelativePath) $status"
+  }
+  Write-Output "Preserved data paths:"
+  foreach ($p in $preservedPaths) {
+    $status = if ($p.Exists) { '(exists)' } else { '(not found)' }
+    Write-Output "  $($p.Name) $status"
+  }
+  if (-not $Apply) {
+    Write-Output 'Uninstall dry-run only. No files were deleted.'
+    Write-Output 'Re-run with -Apply -Uninstall after reviewing the plan.'
+    return
+  }
+  if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+      [Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    throw 'Administrator privileges are required for -Apply -Uninstall.'
+  }
+  Invoke-HibikiUninstall $manifest $destination
+} else {
+  Test-ManifestFiles $manifest $PackageRoot | Out-Null
+  Write-Output "Verified source tag $($manifest.source_tag), commit $($manifest.source_commit)."
+  $destination = Resolve-HibikiDestination $DestinationPath
+  $stagingPlan = Get-StagingPlan $manifest $PackageRoot $destination
+  $preservedPaths = Get-PreservedDataPaths
+  Write-Output "Destination: $destination"
+  Write-Output "Planned payload files:"
+  foreach ($item in $stagingPlan) {
+    Write-Output "  $($item.RelativePath)"
+  }
+  Write-Output "Preserved data paths:"
+  foreach ($p in $preservedPaths) {
+    $status = if ($p.Exists) { '(exists)' } else { '(not found)' }
+    Write-Output "  $($p.Name) $status"
+  }
+  if (-not $Apply) {
+    Write-Output 'Dry-run only. No files or directories were created.'
+    Write-Output 'Re-run with -Apply after reviewing the signed package.'
+    return
+  }
+  if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+      [Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    throw 'Administrator privileges are required for -Apply.'
+  }
+  Invoke-HibikiInstall $PackageRoot $manifest $destination
 }
-Write-Output "Preserved data paths:"
-foreach ($p in $preservedPaths) {
-  $status = if ($p.Exists) { '(exists)' } else { '(not found)' }
-  Write-Output "  $($p.Name) $status"
-}
-
-if (-not $Apply) {
-  Write-Output 'Dry-run only. No files or directories were created.'
-  Write-Output 'Re-run with -Apply after reviewing the signed package.'
-  return
-}
-
-if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
-    [Security.Principal.WindowsBuiltInRole]::Administrator)) {
-  throw 'Administrator privileges are required for -Apply.'
-}
-Invoke-HibikiInstall $PackageRoot $manifest $destination

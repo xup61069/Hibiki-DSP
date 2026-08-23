@@ -14,6 +14,15 @@ requires explicit `-Apply` plus administrator rights before staging an INF with
 Hibiki installer signer/RFC3161 timestamp; no package, certificate or Gumroad
 credential is stored here.
 
+The same bootstrapper supports `-Uninstall` for the verified user-space payload.
+It validates the package manifest and destination before touching anything, removes
+only manifest-declared files inside the destination, backs up every removal to a
+temporary directory, restores prior state on failure, and preserves existing
+`%LocalAppData%/Hibiki DSP` Scene and route-rule files. Dry-run reports the planned
+removals and preserved-data boundaries without deleting anything. This is a
+source-level capability only; it does not claim install, load, runtime audio, driver,
+HLK, Microsoft signing or Authenticode execution evidence.
+
 ## User-space payload staging (source-level capability)
 
 After full manifest verification, `-Apply` copies each manifest-declared
