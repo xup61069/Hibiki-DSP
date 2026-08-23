@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "issue": 657,
+  "scope_digest": "global-snapshot-wave23",
+  "source_commit": null,
+  "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100-pwsh-7.6; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 657",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #647 / PR #648 merged: TruePeakLimiterV1 records previous block gain and caps recovery at 2x per block (~+6 dB); attenuation stays immediate; reset() clears recovery state; consecutive-block regression added (true-peak-release-v1.json)"
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; no product source, driver runtime, installer or machine state is changed.",
+    "Fixed +6 dB per block recovery is not ITU/BS.1770 or certified true-peak conformance.",
+    "No physical endpoint, driver install/load, HLK or Microsoft signing claim."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-23T17:20:00+08:00",
+  "finished_at": "2026-08-23T17:25:00+08:00"
+}
