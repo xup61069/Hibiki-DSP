@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "issue": 636,
+  "scope_digest": "noise-gate-attack-release-direction-v1",
+  "source_commit": "8130856",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.12112.369-msvc-19.51.36256.0-sdk-10.0.28000.0-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 636",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/verify.ps1"
+  ],
+  "results": [
+    {
+      "command": "tools/handoff-check.ps1 -Issue 636",
+      "status": "pass",
+      "coverage": [
+        "schema v2 ownership, scope and Git ancestry for Issue 636"
+      ]
+    },
+    {
+      "command": "tools/docs-check.ps1 / tools/source-policy.ps1 / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "required documentation paths",
+        "source-only policy for tracked paths",
+        "no whitespace errors"
+      ]
+    },
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "3/3 CTest suites passed including hibiki_contract_tests regression",
+        "closed-to-open transition uses attack_ms coefficient (open_block.back() > 0.1F after 48 frames)",
+        "release tail comparison: below-threshold signal closes with release_ms (slow); a same-length attack_ms tail collapses to under 5 percent of the release-tail level",
+        "existing single-owner duplicate-start rejection and normal client sessions stay green"
+      ]
+    }
+  ],
+  "limitations": [
+    "Offline contract tests only; no live audio capture or listening test is claimed.",
+    "One-pole time constants are approximate; the test compares relative tails instead of exact ms timing."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "compiler": "MSVC 19.51.36256.0",
+    "cmake": "4.4.0",
+    "powershell": "pwsh 7.6.4 local"
+  },
+  "started_at": "2026-08-23T15:12:00+08:00",
+  "finished_at": "2026-08-23T15:26:30+08:00"
+}
+

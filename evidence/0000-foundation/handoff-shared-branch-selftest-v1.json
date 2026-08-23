@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "issue": 643,
+  "scope_digest": "handoff-shared-branch-selftest-v1",
+  "source_commit": "e46346d",
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.4-local-vs2026-sdk-28000",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 643",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/handoff-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "offline duplicate-branch registration records the first issue",
+        "a second issue claiming the same active branch is rejected",
+        "two distinct branches are both accepted",
+        "existing parsing, lifecycle, owner, TBD and path cases remain green"
+      ]
+    },
+    {
+      "command": "tools/handoff-check.ps1 -Issue 643",
+      "status": "pass",
+      "coverage": [
+        "issue ownership, declared branch and clean isolated Git state"
+      ]
+    },
+    {
+      "command": "tools/docs-check.ps1 / tools/source-policy.ps1 / git diff --check",
+      "status": "pass",
+      "coverage": [
+        "required documentation paths",
+        "source-only tracked-path policy",
+        "no whitespace or conflict markers"
+      ]
+    }
+  ],
+  "limitations": [
+    "PowerShell tooling self-test only; no C++ build is required for this slice.",
+    "Live global handoff audit remains blocked by the pre-existing shared branch between issues 462 and 641 until an integrator resolves ownership.",
+    "The refactor preserves the existing fail-closed error text but does not add live GitHub API mocking."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4 local"
+  },
+  "started_at": "2026-08-23T15:35:00+08:00",
+  "finished_at": "2026-08-23T15:52:00+08:00"
+}
