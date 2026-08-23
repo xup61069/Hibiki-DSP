@@ -3,6 +3,8 @@ param(
   [switch]$SelfTest
 )
 
+Set-StrictMode -Version Latest
+
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $repo 'apps/control-model-check/Hibiki.ControlModel.Check.csproj'

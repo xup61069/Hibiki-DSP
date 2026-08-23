@@ -4,6 +4,8 @@ param(
   [switch]$SelfTest
 )
 
+Set-StrictMode -Version Latest
+
 $ErrorActionPreference = 'Stop'
 $results = [System.Collections.Generic.List[object]]::new()
 

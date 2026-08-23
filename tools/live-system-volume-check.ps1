@@ -7,6 +7,8 @@ param(
   [switch]$SelfTest
 )
 
+Set-StrictMode -Version Latest
+
 $ErrorActionPreference = 'Stop'
 function Assert-LiveSystemVolumeWriteTestOptIn([bool]$writeTest, [bool]$selfTest) {
   if (-not $writeTest -and -not $selfTest) {
