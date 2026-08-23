@@ -1102,4 +1102,20 @@ Check(removeViewModel.RemoveSelectedTimeline() &&
       removeViewModelNotifications.Contains(nameof(Vst3TimelineEditorViewModel.Rows)) &&
       removeViewModelNotifications.Contains(nameof(Vst3TimelineEditorViewModel.StatusText)),
     "Editor ViewModel timeline removal must refresh projections and notify bindings.");
+var selectionSeamViewModel = new Vst3TimelineEditorViewModel();
+Check(selectionSeamViewModel.RegisterTimeline("compat-selection") &&
+      selectionSeamViewModel.SelectedTimelineId is null,
+    "Compatibility Preview selection seam must start with no timeline selected.");
+Check(selectionSeamViewModel.Select("compat-selection"),
+    "Compatibility Preview selection seam must accept a registered timeline.");
+Check(selectionSeamViewModel.SelectedTimelineId == "compat-selection" &&
+      selectionSeamViewModel.HasSelection && !selectionSeamViewModel.HasEditSession,
+    "Compatibility Preview selection seam must reach the view model.");
+Check(selectionSeamViewModel.BeginEdit() && selectionSeamViewModel.HasEditSession &&
+      selectionSeamViewModel.Discard() && !selectionSeamViewModel.HasEditSession,
+    "Selection seam must expose the same draft lifecycle as the formal shell.");
+Check(!selectionSeamViewModel.Select("missing") &&
+      selectionSeamViewModel.SelectedTimelineId == "compat-selection",
+    "Selection seam must keep the selected timeline after a rejected change.");
+
 Console.WriteLine("Control model checks passed.");

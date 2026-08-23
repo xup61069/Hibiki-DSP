@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "issue": 673,
+  "scope_digest": "compat-timeline-select-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-11-26200-x64-vs2026-sdk-26100-pwsh-7.6-dotnet-10; compatibility-preview source-only",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 673",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/control-model-check.ps1"
+  ],
+  "results": [
+    {
+      "command": "compatibility preview selection seam review",
+      "status": "pass",
+      "coverage": [
+        "Compatibility Preview timeline ComboBox now binds SelectedItem two-way to Vst3TimelineEditor.SelectedTimelineId and forwards SelectionChanged to the same OnVst3TimelineSelect handler used by the formal WinUI shell.",
+        "Control-model check adds a selection-seam regression: register, select through the seam property contract (Select), verify HasSelection without edit session, begin/discard draft lifecycle, and confirm rejected selection keeps the current timeline.",
+        "No engine IPC, RT-thread, driver or physical-audio change; Compatibility Preview remains a local control-model surface."
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Compatibility Preview remains non-formal UI evidence; no formal XAML, accessibility or physical-audio claim.",
+    "Selection binding is verified by source-level seam parity and headless control-model checks; no interactive UI session was recorded."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "dotnet": "10.x local SDK",
+    "powershell": "7.6"
+  },
+  "started_at": "2026-08-23T18:05:00+08:00",
+  "finished_at": "2026-08-23T18:12:00+08:00"
+}
