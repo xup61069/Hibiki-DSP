@@ -4,7 +4,7 @@
   "title": "Adopt single-orchestrator assignment and directory lanes in MULTI_AGENT.md",
   "date": "2026-08-22",
   "branch": "codex/199-orchestrator-lanes",
-  "base_commit": "e5a4b32",
+  "base_commit": "1586643b94cc9ea170f64460fc0bb00cc27d3eaf",
   "owner": "xup61069",
   "scope_globs": [
     "docs/ai/MULTI_AGENT.md",

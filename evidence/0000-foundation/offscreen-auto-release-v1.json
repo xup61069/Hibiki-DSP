@@ -2,8 +2,8 @@
   "schema_version": 1,
   "issue": 714,
   "scope_digest": "offscreen-auto-release-v1",
-  "source_commit": "d4bb50212c36d8f0101f2ff19b2fac93cc1f5e8e",
-  "base_commit": "e29faa1",
+  "source_commit": "d272d3d35530a5347292e0db97f4740e981cf0d4",
+  "base_commit": "0ddad62e6b465868c36348ce129e1ee7813ad494",
   "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6",
   "target": "extensions/offscreen.js + extensions/service-worker.js",
   "cases_added": [
@@ -44,4 +44,3 @@
     "Static source and syntax evidence only; no browser launch, MV3 runtime, real tab-close event, tabCapture, WebSocket audio flow, endpoint, driver, WaveRT, HLK, signing or release evidence."
   ]
 }
-
