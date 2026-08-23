@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "issue": 462,
+  "scope_digest": "driver-topology-minport-v1",
+  "base_commit": "21d8161",
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-msvc-19.51.36256-wdk-10.0.28000.0-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/build-driver.ps1",
+    "pwsh -NoProfile -File tools/driver-signability-check.ps1 -PackageRoot .local/driver-package -RequireInf2Cat"
+  ],
+  "results": [
+    {
+      "command": "tools/verify.ps1",
+      "status": "pass",
+      "coverage": [
+        "core RelWithDebInfo build completed after restoring stale hub and contract test sources to base state",
+        "3/3 CTest suites passed: hibiki_asio_transport_selftest, hibiki_tab_bridge_selftest, hibiki_contract_tests"
+      ],
+      "compiled_artifacts": true,
+      "artifacts_ignored": true
+    },
+    {
+      "command": "tools/build-driver.ps1",
+      "status": "pass",
+      "coverage": [
+        "WDK discovery selected the installed km-enabled 10.0.28000.0 kit",
+        "4 portable C core TUs and kernel-mode x64 C++ TUs compiled, including hibiki_miniport_topology.cpp",
+        "topology miniport adapter and endpoint topology filter descriptor getter linked into HibikiVirtualAudio.sys",
+        "driver package produced under ignored .local/driver-package with SYS, INF, and catalog"
+      ],
+      "compiled_artifacts": true,
+      "artifacts_ignored": true
+    },
+    {
+      "command": "tools/driver-signability-check.ps1 -PackageRoot .local/driver-package -RequireInf2Cat",
+      "status": "pass",
+      "coverage": [
+        "package INF passed source-policy assertions and stable value checks",
+        "Inf2Cat regenerated the catalog for Windows 11 24H2/25H2 x64 targets",
+        "signability errors: none; warnings: none"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Source, build, package, and signability evidence only: no guest installation, PnP start success, runtime audio behavior, HLK, WHQL, or Microsoft signing claim.",
+    "The prior isolated VM load test still ended in CM_PROB_FAILED_START; this wiring requires a fresh guest retest.",
+    "Artifacts remain under ignored .local/ and are not committed.",
+    "The signability helper required WDK_BIN pointing at the versioned x86 Inf2Cat directory on this machine; the build script itself discovered WDK dynamically."
+  ],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4",
+    "windows_build": "26200",
+    "msvc": "19.51.36256",
+    "wdk": "10.0.28000.0"
+  },
+  "started_at": "2026-08-23T15:03:00+08:00",
+  "finished_at": "2026-08-23T15:08:48+08:00"
+}
+
