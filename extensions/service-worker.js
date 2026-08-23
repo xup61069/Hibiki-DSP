@@ -54,5 +54,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })();
     return true;
   }
+  if (message?.type === 'offscreen-capture-released' && typeof sender.url === 'string' && sender.url.endsWith('/offscreen.html')) {
+    (async () => {
+      try {
+        const contexts = await chrome.runtime.getContexts({contextTypes: ['OFFSCREEN_DOCUMENT']});
+        if (contexts.length > 0) await closeOffscreenDocument();
+      } catch (_) {
+        // Already closed or closing; the next state query reports the truth.
+      }
+    })();
+    return false;
+  }
   return false;
 });
