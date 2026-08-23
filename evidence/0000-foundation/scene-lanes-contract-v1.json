@@ -2,13 +2,13 @@
   "schema_version": 1,
   "issue": 941,
   "scope_digest": "scene-lanes-contract-v1",
-  "source_commit": "6529040a",
+  "source_commit": "cdbe05b744100a1d9cebedb1de4e98dfb8a8c0c9",
   "environment_fingerprint": "windows-amd64-pwsh-scene-lanes-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 941",
     "pwsh -NoProfile -File tools/docs-check.ps1",
     "pwsh -NoProfile -File tools/source-policy.ps1",
-    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1 -Clean",
     "git diff --check"
   ],
   "results": [
@@ -27,7 +27,7 @@
     {
       "command": "verify",
       "status": "pass",
-      "log": ".local/verify-941.log"
+      "log": ".local/verify-941-current.log"
     },
     {
       "command": "git diff --check",
@@ -42,6 +42,6 @@
   "tool_versions": {
     "powershell": "pwsh local"
   },
-  "started_at": "2026-08-25T00:30:00+08:00",
-  "finished_at": "2026-08-25T01:00:00+08:00"
+  "started_at": "2026-08-24T06:23:20+08:00",
+  "finished_at": "2026-08-24T06:24:53+08:00"
 }
