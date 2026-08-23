@@ -96,6 +96,7 @@ extern "C" {
 #include <new>
 #include <span>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -1720,12 +1721,50 @@ int main() {
         const auto prompt_start = std::chrono::steady_clock::now();
         CHECK(prompt_stop_server.start(prompt_config, acknowledge_ipc_request, nullptr));
         prompt_stop_server.stop();
-        const auto prompt_elapsed_ms =
+    const auto prompt_elapsed_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - prompt_start)
+            .count();
+    CHECK(prompt_elapsed_ms < prompt_config.io_timeout_ms &&
+          !prompt_stop_server.running());
+
+    // Issue #655 regression: stop() during the between-connection gap must
+    // also cancel promptly. A single cancellation can miss the short window
+    // after a client disconnects and before the next ConnectNamedPipe() is
+    // armed, so repeat until the worker observes stop.
+    {
+        const std::wstring between_pipe =
+            L"\\\\.\\pipe\\HibikiDSP_contract_between_stop_" + std::to_wstring(_getpid());
+        IpcNamedPipeServerV1 between_stop_server;
+        IpcNamedPipeConfigV1 between_config{};
+        between_config.pipe_name = between_pipe;
+        between_config.max_frame_bytes = 1024U;
+        between_config.io_timeout_ms = 1000U;
+        CHECK(between_stop_server.start(between_config, acknowledge_ipc_request, nullptr));
+
+        HANDLE between_client = INVALID_HANDLE_VALUE;
+        for (int attempt = 0;
+             attempt < 300 && between_client == INVALID_HANDLE_VALUE; ++attempt) {
+            between_client = CreateFileW(between_pipe.c_str(), GENERIC_READ | GENERIC_WRITE, 0U,
+                                         nullptr, OPEN_EXISTING, 0U, nullptr);
+            if (between_client == INVALID_HANDLE_VALUE &&
+                GetLastError() == ERROR_PIPE_BUSY) {
+                (void)WaitNamedPipeW(between_pipe.c_str(), 100U);
+            }
+        }
+        CHECK(between_client != INVALID_HANDLE_VALUE);
+        DisconnectNamedPipe(between_client);
+        CloseHandle(between_client);
+
+        const auto between_start = std::chrono::steady_clock::now();
+        between_stop_server.stop();
+        const auto between_elapsed_ms =
             std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now() - prompt_start)
+                std::chrono::steady_clock::now() - between_start)
                 .count();
-        CHECK(prompt_elapsed_ms < prompt_config.io_timeout_ms &&
-              !prompt_stop_server.running());
+        CHECK(between_elapsed_ms < between_config.io_timeout_ms &&
+              !between_stop_server.running());
+    }
     }
     HANDLE ipc_client = INVALID_HANDLE_VALUE;
     for (int attempt = 0; attempt < 30 && ipc_client == INVALID_HANDLE_VALUE; ++attempt) {
