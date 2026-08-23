@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "issue": 813,
+  "scope_digest": "compat-session-controls-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-local-pwsh-7.6.4-dotnet8",
+  "commands": [
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest"
+  ],
+  "results": [
+    {
+      "command": "tools/build-preview.ps1 -Target WinUICompat -SmokeTest",
+      "status": "pass",
+      "coverage": [
+        "bounded session ComboBox binds SessionCatalog and SelectedSessionHandle two-way with accessible refresh action",
+        "selected-App status, bounded catalog sequence and route-rule preview text are readable by assistive technology",
+        "volume slider and mute checkbox bind SessionVolumeDb / SessionMuted; explicit apply calls ApplySelectedSessionVolumeAsync()",
+        "Lane ID and Output Group inputs bind SessionRouteLaneId / SessionRouteOutputGroup; explicit apply calls ApplySelectedSessionRouteAsync()",
+        "all newly added interactive controls declare non-empty accessibility names",
+        "preview retains the boundary that per-App physical delivery remains unverified"
+      ]
+    }
+  ],
+  "limitations": [
+    "Compatibility preview source/build/launch evidence only.",
+    "No runtime screen-reader audit, physical audio delivery, driver install/load, HLK or Microsoft signing claim."
+  ],
+  "logs": [],
+  "started_at": "2026-08-24T08:40:00+08:00",
+  "finished_at": "2026-08-24T08:45:00+08:00"
+}
+
