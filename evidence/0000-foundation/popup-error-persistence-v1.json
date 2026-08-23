@@ -1,0 +1,22 @@
+{
+  "limitations": "User-space extension source/policy evidence only. No browser runtime capture, physical audio, driver, HLK or Microsoft signing is claimed.",
+  "verification": [
+    "node --check extensions/popup.js",
+    "pwsh tools/extension-check.ps1 -SelfTest => 36 cases pass",
+    "pwsh tools/extension-check.ps1 source boundaries pass",
+    "handoff-check #724 pass",
+    "docs-check pass",
+    "source-policy pass",
+    "git diff --check clean"
+  ],
+  "scope": [
+    "extensions/popup.js",
+    "tools/extension-check.ps1"
+  ],
+  "summary": "Popup error persistence: render() skips Idle/status overwrite when status.dataset.error is set; Start/Stop click handlers clear the flag at entry; failed response or catch path sets it. extension-check.ps1 enforces status.dataset.error presence and adds selftest-missing-error-persistence case (36 total).",
+  "issue": 724,
+  "schema_version": "1",
+  "date": "2026-08-23T12:10:51Z",
+  "base_commit": "d272d3d",
+  "branch": "codex/724-popup-error-persistence"
+}

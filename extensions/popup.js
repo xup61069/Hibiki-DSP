@@ -8,9 +8,11 @@ let bridgeConnected = false;
 function render() {
   button.disabled = capturing;
   stopButton.disabled = !capturing;
-  status.textContent = capturing
-    ? (bridgeConnected ? 'Capturing — Hibiki connected' : 'Capturing — native bridge not detected')
-    : 'Idle';
+  if (!status.dataset.error) {
+    status.textContent = capturing
+      ? (bridgeConnected ? 'Capturing — Hibiki connected' : 'Capturing — native bridge not detected')
+      : 'Idle';
+  }
 }
 
 function setBusy(isBusy) {
@@ -40,6 +42,7 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 button.addEventListener('click', async () => {
+  delete status.dataset.error;
   setBusy(true);
   status.textContent = 'Requesting capture…';
   try {
@@ -55,11 +58,13 @@ button.addEventListener('click', async () => {
       render();
     } else {
       status.textContent = response?.error ?? 'Capture failed';
+      status.dataset.error = 'true';
       capturing = false;
       render();
     }
   } catch (error) {
     status.textContent = error instanceof Error ? error.message : String(error);
+    status.dataset.error = 'true';
     capturing = false;
     bridgeConnected = false;
     render();
@@ -70,6 +75,7 @@ button.addEventListener('click', async () => {
 });
 
 stopButton.addEventListener('click', async () => {
+  delete status.dataset.error;
   setBusy(true);
   status.textContent = 'Stopping capture…';
   try {
@@ -80,9 +86,11 @@ stopButton.addEventListener('click', async () => {
       render();
     } else {
       status.textContent = response?.error ?? 'Stop failed';
+      status.dataset.error = 'true';
     }
   } catch (error) {
     status.textContent = error instanceof Error ? error.message : String(error);
+    status.dataset.error = 'true';
     capturing = false;
     bridgeConnected = false;
     render();
