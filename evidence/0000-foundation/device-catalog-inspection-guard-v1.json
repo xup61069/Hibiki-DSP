@@ -1,0 +1,25 @@
+{
+  "schema_version": 2,
+  "issue": 592,
+  "title": "live-device-catalog path inspection failure guard",
+  "base_commit": "d43ddaa6f7f48c00adb530f37139a4160eccd0c3",
+  "summary": {
+    "tools": [
+      "tools/live-device-catalog-check.ps1"
+    ],
+    "behavior": "Get-LiveDeviceCatalogExistingAttributes now resolves entries with a single Get-Item -Force -ErrorAction Stop call: ObjectNotFound maps to missing, every other inspection error throws 'Live device catalog path inspection failed' so inaccessible build-root, parent, or probe entries can no longer be misclassified as absent leaves. SyntheticInspectionErrors enables offline self-test injection. PR #589 closed Issue #588 with an empty diff, leaving the tool unguarded; this slice delivers that missing fix.",
+    "precedent": "Issue #543 / PR #546 canonical inspection-failure pattern; #584/#589 propagation wave",
+    "selftest_cases_added": {
+      "leaf-inspection-error rejection": 1,
+      "parent-inspection-error rejection": 1
+    }
+  },
+  "validation": [
+    { "command": "pwsh -NoProfile -File tools/live-device-catalog-check.ps1 -SelfTest", "result": "pass", "notes": "5 wrapper cases plus 13 offline path cases (11 prior + 2 new); no cmake/no probe/no file write" },
+    { "command": "pwsh -NoProfile -File tools/docs-check.ps1", "result": "pass", "notes": "run on delivered branch before push" },
+    { "command": "pwsh -NoProfile -File tools/source-policy.ps1", "result": "pass", "notes": "no blocked binaries or secrets" },
+    { "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1", "result": "pass", "notes": "workflow set unchanged" }
+  ],
+  "scope": "tools-only gate hardening; no product/API/schema/DSP/driver change",
+  "date": "2026-08-23"
+}

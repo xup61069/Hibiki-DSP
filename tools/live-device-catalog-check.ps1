@@ -47,15 +47,24 @@ function Test-LiveDeviceCatalogPathUnderRoot {
 function Get-LiveDeviceCatalogExistingAttributes {
   param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
   if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
     return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
   }
-  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
-  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+  if ($null -ne $SyntheticInspectionErrors -and $SyntheticInspectionErrors.ContainsKey($fullPath)) {
+    throw "Live device catalog path inspection failed: $fullPath ($($SyntheticInspectionErrors[$fullPath]))"
+  }
+  try {
+    return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop).Attributes
+  }
+  catch {
+    if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return $null }
+    throw "Live device catalog path inspection failed: $fullPath ($($_.Exception.Message))"
+  }
 }
 
 function Assert-LiveDeviceCatalogPath {
@@ -64,7 +73,8 @@ function Assert-LiveDeviceCatalogPath {
     [Parameter(Mandatory = $true)][string]$Root,
     [Parameter(Mandatory = $true)][ValidateSet('File', 'Directory')][string]$Kind,
     [switch]$AllowMissingLeaf,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
@@ -73,14 +83,16 @@ function Assert-LiveDeviceCatalogPath {
     throw "Live device catalog path must remain under the expected root: $fullPath"
   }
 
-  $leafAttributes = Get-LiveDeviceCatalogExistingAttributes -Path $fullPath -SyntheticAttributes $SyntheticAttributes
+  $leafAttributes = Get-LiveDeviceCatalogExistingAttributes -Path $fullPath `
+    -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
   if ($null -eq $leafAttributes -and -not $AllowMissingLeaf) {
     throw "Live device catalog $Kind does not exist: $fullPath"
   }
 
   $cursor = $fullPath
   while ($true) {
-    $attributes = Get-LiveDeviceCatalogExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    $attributes = Get-LiveDeviceCatalogExistingAttributes -Path $cursor `
+      -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
     if ($null -ne $attributes) {
       if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "Live device catalog path or parent is a reparse point: $cursor"
@@ -195,6 +207,24 @@ function Invoke-LiveDeviceCatalogPathSelfTest {
     }
   } catch { $missingProbeCaught = $_.Exception.Message -match 'does not exist' }
   if (-not $missingProbeCaught) { throw 'Live device catalog self-test expected a missing-probe rejection.' }
+  $cases++
+
+  $leafInspectionErrorCaught = $false
+  try {
+    Assert-LiveDeviceCatalogPath -Path $fixture.ProbePath -Root $fixture.BuildRoot -Kind File -AllowMissingLeaf `
+      -SyntheticAttributes @{ $buildRoot = $directory } `
+      -SyntheticInspectionErrors @{ $probePath = 'synthetic access denied' }
+  } catch { $leafInspectionErrorCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $leafInspectionErrorCaught) { throw 'Live device catalog self-test expected a leaf inspection-error rejection.' }
+  $cases++
+
+  $parentInspectionErrorCaught = $false
+  try {
+    Assert-LiveDeviceCatalogPath -Path $fixture.ProbePath -Root $fixture.BuildRoot -Kind File -AllowMissingLeaf `
+      -SyntheticAttributes @{} `
+      -SyntheticInspectionErrors @{ $buildRoot = 'synthetic sharing violation' }
+  } catch { $parentInspectionErrorCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $parentInspectionErrorCaught) { throw 'Live device catalog self-test expected a parent inspection-error rejection.' }
   $cases++
 
   return $cases
