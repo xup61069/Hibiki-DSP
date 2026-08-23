@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "evidence_type": "documentation-only",
+  "title": "SPEC-0002 duplicated EqualLoudnessPolicyV1 line cleanup",
+  "date": "2026-08-24",
+  "issue": 952,
+  "pr": null,
+  "source_commit": null,
+  "scope": [
+    "docs/specs/SPEC-0002-volume-and-iso.md"
+  ],
+  "spec_refs": ["SPEC-0002"],
+  "adr_refs": [],
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 952",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "limitations": [
+    "Documentation-only cleanup; no schema, runtime, DSP, safety, or distribution identity change."
+  ],
+  "notes": "Removed one merge-artifact duplicate line with a stray leading plus in SPEC-0002; the original sentence remains unchanged once.",
+  "started_at": "2026-08-24T06:55:00+08:00",
+  "finished_at": "2026-08-24T07:05:00+08:00"
+}

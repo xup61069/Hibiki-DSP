@@ -143,7 +143,6 @@ Group Master → limiter；失敗時保留既有 active attachment。SceneApply 
 production concurrent RT/control swap 仍需 epoch/RCU 驗證。
 
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
-+`EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
 schema 層的 `anchor_id` 在非 null 時必須是非空字串（`minLength: 1`），與專案
 ID 不可為空的慣例一致；
 `EqualLoudnessStatusV1.diagnostic` 是 bounded 文字欄位（0..256 字元），空字串合法，
