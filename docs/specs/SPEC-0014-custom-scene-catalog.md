@@ -81,8 +81,9 @@ payload 時解碼即拒收，同樣不觸碰既有 catalog。
 `schemas/scene-sync-queue-v1.schema.json` 描述：頂層必須是 `schema_version`（固定 1）、
 `dropped_operations` 與最多 64 筆 `operations`；每筆操作只允許 `is_upsert`、`scene_id`、
 `name` 與 `output_group` 四個欄位。schema 以條件式規則直接強制：Upsert 操作必須有
-非空 `name`（最長 120）與非空 `output_group`（最長 64），Remove 操作兩者必須為空字串，
-且欄位限制必須與控制模型執行期驗證一致。
+非空 `name`（最長 120）與非空 `output_group`（最長 64）；「非空」在 schema 與執行期
+皆代表至少含一個非空白字元。Remove 操作兩者必須為空字串，且欄位限制必須與控制模型
+執行期驗證一致。
 全部成功才回報「引擎已同步」，
 同時保留先前捨棄數量並清空持久化佇列；中途失敗則保留剩餘操作與其持久化狀態，誠實顯示降級
 狀態，待下一次連線再補送。此重播只使用既有 `SceneCatalogCommandV1` wire format 與 Ack 語意，
