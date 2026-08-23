@@ -459,6 +459,13 @@ Check(viewModel.ApplyRouteHealth(routeSnapshot, out _) &&
       viewModel.Expert.RouteHealth.Count == 2 &&
       viewModel.Expert.RouteHealth[0].StateLabel == "已可用",
     "Validated route-health snapshots must replace the conservative defaults.");
+Check(routeSnapshot[0].AccessibleSummary == "Process Loopback：已可用。目前引擎已回報可用。" &&
+      routeSnapshot[1].AccessibleSummary.StartsWith("Chrome／Edge 單分頁：等待引擎回報。") &&
+      routeSnapshot[1].AccessibleSummary.EndsWith("需要擴充功能。"),
+    "Route health cards must compose name, state and boundary detail for assistive technology.");
+Check(RouteHealthCatalogV1.Defaults.Single(card => card.Id == "direct-path").
+      AccessibleSummary.Contains("Vendor ASIO／WASAPI Exclusive：繞過 Hibiki。"),
+    "Default bypass route must expose an honest accessible summary.");
 var duplicateRoutes = new[] { routeSnapshot[0], routeSnapshot[0] };
 Check(!viewModel.ApplyRouteHealth(duplicateRoutes, out var duplicateRouteError) &&
       duplicateRouteError.Contains("重複"),
