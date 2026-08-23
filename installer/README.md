@@ -13,3 +13,32 @@ requires explicit `-Apply` plus administrator rights before staging an INF with
 `pnputil.exe`. The manifest also records the Microsoft driver signature and
 Hibiki installer signer/RFC3161 timestamp; no package, certificate or Gumroad
 credential is stored here.
+
+## User-space payload staging (source-level capability)
+
+After full manifest verification, `-Apply` copies each manifest-declared
+`unsigned_files` entry into an explicit destination directory (default:
+`%ProgramFiles%\Hibiki DSP`). The destination path is validated fail-closed
+before any mutation: it must be absolute, canonical, not blank, not a drive root,
+must not contain `.` or `..` segments, and must not be inside the Windows
+directory.
+
+Each copy is staged to a temporary file inside the target directory, verified
+by SHA-256 against the manifest hash, then atomically moved into place.
+Existing files that would be overwritten are first moved into a per-run backup
+directory inside the destination. If any step fails, completed copies are
+removed in reverse order, backed-up originals are restored, newly created
+empty directories are cleaned up, and the error is re-thrown. On success the
+backup directory is removed. Files under `%LocalAppData%/Hibiki DSP`
+(including `session-route-rules-v1.json` and `scene-cards-v1.json`) are never
+touched by this staging path.
+
+A dry run reports the resolved destination, planned payload files and preserved
+user-data boundaries without creating directories or files.
+
+## Evidence scope
+
+This document describes source-level design and offline verification only.
+It does not claim install, load, runtime audio, driver, HLK, Microsoft signing,
+or Authenticode execution evidence. Running `-Apply` changes machine state and
+requires administrator privileges on a locked test machine.

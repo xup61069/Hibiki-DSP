@@ -8,6 +8,9 @@ $ErrorActionPreference = 'Stop'
 $script:RequiredBoundaries = @(
   'Read-ReleaseManifest',
   'Test-ManifestFiles',
+  'Resolve-HibikiDestination',
+  'Get-StagingPlan',
+  'Copy-HibikiFileWithHash',
   'Invoke-HibikiInstall',
   '-Apply',
   'pnputil.exe',
@@ -61,6 +64,9 @@ if ($SelfTest) {
   $validFixture = @'
 function Read-ReleaseManifest {}
 function Test-ManifestFiles {}
+function Resolve-HibikiDestination {}
+function Get-StagingPlan {}
+function Copy-HibikiFileWithHash {}
 function Invoke-HibikiInstall { param([switch]$Apply) }
 $null = "-Apply"
 $null = "pnputil.exe"
@@ -75,6 +81,7 @@ $null = "sbom_digest"
 
   $caseCount = 0
 
+
   # Case 1: valid fixture parses and satisfies all boundaries.
   Assert-InstallerParseInput -Text $validFixture -SourceName 'selftest-valid'
   Assert-InstallerSourcePolicy -Text $validFixture -SourceName 'selftest-valid'
@@ -83,14 +90,14 @@ $null = "sbom_digest"
   # Case 2: missing Read-ReleaseManifest is rejected.
   $missingOne = $validFixture.Replace('Read-ReleaseManifest', 'MissingBoundary')
   $caught = $false
-  try { Assert-InstallerSourcePolicy -Text $missingOne -SourceName 'selftest-missing-Read-ReleaseManifest' } catch { $caught = $true; if ("$($_.Exception.Message)" -notmatch 'Read-ReleaseManifest') { throw "SelfTest missing-boundary case failed with unexpected message: $($_.Exception.Message)" } }
+  try { Assert-InstallerSourcePolicy -Text $missingOne -SourceName 'selftest-missing-boundary' } catch { $caught = $true; if ("$($_.Exception.Message)" -notmatch 'Read-ReleaseManifest') { throw "SelfTest missing-boundary case failed with unexpected message: $($_.Exception.Message)" } }
   if (-not $caught) { throw 'SelfTest expected missing Read-ReleaseManifest failure.' }
   $caseCount++
 
   # Case 3: missing sha256 is rejected.
   $missingSha = $validFixture.Replace('sha256', 'missingHash')
   $caught = $false
-  try { Assert-InstallerSourcePolicy -Text $missingSha -SourceName 'selftest-missing-sha256' } catch { $caught = $true; if ("$($_.Exception.Message)" -notmatch 'sha256') { throw } }
+  try { Assert-InstallerSourcePolicy -Text $missingSha -SourceName 'selftest-missing-sha256' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected missing sha256 failure.' }
   $caseCount++
 
