@@ -146,6 +146,24 @@ function Get-SchemaStructureErrors {
   return ,@($errors)
 }
 
+function Test-JsonParseAll {
+  # Validates that every entry in the provided list of (Path, Content) pairs is
+  # parseable JSON. Returns an array of error strings; empty means all valid.
+  # Keep this pure so -SelfTest can cover it without touching real files.
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()]$FileEntries
+  )
+  $errors = @()
+  foreach ($entry in $FileEntries) {
+    try {
+      $null = $entry.Content | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+      $errors += ($entry.Path + ': invalid JSON (' + $_.Exception.Message + ')')
+    }
+  }
+  return ,@($errors)
+}
+
 function ConvertFrom-AdrFrontmatter([string]$RawText) {
   # Parse the comment-style frontmatter block used by all ADR files.
   # Returns a hashtable of key -> string value, or throws on structural errors.
@@ -543,7 +561,36 @@ if ($SelfTest) {
   }
   $caseCount++
 
-  if ($caseCount -lt 12) {
+
+  # JSON parse validation: empty input returns no errors.
+  $jsonErrors = Test-JsonParseAll -FileEntries @()
+  if ($jsonErrors.Count -ne 0) {
+    throw 'docs-check self-test failed: empty JSON input should produce no errors.'
+  }
+  $caseCount++
+
+  # JSON parse validation: valid JSON passes.
+  $validJsonEntry = [pscustomobject]@{
+    Path    = 'evidence/selftest-valid-v1.json'
+    Content = '{"schema_version": 1, "issue": 0}'
+  }
+  if ((Test-JsonParseAll -FileEntries @($validJsonEntry)).Count -ne 0) {
+    throw 'docs-check self-test failed: valid JSON was reported as invalid.'
+  }
+  $caseCount++
+
+  # JSON parse validation: malformed JSON is reported with path context.
+  $badJsonEntry = [pscustomobject]@{
+    Path    = 'evidence/selftest-bad-v1.json'
+    Content = '{broken'
+  }
+  $badJsonErrors = Test-JsonParseAll -FileEntries @($badJsonEntry)
+  if ($badJsonErrors.Count -ne 1 -or $badJsonErrors[0] -notmatch [regex]::Escape('invalid JSON')) {
+    throw 'docs-check self-test failed: malformed JSON was not reported.'
+  }
+  $caseCount++
+
+if ($caseCount -lt 12) {
     throw "docs-check self-test failed: expected at least 12 passing cases, saw $caseCount."
   }
   Write-Output "docs-check self-test passed ($caseCount cases; structural parser, multiline normalization, branch mode detection, BASELINE edit detection, live measurement, ADR frontmatter, Spec frontmatter, markdown relative links)."
@@ -604,7 +651,8 @@ $required = @(
   'docs/specs/SPEC-0012-vst3-latency-graph-commit.md',
   'docs/specs/SPEC-0013-session-route-rules.md', 'docs/specs/SPEC-0014-custom-scene-catalog.md',
   'docs/specs/SPEC-0015-physical-device-catalog.md', 'docs/specs/SPEC-0016-process-loopback-capture.md',
-  'docs/VST3_STATE_COMPATIBILITY_REVIEW.md', 'evidence/0000-foundation/initial.json'
+  'docs/VST3_STATE_COMPATIBILITY_REVIEW.md', 'evidence/0000-foundation/initial.json',
+  'evidence/0000-foundation/json-parse-gate-v1.json'
 )
 
 $missing = @($required | Where-Object { -not (Test-Path (Join-Path $repo $_)) })
@@ -710,6 +758,18 @@ $baselineText = Get-Content -LiteralPath (Join-Path $repo 'docs/state/BASELINE.m
 $trackedFiles = @(git -C $repo ls-files)
 if ($LASTEXITCODE -ne 0) { throw 'docs-check could not list tracked files.' }
 $jsonFiles = @(git -C $repo ls-files -- '*.json')
+# Every tracked JSON file must be syntactically valid.
+$allJsonEntries = @()
+foreach ($jsonPath in ($jsonFiles | Sort-Object)) {
+  $allJsonEntries += [pscustomobject]@{
+    Path    = $jsonPath
+    Content = Get-Content -LiteralPath (Join-Path $repo $jsonPath) -Raw
+  }
+}
+$jsonParseErrors = Test-JsonParseAll -FileEntries $allJsonEntries
+if ($jsonParseErrors.Count -gt 0) {
+  throw ('Tracked JSON syntax validation failed: ' + ($jsonParseErrors -join '; '))
+}
 
 $claims = Get-CounterClaims $baselineText
 
