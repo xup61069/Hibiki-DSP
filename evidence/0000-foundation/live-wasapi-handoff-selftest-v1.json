@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 87,
   "scope_digest": "live-wasapi-handoff-selftest-v1",
-  "source_commit": "9fab093",
+  "source_commit": "34dab1a2477728a69655903f0bb0cf4093ca252b",
   "environment_fingerprint": "windows-11-26200-x64-preview",
   "commands": [
     "pwsh -NoProfile -File tools/live-wasapi-handoff-check.ps1 -SelfTest",

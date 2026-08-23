@@ -2,7 +2,7 @@
   "$schema": "evidence/0000-foundation/schema/evidence-entry-v1.json",
   "id": "winui-desktopcompat-gates-v1",
   "title": "DesktopCompat accessible-name and IR WAV load entry-point regression gates",
-  "source_commit": "5aa8acce655449993a47f9658ce344bdbf6b2195",
+  "source_commit": "1fc22e620dd90116e7b50285afb920e56ed41e80",
   "date": "2026-08-23",
   "scope": [
     "tools/winui-shell-check.ps1",

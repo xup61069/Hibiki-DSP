@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 591,
   "scope_digest": "readme-agent-gates-v1",
-  "source_commit": "4c25fa7b42f29d0521aac51a7b7c19c1d2bfda3d",
+  "source_commit": "12a3c4dab4c10253d3069431d64b7e2a947e33b2",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-26100-pwsh-7.6; target-machine-pending",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 591",
