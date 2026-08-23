@@ -694,6 +694,16 @@ ProgressRing、一鍵增強動作與狀態 chip，視窗寬度 840px 以下自�
 狀態文字改用膠囊 chip，連線按鈕從標題列移入 hero 面板，32 個互動控制項的
 automation names 全數保留（Issue #495 / PR #514）。皆為 tooling/source evidence。
 
+第十四波 tooling 與 UI 增量已合併：build-preview.ps1 在每次 Start-Process 前對
+preview smoke 執行檔 fail-closed 驗證，拒絕 .local 外、缺失、目錄形狀與 reparse／
+非目錄祖先 target，self-test 從 11 案例擴充至 17 個離線案例，且不建置、不啟動程序、
+不寫 repo 或存取機器狀態（Issue #519 / PR #522）；WinUI shell 統一頂層卡片外觀
+（CornerRadius 12、一致 24px padding），場景／自訂預設／音量保護標題加入 accent
+icons，requested／effective 音量讀值改用 chip 且 SafetyStatusText 維持 polite-live，
+IR phase 控制項收進帶說明的 tinted 子面板（mode 文字與 added-delay 以 chip 呈現），
+32 個互動控制項與必要 bindings 全數保留（Issue #517 / PR #524）。皆為
+tooling/source evidence。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；

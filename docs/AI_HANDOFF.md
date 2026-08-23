@@ -263,6 +263,17 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   status chip), an 840px adaptive trigger for narrow windows, capsule status chips, and the
   connection button moved from the title bar into the hero panel while preserving all 32
   automation property names (Issue #495 / PR #514).
+- Build-preview launch hardening merged: build-preview.ps1 fails closed before every
+  Start-Process on preview smoke executables, rejecting outside-.local, missing, directory
+  and reparse/non-directory ancestor targets; -SelfTest grew from 11 to 17 offline cases
+  without builds, process launches, repository writes or machine-state access
+  (Issue #519 / PR #522).
+- WinUI card chrome unification merged: top-level cards now share CornerRadius 12 with
+  consistent 24px padding, scene/custom-preset/volume-protection headers gained accent
+  icons, requested/effective volume readouts render as chips with SafetyStatusText kept
+  polite-live, and IR phase controls are grouped into a tinted sub-panel with caption,
+  mode text and added-delay chips while preserving all 32 interactive controls and required
+  bindings (Issue #517 / PR #524).
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe
