@@ -392,10 +392,13 @@ int main() {
     CHECK(gate_transition.process_interleaved(reopen_block.data(),
                                               reopen_block.size()));
     CHECK(reopen_block.back() > 1.0e-4F);
-    std::array<float, 480> fast_tail{};
+    std::array<float, 960> fast_tail{};
     fast_tail.fill(0.001F);
     CHECK(gate_transition.process_interleaved(fast_tail.data(), fast_tail.size()));
-    CHECK(fast_tail.back() < quiet_tail.back() * 0.05F);
+    // Closing with attack_ms collapses to well under 5 percent of the
+    // release_ms tail level within the same window; compare magnitudes
+    // because the high-pass makes both tail samples negative.
+    CHECK(std::abs(fast_tail.back()) < std::abs(quiet_tail.back()) * 0.05F);
 
     OutputGroupVolumeStateV1 state;
     state.requested_db = 3.0;
