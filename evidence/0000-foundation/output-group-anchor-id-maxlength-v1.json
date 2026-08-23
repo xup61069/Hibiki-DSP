@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "issue": 972,
+  "scope_digest": "output-group-anchor-id-maxlength-v1",
+  "source_commit": "4ccc8cb8",
+  "environment_fingerprint": "windows-amd64-pwsh-schema-string-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 972",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {"command": "handoff-check", "status": "pass"},
+    {"command": "docs-check", "status": "pass"},
+    {"command": "source-policy", "status": "pass"},
+    {"command": "git diff --check", "status": "pass"}
+  ],
+  "limitations": [
+    "scene-profile-v1 output_group and equal-loudness-policy-v1 anchor_id now bounded to 64 chars, matching the C++ wire format std::array<char, 64>.",
+    "Schema-only change; no runtime or DSP behavior modified."
+  ],
+  "logs": {},
+  "tool_versions": {"powershell": "pwsh local"},
+  "started_at": "2026-08-24T07:35:00+08:00",
+  "finished_at": "2026-08-24T07:40:00+08:00"
+}

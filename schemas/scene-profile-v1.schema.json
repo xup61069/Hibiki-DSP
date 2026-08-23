@@ -21,7 +21,7 @@
       "type": "string", "minLength": 8, "maxLength": 64,
       "description": "Stable caller-owned calibration label for a previously prepared IR. Opaque comparison token only; never IR samples, file paths, or ISO 226 coefficients."
     },
-    "output_group": {"type": "string", "minLength": 1},
+    "output_group": {"type": "string", "minLength": 1, "maxLength": 64},
     "latency_mode": {"enum": ["game", "balanced", "movie-linear-phase", "strict-direct"]},
     "ir_phase": {
       "$ref": "ir-phase-policy-v1.schema.json"
