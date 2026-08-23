@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://hibiki.invalid/schema/session-route-rules-v1.schema.json",
+  "$id": "https://hibiki.example/schemas/session-route-rules-v1.schema.json",
   "title": "Hibiki Session Route Rules v1",
   "type": "object",
   "additionalProperties": false,
