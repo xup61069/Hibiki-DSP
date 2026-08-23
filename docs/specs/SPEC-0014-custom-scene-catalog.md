@@ -70,8 +70,13 @@ Remove 向引擎推送同步刪除指令。引擎在 `SceneCatalogV1::remove` �
 該 slot 並回傳 Applied；找不到回傳 Invalid 且不影響其他 entry 或 active graph。收到非法
 payload 時解碼即拒收，同樣不觸碰既有 catalog。
 
-未連線時，移除只作用於 UI mirror 與本機 `custom-scene-cards-v1.schema.json` 檔案；
-引擎端 `SceneDefinition` catalog 維持原狀（下次連線前不會同步）。
+未連線時，新增與移除仍立即作用於 UI mirror 與本機
+`custom-scene-cards-v1.schema.json` 檔案；控制模型同時把該操作記入有界重播佇列。
+佇列上限為 64 筆，超過時捨棄最舊操作並顯示容量壓力訊息。控制管線重新連線成功後，
+ViewModel 依原順序把佇列中的 Upsert／Remove 補送到引擎：全部成功才回報「引擎已同步」；
+中途失敗則保留剩餘操作並誠實顯示降級狀態，待下一次連線再補送。此重播只使用既有
+`SceneCatalogCommandV1` wire format 與 Ack 語意，不改變引擎端驗證或 catalog 容量契約；
+已連線時的同步同樣以收到引擎 Ack 為準，不得在送出前宣稱完成。
 
 ViewModel 先更新記憶體 mirror，再以既有暫存檔替換流程保存；未知或內建 ID fail-closed，
 保存失敗時回復原卡片與選取狀態並顯示可讀錯誤。選取自訂卡片仍只能送出既有
