@@ -292,7 +292,7 @@ $msvcInc = Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent
 $env:INCLUDE = "$incRoot\km;$incRoot\km\crt;$incRoot\shared;$msvcInc;$repo\driver\include;$repo\sdk\include"
 $defines = @(
   '/D_AMD64_', '/DAMD64', '/D_WIN64', '/DWINNT=1',
-  '/D_WIN32_WINNT=0x0A00', '/DWINVER=0x0A00', '/DNTDDI_VERSION=0x0A000000',
+  '/D_WIN32_WINNT=0x0A00', '/DWINVER=0x0A00', '/DNTDDI_VERSION=0x0A000008',
   '/DPOOL_NX_OPTIN=1'
 )
 # The WDK headers also define _NTDDK_; the duplicate-definition notice is
