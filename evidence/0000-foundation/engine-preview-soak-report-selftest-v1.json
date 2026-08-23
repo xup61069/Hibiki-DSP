@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "issue": 799,
+  "scope_digest": "engine-preview-soak-report-selftest-v1",
+  "source_commit": "cfa5a9a70206a3f41632f1e32e5993fc2b81f5c6",
+  "environment_fingerprint": "windows-local-pwsh7-git-origin-main-cfa5a9a7",
+  "commands": [
+    "pwsh -NoProfile -File tools/engine-preview-soak.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 799",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/engine-preview-soak.ps1 -SelfTest",
+      "status": "pass",
+      "cases": 17,
+      "coverage": [
+        "argument bounds (iterations and interval)",
+        "IPC frame shape, correlation, short-frame and oversized construction rejection",
+        "aggregate statistics including empty result handling",
+        "cleanup decision safety",
+        "report aggregate acceptance with pass/fail accounting",
+        "report schema-version rejection",
+        "report harness identity rejection",
+        "completed-over-requested rejection",
+        "pass/fail accounting mismatch rejection"
+      ],
+      "repository_reads": false,
+      "process_started": false,
+      "files_written": false
+    }
+  ],
+  "limitations": [
+    "Offline self-test only; no engine process, build, IPC transport, or report file write evidence.",
+    "No physical audio, driver, WaveRT, HLK, Microsoft signing, or endpoint delivery claim."
+  ],
+  "tool_versions": {
+    "powershell": "pwsh 7.6"
+  },
+  "started_at": "2026-08-24T04:55:00+08:00",
+  "finished_at": "2026-08-24T04:58:00+08:00"
+}

@@ -259,6 +259,32 @@ function Get-EnginePreviewSoakCleanupDecision {
   }
 }
 
+function Test-EnginePreviewSoakReportAggregate {
+  param(
+    [Parameter(Mandatory)][int]$SchemaVersion,
+    [Parameter(Mandatory)][string]$Harness,
+    [Parameter(Mandatory)][int]$RequestedIterations,
+    [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Results
+  )
+
+  if ($SchemaVersion -ne 1) {
+    throw "Engine Preview soak report schema version is unsupported: $SchemaVersion"
+  }
+  if ($Harness -cne 'engine-preview-soak') {
+    throw "Engine Preview soak report harness mismatch: $Harness"
+  }
+  Assert-EnginePreviewSoakArguments -Iterations $RequestedIterations -IntervalMs 0
+  $materialized = @($Results)
+  $passed = @($materialized | Where-Object { $_.result -eq 'pass' }).Count
+  $failed = @($materialized | Where-Object { $_.result -eq 'fail' }).Count
+  if ($materialized.Count -gt $RequestedIterations) {
+    throw "Engine Preview soak report completed more iterations than requested: $($materialized.Count) > $RequestedIterations"
+  }
+  if ($passed + $failed -ne $materialized.Count) {
+    throw "Engine Preview soak report iteration results are not all pass/fail entries: passed=$passed failed=$failed total=$($materialized.Count)"
+  }
+}
+
 function Invoke-EnginePreviewSoakSelfTest {
   $cases = 0
   Assert-EnginePreviewSoakArguments -Iterations 1 -IntervalMs 0; $cases++
@@ -321,6 +347,29 @@ function Invoke-EnginePreviewSoakSelfTest {
   if ($exitedDecision.DisposeControlClient -or $exitedDecision.StopEngineProcess) {
     throw 'soak self-test found a redundant cleanup decision for an exited engine.'
   }
+  $cases++
+
+  Test-EnginePreviewSoakReportAggregate -SchemaVersion 1 -Harness 'engine-preview-soak' -RequestedIterations 2 -Results @([pscustomobject]@{ result = 'pass'; duration_ms = 10.0 }, [pscustomobject]@{ result = 'fail'; duration_ms = 20.0 })
+  $cases++
+
+  $schemaCaught = $false
+  try { Test-EnginePreviewSoakReportAggregate -SchemaVersion 2 -Harness 'engine-preview-soak' -RequestedIterations 1 -Results @() } catch { $schemaCaught = $_.Exception.Message -match 'schema' }
+  if (-not $schemaCaught) { throw 'soak self-test expected a report schema-version rejection.' }
+  $cases++
+
+  $harnessCaught = $false
+  try { Test-EnginePreviewSoakReportAggregate -SchemaVersion 1 -Harness 'other-harness' -RequestedIterations 1 -Results @() } catch { $harnessCaught = $_.Exception.Message -match 'harness' }
+  if (-not $harnessCaught) { throw 'soak self-test expected a report harness rejection.' }
+  $cases++
+
+  $overflowCaught = $false
+  try { Test-EnginePreviewSoakReportAggregate -SchemaVersion 1 -Harness 'engine-preview-soak' -RequestedIterations 2 -Results @([pscustomobject]@{ result = 'pass'; duration_ms = 10.0 }, [pscustomobject]@{ result = 'pass'; duration_ms = 20.0 }, [pscustomobject]@{ result = 'fail'; duration_ms = 30.0 }) } catch { $overflowCaught = $_.Exception.Message -match 'more iterations than requested' }
+  if (-not $overflowCaught) { throw 'soak self-test expected a completed-over-requested rejection.' }
+  $cases++
+
+  $sumMismatchCaught = $false
+  try { Test-EnginePreviewSoakReportAggregate -SchemaVersion 1 -Harness 'engine-preview-soak' -RequestedIterations 2 -Results @([pscustomobject]@{ result = 'pass'; duration_ms = 10.0 }, [pscustomobject]@{ result = 'unknown'; duration_ms = 20.0 }) } catch { $sumMismatchCaught = $_.Exception.Message -match 'pass/fail' }
+  if (-not $sumMismatchCaught) { throw 'soak self-test expected a pass/fail accounting rejection.' }
   $cases++
 
   return $cases
@@ -461,6 +510,7 @@ $report = [ordered]@{
   )
 }
 $reportJson = $report | ConvertTo-Json -Depth 5
+Test-EnginePreviewSoakReportAggregate -SchemaVersion $report.schema_version -Harness $report.harness -RequestedIterations $aggregate.requested_iterations -Results $results
 [System.IO.File]::WriteAllText($soakPlan.ReportPath, $reportJson, [System.Text.UTF8Encoding]::new($false))
 "Engine Preview soak finished: passed=$($aggregate.passed_iterations) failed=$($aggregate.failed_iterations) average=$($aggregate.average_duration_ms) ms; anonymous report written under .local." | Write-Output
 if ($aggregate.failed_iterations -gt 0) { exit 1 }
