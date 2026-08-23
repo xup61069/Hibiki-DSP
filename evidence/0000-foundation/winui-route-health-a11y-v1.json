@@ -5,7 +5,8 @@
   "base_commit": "74ee2f320b8761dc491b01557dc114625797bb4f",
   "product_outcome": [
     "Formal shell route health cards expose RouteHealthCardV1.AccessibleSummary as accessible name and Detail as help text while preserving the existing visual card layout.",
-    "Expert status text uses a polite live region so route/control state changes are announced without interrupting screen-reader users."
+    "Expert status text uses a polite live region so route/control state changes are announced without interrupting screen-reader users.",
+    "The title-bar connection status pill is also polite, so connection transitions are announced consistently with other shell status text."
   ],
   "verification": {
     "control_model_check": "PASS",

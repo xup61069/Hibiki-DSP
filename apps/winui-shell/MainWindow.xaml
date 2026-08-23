@@ -44,6 +44,7 @@
                         BorderThickness="1">
                     <TextBlock Text="{Binding ConnectionStatusText}"
                                Style="{ThemeResource CaptionTextBlockStyle}"
+                               AutomationProperties.LiveSetting="Polite"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </Border>
             </StackPanel>
