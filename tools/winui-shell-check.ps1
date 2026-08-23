@@ -58,7 +58,33 @@ function Assert-CompatibilityPreviewControlNames([string]$source, [string]$sourc
      }
    }
    return $controls.Count
- }
+}
+
+function Get-DesktopCompatControlOpenings([string]$source) {
+  $pattern = '(?m)^\s*private\s+readonly\s+(?<type>Button|ComboBox|TrackBar|TextBox)\s+(?<variable>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\s*\(\)'
+  foreach ($match in [regex]::Matches($source, $pattern)) {
+    $line = 1 + @($source.Substring(0, $match.Index).Split([char]10)).Count - 1
+    [pscustomobject]@{
+      Variable = $match.Groups['variable'].Value
+      Type = $match.Groups['type'].Value
+      Line = $line
+    }
+  }
+}
+
+function Assert-DesktopCompatControlNames([string]$source, [string]$sourceName) {
+  $controls = @(Get-DesktopCompatControlOpenings $source)
+  foreach ($control in $controls) {
+    # Match AccessibleName in object-initializer syntax: AccessibleName = "..."
+    $escapedVar = [regex]::Escape($control.Variable)
+    $initPattern = '(?ms)' + $escapedVar + '\s*=\s*new[^;]*?AccessibleName\s*=\s*"([^"]*)"'
+    $match = [regex]::Match($source, $initPattern)
+    if (-not $match.Success -or [string]::IsNullOrWhiteSpace($match.Groups[1].Value)) {
+      throw "DesktopCompat interactive control must declare a non-empty AccessibleName: $($control.Type) $($control.Variable) at $($sourceName):$($control.Line)"
+    }
+  }
+  return $controls.Count
+}
 
 if ($SelfTest) {
   $valid = @'
@@ -124,13 +150,39 @@ if ($SelfTest) {
   }
   if (-not $compatEmptyCaught) { throw 'Compatibility Preview accessibility self-test expected an empty-name failure.' }
 
-  Write-Output 'WinUI interactive-control accessibility self-test passed (7 cases).'
+  $desktopValid = 'private readonly Button _ok = new() { Text = "OK", AccessibleName = "Confirm action" };'
+  if ((Assert-DesktopCompatControlNames $desktopValid 'selftest-desktop-valid.cs') -ne 1) {
+    throw 'DesktopCompat accessibility self-test expected one interactive control.'
+  }
+
+  $desktopMissing = 'private readonly Button _bad = new() { Text = "Click" };'
+  $desktopMissingCaught = $false
+  try {
+    [void](Assert-DesktopCompatControlNames $desktopMissing 'selftest-desktop-missing.cs')
+  } catch {
+    $desktopMissingCaught = $true
+    if ($_.Exception.Message -notmatch 'Button _bad at selftest-desktop-missing\.cs:1') { throw }
+  }
+  if (-not $desktopMissingCaught) { throw 'DesktopCompat accessibility self-test expected a missing-name failure.' }
+
+  $desktopEmpty = 'private readonly ComboBox _combo = new() { AccessibleName = "" };'
+  $desktopEmptyCaught = $false
+  try {
+    [void](Assert-DesktopCompatControlNames $desktopEmpty 'selftest-desktop-empty.cs')
+  } catch {
+    $desktopEmptyCaught = $true
+    if ($_.Exception.Message -notmatch 'ComboBox _combo at selftest-desktop-empty\.cs:1') { throw }
+  }
+  if (-not $desktopEmptyCaught) { throw 'DesktopCompat accessibility self-test expected an empty-name failure.' }
+
+  Write-Output 'WinUI interactive-control accessibility self-test passed (10 cases).'
   exit 0
 }
 
 $repo = Split-Path -Parent $PSScriptRoot
 $shell = Join-Path $repo 'apps/winui-shell'
 $compatPreviewSource = Get-Content (Join-Path $shell 'MainWindow.CompatibilityPreview.cs') -Raw
+$desktopCompatSource = Get-Content (Join-Path $repo 'apps/desktop-compat-preview/Program.cs') -Raw
 $required = @('Hibiki.WinUI.csproj', 'App.xaml', 'App.xaml.cs', 'MainWindow.xaml', 'MainWindow.xaml.cs')
 $missing = @($required | Where-Object { -not (Test-Path (Join-Path $shell $_)) })
 if ($missing.Count -gt 0) { throw "WinUI shell files missing: $($missing -join ', ')" }
@@ -153,6 +205,7 @@ $xaml = Get-Content (Join-Path $shell 'MainWindow.xaml') -Raw
 $codeBehind = Get-Content (Join-Path $shell 'MainWindow.xaml.cs') -Raw
 Write-Output "WinUI interactive-control accessibility scan: $(Assert-InteractiveControlNames $xaml 'apps/winui-shell/MainWindow.xaml') controls."
 Write-Output "Compatibility Preview source accessibility scan: $(Assert-CompatibilityPreviewControlNames $compatPreviewSource 'apps/winui-shell/MainWindow.CompatibilityPreview.cs') controls."
+Write-Output "DesktopCompat source accessibility scan: $(Assert-DesktopCompatControlNames $desktopCompatSource 'apps/desktop-compat-preview/Program.cs') controls."
 foreach ($requiredText in @('x:Name="RootGrid"', 'ItemsSource="{Binding Scenes}"',
     'ItemsSource="{Binding OutputGroups}"', 'SelectedOutputGroup', 'IsExpert',
     'ItemsSource="{Binding PhysicalDevices}"', 'SelectedPhysicalDeviceId',
@@ -167,7 +220,8 @@ foreach ($requiredText in @('x:Name="RootGrid"', 'ItemsSource="{Binding Scenes}"
     'AutomationProperties.Name="系統音量"',
     'AutomationProperties.Name="Expert 詳細模式"',
     'AutomationProperties.LiveSetting="Polite"', 'CustomSceneId', 'CustomSceneName',
-    'CustomSceneDescription', 'OnAddCustomSceneClick')) {
+    'CustomSceneDescription', 'OnAddCustomSceneClick',
+    'AutomationProperties.Name="準備 IR WAV 檔案"', 'OnPrepareIrClick')) {
   if (-not $xaml.Contains($requiredText)) { throw "WinUI shell binding missing: $requiredText" }
 }
 if (-not $codeBehind.Contains('RootGrid.DataContext = ViewModel') -or
