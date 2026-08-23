@@ -3,6 +3,8 @@ param(
   [switch]$SelfTest
 )
 
+Set-StrictMode -Version Latest
+
 $ErrorActionPreference = 'Stop'
 
 $interactiveControlPattern = '(?ms)<(?<type>Button|ComboBox|Slider|ToggleSwitch|CheckBox|TextBox|NumberBox)\b(?<attributes>[^>]*?)(?:/?>)'

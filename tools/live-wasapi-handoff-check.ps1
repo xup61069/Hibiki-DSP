@@ -3,6 +3,8 @@ param(
   [switch]$SelfTest
 )
 
+Set-StrictMode -Version Latest
+
 $ErrorActionPreference = 'Stop'
 
 $LiveWasapiHandoffTarget = 'hibiki_live_wasapi_handoff_probe'
