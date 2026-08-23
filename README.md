@@ -98,7 +98,7 @@ Authenticode 簽章 installer，經 Gumroad 交付。
 
 | # | 里程碑 | 目前狀態 | 主要卡點 |
 | --- | --- | --- | --- |
-| M0 | 目標機器 toolchain 就位（`doctor.ps1` 全綠） | 本機已符合 ADR-0005 的 SDK/WDK >= 10.0.26100 最低基線；正式 target 機器仍待指定與複驗 | 環境：鎖定 target 機器尚未到位 |
+| M0 | 目標機器 toolchain 就位（`doctor.ps1` 全綠） | 本機已符合 ADR-0005 的 SDK/WDK >= 10.0.26100 最低基線；driver 的 Hyper-V VM 隔離載入測試環境建置中（Issue #462）；正式 target 機器仍待指定與複驗 | 環境：鎖定 target 機器尚未到位 |
 | M1 | WinUI XAML 正式建置＋無障礙 smoke | 本機 VS2026 已完成 formal XAML build 與 UIA smoke；target 環境複驗待 M0 | 工程（小）：target 複驗＋M0 |
 | M2 | 第一個可安裝的簽章 WaveRT 虛擬端點 | 本機已有第一次 kernel-mode PortCls adapter `.sys` build、Inf2Cat 封裝與 self-signed test-sign evidence；仍未安裝／載入，離 Microsoft-signed installable endpoint 還差 runtime 接線與行政流程 | **工程：install/load/runtime 接線與實機驗證** ＋ 簽章帳號（行政） |
 | M3 | 引擎 → 虛擬端點實際出聲＋長時間 soak | driver 已有 local build/test-sign evidence；引擎到虛擬端點的實機音訊一次都沒跑過 | M2 ＋ 環境 |
@@ -307,6 +307,22 @@ queue/COM worker 使用 bounded catalog handle 暫時衰減約 3 dB、讀回並�
 `evidence/0000-foundation/session-volume-live-v1.json`。
 同一個 probe 也會送出一個暫時的 `SessionRouteCommand`，確認 route catalog 回報 `Ready`；這是
 控制面 graph transaction 證據，不代表實體音訊已完成 per-App 重送。
+
+### 裝置目錄與 process-loopback 探針（opt-in）
+
+另有兩個不會修改系統狀態的 live probe，只輸出匿名彙整，不列印真實 endpoint／session identity：
+
+```powershell
+pwsh -File tools/live-device-catalog-check.ps1
+pwsh -File tools/live-process-loopback-check.ps1
+```
+
+`live-device-catalog-check` 會枚舉本機 render/capture 數量、sequence 與 payload 大小等 wire 結果，
+暫存輸出只留在 ignored 的 `.local/`；它驗證的是 worker-owned enumeration boundary，不代表已完成
+的 driver／WaveRT／HLK 或 Microsoft signing 驗收。
+`live-process-loopback-check` 會回報匿名格式與 frame aggregate；若本機 Audio Service 不提供
+process-loopback，會如實記錄 `loopback=unavailable`，此時仍只是 source compile evidence，不能
+當成 Chrome 單分頁 tabCapture、實體 per-App routing 或 signed driver 證據。
 
 ### WinUI 相容殼
 
