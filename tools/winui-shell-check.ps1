@@ -34,6 +34,32 @@ function Assert-InteractiveControlNames([string]$xaml, [string]$sourceName) {
   return $controls.Count
 }
 
+function Get-CompatibilityPreviewControlOpenings([string]$source) {
+   $pattern = '(?m)^\s*var\s+(?<variable>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\s+(?<type>Button|ComboBox|Slider|ToggleSwitch|CheckBox|TextBox|NumberBox)\b'
+   foreach ($match in [regex]::Matches($source, $pattern)) {
+     $line = 1 + @($source.Substring(0, $match.Index).Split([char]10)).Count - 1
+     [pscustomobject]@{
+       Variable = $match.Groups['variable'].Value
+       Type = $match.Groups['type'].Value
+       Line = $line
+     }
+   }
+ }
+
+function Assert-CompatibilityPreviewControlNames([string]$source, [string]$sourceName) {
+   $controls = @(Get-CompatibilityPreviewControlOpenings $source)
+   $names = @{}
+   foreach ($match in [regex]::Matches($source, 'AutomationProperties\.SetName\(\s*(?<variable>[A-Za-z_][A-Za-z0-9_]*)\s*,\s*"(?<value>[^"]*)"\s*\)')) {
+     $names[$match.Groups['variable'].Value] = $match.Groups['value'].Value
+   }
+   foreach ($control in $controls) {
+     if (-not $names.ContainsKey($control.Variable) -or [string]::IsNullOrWhiteSpace($names[$control.Variable])) {
+       throw "Compatibility Preview interactive control must declare a non-empty AutomationProperties.Name: $($control.Type) $($control.Variable) at $($sourceName):$($control.Line)"
+     }
+   }
+   return $controls.Count
+ }
+
 if ($SelfTest) {
   $valid = @'
 <StackPanel>
@@ -72,12 +98,39 @@ if ($SelfTest) {
   if ((Assert-InteractiveControlNames $unrelated 'selftest-unrelated.xaml') -ne 0) {
     throw 'WinUI accessibility self-test counted a non-interactive element.'
   }
-  Write-Output 'WinUI interactive-control accessibility self-test passed (4 cases).'
+  $newline = [Environment]::NewLine
+  $compatValid = 'var connectButton = new Button();' + $newline + 'AutomationProperties.SetName(connectButton, "Preview connect");'
+  if ((Assert-CompatibilityPreviewControlNames $compatValid 'selftest-compat-valid.cs') -ne 1) {
+    throw 'Compatibility Preview accessibility self-test expected one interactive control.'
+  }
+
+  $compatMissing = 'var missingSlider = new Slider();' + $newline + 'var namedTextBox = new TextBox();' + $newline + 'AutomationProperties.SetName(namedTextBox, "Preview volume");'
+  $compatMissingCaught = $false
+  try {
+    [void](Assert-CompatibilityPreviewControlNames $compatMissing 'selftest-compat-missing.cs')
+  } catch {
+    $compatMissingCaught = $true
+    if ($_.Exception.Message -notmatch 'Slider at selftest-compat-missing\.cs:1') { throw }
+  }
+  if (-not $compatMissingCaught) { throw 'Compatibility Preview accessibility self-test expected a missing-name failure.' }
+
+  $compatEmpty = 'var emptyCombo = new ComboBox();' + $newline + 'AutomationProperties.SetName(emptyCombo, "");'
+  $compatEmptyCaught = $false
+  try {
+    [void](Assert-CompatibilityPreviewControlNames $compatEmpty 'selftest-compat-empty.cs')
+  } catch {
+    $compatEmptyCaught = $true
+    if ($_.Exception.Message -notmatch 'ComboBox\s+emptyCombo at selftest-compat-empty\.cs:1') { throw }
+  }
+  if (-not $compatEmptyCaught) { throw 'Compatibility Preview accessibility self-test expected an empty-name failure.' }
+
+  Write-Output 'WinUI interactive-control accessibility self-test passed (7 cases).'
   exit 0
 }
 
 $repo = Split-Path -Parent $PSScriptRoot
 $shell = Join-Path $repo 'apps/winui-shell'
+$compatPreviewSource = Get-Content (Join-Path $shell 'MainWindow.CompatibilityPreview.cs') -Raw
 $required = @('Hibiki.WinUI.csproj', 'App.xaml', 'App.xaml.cs', 'MainWindow.xaml', 'MainWindow.xaml.cs')
 $missing = @($required | Where-Object { -not (Test-Path (Join-Path $shell $_)) })
 if ($missing.Count -gt 0) { throw "WinUI shell files missing: $($missing -join ', ')" }
@@ -99,6 +152,7 @@ if ([string]::IsNullOrWhiteSpace($projectVersion) -or $projectVersion -ne $lockV
 $xaml = Get-Content (Join-Path $shell 'MainWindow.xaml') -Raw
 $codeBehind = Get-Content (Join-Path $shell 'MainWindow.xaml.cs') -Raw
 Write-Output "WinUI interactive-control accessibility scan: $(Assert-InteractiveControlNames $xaml 'apps/winui-shell/MainWindow.xaml') controls."
+Write-Output "Compatibility Preview source accessibility scan: $(Assert-CompatibilityPreviewControlNames $compatPreviewSource 'apps/winui-shell/MainWindow.CompatibilityPreview.cs') controls."
 foreach ($requiredText in @('x:Name="RootGrid"', 'ItemsSource="{Binding Scenes}"',
     'ItemsSource="{Binding OutputGroups}"', 'SelectedOutputGroup', 'IsExpert',
     'ItemsSource="{Binding PhysicalDevices}"', 'SelectedPhysicalDeviceId',
