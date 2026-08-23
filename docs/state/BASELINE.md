@@ -811,8 +811,10 @@ WinUICompat 建置不啟用 Core MRT 資源工具，主題資源走既有 TryGet
 預覽以無樣式但可啟動的方式執行；審計文字同時澄清 VS2026 Appx packaging tasks 存在於
 本機而 dotnet CLI build 不會載入它們（Issue #703 / PR #709、Issue #720 / PR #721）。
 瀏覽器單分頁捕捉的 popup Start／Stop handler 攔截訊息通道錯誤，顯示實際錯誤並重新
-查詢真實捕捉狀態後才恢復控制項（Issue #702 / PR #704）；extension gate 強制 popup 檢查
-response.ok 並如實回報錯誤，自檢在缺少此邊界時 fail-closed（Issue #715 / PR #719）。
+查詢真實捕捉狀態後才恢復控制項（Issue #702 / PR #704）；後續修正讓失敗文字在背景狀態
+刷新時保留，直到使用者下一次操作才更新（Issue #724 / PR #727）。extension gate 強制
+popup 檢查 response.ok、如實回報錯誤，並要求以 error 標記保護此訊息；自檢在缺少任一
+邊界時 fail-closed（Issue #715 / PR #719、Issue #727）。
 offscreen 在來源串流自然結束時釋放捕捉 graph、通知 service worker 並自動關閉 document，
 不需要使用者手動停止（Issue #706 / PR #707、Issue #714 / PR #716）。SPEC-0009 記錄失敗回應與
 stream-ended 邊界，README 補上捕捉生命週期與 bridge 狀態說明；compat preview smoke 改為從
