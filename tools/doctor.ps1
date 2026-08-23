@@ -16,6 +16,16 @@ function Add-Check([string]$Name, [bool]$Ok, [string]$Detail) {
   $results.Add([pscustomobject]@{ Name = $Name; Status = $(if ($Ok) { 'OK' } else { 'MISSING' }); Detail = $Detail })
 }
 
+function Test-WindowsKitPackageEntryProperty {
+  param(
+    [Parameter(Mandatory)][object]$Entry,
+    [Parameter(Mandatory)][string]$Name
+  )
+  $property = $Entry.PSObject.Properties[$Name]
+  if ($null -eq $property) { return $false }
+  return $null -ne $property.Value -and "$($property.Value)" -ne ''
+}
+
 function Get-WindowsKitPackageEntries {
   $uninstallRoots = @(
     'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
@@ -24,7 +34,10 @@ function Get-WindowsKitPackageEntries {
 
   foreach ($root in $uninstallRoots) {
     Get-ItemProperty -Path $root -ErrorAction SilentlyContinue |
-      Where-Object { $_.DisplayName -and $_.DisplayVersion } |
+      Where-Object {
+        (Test-WindowsKitPackageEntryProperty -Entry $_ -Name 'DisplayName') -and
+        (Test-WindowsKitPackageEntryProperty -Entry $_ -Name 'DisplayVersion')
+      } |
       Select-Object DisplayName, DisplayVersion
   }
 }
@@ -126,7 +139,25 @@ function Invoke-WindowsKitSelfTest {
     }
   }
 
-  Write-Output "Windows SDK/WDK detection self-test passed ($($cases.Count) cases)."
+  $entryCases = @(
+    @{ Name = 'both-present'; Entry = [pscustomobject]@{ DisplayName = 'Windows Software Development Kit - Windows 10.0.26100'; DisplayVersion = '10.1.26100.8249' }; ExpectName = $true; ExpectVersion = $true },
+    @{ Name = 'only-name'; Entry = [pscustomobject]@{ DisplayName = 'Incomplete Registry Entry' }; ExpectName = $true; ExpectVersion = $false },
+    @{ Name = 'only-version'; Entry = [pscustomobject]@{ DisplayVersion = '10.1.26100.8249' }; ExpectName = $false; ExpectVersion = $true },
+    @{ Name = 'both-empty'; Entry = [pscustomobject]@{ DisplayName = ''; DisplayVersion = '' }; ExpectName = $false; ExpectVersion = $false }
+  )
+  foreach ($case in $entryCases) {
+    $hasName = Test-WindowsKitPackageEntryProperty -Entry $case.Entry -Name 'DisplayName'
+    $hasVersion = Test-WindowsKitPackageEntryProperty -Entry $case.Entry -Name 'DisplayVersion'
+    if ($hasName -ne $case.ExpectName) {
+      throw "Windows Kit package entry self-test failed: $($case.Name) DisplayName expected $($case.ExpectName), got $($hasName)."
+    }
+    if ($hasVersion -ne $case.ExpectVersion) {
+      throw "Windows Kit package entry self-test failed: $($case.Name) DisplayVersion expected $($case.ExpectVersion), got $($hasVersion)."
+    }
+  }
+
+  $assertionCount = $cases.Count + $entryCases.Count
+  Write-Output "Windows SDK/WDK detection self-test passed ($assertionCount assertions)."
 }
 
 if ($SelfTest) {
@@ -174,7 +205,8 @@ $kitAssessment = Get-WindowsKitAssessment -Candidates $kitCandidates -PackageEnt
 Add-Check "Windows SDK/WDK >= $minimumKitVersion" $kitAssessment.Ok $kitAssessment.Detail
 
 $results | Format-Table -AutoSize
-if (($results | Where-Object Status -eq 'MISSING').Count -gt 0) {
+$missingCount = @($results | Where-Object Status -eq 'MISSING').Count
+if ($missingCount -gt 0) {
   Write-Warning 'The repository foundation can be inspected now, but a full Windows build requires the missing prerequisites.'
   if (-not $CheckOnly) { exit 2 }
 }
