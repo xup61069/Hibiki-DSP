@@ -34,11 +34,11 @@
       "result": "testsigning=Yes confirmed inside the guest."
     },
     {
-      "command": "certutil -addstore Root <guest>\hibiki-test-sign.cer during SetupComplete",
+      "command": "certutil -addstore Root <guest>\\hibiki-test-sign.cer during SetupComplete",
       "result": "Root certificate import succeeded."
     },
     {
-      "command": "certutil -addstore TrustedPublisher <guest>\hibiki-test-sign.cer during SetupComplete",
+      "command": "certutil -addstore TrustedPublisher <guest>\\hibiki-test-sign.cer during SetupComplete",
       "result": "FAILED with store-not-found; Driver Store consequently rejected the catalog with 0xE0000242 and reported an untrusted publisher.",
       "diagnostic": "setupapi.dev.log recorded catalog validation, root trust, then publisher-trust failure."
     },
@@ -48,7 +48,7 @@
       "diagnostic": "pnputil exit code 0. This command stages the package but does not create a Root-enumerated device."
     },
     {
-      "command": "devcon install <guest>\HibikiVirtualAudio.inf Root\HibikiDSP",
+      "command": "devcon install <guest>\\HibikiVirtualAudio.inf Root\\HibikiDSP",
       "result": "Root device node created; service installed; drivers copied from Driver Store.",
       "diagnostic": "Device entered CM_PROB_FAILED_START with problem status 0xC000000D after PnP start."
     },
@@ -59,7 +59,7 @@
   ],
   "final_state": {
     "driver_store": "HibikiVirtualAudio.inf staged as oem2.inf",
-    "device_node": "ROOT\\MEDIA\\0000 present with MEDIA class",
+    "device_node": "ROOT\\\\MEDIA\\\\0000 present with MEDIA class",
     "service": "HibikiVirtualAudio installed but stopped",
     "pnp_status": "CM_PROB_FAILED_START (code 10), NTSTATUS 0xC000000D",
     "sound_device_visible": false,
