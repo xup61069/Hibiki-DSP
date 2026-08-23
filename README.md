@@ -111,7 +111,9 @@ Authenticode 簽章 installer，經 Gumroad 交付。
 - **最大的單一工程缺口是 driver 的 install/load/runtime 驗證**——本機已能把通過合約測試的
   原始碼建成本地 kernel-mode `.sys`、封裝並做 self-signed test-sign；但「真的能安裝、載入、
   出聲且通過長時間 soak」還沒發生。
-- **最硬的非工程前置是 M0 那台機器與微軟簽章體系**——沒有它們，M1 以後全部排不了隊。
+- **近期非工程前置是 M0 的 target 機器**；Microsoft Hardware Program／正式簽章不阻擋
+  source、DSP、UI、一般 CI 或本機 test-signing，只在 consumer driver／installer release
+  進入 M2/M4 驗收時成為必要行政流程。
 - 所以誠實的答案是：**V1 沒有日期**。瓶頸不在「能不能編出 `.sys`」，而在實機 install/load/
   runtime audio 驗證的環境到位與簽章／發行帳號的行政流程。M0 到位後，driver 要從現有的
   build/test-sign evidence 繼續往可載入端點推進；M3/M4 再疊上實機 soak 與簽章等待期。
@@ -120,7 +122,7 @@ Authenticode 簽章 installer，經 Gumroad 交付。
 
 ## 給 AI 協作者
 
-**入口順序（canonical）**：先讀 [AGENTS.md](AGENTS.md)（硬限制與必跑命令），再依
+**入口順序（canonical）**：先讀 [AGENTS.md](AGENTS.md)（三層規則與 scope-triggered gates），再依
 [AI 接手頁](docs/AI_HANDOFF.md) 操作，多 session 並行規則見
 [docs/ai/MULTI_AGENT.md](docs/ai/MULTI_AGENT.md)。它們會指向唯一的 active handoff、
 目前環境限制、已驗證命令、不能碰的資料，以及 **一個**下一步。不要從聊天紀錄、舊
@@ -132,27 +134,27 @@ registry、私人裝置 ID 或未提交的 build output 推斷專案狀態。
 `winget install --id Microsoft.PowerShell`；本機第一次執行若被 Execution Policy
 擋下，加 `-ExecutionPolicy Bypass`。
 
-**驗證門檻（core + conditional）**：每個切片必跑核心 gates；其餘依範圍觸發，完整對照表見
+**驗證門檻（always-run + conditional）**：每個寫入切片執行最小共同檢查；其餘依範圍觸發，完整對照表見
 [AGENTS.md](AGENTS.md) 第三層。
 
 ```powershell
-pwsh -File tools/doctor.ps1 -CheckOnly
-pwsh -File tools/verify.ps1
-pwsh -File tools/docs-check.ps1
 pwsh -File tools/handoff-check.ps1 -Issue <n>
-pwsh -File tools/source-only-ci-check.ps1
+pwsh -File tools/docs-check.ps1
 pwsh -File tools/source-policy.ps1
+git diff --check
 ```
 
-條件式 gates（依變更範圍）：UI 用 `build-preview.ps1` 與 `winui-shell-check.ps1`；engine 整合用
+條件式 gates（依變更範圍）：需要 build/toolchain evidence 用 `doctor.ps1 -CheckOnly`；
+C/C++、CMake、schema、contract 或 tests 用 `verify.ps1`；workflow/release policy 用
+`source-only-ci-check.ps1`；UI 用 `control-model-check.ps1`、`build-preview.ps1` 與
+`winui-shell-check.ps1`；engine 整合用
 `build-engine-preview.ps1`、`engine-preview-smoke.ps1`、`control-model-check.ps1`、
 `control-model-engine-smoke.ps1`；extensions 用 `extension-check.ps1`；installer/distribution
 identity 用 `installer-check.ps1`、`distribution-check.ps1`；driver boundary 用
 `driver-source-check.ps1`（driver 簽章屬 release 階段）；live probes 一律明確 opt-in。
 
-```powershell
-pwsh -File tools/probe-environment.ps1
-```
+需要記錄 target environment 時才執行 `pwsh -File tools/probe-environment.ps1`；輸出只留在
+ignored `.local/`，純文件小改不必為了形式探測機器。
 
 在鎖定的 Windows 11 24H2+/VS 2026/SDK-WDK 機器上，將 Compatibility Preview 改為
 `pwsh -File tools/build-preview.ps1 -Target WinUI`，以取得正式 XAML build evidence；
@@ -160,8 +162,9 @@ Desktop Compatibility Preview 只能驗證本機 ViewModel／啟動 smoke，不�
 無障礙、driver 或發行驗收。
 
 多個 gate 另提供 `-SelfTest`（不碰機器、不寫檔即可驗證 gate 自身邏輯，例：
-`pwsh -File tools/docs-check.ps1 -SelfTest`）。工作切片必須
-Issue／worktree／branch／handoff／draft PR 一對一，認領前檢查 branch 佔位；細節見
+`pwsh -File tools/docs-check.ps1 -SelfTest`）。寫入切片必須
+Issue／非 main branch／handoff／draft PR 一對一；並行 writer、branch occupied 或狀態不明時
+worktree 隔離才是硬要求，單一 writer 時仍建議使用。認領前檢查 branch 佔位；細節見
 `docs/ai/MULTI_AGENT.md`。
 
 **真值順序**：產品行為以 [Specs](docs/specs/INDEX.md) 為準；架構理由以

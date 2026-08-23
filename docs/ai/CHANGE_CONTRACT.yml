@@ -1,15 +1,20 @@
-schema_version: 1
+schema_version: 2
 rules:
   public_behavior:
     required: [spec_update, contract_tests, evidence]
-  architecture_or_dependency:
-    required: [adr_or_superseding_adr, project_map_update, third_party_update]
+  architecture_decision:
+    required: [new_or_superseding_adr, affected_spec_and_tests, evidence]
+  dependency_change:
+    required: [third_party_update, license_review, sbom_policy_review]
   build_or_toolchain:
-    required: [agents_update, readme_update, ci_update]
+    required: [affected_build_docs, affected_ci_or_gate, evidence]
   validation_tiers:
-    core_gates: [doctor_check_only, handoff_check_issue, verify, docs_check, source_policy, source_only_ci_check]
+    always_run: [handoff_check_issue, docs_check, source_policy, git_diff_check]
     conditional_gates:
-      ui_or_control_model: [build_preview, winui_shell_check]
+      build_or_toolchain_evidence: [doctor_check_only]
+      native_or_contract_change: [verify]
+      workflow_or_release_policy: [source_only_ci_check]
+      ui_or_control_model: [control_model_check, build_preview, winui_shell_check]
       engine_integration: [build_engine_preview, engine_preview_smoke, control_model_check, control_model_engine_smoke]
       extensions: [extension_check]
       installer_or_distribution_identity: [installer_check, distribution_check]
@@ -17,6 +22,6 @@ rules:
       driver_release_stage: [driver_signability_check]
       opt_in_live_probes: [live_device_catalog_check, live_wasapi_handoff_check, live_system_volume_check, live_session_volume_check, live_audio_session_check, live_process_loopback_check]
   task_handoff:
-    required: [issue, branch, target_branch, owner, scope_globs, shared_paths, depends_on, issue_body_handoff_block, base_commit, next_safe_action]
+    required: [explicit_assignment, issue, branch, target_branch, owner, scope_globs, shared_paths, depends_on, issue_body_handoff_block, base_commit, workspace_isolation_decision, next_safe_action]
   release:
     required: [signed_source_tag, unsigned_reproducibility, release_manifest, source_policy]
