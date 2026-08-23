@@ -795,6 +795,31 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
+第三十四波整合增量已合併：正式 WinUI VST3 時間軸編輯器新增「清除歷史」與「保存基準」；
+清除歷史只重置 undo/redo，保留時間軸資料列、dirty 狀態與開啟中的草稿，空歷史是安全 no-op。
+保存基準重用 `SaveSelected()`，把目前內容設為新的未修改基準並清除 dirty 指示；沒有選取
+時間軸或草稿開啟時仍拒絕（Issue #786 / PR #791、Issue #794 / PR #798）。DesktopCompat
+Preview 新增自訂 Scene 的 ID／名稱／描述欄位與可達新增／移除控制，WinUI Compatibility
+Preview 新增含自訂卡片的 Scene picker 和可達清單；兩者只綁既有 ViewModel seam、驗證規則、
+32 筆上限、儲存失敗回復與狀態文字，不直接讀寫 catalog 檔或改 IPC/schema（Issue #788 /
+PR #796）。VirtualMicDspV1 noise gate 加入 upper-only 2 dB hysteresis：在設定 threshold
+關閉、高 2 dB 才重開，中間保持狀態，避免房噪／呼吸聲造成快速 gain pumping；每聲道只增加
+一個 bool 與一個 float，RT thread 維持無配置、鎖、等待或 I/O（Issue #787 / PR #795）。
+ISO 226 公式補償加入頻段 phon 邊界：20–4000 Hz 允許 20–90 phon，4 kHz 以上至 12.5 kHz
+允許 20–80 phon，0/10 phon 與超出範圍仍 fail-closed；批次中任一現值或參考值無效就整批拒絕，
+係數與 contour 資料仍由呼叫端提供（Issue #789 / PR #797）。
+
+installer-check 交易式 uninstall 自檢從函式存在檢查升級為實際行為測試：路徑 traversal 拒絕、
+只刪 planned files、移除計數、成功後冪等、locked-file rollback 位元組一致、backup 不殘留，
+共 12 案例；後續再把 TEMP/TMP 只導到 self-test process 的 fixture temp root，確認
+`.NET GetTempPath()` 解析到隔離目錄、刻意保留的 backup 會被拒絕，成長到 13 案例。這些仍是
+離線 temp-fixture source/self-test evidence，不是真實 `-Apply`/`-Uninstall` 或機器狀態變更
+（Issue #785 / PR #793、Issue #800 / PR #802）。engine-preview-soak 的離線報表形狀自檢要求
+schema version 1、harness identity、completed <= requested 且 iteration result 只有 pass/fail，
+共 17 案例，不啟動 engine、不建置、不寫檔（Issue #799 / PR #801）。上述分別是 source、
+contract-model、source-gate、compatibility preview build/launch 或離線 self-test evidence；
+不宣稱 runtime screen-reader audit、實體音訊量測、driver guest 安裝／載入／HLK 或 Microsoft signing。
+
 第三十三波整合增量已合併：官方 bootstrapper 新增經 manifest 與 SHA-256 驗證的交易式
 user-space payload staging，失敗會回復既有安裝且不碰 `%LocalAppData%/Hibiki DSP` 使用者
 資料；9 個離線功能案例涵蓋有效 staging、路徑逃逸拒絕、hash mismatch、rollback 與 backup
