@@ -1550,5 +1550,80 @@ static async Task RunSceneCatalogCheckServerAsync(
     }
 }
 
+// Case 4: the bounded sync queue drops its oldest operation under pressure
+// and keeps that loss visible through later offline work and replay success.
+{
+    const string pipeName = "HibikiDSP_scene_sync_capacity_check";
+    using var serverCts = new CancellationTokenSource();
+    var replayedOperations = new List<string>();
+    var connectedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var serverTask = RunSceneCatalogCheckServerAsync(pipeName, request =>
+    {
+        if (request.Type == ControlMessageType.SceneCatalogCommand &&
+            TryReadSceneCatalogOp(request.Payload.ToArray(), out var operation, out var sceneId))
+        {
+            replayedOperations.Add($"{operation}:{sceneId}");
+        }
+        return null;
+    }, connectedSignal, serverCts.Token);
+    var capacityPath = Path.Combine(Path.GetTempPath(),
+        $"hibiki-scene-sync-capacity-{Guid.NewGuid():N}.json");
+    try
+    {
+        var capacityViewModel = new EasyControlViewModel(pipeName)
+        {
+            CustomSceneCatalogPath = capacityPath,
+            SelectedOutputGroup = "main"
+        };
+        var capacityId = sceneSyncBaseId + "-capacity";
+        Check(capacityViewModel.PendingSceneCatalogOpsCount == 0 &&
+              capacityViewModel.DroppedSceneCatalogOperations == 0,
+            "Capacity fixture must start without queued or dropped scene operations.");
+
+        // Alternate local add/remove so the 32-card mirror stays valid while
+        // producing 65 distinct ordered catalog operations.
+        for (var i = 0; i <= EasyControlViewModel.MaxPendingSceneCatalogOps; i++)
+        {
+            if (i % 2 == 0)
+            {
+                Check(await capacityViewModel.AddCustomSceneAsync(new SceneCard(
+                        capacityId, $"容量測試 {i}", "離線容量壓力", "零額外緩衝", true)),
+                    $"Offline capacity add {i} must succeed locally.");
+            }
+            else
+            {
+                Check(await capacityViewModel.RemoveCustomSceneAsync(capacityId),
+                    $"Offline capacity remove {i} must succeed locally.");
+            }
+        }
+
+        Check(capacityViewModel.PendingSceneCatalogOpsCount ==
+              EasyControlViewModel.MaxPendingSceneCatalogOps,
+            "The offline scene sync queue must remain bounded.");
+        Check(capacityViewModel.DroppedSceneCatalogOperations == 1,
+            "The 65th ordered operation must evict exactly the oldest queued operation.");
+        Check(capacityViewModel.StatusText.Contains("已捨棄最舊", StringComparison.Ordinal),
+            "Capacity eviction must be reported immediately.");
+
+        await capacityViewModel.ConnectAsync(TimeSpan.FromSeconds(5));
+        Check(capacityViewModel.IsConnected,
+            "Capacity fixture failed to reach the local check engine.");
+        Check(capacityViewModel.PendingSceneCatalogOpsCount == 0,
+            "A successful connect must drain the retained scene operations.");
+        Check(replayedOperations.Count == EasyControlViewModel.MaxPendingSceneCatalogOps &&
+              replayedOperations[0].StartsWith("Remove:", StringComparison.Ordinal) &&
+              replayedOperations[^1].StartsWith("Upsert:", StringComparison.Ordinal),
+            "Replay must retain order after evicting only the oldest operation.");
+        Check(capacityViewModel.StatusText.Contains("補送（64 筆）", StringComparison.Ordinal) &&
+              capacityViewModel.StatusText.Contains("已捨棄最舊的 1 筆", StringComparison.Ordinal),
+            "Successful replay must preserve the durable capacity-loss warning.");
+    }
+    finally
+    {
+        serverCts.Cancel();
+        try { await serverTask; } catch (OperationCanceledException) { }
+        if (File.Exists(capacityPath)) File.Delete(capacityPath);
+    }
+}
 
 Console.WriteLine("Control model checks passed.");
