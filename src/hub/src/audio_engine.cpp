@@ -59,10 +59,11 @@ bool AudioEngineModel::commit_graph() noexcept {
         return false;
     }
     active_graph_ = pending_graph_;
-    // A committed graph is a new listening context. Start the bounded
-    // true-peak guard from unity gain so attenuation accumulated by the
-    // previous graph cannot keep ducking quiet audio after the switch.
-    rt_true_peak_limiter_.reset();
+    // A committed graph is a new listening context. Start every bounded
+    // true-peak guard from unity gain so attenuation accumulated by any
+    // previous group cannot keep ducking quiet audio after the switch.
+    main_true_peak_limiter_.reset();
+    if (volume_bank_ != nullptr) volume_bank_->reset_limiters();
     active_latency_bank_ = std::move(pending_latency_bank_);
     has_active_graph_ = true;
     has_pending_graph_ = false;
@@ -174,7 +175,7 @@ bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
     if (!apply_ir("main", output_interleaved, frames)) return false;
     if (!apply_group_master("main", output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
-        (void)rt_true_peak_limiter_.limit_in_place(
+        (void)main_true_peak_limiter_.limit_in_place(
             output_interleaved, frames, active_graph_.output_channels, -1.0,
             sample_rate_.load(std::memory_order_relaxed));
     }
@@ -193,9 +194,15 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
     if (!apply_ir(output_group, output_interleaved, frames)) return false;
     if (!apply_group_master(output_group, output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
-        (void)rt_true_peak_limiter_.limit_in_place(
-            output_interleaved, frames, active_graph_.output_channels, -1.0,
-            sample_rate_.load(std::memory_order_relaxed));
+        auto* const group_limiter =
+            volume_bank_ != nullptr
+                ? volume_bank_->limiter_for_group(output_group)
+                : nullptr;
+        (void)(group_limiter != nullptr
+                   ? group_limiter->limit_in_place(
+                         output_interleaved, frames, active_graph_.output_channels,
+                         -1.0, sample_rate_.load(std::memory_order_relaxed))
+                   : 1.0F);
     }
     return true;
 }
