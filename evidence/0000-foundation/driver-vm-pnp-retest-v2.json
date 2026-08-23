@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "slice": "driver-vm-pnp-retest-v2",
+  "issue": 462,
+  "date": "2026-08-23T18:26:54Z",
+  "machine_fingerprint": "windows-26200-amd64-hyperv-gen2-4-vcpu-4gb-private-switch",
+  "scope_boundary": {
+    "purpose": "Rebuild and PnP-start the locally test-signed WaveRT adapter in an isolated Hyper-V guest after correcting the WaveRT-to-topology bridge data ranges.",
+    "not_claimed": [
+      "physical audio playback",
+      "WaveRT streaming behavior",
+      "HLK certification",
+      "Microsoft signing or consumer release readiness"
+    ]
+  },
+  "official_media": {
+    "source": "Microsoft Windows 11 Enterprise Evaluation 25H2 x64 EN-US",
+    "bytes": 7092807680,
+    "sha256": "A61ADEAB895EF5A4DB436E0A7011C92A2FF17BB0357F58B13BBC4062E535E7B9",
+    "verified_before_provisioning": true
+  },
+  "root_cause": {
+    "previous_guest_result": "CM_PROB_FAILED_START (Code 10), STATUS_RANGE_NOT_FOUND (0xC000028C)",
+    "cause": "The WaveRT bridge pins advertised zero data ranges while their paired topology bridge pins advertised the analog audio range, so PortCls could not register the physical connection.",
+    "correction": "Use the same analog audio bridge range on both halves of each WaveRT/topology physical connection."
+  },
+  "package": {
+    "sys_sha256": "32AB7988E6D402EA31DA3F0E9D07015B45F01304B969CC7B8C5FFED3CE87013C",
+    "cat_sha256": "E5214187883330C71EC4F5F9AD951FFDB8BD9A77B27B3417FC39D01DE13111C5",
+    "sys_signature_in_guest": "Valid",
+    "cat_signature_in_guest": "Valid",
+    "test_signing_enabled": true,
+    "pnputil_exit_code": 0,
+    "devcon_exit_code": 0
+  },
+  "pre_install": {
+    "inspection_mode": "inspection-only",
+    "mutation_attempted": false,
+    "device_count": 0
+  },
+  "post_install_stable_restart": {
+    "inspection_mode": "inspection-only",
+    "mutation_attempted": false,
+    "device_resolution": "Root\\HibikiDSP hardware ID resolved to an anonymous MEDIA-class instance token",
+    "device_count": 1,
+    "device_status": "OK",
+    "problem_code": 0,
+    "problem_status": null,
+    "problem_status_interpretation": "The healthy device did not expose DEVPKEY_Device_ProblemStatus; Status=OK and ProblemCode=0 are the typed no-problem result.",
+    "service": "HibikiVirtualAudio",
+    "service_status": "Running",
+    "setupapi_start_result": "Device restart and related-driver installation exited successfully without a failed-start entry."
+  },
+  "result": {
+    "pnp_start": "PASS",
+    "survives_clean_guest_restart": true,
+    "interpretation": "The isolated guest proves package trust, installation, device creation, PortCls PnP start, and a running kernel service for this test build."
+  },
+  "claims": "Anonymous isolated-guest PnP-start evidence only. No physical-device control, playback/capture quality, real-time streaming, HLK, Microsoft signing, or release claim."
+}
