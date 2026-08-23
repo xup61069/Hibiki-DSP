@@ -8,6 +8,8 @@
 #include <cstddef>
 #include <string_view>
 
+#include "hibiki/true_peak_limiter.hpp"
+
 namespace hibiki {
 
 enum class VolumeOrigin : std::uint8_t {
@@ -94,6 +96,14 @@ public:
     // Must be called by the control worker before the group can be rendered.
     // Registration never allocates and is idempotent for an existing label.
     [[nodiscard]] bool register_group(std::string_view output_group) noexcept;
+    // RT-only operation. It returns nullptr when the group is not registered;
+    // every limiter is fixed storage owned by its slot, so lookup performs no
+    // allocation, lock or platform call.
+    [[nodiscard]] TruePeakLimiterV1* limiter_for_group(
+        std::string_view output_group) const noexcept;
+    // RT-only operation. It resets every per-group limiter to unity gain and
+    // performs no allocation, lock or platform call.
+    void reset_limiters() const noexcept;
     [[nodiscard]] bool has_group(std::string_view output_group) const noexcept;
     [[nodiscard]] std::size_t group_count() const noexcept { return group_count_; }
 
@@ -120,6 +130,7 @@ private:
         OutputGroupVolumeStateV1 control{};
         std::atomic<std::uint64_t> rt_word{};
         mutable VolumeRampProcessorV1 ramp{};
+        mutable TruePeakLimiterV1 limiter{};
     };
 
     [[nodiscard]] Slot* find_slot(std::string_view output_group) noexcept;
