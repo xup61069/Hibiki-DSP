@@ -8,8 +8,8 @@
   "required": ["schema_version", "state_id", "plugin_id", "class_id", "module_sha256", "state_version", "byte_count", "storage"],
   "properties": {
     "schema_version": {"const": 1},
-    "state_id": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[^\\u0000]+$"},
-    "plugin_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000]+$"},
+    "state_id": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+    "plugin_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"},
     "class_id": {"type": "string", "pattern": "^[0-9A-Fa-f]{32}$"},
     "module_sha256": {"type": "string", "pattern": "^[0-9A-Fa-f]{64}$"},
     "state_version": {"type": "integer", "minimum": 1, "maximum": 4294967295},
