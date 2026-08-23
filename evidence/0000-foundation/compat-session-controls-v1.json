@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 813,
   "scope_digest": "compat-session-controls-v1",
-  "source_commit": "202454e237dd9cc78ab58f26b68f931009b2eba9"
+  "source_commit": "202454e237dd9cc78ab58f26b68f931009b2eba9",
   "environment_fingerprint": "windows-local-pwsh-7.6.4-dotnet8",
   "commands": [
     "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest"

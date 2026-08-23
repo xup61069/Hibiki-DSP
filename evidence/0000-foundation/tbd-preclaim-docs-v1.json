@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 556,
   "scope_digest": "tbd-preclaim-docs-v1",
-  "source_commit": "5662392ab68397cfc0434112f2ffc259f40bcfbb"
+  "source_commit": "5662392ab68397cfc0434112f2ffc259f40bcfbb",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-26100-pwsh-7.6; target-machine-pending",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 556",

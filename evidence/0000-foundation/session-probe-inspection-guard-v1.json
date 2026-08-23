@@ -23,6 +23,6 @@
     { "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1", "result": "pass", "notes": "workflow set unchanged" }
   ],
   "scope": "tools-only live probe hardening; no product/API/schema/DSP/driver change; no live audio probing performed; no identity-bearing output introduced",
-  "date": "2026-08-23"
-  "source_commit": "b8ef9545e88160292b66986ec4c7d20d76f8caef",
+  "date": "2026-08-23",
+  "source_commit": "b8ef9545e88160292b66986ec4c7d20d76f8caef"
 }

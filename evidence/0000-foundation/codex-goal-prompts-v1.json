@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 625,
   "scope_digest": "codex-goal-prompts-v1",
-  "source_commit": "3840276f4002b748ed75133ca5afe7e464be4bfb"
+  "source_commit": "3840276f4002b748ed75133ca5afe7e464be4bfb",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6; documentation-only communication contract",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 625",

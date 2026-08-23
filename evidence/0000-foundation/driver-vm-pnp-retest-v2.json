@@ -56,6 +56,6 @@
     "survives_clean_guest_restart": true,
     "interpretation": "The isolated guest proves package trust, installation, device creation, PortCls PnP start, and a running kernel service for this test build."
   },
-  "claims": "Anonymous isolated-guest PnP-start evidence only. No physical-device control, playback/capture quality, real-time streaming, HLK, Microsoft signing, or release claim."
-  "source_commit": "6d1cfd7b46e8b40a21c28a745b9c45a654ca44b7",
+  "claims": "Anonymous isolated-guest PnP-start evidence only. No physical-device control, playback/capture quality, real-time streaming, HLK, Microsoft signing, or release claim.",
+  "source_commit": "6d1cfd7b46e8b40a21c28a745b9c45a654ca44b7"
 }

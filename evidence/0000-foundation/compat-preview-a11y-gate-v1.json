@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 732,
   "scope_digest": "compat-preview-a11y-gate-v1",
-  "source_commit": "d805518c49656e53bd230f1f9beb76ea49f5f3d4"
+  "source_commit": "d805518c49656e53bd230f1f9beb76ea49f5f3d4",
   "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6; compatibility-preview source-only gate",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 732",

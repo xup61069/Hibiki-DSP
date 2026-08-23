@@ -311,6 +311,6 @@
       "name": "Easy 模式只顯示安全操作；切換 Expert 才會顯示 Matrix、DSP Graph、IR 與 VST3。"
     }
   ],
-  "expectations": "at-least: 10 controls, 1 named Group, 2 ComboBox, 4 Button"
-  "source_commit": "7e1ebffa2f02189c24cfa6bedc3886a7f407bc21",
+  "expectations": "at-least: 10 controls, 1 named Group, 2 ComboBox, 4 Button",
+  "source_commit": "7e1ebffa2f02189c24cfa6bedc3886a7f407bc21"
 }

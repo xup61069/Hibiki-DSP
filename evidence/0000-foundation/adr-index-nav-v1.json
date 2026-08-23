@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 547,
   "scope_digest": "adr-index-nav-v1",
-  "source_commit": "a90ef5ea0652b0d94df40f3616fdd2fbb0c9905d"
+  "source_commit": "a90ef5ea0652b0d94df40f3616fdd2fbb0c9905d",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-26100-pwsh-7.6; target-machine-pending",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 547",

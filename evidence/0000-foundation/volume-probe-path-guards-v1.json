@@ -24,6 +24,6 @@
     { "command": "git diff --check", "result": "pass" }
   ],
   "scope": "tools-only live probe hardening; no product/API/schema/DSP/driver change; no live volume mutation performed",
-  "date": "2026-08-23"
-  "source_commit": "6e12a1bee290bb59da8965bb499338320947bbd8",
+  "date": "2026-08-23",
+  "source_commit": "6e12a1bee290bb59da8965bb499338320947bbd8"
 }

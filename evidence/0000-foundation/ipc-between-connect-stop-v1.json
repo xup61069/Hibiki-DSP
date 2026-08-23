@@ -49,6 +49,6 @@
   },
   "started_at": "2026-08-23T17:36:00+08:00",
   "finished_at": "2026-08-23T17:55:00+08:00",
-  "date": "2026-08-23"
-  "source_commit": "5bd32226fe923d0d5f86b08b1e6c9699bcc6ab45",
+  "date": "2026-08-23",
+  "source_commit": "5bd32226fe923d0d5f86b08b1e6c9699bcc6ab45"
 }

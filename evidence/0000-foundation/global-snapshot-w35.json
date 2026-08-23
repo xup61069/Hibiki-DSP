@@ -3,7 +3,7 @@
   "issue": 818,
   "scope_digest": "global-snapshot-w35",
   "base_commit": "db8efc4b68c584b9000c772dd151a180b546e52a",
-  "source_commit": "93bea9ea6d74b6117b51c2115492cf42b9219cf5"
+  "source_commit": "93bea9ea6d74b6117b51c2115492cf42b9219cf5",
   "environment_fingerprint": "windows-local-pwsh-7.6.4; documentation-only integrator snapshot",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 818",

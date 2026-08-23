@@ -22,6 +22,6 @@
     { "command": "git diff --check", "result": "pass" }
   ],
   "scope": "tools-only gate hardening; no product/schema/DSP/driver change; identity-free probe output semantics unchanged",
-  "date": "2026-08-23"
-  "source_commit": "31c71bd9af2c544037a91eb9de833db22490d9b5",
+  "date": "2026-08-23",
+  "source_commit": "31c71bd9af2c544037a91eb9de833db22490d9b5"
 }
