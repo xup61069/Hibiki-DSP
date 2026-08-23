@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "issue": 886,
+  "scope_digest": "schema-id-normalize-v1",
+  "source_commit": "012b4c0298294f7719b18b2e55678ecdb237d41d",
+  "environment_fingerprint": "windows-local-pwsh-7.6-schema-metadata-fix",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 886",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Metadata-only schema $id correction; no runtime behavior, validation logic or product behavior changes.",
+    "The hibiki.example domain is a project convention; no external DNS resolution is required."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh 7.6 local"
+  },
+  "started_at": "2026-08-24T13:30:00+08:00",
+  "finished_at": "2026-08-24T13:36:00+08:00"
+}
