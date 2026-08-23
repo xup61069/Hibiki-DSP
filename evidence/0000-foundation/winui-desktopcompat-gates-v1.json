@@ -1,0 +1,29 @@
+{
+  "$schema": "evidence/0000-foundation/schema/evidence-entry-v1.json",
+  "id": "winui-desktopcompat-gates-v1",
+  "title": "DesktopCompat accessible-name and IR WAV load entry-point regression gates",
+  "source_commit": "5aa8acce655449993a47f9658ce344bdbf6b2195",
+  "date": "2026-08-23",
+  "scope": [
+    "tools/winui-shell-check.ps1",
+    "apps/desktop-compat-preview/Program.cs",
+    "apps/winui-shell/MainWindow.xaml"
+  ],
+  "what_it_proves": [
+    "winui-shell-check scans DesktopCompat Program.cs interactive controls for non-empty AccessibleName (12 found).",
+    "Removing any AccessibleName from DesktopCompat causes the gate to fail.",
+    "Removing the IR WAV load AutomationProperties.Name or OnPrepareIrClick handler from MainWindow.xaml causes the gate to fail.",
+    "Offline self-test covers valid, missing, empty DesktopCompat cases (10 total cases)."
+  ],
+  "verification_commands": [
+    "pwsh -NoProfile -File tools/winui-shell-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/winui-shell-check.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "limitations": [
+    "Source-level static scan only; no screen-reader/UI Automation runtime audit.",
+    "Does not prove physical audio playback, driver install/load, HLK or Microsoft signing."
+  ]
+}
