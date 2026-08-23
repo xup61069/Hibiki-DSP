@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "issue": 751,
+  "scope_digest": "global-snapshot-w31",
+  "source_commit": null,
+  "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 751",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/extension-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/winui-shell-check.ps1 -SelfTest"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #747 / PR #749 merged: all 14 interactive controls in apps/desktop-compat-preview/Program.cs declare non-empty AccessibleName, including the locally constructed output-group ComboBox and engine-connect Button; DesktopCompat Release build and launch smoke passed.",
+        "Issue #748 / PR #750: extension-check now validates every aria-labelledby reference in popup markup; the target must exist and resolve to non-empty visible text, a broken reference fails even when aria-label is also present because labelledby takes accessible-name precedence, offline self-tests cover valid/missing/empty-text targets."
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; this update does not change product source behavior.",
+    "DesktopCompat AccessibleName additions are WinForms source/build/launch evidence; no screen-reader or UI Automation runtime automation was exercised.",
+    "The aria-labelledby resolution gate is a source-level policy check with offline self-tests, not browser runtime automation.",
+    "No formal XAML/accessibility runtime audit, physical audio, driver install/load/HLK or Microsoft signing claim."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6"
+  },
+  "started_at": "2026-08-23T21:40:00+08:00",
+  "finished_at": "pending-gates"
+}
