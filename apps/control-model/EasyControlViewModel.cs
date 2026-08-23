@@ -56,6 +56,9 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private string _customSceneCatalogPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Hibiki DSP", "scene-cards-v1.json");
+    private string _customSceneQueuePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Hibiki DSP", "scene-sync-queue-v1.json");
     private readonly Queue<PendingSceneCatalogOp> _pendingSceneCatalogOps = new();
     private int _droppedSceneCatalogOperations;
 
@@ -499,8 +502,26 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     public int PendingSceneCatalogOpsCount => _pendingSceneCatalogOps.Count;
     public int DroppedSceneCatalogOperations => _droppedSceneCatalogOperations;
 
-    private sealed record PendingSceneCatalogOp(
+    // Read-only seam for the control-model check host; it verifies replay
+    // payload preservation without exposing mutable queue state.
+    internal IReadOnlyList<PendingSceneCatalogOp> PendingSceneCatalogOpTestsOnly =>
+        _pendingSceneCatalogOps.ToArray();
+
+    internal sealed record PendingSceneCatalogOp(
         bool IsUpsert, string SceneId, string Name, string OutputGroup);
+
+    public string CustomSceneQueuePath
+    {
+        get => _customSceneQueuePath;
+        set
+        {
+            var normalized = value?.Trim() ?? string.Empty;
+            if (normalized == _customSceneQueuePath) return;
+            if (string.IsNullOrWhiteSpace(normalized))
+                throw new ArgumentException("Custom scene queue path cannot be empty.");
+            _customSceneQueuePath = normalized;
+        }
+    }
 
     public bool UpsertCustomScene(SceneCard scene)
     {
@@ -554,6 +575,16 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             StatusText = $"自訂場景未保存：{saveError}";
             return false;
         }
+        if (!IsConnected &&
+            !TryPersistOfflineSceneOp(new PendingSceneCatalogOp(
+                true, scene.Id, scene.Name, _session.ActiveOutputGroup ?? "main")))
+        {
+            _session.CustomScenes.Remove(scene.Id);
+            if (previous is not null) _session.CustomScenes.Upsert(previous);
+            OnPropertyChanged(nameof(Scenes));
+            OnPropertyChanged(nameof(CustomSceneCards));
+            return false;
+        }
         CustomSceneId = string.Empty;
         CustomSceneName = string.Empty;
         CustomSceneDescription = string.Empty;
@@ -575,8 +606,6 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             return true;
         }
 
-        EnqueueSceneCatalogOp(new PendingSceneCatalogOp(
-            true, scene.Id, scene.Name, _session.ActiveOutputGroup ?? "main"));
         ReportSceneCatalogStatus(
             $"已加入自訂場景：{scene.Name}（離線；連線後自動同步）");
         return true;
@@ -1243,16 +1272,79 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     public bool LoadCustomScenes(out string error)
     {
         var loaded = _session.CustomScenes.TryLoad(CustomSceneCatalogPath, out error);
+        if (loaded && !LoadPendingSceneCatalogOps(out var queueError))
+        {
+            error = $"場景卡片已載入，但同步佇列載入失敗：{queueError}";
+            return false;
+        }
         if (loaded)
         {
             OnPropertyChanged(nameof(Scenes));
             OnPropertyChanged(nameof(CustomSceneCards));
+            OnPropertyChanged(nameof(PendingSceneCatalogOpsCount));
+            OnPropertyChanged(nameof(DroppedSceneCatalogOperations));
         }
         return loaded;
     }
 
     public bool SaveCustomScenes(out string error) =>
         _session.CustomScenes.TrySave(CustomSceneCatalogPath, out error);
+
+    private bool SavePendingSceneCatalogOps()
+    {
+        var queue = new CustomSceneSyncQueueV1();
+
+        foreach (var operation in _pendingSceneCatalogOps)
+        {
+            if (!queue.Enqueue(new SceneCatalogQueueCard(
+                    operation.IsUpsert, operation.SceneId, operation.Name,
+                    operation.OutputGroup)))
+            {
+                return false;
+            }
+        }
+
+        return queue.TrySave(
+            CustomSceneQueuePath,
+            _droppedSceneCatalogOperations,
+            out _);
+    }
+
+    // An offline scene edit is only accepted when both the visible card and
+    // its replay operation survive a crash. If the queue file cannot be
+    // saved, restore the exact previous bounded queue and let the caller
+    // roll back the card change.
+    private bool TryPersistOfflineSceneOp(PendingSceneCatalogOp operation)
+    {
+        var previousOps = _pendingSceneCatalogOps.ToArray();
+        var previousDropped = _droppedSceneCatalogOperations;
+
+        EnqueueSceneCatalogOp(operation);
+        if (SavePendingSceneCatalogOps()) return true;
+
+        _pendingSceneCatalogOps.Clear();
+        foreach (var item in previousOps) _pendingSceneCatalogOps.Enqueue(item);
+        _droppedSceneCatalogOperations = previousDropped;
+        StatusText = "離線場景同步佇列保存失敗；變更未套用，音訊保持安全狀態";
+        return false;
+    }
+
+    public bool LoadPendingSceneCatalogOps(out string error)
+    {
+        var queue = new CustomSceneSyncQueueV1();
+        if (!queue.TryLoad(CustomSceneQueuePath, out var droppedCount, out error))
+            return false;
+
+        _pendingSceneCatalogOps.Clear();
+        foreach (var operation in queue.Operations)
+        {
+            _pendingSceneCatalogOps.Enqueue(new PendingSceneCatalogOp(
+                operation.IsUpsert, operation.SceneId, operation.Name,
+                operation.OutputGroup));
+        }
+        _droppedSceneCatalogOperations = droppedCount;
+        return true;
+    }
 
     public bool LoadRouteRules(out string error)
     {
@@ -1310,7 +1402,16 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         }
         else
         {
-            EnqueueSceneCatalogOp(new PendingSceneCatalogOp(false, previous.Id, "", ""));
+            if (!TryPersistOfflineSceneOp(new PendingSceneCatalogOp(
+                    false, previous.Id, "", "")))
+            {
+                _session.CustomScenes.Upsert(previous);
+                _selectedScene = previousSelection;
+                OnPropertyChanged(nameof(Scenes));
+                OnPropertyChanged(nameof(CustomSceneCards));
+                OnPropertyChanged(nameof(SelectedScene));
+                return false;
+            }
             ReportSceneCatalogStatus(
                 $"已移除自訂場景：{previous.Name}（離線；連線後自動同步）");
         }
@@ -1376,6 +1477,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             catch (ArgumentException)
             {
                 _pendingSceneCatalogOps.Dequeue();
+                SavePendingSceneCatalogOps();
                 continue;
             }
             if (!await SendSceneCatalogCommandAsync(command, cancellationToken)
@@ -1386,6 +1488,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
                 return false;
             }
             _pendingSceneCatalogOps.Dequeue();
+            SavePendingSceneCatalogOps();
         }
         if (total > 0)
             ReportSceneCatalogStatus(
