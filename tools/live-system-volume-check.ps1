@@ -85,14 +85,23 @@ function Test-LiveSystemVolumePathUnderRoot {
 function Get-LiveSystemVolumeExistingAttributes {
   param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
   $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
   if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
     return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
   }
-  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
-  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+  if ($null -ne $SyntheticInspectionErrors -and $SyntheticInspectionErrors.ContainsKey($fullPath)) {
+    throw "Live system-volume path inspection failed: $fullPath ($($SyntheticInspectionErrors[$fullPath]))"
+  }
+  try {
+    return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop).Attributes
+  }
+  catch {
+    if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return $null }
+    throw "Live system-volume path inspection failed: $fullPath ($($_.Exception.Message))"
+  }
 }
 
 function Assert-LiveSystemVolumePath {
@@ -101,7 +110,8 @@ function Assert-LiveSystemVolumePath {
     [Parameter(Mandatory = $true)][string]$Root,
     [Parameter(Mandatory = $true)][ValidateSet('File', 'Directory')][string]$Kind,
     [switch]$AllowMissingLeaf,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
   $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
   $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
@@ -109,14 +119,16 @@ function Assert-LiveSystemVolumePath {
     throw "Live system-volume path must remain under the expected root: $fullPath"
   }
 
-  $leafAttributes = Get-LiveSystemVolumeExistingAttributes -Path $fullPath -SyntheticAttributes $SyntheticAttributes
+  $leafAttributes = Get-LiveSystemVolumeExistingAttributes -Path $fullPath `
+    -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
   if ($null -eq $leafAttributes -and -not $AllowMissingLeaf) {
     throw "Live system-volume $Kind does not exist: $fullPath"
   }
 
   $cursor = $fullPath
   while ($true) {
-    $attributes = Get-LiveSystemVolumeExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    $attributes = Get-LiveSystemVolumeExistingAttributes -Path $cursor `
+      -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
     if ($null -ne $attributes) {
       if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "Live system-volume path or parent is a reparse point: $cursor"
@@ -204,6 +216,15 @@ if ($SelfTest) {
     $wrongKindCaught = $_.Exception.Message -match 'is not a directory'
   }
   if (-not $wrongKindCaught) { throw 'Live system-volume self-test expected wrong-kind rejection.' }
+  $caseCount++
+
+  $inspectionCaught = $false
+  try {
+    Assert-LiveSystemVolumePath -Path (Join-Path $repo '.local/inspection-child') -Root (Join-Path $repo '.local') -Kind Directory -AllowMissingLeaf -SyntheticInspectionErrors @{ ([IO.Path]::GetFullPath((Join-Path $repo '.local/inspection-child')).TrimEnd('\', '/')) = 'synthetic access denied' }
+  } catch {
+    $inspectionCaught = $_.Exception.Message -match 'path inspection failed'
+  }
+  if (-not $inspectionCaught) { throw 'Live system-volume self-test expected inspection-failure rejection.' }
   $caseCount++
 
   Write-Output "Live system-volume wrapper self-test passed ($caseCount cases)."
