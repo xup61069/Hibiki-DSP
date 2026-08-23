@@ -1,0 +1,28 @@
+{
+  "schema_version": 2,
+  "issue": 630,
+  "title": "Context pack path boundary and inspection failure guard",
+  "base_commit": "413b694",
+  "summary": {
+    "tools": [
+      "tools/context-pack.ps1"
+    ],
+    "behavior": "Every context file read now resolves through a repository-root boundary guard: candidates outside the repository root, reparse-point leaves or ancestors, wrong leaf types, and inaccessible entries fail closed. ObjectNotFound remains the only missing classification and still reports 'Context file missing' for optional reads. SyntheticAttributes and SyntheticInspectionErrors enable offline self-test injection. Valid in-repository packing behavior is otherwise unchanged.",
+    "precedent": "Issue #543 / PR #546 canonical inspection-failure pattern",
+    "selftest_cases_added": {
+      "in-root synthetic resolve": 1,
+      "real AGENTS.md resolve": 1,
+      "outside-root rejection": 1,
+      "reparse leaf rejection": 1,
+      "reparse parent rejection": 1,
+      "non-file leaf rejection": 1,
+      "allowed-missing leaf": 1,
+      "strict missing rejection": 1,
+      "leaf inspection-failure rejection": 1,
+      "parent inspection-failure rejection": 1
+    }
+  },
+  "validation": [],
+  "scope": "tools/context-pack.ps1 hardening plus offline self-test and evidence only; no product/API/schema/DSP/driver change; no filesystem writes or machine-state change during self-test; no live probe executed.",
+  "date": "2026-08-23"
+}
