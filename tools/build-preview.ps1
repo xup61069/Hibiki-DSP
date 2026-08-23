@@ -61,6 +61,7 @@ function Move-PreviewOutputAside {
   New-Item -ItemType Directory -Force -Path $trashRoot | Out-Null
   $destination = Join-Path $trashRoot ($leaf + '-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
   Move-Item -LiteralPath $fullRoot -Destination $destination
+  Write-Output ([string]'Staged existing preview output aside: '+$destination)
 }
 
 function Find-VisualStudioMsBuild {
