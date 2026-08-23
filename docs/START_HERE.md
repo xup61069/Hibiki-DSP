@@ -80,3 +80,9 @@ branch，確認前一個 AI 停止寫入後才把 owner 交給下一個 AI。真
 - 子系統位置與目前 contract：`docs/PROJECT_MAP.md`。
 - 分支的唯一下一步與 write scope：對應 Issue body handoff block。
 - 實際執行過的命令、環境與 limitation：`evidence/`；本入口不再複製會快速過期的功能清單。
+
+## 開 Codex 視窗與看進度
+
+建議一個視窗只負責一個可驗證成果；不同視窗並行時不得共用 write scope。給 maintainer 的回報
+先講產品變化、使用者影響、確認方式與剩餘缺口，Git 操作只留必要的短版紀錄。五種主要視窗角色、
+可直接貼上的 `/goal` 啟動詞與長任務停止條件見 [Codex Goals](ai/CODEX_GOALS.md)。

@@ -28,6 +28,11 @@
 - 目前產品目標是 Windows 11 24H2+ x64、C++20 即時核心與 C# WinUI 3 UI；這是 accepted
   architecture/product baseline，不是不可討論的永久禁令。改變時以新 Spec／ADR 與測試取代，
   不在單一 feature PR 中順手偏離。
+- 對 maintainer 的進度與完成回報必須先用白話說明：現在讓產品多了／修好了什麼、使用者會
+  感覺到什麼、如何確認，以及還缺什麼。不要用 push、commit、branch、PR、merge 或 CI 當標題
+  或主要敘事；這些只在影響風險、阻擋、驗證可信度，或 maintainer 明確詢問時，放在末尾的短版
+  開發紀錄。省略對話中的 Git 細節不會取消下列內部協作與交接規則。可貼用的視窗分工與 `/goal`
+  啟動詞見 `docs/ai/CODEX_GOALS.md`。
 - 唯讀偵察不需要認領。寫入需要 maintainer／orchestrator 明確指派、GitHub Issue、非 `main`
   branch、Issue body 內的 `<!-- hibiki:handoff-v1 -->` block 與 write scope。人類 maintainer
   對目前 session 的直接要求算明確指派；active orchestrator 可在檢查 overlap 後建立並正式
