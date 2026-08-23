@@ -61,12 +61,20 @@ reference 字串分別佔用固定區間，timeline ID 表與最多 4 條 lane r
 catalog，讓沒有使用者 preset 的 fresh clone 維持向後相容。
 wire format 解碼失敗不影響已存在的 catalog 內容或 active graph。
 
-## 正式殼層的本機卡片移除
+## 正式殼層的本機卡片移除與引擎同步
 
-正式 WinUI 殼層列出本機自訂卡片，並為每個移除操作提供非空無障礙名稱。移除只作用於 UI
-mirror 與本機 `custom-scene-cards-v1.schema.json` 檔案；引擎端 `SceneDefinition` catalog 不會被
-刪除或改寫。ViewModel 先更新記憶體 mirror，再以既有暫存檔替換流程保存；未知或內建 ID
-fail-closed，保存失敗時回復原卡片與選取狀態並顯示可讀錯誤。選取自訂卡片仍只能送出既有
+正式 WinUI 殼層列出本機自訂卡片，並為每個移除操作提供非空無障礙名稱。
+
+控制管線已連線時，ViewModel 在本機 mirror 與暫存檔保存成功後，以 `SceneCatalogCommandV1`
+Remove 向引擎推送同步刪除指令。引擎在 `SceneCatalogV1::remove` 中查找該 ID：找到才釋放
+該 slot 並回傳 Applied；找不到回傳 Invalid 且不影響其他 entry 或 active graph。收到非法
+payload 時解碼即拒收，同樣不觸碰既有 catalog。
+
+未連線時，移除只作用於 UI mirror 與本機 `custom-scene-cards-v1.schema.json` 檔案；
+引擎端 `SceneDefinition` catalog 維持原狀（下次連線前不會同步）。
+
+ViewModel 先更新記憶體 mirror，再以既有暫存檔替換流程保存；未知或內建 ID fail-closed，
+保存失敗時回復原卡片與選取狀態並顯示可讀錯誤。選取自訂卡片仍只能送出既有
 `SceneApply(scene_id, output_group)`。
 
 ## 驗收
