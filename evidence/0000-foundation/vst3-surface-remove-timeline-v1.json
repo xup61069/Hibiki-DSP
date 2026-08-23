@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "issue": 600,
+  "scope_digest": "vst3-surface-remove-timeline-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-dotnet-10.0.400-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 600",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1"
+  ],
+  "results": [],
+  "validation": [
+    {
+      "command": "pwsh -NoProfile -File tools/verify.ps1",
+      "status": "pass",
+      "note": "Validation from the original #582 worktree; re-validated on the recovery branch before marking ready.",
+      "coverage": [
+        "Vst3TimelineSupervisorSurfaceV1::remove_selected fails closed while detached, unselected or with an open edit session; success clears selection/baseline/history and removes the stored timeline"
+      ]
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/control-model-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "Vst3TimelineSurfaceModelV1.RemoveSelected refuses during an open draft, clears selection/published/baseline/history on success and keeps other stored timelines",
+        "Vst3TimelineEditorViewModel.RemoveSelectedTimeline refreshes ids/rows, clears the stale row index and reports the outcome through status text and notifications"
+      ]
+    }
+  ],
+  "limitations": [
+    "This slice changes the headless supervisor surface contract and managed control-model mirror only; it adds no IPC, engine, worker, RT-thread, driver or signing behavior.",
+    "The evidence does not prove physical audio, WaveRT, HLK, signing, third-party VST3 certification or production WinUI integration."
+  ],
+  "logs": []
+}
