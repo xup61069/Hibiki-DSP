@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 423,
   "scope_digest": "scene-ir-reference-v1",
-  "source_commit": "79f3f97",
+  "source_commit": "79f3f97d2aa5e6381123d8d695031aa0390d67ec",
   "environment_fingerprint": "windows-26200-amd64-msvc-19.51.36256-cmake-4.4.0-dotnet-10.0.400-pwsh-7.6.5-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526",
   "commands": [
     "cmake --build .local/build --config RelWithDebInfo --target hibiki_contract_tests",

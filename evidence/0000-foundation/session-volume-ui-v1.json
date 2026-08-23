@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "expert-session-volume-ui-v1",
-  "source_commit": "ebb80a3",
+  "source_commit": "ebb80a39d9f9a0c87100cbe2c1221d50ee4f2293",
   "environment_fingerprint": "windows-22631-vs17-dotnet-local",
   "commands": [
     "pwsh -File tools/control-model-check.ps1",

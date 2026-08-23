@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 110,
   "scope_digest": "vst3-scheduler-store-export-v1",
-  "source_commit": "05a7779",
+  "source_commit": "05a77791fce8e00fe5b2a8f2af9a2190309c5a74",
   "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-msvc-19.44-dotnet-10.0.301-pwsh-7.6.5; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/verify.ps1",

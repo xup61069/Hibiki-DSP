@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "session-routing-live-v1",
-  "source_commit": "d1ad93e",
+  "source_commit": "d1ad93ebb0017db1d69f427d487babfa541625a7",
   "environment_fingerprint": "windows-26200-amd64-vs17.14.37502.11-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -NoProfile -File tools/live-session-volume-check.ps1 -WriteTest"

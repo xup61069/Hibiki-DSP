@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 182,
   "scope_digest": "docs-check-counters-ownership-fix-v1",
-  "source_commit": "d2a9ee2",
+  "source_commit": "d2a9ee268c63928558ea13a33e68dea5aed5c49e",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; cmake-missing-wdk-missing-portable-user-space",
   "commands": [
     "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
