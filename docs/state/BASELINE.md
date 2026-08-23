@@ -795,6 +795,17 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
+第三十波整合增量已合併：瀏覽器單分頁捕捉的 Start／Stop 失敗訊息保留到下一次使用者操作，
+不會被立即的狀態重繪蓋成 Idle；extension gate 同步要求 status.dataset.error 邊界並在
+自檢中驗證（Issue #724 / PR #727）。Compatibility Preview 開放與正式 shell 相同的
+「刪除目前時間軸」動作，重用 fail-closed ViewModel handler 並帶無障礙名稱（Issue #723 /
+PR #729）。offscreen natural-end release gate 追加 handler 定義移除時 fail-closed 的
+自檢，避免 ended listener 靜默指向未定義函式（Issue #733 / PR #735）。winui-shell-check
+掃描 Compatibility Preview C# 控制建構的 AutomationProperties.Name，缺漏或空值會讓
+檢查失敗（Issue #732 / PR #734）。分別為 extension source/policy evidence、compat preview
+source/build/launch evidence 與 UI source-gate evidence。不宣稱正式 XAML/accessibility
+runtime audit、瀏覽器 runtime automation、實體音訊、driver 安裝/載入/HLK 或 Microsoft signing。
+
 第二十九波整合增量已合併：Compatibility Preview 的 MRT 紀錄修正為 fail-soft 邊界——
 WinUICompat 建置不啟用 Core MRT 資源工具，主題資源走既有 TryGetValue 回退路徑，
 預覽以無樣式但可啟動的方式執行；審計文字同時澄清 VS2026 Appx packaging tasks 存在於
