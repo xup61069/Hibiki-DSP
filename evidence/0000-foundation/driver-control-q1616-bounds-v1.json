@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 937,
   "scope_digest": "driver-control-q1616-bounds-v1",
-  "source_commit": "6aca8c748e0e5a1c0f2b3d4e5f6a7b8c9d0e1f2a",
+  "source_commit": "620fff612899f06870e8a800f2e6e96d787e7d9e",
   "environment_fingerprint": "windows-amd64-pwsh-schema-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 937",
