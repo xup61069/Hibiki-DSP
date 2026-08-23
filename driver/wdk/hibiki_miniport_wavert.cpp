@@ -211,6 +211,7 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferWithNotification(
         m_PortStream->FreePagesFromMdl(mdl);
         return STATUS_INSUFFICIENT_RESOURCES;
     }
+    RtlZeroMemory(buffer, actual_size);
 
     m_DmaBuffer = buffer;
     m_DmaBufferMdl = mdl;
