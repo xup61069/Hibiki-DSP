@@ -36,8 +36,9 @@ grouped target；未知 label、非零 padding、非法 UTF-8 或格式長度一
 
 Group render 完成後，非 Strict Direct Scene 會經過 `TruePeakLimiterV1` 的 −1 dBTP
 bounded guard；它以三個線性 inter-sample probes 作保守估算並採 block-coherent gain。
-需要的衰減立即套用；恢復時每個處理區塊最多放寬約 +6 dB，避免保護電路本身在區塊間
-瞬間跳回。目前不宣稱 ITU/BS.1770 conformance，正式 meter oracle 仍是 release gate。
+需要的衰減立即套用；恢復速率以 dB/ms 計算（約 +6 dB per millisecond），與引擎回呼
+區塊大小無關。避免保護電路本身在短區塊間瞬間跳回或在大區塊間恢復過慢。
+目前不宣稱 ITU/BS.1770 conformance，正式 meter oracle 仍是 release gate。
 
 目前 user-space contract 已提供 `apply_windows_notification`：只接受有限 dB 範圍與不倒退
 的 generation，接受後將 origin 設為 Windows 並重新套用 safety。真正的
