@@ -22,21 +22,27 @@
         "properties": {
           "is_upsert": {"type": "boolean"},
           "scene_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,30}$"},
-          "name": {
-            "anyOf": [
-              {"type": "string", "minLength": 1, "maxLength": 120},
-              {"const": ""}
-            ]
-          },
-          "output_group": {
-            "anyOf": [
-              {"type": "string", "minLength": 1, "maxLength": 64},
-              {"const": ""}
-            ]
+          "name": {"type": "string"},
+          "output_group": {"type": "string"}
+        },
+        "if": {
+          "properties": {"is_upsert": {"const": true}},
+          "required": ["is_upsert"]
+        },
+        "then": {
+          "properties": {
+            "name": {"minLength": 1, "maxLength": 120},
+            "output_group": {"minLength": 1, "maxLength": 64}
+          }
+        },
+        "else": {
+          "properties": {
+            "name": {"maxLength": 0},
+            "output_group": {"maxLength": 0}
           }
         }
       }
     }
   },
-  "$comment": "Upsert operations require non-empty name and output group; remove operations must leave both empty. The runtime parser additionally validates complete candidates before replacing the in-memory queue."
+  "$comment": "The if/then/else on each operation enforces: upsert requires non-empty name (max 120) and output_group (max 64); remove requires both exactly empty. The runtime parser additionally validates complete candidates before replacing the in-memory queue."
 }
