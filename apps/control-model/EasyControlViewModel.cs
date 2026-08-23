@@ -1095,6 +1095,24 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         }
     }
 
+    // Product-surface wrapper around the bounded IPC refresh. The UI never
+    // enumerates Windows endpoints itself; failures preserve the prior picker.
+    public async Task<bool> RefreshPhysicalDevicePickerAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (!IsConnected)
+        {
+            StatusText = "引擎未連線；無法重新掃描裝置清單";
+            return false;
+        }
+
+        StatusText = "正在重新掃描實體輸出裝置…";
+        var refreshed = await RefreshPhysicalDevicesAsync(cancellationToken).ConfigureAwait(true);
+        if (refreshed)
+            StatusText = $"已重新掃描裝置清單：{PhysicalDevices.Count} 個 Active render 裝置";
+        return refreshed;
+    }
+
     public async Task<bool> RefreshSessionCatalogAsync(
         CancellationToken cancellationToken = default)
     {
