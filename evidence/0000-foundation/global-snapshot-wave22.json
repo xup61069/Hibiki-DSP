@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "issue": 649,
+  "scope_digest": "global-snapshot-wave22",
+  "source_commit": null,
+  "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-26100-pwsh-7.6; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/handoff-check.ps1 -Issue 649",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/docs-check.ps1",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/source-policy.ps1",
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File tools/source-only-ci-check.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #636 / PR #640 merged: noise gate attack/release direction corrected with magnitude-based closed-tail coverage",
+        "Issue #643 / PR #644 merged: offline self-test rejects multiple active issues sharing one branch",
+        "Issue #637 / PR #645 merged: synchronous first-instance pipe handle is registered before worker startup so immediate stop cancels pending connect"
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; no product source, driver runtime, installer or machine state is changed.",
+    "Driver install/load/HLK/Microsoft signing and runtime audio remain release-stage evidence and are not claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-23T16:15:00+08:00",
+  "finished_at": "2026-08-23T16:20:00+08:00"
+}
