@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "issue": 745,
+  "scope_digest": "installer-payload-staging-v1",
+  "source_commit": "a666fede6cdd8d94bd1e883a729850d1ebd34d2b",
+  "environment_fingerprint": "windows-local-pwsh-7.6.4",
+  "commands": [
+    "pwsh -NoProfile -File tools/installer-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/installer-check.ps1",
+    "pwsh -NoProfile -File tools/distribution-check.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 745",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "tools/installer-check.ps1 -SelfTest",
+      "status": "pass",
+      "coverage": [
+        "valid fixture with all 15 required boundaries parses and passes policy",
+        "missing Read-ReleaseManifest rejected and names the boundary",
+        "missing sha256 rejected",
+        "missing pnputil.exe rejected",
+        "missing IsPathRooted traversal guard rejected",
+        "missing microsoft_signature_thumbprint rejected",
+        "PowerShell parse error rejected via ParseInput error reporting",
+        "missing rfc3161_timestamp rejected"
+      ],
+      "case_count": 8,
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/installer-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "real installer/HibikiSetup.ps1 parsed via Parser.ParseFile with zero errors",
+        "all 15 required source boundaries present including Resolve-HibikiDestination, Get-StagingPlan, Copy-HibikiFileWithHash for transactional payload staging"
+      ],
+      "compiled_artifacts": false
+    },
+    {
+      "command": "tools/distribution-check.ps1",
+      "status": "pass",
+      "coverage": [
+        "distribution profile stable GUID and identity checks"
+      ]
+    },
+    {
+      "command": "always-run gates",
+      "status": "pass",
+      "coverage": [
+        "handoff-check Issue 745 ownership scope and Git state",
+        "docs-check 597 tracked paths 243 repository JSON files",
+        "source-policy 597 tracked paths no blocked binary or secret",
+        "git diff --check no whitespace errors"
+      ]
+    }
+  ],
+  "limitations": [
+    "Source-level design and offline verification only; no -Apply execution.",
+    "Does not claim install, load, runtime audio, driver, HLK, Microsoft signing, or Authenticode execution evidence."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4"
+  },
+  "started_at": "2026-08-23 13:53:50+08:00",
+  "finished_at": "2026-08-23 13:53:50+08:00"
+}

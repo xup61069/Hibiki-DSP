@@ -2,6 +2,7 @@
 param(
   [Parameter(Mandatory = $true)][string]$PackageRoot,
   [Parameter(Mandatory = $true)][string]$ManifestPath,
+  [string]$DestinationPath = "%ProgramFiles%\Hibiki DSP",
   [switch]$Apply
 )
 
@@ -76,11 +77,100 @@ function Test-ManifestFiles($Manifest, [string]$Root) {
   return $true
 }
 
+function Resolve-HibikiDestination([string]$Requested) {
+  if ([string]::IsNullOrWhiteSpace($Requested)) {
+    throw 'Destination path cannot be blank.'
+  }
+  $expanded = [Environment]::ExpandEnvironmentVariables($Requested)
+  $rawSegments = $expanded.Split('\/ ') | Where-Object { $_ }
+  foreach ($seg in $rawSegments) {
+    if ($seg -eq '.' -or $seg -eq '..') {
+      throw "Destination must not contain '.' or '..' segments: $Requested"
+    }
+  }
+  $fullPath = [IO.Path]::GetFullPath($expanded)
+  if (-not [IO.Path]::IsPathRooted($fullPath)) {
+    throw "Destination must be an absolute path: $Requested"
+  }
+  $driveRoot = [IO.Path]::GetPathRoot($fullPath).TrimEnd('\')
+  if ($fullPath.TrimEnd('\') -eq $driveRoot) {
+    throw "Destination cannot be a drive root: $fullPath"
+  }
+  $windowsDir = [Environment]::GetFolderPath('Windows')
+  $windowsFull = [IO.Path]::GetFullPath($windowsDir).TrimEnd('\')
+  if ($fullPath.StartsWith($windowsFull + '\', [StringComparison]::OrdinalIgnoreCase) -or
+      $fullPath.TrimEnd('\').Equals($windowsFull, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Destination must not be inside the Windows directory: $fullPath"
+  }
+  return $fullPath
+}
+
+function Get-PreservedDataPaths {
+  $localAppData = [Environment]::GetFolderPath('LocalApplicationData')
+  $dataDir = Join-Path $localAppData 'Hibiki DSP'
+  return @(
+    @{ Name = 'session-route-rules-v1.json'; Path = (Join-Path $dataDir 'session-route-rules-v1.json'); Exists = (Test-Path -LiteralPath (Join-Path $dataDir 'session-route-rules-v1.json')) },
+    @{ Name = 'scene-cards-v1.json'; Path = (Join-Path $dataDir 'scene-cards-v1.json'); Exists = (Test-Path -LiteralPath (Join-Path $dataDir 'scene-cards-v1.json')) }
+  )
+}
+
+function Get-StagingPlan($Manifest, [string]$Root, [string]$Destination) {
+  $resolvedRoot = ([IO.Path]::GetFullPath((Resolve-Path -LiteralPath $Root).Path)).TrimEnd('\') + '\'
+  $resolvedDest = ([IO.Path]::GetFullPath($Destination)).TrimEnd('\') + '\'
+  $plan = @()
+  foreach ($entry in @($Manifest.unsigned_files)) {
+    $sourcePath = Join-Path $Root $entry.path
+    $destPath = Join-Path $Destination $entry.path
+    $resolvedSource = [IO.Path]::GetFullPath($sourcePath)
+    $resolvedDestFile = [IO.Path]::GetFullPath($destPath)
+    if (-not $resolvedSource.StartsWith($resolvedRoot, [StringComparison]::OrdinalIgnoreCase)) {
+      throw "Staging source escapes PackageRoot: $($entry.path)"
+    }
+    if (-not $resolvedDestFile.StartsWith($resolvedDest, [StringComparison]::OrdinalIgnoreCase)) {
+      throw "Staging destination escapes DestinationPath: $($entry.path)"
+    }
+    $plan += @{
+      RelativePath = $entry.path
+      Source       = $resolvedSource
+      Destination  = $resolvedDestFile
+      Sha256       = $entry.sha256.ToLowerInvariant()
+    }
+  }
+  return ,$plan
+}
+
+function Copy-HibikiFileWithHash {
+  [CmdletBinding()]
+  param(
+    [string]$Source,
+    [string]$Target,
+    [string]$ExpectedSha256
+  )
+  $targetDir = Split-Path -Parent $Target
+  if (-not (Test-Path -LiteralPath $targetDir)) {
+    New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+  }
+  $tempFile = Join-Path $targetDir ('.hibiki-tmp-' + [Guid]::NewGuid().ToString('N'))
+  try {
+    Copy-Item -LiteralPath $Source -Destination $tempFile
+    $actualHash = (Get-FileHash -LiteralPath $tempFile -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actualHash -ne $ExpectedSha256) {
+      throw "Post-copy hash mismatch for $(Split-Path -Leaf $Target): expected $ExpectedSha256 got $actualHash"
+    }
+    Move-Item -LiteralPath $tempFile -Destination $Target -Force
+  } finally {
+    if ((Test-Path -LiteralPath $tempFile) -and ($tempFile -ne $Target)) {
+      Remove-Item -LiteralPath $tempFile -Force -ErrorAction SilentlyContinue
+    }
+  }
+}
+
 function Invoke-HibikiInstall {
   [CmdletBinding(SupportsShouldProcess)]
   param(
     [string]$Root,
-    $Manifest
+    $Manifest,
+    [string]$Destination
   )
   $driverInfs = @(Get-ChildItem -LiteralPath $Root -Recurse -Filter '*.inf' -File)
   if ($driverInfs.Count -eq 0) { throw 'No driver INF found in the supplied package.' }
@@ -90,15 +180,102 @@ function Invoke-HibikiInstall {
       if ($LASTEXITCODE -ne 0) { throw "PnPUtil failed for $($_.Name): $LASTEXITCODE" }
     }
   }
-  Write-Output "Hibiki $($Manifest.product_version) driver transaction completed."
+  $plan = Get-StagingPlan $Manifest $Root $Destination
+  $backupDirName = '.hibiki-backup-' + [Guid]::NewGuid().ToString('N')
+  $backupDir = Join-Path $Destination $backupDirName
+  $completedCopies = @()
+  $backedUpFiles = @()
+  $createdDirs = @()
+  $backupCreated = $false
+  try {
+    if (-not (Test-Path -LiteralPath $Destination)) {
+      New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+      $createdDirs += $Destination
+    }
+    foreach ($item in $plan) {
+      $destParent = Split-Path -Parent $item.Destination
+      if (-not (Test-Path -LiteralPath $destParent)) {
+        $dirsToCreate = @()
+        $checkDir = $destParent
+        while ($checkDir -and -not (Test-Path -LiteralPath $checkDir)) {
+          $dirsToCreate += $checkDir
+          $checkDir = Split-Path -Parent $checkDir
+        }
+        for ($i = $dirsToCreate.Count - 1; $i -ge 0; $i--) {
+          New-Item -ItemType Directory -Path $dirsToCreate[$i] -Force | Out-Null
+          $createdDirs += $dirsToCreate[$i]
+        }
+      }
+      if (Test-Path -LiteralPath $item.Destination) {
+        if (-not $backupCreated) {
+          New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+          $backupCreated = $true
+        }
+        $backupSubPath = Join-Path $backupDir $item.RelativePath
+        $backupSubDir = Split-Path -Parent $backupSubPath
+        if (-not (Test-Path -LiteralPath $backupSubDir)) {
+          New-Item -ItemType Directory -Path $backupSubDir -Force | Out-Null
+        }
+        Move-Item -LiteralPath $item.Destination -Destination $backupSubPath
+        $backedUpFiles += @{ Original = $item.Destination; Backup = $backupSubPath }
+      }
+      Copy-HibikiFileWithHash -Source $item.Source -Target $item.Destination -ExpectedSha256 $item.Sha256
+      $completedCopies += $item.Destination
+    }
+    if ($backupCreated -and (Test-Path -LiteralPath $backupDir)) {
+      Remove-Item -LiteralPath $backupDir -Recurse -Force
+    }
+  } catch {
+    for ($i = $completedCopies.Count - 1; $i -ge 0; $i--) {
+      if (Test-Path -LiteralPath $completedCopies[$i]) {
+        Remove-Item -LiteralPath $completedCopies[$i] -Force -ErrorAction SilentlyContinue
+      }
+    }
+    for ($i = $backedUpFiles.Count - 1; $i -ge 0; $i--) {
+      $bkEntry = $backedUpFiles[$i]
+      if ((Test-Path -LiteralPath $bkEntry.Backup) -and -not (Test-Path -LiteralPath $bkEntry.Original)) {
+        $origParent = Split-Path -Parent $bkEntry.Original
+        if (-not (Test-Path -LiteralPath $origParent)) {
+          New-Item -ItemType Directory -Path $origParent -Force | Out-Null
+        }
+        Move-Item -LiteralPath $bkEntry.Backup -Destination $bkEntry.Original -Force
+      }
+    }
+    for ($i = $createdDirs.Count - 1; $i -ge 0; $i--) {
+      if (Test-Path -LiteralPath $createdDirs[$i]) {
+        $remaining = @(Get-ChildItem -LiteralPath $createdDirs[$i] -ErrorAction SilentlyContinue)
+        if ($remaining.Count -eq 0) {
+          Remove-Item -LiteralPath $createdDirs[$i] -Force -ErrorAction SilentlyContinue
+        }
+      }
+    }
+    throw
+  }
+  Write-Output "Hibiki $($Manifest.product_version) driver and payload installation completed."
 }
 
 $manifest = Read-ReleaseManifest $ManifestPath
 Test-ManifestFiles $manifest $PackageRoot | Out-Null
 Write-Output "Verified source tag $($manifest.source_tag), commit $($manifest.source_commit)."
 
+$destination = Resolve-HibikiDestination $DestinationPath
+$stagingPlan = Get-StagingPlan $manifest $PackageRoot $destination
+$preservedPaths = Get-PreservedDataPaths
+
+Write-Output "Destination: $destination"
+Write-Output "Planned payload files:"
+foreach ($item in $stagingPlan) {
+  Write-Output "  $($item.RelativePath)"
+}
+Write-Output "Preserved data paths:"
+foreach ($p in $preservedPaths) {
+  $status = if ($p.Exists) { '(exists)' } else { '(not found)' }
+  Write-Output "  $($p.Name) $status"
+}
+
 if (-not $Apply) {
-  Write-Output 'Dry-run only. Re-run with -Apply after reviewing the signed package.'
+  Write-Output 'Dry-run only. No files or directories were created.'
+  Write-Output 'Re-run with -Apply after reviewing the signed package.'
   return
 }
 
@@ -106,4 +283,4 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     [Security.Principal.WindowsBuiltInRole]::Administrator)) {
   throw 'Administrator privileges are required for -Apply.'
 }
-Invoke-HibikiInstall $PackageRoot $manifest
+Invoke-HibikiInstall $PackageRoot $manifest $destination
