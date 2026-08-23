@@ -12,7 +12,9 @@
     "reference_phon": {"type": "number", "minimum": 20, "maximum": 90},
     "strength": {"type": "number", "minimum": 0, "maximum": 1},
     "max_boost_db": {"type": "number", "minimum": 0, "maximum": 12},
-    "measured_f3_hz": {"type": "number", "minimum": 0, "maximum": 20000},
-    "anchor_id": {"type": ["string", "null"], "minLength": 1}
+    "measured_f3_hz": {"type": "number", "minimum": 0},
+    "anchor_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 64}
+
   }
 }
+
