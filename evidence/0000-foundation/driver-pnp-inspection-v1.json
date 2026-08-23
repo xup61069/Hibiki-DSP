@@ -1,0 +1,64 @@
+{
+  "schema_version": 2,
+  "issue": 781,
+  "title": "Read-only anonymized driver PnP inspection bundle",
+  "base_commit": "5e4e60ea017e1f732bb146a5d8b7673d99be5c3a",
+  "source_commit": "74c9492a",
+  "summary": {
+    "behavior": "A PowerShell 7 collector targets only ROOT\\HIBIKIDSP and HibikiVirtualAudio, reads typed PnP problem/service/driver properties plus a bounded SetupAPI tail, redacts local identifiers and writes JSON only below repository .local.",
+    "user_impact": "The next consent-gated VM retest can distinguish missing-device, service, problem-code and problem-status states and retain a comparable sanitized install excerpt instead of reporting only a generic Code 10.",
+    "scope_boundary": "Inspection-only source/self-test and host unavailable-path evidence. No device or boot mutation, driver installation, load, PnP start, runtime audio, HLK or Microsoft signing claim.",
+    "files": [
+      "tools/driver-pnp-inspection.ps1"
+    ]
+  },
+  "privacy_and_safety": {
+    "exact_target": "Only instance IDs matching ROOT\\HIBIKIDSP and service HibikiVirtualAudio are projected.",
+    "redaction": "Instance IDs become 16-character SHA-256 tokens; SetupAPI excerpts redact Hibiki instance suffixes, filesystem/UNC paths, SIDs and the computer name.",
+    "bounded_output": "At most the requested SetupAPI section tail is emitted (default 160 lines), and the destination must remain below .local with no reparse-point parent or directory leaf.",
+    "mutation_boundary": "The script AST self-test rejects PnP/boot mutation commands; runtime output records mutation_attempted=false."
+  },
+  "validation": [
+    {
+      "command": "pwsh -NoProfile -File tools/driver-pnp-inspection.ps1 -SelfTest",
+      "result": "pass; 7 offline cases for output containment, reparse rejection, exact target filtering, typed 10/0xC000000D projection, redaction, bounded SetupAPI extraction and absence of mutating commands"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/driver-pnp-inspection.ps1",
+      "result": "pass on non-guest host; inspection-only; mutation_attempted=false; device_count=0; PnP cmdlets available; missing Hibiki service reported as unavailable; sanitized JSON written under .local"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 781",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1",
+      "result": "pass; 80 required paths and 24 specs"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-policy.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ],
+  "official_references": [
+    "https://learn.microsoft.com/en-us/powershell/module/pnpdevice/get-pnpdeviceproperty",
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/install/devpkey-device-problemstatus",
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/pnputil-command-syntax",
+    "https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/devcon-migration"
+  ],
+  "limits": [
+    "The host run had no Hibiki PnP device or service; it proves honest unavailable behavior, not driver load.",
+    "The next Issue #462 guest run still requires explicit user consent before any install, enable, TESTSIGNING or reboot action.",
+    "DbgPrintEx stage output requires the separately configured guest/kernel-debug capture path and is not fabricated by this collector."
+  ],
+  "next_safe_action": "After PR review/merge and explicit user consent, run the collector before and immediately after the Issue #462 isolated-VM install/PnP start attempt and compare the sanitized reports.",
+  "date": "2026-08-23"
+}
