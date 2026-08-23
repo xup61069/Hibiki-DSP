@@ -38,3 +38,6 @@ profiles/private/
 profiles/device-data/
 **/endpoint-id*
 **/*serial*
+
+.opencode/
+.opencode/
