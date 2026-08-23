@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "issue": 748,
+  "scope_digest": "extension-popup-labelledby-gate-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6; extension popup source-only gate",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 748",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/extension-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/extension-check.ps1"
+  ],
+  "results": [
+    {
+      "command": "Extension popup accessible-name target gate",
+      "status": "pass",
+      "coverage": [
+        "extension-check resolves every aria-labelledby ID against popup elements and strips nested markup before requiring non-empty text.",
+        "A labelledby reference takes precedence over an otherwise valid aria-label; missing targets or empty text fail closed.",
+        "Offline self-tests cover valid label references, missing targets, empty-text targets and existing aria-label cases; the real popup passes at two named controls."
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "The gate is a source-level accessibility regression check, not a browser UI Automation runtime audit.",
+    "No physical-audio, driver install/load, HLK, Microsoft signing or vendor ASIO control is claimed."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6"
+  },
+  "started_at": "2026-08-23T21:20:00+08:00",
+  "finished_at": "2026-08-23T21:50:00+08:00"
+}
