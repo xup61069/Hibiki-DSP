@@ -2,27 +2,42 @@ const button = document.getElementById('capture');
 const stopButton = document.getElementById('stop');
 const status = document.getElementById('status');
 
+let capturing = false;
+let bridgeConnected = false;
+
+function render() {
+  button.disabled = capturing;
+  stopButton.disabled = !capturing;
+  status.textContent = capturing
+    ? (bridgeConnected ? 'Capturing — Hibiki connected' : 'Capturing — native bridge not detected')
+    : 'Idle';
+}
+
 function setBusy(isBusy) {
-  button.disabled = isBusy;
-  stopButton.disabled = isBusy;
+  button.disabled = isBusy || capturing;
+  stopButton.disabled = isBusy || !capturing;
 }
 
 async function refreshState() {
   setBusy(true);
   try {
     const state = await chrome.runtime.sendMessage({type: 'get-capture-state'});
-    updateControls(state?.capturing === true);
+    capturing = state?.capturing === true;
+    bridgeConnected = state?.bridgeConnected === true;
   } catch (_) {
-    updateControls(false);
+    capturing = false;
+    bridgeConnected = false;
   }
+  render();
   setBusy(false);
 }
 
-function updateControls(capturing) {
-  button.disabled = capturing;
-  stopButton.disabled = !capturing;
-  status.textContent = capturing ? 'Capturing' : 'Idle';
-}
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type !== 'capture-state') return;
+  capturing = message.capturing === true;
+  bridgeConnected = message.bridgeConnected === true;
+  render();
+});
 
 button.addEventListener('click', async () => {
   setBusy(true);
@@ -35,11 +50,14 @@ button.addEventListener('click', async () => {
   }
   const response = await chrome.runtime.sendMessage({type: 'capture-active-tab', tabId: tab.id});
   if (response?.ok) {
-    updateControls(true);
+    capturing = true;
+    render();
   } else {
     status.textContent = response?.error ?? 'Capture failed';
-    updateControls(false);
+    capturing = false;
+    render();
   }
+  setBusy(false);
 });
 
 stopButton.addEventListener('click', async () => {
@@ -47,11 +65,13 @@ stopButton.addEventListener('click', async () => {
   status.textContent = 'Stopping capture…';
   const response = await chrome.runtime.sendMessage({type: 'stop-capture'});
   if (response?.ok) {
-    updateControls(false);
+    capturing = false;
+    bridgeConnected = false;
+    render();
   } else {
     status.textContent = response?.error ?? 'Stop failed';
-    updateControls(true);
   }
+  setBusy(false);
 });
 
 refreshState();
