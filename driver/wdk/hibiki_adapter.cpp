@@ -29,15 +29,18 @@ static const PCWSTR EndpointSubdeviceNames[HIBIKI_MAX_SUBDEVICES_V1] = {
 extern "C" NTSTATUS HibikiRegisterSingleSubdeviceV1(
     _In_ PDEVICE_OBJECT   DeviceObject,
     _In_ PRESOURCELIST    ResourceList,
+    _In_opt_ PIRP         Irp,
     _In_ ULONG            EndpointIndex,
     _In_ PCWSTR           SubdeviceName) {
     if (DeviceObject == nullptr || SubdeviceName == nullptr) {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: RegisterSingle null param\n");
         return STATUS_INVALID_PARAMETER;
     }
 
     hibiki_endpoint_topology_v1 topology{};
     if (hibiki_endpoint_topology_get_v1(EndpointIndex, &topology) == 0 ||
         hibiki_endpoint_topology_validate_v1(&topology) == 0) {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] topology invalid idx=%lu\n", SubdeviceName, EndpointIndex);
         return STATUS_INVALID_PARAMETER;
     }
 
@@ -45,13 +48,16 @@ extern "C" NTSTATUS HibikiRegisterSingleSubdeviceV1(
     PPORT port = nullptr;
     NTSTATUS ntStatus = PcNewPort(&port, CLSID_PortWaveRT);
     if (!NT_SUCCESS(ntStatus) || port == nullptr) {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] PcNewPort failed 0x%08X\n", SubdeviceName, ntStatus);
         return ntStatus;
     }
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL, "HIBIKI: [%ws] PcNewPort ok\n", SubdeviceName);
 
     // 2. Create and initialize Miniport WaveRT
     auto* miniport = new (NonPagedPoolNx) HibikiMiniportWaveRtV1();
     if (miniport == nullptr) {
         port->Release();
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] alloc miniport failed\n", SubdeviceName);
         return STATUS_INSUFFICIENT_RESOURCES;
     }
 
@@ -60,19 +66,25 @@ extern "C" NTSTATUS HibikiRegisterSingleSubdeviceV1(
     if (!NT_SUCCESS(ntStatus)) {
         miniport->Release();
         port->Release();
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] InitEndpoint failed 0x%08X\n", SubdeviceName, ntStatus);
         return ntStatus;
     }
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL, "HIBIKI: [%ws] InitEndpoint ok\n", SubdeviceName);
 
-    // 3. Initialize Port with Miniport
-    ntStatus = port->Init(DeviceObject, nullptr, miniport, nullptr, ResourceList);
+    // 3. Initialize Port with Miniport. Pass the start-device IRP through;
+    // PortCls requires the initiating IRP during subdevice installation.
+    ntStatus = port->Init(DeviceObject, Irp, miniport, nullptr, ResourceList);
     if (!NT_SUCCESS(ntStatus)) {
         miniport->Release();
         port->Release();
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] port->Init failed 0x%08X\n", SubdeviceName, ntStatus);
         return ntStatus;
     }
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL, "HIBIKI: [%ws] port->Init ok\n", SubdeviceName);
 
     // 4. Register Subdevice with PortCls
     ntStatus = PcRegisterSubdevice(DeviceObject, const_cast<PWSTR>(SubdeviceName), port);
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: [%ws] PcRegisterSubdevice -> 0x%08X\n", SubdeviceName, ntStatus);
 
     // Release local COM references (PortCls retains registered references)
     miniport->Release();
@@ -83,12 +95,13 @@ extern "C" NTSTATUS HibikiRegisterSingleSubdeviceV1(
 
 extern "C" NTSTATUS HibikiRegisterSubdevicesV1(
     _In_ PDEVICE_OBJECT   DeviceObject,
-    _In_ PRESOURCELIST    ResourceList) {
+    _In_ PRESOURCELIST    ResourceList,
+    _In_opt_ PIRP         Irp) {
     if (DeviceObject == nullptr) return STATUS_INVALID_PARAMETER;
 
     for (ULONG i = 0; i < HIBIKI_MAX_SUBDEVICES_V1; ++i) {
         const NTSTATUS ntStatus = HibikiRegisterSingleSubdeviceV1(
-            DeviceObject, ResourceList, i, EndpointSubdeviceNames[i]);
+            DeviceObject, ResourceList, Irp, i, EndpointSubdeviceNames[i]);
         if (!NT_SUCCESS(ntStatus)) {
             return ntStatus;
         }
@@ -105,11 +118,9 @@ extern "C" NTSTATUS HibikiStartDevice(
     _In_ PDEVICE_OBJECT   DeviceObject,
     _In_ PIRP             Irp,
     _In_ PRESOURCELIST    ResourceList) {
-    UNREFERENCED_PARAMETER(Irp);
-
     if (DeviceObject == nullptr) return STATUS_INVALID_PARAMETER;
 
-    return HibikiRegisterSubdevicesV1(DeviceObject, ResourceList);
+    return HibikiRegisterSubdevicesV1(DeviceObject, ResourceList, Irp);
 }
 
 //=============================================================================
