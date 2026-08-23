@@ -162,6 +162,11 @@ public sealed partial class MainWindow : Window
         ViewModel.Vst3TimelineEditor.ClearHistory();
     }
 
+    private void OnVst3SaveBaselineClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.Vst3TimelineEditor.SaveSelected();
+    }
+
     private void OnVst3RegisterClick(object sender, RoutedEventArgs e)
     {
         ViewModel.Vst3TimelineEditor.RegisterTimeline(ViewModel.Vst3TimelineEditor.NewTimelineIdText);
