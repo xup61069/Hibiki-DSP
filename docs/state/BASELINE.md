@@ -795,6 +795,24 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
+第二十波指令面與證據增量已合併：AGENTS.md 改寫為三層規則索引（硬性限制／產品與流程
+預設／core+conditional 驗證門檻），driver 安裝、載入、HLK 與 Microsoft 簽章明確歸屬
+release 階段，README gates 清單同步拆分核心與條件式兩層，AI_HANDOFF 從長文壓縮為短入口、
+MULTI_AGENT 認領流程改為「指派後即開工、首個可審閱 commit 開 draft PR」並把 directory
+lane 表降級為路由提示，CONTRIBUTING 移除已廢除的 baseline counter 檔指引，退役的
+task-handoff schema 以 SPEC-0004 記錄並由 CHANGE_CONTRACT.yml 的 validation_tiers 取代，
+evidence ai-instruction-audit-v2.json（Issue #610 / PR #616）；README live probe 文件對齊：
+live-wasapi-handoff-check.ps1 與 live-audio-session-check.ps1 兩個 opt-in 探針從公開入口頁
+可被發現（匿名彙整輸出與 unavailable 如實記錄語意），docs-check -SelfTest 範例補進 gates
+說明，evidence readme-live-probe-docs-v1.json（Issue #613 / PR #615）；隔離 Hyper-V VM
+WaveRT 載入測試 evidence：official Win11 media 建置 Gen2 guest、testsigning 開啟、Root
+cert 匯入成功但 TrustedPublisher store 缺失導致 Driver Store 以 0xE0000242 拒絕 catalog，
+guest 內 Import-Certificate 恢復後 pnputil 成功 staging 為 oem2.inf，devcon 建立
+Root\HibikiDSP 且服務安裝但 PnP start 可重現失敗（CM_PROB_FAILED_START /
+NTSTATUS 0xC000000D，含 disable/enable 重試），明確不主張實體音訊、WaveRT streaming、HLK
+或 Microsoft signing，evidence driver-vm-load-test-v1.json（Issue #462 / PR #614）。皆為
+docs/evidence 增量。
+
 目前驗證摘要：`verify.ps1` 的 3 個 CTest（contract_tests、asio_transport_selftest、tab_bridge_selftest）通過；`docs-check.ps1` 的 80 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；
