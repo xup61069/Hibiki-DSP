@@ -1024,7 +1024,7 @@ contract/control-model checks。
 本次 CalibrationModel C# control model 與 bounded PEQ compiler 的 source commit 是 `5ef674f`；
 本次 Vst3TimelineEditor supervisor-side parameter timeline editing transaction 的 source commit 是 `9f5f02e`；
 本次 live SessionRouteRuleCommand upsert/remove readback transaction probe 的 source commit 是 `d1ad93e`；
-本次 live Engine Preview system volume write-through IPC probe 的 source commit 是 `c42cabd`；
+本次 live Engine Preview system volume write-through IPC probe 的 source commit 是 `1300e4cb5b2a6388f51049ebd98c945dcfeaf214`；
 本次 Expert per-App volume controls 的 source commit 是 `ebb80a3`；
 本次 Session command worker queue 的 source commit 是 `6f9d6b1`；
 本次 App route selection controls 的 source commit 是 `d4862d9`；
