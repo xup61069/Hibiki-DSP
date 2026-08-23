@@ -296,14 +296,23 @@ if ($null -ne $pnpDeviceCommand -and $null -ne $pnpPropertyCommand) {
   try {
     $allDevices = @(Get-PnpDevice -ErrorAction Stop)
     foreach ($device in @($allDevices | Where-Object { [string]$_.InstanceId -match $targetInstancePattern })) {
-      $properties = @(Get-PnpDeviceProperty -InstanceId ([string]$device.InstanceId) -KeyName @(
-          'DEVPKEY_Device_ProblemCode',
-          'DEVPKEY_Device_ProblemStatus',
-          'DEVPKEY_Device_Service',
-          'DEVPKEY_Device_DriverInfPath',
-          'DEVPKEY_Device_DriverVersion'
-        ) -ErrorAction Stop)
-      $devices += ConvertTo-HibikiDeviceSummary -Device $device -Properties $properties
+      $properties = @()
+      $propertyError = $null
+      try {
+        $properties = @(Get-PnpDeviceProperty -InstanceId ([string]$device.InstanceId) -KeyName @(
+            'DEVPKEY_Device_ProblemCode',
+            'DEVPKEY_Device_ProblemStatus',
+            'DEVPKEY_Device_Service',
+            'DEVPKEY_Device_DriverInfPath',
+            'DEVPKEY_Device_DriverVersion'
+          ) -ErrorAction Stop)
+      }
+      catch {
+        $propertyError = 'property-query-failed'
+      }
+      $summary = ConvertTo-HibikiDeviceSummary -Device $device -Properties $properties
+      $summary['property_error'] = $propertyError
+      $devices += $summary
     }
   }
   catch {
