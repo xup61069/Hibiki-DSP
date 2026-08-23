@@ -16,20 +16,24 @@
       "command": "integrator snapshot review",
       "status": "pass",
       "coverage": [
-        "Issue #804 / PR #808 merged at c6f2ad5d: DesktopCompat and WinUI Compatibility Previews expose bounded per-App route-rule presets (list with accessible remove actions, add/update draft fields, clear-all) reusing the existing EasyControlViewModel validation, 64-item limit, priority ordering and local JSON persistence; no engine IPC or schema change.",
-        "Issue #787 / PR #812 merged at b6549432: SPEC-0003 records the VirtualMicDspV1 upper-only 2 dB reopening hysteresis introduced by PR #795 as a normative DSP contract boundary; documentation-only change.",
-        "Issue #806 / PR #811 merged at 1344f6d7: wave34 global snapshot evidence timestamps corrected to match actual gate completion times; documentation-only change.",
-        "Issue #768 / PR #814 merged at db8efc4b: SceneCatalogCommandV1 (IPC type 20) adds a bounded 3260-byte wire format for Upsert/Remove/Clear on the engine-side scene catalog; engine control worker owns a mutable catalog and applies validated definitions atomically via existing SceneCatalogV1::upsert; C# control model sends Upsert after custom-scene save and Remove after delete when connected; contract tests cover encode-decode round-trip, engine apply, scene apply resolution, remove and corrupted-payload rejection."
+        "Issue #804 / PR #808 merged at c6f2ad5d: DesktopCompat and WinUI Compatibility Preview expose the bounded per-App route-rule workflow through existing ViewModel validation, persistence rollback, status and IPC seams.",
+        "Issue #810 / PR #812 merged at b6549432: SPEC-0003 records the shared upper-only 2 dB reopen hysteresis for BasicNoiseSuppressorV1 and VirtualMicDspV1 without changing source behavior.",
+        "Issue #809 / PR #811 merged at 1344f6d7: wave34 snapshot evidence now records actual gate timestamps, the full passing command list and an explicit post-merge correction note.",
+        "Issue #768 / PR #814 merged at db8efc4b: SceneCatalogCommandV1 adds bounded Upsert/Remove/Clear IPC; the engine owns a mutable validated scene catalog and the C# model pushes local add/remove changes when connected."
       ]
     }
   ],
   "limitations": [
-    "Documentation-only integrator snapshot; no product source behavior changes in this PR.",
-    "Route-rule preview evidence remains compatibility-preview source/build/launch scope; no runtime screen-reader audit or physical-audio claim.",
-    "Scene-catalog IPC is user-space contract/source/contract-test/engine-smoke evidence; no physical audio delivery, driver install/load, HLK or Microsoft signing claim.",
-    "Noise-gate hysteresis spec entry is a documentation record of already-merged PR #795 behavior; no new runtime measurement."
+    "Documentation-only integrator snapshot; this update does not change product source behavior.",
+    "Compatibility route-rule evidence remains preview source/build/launch evidence; no runtime screen-reader audit or physical audio delivery is claimed.",
+    "Custom scene catalog evidence is user-space source, contract-test, control-model, engine-preview and smoke-process evidence; no physical endpoint delivery, driver install/load, HLK or Microsoft signing is claimed.",
+    "The hysteresis spec update records already merged behavior and does not add a new conformance oracle or physical measurement.",
+    "Gate timestamps are minute-level local-clock approximations recorded after the run; individual command durations are not captured."
   ],
   "logs": [],
-  "started_at": "2026-08-24T09:30:00+08:00",
-  "finished_at": null
+  "tool_versions": {
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-24T00:57:00+08:00",
+  "finished_at": "2026-08-24T01:05:00+08:00"
 }

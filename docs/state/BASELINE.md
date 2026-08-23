@@ -835,6 +835,25 @@ schema version 1、harness identity、completed <= requested 且 iteration resul
 contract-model、source-gate、compatibility preview build/launch 或離線 self-test evidence；
 不宣稱 runtime screen-reader audit、實體音訊量測、driver guest 安裝／載入／HLK 或 Microsoft signing。
 
+第三十五波整合增量已合併：Desktop Compatibility Preview 新增完整的每-App 路由規則編輯面，
+WinUI Compatibility Preview 以可達 TextBox／NumberBox／CheckBox／ComboBox 提供同一流程；使用者
+可管理有界規則清單中的 ID、App ID、顯示名稱、Lane、output group、priority、makeup gain、
+enabled 與 gain owner，並執行新增／更新、逐筆移除和清除全部。操作重用既有 ViewModel 驗證、
+持久化 rollback、狀態文字與 IPC command seam，不改 EasyControlViewModel 或 engine contract
+(Issue #804 / PR #808)。SPEC-0003 把 BasicNoiseSuppressorV1 與 VirtualMicDspV1 的 noise gate
+hysteresis 記錄為權威契約：envelope 在設定 threshold 關閉，須回升到 threshold +2 dB 才重新
+開啟，中間保持狀態，避免臨界附近快速開關 (Issue #810 / PR #812)。自訂 Scene catalog 的控制平面
+同步加入 SceneCatalogCommandV1（IPC type 20）：固定 3260-byte payload 支援 Upsert／Remove／Clear，
+欄位邊界嚴格驗證、zero padding、bounded UTF-8 字串、finite double 與容量限制任一失敗即整包拒收；
+engine control worker 擁有 mutable catalog，收到 Upsert 後重建完整 SceneDefinitionV1 並通過既有
+Scene／Graph／ISO policy 驗證才原子替換。C# 控制模型在本機新增或刪除自訂卡且已連線時推送同步；
+contract tests 涵蓋 encode→decode 往返、engine apply、SceneApply resolution、remove 與破損 payload
+拒收 (Issue #768 / PR #814)。Wave34 快照 evidence 的未來時間 placeholder 已修正為實際 gate start/
+finish，補上 doctor、source-only-CI 與 verify 命令紀錄，並留下 post-merge correction 紀錄
+(Issue #809 / PR #811)。以上分別為 compatibility preview source/build/launch、spec/documentation、
+source+contract test/control-model/engine smoke 與 documentation/evidence correction evidence；
+不宣稱 runtime screen-reader audit、實體音訊量測、真實 installer 執行、driver guest 安裝／載入／HLK
+或 Microsoft signing。
 第三十三波整合增量已合併：官方 bootstrapper 新增經 manifest 與 SHA-256 驗證的交易式
 user-space payload staging，失敗會回復既有安裝且不碰 `%LocalAppData%/Hibiki DSP` 使用者
 資料；9 個離線功能案例涵蓋有效 staging、路徑逃逸拒絕、hash mismatch、rollback 與 backup
