@@ -173,8 +173,10 @@ Hello/Heartbeat 沿用既有 frame，ProcessBlock 以 caller-owned packet 驗證
 回傳 ProcessBlockResponse，plugin 或格式錯誤回傳 Error。這個 target 不會在一般 CI 或
 public source-only checkout 自動生成，且仍不提供第三方 plugin binary。
 
-`Vst3PluginStateStoreV1` 是私有 state boundary：每筆最多 1 MiB、最多 16 筆，要求 state
-ID、plugin ID、32-hex class UID、非零 module SHA-256 與明確 state version；restore 必須
+`Vst3PluginStateStoreV1` 是私有 state boundary：每筆最多 1 MiB、最多 16 筆，要求 state ID
+（1..64 bytes，`[a-z0-9][a-z0-9._-]*`）、plugin ID（1..128 bytes，
+`[a-z0-9][a-z0-9._-]*`）、32-hex class UID、非零 module SHA-256 與明確 state version；
+restore 必須
 完全匹配 identity/version，destination 不足或 mismatch 會 fail-closed。
 `restore_with_migration` 只在 identity 完全匹配且呼叫端明確提供 handler 時處理版本差異；
 沒有 handler、handler 回報錯誤、或輸出超過 1 MiB 都拒絕，Hibiki 不解讀第三方 opaque bytes。
@@ -189,7 +191,8 @@ error、destination 不足與 allocation failure 分開回報。它只建立 wor
 目前已有固定 16-rule `Vst3PluginStateMigrationRegistryV1` primitive，但 handler 仍由受信任的
 control-plane caller 注入，未提供自動探測或遠端下載。
 
-`Vst3SceneStateCoordinatorV1` 將 Scene ID、state ID、plugin identity 與 target state version
+`Vst3SceneStateCoordinatorV1` 將 Scene ID（與 state ID 相同 bounded ID 規則）、state ID、
+plugin identity 與 target state version
 綁定到最多 16 筆固定容量 reference。Scene 啟用前會 inspect 私有 state、檢查 byte bound，
 並要求 exact version 或 registry 中唯一的 source→target rule；`restore` 只寫入 caller-owned
 buffer，絕不把 opaque bytes 放入 Scene JSON、GitHub 或 AI context。其 metadata contract 是
