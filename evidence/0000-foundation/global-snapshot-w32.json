@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "issue": 760,
+  "scope_digest": "global-snapshot-w32",
+  "source_commit": null,
+  "environment_fingerprint": "windows-local-vs2026-sdk-26100-pwsh-7.6; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 760",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #753 / PR #755 merged: SPEC-0009 now records the popup accessibility policy introduced by PR #744 and extended by PR #750; every interactive popup control must carry a non-empty aria-label or an aria-labelledby whose targets all resolve to non-empty visible text, with violations failing closed.",
+        "Issue #752 / PR #757 merged: winui-shell-check now enforces two regression boundaries: DesktopCompat Preview interactive controls (Button, ComboBox, TrackBar, TextBox) must declare non-empty AccessibleName in Program.cs; formal shell MainWindow.xaml must retain the IR WAV load button with its AutomationProperties.Name and OnPrepareIrClick handler.",
+        "Issue #756 / PR #758 merged: formal shell route-health cards project the control model's complete accessible summary to assistive technology instead of only visual fragments, and Expert status changes use polite live-region announcement; source-only accessibility projection evidence."
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; this update does not change product source behavior.",
+    "SPEC-0009 a11y policy entry is documentation of an enforced source gate, not browser runtime automation.",
+    "DesktopCompat AccessibleName and IR load entry-point gates are source-level policy checks with offline self-tests.",
+    "Route health accessible summaries are source-only accessibility projection evidence; no runtime UIA or screen-reader audit was exercised.",
+    "No physical audio, driver install/load/HLK or Microsoft signing claim."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6"
+  },
+  "started_at": "2026-08-23T22:08:00+08:00",
+  "finished_at": "pending-gates"
+}
+

@@ -795,6 +795,17 @@ native 端在 detached/unselected/edit-session-open 時拒絕、成功時透過 
 官方空白 Issue 逃生口（Issue #604 / PR #606）。皆為 tooling/UI/VST3 surface/docs
 evidence。
 
+第三十二波整合增量已合併：SPEC-0009 補上 popup 無障礙政策的權威文件條目，記錄 PR #744
+引入並由 PR #750 擴充的 aria-label／aria-labelledby 強制檢查與 fail-closed 行為
+（Issue #753 / PR #755）。winui-shell-check 新增兩個回歸防護：DesktopCompat Preview 的
+互動控制項必須在 Program.cs 宣告非空 AccessibleName，正式 shell MainWindow.xaml 必須保留
+IR WAV 載入按鈕及其 AutomationProperties.Name 和 OnPrepareIrClick handler，缺漏會讓 gate
+fail-closed（Issue #752 / PR #757）。正式 shell route-health 卡片將控制模型的完整無障礙
+摘要投射給輔助技術而非僅視覺片段，Expert 狀態變更改用 polite live region 公告
+（Issue #756 / PR #758）。前者為文件 evidence，後者分別為 UI source-gate 與 source-only
+accessibility projection evidence。不宣稱正式 XAML/accessibility runtime audit、螢幕閱讀器
+runtime automation、實體音訊、driver 安裝/載入/HLK 或 Microsoft signing。
+
 第三十一波整合增量已合併：Desktop Compatibility Preview 的 14 個互動控制項全部補上非空
 AccessibleName，涵蓋 session 選擇器、音量滑桿、路由欄位、場景與 IR 控制以及本機建立的
 output-group 下拉和連線按鈕；名稱沿用可見的繁中介面用語，Release build 與啟動 smoke 通過
