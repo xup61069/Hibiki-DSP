@@ -515,6 +515,9 @@ int wmain(const int argc, wchar_t* const* argv) {
 
     hibiki::AudioEngineModel engine;
     hibiki::EngineControlWorkerV1 control_worker{engine};
+    // Custom scene cards arrive over control IPC; the preview host owns the
+    // fixed-capacity catalog for the lifetime of the worker.
+    control_worker.ensure_owned_scene_catalog();
     IrPrepareState ir_state{&engine};
     control_worker.set_ir_prepare_handler(prepare_ir_file, &ir_state);
     SystemVolumeState system_volume;

@@ -6,9 +6,12 @@
   "source_commit": null,
   "environment_fingerprint": "windows-local-pwsh-7.6.4; documentation-only integrator snapshot",
   "commands": [
+    "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 805",
     "pwsh -NoProfile -File tools/docs-check.ps1",
     "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
     "git diff --check"
   ],
   "results": [
@@ -29,6 +32,7 @@
   ],
   "limitations": [
     "Documentation-only integrator snapshot; this update does not change product source behavior.",
+    "Gate timestamps are minute-level local-clock approximations recorded after the run; individual command durations are not captured.",
     "Timeline UI evidence is control-model, shell-source gate and compatibility preview build/launch evidence only; no formal XAML runtime UIA or screen-reader audit was exercised.",
     "Virtual-mic hysteresis evidence is user-space source and contract-test evidence, not physical audio measurement.",
     "ISO 226 evidence remains caller-supplied-coefficient formula validation; no licensed coefficient dataset, conformance oracle or physical loudness claim is added.",
@@ -39,6 +43,11 @@
   "tool_versions": {
     "powershell": "7.6.4"
   },
-  "started_at": "2026-08-24T04:20:00+08:00",
-  "finished_at": "pending-gates"
+  "started_at": "2026-08-24T00:05:00+08:00",
+  "finished_at": "2026-08-24T00:17:12+08:00",
+  "post_merge_correction": {
+    "issue": 809,
+    "note": "Timestamps and gate list corrected after PR #807 merge; original evidence recorded pending-gates with a future-dated placeholder.",
+    "corrected_at": "2026-08-24T00:30:00+08:00"
+  }
 }

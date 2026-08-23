@@ -134,8 +134,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   `KWeightedProxy` 內容音量，速率與 boost/cut 都受 policy 限制。K-weighted 路徑仍是
   bounded proxy，不是靜默擷取、完整 gated LUFS meter、降噪或 BS.1770 conformance。
 - 同一個 tab effects contract 可選套用 `BasicNoiseSuppressorV1`：固定高通＋downward gate，
-  只接受 1–8 聲道且要求 sample rate/channel 完全相符。它是可測試的基本抑噪，不宣稱
-  RNNoise、頻譜 AI、AEC 或麥克風權限處理；效果順序為 PEQ → IR → basic suppressor → level。
+  只接受 1–8 聲道且要求 sample rate/channel 完全相符。gate 採 upper-only 2 dB hysteresis：
+  envelope 在設定的 threshold 關閉，必須回升到 threshold +2 dB 才重新開啟，兩個邊界之間
+  維持原狀態，因此訊號在臨界附近徘徊時不會反覆開關（chatter）。它是可測試的基本抑噪，
+  不宣稱 RNNoise、頻譜 AI、AEC 或麥克風權限處理；效果順序為 PEQ → IR → basic suppressor → level。
 - `SessionRouteGraphBuilderV1` 將 `AudioSessionRegistry` 的 active、已 bind session 轉成
   `GraphConfigV1`；`WindowsSession` gain owner 不重複套 lane makeup，`HibikiInternal` 才
   使用 per-session makeup dB。未綁定 session 忽略、重複 lane ID 或 Strict Direct 搭配 gain
@@ -160,7 +162,9 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
 - `VirtualMicRouteModel` 提供未來 Virtual Mic endpoint 的 user-space capture/reference contract：
   固定 1/2 聲道與 44.1/48/96/192 kHz、privacy mute 預設開啟、caller-owned capture 與
   render echo-reference copy。可選 `VirtualMicDspV1` 以固定 128-tap 上限做 normalized-LMS
-  reference cancellation 與慢速 noise gate；這是 bounded baseline，不宣稱 acoustic AEC、
+  reference cancellation 與慢速 noise gate；noise gate 同樣採 upper-only 2 dB hysteresis
+  （在設定 threshold 關閉、envelope 回升到 threshold +2 dB 才重新開啟，中間維持狀態），
+  臨界附近訊號不會造成 chatter。這是 bounded baseline，不宣稱 acoustic AEC、
   RNNoise 或 conformance，driver/IPC/permission indicator 仍需另行驗收。
 - `process_virtual_mic_lane_to_wasapi_v1` 在 privacy gate／optional DSP 後共用 lane-to-WASAPI
   adapter；capture、reference、graph 或 sink 任一邊界失敗都不提交。這只提供 user-space

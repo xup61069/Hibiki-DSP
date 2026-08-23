@@ -68,6 +68,7 @@ bool is_valid_message_type(const IpcMessageType type) noexcept {
         case IpcMessageType::SessionRouteCommand:
         case IpcMessageType::SessionRouteRuleCommand:
         case IpcMessageType::IrPrepareCommand:
+        case IpcMessageType::SceneCatalogCommand:
             return true;
     }
     return false;

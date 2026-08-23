@@ -28,6 +28,20 @@ UI mirror 以 `custom-scene-cards-v1.schema.json` 保存到 user-space 的本機
 暫存檔替換，載入先完整驗證後才交換 catalog。檔案只含顯示卡片，不含裝置 ID、校正資料、
 plugin state 或完整 graph；載入失敗時保留目前記憶體內容。
 
+## 引擎同步管線
+
+UI 新增或刪除自訂場景卡且控制管線已連線時，控制模型以 `SceneCatalogCommandV1`
+（IpcMessageType 20）向引擎推送 Upsert 或 Remove 操作。payload 使用固定 3260-byte
+wire format，欄位位置互不重疊：header 與 enum 位於 [0..23]，七組 IEEE-754 f64 參數位於
+[24..79]，三段 bounded string（scene_id、scene_name、output_group）與兩段 optional
+reference 字串分別佔用固定區間，timeline ID 表與最多 4 條 lane record 接在後方。
+
+編碼與解碼必須對稱且嚴格：schema 版本、operation 範圍、zero-padding、bounded-string
+可列印 UTF-8、enum 邊界、finite double、lane/timeline 容量任一驗證失敗即拒收，
+不得部分套用。make-up gain 以 Q16.16 定點數傳輸；channel matrix 以 f32 bit-level 序列化。
+引擎收到 Upsert 後重建完整 `SceneDefinitionV1`，通過既有 Scene/Graph/ISO policy 驗證後
+才進入 catalog；Remove/Clear 同樣走原子替換。
+
 ## 交易與容量
 
 - `SceneCatalogV1::upsert` 先建立完整 replacement，再以 slot swap 原子替換；配置失敗
@@ -45,13 +59,22 @@ plugin state 或完整 graph；載入失敗時保留目前記憶體內容。
 未知 custom ID、output group 不一致、非法 definition 與容量耗盡都回傳 Invalid／Failed，
 並保留上一個 active graph、Scene 與 revision。內建 Game／Movie／Voice／Studio 不依賴
 catalog，讓沒有使用者 preset 的 fresh clone 維持向後相容。
+wire format 解碼失敗不影響已存在的 catalog 內容或 active graph。
 
-## 正式殼層的本機卡片移除
+## 正式殼層的本機卡片移除與引擎同步
 
-正式 WinUI 殼層列出本機自訂卡片，並為每個移除操作提供非空無障礙名稱。移除只作用於 UI
-mirror 與本機 `custom-scene-cards-v1.schema.json` 檔案；引擎端 `SceneDefinition` catalog 不會被
-刪除或改寫。ViewModel 先更新記憶體 mirror，再以既有暫存檔替換流程保存；未知或內建 ID
-fail-closed，保存失敗時回復原卡片與選取狀態並顯示可讀錯誤。選取自訂卡片仍只能送出既有
+正式 WinUI 殼層列出本機自訂卡片，並為每個移除操作提供非空無障礙名稱。
+
+控制管線已連線時，ViewModel 在本機 mirror 與暫存檔保存成功後，以 `SceneCatalogCommandV1`
+Remove 向引擎推送同步刪除指令。引擎在 `SceneCatalogV1::remove` 中查找該 ID：找到才釋放
+該 slot 並回傳 Applied；找不到回傳 Invalid 且不影響其他 entry 或 active graph。收到非法
+payload 時解碼即拒收，同樣不觸碰既有 catalog。
+
+未連線時，移除只作用於 UI mirror 與本機 `custom-scene-cards-v1.schema.json` 檔案；
+引擎端 `SceneDefinition` catalog 維持原狀（下次連線前不會同步）。
+
+ViewModel 先更新記憶體 mirror，再以既有暫存檔替換流程保存；未知或內建 ID fail-closed，
+保存失敗時回復原卡片與選取狀態並顯示可讀錯誤。選取自訂卡片仍只能送出既有
 `SceneApply(scene_id, output_group)`。
 
 ## 驗收
@@ -60,5 +83,6 @@ fail-closed，保存失敗時回復原卡片與選取狀態並顯示可讀錯誤
    mirror 可 upsert、移除、列舉與選取同一個 ID。
 2. Strict Direct mismatch、非法 policy/graph、未知 ID 與 group mismatch fail-closed。
 3. 32-entry capacity、remove/clear 與 replacement failure 不破壞既有 slot。
-4. CTest、docs-check、source-policy 與 source-only CI gate 通過；沒有 binary 或私人裝置
-   metadata 進入 catalog/schema。
+4. wire format encode→decode 往返一致；破損 lane count 或非法 padding 拒收。
+5. CTest、docs-check、source-policy 與 source-only CI gate 通過；沒有 binary 或私人裝置
+  metadata 進入 catalog/schema。

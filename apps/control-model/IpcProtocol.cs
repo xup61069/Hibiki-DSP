@@ -28,7 +28,8 @@ public enum ControlMessageType : ushort
     SessionVolumeCommand = 16,
     SessionRouteCommand = 17,
     SessionRouteRuleCommand = 18,
-    IrPrepareCommand = 19
+    IrPrepareCommand = 19,
+    SceneCatalogCommand = 20
 }
 
 public enum IpcDecodeError
@@ -156,7 +157,8 @@ public static class IpcCodecV1
         ControlMessageType.ControlStatusSnapshot or ControlMessageType.ControlStatusRequest or
         ControlMessageType.SessionCatalogSnapshot or ControlMessageType.SessionCatalogRequest or
         ControlMessageType.SessionVolumeCommand or ControlMessageType.SessionRouteCommand or
-        ControlMessageType.SessionRouteRuleCommand or ControlMessageType.IrPrepareCommand;
+        ControlMessageType.SessionRouteRuleCommand or ControlMessageType.IrPrepareCommand or
+        ControlMessageType.SceneCatalogCommand;
 }
 
 public static class ControlPayloadsV1
@@ -530,6 +532,89 @@ public static class ControlPayloadsV1
         BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(16), expectedChannels);
         BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(20), (ushort)pathBytes.Length);
         pathBytes.CopyTo(payload.AsSpan(24));
+        return payload;
+    }
+
+    // Bounded mirror of the C++ SceneCatalogCommandV1 wire format. Only the
+    // fields needed by the UI's custom scene cards are populated; the rest of
+    // the definition is validated engine-side and stays fail-closed on any
+    // mismatch.
+    public sealed record SceneCatalogLaneV1(
+        string Id,
+        string OutputGroup,
+        uint ChannelCount,
+        double MakeupGainDb,
+        bool Enabled,
+        bool MatrixEnabled,
+        int[] ChannelMap,
+        float[,] ChannelMatrix,
+        uint ReportedLatencySamples);
+
+    private const int SceneCatalogPayloadBytes = 3260;
+
+    public static byte[] EncodeSceneCatalogCommand(
+        SessionRouteRuleOperationV1 operation,
+        string sceneId,
+        string name = "",
+        string outputGroup = "")
+    {
+        var id = StrictUtf8.GetBytes(sceneId ?? string.Empty);
+        var payload = new byte[SceneCatalogPayloadBytes];
+        if (operation == SessionRouteRuleOperationV1.Clear)
+        {
+            if (id.Length != 0) throw new ArgumentException("Clear must not carry a scene ID.");
+            payload[1] = (byte)operation;
+            return payload;
+        }
+        if (id.Length is < 1 or > 31 || id.Any(value => value < 0x20))
+            throw new ArgumentException("Scene ID must be 1..31 printable UTF-8 bytes.",
+                                        nameof(sceneId));
+        payload[1] = (byte)operation;
+        id.CopyTo(payload.AsSpan(96));
+        payload[17] = (byte)id.Length;
+        if (operation == SessionRouteRuleOperationV1.Remove)
+            return payload;
+
+        var nameBytes = StrictUtf8.GetBytes(name ?? string.Empty);
+        var outputBytes = StrictUtf8.GetBytes(outputGroup ?? string.Empty);
+        if (nameBytes.Length is < 1 or > 120 ||
+            outputBytes.Length is < 1 or > 64 ||
+            nameBytes.Any(value => value < 0x20) || outputBytes.Any(value => value < 0x20))
+            throw new ArgumentException("Scene name/output group are outside the v1 limit.");
+        nameBytes.CopyTo(payload.AsSpan(128));
+        outputBytes.CopyTo(payload.AsSpan(248));
+
+        BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(4), 0U);   // Game latency mode.
+        BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(8), 3U);   // IR phase bypass.
+        BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(80), 1U);  // Relative loudness.
+        BinaryPrimitives.WriteDoubleLittleEndian(payload.AsSpan(24), -1.0); // Limiter.
+        BinaryPrimitives.WriteDoubleLittleEndian(payload.AsSpan(32), -1.0);
+        BinaryPrimitives.WriteDoubleLittleEndian(payload.AsSpan(40), 80.0);
+        BinaryPrimitives.WriteDoubleLittleEndian(payload.AsSpan(48), 0.30);
+        BinaryPrimitives.WriteDoubleLittleEndian(payload.AsSpan(56), 6.0);
+        payload[12] = 1;                                                   // Auto attenuate on.
+        payload[13] = 0;                                                   // Strict Direct off.
+        payload[14] = 2;                                                   // Stereo graph.
+        payload[15] = 1;                                                   // One lane.
+        payload[18] = (byte)nameBytes.Length;
+        payload[19] = (byte)outputBytes.Length;
+        payload[22] = 1;                                                   // ISO derived standard.
+
+        var laneId = StrictUtf8.GetBytes(sceneId + "-lane");
+        if (laneId.Length is < 1 or > 31)
+            throw new ArgumentException("Derived lane ID exceeds the v1 limit.", nameof(sceneId));
+        laneId.CopyTo(payload.AsSpan(1464));
+        outputBytes.CopyTo(payload.AsSpan(1495));
+        BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(1559), 2U);
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(1563), 0);
+        payload[1567] = 1;                                                 // Enabled.
+        payload[1568] = 0;                                                 // Matrix disabled.
+        payload[1569] = 0;
+        payload[1570] = 1;
+        BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(1581),
+                                                  (ushort)laneId.Length);
+        BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(1583),
+                                                  (ushort)outputBytes.Length);
         return payload;
     }
 
@@ -1082,6 +1167,17 @@ public sealed class ControlCommandFactoryV1
     public IpcEnvelopeV1 ApplyScene(string sceneId, string outputGroup) =>
         _requests.Create(ControlMessageType.SceneApply,
             ControlPayloadsV1.EncodeSceneApply(sceneId, outputGroup));
+
+    public IpcEnvelopeV1 UpsertSceneCatalog(string sceneId, string name,
+                                             string outputGroup) =>
+        _requests.Create(ControlMessageType.SceneCatalogCommand,
+            ControlPayloadsV1.EncodeSceneCatalogCommand(
+                SessionRouteRuleOperationV1.Upsert, sceneId, name, outputGroup));
+
+    public IpcEnvelopeV1 RemoveSceneCatalog(string sceneId) =>
+        _requests.Create(ControlMessageType.SceneCatalogCommand,
+            ControlPayloadsV1.EncodeSceneCatalogCommand(
+                SessionRouteRuleOperationV1.Remove, sceneId));
 
     public IpcEnvelopeV1 PrepareIr(string path, IrPhasePolicyV1 policy,
                                    uint expectedSampleRate = 0U,
