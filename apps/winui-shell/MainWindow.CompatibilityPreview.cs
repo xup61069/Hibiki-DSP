@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Media;
 using Hibiki.ControlModel;
+using System.Globalization;
 
 namespace Hibiki.WinUI;
 
@@ -16,6 +17,7 @@ public sealed partial class MainWindow
 #if HIBIKI_COMPATIBILITY_PREVIEW
     private readonly StackPanel _compatibilityCustomSceneList = new() { Spacing = 8 };
     private readonly StackPanel _compatibilityRouteRuleList = new() { Spacing = 8 };
+    private readonly StackPanel _compatibilityVst3RowList = new() { Spacing = 4 };
 
     private static T ResolveThemeResource<T>(string key) where T : class
     {
@@ -337,6 +339,44 @@ public sealed partial class MainWindow
         AutomationProperties.SetName(redoButton, "重做時間軸操作");
         redoButton.Click += OnVst3RedoClick;
         content.Children.Add(redoButton);
+        var clearHistoryButton = new Button { Content = "清除歷史" };
+        AutomationProperties.SetName(clearHistoryButton, "清除時間軸編輯歷史");
+        clearHistoryButton.Click += OnVst3ClearHistoryClick;
+        content.Children.Add(clearHistoryButton);
+        var saveBaselineButton = new Button { Content = "保存基準" };
+        AutomationProperties.SetName(saveBaselineButton, "保存時間軸基準");
+        saveBaselineButton.Click += OnVst3SaveBaselineClick;
+        content.Children.Add(saveBaselineButton);
+
+        AutomationProperties.SetName(_compatibilityVst3RowList, "VST3 時間軸事件列表");
+        content.Children.Add(_compatibilityVst3RowList);
+        var eventParameterBox = new TextBox { Header = "參數 ID", PlaceholderText = "0" };
+        AutomationProperties.SetName(eventParameterBox, "新事件參數 ID");
+        eventParameterBox.SetBinding(TextBox.TextProperty,
+            TwoWayBindingFor("Vst3TimelineEditor.NewParameterIdText"));
+        var eventPositionBox = new TextBox { Header = "取樣位置", PlaceholderText = "0" };
+        AutomationProperties.SetName(eventPositionBox, "新事件取樣位置");
+        eventPositionBox.SetBinding(TextBox.TextProperty,
+            TwoWayBindingFor("Vst3TimelineEditor.NewPositionText"));
+        var eventValueBox = new TextBox { Header = "正規化值 0–1", PlaceholderText = "0.0" };
+        AutomationProperties.SetName(eventValueBox, "新事件正規化值");
+        eventValueBox.SetBinding(TextBox.TextProperty,
+            TwoWayBindingFor("Vst3TimelineEditor.NewValueText"));
+        var eventFields = new Grid { ColumnSpacing = 8 };
+        eventFields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        eventFields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        eventFields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(eventParameterBox, 0);
+        Grid.SetColumn(eventPositionBox, 1);
+        Grid.SetColumn(eventValueBox, 2);
+        eventFields.Children.Add(eventParameterBox);
+        eventFields.Children.Add(eventPositionBox);
+        eventFields.Children.Add(eventValueBox);
+        content.Children.Add(eventFields);
+        var upsertEventButton = new Button { Content = "加入事件" };
+        AutomationProperties.SetName(upsertEventButton, "加入時間軸事件");
+        upsertEventButton.Click += OnVst3UpsertClick;
+        content.Children.Add(upsertEventButton);
         var rowValueBox = new TextBox { Header = "更新值", Width = 120 };
         AutomationProperties.SetName(rowValueBox, "修改選取列的值");
         rowValueBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("Vst3TimelineEditor.SelectedRowValueText"));
@@ -345,7 +385,13 @@ public sealed partial class MainWindow
         AutomationProperties.SetName(setRowValueButton, "更新選取列數值");
         setRowValueButton.Click += OnVst3SetRowValueClick;
         content.Children.Add(setRowValueButton);
+        var removeRowButton = new Button { Content = "刪除選取列" };
+        AutomationProperties.SetName(removeRowButton, "刪除選取列");
+        removeRowButton.Click += OnVst3RemoveRowClick;
+        content.Children.Add(removeRowButton);
         content.Children.Add(BoundText("Vst3TimelineEditor.StatusText"));
+        ViewModel.Vst3TimelineEditor.PropertyChanged += OnCompatibilityVst3PropertyChanged;
+        SyncCompatibilityVst3Rows();
 
         content.Children.Add(new TextBlock
         {
@@ -399,6 +445,7 @@ public sealed partial class MainWindow
     private void OnCompatibilityPreviewClosed(object sender, WindowEventArgs e)
     {
         ViewModel.PropertyChanged -= OnCompatibilityViewModelPropertyChanged;
+        ViewModel.Vst3TimelineEditor.PropertyChanged -= OnCompatibilityVst3PropertyChanged;
     }
 
     private void SyncCompatibilityCustomScenes()
@@ -483,6 +530,57 @@ public sealed partial class MainWindow
             row.Children.Add(summary);
             row.Children.Add(removeButton);
             _compatibilityRouteRuleList.Children.Add(row);
+        }
+    }
+
+    private void OnCompatibilityVst3PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(Vst3TimelineEditorViewModelV1.TimelineIds) ||
+            e.PropertyName == nameof(Vst3TimelineEditorViewModelV1.Rows))
+            SyncCompatibilityVst3Rows();
+    }
+
+    private void SyncCompatibilityVst3Rows()
+    {
+        _compatibilityVst3RowList.Children.Clear();
+        foreach (var row in ViewModel.Vst3TimelineEditor.Rows)
+        {
+            var rowLayout = new Grid { ColumnSpacing = 8 };
+            rowLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            rowLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var details = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
+            var identity = new TextBlock
+            {
+                Text = $"#{row.Index} 參數 {row.ParameterId}",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                TextWrapping = TextWrapping.Wrap,
+            };
+            var values = new TextBlock
+            {
+                Text = $"位置 {row.SamplePosition}；值 {row.NormalizedValue.ToString("0.0###", CultureInfo.InvariantCulture)}",
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush"),
+            };
+            AutomationProperties.SetName(details, $"時間軸列 {row.Index} 內容");
+            details.Children.Add(identity);
+            details.Children.Add(values);
+            Grid.SetColumn(details, 0);
+            var selectButton = new Button { Content = "選取列", Tag = row.Index };
+            AutomationProperties.SetName(selectButton, "選取時間軸列");
+            selectButton.Click += OnCompatibilityVst3RowSelectClick;
+            Grid.SetColumn(selectButton, 1);
+            rowLayout.Children.Add(details);
+            rowLayout.Children.Add(selectButton);
+            _compatibilityVst3RowList.Children.Add(rowLayout);
+        }
+    }
+
+    private void OnCompatibilityVst3RowSelectClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: int index })
+        {
+            ViewModel.Vst3TimelineEditor.SelectedRowIndex = index;
+            SyncCompatibilityVst3Rows();
         }
     }
 
