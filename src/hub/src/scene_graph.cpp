@@ -117,9 +117,30 @@ bool process_graph_filtered(const RtGraphSnapshotV1& snapshot,
 
     for (std::size_t lane_index = 0; lane_index < snapshot.lane_count; ++lane_index) {
         const auto& lane = snapshot.lanes[lane_index];
-        if (!output_group.empty() &&
-            (lane.output_group_bytes != output_group.size() ||
-             !std::equal(output_group.begin(), output_group.end(), lane.output_group.begin()))) {
+        const bool is_target_group = output_group.empty() ||
+            (lane.output_group_bytes == output_group.size() &&
+             std::equal(output_group.begin(), output_group.end(),
+                        lane.output_group.begin()));
+        if (!is_target_group) {
+            // Every enabled lane must advance its fixed delay clock once per
+            // render block, even when it does not mix into the target output
+            // group. Otherwise its cross-block ring falls behind the shared
+            // audio timeline and returns stale plugin-latency compensation
+            // on the next render for its own group.
+            if (latency_bank != nullptr && lane.enabled) {
+                const auto& background_input = inputs[lane_index];
+                if (background_input.interleaved != nullptr &&
+                    background_input.channel_count == lane.input_channels &&
+                    background_input.channel_count > 0 &&
+                    background_input.channel_count <= 8) {
+                    if (!latency_bank->process_lane(lane_index,
+                                                    background_input.interleaved,
+                                                    background_input.channel_count,
+                                                    frames)) {
+                        return false;
+                    }
+                }
+            }
             continue;
         }
         matched_output_group = true;

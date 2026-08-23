@@ -149,6 +149,9 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   `process_graph_for_output_group` 與 `AudioEngineModel::process_output_group` 只 render
   指定群組，未命中的群組 fail-closed，避免四個 App／tab 的 samples 互相串音。未指定群組
   的舊 `process_graph` 仍保留「render 全部 lanes」語意。
+- grouped render 必須讓每個 enabled lane 的固定 latency ring 剛好推進一次，即使該 lane
+  不屬於目前 target group；背景 lane 只推進 clock，不混入 target output。contract test
+  覆蓋 main/movie 交錯 callback 時的 impulse 對齊。
 - `WindowsWasapiOutputV1` 提供 user-space physical sink boundary：同一個 dedicated sink worker
   apartment 以 endpoint ID 綁定 shared-mode Float32 2/6/8 聲道與固定 sample rate，再由該 worker
   的 `render` 處理 padding、WASAPI buffer copy、ReleaseBuffer。格式不符、裝置不存在或 buffer

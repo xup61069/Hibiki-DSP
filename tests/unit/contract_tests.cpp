@@ -3821,6 +3821,70 @@ int main() {
     CHECK(std::abs(group_engine_output[254] - 0.25F) < 1e-5F &&
           std::abs(group_engine_output[255] + 0.25F) < 1e-5F);
 
+    // Multi-group render clock: a delayed lane must advance once per render,
+    // even while another output group is selected, so its fixed ring stays on
+    // the shared audio timeline instead of returning stale alignment.
+    auto clocked_group_engine = std::make_unique<AudioEngineModel>();
+    GraphConfigV1 clocked_group_graph;
+    clocked_group_graph.lanes.push_back(LaneConfigV1{"clock-delay", "main", 2, 0.0, true});
+    clocked_group_graph.lanes.push_back(LaneConfigV1{"clock-reference", "main", 2, 0.0, true});
+    clocked_group_graph.lanes.push_back(LaneConfigV1{"clock-movie", "movie", 2, 0.0, true});
+    clocked_group_graph.lanes[0].reported_latency_samples = 0U;
+    clocked_group_graph.lanes[1].reported_latency_samples = 2U;
+    CHECK(clocked_group_engine->prepare_graph(clocked_group_graph, 2U) &&
+          clocked_group_engine->commit_graph());
+    CHECK(clocked_group_engine->apply_windows_volume(
+              "main", VolumeNotificationV1{12.0, false, 1U}) ==
+          VolumeNotificationResult::Accepted);
+    CHECK(clocked_group_engine->apply_windows_volume(
+              "movie", VolumeNotificationV1{0.0, false, 1U}) ==
+          VolumeNotificationResult::Accepted);
+    clocked_group_engine->set_sample_rate(8000U);
+    std::array<float, 2U * 128U> clock_prime_input{};
+    std::array<float, 2U * 128U> clock_prime_output{};
+    const std::array<RtLaneInputV1, 3> clock_prime_views{{
+        {clock_prime_input.data(), 2U},
+        {clock_prime_input.data(), 2U},
+        {clock_prime_input.data(), 2U}}};
+    for (int prime_pass = 0; prime_pass < 2; ++prime_pass) {
+        CHECK(clocked_group_engine->process_output_group(
+            "movie", clock_prime_views, clock_prime_output.data(), 128U));
+        // The silent reference lane keeps the shared limiter state quiet so
+        // the delayed impulse is not rescaled between grouped render calls.
+        CHECK(clocked_group_engine->process_output_group(
+            "main", clock_prime_views, clock_prime_output.data(), 128U));
+    }
+    std::array<float, 2> clock_movie_input{0.3F, -0.3F};
+    std::array<float, 2> clock_reference_input{0.0F, 0.0F};
+    const std::array<std::array<float, 2>, 4> clock_delay_inputs{{
+        {0.5F, -0.5F}, {0.1F, -0.1F}, {0.2F, -0.2F}, {0.15F, -0.15F}}};
+    std::array<float, 2> clock_output{};
+    const std::array<RtLaneInputV1, 3> clock_inputs_cb1{{
+        {clock_delay_inputs[0].data(), 2U},
+        {clock_reference_input.data(), 2U},
+        {clock_movie_input.data(), 2U}}};
+    CHECK(clocked_group_engine->process_output_group(
+        "movie", clock_inputs_cb1, clock_output.data(), 1U));
+    CHECK(std::abs(clock_output[0] - 0.3F) < 1e-6F &&
+          std::abs(clock_output[1] + 0.3F) < 1e-6F);
+    for (std::size_t clock_step = 1U; clock_step < 4U; ++clock_step) {
+        const std::array<RtLaneInputV1, 3> clock_inputs{{
+            {clock_delay_inputs[clock_step].data(), 2U},
+            {clock_reference_input.data(), 2U},
+            {clock_movie_input.data(), 2U}}};
+        const float expected_clock_sample =
+            clock_step == 2U ? clock_delay_inputs[0][0]
+                             : (clock_step == 3U ? clock_delay_inputs[1][0] : 0.0F);
+        CHECK(clocked_group_engine->process_output_group(
+            "main", clock_inputs, clock_output.data(), 1U));
+        // The two-sample ring needs two displacement reads: the interleaved
+        // movie callback consumes the first, and the first main render consumes
+        // the second. The cb1 impulse therefore re-emerges on the second main
+        // render, exactly on the shared audio timeline.
+        CHECK(std::abs(clock_output[0] - expected_clock_sample) < 1e-6F &&
+              std::abs(clock_output[1] + expected_clock_sample) < 1e-6F);
+    }
+
     std::vector<RtLaneInputV1> tab_lane_inputs(1);
     float tab_lane_input[8]{};
     float tab_lane_output[8]{};
