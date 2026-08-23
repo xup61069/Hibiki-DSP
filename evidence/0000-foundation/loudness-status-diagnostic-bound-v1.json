@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "issue": 944,
+  "scope_digest": "loudness-status-diagnostic-bound-v1",
+  "source_commit": "620fff612899f06870e8a800f2e6e96d787e7d9e",
+  "environment_fingerprint": "windows-amd64-pwsh-schema-bound",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 944",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass",
+      "required_paths": 85,
+      "specs": 24
+    },
+    {
+      "command": "source-policy",
+      "status": "pass",
+      "scanned_paths": 639
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Schema and spec documentation only; no runtime C++ validator change in this slice.",
+    "Empty diagnostic strings remain valid; existing successful and neutral statuses are unaffected."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-25T00:10:00+08:00",
+  "finished_at": "2026-08-25T00:15:00+08:00"
+}
+
