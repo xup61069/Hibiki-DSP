@@ -285,6 +285,15 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   rejecting outside-repository-.local outputs, reparse-point targets/ancestors and
   non-directory targets; the write-free self-test gained 10 offline synthetic output-path
   cases (Issue #525 / PR #528).
+- WinUI custom scene form modernization merged: the form is now a responsive two-column
+  Grid (Scene ID/name side-by-side, description spanning both columns) with an adaptive
+  trigger stacking below 720px; the add-custom-preset action is a full-width accent primary
+  button and the footer hint became a caption chip, with control-model and engine behavior
+  unchanged (Issue #529 / PR #534).
+- Probe-environment path-guard evidence validation merged: the previously empty validation
+  array in evidence/0000-foundation/probe-environment-path-guard-v1.json now records the
+  actual offline validation commands and results for the Issue #518 path guard, satisfying
+  the evidence acceptance contract (Issue #533 / PR #535).
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe
