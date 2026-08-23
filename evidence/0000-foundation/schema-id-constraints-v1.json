@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "evidence_type": "documentation-only",
+  "title": "Schema ID field length constraints for equal-loudness anchor_id and calibration device_id",
+  "date": "2026-08-24",
+  "issue": 932,
+  "pr": null,
+  "source_commit": null,
+  "scope": [
+    "schemas/equal-loudness-policy-v1.schema.json",
+    "schemas/calibration-response-v1.schema.json"
+  ],
+  "spec_refs": ["SPEC-0002", "SPEC-0011"],
+  "adr_refs": [],
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 932",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1"
+  ],
+  "limitations": [
+    "Schema-only change; no runtime behavior modification.",
+    "C++ wire-format validation was already stricter than JSON schema; this aligns the schema layer."
+  ],
+  "notes": "Added minLength:1 to equal-loudness-policy-v1 anchor_id and maxLength:260 to calibration-response-v1 device_id. SPEC-0002 and SPEC-0011 updated to document the constraints."
+}
