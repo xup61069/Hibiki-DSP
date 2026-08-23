@@ -107,6 +107,7 @@ function Assert-ExtensionSourcePolicy(
       'chromeMediaSource\s*:\s*(?:\x27|\x22)tab(?:\x27|\x22)',
       'chromeMediaSourceId\s*:\s*message\.streamId',
       'video\s*:\s*false',
+      'sendResponse',
       'stop-tab-stream',
       'get-capture-state',
       'activeStream\s*=\s*stream',
@@ -290,7 +291,7 @@ if ($SelfTest) {
   $sourceFixture = @{
     popup = "button.addEventListener('click', async () => { await chrome.runtime.sendMessage({type: 'capture-active-tab', tabId: tab.id}); }); stopButton.addEventListener('click', async () => { await chrome.runtime.sendMessage({type: 'stop-capture'}); }); refreshState(); async function refreshState() { await chrome.runtime.sendMessage({type: 'get-capture-state'}); }"
     serviceWorker = "chrome.runtime.onMessage.addListener(async (message) => { if (message.type === 'stop-capture') { await closeOffscreenDocument(); } if (message.type === 'get-capture-state') { await chrome.runtime.sendMessage({type: 'get-capture-state'}); } await chrome.offscreen.createDocument({url: 'offscreen.html'}); await chrome.offscreen.closeDocument(); const streamId = await chrome.tabCapture.getMediaStreamId({targetTabId: message.tabId}); });"
-    offscreen = "chrome.runtime.onMessage.addListener(async (message) => { if (message.type === 'stop-tab-stream') { activeStream.getTracks().forEach(track => track.stop()); } if (message.type === 'get-capture-state') { return; } const context = new AudioContext(); await context.audioWorklet.addModule('audio-worklet.js'); const node = new AudioWorkletNode(context, 'hibiki-tab-packetizer'); const constraints = {audio: {mandatory: {chromeMediaSource: 'tab', chromeMediaSourceId: message.streamId}}, video: false}; await navigator.mediaDevices.getUserMedia(constraints); const stream = await navigator.mediaDevices.getUserMedia(constraints); activeStream = stream; const bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab'); });"
+    offscreen = "chrome.runtime.onMessage.addListener(async (message) => { if (message.type === 'stop-tab-stream') { activeStream.getTracks().forEach(track => track.stop()); } if (message.type === 'get-capture-state') { return; } if (message.type !== 'start-tab-stream') return; const context = new AudioContext(); await context.audioWorklet.addModule('audio-worklet.js'); const node = new AudioWorkletNode(context, 'hibiki-tab-packetizer'); const constraints = {audio: {mandatory: {chromeMediaSource: 'tab', chromeMediaSourceId: message.streamId}}, video: false}; await navigator.mediaDevices.getUserMedia(constraints); const stream = await navigator.mediaDevices.getUserMedia(constraints); activeStream = stream; sendResponse({ok: true}); const bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab'); });"
     worklet = "const packet = new ArrayBuffer(16 + 4); const view = new DataView(packet); view.setUint8(0, 0x48); view.setUint8(1, 0x49); view.setUint8(2, 0x42); view.setUint8(3, 0x54); view.setUint16(4, 1, true); this.port.postMessage(packet, [packet]); registerProcessor('hibiki-tab-packetizer', HibikiTabPacketizer);"
   }
   Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-source-valid'
@@ -314,6 +315,11 @@ if ($SelfTest) {
   $caught = $false
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $missingOffscreenStop $sourceFixture.worklet 'selftest-missing-offscreen-stop' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected missing offscreen stream-stop failure.' }
+
+  $missingStartResponse = $sourceFixture.offscreen -replace 'sendResponse\(\{ok: true\}\)', 'console.log()'
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $missingStartResponse $sourceFixture.worklet 'selftest-missing-start-response' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected missing offscreen start response failure.' }
   $popupDirectCapture = $sourceFixture.popup + " chrome.tabCapture.getMediaStreamId({targetTabId: tab.id});"
   $caught = $false
   try { Assert-ExtensionSourcePolicy $popupDirectCapture $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-popup-direct-capture' } catch { $caught = $true }
@@ -362,7 +368,7 @@ connect-src   ws://127.0.0.1:17842
 "@
   Assert-ExtensionManifestPolicy $multilineCsp 'selftest-multiline-csp'
 
-  Write-Output 'Browser extension policy self-test passed (28 cases).'
+  Write-Output 'Browser extension policy self-test passed (29 cases).'
   exit 0
 }
 
