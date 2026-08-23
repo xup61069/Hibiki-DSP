@@ -441,6 +441,21 @@ var snapshotFrame = new IpcEnvelopeV1(ControlMessageType.DeviceCatalogSnapshot, 
 Check(viewModel.ApplyPhysicalDeviceSnapshot(snapshotFrame, out _) &&
       viewModel.PhysicalDevices.Count == 2 && viewModel.PhysicalDevices[1].IsDefault,
     "ViewModel did not atomically apply the device catalog snapshot.");
+var pickerRefreshViewModel = new EasyControlViewModel { SelectedOutputGroup = "main" };
+Check(pickerRefreshViewModel.ApplyPhysicalDeviceSnapshot(snapshotFrame, out _) &&
+      pickerRefreshViewModel.PhysicalDevices.Count == 2,
+    "Picker refresh fixture could not seed the bounded snapshot seam.");
+Check(!await pickerRefreshViewModel.RefreshPhysicalDevicePickerAsync() &&
+      pickerRefreshViewModel.StatusText.Contains("無法重新掃描"),
+    "Disconnected device picker refresh must fail closed.");
+var stalePickerSnapshot = new IpcEnvelopeV1(
+    ControlMessageType.DeviceCatalogSnapshot, 0UL,
+    ControlPayloadsV1.EncodeDeviceCatalogSnapshot([snapshotSpeaker], 29UL));
+Check(!pickerRefreshViewModel.ApplyPhysicalDeviceSnapshot(stalePickerSnapshot, out var stalePickerError) &&
+      stalePickerError.Contains("過期") &&
+      pickerRefreshViewModel.PhysicalDevices.Count == 2 &&
+      pickerRefreshViewModel.StatusText.Contains("無法重新掃描"),
+    "Stale picker data must preserve the previous catalog and not fake a successful scan.");
 var staleSnapshot = new IpcEnvelopeV1(
     ControlMessageType.DeviceCatalogSnapshot, 0UL,
     ControlPayloadsV1.EncodeDeviceCatalogSnapshot([snapshotSpeaker], 29UL));

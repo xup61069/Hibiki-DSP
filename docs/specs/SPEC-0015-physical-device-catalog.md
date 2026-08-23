@@ -3,10 +3,11 @@ id: SPEC-0015
 status: accepted
 owner: hibiki-maintainers
 authority: platform-boundary
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-24
 review_after_days: 30
 related_adrs: [ADR-0002, ADR-0004]
 source_globs: ["src/hub/**", "tests/unit/**", "schemas/physical-device-catalog-v1.schema.json", "schemas/device-catalog-snapshot-v1.schema.json", "docs/specs/SPEC-0015-physical-device-catalog.md"]
+ui_source_globs: ["apps/winui-shell/**", "tools/winui-shell-check.ps1"]
 ---
 
 # SPEC-0015：實體裝置目錄與切換前資料契約
@@ -43,6 +44,9 @@ WinUI／engine 的 `DeviceSwitch` request 使用 `schemas/device-switch-request-
 才產生 request，engine 未回 ACK 前不顯示已同步。
 UI 可送出空 payload 的 `DeviceCatalogRequest` 取得當前快照；control service 只有在註冊
 snapshot provider 時才回傳 `DeviceCatalogSnapshot`，否則回 Error，避免把空目錄誤報為成功。
+正式 WinUI 殼層提供「重新掃描裝置」入口，只呼叫 ViewModel 的 bounded IPC refresh；UI 不
+枚舉 Windows endpoint。未連線、逾時、Error、格式錯誤或過期 sequence 都 fail-closed 並
+保留上一份 picker 狀態；成功時只以最新 Active render 數量更新狀態文字。
 引擎提供的 `DeviceCatalogSnapshot` v1 使用固定 16-byte header 與每筆 416-byte wire entry
 （最多 32 筆），由 control worker 產生；C# 端必須驗證 reserved bytes、UTF-8、格式、重複
 身份、default 互斥與 catalog sequence，通過後才以 atomic replace 更新 picker。快照過期或
