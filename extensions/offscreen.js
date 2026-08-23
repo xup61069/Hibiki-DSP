@@ -86,6 +86,7 @@ async function handleSourceEnded() {
   if (!activeStream) return;
   await teardownCaptureGraph();
   reportState();
+  chrome.runtime.sendMessage({type: 'offscreen-capture-released'});
 }
 
 async function closeExistingContext() {
