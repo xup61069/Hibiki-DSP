@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "issue": 805,
+  "scope_digest": "global-snapshot-w34",
+  "base_commit": "2833c9bb066a3be49c191f5e20a7565e1850d932",
+  "source_commit": null,
+  "environment_fingerprint": "windows-local-pwsh-7.6.4; documentation-only integrator snapshot",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 805",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "integrator snapshot review",
+      "status": "pass",
+      "coverage": [
+        "Issue #786 / PR #791 merged at 1f644999: formal WinUI exposes the accessible VST3 timeline clear-history action through the existing ViewModel seam; history resets while rows, dirty state and an open draft remain intact, and empty history is a safe no-op.",
+        "Issue #794 / PR #798 merged at 3a2845f0: formal WinUI exposes the accessible timeline baseline-save action; SaveSelected makes current content the unmodified baseline and existing refusal boundaries remain fail-closed.",
+        "Issue #788 / PR #796 merged at c17e0b03: DesktopCompat and WinUI Compatibility Previews expose custom-scene editing and accessible add/remove seams while reusing validation, the 32-item limit, rollback-on-save-failure and status text.",
+        "Issue #787 / PR #795 merged at 34478fb6: VirtualMicDspV1 adds upper-only 2 dB reopening hysteresis with fixed per-channel state and a threshold-band chatter regression; RT constraints remain allocation-free, lock-free and wait-free.",
+        "Issue #789 / PR #797 merged at cc50f34b: ISO 226 formula compensation enforces frequency-dependent normative phon validity, rejects informative zero/ten phon values, and fails closed when any batch evaluation is invalid; caller-supplied coefficients remain required.",
+        "Issue #785 / PR #793 merged at cfa5a9a7: installer-check exercises transactional uninstall behavior across traversal rejection, selective removal, reporting, idempotency, backup hygiene and locked-file rollback in 12 offline cases.",
+        "Issue #800 / PR #802 merged at 2833c9bb: uninstall residue checks observe the process-local temp root actually used by .NET GetTempPath, reject a retained backup fixture, and expand coverage to 13 cases without changing user or machine environment state.",
+        "Issue #799 / PR #801 merged at 1da6761b: engine-preview-soak self-test validates report schema version, harness identity, completed/requested bounds and pass/fail-only iteration results in 17 fully offline cases."
+      ]
+    }
+  ],
+  "limitations": [
+    "Documentation-only integrator snapshot; this update does not change product source behavior.",
+    "Timeline UI evidence is control-model, shell-source gate and compatibility preview build/launch evidence only; no formal XAML runtime UIA or screen-reader audit was exercised.",
+    "Virtual-mic hysteresis evidence is user-space source and contract-test evidence, not physical audio measurement.",
+    "ISO 226 evidence remains caller-supplied-coefficient formula validation; no licensed coefficient dataset, conformance oracle or physical loudness claim is added.",
+    "Installer and soak evidence is offline fixture/self-test evidence; no real installer -Apply/-Uninstall execution, service/driver mutation, machine-state change or production soak run is claimed.",
+    "No driver install/load/PnP start/physical audio/HLK/Microsoft signing claim."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4"
+  },
+  "started_at": "2026-08-24T04:20:00+08:00",
+  "finished_at": "pending-gates"
+}
