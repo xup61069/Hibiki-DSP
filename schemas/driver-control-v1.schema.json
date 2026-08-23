@@ -14,9 +14,9 @@
     "channel_count": {"enum": [2, 6, 8]},
     "sample_rate": {"enum": [44100, 48000, 96000, 192000]},
     "frames_per_buffer": {"type": "integer", "minimum": 1, "maximum": 4096},
-    "requested_db_q16_16": {"type": "integer"},
-    "safety_ceiling_db_q16_16": {"type": "integer"},
-    "effective_db_q16_16": {"type": "integer"},
+    "requested_db_q16_16": {"type": "integer", "minimum": -2147483648, "maximum": 2147483647},
+    "safety_ceiling_db_q16_16": {"type": "integer", "minimum": -2147483648, "maximum": 2147483647},
+    "effective_db_q16_16": {"type": "integer", "minimum": -2147483648, "maximum": 2147483647},
     "mute": {"type": "boolean"},
     "generation": {"type": "integer", "minimum": 1},
     "actuator": {"enum": ["internal-dsp", "device-hardware", "strict-direct"]}
