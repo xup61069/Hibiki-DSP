@@ -24,15 +24,19 @@
     },
     {
       "command": "pwsh -NoProfile -File tools/docs-check.ps1",
-      "result": "pass (80 required paths; 570 tracked paths)"
+      "result": "pass (80 required paths; 571 tracked paths)"
     },
     {
       "command": "pwsh -NoProfile -File tools/source-policy.ps1",
-      "result": "pass (570 tracked paths)"
+      "result": "pass (571 tracked paths)"
     },
     {
       "command": "git diff --check",
       "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "result": "pass (2 workflows; 571 tracked paths)"
     }
   ],
   "limits": [
