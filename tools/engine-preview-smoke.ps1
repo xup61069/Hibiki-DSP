@@ -42,15 +42,24 @@ function Test-EnginePreviewSmokePathUnderRoot {
 function Get-EnginePreviewSmokeExistingAttributes {
   param(
     [Parameter(Mandatory)][string]$Path,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
   if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
     return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
   }
-  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
-  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+  if ($null -ne $SyntheticInspectionErrors -and $SyntheticInspectionErrors.ContainsKey($fullPath)) {
+    throw "Engine Preview smoke path inspection failed: $fullPath ($($SyntheticInspectionErrors[$fullPath]))"
+  }
+  try {
+    return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop).Attributes
+  }
+  catch {
+    if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return $null }
+    throw "Engine Preview smoke path inspection failed: $fullPath ($($_.Exception.Message))"
+  }
 }
 
 function Assert-EnginePreviewSmokePath {
@@ -59,7 +68,8 @@ function Assert-EnginePreviewSmokePath {
     [Parameter(Mandatory)][string]$Root,
     [Parameter(Mandatory)][ValidateSet('File', 'Directory')][string]$Kind,
     [switch]$AllowMissingLeaf,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
@@ -68,14 +78,16 @@ function Assert-EnginePreviewSmokePath {
     throw "Engine Preview smoke path must remain under the expected root: $fullPath"
   }
 
-  $leafAttributes = Get-EnginePreviewSmokeExistingAttributes -Path $fullPath -SyntheticAttributes $SyntheticAttributes
+  $leafAttributes = Get-EnginePreviewSmokeExistingAttributes -Path $fullPath `
+    -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
   if ($null -eq $leafAttributes -and -not $AllowMissingLeaf) {
     throw "Engine Preview smoke $Kind does not exist: $fullPath"
   }
 
   $cursor = $fullPath
   while ($true) {
-    $attributes = Get-EnginePreviewSmokeExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    $attributes = Get-EnginePreviewSmokeExistingAttributes -Path $cursor `
+      -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
     if ($null -ne $attributes) {
       if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "Engine Preview smoke path or parent is a reparse point: $cursor"
@@ -211,6 +223,24 @@ function Invoke-EnginePreviewSmokePathSelfTest {
     }
   } catch { $irDirectoryTypeCaught = $_.Exception.Message -match 'not a directory' }
   if (-not $irDirectoryTypeCaught) { throw 'Engine Preview smoke self-test expected a non-directory IR root rejection.' }
+  $cases++
+
+  $leafInspectionErrorCaught = $false
+  try {
+    Assert-EnginePreviewSmokePath -Path $fixture.EnginePath -Root $fixture.LocalRoot -Kind File -AllowMissingLeaf `
+      -SyntheticAttributes @{ $localRoot = $directory; $workingDirectory = $directory } `
+      -SyntheticInspectionErrors @{ $enginePath = 'synthetic access denied' }
+  } catch { $leafInspectionErrorCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $leafInspectionErrorCaught) { throw 'Engine Preview smoke self-test expected a leaf inspection-error rejection.' }
+  $cases++
+
+  $parentInspectionErrorCaught = $false
+  try {
+    Assert-EnginePreviewSmokePath -Path $fixture.EnginePath -Root $fixture.LocalRoot -Kind File -AllowMissingLeaf `
+      -SyntheticAttributes @{ $workingDirectory = $directory; $enginePath = $file } `
+      -SyntheticInspectionErrors @{ $localRoot = 'synthetic sharing violation' }
+  } catch { $parentInspectionErrorCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $parentInspectionErrorCaught) { throw 'Engine Preview smoke self-test expected a parent inspection-error rejection.' }
   $cases++
 
   return $cases
