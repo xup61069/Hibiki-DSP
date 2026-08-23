@@ -38,7 +38,6 @@ async function startCapture(message) {
   bridge?.close();
   bridge = null;
   setBridgeConnected(false);
-  context?.close();
   await closeExistingContext();
   context = new AudioContext();
   try {
@@ -51,6 +50,9 @@ async function startCapture(message) {
     };
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     activeStream = stream;
+    stream.getTracks().forEach((track) => {
+      track.addEventListener('ended', () => { void handleSourceEnded(); });
+    });
     source = context.createMediaStreamSource(stream);
     packetizer = new AudioWorkletNode(context, 'hibiki-tab-packetizer');
     destination = context.createMediaStreamDestination();
@@ -59,8 +61,8 @@ async function startCapture(message) {
       bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab');
       bridge.binaryType = 'arraybuffer';
       bridge.onopen = () => setBridgeConnected(true);
-      bridge.onclose = () => { bridgeConnected = false; reportState(); };
-      bridge.onerror = () => { bridgeConnected = false; reportState(); };
+      bridge.onclose = () => setBridgeConnected(false);
+      bridge.onerror = () => setBridgeConnected(false);
       packetizer.port.onmessage = (event) => {
         if (bridge?.readyState === WebSocket.OPEN && event.data instanceof ArrayBuffer) {
           bridge.send(event.data);
@@ -78,6 +80,12 @@ async function startCapture(message) {
     reportState();
     throw error;
   }
+}
+
+async function handleSourceEnded() {
+  if (!activeStream) return;
+  await teardownCaptureGraph();
+  reportState();
 }
 
 async function closeExistingContext() {
