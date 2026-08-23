@@ -109,6 +109,14 @@ public sealed partial class MainWindow
         vst3TimelineSelector.SetBinding(ComboBox.SelectedItemProperty, TwoWayBindingFor("Vst3TimelineEditor.SelectedTimelineId"));
         vst3TimelineSelector.SelectionChanged += OnVst3TimelineSelect;
         content.Children.Add(vst3TimelineSelector);
+        var newTimelineIdBox = new TextBox { Header = "新時間軸 ID", PlaceholderText = "例如 game-bgm" };
+        AutomationProperties.SetName(newTimelineIdBox, "新時間軸 ID");
+        newTimelineIdBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("Vst3TimelineEditor.NewTimelineIdText"));
+        content.Children.Add(newTimelineIdBox);
+        var registerButton = new Button { Content = "註冊新時間軸" };
+        AutomationProperties.SetName(registerButton, "註冊新時間軸");
+        registerButton.Click += OnVst3RegisterClick;
+        content.Children.Add(registerButton);
         var beginEditButton = new Button { Content = "開始草稿" };
         AutomationProperties.SetName(beginEditButton, "開始時間軸草稿");
         beginEditButton.Click += OnVst3BeginEditClick;
@@ -129,6 +137,14 @@ public sealed partial class MainWindow
         AutomationProperties.SetName(redoButton, "重做時間軸操作");
         redoButton.Click += OnVst3RedoClick;
         content.Children.Add(redoButton);
+        var rowValueBox = new TextBox { Header = "更新值", Width = 120 };
+        AutomationProperties.SetName(rowValueBox, "修改選取列的值");
+        rowValueBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("Vst3TimelineEditor.SelectedRowValueText"));
+        content.Children.Add(rowValueBox);
+        var setRowValueButton = new Button { Content = "更新選取列" };
+        AutomationProperties.SetName(setRowValueButton, "更新選取列數值");
+        setRowValueButton.Click += OnVst3SetRowValueClick;
+        content.Children.Add(setRowValueButton);
         content.Children.Add(BoundText("Vst3TimelineEditor.StatusText"));
 
         content.Children.Add(new TextBlock

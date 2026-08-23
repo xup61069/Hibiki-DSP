@@ -6,13 +6,12 @@ using System.Globalization;
 namespace Hibiki.ControlModel;
 
 // Observable supervisor-side view model over Vst3TimelineSurfaceModelV1
-// (Issue #390). It exists so a future supervisor UI can bind selection,
-// draft transactions, canonical row projection and derived dirty/undo state
-// without touching engine or IPC surfaces. Parsing is fail-closed with
-// invariant culture only; every action updates one Traditional Chinese
-// status line instead of throwing. This remains headless control-plane
-// evidence until real XAML lands.
-public sealed class Vst3TimelineEditorViewModel : INotifyPropertyChanged
+// (Issues #390/#667/#679). The WinUI Expert shell and compatibility preview bind
+// selection, draft transactions, canonical row projection and derived
+// dirty/undo state through this V1 surface without touching engine or IPC.
+// Parsing is fail-closed with invariant culture only; every action updates one
+// Traditional Chinese status line instead of throwing.
+public sealed class Vst3TimelineEditorViewModelV1 : INotifyPropertyChanged
 {
     public sealed record TimelineEventRow(int Index, uint ParameterId, ulong SamplePosition, double NormalizedValue);
 
@@ -21,16 +20,28 @@ public sealed class Vst3TimelineEditorViewModel : INotifyPropertyChanged
     private IReadOnlyList<TimelineEventRow> _rows = Array.Empty<TimelineEventRow>();
     private string _statusText = "尚未選取任何時間軸";
     private int _selectedRowIndex = -1;
+    private string _newTimelineIdText = string.Empty;
     private string _newParameterIdText = string.Empty;
     private string _newPositionText = string.Empty;
     private string _newValueText = string.Empty;
+    private string _selectedRowValueText = string.Empty;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public IReadOnlyList<string> TimelineIds => _timelineIds;
     public IReadOnlyList<TimelineEventRow> Rows => _rows;
     public string StatusText => _statusText;
-    public string? SelectedTimelineId => _model.SelectedTimelineId;
+    public string? SelectedTimelineId
+    {
+        get => _model.SelectedTimelineId;
+        set
+        {
+            if (value is null && _model.SelectedTimelineId is null)
+                return;
+            if (!EqualityComparer<string?>.Default.Equals(value, _model.SelectedTimelineId))
+                Select(value);
+        }
+    }
     public bool HasSelection => _model.HasSelection;
     public bool HasEditSession => _model.HasEditSession;
     public bool IsDirty => _model.IsDirty();
@@ -39,9 +50,11 @@ public sealed class Vst3TimelineEditorViewModel : INotifyPropertyChanged
     public int UndoDepth => _model.UndoDepth;
     public int RedoDepth => _model.RedoDepth;
     public int SelectedRowIndex { get => _selectedRowIndex; set { if (value != _selectedRowIndex) { _selectedRowIndex = value; OnPropertyChanged(); } } }
+    public string NewTimelineIdText { get => _newTimelineIdText; set { if (value != _newTimelineIdText) { _newTimelineIdText = value; OnPropertyChanged(); } } }
     public string NewParameterIdText { get => _newParameterIdText; set { if (value != _newParameterIdText) { _newParameterIdText = value; OnPropertyChanged(); } } }
     public string NewPositionText { get => _newPositionText; set { if (value != _newPositionText) { _newPositionText = value; OnPropertyChanged(); } } }
     public string NewValueText { get => _newValueText; set { if (value != _newValueText) { _newValueText = value; OnPropertyChanged(); } } }
+    public string SelectedRowValueText { get => _selectedRowValueText; set { if (value != _selectedRowValueText) { _selectedRowValueText = value; OnPropertyChanged(); } } }
 
     public bool RegisterTimeline(string? id)
     {

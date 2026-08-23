@@ -56,7 +56,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public ExpertSurfaceModel Expert { get; } = new();
 
-    public Vst3TimelineEditorViewModel Vst3TimelineEditor { get; } = new();
+    public Vst3TimelineEditorViewModelV1 Vst3TimelineEditor { get; } = new();
 
     public IReadOnlyList<IrPhaseModeOption> IrPhaseModeOptions { get; } =
     [
