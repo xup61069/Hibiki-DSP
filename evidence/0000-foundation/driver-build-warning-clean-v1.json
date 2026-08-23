@@ -1,0 +1,63 @@
+{
+  "schema_version": 2,
+  "issue": 774,
+  "title": "Warning-clean and duplicate-free driver package build plan",
+  "base_commit": "0eb83ef8b9f476efc7412ea71468c3d01c6843e3",
+  "source_commit": "65af76c8",
+  "summary": {
+    "behavior": "The local WDK build resolves matching MSVC and UCRT headers before the WDK kernel CRT fallback, maps each driver source to one unique object, compiles guids.cpp once, and treats compiler and linker warnings as errors.",
+    "user_impact": "Driver package diagnostics are no longer obscured by repeated C4083 header warnings or a duplicate guids.obj linker warning; new warnings stop the build before VM testing.",
+    "scope_boundary": "Source, local WDK build, Inf2Cat and package signability evidence only. No driver installation, load, PnP start, runtime audio, HLK or Microsoft signing claim.",
+    "files": [
+      "tools/build-driver.ps1"
+    ]
+  },
+  "regressions_closed": {
+    "mixed_crt_headers": "MSVC vcruntime.h now resolves the matching MSVC vadefs.h, with the WDK UCRT directory available for corecrt.h; the prior C4083 diagnostics are absent under /WX.",
+    "duplicate_guid_object": "The compile plan contains one guids.cpp source and one guids.obj destination; the prior LNK4042 duplicate-object warning is absent under linker /WX.",
+    "future_warnings": "Both cl.exe and link.exe receive /WX, so warning-bearing builds fail closed."
+  },
+  "validation": [
+    {
+      "command": "pwsh -NoProfile -File tools/build-driver.ps1 -SelfTest",
+      "result": "pass; 12 output-path cases plus 11 unique source/object mappings, compatible include order and warnings-as-errors"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/build-driver.ps1",
+      "result": "pass; 11 translation units compiled once; HibikiVirtualAudio.sys linked with compiler/linker /WX; no warnings emitted; Inf2Cat 0 errors / 0 warnings"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/driver-signability-check.ps1 -PackageRoot .local/driver-package -RequireInf2Cat",
+      "result": "pass; Windows 11 24H2/25H2 x64 package signability; Inf2Cat 0 errors / 0 warnings"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 774",
+      "result": "pass"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/docs-check.ps1",
+      "result": "pass; 80 required paths and 24 specs"
+    },
+    {
+      "command": "pwsh -NoProfile -File tools/source-policy.ps1",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ],
+  "environment": {
+    "os": "Windows 11 x64 build 26200",
+    "visual_studio": "2026 18.9",
+    "msvc": "19.51.36231",
+    "wdk": "10.0.28000.0",
+    "powershell": "7.6.4"
+  },
+  "limits": [
+    "The generated SYS, INF and CAT remain ignored local artifacts and were not committed or published.",
+    "A warning-clean package build does not prove guest PnP start or physical audio delivery."
+  ],
+  "next_safe_action": "Review PR #776, then merge and use the warning-clean package in the separately consent-gated Issue #462 guest PnP start retest.",
+  "date": "2026-08-23"
+}
