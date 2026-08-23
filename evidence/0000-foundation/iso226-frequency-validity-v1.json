@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "issue": 789,
+  "scope_digest": "iso226-frequency-validity-v1",
+  "source_commit": "e1f55321723b778c7f0bc9443dc9187530ce21a8",
+  "environment_fingerprint": "windows-local-pwsh-7.6.4-cmake-4.4.2-msvc-19.51.36256.0-sdk-10.0.28000",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 789",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/verify.ps1 -Clean"
+  ],
+  "results": [
+    {
+      "command": "tools/handoff-check.ps1 -Issue 789",
+      "status": "pass",
+      "coverage": ["issue ownership", "branch and base commit", "declared write scope"],
+      "compiled_artifacts": false,
+      "case_count": 1
+    },
+    {
+      "command": "tools/docs-check.ps1",
+      "status": "pass",
+      "coverage": ["required paths", "spec links", "live tracked-path and repository JSON counts"],
+      "compiled_artifacts": false,
+      "case_count": 80
+    },
+    {
+      "command": "tools/source-policy.ps1",
+      "status": "pass",
+      "coverage": ["617 tracked source-only paths"],
+      "compiled_artifacts": false,
+      "case_count": 617
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "coverage": ["whitespace"],
+      "compiled_artifacts": false,
+      "case_count": 1
+    },
+    {
+      "command": "tools/verify.ps1 -Clean",
+      "status": "pass",
+      "coverage": ["clean CMake configure/build", "hibiki_asio_transport_selftest pass", "hibiki_tab_bridge_selftest pass", "hibiki_contract_tests pass including ISO frequency-validity regressions"],
+      "compiled_artifacts": true,
+      "case_count": 3
+    }
+  ],
+  "changes": [
+    {
+      "file": "src/hub/src/iso226.cpp",
+      "summary": "Enforce the frequency-dependent normative phon range: 20-90 through 4 kHz and 20-80 through 12.5 kHz; informative values remain invalid."
+    },
+    {
+      "file": "src/hub/include/hibiki/iso226.hpp",
+      "summary": "Document the formula-domain boundary while retaining caller-supplied coefficients and no embedded ISO table."
+    },
+    {
+      "file": "tests/unit/contract_tests.cpp",
+      "summary": "Add boundary, transition, high-frequency cap, informative-domain, and compensation fail-closed regressions."
+    },
+    {
+      "file": "docs/specs/SPEC-0002-volume-and-iso.md",
+      "summary": "Record the normative validity boundary, known 0-phon caveat, and caller-side log-frequency interpolation/direct-formula guidance."
+    }
+  ],
+  "limitations": [
+    "User-space source contract only; no RT-thread allocation, lock, wait, COM, filesystem, or UI work is introduced.",
+    "No ISO certification, acoustic calibration, physical-audio delivery, driver, HLK, or Microsoft-signing claim is made.",
+    "The licensed ISO document, complete restricted table, and downloaded CSV are not added to the repository."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "7.6.4",
+    "cmake": "4.4.2"
+  },
+  "started_at": "2026-08-23T23:25:00+08:00",
+  "finished_at": "2026-08-23T23:30:04+08:00"
+}

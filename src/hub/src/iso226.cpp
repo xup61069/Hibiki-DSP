@@ -10,6 +10,20 @@ namespace {
 constexpr double kOneKhz = 1000.0;
 constexpr double kMinFrequency = 20.0;
 constexpr double kMaxFrequency = 12500.0;
+constexpr double kNormativeFrequencySplit = 4000.0;
+constexpr double kMinPhon = 20.0;
+constexpr double kHighBandMaxPhon = 80.0;
+constexpr double kLowBandMaxPhon = 90.0;
+
+bool normative_phon_for_frequency(const double frequency_hz,
+                                  const double phon) noexcept {
+    if (!std::isfinite(frequency_hz) || frequency_hz < kMinFrequency ||
+        frequency_hz > kMaxFrequency || !std::isfinite(phon)) {
+        return false;
+    }
+    const bool high_band = frequency_hz > kNormativeFrequencySplit;
+    return phon >= kMinPhon && phon <= (high_band ? kHighBandMaxPhon : kLowBandMaxPhon);
+}
 
 bool valid_mode(const EqualLoudnessMode mode) noexcept {
     return mode == EqualLoudnessMode::Calibrated || mode == EqualLoudnessMode::Relative ||
@@ -60,8 +74,8 @@ bool iso226_spl_from_phon(const Iso226FormulaPointV1& point,
         point.frequency_hz > 12500.0 || !std::isfinite(point.alpha_f) || point.alpha_f <= 0.0 ||
         !std::isfinite(point.threshold_db) || !std::isfinite(point.transfer_db) ||
         !std::isfinite(reference.reference_alpha) || reference.reference_alpha <= 0.0 ||
-        !std::isfinite(reference.reference_threshold_db) || !std::isfinite(phon) || phon < 20.0 ||
-        phon > 90.0) {
+        !std::isfinite(reference.reference_threshold_db) ||
+        !normative_phon_for_frequency(point.frequency_hz, phon)) {
         return false;
     }
     const double loudness_term =
