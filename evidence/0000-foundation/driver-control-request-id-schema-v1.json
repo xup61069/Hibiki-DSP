@@ -5,7 +5,7 @@
   "date": "2026-08-24",
   "issue": 962,
   "pr": null,
-  "source_commit": null,
+  "source_commit": "acf5f3182028f00594a6067050b72f3ef6dccbfd",
   "scope": [
     "schemas/driver-control-v1.schema.json",
     "docs/specs/SPEC-0003-virtual-endpoints-and-routing.md"
