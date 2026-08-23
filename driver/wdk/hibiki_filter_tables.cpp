@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MS-PL
+// SPDX-License-Identifier: MS-PL
 //
 // Hibiki WaveRT PortCls Filter and Topology Tables Implementation.
 // Constructs static PortCls PCFILTER_DESCRIPTOR, PCPIN_DESCRIPTOR, PCNODE_DESCRIPTOR,
@@ -234,7 +234,7 @@ static const KSPIN_MEDIUM PinMediumsDontCare[] = {
 // Helper macro for render pin tables
 #define DEFINE_RENDER_PINS(Name, DataRanges)                                   \
 static const PCPIN_DESCRIPTOR Pins_##Name[] = {                                \
-    /* Pin 0: Streaming WaveRT Pin (Source -> internal graph) */                \
+    /* Pin 0: Streaming WaveRT Pin (Sink - apps write audio into the filter) */\
     {                                                                          \
         1, 1, 1,                                                               \
         NULL,                                                                  \
@@ -242,7 +242,7 @@ static const PCPIN_DESCRIPTOR Pins_##Name[] = {                                \
             1, PinInterfacesStream,                                           \
             1, PinMediumsDontCare,                                            \
             SIZEOF_ARRAY(DataRanges), DataRanges,                              \
-            KSPIN_DATAFLOW_OUT,                                                \
+            KSPIN_DATAFLOW_IN,                                                 \
             KSPIN_COMMUNICATION_SINK,                                          \
             &KSCATEGORY_AUDIO,                                                 \
             NULL,                                                              \
@@ -257,7 +257,7 @@ static const PCPIN_DESCRIPTOR Pins_##Name[] = {                                \
             0, NULL,                                                           \
             0, NULL,                                                           \
             0, NULL,                                                           \
-            KSPIN_DATAFLOW_IN,                                                 \
+            KSPIN_DATAFLOW_OUT,                                                 \
             KSPIN_COMMUNICATION_NONE,                                          \
             &KSNODETYPE_SPEAKER,                                               \
             NULL,                                                              \
@@ -272,7 +272,7 @@ DEFINE_RENDER_PINS(Surround, PinDataRanges_Surround);
 
 // Pin table for Virtual Mic (Capture)
 static const PCPIN_DESCRIPTOR Pins_VirtualMic[] = {
-    /* Pin 0: Physical Bridge Pin (all instance counts zero) */
+    /* Pin 0: Physical Bridge Pin (microphone in; all instance counts zero) */
     {
         0, 0, 0,
         NULL,
@@ -280,14 +280,14 @@ static const PCPIN_DESCRIPTOR Pins_VirtualMic[] = {
             0, NULL,
             0, NULL,
             0, NULL,
-            KSPIN_DATAFLOW_OUT,
+            KSPIN_DATAFLOW_IN,
             KSPIN_COMMUNICATION_NONE,
             &KSNODETYPE_MICROPHONE,
             NULL,
             0
         }
     },
-    /* Pin 1: Streaming WaveRT Pin (Sink <- internal graph) */
+    /* Pin 1: Streaming WaveRT Pin (Source - apps read audio from the filter) */
     {
         1, 1, 1,
         NULL,
@@ -295,7 +295,7 @@ static const PCPIN_DESCRIPTOR Pins_VirtualMic[] = {
             1, PinInterfacesStream,
             1, PinMediumsDontCare,
             SIZEOF_ARRAY(PinDataRanges_VirtualMic), PinDataRanges_VirtualMic,
-            KSPIN_DATAFLOW_IN,
+            KSPIN_DATAFLOW_OUT,
             KSPIN_COMMUNICATION_SINK,
             &KSCATEGORY_AUDIO,
             NULL,
@@ -434,6 +434,7 @@ extern "C" NTSTATUS HibikiDataRangeIntersectionEndpointV1(
 
     return STATUS_SUCCESS;
 }
+
 
 
 
