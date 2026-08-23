@@ -340,7 +340,17 @@ Foundation integration Issue 是 foundation handoff，只由 integrator 更新�
   indexer lookups in MainWindow.CompatibilityPreview.cs became a fail-soft TryGetValue-based
   resolver so missing framework theme resources can no longer crash WinUICompat window
   activation (stowed exception 0xC000027B); the formal XAML path and DesktopCompat behavior
-  are unchanged (Issue #548 / PR #564).
+  are unchanged (Issue #548 / PR #571).
+- .opencode loop-state untracking merged: all 809 accidentally committed
+  .opencode/opencode-loop/** files (loop log, session scheduler state, corrupt snapshots)
+  that had entered main through the PR #564 false-close were removed with a rooted
+  .opencode/ .gitignore rule and no history rewrite (opencode-state-untrack-v1.json,
+  Issue #568 / PR #569).
+- GitHub handoff CI isolation merged: pull-request verify now validates only the
+  branch-owned issue while repository-wide handoff health moved to a dedicated
+  handoff-audit workflow driven by issue events and a schedule; the AI task template emits
+  a valid TBD pre-claim instead of auto-claiming (github-handoff-ci-isolation-v1.json,
+  Issue #565 / PR #566).
 - Timeline surface increments merged: `Vst3TimelineSurfaceModelV1.ClearHistory()` (and the
   ViewModel wrapper) clears undo/redo stacks with history-only notifications while leaving
   published snapshots, dirty baselines and open drafts untouched; empty-history calls are safe
