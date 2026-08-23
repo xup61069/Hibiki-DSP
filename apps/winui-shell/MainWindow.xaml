@@ -759,6 +759,7 @@
                                 </StackPanel>
                             </Border>
                     </StackPanel>
+                    </Border>
                 </controls:Expander>
             </StackPanel>
         </ScrollViewer>
