@@ -447,6 +447,11 @@ connect-src   ws://127.0.0.1:17842
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $droppedReleaseNotification $sourceFixture.worklet 'selftest-offscreen-drops-release-notification' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected missing natural-end release notification failure.' }
 
+  $missingHandlerDefinition = $sourceFixture.offscreen -replace 'async function handleSourceEnded\(\) \{.*\}', ''
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $missingHandlerDefinition $sourceFixture.worklet 'selftest-offscreen-missing-ended-handler-definition' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected missing natural-end handler definition failure.' }
+
   $unvalidatedSenderUrlType = $sourceFixture.serviceWorker -replace "typeof sender\.url === 'string'", 'false'
   $caught = $false
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $unvalidatedSenderUrlType $sourceFixture.offscreen $sourceFixture.worklet 'selftest-release-skips-sender-type-check' } catch { $caught = $true }
@@ -467,7 +472,7 @@ connect-src   ws://127.0.0.1:17842
   try { Assert-ExtensionSourcePolicy $missingErrorPersistence $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-missing-error-persistence' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected missing error persistence failure.' }
 
-  Write-Output 'Browser extension policy self-test passed (41 cases).'
+  Write-Output 'Browser extension policy self-test passed (42 cases).'
   exit 0
 }
 
