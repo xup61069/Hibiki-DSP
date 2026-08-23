@@ -40,15 +40,24 @@ function Test-ControlModelSmokePathUnderRoot {
 function Get-ControlModelSmokeExistingAttributes {
   param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
   if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
     return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
   }
-  if (-not (Test-Path -LiteralPath $fullPath)) { return $null }
-  return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force).Attributes
+  if ($null -ne $SyntheticInspectionErrors -and $SyntheticInspectionErrors.ContainsKey($fullPath)) {
+    throw "Control-model smoke path inspection failed: $fullPath ($($SyntheticInspectionErrors[$fullPath]))"
+  }
+  try {
+    return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop).Attributes
+  }
+  catch {
+    if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return $null }
+    throw "Control-model smoke path inspection failed: $fullPath ($($_.Exception.Message))"
+  }
 }
 
 function Assert-ControlModelSmokePath {
@@ -57,7 +66,8 @@ function Assert-ControlModelSmokePath {
     [Parameter(Mandatory = $true)][string]$Root,
     [Parameter(Mandatory = $true)][ValidateSet('File', 'Directory')][string]$Kind,
     [switch]$AllowMissingLeaf,
-    [hashtable]$SyntheticAttributes
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
   )
 
   $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
@@ -66,14 +76,16 @@ function Assert-ControlModelSmokePath {
     throw "Control-model smoke path must remain under the expected root: $fullPath"
   }
 
-  $leafAttributes = Get-ControlModelSmokeExistingAttributes -Path $fullPath -SyntheticAttributes $SyntheticAttributes
+  $leafAttributes = Get-ControlModelSmokeExistingAttributes -Path $fullPath `
+    -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
   if ($null -eq $leafAttributes -and -not $AllowMissingLeaf) {
     throw "Control-model smoke $Kind does not exist: $fullPath"
   }
 
   $cursor = $fullPath
   while ($true) {
-    $attributes = Get-ControlModelSmokeExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes
+    $attributes = Get-ControlModelSmokeExistingAttributes -Path $cursor `
+      -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
     if ($null -ne $attributes) {
       if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "Control-model smoke path or parent is a reparse point: $cursor"
@@ -226,6 +238,15 @@ function Invoke-ControlModelSmokePathSelfTest {
     }
   } catch { $outputTypeCaught = $_.Exception.Message -match 'not a directory' }
   if (-not $outputTypeCaught) { throw 'Control-model smoke self-test expected an output-root type rejection.' }
+  $cases++
+
+  $inspectionCaught = $false
+  try {
+    Assert-ControlModelSmokePath -Path $fixture.EnginePath -Root $fixture.LocalRoot -Kind File -AllowMissingLeaf -SyntheticInspectionErrors @{
+      $enginePath = 'synthetic access denied'
+    }
+  } catch { $inspectionCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $inspectionCaught) { throw 'Control-model smoke self-test expected an inspection-failure rejection.' }
   $cases++
 
   return $cases
