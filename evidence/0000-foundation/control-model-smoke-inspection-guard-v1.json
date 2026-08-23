@@ -1,0 +1,24 @@
+{
+  "schema_version": 2,
+  "issue": 584,
+  "title": "control-model smoke path inspection failure guard",
+  "base_commit": "b041ac21507d3447af99bc098dbc44a9eea783b0",
+  "summary": {
+    "tools": [
+      "tools/control-model-engine-smoke.ps1"
+    ],
+    "behavior": "Get-ControlModelSmokeExistingAttributes now resolves entries with a single Get-Item -Force -ErrorAction Stop call: ObjectNotFound maps to missing, every other inspection error throws 'Control-model smoke path inspection failed' so inaccessible entries can no longer be misclassified as absent leaves. SyntheticInspectionErrors enables offline self-test injection.",
+    "precedent": "Issue #543 / PR #546 canonical inspection-failure pattern",
+    "selftest_cases_added": {
+      "inspection-failure rejection": 1
+    }
+  },
+  "validation": [
+    { "command": "pwsh -NoProfile -File tools/control-model-engine-smoke.ps1 -SelfTest", "result": "pass", "notes": "16 offline cases passed (15 prior + 1 new); offline/no-process/no-dotnet/no-file-write" },
+    { "command": "pwsh -NoProfile -File tools/docs-check.ps1", "result": "pass", "notes": "run on delivered branch before push" },
+    { "command": "pwsh -NoProfile -File tools/source-policy.ps1", "result": "pass", "notes": "no blocked binaries or secrets" },
+    { "command": "pwsh -NoProfile -File tools/source-only-ci-check.ps1", "result": "pass", "notes": "workflow set unchanged" }
+  ],
+  "scope": "tools-only gate hardening; no product/API/schema/DSP/driver change",
+  "date": "2026-08-23"
+}
