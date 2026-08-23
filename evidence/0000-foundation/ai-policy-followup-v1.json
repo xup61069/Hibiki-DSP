@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "issue": 623,
+  "scope_digest": "ai-policy-followup-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6; documentation-only follow-up",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 623",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "AI policy consistency review",
+      "status": "pass",
+      "coverage": [
+        "Windows 11, C++20 and WinUI are classified as changeable accepted product defaults instead of universal safety prohibitions",
+        "explicit maintainer requests are valid assignments while agents remain prohibited from self-selecting backlog",
+        "non-main branches remain mandatory; dedicated worktrees are mandatory for concurrent, occupied or uncertain state and recommended for a proven single writer",
+        "draft PR creation follows the first reproducible WIP/reviewable commit and no rule requires an empty claim commit",
+        "always-run validation is limited to scoped handoff, docs, source policy and diff hygiene; doctor, verify, workflow, subsystem and live gates are scope-triggered",
+        "directory lanes are routing hints in both MULTI_AGENT and CONFLICT_POLICY; exact scope, semantic contract and shared-path conflicts remain fail-closed",
+        "START_HERE replaces a duplicated subsystem status list with pointers to BASELINE, PROJECT_MAP, issue handoff and evidence",
+        "driver signing is documented as staged: no Hardware Program account for source/user-space work, explicit test-signing for local or VM development, Microsoft signing for consumer release"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation and repository-process contract only; no product source, build script, driver runtime or release account is changed.",
+    "No build, target-machine probe, live audio probe, driver installation or signing action is required by this scope."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4"
+  },
+  "started_at": "2026-08-23T12:20:00+08:00",
+  "finished_at": "2026-08-23T13:00:00+08:00"
+}

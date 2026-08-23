@@ -11,9 +11,10 @@
 
 ## 第一層：硬性限制（不可協商）
 
-- 目標平台：Windows 11 24H2+ x64；C++20 即時核心、C# WinUI 3 UI。
 - RT audio thread 不配置、不取得 mutex、不等待、不呼叫 COM/UI/檔案系統。
-- driver（MS-PL）與 GPL user-space 只能透過版本化 IPC 互動；不得靜態或動態連結。
+- driver（MS-PL）與 GPL user-space 只能透過版本化 Apache ABI／IPC 互動；不得靜態或動態
+  連結。高流量 audio path 可使用契約化的固定容量 shared-memory/ring，不需要把 samples
+  送進變長 control message。
 - 廠商 ASIO、WASAPI Exclusive、RAW 路徑不可宣稱受 Hibiki 控制。
 - 不提交 EXE、DLL、SYS、MSI、MSIX、VST3、PE/COFF、簽章憑證或私密金鑰。
 - 真實裝置 ID、校正檔、序號、私人路徑放 `.local/`，不得進 Git。
@@ -24,11 +25,22 @@
 
 ## 第二層：產品與流程預設（可依 ADR/Spec 演進）
 
-- 每個工作切片對應一個 GitHub Issue、一個隔離 worktree、一個 branch、Issue body 內的
-  `<!-- hibiki:handoff-v1 -->` handoff block 與一個 draft PR。詳細協定見
-  `docs/ai/MULTI_AGENT.md`。
-- 寫入需要被指派（Issue assignee + lifecycle label）；唯讀偵察不需要認領。首次可審閱的
-  commit push 後就開 draft PR，不需要空認領 commit。
+- 目前產品目標是 Windows 11 24H2+ x64、C++20 即時核心與 C# WinUI 3 UI；這是 accepted
+  architecture/product baseline，不是不可討論的永久禁令。改變時以新 Spec／ADR 與測試取代，
+  不在單一 feature PR 中順手偏離。
+- 對 maintainer 的進度與完成回報必須先用白話說明：現在讓產品多了／修好了什麼、使用者會
+  感覺到什麼、如何確認，以及還缺什麼。不要用 push、commit、branch、PR、merge 或 CI 當標題
+  或主要敘事；這些只在影響風險、阻擋、驗證可信度，或 maintainer 明確詢問時，放在末尾的短版
+  開發紀錄。省略對話中的 Git 細節不會取消下列內部協作與交接規則。可貼用的視窗分工與 `/goal`
+  啟動詞見 `docs/ai/CODEX_GOALS.md`。
+- 唯讀偵察不需要認領。寫入需要 maintainer／orchestrator 明確指派、GitHub Issue、非 `main`
+  branch、Issue body 內的 `<!-- hibiki:handoff-v1 -->` block 與 write scope。人類 maintainer
+  對目前 session 的直接要求算明確指派；active orchestrator 可在檢查 overlap 後建立並正式
+  claim Issue，worker 不得自行挑選 backlog。
+- 有其他 writer、branch 已被 worktree 佔用或 occupancy 不確定時，必須使用獨立 worktree；
+  確認只有單一 writer 時仍建議隔離，但不是文件小改的硬性前置。
+- 首次可重建的 WIP/reviewable commit push 後立即開 draft PR，不需要空認領 commit。
+  詳細協定見 `docs/ai/MULTI_AGENT.md`。
 - 衝突判定以 handoff block 的 `scope_globs`、語意契約 ownership 與 open Issue/draft PR
   為準。`docs/ai/MULTI_AGENT.md` 的目錄 lane 表只是路由提示，不是全域單寫者瓶頸。
 - `docs/state/BASELINE.md` 的計數由 `tools/docs-check.ps1` 即時量測；切片不需維護
@@ -42,31 +54,32 @@
 - 換 AI 或電腦前：更新 Issue body handoff block、建立 WIP commit、push branch、寫明
   下一個安全動作。
 
-## 第三層：驗證門檻（core + conditional）
+## 第三層：驗證門檻（always-run + conditional）
 
 所有 gates 用 PowerShell 7（`pwsh`）執行；沒有 `pwsh` 先
 `winget install --id Microsoft.PowerShell`。多數 gate 提供 `-SelfTest` 離線自檢。
 
-### 核心（每個切片必跑）
+### Always-run（每個寫入切片必跑）
 
 ```powershell
-pwsh -File tools/doctor.ps1 -CheckOnly
 pwsh -File tools/handoff-check.ps1 -Issue <n>
-pwsh -File tools/verify.ps1
 pwsh -File tools/docs-check.ps1
 pwsh -File tools/source-policy.ps1
-pwsh -File tools/source-only-ci-check.ps1
+git diff --check
 ```
 
 ### 條件式（範圍或驗收需要時才跑）
 
 | 觸發條件 | 額外 gates |
 | --- | --- |
-| 改 UI／control model | `build-preview.ps1`（DesktopCompat 或鎖定機上的 `-Target WinUI`）、`winui-shell-check.ps1` |
+| 需要 build／toolchain evidence | `doctor.ps1 -CheckOnly` |
+| 改 C/C++、CMake、schema、contract 或 tests | `verify.ps1` |
+| 改 workflow、公開 release／artifact policy | `source-only-ci-check.ps1` |
+| 改 UI／control model | `control-model-check.ps1`、`build-preview.ps1`（DesktopCompat 或鎖定機上的 `-Target WinUI`）、`winui-shell-check.ps1` |
 | 改 engine/control plane 整合 | `build-engine-preview.ps1`、`engine-preview-smoke.ps1`、`control-model-check.ps1`、`control-model-engine-smoke.ps1` |
 | 改 extensions | `extension-check.ps1` |
 | 改 installer／distribution identity | `installer-check.ps1`、`distribution-check.ps1` |
-| 改 driver source boundary | `driver-source-check.ps1` |
+| 改 driver source boundary | `driver-source-check.ps1`；需要 WDK build evidence 時另跑 `build-driver.ps1` |
 | driver release 驗收（WDK package 存在時） | `driver-signability-check.ps1`（必要時加 `-PackageRoot <package> -RequireInf2Cat`） |
 | 明確 opt-in 的 live probe | `live-*-check.ps1` 系列；只輸出匿名資料，不改變機器狀態（`-WriteTest` 變體除外），結果不等於 driver/HLK/簽章 evidence |
 

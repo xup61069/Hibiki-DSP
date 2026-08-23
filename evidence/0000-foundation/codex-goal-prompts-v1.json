@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "issue": 625,
+  "scope_digest": "codex-goal-prompts-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-26200-amd64-pwsh-7.6; documentation-only communication contract",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 625",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "AI communication and Goal contract review",
+      "status": "pass",
+      "coverage": [
+        "maintainer-facing updates lead with product capability, user impact, verification and remaining gaps",
+        "GitHub and source-control mechanics are limited to short trailing audit details unless specifically requested or decision-relevant",
+        "five distinct Codex windows cover V1 integration, UI/UX, audio core/DSP, Windows runtime/driver, and independent verification",
+        "every Goal prompt defines an outcome, boundaries, verification, and a stopping or pause condition",
+        "the long-running V1 integrator has a measurable V1 acceptance end state instead of an unbounded backlog",
+        "parallel windows retain exclusive write scopes and all existing handoff and evidence requirements"
+      ],
+      "compiled_artifacts": false
+    }
+  ],
+  "limitations": [
+    "Documentation and repository-process contract only; no product source, driver runtime, release account, signing credential or machine state is changed.",
+    "Goal mode can support long-running work but is not represented as a literal infinite process; each run retains explicit completion and pause conditions."
+  ],
+  "logs": [],
+  "tool_versions": {
+    "powershell": "pwsh 7.6.4"
+  },
+  "started_at": "2026-08-23T13:12:52+08:00",
+  "finished_at": "2026-08-23T13:18:48+08:00"
+}

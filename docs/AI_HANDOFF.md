@@ -7,19 +7,23 @@
 
 ```powershell
 git fetch --all --prune
+git status --short --branch
 gh issue view <issue>
-pwsh -File tools/doctor.ps1 -CheckOnly
 pwsh -File tools/handoff-check.ps1 -Issue <issue>
 pwsh -File tools/context-pack.ps1 -Issue <issue> -NoSource
 ```
 
-工作樹不是乾淨狀態、handoff check 失敗，或 target toolchain 不符合時，先在 Issue body 的
-handoff block 記錄事實；不要直接改 DSP、driver、永久 ID 或 release 設定。
+工作樹不是乾淨狀態或 handoff check 失敗時，先在 Issue body 記錄事實；不要直接改 DSP、
+driver、永久 ID 或 release 設定。需要 build／target evidence 的切片才另跑
+`doctor.ps1 -CheckOnly` 與 `probe-environment.ps1`。
 
 ## 多 AI 並行入口
 
-- 完整規則見 `docs/ai/MULTI_AGENT.md`：寫入需要被指派（Issue assignee + lifecycle label），
-  唯讀偵察不需要認領。首次可審閱的 commit push 後就開 draft PR；不需要空認領 commit。
+- 完整規則見 `docs/ai/MULTI_AGENT.md`：唯讀偵察不需要認領；寫入需要 maintainer／orchestrator
+  明確指派、Issue assignee + lifecycle label、非 `main` branch 與 handoff scope。人類
+  maintainer 的直接要求算指派，但仍須先 materialize Issue 並檢查 overlap。
+- 有並行 writer、branch occupancy 或不確定狀態時必須使用獨立 worktree；單一 writer 時建議
+  使用。首次可重建的 WIP/reviewable commit push 後立即開 draft PR，不需要空認領 commit。
 - 修改前在 Issue body handoff block 宣告 `scope_globs`、`shared_paths` 與 `depends_on`。
   scope 重疊時先停止，由 integrator 指定 owner。
 - feature AI 只更新自己的 handoff、目標 Spec、tests 與 evidence；全域摘要由 integrator 在
@@ -27,6 +31,12 @@ handoff block 記錄事實；不要直接改 DSP、driver、永久 ID 或 releas
 
 ## 目前狀態與已完成能力
 
+- 第二十波整合增量：AGENTS.md 改為三層規則索引（硬性限制／流程預設／core+conditional
+  驗證門檻），driver 簽章歸 release 階段；README live probe 文件補齊
+  live-wasapi-handoff-check 與 live-audio-session-check 的 opt-in 說明與 docs-check
+  -SelfTest 範例（Issue #613 / PR #615）；隔離 VM WaveRT 載入測試記錄 TrustedPublisher
+  恢復後 pnputil staging 成功、但 PnP start 仍以 CM_PROB_FAILED_START (0xC000000D)
+  可重現失敗，下一步是診斷 PortCls adapter start path（Issue #462 / PR #614）。
 - main 已合併的能力、限制與最新整合紀錄：見 [baseline](state/BASELINE.md)。
 - 子系統地圖（driver/src/apps/vst-host/extensions/tools）：見 [PROJECT_MAP](PROJECT_MAP.md)。
 - 各切片的測試命令、環境指紋與證據範圍：見 [evidence](../evidence/0000-foundation/)。
