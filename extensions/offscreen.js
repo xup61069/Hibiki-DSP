@@ -3,40 +3,94 @@ let source = null;
 let packetizer = null;
 let destination = null;
 let bridge = null;
+let activeStream = null;
 
-chrome.runtime.onMessage.addListener(async (message) => {
-  if (message?.type !== 'start-tab-stream' || typeof message.streamId !== 'string') return;
+function reportState() {
+  chrome.runtime.sendMessage({type: 'capture-state', capturing: context !== null});
+}
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === 'get-capture-state') {
+    sendResponse({capturing: context !== null});
+    return false;
+  }
+  if (message?.type === 'stop-tab-stream') {
+    stopCapture();
+    sendResponse({ok: true});
+    return false;
+  }
+  if (message?.type !== 'start-tab-stream' || typeof message.streamId !== 'string') return false;
+  startCapture(message);
+  return false;
+});
+
+async function startCapture(message) {
   bridge?.close();
   bridge = null;
   context?.close();
+  await closeExistingContext();
   context = new AudioContext();
-  await context.audioWorklet.addModule('audio-worklet.js');
-  const constraints = {
-    audio: {
-      mandatory: {chromeMediaSource: 'tab', chromeMediaSourceId: message.streamId}
-    },
-    video: false
-  };
-  const stream = await navigator.mediaDevices.getUserMedia(constraints);
-  source = context.createMediaStreamSource(stream);
-  packetizer = new AudioWorkletNode(context, 'hibiki-tab-packetizer');
-  destination = context.createMediaStreamDestination();
-  source.connect(packetizer).connect(destination);
   try {
-    bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab');
-    bridge.binaryType = 'arraybuffer';
-    packetizer.port.onmessage = (event) => {
-      if (bridge?.readyState === WebSocket.OPEN && event.data instanceof ArrayBuffer) {
-        bridge.send(event.data);
-      }
+    await context.audioWorklet.addModule('audio-worklet.js');
+    const constraints = {
+      audio: {
+      mandatory: {chromeMediaSource: 'tab', chromeMediaSourceId: message.streamId}
+      },
+      video: false
     };
-  } catch (_) {
-    // The optional native bridge may not be running. Local playback remains
-    // connected through MediaStreamDestination in that case.
-    bridge = null;
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    activeStream = stream;
+    source = context.createMediaStreamSource(stream);
+    packetizer = new AudioWorkletNode(context, 'hibiki-tab-packetizer');
+    destination = context.createMediaStreamDestination();
+    source.connect(packetizer).connect(destination);
+    try {
+      bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab');
+      bridge.binaryType = 'arraybuffer';
+      packetizer.port.onmessage = (event) => {
+        if (bridge?.readyState === WebSocket.OPEN && event.data instanceof ArrayBuffer) {
+          bridge.send(event.data);
+        }
+      };
+    } catch (_) {
+      // The optional native bridge may not be running. Local playback remains
+      // connected through MediaStreamDestination in that case.
+      bridge = null;
+    }
+    await context.resume();
+    reportState();
+  } catch (error) {
+    await teardownCaptureGraph();
+    reportState();
+    throw error;
   }
-  await context.resume();
-  // Keeping the graph alive here prevents the tab stream from ending when the
-  // popup closes; no microphone or hidden tab is captured. The native bridge
-  // consumes HIBT packets only when the user has started it separately.
-});
+}
+
+async function closeExistingContext() {
+  if (context) {
+    try { await context.close(); } catch (_) {}
+    context = null;
+  }
+}
+
+async function teardownCaptureGraph() {
+  activeStream?.getTracks().forEach(track => track.stop());
+  activeStream = null;
+  source?.disconnect();
+  source = null;
+  packetizer?.disconnect();
+  packetizer = null;
+  destination?.disconnect();
+  destination = null;
+  bridge?.close();
+  bridge = null;
+  if (context) {
+    try { await context.close(); } catch (_) {}
+    context = null;
+  }
+}
+
+async function stopCapture() {
+  await teardownCaptureGraph();
+  reportState();
+}

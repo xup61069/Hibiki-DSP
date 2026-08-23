@@ -15,6 +15,14 @@ source_globs: ["extensions/**", "tools/extension-check.ps1"]
 stream，AudioWorklet 將音訊轉成 `HIBT` packet；Windows process routing 不得宣稱
 能靜默取得 Chrome/Edge 單一分頁。
 
+## User-controlled capture lifecycle
+
+popup 必須提供明確的 Stop 控制項：點擊後透過 service worker 通知 offscreen 停止
+stream（停止所有 track、斷開 graph）並關閉 offscreen document。popup 開啟時必須
+查詢真實狀態（idle 或 capturing），不得假設 idle。start 失敗必須回報錯誤，不得
+宣稱「Capture started」。`tools/extension-check.ps1` 驗證這些 stop 與 state 邊界，
+self-test 涵蓋缺少 handler 的情況。
+
 ## HIBT packet
 
 固定 little-endian header：`magic='HIBT'`、`version=1`、`channels`、`frames`、
@@ -47,4 +55,3 @@ MV3 extension source gate (`tools/extension-check.ps1`) 強制驗證最小權限
 2. Host 權限僅限 `http://127.0.0.1/*`，拒絕 wildcard remote hosts 與 `<all_urls>`。
 3. `extension_pages` CSP 必須為 `script-src 'self'; object-src 'self'; connect-src ws://127.0.0.1:17842`，
    嚴格禁止 `unsafe-eval`、`unsafe-inline`、外部 script 或 non-loopback connect-src。
-
