@@ -15,12 +15,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
   if (message?.type === 'stop-tab-stream') {
-    stopCapture();
-    sendResponse({ok: true});
+    stopCapture()
+      .then(() => sendResponse({ok: true}))
+      .catch((error) => sendResponse({ok: false, error: String(error)}));
     return false;
   }
   if (message?.type !== 'start-tab-stream' || typeof message.streamId !== 'string') return false;
-  startCapture(message);
+  startCapture(message)
+    .then(() => sendResponse({ok: true}))
+    .catch((error) => sendResponse({ok: false, error: String(error)}));
   return false;
 });
 
