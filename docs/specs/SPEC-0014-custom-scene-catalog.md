@@ -6,7 +6,7 @@ authority: product-behavior
 last_reviewed: 2026-08-23
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["src/hub/**scene_catalog*", "src/hub/**engine_control*", "apps/control-model/**Scene*", "apps/winui-shell/**", "schemas/scene-definition-v1.schema.json", "schemas/custom-scene-cards-v1.schema.json", "tests/**"]
+source_globs: ["src/hub/**scene_catalog*", "src/hub/**engine_control*", "apps/control-model/**Scene*", "apps/winui-shell/**", "schemas/scene-definition-v1.schema.json", "schemas/custom-scene-cards-v1.schema.json", "schemas/scene-sync-queue-v1.schema.json", "tests/**"]
 ---
 
 # SPEC-0014：自定義 Scene catalog 與 SceneApply resolver
