@@ -1,0 +1,23 @@
+{
+  "schema_version": 2,
+  "issue": 630,
+  "title": "Context-pack path escape guard",
+  "base_commit": "21d8161ebe5c7cd2186cf41649a5bfd7af5deecb",
+  "summary": {
+    "tools": [
+      "tools/context-pack.ps1"
+    ],
+    "behavior": "Context packing now resolves candidate paths and walks every parent to the repository root before writing. Reparse points, non-directory parents, drive roots outside the repository, and non-NotFound inspection failures fail closed instead of being treated as safe repository paths. Six offline synthetic cases cover accepted in-root paths and the rejection classes including inspection failure.",
+    "selftest_cases_added": {
+      "path-guard": 6
+    }
+  },
+  "validation": [
+    { "command": "pwsh -NoProfile -File tools/context-pack.ps1 -SelfTest", "result": "pass", "notes": "12 glob cases plus 6 path-guard cases passed; offline/no-file-write" },
+    { "command": "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 630", "result": "pass", "notes": "ownership, scope and Git state verified on delivered branch" },
+    { "command": "pwsh -NoProfile -File tools/docs-check.ps1", "result": "pass", "notes": "80 required paths and 24 specs checked" },
+    { "command": "pwsh -NoProfile -File tools/source-policy.ps1", "result": "pass", "notes": "no blocked binaries or secrets" }
+  ],
+  "scope": "tools-only context-pack hardening; no product/API/schema/DSP/driver change; no live audio probe performed; no identity-bearing output introduced",
+  "date": "2026-08-23"
+}

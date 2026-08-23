@@ -41,6 +41,68 @@ function Test-ContextGlob([string]$relativePath, [string]$glob) {
   return $relativePath -match (Convert-ContextGlobToRegex $glob)
 }
 
+function Get-ContextExistingAttributes {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
+  )
+
+  $fullPath = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($fullPath)) {
+    return [System.IO.FileAttributes]$SyntheticAttributes[$fullPath]
+  }
+  if ($null -ne $SyntheticInspectionErrors -and $SyntheticInspectionErrors.ContainsKey($fullPath)) {
+    throw "Context path inspection failed: $fullPath ($($SyntheticInspectionErrors[$fullPath]))"
+  }
+  try {
+    return [System.IO.FileAttributes](Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop).Attributes
+  }
+  catch {
+    if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return $null }
+    throw "Context path inspection failed: $fullPath ($($_.Exception.Message))"
+  }
+}
+
+function Assert-ContextPathUnderRoot {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$RepositoryRoot,
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
+  )
+
+  $expectedRoot = [IO.Path]::GetFullPath($RepositoryRoot).TrimEnd('\', '/')
+  $candidate = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+
+  $cursor = $candidate
+  while ($true) {
+    $attributes = Get-ContextExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
+    if ($null -ne $attributes) {
+      if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Context path or parent is a reparse point: $cursor"
+      }
+      if ($cursor -ne $candidate -and (($attributes -band [System.IO.FileAttributes]::Directory) -eq 0)) {
+        throw "Context path parent is not a directory: $cursor"
+      }
+    }
+
+    if ($cursor -eq $expectedRoot) { break }
+    if ($cursor -match '^[A-Za-z]:\\?$') {
+      throw "Context path escapes the repository root: $candidate"
+    }
+    $rawParent = Split-Path -Parent $cursor -ErrorAction Stop
+    $parent = [IO.Path]::GetFullPath($rawParent).TrimEnd('\', '/')
+    if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) {
+      throw "Context path escapes the repository root: $candidate"
+    }
+    $cursor = $parent
+  }
+}
+
+$script:ContextSyntheticAttributes = $null
+$script:ContextSyntheticInspectionErrors = $null
+
 if ($SelfTest) {
   $cases = @(
     @{ Name = 'exact-match'; Path = 'docs/AI_HANDOFF.md'; Glob = 'docs/AI_HANDOFF.md'; Expected = $true },
@@ -65,6 +127,81 @@ if ($SelfTest) {
   }
 
   Write-Output "Context-pack glob self-test passed ($($cases.Count) cases)."
+
+  $archive = [int][System.IO.FileAttributes]::Archive
+  $directory = [int][System.IO.FileAttributes]::Directory
+  $reparsePoint = [int][System.IO.FileAttributes]::ReparsePoint
+  $repoFull = [IO.Path]::GetFullPath($repo).TrimEnd('\', '/')
+
+  function New-GuardSyntheticChain([string]$Root, [string]$RelativeLeaf, [int]$LeafAttributes) {
+    $fullLeaf = [IO.Path]::GetFullPath((Join-Path $Root $RelativeLeaf)).TrimEnd('\', '/')
+    $map = @{}
+    $cursor = $fullLeaf
+    while ($true) {
+      $map[$cursor] = if ($cursor -eq $fullLeaf) { $LeafAttributes } else { $directory }
+      $rawParent = Split-Path -Parent $cursor -ErrorAction SilentlyContinue
+      if ([string]::IsNullOrWhiteSpace($rawParent)) { break }
+      $parent = [IO.Path]::GetFullPath($rawParent).TrimEnd('\', '/')
+      if ($parent -match '^[A-Za-z]:$') { break }
+      if ($parent -eq $cursor) { break }
+      $cursor = $parent
+    }
+    return @{ Leaf = $fullLeaf; Attributes = $map }
+  }
+
+  function Invoke-GuardCase([scriptblock]$Action) {
+    try {
+      & $Action
+      return $null
+    } catch {
+      return "$($_.Exception.Message) [$($_.InvocationInfo.ScriptLineNumber)]"
+    }
+  }
+
+  $guardCases = @(
+    @{ Name = 'accept-inside-repository'; ExpectedError = $null; Action = {
+      $chain = New-GuardSyntheticChain -Root $repoFull -RelativeLeaf 'docs/sub/target.md' -LeafAttributes $archive
+      Assert-ContextPathUnderRoot -Path $chain.Leaf -RepositoryRoot $repoFull -SyntheticAttributes $chain.Attributes
+    } },
+    @{ Name = 'reject-outside-repository'; ExpectedError = 'escapes the repository root'; Action = {
+      $outsideRoot = Join-Path ([IO.Path]::GetTempPath()) 'hibiki-context-pack-outside'
+      $chain = New-GuardSyntheticChain -Root $outsideRoot -RelativeLeaf 'secret.txt' -LeafAttributes $archive
+      Assert-ContextPathUnderRoot -Path $chain.Leaf -RepositoryRoot $repoFull -SyntheticAttributes $chain.Attributes
+    } },
+    @{ Name = 'reject-reparse-point-leaf'; ExpectedError = 'reparse point'; Action = {
+      $chain = New-GuardSyntheticChain -Root $repoFull -RelativeLeaf 'docs/link.md' -LeafAttributes ($archive -bor $reparsePoint)
+      Assert-ContextPathUnderRoot -Path $chain.Leaf -RepositoryRoot $repoFull -SyntheticAttributes $chain.Attributes
+    } },
+    @{ Name = 'reject-reparse-point-parent'; ExpectedError = 'reparse point'; Action = {
+      $chain = New-GuardSyntheticChain -Root $repoFull -RelativeLeaf 'docs/sub/target.md' -LeafAttributes $archive
+       $middle = [IO.Path]::GetFullPath((Join-Path $repoFull 'docs\sub')).TrimEnd('\', '/')
+      $chain.Attributes[$middle] = $directory -bor $reparsePoint
+      Assert-ContextPathUnderRoot -Path $chain.Leaf -RepositoryRoot $repoFull -SyntheticAttributes $chain.Attributes
+    } },
+    @{ Name = 'reject-parent-not-directory'; ExpectedError = 'not a directory'; Action = {
+      $chain = New-GuardSyntheticChain -Root $repoFull -RelativeLeaf 'docs/sub/target.md' -LeafAttributes $archive
+      $middle = [IO.Path]::GetFullPath((Join-Path $repoFull 'docs\sub')).TrimEnd('\', '/')
+      $chain.Attributes[$middle] = $archive
+      Assert-ContextPathUnderRoot -Path $chain.Leaf -RepositoryRoot $repoFull -SyntheticAttributes $chain.Attributes
+    } },
+    @{ Name = 'reject-inspection-error'; ExpectedError = 'Context path inspection failed'; Action = {
+      $chain = New-GuardSyntheticChain -Root $repoFull -RelativeLeaf 'docs/sub/target.md' -LeafAttributes $archive
+      Assert-ContextPathUnderRoot -Path $chain.Leaf -RepositoryRoot $repoFull -SyntheticAttributes $null -SyntheticInspectionErrors @{ $chain.Leaf = 'access denied' }
+    } }
+  )
+
+  foreach ($guardCase in $guardCases) {
+    $actualError = Invoke-GuardCase $guardCase.Action
+    if ($null -eq $guardCase.ExpectedError) {
+      if ($null -ne $actualError) {
+        throw "context-pack guard self-test case '$($guardCase.Name)' expected success but got: $actualError"
+      }
+    } elseif ($null -eq $actualError -or -not $actualError.Contains($guardCase.ExpectedError)) {
+      throw "context-pack guard self-test case '$($guardCase.Name)' expected error containing '$($guardCase.ExpectedError)' but got: $actualError"
+    }
+  }
+
+  Write-Output "Context-pack path-guard self-test passed ($($guardCases.Count) cases)."
   exit 0
 }
 
@@ -85,8 +222,9 @@ $sourceGlobs = [System.Collections.Generic.HashSet[string]]::new(
   [System.StringComparer]::OrdinalIgnoreCase)
 
 function Write-ContextFile([string]$label, [string]$path) {
-  if (-not (Test-Path $path)) { throw "Context file missing: $path" }
+  if (-not (Test-Path -LiteralPath $path)) { throw "Context file missing: $path" }
   $resolved = (Resolve-Path -LiteralPath $path).Path
+  Assert-ContextPathUnderRoot -Path $resolved -RepositoryRoot $repo -SyntheticAttributes $script:ContextSyntheticAttributes -SyntheticInspectionErrors $script:ContextSyntheticInspectionErrors
   if (-not $seenFiles.Add($resolved)) { return }
   Write-Output "=== $label :: $path ==="
   Get-Content -LiteralPath $path
