@@ -17,6 +17,10 @@ struct IpcNamedPipeConfigV1 {
     std::wstring pipe_name;
     std::uint32_t max_frame_bytes{static_cast<std::uint32_t>(kIpcMaxPayloadBytes + 20U)};
     std::uint32_t io_timeout_ms{1000U};
+    // Canonical single-owner services set this to fail closed when another
+    // instance already owns the first pipe instance. Per-test unique names can
+    // leave it false.
+    bool require_first_pipe_instance{false};
 };
 
 using IpcFrameHandlerV1 = bool (*)(const IpcFrameV1& request,
@@ -47,10 +51,11 @@ public:
     }
 
 private:
-    void run() noexcept;
+    void run(void* initial_pipe) noexcept;
     void cancel_current_io() noexcept;
 
     std::atomic<bool> stop_requested_{false};
+    bool first_pipe_created_{false};
     std::atomic<bool> running_{false};
     std::atomic<bool> client_connected_{false};
     std::atomic<std::uintptr_t> pipe_handle_{0U};

@@ -47,7 +47,10 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
 - UI/engine/driver control plane 使用 versioned named-pipe framing；目前 user-space 提供
   `IpcFrameV1` little-endian envelope、payload 上限 1 MiB、request ID 與明確 decode errors。
   C++ `IpcNamedPipeServerV1` 以 4-byte little-endian length prefix、bounded overlapped I/O、
-  單一 control callback 與 local-only pipe 實作 transport；C# `NamedPipeControlClientV1`
+  單一 control callback 與 local-only pipe 實作 transport。canonical 單一擁有者服務可要求
+  first-instance ownership：`start` 必須同步建立第一個 server handle，取得失敗時回 false，
+  後續 server-side recreate 也保留同一 ownership；Engine Preview 的 canonical control pipe
+  採用此 fail-closed 邊界。C# `NamedPipeControlClientV1`
   使用同一 logical pipe name 與 request correlation。payload schema 可在後續以 Protobuf
   或等價固定編碼替換，但 version、message type 與 Validate/Prepare/Commit 語意不可破壞。
 - `VolumeNotification` v1 payload 固定為 16 bytes：Q16.16 dB、mute、三個 reserved bytes
