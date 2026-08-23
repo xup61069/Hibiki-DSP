@@ -41,6 +41,83 @@ function Test-ContextGlob([string]$relativePath, [string]$glob) {
   return $relativePath -match (Convert-ContextGlobToRegex $glob)
 }
 
+function Get-ContextPackExistingAttributes {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
+  )
+
+  $resolvedPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  if ($null -ne $SyntheticAttributes -and $SyntheticAttributes.ContainsKey($resolvedPath)) {
+    return [System.IO.FileAttributes]$SyntheticAttributes[$resolvedPath]
+  }
+  if ($null -ne $SyntheticInspectionErrors -and $SyntheticInspectionErrors.ContainsKey($resolvedPath)) {
+    throw "Context pack path inspection failed: $resolvedPath ($($SyntheticInspectionErrors[$resolvedPath]))"
+  }
+  try {
+    return [System.IO.FileAttributes](Get-Item -LiteralPath $resolvedPath -Force -ErrorAction Stop).Attributes
+  }
+  catch {
+    if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return $null }
+    throw "Context pack path inspection failed: $resolvedPath ($($_.Exception.Message))"
+  }
+}
+
+function Resolve-ContextPackPath {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Root,
+    [ValidateSet('File', 'Directory')][string]$Kind = 'File',
+    [switch]$AllowMissingLeaf,
+    [hashtable]$SyntheticAttributes,
+    [hashtable]$SyntheticInspectionErrors
+  )
+
+  $resolvedRoot = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+  $resolvedPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+  if (-not $resolvedPath.StartsWith(
+        $resolvedRoot + [System.IO.Path]::DirectorySeparatorChar,
+        [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "Context path must remain under the repository root: $resolvedPath"
+  }
+
+  $cursor = $resolvedPath
+  while ($true) {
+    $attributes = Get-ContextPackExistingAttributes -Path $cursor -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
+    if ($null -ne $attributes) {
+      if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Context path or parent is a reparse point: $cursor"
+      }
+      if ($cursor -eq $resolvedRoot) {
+        if (($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+          throw "Context path root is not a directory: $cursor"
+        }
+      } elseif ($cursor -eq $resolvedPath) {
+        if ($Kind -eq 'File' -and (($attributes -band [System.IO.FileAttributes]::Directory) -ne 0)) {
+          throw "Context path is not a file: $cursor"
+        }
+      } elseif (($attributes -band [System.IO.FileAttributes]::Directory) -eq 0) {
+        throw "Context path parent is not a directory: $cursor"
+      }
+    }
+
+    if ($cursor -eq $resolvedRoot) { break }
+    $parent = [System.IO.Path]::GetFullPath((Split-Path -Parent $cursor)).TrimEnd('\', '/')
+    if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $cursor) {
+      throw "Context path could not reach the repository root: $resolvedPath"
+    }
+    $cursor = $parent
+  }
+
+  $leafAttributes = Get-ContextPackExistingAttributes -Path $resolvedPath -SyntheticAttributes $SyntheticAttributes -SyntheticInspectionErrors $SyntheticInspectionErrors
+  if ($null -eq $leafAttributes) {
+    if (-not $AllowMissingLeaf) { throw "Context path does not exist: $resolvedPath" }
+    return $null
+  }
+  return $resolvedPath
+}
+
 if ($SelfTest) {
   $cases = @(
     @{ Name = 'exact-match'; Path = 'docs/AI_HANDOFF.md'; Glob = 'docs/AI_HANDOFF.md'; Expected = $true },
@@ -65,6 +142,106 @@ if ($SelfTest) {
   }
 
   Write-Output "Context-pack glob self-test passed ($($cases.Count) cases)."
+
+  $pathRepositoryRoot = [System.IO.Path]::GetFullPath('C:\hibiki-context-pack-selftest').TrimEnd('\', '/')
+  $pathDocsRoot = Join-Path $pathRepositoryRoot 'docs'
+  $pathInsideFile = Join-Path $pathDocsRoot 'AI_HANDOFF.md'
+  $pathOutsideFile = [System.IO.Path]::GetFullPath('C:\hibiki-context-pack-selftest-outside\secret.md')
+  $directoryAttribute = [System.IO.FileAttributes]::Directory
+  $fileAttribute = [System.IO.FileAttributes]::Archive
+  $pathCases = 0
+
+  $validResolved = Resolve-ContextPackPath -Path $pathInsideFile -Root $pathRepositoryRoot -Kind File -SyntheticAttributes @{
+    $pathRepositoryRoot = $directoryAttribute
+    $pathDocsRoot = $directoryAttribute
+    $pathInsideFile = $fileAttribute
+  }
+  if ($validResolved -ne $pathInsideFile) { throw 'context-pack self-test expected a valid in-repository path to resolve.' }
+  $pathCases++
+
+  if ($null -eq (Resolve-ContextPackPath -Path (Join-Path $repo 'AGENTS.md') -Root $repo -Kind File)) {
+    throw 'context-pack self-test expected the real AGENTS.md file to resolve.'
+  }
+  $pathCases++
+
+  $outsideCaught = $false
+  try {
+    Resolve-ContextPackPath -Path $pathOutsideFile -Root $pathRepositoryRoot -Kind File -SyntheticAttributes @{}
+  } catch { $outsideCaught = $_.Exception.Message -match 'must remain under the repository root' }
+  if (-not $outsideCaught) { throw 'context-pack self-test expected an outside-root rejection.' }
+  $pathCases++
+
+  $reparseLeafCaught = $false
+  try {
+    Resolve-ContextPackPath -Path $pathInsideFile -Root $pathRepositoryRoot -Kind File -SyntheticAttributes @{
+      $pathRepositoryRoot = $directoryAttribute
+      $pathDocsRoot = $directoryAttribute
+      $pathInsideFile = $fileAttribute -bor [System.IO.FileAttributes]::ReparsePoint
+    }
+  } catch { $reparseLeafCaught = $_.Exception.Message -match 'is a reparse point' }
+  if (-not $reparseLeafCaught) { throw 'context-pack self-test expected a reparse-leaf rejection.' }
+  $pathCases++
+
+  $reparseParentCaught = $false
+  try {
+    Resolve-ContextPackPath -Path $pathInsideFile -Root $pathRepositoryRoot -Kind File -SyntheticAttributes @{
+      $pathRepositoryRoot = $directoryAttribute
+      $pathDocsRoot = $directoryAttribute -bor [System.IO.FileAttributes]::ReparsePoint
+      $pathInsideFile = $fileAttribute
+    }
+  } catch { $reparseParentCaught = $_.Exception.Message -match 'is a reparse point' }
+  if (-not $reparseParentCaught) { throw 'context-pack self-test expected a reparse-parent rejection.' }
+  $pathCases++
+
+  $nonFileCaught = $false
+  try {
+    Resolve-ContextPackPath -Path $pathInsideFile -Root $pathRepositoryRoot -Kind File -SyntheticAttributes @{
+      $pathRepositoryRoot = $directoryAttribute
+      $pathDocsRoot = $directoryAttribute
+      $pathInsideFile = $directoryAttribute
+    }
+  } catch { $nonFileCaught = $_.Exception.Message -match 'is not a file' }
+  if (-not $nonFileCaught) { throw 'context-pack self-test expected a non-file leaf rejection.' }
+  $pathCases++
+
+  $missingAllowedResolved = Resolve-ContextPackPath -Path $pathInsideFile -Root $pathRepositoryRoot -Kind File -AllowMissingLeaf -SyntheticAttributes @{
+    $pathRepositoryRoot = $directoryAttribute
+    $pathDocsRoot = $directoryAttribute
+  }
+  if ($null -ne $missingAllowedResolved) { throw 'context-pack self-test expected a missing leaf to stay unresolved.' }
+  $pathCases++
+
+  $missingStrictCaught = $false
+  try {
+    Resolve-ContextPackPath -Path $pathInsideFile -Root $pathRepositoryRoot -Kind File -SyntheticAttributes @{
+      $pathRepositoryRoot = $directoryAttribute
+      $pathDocsRoot = $directoryAttribute
+    }
+  } catch { $missingStrictCaught = $_.Exception.Message -match 'does not exist' }
+  if (-not $missingStrictCaught) { throw 'context-pack self-test expected a missing-path rejection.' }
+  $pathCases++
+
+  $inspectionLeafCaught = $false
+  try {
+    Resolve-ContextPackPath -Path $pathInsideFile -Root $pathRepositoryRoot -Kind File -SyntheticAttributes @{
+      $pathRepositoryRoot = $directoryAttribute
+      $pathDocsRoot = $directoryAttribute
+    } -SyntheticInspectionErrors @{ $pathInsideFile = 'synthetic access denied' }
+  } catch { $inspectionLeafCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $inspectionLeafCaught) { throw 'context-pack self-test expected a leaf inspection-failure rejection.' }
+  $pathCases++
+
+  $inspectionParentCaught = $false
+  try {
+    Resolve-ContextPackPath -Path $pathInsideFile -Root $pathRepositoryRoot -Kind File -SyntheticAttributes @{
+      $pathRepositoryRoot = $directoryAttribute
+      $pathInsideFile = $fileAttribute
+    } -SyntheticInspectionErrors @{ $pathDocsRoot = 'synthetic sharing violation' }
+  } catch { $inspectionParentCaught = $_.Exception.Message -match 'path inspection failed' }
+  if (-not $inspectionParentCaught) { throw 'context-pack self-test expected a parent inspection-failure rejection.' }
+  $pathCases++
+
+  Write-Output "Context-pack path guard self-test passed ($pathCases cases)."
   exit 0
 }
 
@@ -85,11 +262,11 @@ $sourceGlobs = [System.Collections.Generic.HashSet[string]]::new(
   [System.StringComparer]::OrdinalIgnoreCase)
 
 function Write-ContextFile([string]$label, [string]$path) {
-  if (-not (Test-Path $path)) { throw "Context file missing: $path" }
-  $resolved = (Resolve-Path -LiteralPath $path).Path
+  $resolved = Resolve-ContextPackPath -Path $path -Root $repo -Kind File -AllowMissingLeaf
+  if ($null -eq $resolved) { throw "Context file missing: $path" }
   if (-not $seenFiles.Add($resolved)) { return }
   Write-Output "=== $label :: $path ==="
-  Get-Content -LiteralPath $path
+  Get-Content -LiteralPath $resolved
 }
 
 Write-Output "=== Hibiki context pack: Issue #$Issue ==="
@@ -116,10 +293,14 @@ foreach ($id in $specIds) {
   }
 }
 foreach ($id in $adrIds) {
-  $file = Get-ChildItem -LiteralPath (Join-Path $repo 'docs/adr') -Filter "*-*.md" -File |
-    Where-Object { Select-String -LiteralPath $_.FullName -Pattern "ADR-$($id.Substring(4))" -Quiet } |
-    Select-Object -First 1
-  if ($file) { Write-ContextFile $id $file.FullName }
+  $adrFiles = Get-ChildItem -LiteralPath (Join-Path $repo 'docs/adr') -Filter "*-*.md" -File
+  foreach ($file in $adrFiles) {
+    Resolve-ContextPackPath -Path $file.FullName -Root $repo -Kind File | Out-Null
+    if (Select-String -LiteralPath $file.FullName -Pattern "ADR-$($id.Substring(4))" -Quiet) {
+      Write-ContextFile $id $file.FullName
+      break
+    }
+  }
 }
 
 if (-not $NoSource) {
