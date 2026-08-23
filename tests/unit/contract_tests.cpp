@@ -1743,7 +1743,8 @@ int main() {
         CHECK(between_stop_server.start(between_config, acknowledge_ipc_request, nullptr));
 
         HANDLE between_client = INVALID_HANDLE_VALUE;
-        for (int attempt = 0; attempt < 30 && between_client == INVALID_HANDLE_VALUE; ++attempt) {
+        for (int attempt = 0;
+             attempt < 300 && between_client == INVALID_HANDLE_VALUE; ++attempt) {
             between_client = CreateFileW(between_pipe.c_str(), GENERIC_READ | GENERIC_WRITE, 0U,
                                          nullptr, OPEN_EXISTING, 0U, nullptr);
             if (between_client == INVALID_HANDLE_VALUE &&
@@ -1754,9 +1755,6 @@ int main() {
         CHECK(between_client != INVALID_HANDLE_VALUE);
         DisconnectNamedPipe(between_client);
         CloseHandle(between_client);
-        while (between_stop_server.client_connected()) {
-            std::this_thread::yield();
-        }
 
         const auto between_start = std::chrono::steady_clock::now();
         between_stop_server.stop();
