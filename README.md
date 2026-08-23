@@ -126,19 +126,40 @@ Authenticode 簽章 installer，經 Gumroad 交付。
 目前環境限制、已驗證命令、不能碰的資料，以及 **一個**下一步。不要從聊天紀錄、舊
 registry、私人裝置 ID 或未提交的 build output 推斷專案狀態。
 
-**執行環境**：所有 `tools/*.ps1` gates 需要 PowerShell 7（`pwsh`）；沒有先
-`winget install --id Microsoft.PowerShell`。PowerShell 5.1 無法執行。
+**執行環境**：所有 `tools/*.ps1` gates 以 UTF-8（無 BOM）儲存並使用 .NET Core API，
+必須用 PowerShell 7（`pwsh`）執行。Windows 內建的 PowerShell 5.1 會把中文註解解成
+亂碼、缺少必要方法，直接跑必失敗。機器沒有 `pwsh` 時先安裝：
+`winget install --id Microsoft.PowerShell`；本機第一次執行若被 Execution Policy
+擋下，加 `-ExecutionPolicy Bypass`。
 
 **必跑 gates**：
 
 ```powershell
 pwsh -File tools/doctor.ps1 -CheckOnly
 pwsh -File tools/handoff-check.ps1
+pwsh -File tools/build-preview.ps1 -Target DesktopCompat
+pwsh -File tools/probe-environment.ps1
 pwsh -File tools/verify.ps1
+pwsh -File tools/docs-check.ps1
+pwsh -File tools/source-only-ci-check.ps1
+pwsh -File tools/extension-check.ps1
+pwsh -File tools/installer-check.ps1
 pwsh -File tools/control-model-check.ps1
+pwsh -File tools/build-engine-preview.ps1
+pwsh -File tools/engine-preview-smoke.ps1
+pwsh -File tools/control-model-engine-smoke.ps1
+pwsh -File tools/winui-shell-check.ps1
 pwsh -File tools/docs-check.ps1
 pwsh -File tools/source-policy.ps1
+pwsh -File tools/distribution-check.ps1
+pwsh -File tools/driver-source-check.ps1
+pwsh -File tools/driver-signability-check.ps1
 ```
+
+在鎖定的 Windows 11 24H2+/VS 2026/SDK-WDK 機器上，將 Compatibility Preview 改為
+`pwsh -File tools/build-preview.ps1 -Target WinUI`，以取得正式 XAML build evidence；
+Desktop Compatibility Preview 只能驗證本機 ViewModel／啟動 smoke，不得代替 XAML、
+無障礙、driver 或發行驗收。
 
 多個 gate 另提供 `-SelfTest`（不碰機器即可驗證 gate 自身邏輯）。工作切片必須
 Issue／worktree／branch／handoff／draft PR 一對一，認領前檢查 branch 佔位；細節見
@@ -168,13 +189,7 @@ git clone https://github.com/xup61069/Hibiki-DSP.git
 目標環境是 **Windows 11 24H2+ x64、Visual Studio 2026、Windows SDK/WDK >= 10.0.26100（ADR-0005 最低基線）**。
 本機若低於此版本，仍可跑 user-space contract tests，但不能宣稱 driver 或正式 preview 已驗證。
 
-```powershell
-pwsh -File tools/doctor.ps1 -CheckOnly
-pwsh -File tools/verify.ps1
-pwsh -File tools/control-model-check.ps1
-pwsh -File tools/docs-check.ps1
-pwsh -File tools/source-policy.ps1
-```
+本節的完整必跑命令清單以上方「給 AI 協作者」的單一真值為準，不在這裡重複維護。
 
 驗證輸出一律留在 ignored 的 `.local/`；本 GitHub repository 不上傳 EXE、DLL、SYS、MSI、
 MSIX、VST3 或 CI artifact。多個 gate 提供 `-SelfTest` 模式（不碰機器、不寫檔），CI 的
