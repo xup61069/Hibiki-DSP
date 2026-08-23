@@ -82,7 +82,7 @@ function Resolve-HibikiDestination([string]$Requested) {
     throw 'Destination path cannot be blank.'
   }
   $expanded = [Environment]::ExpandEnvironmentVariables($Requested)
-  $rawSegments = $expanded.Split('\/ ') | Where-Object { $_ }
+  $rawSegments = $expanded.Split('\/') | Where-Object { $_ }
   foreach ($seg in $rawSegments) {
     if ($seg -eq '.' -or $seg -eq '..') {
       throw "Destination must not contain '.' or '..' segments: $Requested"
@@ -142,9 +142,9 @@ function Get-StagingPlan($Manifest, [string]$Root, [string]$Destination) {
 function Copy-HibikiFileWithHash {
   [CmdletBinding()]
   param(
-    [string]$Source,
-    [string]$Target,
-    [string]$ExpectedSha256
+    [Parameter(Mandatory)][string]$Source,
+    [Parameter(Mandatory)][string]$Target,
+    [Parameter(Mandatory)][string]$ExpectedSha256
   )
   $targetDir = Split-Path -Parent $Target
   if (-not (Test-Path -LiteralPath $targetDir)) {
@@ -165,22 +165,12 @@ function Copy-HibikiFileWithHash {
   }
 }
 
-function Invoke-HibikiInstall {
-  [CmdletBinding(SupportsShouldProcess)]
+function Invoke-PayloadStaging {
+  [CmdletBinding()]
   param(
-    [string]$Root,
-    $Manifest,
-    [string]$Destination
+    [AllowEmptyCollection()][array]$Plan,
+    [Parameter(Mandatory)][string]$Destination
   )
-  $driverInfs = @(Get-ChildItem -LiteralPath $Root -Recurse -Filter '*.inf' -File)
-  if ($driverInfs.Count -eq 0) { throw 'No driver INF found in the supplied package.' }
-  $driverInfs | ForEach-Object {
-    if ($PSCmdlet.ShouldProcess($_.FullName, 'Stage signed Hibiki driver')) {
-      & pnputil.exe /add-driver $_.FullName /install
-      if ($LASTEXITCODE -ne 0) { throw "PnPUtil failed for $($_.Name): $LASTEXITCODE" }
-    }
-  }
-  $plan = Get-StagingPlan $Manifest $Root $Destination
   $backupDirName = '.hibiki-backup-' + [Guid]::NewGuid().ToString('N')
   $backupDir = Join-Path $Destination $backupDirName
   $completedCopies = @()
@@ -192,7 +182,7 @@ function Invoke-HibikiInstall {
       New-Item -ItemType Directory -Path $Destination -Force | Out-Null
       $createdDirs += $Destination
     }
-    foreach ($item in $plan) {
+    foreach ($item in $Plan) {
       $destParent = Split-Path -Parent $item.Destination
       if (-not (Test-Path -LiteralPath $destParent)) {
         $dirsToCreate = @()
@@ -251,6 +241,25 @@ function Invoke-HibikiInstall {
     }
     throw
   }
+}
+
+function Invoke-HibikiInstall {
+  [CmdletBinding(SupportsShouldProcess)]
+  param(
+    [Parameter(Mandatory)][string]$Root,
+    [Parameter(Mandatory)]$Manifest,
+    [Parameter(Mandatory)][string]$Destination
+  )
+  $driverInfs = @(Get-ChildItem -LiteralPath $Root -Recurse -Filter '*.inf' -File)
+  if ($driverInfs.Count -eq 0) { throw 'No driver INF found in the supplied package.' }
+  $driverInfs | ForEach-Object {
+    if ($PSCmdlet.ShouldProcess($_.FullName, 'Stage signed Hibiki driver')) {
+      & pnputil.exe /add-driver $_.FullName /install
+      if ($LASTEXITCODE -ne 0) { throw "PnPUtil failed for $($_.Name): $LASTEXITCODE" }
+    }
+  }
+  $plan = Get-StagingPlan $Manifest $Root $Destination
+  Invoke-PayloadStaging -Plan $plan -Destination $Destination
   Write-Output "Hibiki $($Manifest.product_version) driver and payload installation completed."
 }
 
