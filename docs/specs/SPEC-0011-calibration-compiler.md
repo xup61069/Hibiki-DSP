@@ -29,6 +29,8 @@ C# control model 以 `CalibrationModel.cs` 提供對應的強型別 `Calibration
 `CalibrationResponseV1`、`PeqFilterV1`、`PeqPresetV1`、`CalibrationCompilePolicyV1` 與
 `CalibrationCompilerV1`，支援 `schemas/calibration-response-v1.schema.json` 與
 `schemas/peq-filter-v1.schema.json` 的原子 JSON 載入／保存及相同演算法的編譯與匯出。
+schema 層的 `device_id` 上限為 260 字元（`maxLength: 260`），與
+`device-switch-request-v1.schema.json` 的 endpoint ID 邊界一致。
 
 ## 限制與安全
 

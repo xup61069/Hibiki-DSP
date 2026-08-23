@@ -142,6 +142,8 @@ Group Master → limiter；失敗時保留既有 active attachment。SceneApply 
 production concurrent RT/control swap 仍需 epoch/RCU 驗證。
 
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
+schema 層的 `anchor_id` 在非 null 時必須是非空字串（`minLength: 1`），與專案
+ID 不可為空的慣例一致；
 `Program-aware` 另有 `ProgramAwareLevelControllerV1` 的慢速內容音量控制：預設保留無配置的
 RMS 代理；`KWeightedProxy` 會在固定容量狀態內串接高通與高頻 shelf 兩段 K-weighting，並
 可選排除呼叫端標示的 LFE channel。兩者都使用 3 秒分析窗、靜音門、增益上限與 dB/s
