@@ -53,7 +53,9 @@ jobs:
           if ($branch -eq '' -or $branch -eq 'main') { throw 'branch must be a unique working branch.' }
 
           # Parse the handoff block without executing the main audit path.
-          & {
+          # Dot-source (not invoke) so the helper functions survive this
+          # block; an invocation scope would discard them on exit.
+          . {
             param([string]$ScriptPath)
             $content = Get-Content -LiteralPath $ScriptPath -Raw
             $start = $content.IndexOf('function Get-AdmissionIssueData')
@@ -62,6 +64,9 @@ jobs:
             if ($end -lt 0) { throw 'Admission overlap helpers are missing from tools/handoff-check.ps1.' }
             Invoke-Expression $content.Substring($start, $end - $start)
           } (Join-Path (Get-Location) 'tools/handoff-check.ps1')
+          if (-not (Get-Command Test-AdmissionIssueEligibility -ErrorAction SilentlyContinue)) {
+            throw 'Admission helpers did not load into session scope; fail closed.'
+          }
 
           $issue = gh issue view $issueNumber --json number,state,title,body,labels,assignees | ConvertFrom-Json
           if (-not $issue -or [int]$issue.number -ne $issueNumber) { throw "Issue #$issueNumber not found." }
