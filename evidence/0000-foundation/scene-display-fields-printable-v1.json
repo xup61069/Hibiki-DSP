@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "issue": 1027,
+  "scope_digest": "scene-display-fields-printable-v1",
+  "source_commit": "65188772e55c7ae64d0a2023f08b5122515359b6",
+  "environment_fingerprint": "windows-amd64-pwsh-scene-display-fields-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1027",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target DesktopCompat",
+    "pwsh -NoProfile -File tools/verify.ps1"
+  ],
+  "results": [
+    {"command": "handoff-check", "status": "pass"},
+    {"command": "docs-check", "status": "pass"},
+    {"command": "source-policy", "status": "pass"},
+    {"command": "git diff --check", "status": "pass"},
+    {"command": "control-model-check", "status": "pass"},
+    {"command": "build-preview -Target DesktopCompat", "status": "pass"},
+    {"command": "verify -Clean", "status": "pass"}
+  ],
+  "limitations": [
+    "Custom Scene description and latency_label now reject control characters at card entry and persisted load.",
+    "Schema patterns align with the existing invisible-control exclusion used by other public text fields.",
+    "Control-model, schema contract and compatibility-preview verification only; no engine, DSP or driver behavior modified."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-24T19:50:00+08:00",
+  "finished_at": "2026-08-24T20:20:00+08:00"
+}
