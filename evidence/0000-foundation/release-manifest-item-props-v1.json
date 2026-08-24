@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "issue": 1052,
+  "scope_digest": "release-manifest-item-props-v1",
+  "source_commit": "b1a32704d69edae22601a9e8620d229eacd96cd0",
+  "environment_fingerprint": "windows-amd64-pwsh-release-manifest-props",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1052",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [],
+  "limitations": [
+    "Added additionalProperties:false to unsigned_files items so manifest entries cannot carry undeclared fields.",
+    "Schema-level validation only; no release artifact or signing evidence implied."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
