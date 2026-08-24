@@ -174,6 +174,7 @@ public sealed class CustomSceneCatalogV1
         if (string.IsNullOrWhiteSpace(scene.Id) || scene.Id.Length > 31 ||
             string.IsNullOrWhiteSpace(scene.Name) ||
             Encoding.UTF8.GetByteCount(scene.Name) > 120 ||
+            scene.Name.Any(char.IsControl) ||
             scene.Description.Length > 240 || scene.LatencyLabel.Length > 64 ||
             ScenePresetCatalog.EasyDefaults.Any(item => item.Id == scene.Id))
             return false;
