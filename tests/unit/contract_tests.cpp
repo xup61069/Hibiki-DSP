@@ -2880,6 +2880,102 @@ int main() {
         parameter_packet, decoded_worker, std::span<Vst3WorkerParameterPointV1>(decoded_parameters),
         decoded_parameter_count, decoded_parameter_samples, worker_error) &&
           worker_error == Vst3WorkerProtocolErrorV1::InvalidFormat);
+    // Issue 1283: multi-bus/side-chain frame contract fixtures. Deterministic,
+    // in-memory; covers round-trip integrity plus the fail-closed boundaries
+    // (layout mismatch, reserved bytes, non-finite samples, inactive slots).
+    {
+        Vst3BusLayoutV1 multibus_layout{};
+        multibus_layout.input_bus_count = 2U;
+        multibus_layout.output_bus_count = 1U;
+        multibus_layout.inputs[0] = Vst3AudioBusV1{Vst3BusRoleV1::Main, 1U, 0U, 2U};
+        multibus_layout.inputs[1] = Vst3AudioBusV1{Vst3BusRoleV1::Sidechain, 1U, 0U, 2U};
+        multibus_layout.outputs[0] = Vst3AudioBusV1{Vst3BusRoleV1::Main, 1U, 0U, 2U};
+        // Bus order: main-in 2ch x 4f, sidechain 2ch x 4f, main-out 2ch x 4f.
+        const float multibus_samples[24] = {
+            0.125F, -0.125F, 0.25F, -0.25F, 0.375F, -0.375F, 0.5F, -0.5F,
+            0.5F, -0.5F, 0.625F, -0.625F, 0.75F, -0.75F, 0.875F, -0.875F,
+            0.0625F, -0.0625F, 0.1875F, -0.1875F, 0.3125F, -0.3125F,
+            0.4375F, -0.4375F};
+        const auto mb_payload_bytes = kVst3WorkerMultibusPrefixBytesV1 +
+                                      kVst3WorkerMultibusBusTableBytesV1 +
+                                      sizeof(multibus_samples);
+        std::vector<std::uint8_t> mb_packet(kVst3WorkerHeaderBytesV1 + mb_payload_bytes);
+        const Vst3WorkerFrameV1 mb_frame{Vst3WorkerMessageTypeV1::ProcessBlockMultiBus,
+                                         21U, 0U, 4U,
+                                         static_cast<std::uint32_t>(mb_payload_bytes), 0U};
+        std::size_t mb_bytes_written = 0U;
+        CHECK(encode_vst3_worker_multibus_frame_v1(
+            mb_frame, multibus_layout, std::span<const float>(multibus_samples),
+            std::span<std::uint8_t>(mb_packet), mb_bytes_written) &&
+              mb_bytes_written == mb_packet.size());
+        Vst3WorkerFrameV1 mb_decoded{};
+        Vst3WorkerMultibusViewV1 mb_view{};
+        std::span<const float> mb_decoded_samples;
+        CHECK(validate_vst3_worker_multibus_frame_v1(mb_packet, mb_decoded, mb_view,
+                                                     mb_decoded_samples, worker_error) &&
+              mb_decoded.request_id == 21U && mb_view.frames == 4U &&
+              mb_view.input_sample_count == 16U &&
+              mb_view.output_sample_offset == 16U && mb_view.output_sample_count == 8U &&
+              vst3_bus_layout_has_sidechain_v1(mb_view.layout));
+        CHECK(mb_decoded_samples.size() == 24U);
+        std::span<const float> main_in_samples;
+        std::span<const float> sidechain_samples;
+        std::span<const float> main_out_samples;
+        CHECK(vst3_worker_multibus_bus_samples_v1(mb_view, mb_decoded_samples, true, 0U,
+                                                  main_in_samples) &&
+              main_in_samples.size() == 8U &&
+              std::abs(main_in_samples[0] - 0.125F) < 1e-6F);
+        CHECK(vst3_worker_multibus_bus_samples_v1(mb_view, mb_decoded_samples, true, 1U,
+                                                  sidechain_samples) &&
+              sidechain_samples.size() == 8U &&
+              std::abs(sidechain_samples[6] - 0.875F) < 1e-6F);
+        CHECK(vst3_worker_multibus_bus_samples_v1(mb_view, mb_decoded_samples, false, 0U,
+                                                 main_out_samples) &&
+              main_out_samples.size() == 8U &&
+              std::abs(main_out_samples[7] - (-0.4375F)) < 1e-6F);
+        // Fail closed: out-of-range bus index and inactive slot.
+        std::span<const float> rejected_samples;
+        CHECK(!vst3_worker_multibus_bus_samples_v1(mb_view, mb_decoded_samples, true, 2U,
+                                                   rejected_samples));
+        CHECK(!vst3_worker_multibus_bus_samples_v1(mb_view, mb_decoded_samples, false, 1U,
+                                                   rejected_samples));
+        // Fail closed: non-zero reserved byte inside the embedded layout table.
+        mb_packet[kVst3WorkerHeaderBytesV1 + kVst3WorkerMultibusPrefixBytesV1 + 2U] = 1U;
+        CHECK(!validate_vst3_worker_multibus_frame_v1(mb_packet, mb_decoded, mb_view,
+                                                      mb_decoded_samples, worker_error) &&
+              worker_error == Vst3WorkerProtocolErrorV1::InvalidFormat);
+        mb_packet[kVst3WorkerHeaderBytesV1 + kVst3WorkerMultibusPrefixBytesV1 + 2U] = 0U;
+        // Fail closed: NaN sample.
+        float mb_nan = std::numeric_limits<float>::quiet_NaN();
+        std::memcpy(mb_packet.data() + kVst3WorkerHeaderBytesV1 +
+                        kVst3WorkerMultibusPrefixBytesV1 + kVst3WorkerMultibusBusTableBytesV1 +
+                        3U * sizeof(float),
+                    &mb_nan, sizeof(mb_nan));
+        CHECK(!validate_vst3_worker_multibus_frame_v1(mb_packet, mb_decoded, mb_view,
+                                                      mb_decoded_samples, worker_error) &&
+              worker_error == Vst3WorkerProtocolErrorV1::NonFiniteSample);
+        std::memcpy(mb_packet.data() + kVst3WorkerHeaderBytesV1 +
+                        kVst3WorkerMultibusPrefixBytesV1 + kVst3WorkerMultibusBusTableBytesV1 +
+                        3U * sizeof(float),
+                    &multibus_samples[3], sizeof(float));
+        // Fail closed: payload_bytes disagrees with embedded layout geometry.
+        Vst3WorkerFrameV1 bad_mb_frame = mb_frame;
+        bad_mb_frame.payload_bytes += 4U;
+        std::vector<std::uint8_t> bad_mb_packet(kVst3WorkerHeaderBytesV1 + mb_payload_bytes + 4U,
+                                                0U);
+        std::memcpy(bad_mb_packet.data(), mb_packet.data(), mb_packet.size());
+        CHECK(!validate_vst3_worker_multibus_frame_v1(bad_mb_packet, mb_decoded, mb_view,
+                                                      mb_decoded_samples, worker_error) &&
+              worker_error == Vst3WorkerProtocolErrorV1::PayloadMismatch);
+        // Fail closed: encode rejects a layout that fails bus-layout validation
+        // (side-chain on an output bus).
+        Vst3BusLayoutV1 invalid_layout = multibus_layout;
+        invalid_layout.outputs[0].role = Vst3BusRoleV1::Sidechain;
+        CHECK(!encode_vst3_worker_multibus_frame_v1(mb_frame, invalid_layout,
+                                                    std::span<const float>(multibus_samples),
+                                                    std::span<std::uint8_t>(mb_packet),
+                                                    mb_bytes_written));
+    }
     Vst3ParameterTimelineV1 parameter_timeline;
     CHECK(parameter_timeline.append(Vst3ParameterTimelineEventV1{7U, 48003U, 0.75}) &&
           parameter_timeline.append(Vst3ParameterTimelineEventV1{3U, 48000U, 0.25}) &&

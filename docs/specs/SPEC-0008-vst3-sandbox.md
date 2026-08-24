@@ -79,6 +79,19 @@ Sidechain，output 不得標示 Sidechain，所有未使用槽位必須完全為
 SDK processor／worker 仍只實作一個 Main input/output bus，因此 side-chain/multi-bus 的
 實際 plugin process 仍是後續 gate，不可由 validator 反推已完成。
 
+`vst3_worker_protocol.hpp` 現在提供 versioned multi-bus/side-chain worker frame 契約：
+`ProcessBlockMultiBus`／`ProcessBlockMultiBusResponse` 的 payload 是 self-describing
+fixed prefix（schema version、input/output bus count、16 reserved bytes）+ 16 條 8-byte
+bus records（與 `Vst3AudioBusV1` 同構）+ bus-ordered interleaved Float32 samples
+（active inputs 依槽位順序，然後 active outputs）。內嵌 layout 必須通過
+`validate_vst3_bus_layout_v1` 全部規則（含 Main input/output 必在 index 0、output 不得
+Sidechain、總聲道上限 32），reserved bytes 必須為零，frame 上限為 512 frames，且最壞情況
+payload 仍在既有 `kVst3WorkerMaxPayloadBytesV1` 預算內（static_assert 保證）。codec 不配置、
+不鎖、不等待；NaN/Inf、layout 違規、geometry mismatch 一律 fail-closed。
+`vst3_worker_multibus_bus_samples_v1` 提供已驗證 block 內的 per-bus sample slicing。
+這仍是 wire/control-plane 契約：SDK processor 與 worker executable 尚未 dispatch 多 bus
+plugin processing，不能由本契約反推 side-chain/multi-bus 實際 plugin process 已完成。
+
 `Vst3SceneAutomationSchedulerV1` 提供 Scene reference 到 lane 的 control-plane registry：
 最多 16 條 timeline、16 個 scene/lane binding，啟用時先驗證所有 timeline、lane token 與
 lane state，再套用 snapshot；每個 lane 用 `atomic_flag` 保持最多一個 in-flight block，
