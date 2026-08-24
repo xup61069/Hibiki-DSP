@@ -136,6 +136,12 @@ v2 manifest 是 append-only assertion。`metadata.scope` 只是人類可讀 labe
   byte count 與 SHA-256 作 domain-separated canonical digest。rename 使用 `--no-renames`，因此穩定
   表示為 delete + add；不得從 checkout 後可能經 CRLF/smudge 改寫的 bytes 計算。
 
+產生來源綁定時使用對應助手，不要手動列路徑或重算 digest：`change` 先 stage 完整非-evidence
+變更再執行 `evidence-audit.ps1 -DescribeCurrentChange`；evidence-only 候選的 `snapshot` 執行
+`evidence-audit.ps1 -DescribeSnapshotSourceSet -SnapshotCommit <40-hex>`，由工具驗證 commit 存在、
+可由 origin/main 到達且非-evidence change set 非空後，輸出完整 paths 與 digest；任一條件不滿足即
+fail closed。
+
 canonical byte stream 使用 UTF-8、無 BOM 與 NUL 分隔：先寫
 `hibiki-evidence-source-set-v1\0`；每個 ordinal-sorted path 寫 `P\0<path>\0`，接著依序寫 before、
 after state。absent state 是 `0\0`；present state 是
