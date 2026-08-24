@@ -27,6 +27,9 @@ EasySceneDefaultsV1 make_easy_scene(const EasySceneKind kind,
             defaults.scene.ir_phase = IrPhasePolicyV1{1, IrPhaseMode::LinearPhase, 1.0};
             defaults.loudness.strength = 0.70;
             defaults.loudness.max_boost_db = 6.0;
+            defaults.program_aware.enabled = true;
+            defaults.program_aware.target_dbfs = -23.0;
+            defaults.program_aware.max_cut_db = 12.0;
             break;
         case EasySceneKind::Voice:
             defaults.scene.latency_mode = LatencyMode::Balanced;

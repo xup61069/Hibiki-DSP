@@ -155,7 +155,8 @@ production concurrent RT/control swap 仍需 epoch/RCU 驗證。
 `AudioEngineModel::prepare_loudness_peq` 把 caller-supplied ISO formula points、current phon
 與 `EqualLoudnessPolicyV1` 先送入既有 `build_formula_compensation`，再在 control plane 編成最多
 16 段固定容量 PEQ。commit 才會替換指定 output group 的 active attachment；prepare/clear rollback
-保留舊 attachment。RT render 順序為 graph → IR → equal-loudness PEQ → Group Master → limiter；
+保留舊 attachment。RT render 順序為 graph → IR → equal-loudness PEQ → program-aware level →
+Group Master → limiter；
 Strict Direct 時可準備或保留 attachment，但 render 會 fail-open bypass，確保輸出不變。SceneApply 成功路徑會在同一個 control
 transaction 清掉上一個 loudness EQ，避免不相關 Scene 的音色殘留。這是 bounded proxy 與音色控制，
 不是 ISO 226 conformance、正式係數 fit、實體 sink delivery 或 driver/WaveRT evidence；production
@@ -175,6 +176,16 @@ RMS 代理；`KWeightedProxy` 會在固定容量狀態內串接高通與高頻 s
 完整 gated loudness、合法 oracle 與 true-peak conformance），UI／文件必須顯示 proxy；它
 也不會在 `Relative`／`Calibrated` ISO 曲線中偷偷改變音色。正式 BS.1770 analyzer 與 oracle
 仍是 release gate。
+
+`ProgramAwareLevelBankV1` 把上述 controller 變成最多 32 個 output group 的固定容量
+attachment，與 `OutputGroupVolumeBankV1` 同所有權模式：control plane 註冊並設定政策，
+RT thread 只以 group label 查找既有 slot，過程不配置、不鎖定、不等待。
+`AudioEngineModel::prepare_program_aware`／`prepare_program_aware_clear`／
+`commit_program_aware`／`rollback_program_aware` 提供與 loudness PEQ 相同的交易式邊界；
+commit 是唯一 RT-visible 替換點。Movie Easy Scene 預設啟用 RmsProxy（target −23 dBFS、
+max cut 12 dB），SceneApply 成功路徑在同一個 control transaction 清掉上一個 Scene 的
+controller；Strict Direct 維持 fail-open bypass。此整合仍是 user-space bounded proxy，
+不宣稱 BS.1770 conformance、實體 sink delivery 或 driver/WaveRT evidence。
 
 ## IR 相位／延遲滑桿
 

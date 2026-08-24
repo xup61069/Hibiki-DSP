@@ -178,4 +178,99 @@ bool ProgramAwareLevelControllerV1::process_interleaved(float* const interleaved
     return true;
 }
 
+bool ProgramAwareLevelBankV1::valid_group(const std::string_view output_group) noexcept {
+    return !output_group.empty() && output_group.size() <= kMaxProgramAwareGroupBytesV1 &&
+           output_group.find('\0') == std::string_view::npos;
+}
+
+ProgramAwareLevelBankV1::Slot* ProgramAwareLevelBankV1::find_slot(
+    const std::string_view output_group) noexcept {
+    for (auto& slot : slots_) {
+        if (!slot.used || slot.group[0] == '\0') continue;
+        const auto bytes = static_cast<std::size_t>(slot.group[0]);
+        if (bytes != output_group.size()) continue;
+        bool equal = true;
+        for (std::size_t index = 0U; index < bytes; ++index) {
+            if (static_cast<unsigned char>(slot.group[1 + index]) !=
+                static_cast<unsigned char>(output_group[index])) {
+                equal = false;
+                break;
+            }
+        }
+        if (equal) return &slot;
+    }
+    return nullptr;
+}
+
+const ProgramAwareLevelBankV1::Slot* ProgramAwareLevelBankV1::find_slot(
+    const std::string_view output_group) const noexcept {
+    for (const auto& slot : slots_) {
+        if (!slot.used || slot.group[0] == '\0') continue;
+        const auto bytes = static_cast<std::size_t>(slot.group[0]);
+        if (bytes != output_group.size()) continue;
+        bool equal = true;
+        for (std::size_t index = 0U; index < bytes; ++index) {
+            if (static_cast<unsigned char>(slot.group[1 + index]) !=
+                static_cast<unsigned char>(output_group[index])) {
+                equal = false;
+                break;
+            }
+        }
+        if (equal) return &slot;
+    }
+    return nullptr;
+}
+
+bool ProgramAwareLevelBankV1::register_group(const std::string_view output_group) noexcept {
+    if (!valid_group(output_group)) return false;
+    if (find_slot(output_group) != nullptr) return true;
+    for (auto& slot : slots_) {
+        if (slot.used) continue;
+        slot.used = true;
+        slot.group.fill(0);
+        slot.group[0] = static_cast<char>(output_group.size());
+        std::copy(output_group.begin(), output_group.end(), slot.group.begin() + 1);
+        slot.policy = {};
+        slot.controller = {};
+        ++group_count_;
+        return true;
+    }
+    return false;
+}
+
+ProgramAwareLevelControllerV1* ProgramAwareLevelBankV1::controller_for_group(
+    const std::string_view output_group) const noexcept {
+    if (output_group.empty() || output_group.find('\0') != std::string_view::npos) {
+        return nullptr;
+    }
+    auto* slot = find_slot(output_group);
+    return slot != nullptr ? &slot->controller : nullptr;
+}
+
+bool ProgramAwareLevelBankV1::configure_group(
+    const std::string_view output_group,
+    const ProgramAwareLevelPolicyV1& policy,
+    const std::uint32_t sample_rate) noexcept {
+    auto* slot = find_slot(output_group);
+    if (slot == nullptr) return false;
+    if (!slot->controller.configure(policy, sample_rate)) return false;
+    slot->policy = policy;
+    return true;
+}
+
+void ProgramAwareLevelBankV1::reset_all() noexcept {
+    for (auto& slot : slots_) {
+        if (!slot.used) continue;
+        slot.policy = {};
+        slot.controller = {};
+    }
+    group_count_ = 0U;
+}
+
+bool ProgramAwareLevelBankV1::has_group(const std::string_view output_group) const noexcept {
+    return !output_group.empty() &&
+           output_group.find('\0') == std::string_view::npos &&
+           find_slot(output_group) != nullptr;
+}
+
 }  // namespace hibiki

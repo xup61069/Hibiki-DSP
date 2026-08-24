@@ -4,6 +4,7 @@
 
 #include "hibiki/iso226.hpp"
 #include "hibiki/contracts.hpp"
+#include "hibiki/program_loudness.hpp"
 #include "hibiki/scene_graph.hpp"
 
 #include <string>
@@ -21,6 +22,7 @@ struct EasySceneDefaultsV1 {
     SceneProfileV1 scene{};
     GraphConfigV1 graph{};
     EqualLoudnessPolicyV1 loudness{};
+    ProgramAwareLevelPolicyV1 program_aware{};
 };
 
 [[nodiscard]] EasySceneDefaultsV1 make_easy_scene(EasySceneKind kind,
