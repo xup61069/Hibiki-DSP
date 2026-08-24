@@ -43,11 +43,8 @@ function Read-ReleaseManifest([string]$Path) {
   if (($manifest.product_version -is [string]) -and $manifest.product_version.Length -gt 64) {
     throw 'Manifest product_version exceeds maximum length of 64 characters.'
   }
-  if ($manifest.source_tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+') {
-    throw 'Manifest source_tag is not a stable version tag.'
-  }
-  if (($manifest.source_tag -is [string]) -and $manifest.source_tag.Length -gt 48) {
-    throw 'Manifest source_tag suffix exceeds maximum of 32 characters after version prefix.'
+  if ($manifest.source_tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9._:+-]{0,32}$') {
+    throw 'Manifest source_tag must match v<major>.<minor>.<patch> with at most 32 allowed suffix characters.'
   }
   if ([string]::IsNullOrWhiteSpace($manifest.source_commit) -or
       $manifest.source_commit -notmatch '^[0-9a-f]{40}$') {
@@ -65,6 +62,20 @@ function Read-ReleaseManifest([string]$Path) {
       $manifest.sbom_digest -notmatch '^[0-9a-fA-F]{64}$') {
     throw 'Manifest sbom_digest must be a SHA-256 digest.'
   }
+  foreach ($sectionName in @('driver_package', 'installer')) {
+    $section = $manifest.$sectionName
+    if ($null -eq $section) { continue }
+    $allowedFields = @{
+      driver_package = @('sha256', 'catalog_sha256', 'microsoft_signature_thumbprint')
+      installer = @('sha256', 'signer_thumbprint', 'rfc3161_timestamp')
+    }
+    foreach ($prop in ($section | Get-Member -MemberType NoteProperty).Name) {
+      if ($allowedFields[$sectionName] -notcontains $prop) {
+        throw ("Manifest " + $sectionName + " contains unknown field: " + $prop)
+      }
+    }
+  }
+
   if ($null -eq $manifest.driver_package -or
       $manifest.driver_package.sha256 -notmatch '^[0-9a-fA-F]{64}$' -or
       $manifest.driver_package.catalog_sha256 -notmatch '^[0-9a-fA-F]{64}$' -or
@@ -88,20 +99,43 @@ function Read-ReleaseManifest([string]$Path) {
 
   if (($manifest.PSObject.Properties.Name -contains 'signed_installer_sha256')) {
     $sigHash = $manifest.signed_installer_sha256
-    if ($null -ne $sigHash -and $sigHash -notmatch '^[0-9a-fA-F]{64}$') {
+    if ($null -eq $sigHash -or $sigHash -isnot [string] -or $sigHash -notmatch '^[0-9a-fA-F]{64}$') {
       throw 'Manifest signed_installer_sha256 must be a SHA-256 digest when present.'
     }
   }
 
+  if ($null -eq $manifest.unsigned_files -or $manifest.unsigned_files -isnot [array]) {
+    throw 'Manifest unsigned_files must be an array.'
+  }
   if (@($manifest.unsigned_files).Count -gt 1024) {
     throw 'Manifest unsigned_files exceeds maximum count of 1024 entries.'
   }
   foreach ($entry in @($manifest.unsigned_files)) {
-    if ($entry.path.Length -gt 260) {
-      throw "Manifest unsigned_files path exceeds maximum length of 260 characters."
+    if ($null -eq $entry -or $entry -isnot [pscustomobject]) {
+      throw 'Manifest unsigned_files entries must be objects.'
+    }
+    foreach ($prop in ($entry | Get-Member -MemberType NoteProperty).Name) {
+      if ($prop -notin @('path', 'sha256')) {
+        throw ("Manifest unsigned_files entry contains unknown field: " + $prop)
+      }
+    }
+    if (-not ($entry.PSObject.Properties.Name -contains 'path')) {
+      throw 'Manifest unsigned_files entry is missing required path field.'
+    }
+    if (-not ($entry.PSObject.Properties.Name -contains 'sha256')) {
+      throw 'Manifest unsigned_files entry is missing required sha256 field.'
+    }
+    if ($entry.path -isnot [string] -or $entry.path.Length -lt 1 -or $entry.path.Length -gt 260) {
+      throw 'Manifest unsigned_files path must be a string of 1..260 characters.'
+    }
+    if ($entry.sha256 -isnot [string] -or $entry.sha256 -notmatch '^[0-9a-fA-F]{64}$') {
+      throw ("Manifest unsigned_files sha256 must be a 64-character hexadecimal digest: " + $entry.path)
     }
   }
 
+  if ($null -eq $manifest.tests -or $manifest.tests -isnot [array]) {
+    throw 'Manifest tests must be an array.'
+  }
   if (@($manifest.tests).Count -gt 256) {
     throw 'Manifest tests exceeds maximum count of 256 entries.'
   }
