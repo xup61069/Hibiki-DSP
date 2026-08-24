@@ -8,6 +8,7 @@
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1028",
     "pwsh -NoProfile -File tools/docs-check.ps1",
     "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
     "git diff --check"
   ],
   "results": [
@@ -22,6 +23,11 @@
     {
       "command": "source-policy",
       "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass",
+      "log": ".local/verify-1028.log"
     },
     {
       "command": "git diff --check",
