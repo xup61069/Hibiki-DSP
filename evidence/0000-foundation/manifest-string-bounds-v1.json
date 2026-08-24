@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 954,
   "scope_digest": "manifest-string-bounds-v1",
-  "source_commit": "0901663d",
+  "source_commit": "0901663dc0fba01491ca1fc7d8a229ef4733e114",
   "environment_fingerprint": "windows-amd64-pwsh-manifest-string-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 954",

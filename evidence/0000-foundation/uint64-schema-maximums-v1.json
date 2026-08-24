@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1011,
   "scope_digest": "uint64-schema-maximums-v1",
-  "source_commit": "8b2ecd5c",
+  "source_commit": "192fd6035965442ef797bc68fa9d216988ab948d",
   "environment_fingerprint": "windows-amd64-pwsh-uint64-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1011",
