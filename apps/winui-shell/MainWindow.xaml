@@ -403,6 +403,11 @@
                                         <controls:ItemsRepeater.ItemTemplate>
                                             <DataTemplate>
                                                 <StackPanel Padding="12" Spacing="4" CornerRadius="8" AutomationProperties.Name="{Binding AccessibleSummary}" AutomationProperties.HelpText="{Binding Detail}" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                                     <StackPanel.Transitions>
+                                                         <TransitionCollection>
+                                                             <EntranceThemeTransition FromVerticalOffset="24" />
+                                                         </TransitionCollection>
+                                                     </StackPanel.Transitions>
                                                     <Grid ColumnSpacing="8">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="*" />
