@@ -71,7 +71,7 @@ public sealed record PeqFilterV1(
     public const string PeakingType = "peaking";
 
     public bool IsValid =>
-        string.Equals(Type, PeakingType, StringComparison.OrdinalIgnoreCase) &&
+        Type == PeakingType &&
         double.IsFinite(FrequencyHz) && FrequencyHz is >= 10.0 and <= 48000.0 &&
         double.IsFinite(GainDb) && GainDb is >= -44.0 and <= 24.0 &&
         double.IsFinite(Q) && Q is >= 0.1 and <= 100.0;
@@ -583,7 +583,7 @@ public static class CalibrationCompilerV1
             var filters = new List<PeqFilterV1>(doc.Filters.Count);
             foreach (var f in doc.Filters)
             {
-                if (f is null || !string.Equals(f.Type, PeqFilterV1.PeakingType, StringComparison.OrdinalIgnoreCase) ||
+                if (f is null || f.Type != PeqFilterV1.PeakingType ||
                     !double.IsFinite(f.FrequencyHz) || f.FrequencyHz is < 10.0 or > 48000.0 ||
                     !double.IsFinite(f.GainDb) || f.GainDb is < -44.0 or > 24.0 ||
                     !double.IsFinite(f.Q) || f.Q is < 0.1 or > 100.0)
