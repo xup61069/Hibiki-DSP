@@ -18,8 +18,8 @@
         "additionalProperties": false,
         "required": ["id", "output_group", "channel_count", "makeup_gain_db", "enabled", "channel_map"],
         "properties": {
-          "id": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]*$"},
-          "output_group": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]*$"},
+          "id": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^(?![\\s\\S]*[\u0000-\u001F\u007F-\u009F])"},
+          "output_group": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^(?![\\s\\S]*[\u0000-\u001F\u007F-\u009F])"},
           "channel_count": {"enum": [2, 6, 8]},
           "makeup_gain_db": {"type": "number", "minimum": -144, "maximum": 12},
           "enabled": {"type": "boolean"},

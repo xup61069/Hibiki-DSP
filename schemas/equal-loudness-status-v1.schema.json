@@ -12,6 +12,6 @@
     "limited": {"type": "boolean"},
     "maximum_fit_error_db": {"type": "number", "minimum": 0, "maximum": 144},
     "realized_peak_db": {"type": "number", "minimum": -120, "maximum": 12},
-    "diagnostic": {"type": "string", "minLength": 0, "maxLength": 256, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]*$"}
+    "diagnostic": {"type": "string", "minLength": 0, "maxLength": 256, "pattern": "^(?![\\s\\S]*[\u0000-\u001F\u007F-\u009F])"}
   }
 }

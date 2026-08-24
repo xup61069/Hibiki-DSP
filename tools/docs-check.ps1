@@ -360,6 +360,323 @@ function Assert-PrintableContractSchemas {
     -ExpectedValid $true -CaseName 'calibration device_id printable U+2028'
 }
 
+function Copy-PrintableSchemaDocument {
+  param([Parameter(Mandatory = $true)]$Document)
+  return $Document | ConvertTo-Json -Depth 12 -Compress |
+    ConvertFrom-Json -AsHashtable
+}
+
+function Set-PrintableSchemaDocumentValue {
+  param(
+    [Parameter(Mandatory = $true)]$Document,
+    [Parameter(Mandatory = $true)][string]$FieldPath,
+    [Parameter(Mandatory = $true)]$Value
+  )
+
+  $parts = $FieldPath -split '\\.'
+  $current = $Document
+  for ($index = 0; $index -lt $parts.Count - 1; $index++) {
+    $key = $parts[$index]
+    if ($key -match '^\\d+$') {
+      $current = $current[[int]$key]
+    } else {
+      $current = $current[$key]
+    }
+  }
+
+  $key = $parts[$parts.Count - 1]
+  if ($key -match '^\\d+$') {
+    $current[[int]$key] = $Value
+  } else {
+    $current[$key] = $Value
+  }
+}
+
+function Assert-ExtendedPrintableContractSchemas {
+  param(
+    [Parameter(Mandatory = $true)][string]$RepositoryRoot
+  )
+
+  $outputFanoutSinks = @()
+  for ($index = 0; $index -lt 8; $index++) {
+    $outputFanoutSinks += [ordered]@{
+      sink_id = "sink-$index"
+      channels = 2
+      enabled = $true
+    }
+  }
+
+  $digest64 = 'a' * 64
+  $commit40 = 'b' * 40
+  $thumbprint40 = 'c' * 40
+
+  $cases = @(
+    [pscustomobject]@{
+      SchemaName = 'acoustic-anchor-v1'
+      Fields = @('microphone_calibration_id')
+      Document = [ordered]@{
+        schema_version = 1
+        device_class = 'speaker'
+        test_signal_dbfs = -12
+        measured_1k_spl_db = 78
+        uncertainty_db = 2
+        microphone_calibration_id = 'mic-音訊-1'
+      }
+    },
+    [pscustomobject]@{
+      SchemaName = 'custom-scene-cards-v1'
+      Fields = @('scenes.0.name', 'scenes.0.description', 'scenes.0.latency_label')
+      Document = [ordered]@{
+        schema_version = 1
+        scenes = @([ordered]@{
+          id = 'game-card'
+          name = '遊戲卡片'
+          description = 'printable 描述'
+          latency_label = '低延遲'
+          safety_enabled = $true
+        })
+      }
+    },
+    [pscustomobject]@{
+      SchemaName = 'device-switch-request-v1'
+      Fields = @('endpoint_id')
+      Document = [ordered]@{
+        schema_version = 1
+        endpoint_id = 'endpoint-音訊'
+        channels = 2
+        sample_rate = 48000
+        buffer_frames = 256
+        catalog_sequence = 7
+      }
+    },
+    [pscustomobject]@{
+      SchemaName = 'driver-control-v1'
+      Fields = @('endpoint_guid', 'event_context_guid')
+      Document = [ordered]@{
+        schema_version = 1
+        message_type = 'volume-notification'
+        request_id = 1
+        endpoint_guid = '{0F3A-音訊-GUID}'
+        event_context_guid = '{0F3A-事件-GUID}'
+        channel_count = 2
+        sample_rate = 48000
+        frames_per_buffer = 256
+        requested_db_q16_16 = 0
+        safety_ceiling_db_q16_16 = 0
+        effective_db_q16_16 = 0
+        mute = $false
+        generation = 1
+        actuator = 'internal-dsp'
+      }
+    },
+    [pscustomobject]@{
+      SchemaName = 'equal-loudness-policy-v1'
+      Fields = @('anchor_id')
+      Document = [ordered]@{
+        schema_version = 1
+        standard = 'iso-226-2023-derived'
+        mode = 'relative'
+        reference_phon = 40
+        strength = 0.5
+        max_boost_db = 6
+        anchor_id = 'anchor-音訊'
+      }
+    },
+    [pscustomobject]@{
+      SchemaName = 'equal-loudness-status-v1'
+      Fields = @('diagnostic')
+      Document = [ordered]@{
+        schema_version = 1
+        mode = 'relative'
+        calibrated = $false
+        limited = $false
+        maximum_fit_error_db = 0
+        realized_peak_db = -1
+        diagnostic = '正常'
+      }
+    },
+    [pscustomobject]@{
+      SchemaName = 'graph-config-v1'
+      Fields = @('lanes.0.id', 'lanes.0.output_group')
+      Document = [ordered]@{
+        schema_version = 1
+        output_channels = 8
+        strict_direct = $false
+        lanes = @([ordered]@{
+          id = 'lane-音訊'
+          output_group = 'group-音訊'
+          channel_count = 8
+          makeup_gain_db = 0
+          enabled = $true
+          channel_map = @(0, 1, 2, 3, 4, 5, 6, 7)
+        })
+      }
+    },
+    [pscustomobject]@{
+      SchemaName = 'output-fanout-plan-v1'
+      Fields = @('sinks.0.sink_id')
+      Document = [ordered]@{
+        schema_version = 1
+        revision = 1
+        output_channels = 8
+        sink_count = 8
+        sinks = $outputFanoutSinks
+      }
+    },
+    [pscustomobject]@{
+      SchemaName = 'physical-device-catalog-v1'
+      Fields = @('devices.0.endpoint_id', 'devices.0.display_name')
+      Document = [ordered]@{
+        schema_version = 1
+        devices = @([ordered]@{
+          schema_version = 1
+          endpoint_id = 'endpoint-實體'
+          display_name = '實體喇叭'
+          flow = 'render'
+          availability = 'active'
+          channels = 2
+          sample_rate = 48000
+          buffer_frames = 256
+          is_default = $true
+          last_sequence = 7
+        })
+      }
+    },
+    [pscustomobject]@{
+      SchemaName = 'release-manifest-v1'
+      Fields = @(
+        'product_version',
+        'distribution_id',
+        'unsigned_files.0.path',
+        'installer.rfc3161_timestamp',
+        'tests.0'
+      )
+      Document = [ordered]@{
+        schema_version = 1
+        product_version = '1.0.0'
+        source_tag = 'v1.0.0'
+        source_commit = $commit40
+        distribution_id = 'distribution-標準'
+        toolchain_digest = $digest64
+        dependency_lock_digest = $digest64
+        unsigned_files = @([ordered]@{
+          path = 'apps/ Hibiki.exe'
+          sha256 = $digest64
+        })
+        driver_package = [ordered]@{
+          sha256 = $digest64
+          catalog_sha256 = $digest64
+          microsoft_signature_thumbprint = $thumbprint40
+        }
+        installer = [ordered]@{
+          sha256 = $digest64
+          signer_thumbprint = $thumbprint40
+          rfc3161_timestamp = 'RFC3161 timestamp'
+        }
+        sbom_digest = $digest64
+        tests = @('schema strict-end regression')
+      }
+    },
+    [pscustomobject]@{
+      SchemaName = 'scene-profile-v1'
+      Fields = @(
+        'name',
+        'lanes.0',
+        'automation_timeline_ids.0',
+        'ir_reference',
+        'output_group'
+      )
+      Document = [ordered]@{
+        schema_version = 1
+        id = 'scene-game'
+        name = '遊戲場景'
+        lanes = @('lane-音訊')
+        automation_timeline_ids = @('timeline-音訊')
+        ir_reference = 'prepared-ir-label'
+        output_group = 'group-音訊'
+        latency_mode = 'game'
+        safety = [ordered]@{
+          limiter_dbtp = -1
+          auto_attenuate = $true
+        }
+      }
+    },
+    [pscustomobject]@{
+      SchemaName = 'scene-sync-queue-v1'
+      Fields = @('operations.0.name', 'operations.0.output_group')
+      Document = [ordered]@{
+        schema_version = 1
+        dropped_operations = 0
+        operations = @([ordered]@{
+          is_upsert = $true
+          scene_id = 'scene-game'
+          name = '遊戲場景'
+          output_group = 'group-音訊'
+        })
+      }
+    },
+    [pscustomobject]@{
+      SchemaName = 'session-route-rule-v1'
+      Fields = @('match.app_id', 'match.display_name_contains', 'lane_id', 'output_group')
+      Document = [ordered]@{
+        schema_version = 1
+        rule_id = 'route-game'
+        priority = 10
+        enabled = $true
+        match = [ordered]@{
+          app_id = 'app.音訊'
+          display_name_contains = '遊戲'
+        }
+        lane_id = 'lane-音訊'
+        output_group = 'group-音訊'
+        gain_owner = 'windows-session'
+        makeup_gain_db = 0
+      }
+    },
+    [pscustomobject]@{
+      SchemaName = 'session-route-rules-v1'
+      Fields = @('rules.0.app_id', 'rules.0.display_name', 'rules.0.lane_id', 'rules.0.output_group')
+      Document = [ordered]@{
+        schema_version = 1
+        rules = @([ordered]@{
+          rule_id = 'route-game'
+          priority = 10
+          enabled = $true
+          gain_owner = 0
+          makeup_gain_db = 0
+          app_id = 'app.音訊'
+          display_name = '遊戲'
+          lane_id = 'lane-音訊'
+          output_group = 'group-音訊'
+        })
+      }
+    }
+  )
+
+  foreach ($case in $cases) {
+    if ($case.SchemaName -eq 'scene-profile-v1') {
+      continue
+    }
+    $schemaFile = Join-Path $RepositoryRoot ("schemas/" + $case.SchemaName + ".schema.json")
+    Assert-JsonSchemaExpectation -SchemaFile $schemaFile -Document $case.Document `
+      -ExpectedValid $true -CaseName ($case.SchemaName + ' printable UTF-8 baseline')
+
+    foreach ($field in $case.Fields) {
+      $trailingLfDocument = Copy-PrintableSchemaDocument -Document $case.Document
+      Set-PrintableSchemaDocumentValue -Document $trailingLfDocument `
+        -FieldPath $field -Value ('pre' + ([char]0x0A))
+      Assert-JsonSchemaExpectation -SchemaFile $schemaFile -Document $trailingLfDocument `
+        -ExpectedValid $false -CaseName ($case.SchemaName + ' ' + $field + ' trailing LF')
+
+      $middleDelDocument = Copy-PrintableSchemaDocument -Document $case.Document
+      Set-PrintableSchemaDocumentValue -Document $middleDelDocument `
+        -FieldPath $field -Value ('pre' + ([char]0x7F) + 'post')
+      Assert-JsonSchemaExpectation -SchemaFile $schemaFile -Document $middleDelDocument `
+        -ExpectedValid $false -CaseName ($case.SchemaName + ' ' + $field + ' middle DEL')
+    }
+  }
+}
+
 function ConvertFrom-AdrFrontmatter([string]$RawText) {
   # Parse the comment-style frontmatter block used by all ADR files.
   # Returns a hashtable of key -> string value, or throws on structural errors.
@@ -657,6 +974,7 @@ if ($SelfTest) {
   # Printable contract schemas: real repository schemas enforce runtime-equivalent
   # whole-string C0/C1/DEL rejection through the actual JSON Schema validator.
   Assert-PrintableContractSchemas -RepositoryRoot $repo
+  Assert-ExtendedPrintableContractSchemas -RepositoryRoot $repo
   $caseCount++
 
   if (-not (Test-BaselineChangedByHead -ChangedPaths @('docs/state/BASELINE.md'))) {
@@ -938,6 +1256,7 @@ if ($schemaStructureErrors.Count -gt 0) {
   throw ('Contract schema structure validation failed: ' + ($schemaStructureErrors -join '; '))
 }
 Assert-PrintableContractSchemas -RepositoryRoot $repo
+Assert-ExtendedPrintableContractSchemas -RepositoryRoot $repo
 
 $handoffSchemaIndex = Get-Content -LiteralPath (Join-Path $repo 'docs/ai/HANDOFF_SCHEMA.json') -Raw |
   ConvertFrom-Json

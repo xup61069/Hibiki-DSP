@@ -20,10 +20,10 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 120,
-            "pattern": "^(?=\\S)[^\\u0000-\\u001F\\u007F-\\u009F]*$"
+            "pattern": "^(?=\\S)(?![\\s\\S]*[\u0000-\u001F\u007F-\u009F])"
           },
-          "description": {"type": "string", "maxLength": 240, "pattern": "^[^\u0000-\u001F\u007F-\u009F]*$"},
-          "latency_label": {"type": "string", "maxLength": 64, "pattern": "^[^\u0000-\u001F\u007F-\u009F]*$"},
+          "description": {"type": "string", "maxLength": 240, "pattern": "^(?![\\s\\S]*[\u0000-\u001F\u007F-\u009F])"},
+          "latency_label": {"type": "string", "maxLength": 64, "pattern": "^(?![\\s\\S]*[\u0000-\u001F\u007F-\u009F])"},
           "safety_enabled": {"type": "boolean"}
         }
       }
