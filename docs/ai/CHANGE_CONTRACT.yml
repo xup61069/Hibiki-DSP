@@ -19,9 +19,8 @@ rules:
       extensions: [extension_check]
       installer_or_distribution_identity: [installer_check, distribution_check]
       driver_source_boundary: [driver_source_check]
-      driver_release_stage: [driver_signability_check]
       opt_in_live_probes: [live_device_catalog_check, live_wasapi_handoff_check, live_system_volume_check, live_session_volume_check, live_audio_session_check, live_process_loopback_check]
   task_handoff:
     required: [explicit_assignment, issue, branch, target_branch, owner, scope_globs, shared_paths, depends_on, issue_body_handoff_block, base_commit, workspace_isolation_decision, next_safe_action]
   release:
-    required: [signed_source_tag, unsigned_reproducibility, release_manifest, source_policy]
+    required: [unsigned_reproducibility, release_manifest, source_policy]

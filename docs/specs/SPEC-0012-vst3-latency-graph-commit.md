@@ -51,4 +51,4 @@ source_globs: ["vst-host/**", "src/hub/**", "schemas/latency-graph-commit-v1.sch
   `LaneLatencyBankV1` 接入 lane mixer，兩者都以固定上限運作。仍須新增裝置重綁、sink 時鐘
   及第三方 plugin 回報延遲的端對端測試。
 - 本規格不提供第三方 plugin certification、side-chain/multi-bus、state persistence 或
-  signed driver；VST3 SDK 與 plugin 仍只可在隔離 worker 執行。
+  WaveRT driver delivery；VST3 SDK 與 plugin 仍只可在隔離 worker 執行。

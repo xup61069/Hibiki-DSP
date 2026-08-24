@@ -6,6 +6,8 @@
 
 - Windows Audio Scene OS 的 source-only foundation：C++ user-space graph、固定輸出群組、
   volume safety、IPC、ASIO/VST3/browser/driver source boundaries、校正 exporter 與 contract tests。
+- 發行與 driver 政策移除 HLK 與所有簽章要求：ReleaseManifest 只保留內容 hash/SBOM，
+  installer gate 同步拒收簽章 metadata，CI 不再執行 signability 步驟。
 - Expert per-App route presets：bounded local catalog、原子保存、優先級 resolver、同優先級歧義
   fail-closed、版本化 route-rule command 與 source-only WinUI editor。
 - AI 交接入口與 machine-checkable handoff gate；fresh clone 可由文件找到目前限制、證據與唯一下一步。
@@ -19,5 +21,5 @@
 
 ### Not yet released
 
-- 沒有可安裝 preview、WaveRT driver、Microsoft 簽章安裝器或 GitHub binary release。目標
-  Windows 11 24H2/VS 2026/WDK、WinUI XAML build 與實體音訊硬體驗收仍是 release blocker。
+- 沒有可安裝 preview、WaveRT driver 或 GitHub binary release。專案不需要 HLK 與任何簽章；
+  目標 Windows 11 24H2/VS 2026/WDK、WinUI XAML build 與實體音訊硬體驗收仍是 release blocker。

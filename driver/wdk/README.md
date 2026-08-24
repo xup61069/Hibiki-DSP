@@ -55,14 +55,15 @@ catalog rather than accepting free-form channel/rate values: render pin
 initialization uses catalog buffer geometry, format construction emits the
 catalog channel mask, and property-context initialization uses the catalog
 GUID/channel/rate. This keeps the eventual SYSVAD tables and portable contract
-on one identity source. It still does not provide a WDK build, `.sys`, HLK
-result or Microsoft signature. `HibikiWaveRtPinInitializeCaptureEndpointV1`
+on one identity source. It still does not provide a WDK build or `.sys`.
+`HibikiWaveRtPinInitializeCaptureEndpointV1`
 and the generic `HibikiWaveRtBuildFormatEndpointV1` cover the Virtual Mic
 capture direction without creating a second format contract.
 
-Before enabling a driver build, the maintainer must compile this source in a
-clean WDK project, run Driver Verifier/HLK and record signability evidence for
-Windows 11 24H2+; source presence alone is not driver evidence.
+Before enabling a driver build, the maintainer should compile this source in a
+clean WDK project and verify target-machine behavior on Windows 11 24H2+; source
+presence alone is not driver evidence. HLK and signing are not project
+requirements.
 
 The Apache transport also provides a 16-byte header-only Hello/Ack/Error
 exchange for request correlation. It is suitable for a future bounded kernel/

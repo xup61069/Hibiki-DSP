@@ -54,11 +54,13 @@ private:
                                                std::uint32_t channels,
                                                double source_step) noexcept;
 
-// Persistent no-allocation linear SRC. The caller supplies a whole input
-// block and enough output storage for that block; the class carries phase and
-// one boundary frame into the next call so clock-ratio changes do not reset
-// the stream at every block.
-class PersistentLinearResampler final {
+// Persistent no-allocation asynchronous SRC. The caller supplies a whole
+// input block and enough output storage for that block; the class carries a
+// fractional phase and a fixed 15-frame history into the next call so
+// clock-ratio changes do not reset the stream. A compile-time polyphase FIR
+// bank is selected from the fractional phase; the RT path does not construct
+// coefficients or allocate.
+class PersistentPolyphaseResampler final {
 public:
     [[nodiscard]] bool prepare(std::uint32_t channels, double source_step) noexcept;
     [[nodiscard]] bool set_source_step(double source_step) noexcept;
@@ -73,11 +75,18 @@ public:
     [[nodiscard]] double source_step() const noexcept { return source_step_; }
 
 private:
-    std::array<float, 8> previous_{};
+    static constexpr std::size_t kPolyphasePhasesV1 = 8U;
+    static constexpr std::size_t kPolyphaseTapsPerPhaseV1 = 16U;
+    static constexpr std::size_t kPolyphaseHistoryFramesV1 =
+        kPolyphaseTapsPerPhaseV1 - 1U;
+
+    std::array<float, kPolyphaseHistoryFramesV1 * 8U> history_{};
     std::uint32_t channels_{0};
     double source_step_{1.0};
     double phase_{0.0};
     bool has_previous_{false};
+
+    void append_history(const float* input, std::size_t input_frames) noexcept;
 };
 
 struct OutputSinkClockSnapshotV1 {
@@ -108,7 +117,7 @@ public:
 
 private:
     ClockDriftEstimator drift_{};
-    PersistentLinearResampler resampler_{};
+    PersistentPolyphaseResampler resampler_{};
     double base_source_step_{1.0};
     OutputSinkClockSnapshotV1 snapshot_{};
 };

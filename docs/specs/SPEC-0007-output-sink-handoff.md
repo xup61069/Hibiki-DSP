@@ -24,7 +24,11 @@ source_globs: ["src/hub/**output*", "src/hub/**wasapi*", "src/hub/**audio_engine
 ## Clock 與回復
 
 - crossfade 與 `OutputSinkModel` 的 persistent SRC 可連續串接；clock drift 只由 control
-  plane 更新 ratio，audio thread 讀 immutable snapshot。
+  plane 更新 ratio，audio thread 讀 immutable snapshot。persistent SRC 是固定容量
+  8 phase × 16 tap polyphase FIR bank，支援 2/6/8 聲道與既有 0.25x..4.0x source-step
+  envelope；跨 block 攜帶 fractional phase 與 15-frame history，ratio 變更不重置 stream。
+  prepare/process 邊界維持 no-allocation、no-mutex、no COM；invalid channels/step 或
+  capacity 不足都 fail-closed。
 - USB/HDMI/Bluetooth 拔插或 Audio Service invalidation 由 `DeviceRecoveryCoordinator`
   進入 safe-start；不得回到 0 dB、100% 或未驗證的舊 endpoint。
 - `WindowsWasapiSinkWorkerV1` 將 COM/WASAPI 完整限制在單一 dedicated sink worker apartment：
@@ -45,8 +49,11 @@ source_globs: ["src/hub/**output*", "src/hub/**wasapi*", "src/hub/**audio_engine
   `AUDCLNT_E_SERVICE_NOT_RUNNING` 只在 dedicated worker 內執行 bounded bind/start retry；
   普通 event timeout 不會誤觸發重綁。重綁成功恢復 `endpoint_ready`，連續失敗才標記
   `degraded`，不會由 graph RT thread 直接操作 COM。
-- 真實 WaveRT endpoint、硬體 clock fixture、DPC/拔插 soak 與 WHCP/HLK 證據不在本機
+- 真實 WaveRT endpoint、硬體 clock fixture、DPC/拔插 soak 不在本機
   contract test 中，必須在 Windows 11 24H2+ test machine 完成。
+- 本節的 persistent SRC contract test 是 user-space DSP evidence only；不得推論真實
+  multi-output clock drift、USB/HDMI/Bluetooth 拔插 soak、WaveRT/driver rate behavior、
+  HLK、signing 或 physical audio delivery 已通過驗收。
 
 ## WASAPI endpoint handoff
 
@@ -61,7 +68,7 @@ audio graph 不重啟、不直接呼叫 COM。候選 submit、endpoint bind 或�
 `ReadyToCommit` 是唯一允許交換 active slot 的狀態；`commit` 停止舊 worker 後才翻轉
 active slot，`rollback` 保留仍在執行的舊 worker。這個 user-space handoff 只證明狀態機、
 bounded queue 與 source-level fallback；實體 endpoint 的暖機時間、音量連續性、拔插與
-Audio Service restart 仍需 Windows 11 24H2+ 實機／HLK evidence。
+Audio Service restart 仍需 Windows 11 24H2+ 實機 evidence。
 
 Rollback 之後只要舊 worker 仍然 `running` 且 `endpoint_ready`，狀態會保留為
 `RolledBack` 並允許下一次 `begin → prepare` 重試；不能要求重啟整個 engine 或先重新
