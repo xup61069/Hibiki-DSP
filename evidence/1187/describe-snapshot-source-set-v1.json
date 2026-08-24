@@ -1,0 +1,50 @@
+{
+  "evidence_format": 2,
+  "issue": 1187,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "AGENTS.md",
+      "docs/specs/SPEC-0004-ai-handoff-and-evidence.md",
+      "tools/evidence-audit.ps1"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "abf228d3478c956956512eec2789bf9975c1dc8cd0542aec9a887ae9dd23ec18"
+  },
+  "metadata": {
+    "scope": "describe-snapshot-source-set-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-git-2.49.0-windows-1",
+    "commands": [
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeSnapshotSourceSet -SnapshotCommit 77cadeb027ead56b3a723b78cda96d2096a58215",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange"
+    ],
+    "results": [
+      {
+        "command": "-SelfTest",
+        "status": "pass",
+        "detail": "48 cases pass, including new integration coverage: described snapshot record binds clean against Get-V2SourceSetFinding; missing/unreachable/empty snapshot commits each fail closed with the expected error."
+      },
+      {
+        "command": "-DescribeSnapshotSourceSet -SnapshotCommit 77cadeb0 (Issue #1177 final binding)",
+        "status": "pass",
+        "detail": "Output paths and digest exactly match the manually corrected manifest merged in PR #1180 (8 paths, digest 464184d3...); demonstrates the helper reproduces the correct binding on first try."
+      },
+      {
+        "command": "-DescribeCurrentChange",
+        "status": "pass",
+        "detail": "Produced the change-mode source_provenance recorded in this manifest for the three staged non-evidence files."
+      }
+    ],
+    "limitations": [
+      "Tool output proves Git-byte binding only; it does not prove declared commands ran or replace review/trusted CI.",
+      "Snapshot mode remains restricted to evidence-only candidates per SPEC-0004; no schema or digest algorithm change."
+    ],
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1"
+    },
+    "started_at": "2026-08-24T19:02:00+08:00",
+    "finished_at": "2026-08-24T19:10:59+08:00"
+  }
+}

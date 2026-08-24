@@ -83,7 +83,7 @@ git diff --check
 | 需要 build／toolchain evidence | `doctor.ps1 -CheckOnly` |
 | 改 C/C++、CMake、schema、contract 或 tests | `verify.ps1` |
 | 改 workflow、公開 release／artifact policy | `source-only-ci-check.ps1` |
-| 新增或更正 evidence | `evidence-audit.ps1`（change 模式先以 `-DescribeCurrentChange` 產生來源摘要） |
+| 新增或更正 evidence | `evidence-audit.ps1`（`change` 模式以 `-DescribeCurrentChange`、evidence-only `snapshot` 模式以 `-DescribeSnapshotSourceSet` 產生來源摘要） |
 | 改 UI／control model | `control-model-check.ps1`、`build-preview.ps1`（DesktopCompat 或鎖定機上的 `-Target WinUI`）、`winui-shell-check.ps1` |
 | 改 engine/control plane 整合 | `build-engine-preview.ps1`、`engine-preview-smoke.ps1`、`control-model-check.ps1`、`control-model-engine-smoke.ps1` |
 | 改 extensions | `extension-check.ps1` |
