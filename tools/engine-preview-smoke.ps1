@@ -4,6 +4,7 @@ param(
   [switch]$EnableSystemVolume,
   [switch]$EnableSessionRouting,
   [switch]$EnableWasapiOutput,
+  [switch]$EnableTestTone,
   [switch]$StatusOnly,
   [switch]$SelfTest
 )
@@ -19,12 +20,12 @@ function Get-EnginePreviewSmokePlan {
   )
 
   $localRoot = Join-Path $RepositoryRoot '.local'
-  $engineWorkingDirectory = Join-Path $localRoot 'engine-preview/Release'
+  $engineWorkingDirectory = Join-Path $localRoot 'engine-preview'
   [pscustomobject]@{
     RepositoryRoot = $RepositoryRoot
     LocalRoot = $localRoot
     EngineWorkingDirectory = $engineWorkingDirectory
-    EnginePath = Join-Path $engineWorkingDirectory 'hibiki_engine_preview.exe'
+    EnginePath = Join-Path $engineWorkingDirectory 'Release/hibiki_engine_preview.exe'
     IrDirectory = $localRoot
     IrPath = Join-Path $localRoot 'engine-preview-smoke-ir.wav'
   }
@@ -425,6 +426,10 @@ $engineArguments = @()
 if ($EnableSystemVolume) { $engineArguments += '--enable-system-volume' }
 if ($EnableSessionRouting) { $engineArguments += '--enable-session-routing' }
 if ($EnableWasapiOutput) { $engineArguments += '--enable-wasapi-output' }
+if ($EnableTestTone) {
+  if (-not $EnableWasapiOutput) { throw 'EnableTestTone requires EnableWasapiOutput.' }
+  $engineArguments += '--enable-test-tone'
+}
 $engineProcess = Start-Process -FilePath $engine -ArgumentList $engineArguments `
   -WorkingDirectory $smokePlan.EngineWorkingDirectory -WindowStyle Hidden -PassThru
 $irPath = $smokePlan.IrPath
@@ -502,6 +507,27 @@ try {
         throw "WASAPI main output route state is invalid: $mainOutputState."
       }
       $statusSummary += "WASAPI output route state=$mainOutputState; physical delivery is endpoint-dependent"
+    }
+    if ($EnableTestTone) {
+      $toneRendering = $false
+      for ($attempt = 0; $attempt -lt 50; $attempt++) {
+        $mainOutputRouteOffset = 20 + 40 + (1 * 224)
+        $detailBytes = [BitConverter]::ToUInt16($statusReply, $mainOutputRouteOffset + 6)
+        $detail = [System.Text.Encoding]::UTF8.GetString($statusReply, $mainOutputRouteOffset + 104, $detailBytes)
+        if ($detail -eq 'test tone rendering.') {
+          $toneRendering = $true
+          break
+        }
+        Start-Sleep -Milliseconds 20
+        $statusFrame = New-IpcFrame 13 ([uint64](44 + $attempt)) @()
+        Send-IpcFrame $client $statusFrame
+        $statusReply = Receive-IpcFrame $client
+        Assert-IpcFrameShape -Frame $statusReply -ExpectedType 12 -ExpectedRequestId ([uint64](44 + $attempt)) -MinimumPayloadLength (40 + (6 * 224))
+      }
+      if (-not $toneRendering) {
+        throw 'Engine Preview test tone did not report rendered WASAPI blocks in the status snapshot.'
+      }
+      $statusSummary += 'test tone rendered through the user-space graph and WASAPI sink'
     }
     Write-Output "Engine Preview status-only smoke passed ($($statusSummary -join '; '))."
     return

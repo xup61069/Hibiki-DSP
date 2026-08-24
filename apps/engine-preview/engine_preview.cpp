@@ -4,6 +4,7 @@
 #include "hibiki/control_status.hpp"
 #include "hibiki/control_service.hpp"
 #include "hibiki/engine_control.hpp"
+#include "hibiki/scene_presets.hpp"
 #include "hibiki/session_catalog.hpp"
 #include "hibiki/session_command_queue.hpp"
 #include "hibiki/session_route_rules.hpp"
@@ -20,10 +21,12 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cwchar>
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -68,6 +71,20 @@ struct WasapiOutputState final {
     std::uint32_t block_frames{128U};
     bool requested{false};
     bool active{false};
+    bool test_tone_enabled{false};
+};
+
+constexpr std::uint32_t kTestToneInputChannels = 2U;
+constexpr std::uint32_t kTestToneMaxFrames = 4096U;
+constexpr std::uint32_t kTestToneMaxOutputChannels = 8U;
+
+struct TestToneState final {
+    std::array<float, kTestToneMaxFrames * kTestToneInputChannels> input{};
+    std::array<float, kTestToneMaxFrames * kTestToneMaxOutputChannels> output{};
+    std::array<hibiki::RtLaneInputV1, 1U> lanes{};
+    double phase{0.0};
+    std::uint32_t sample_rate{0U};
+    std::uint32_t block_frames{0U};
 };
 
 bool supported_wasapi_layout(const std::uint32_t channels) noexcept {
@@ -109,6 +126,60 @@ bool start_default_wasapi_output(
     return true;
 }
 
+bool prepare_test_tone(TestToneState& tone,
+                       WasapiOutputState& output,
+                       hibiki::AudioEngineModel& engine) noexcept {
+    if (!output.active || output.config.sample_rate == 0U || output.block_frames == 0U ||
+        output.block_frames > kTestToneMaxFrames ||
+        output.config.channels > kTestToneMaxOutputChannels) {
+        return false;
+    }
+
+    auto scene = hibiki::make_easy_scene(hibiki::EasySceneKind::Studio, "main");
+    scene.graph.output_channels = output.config.channels;
+    engine.set_sample_rate(output.config.sample_rate);
+    if (!engine.prepare_graph(scene.graph, 1U) || !engine.commit_graph()) {
+        engine.rollback_graph();
+        return false;
+    }
+
+    tone.lanes[0U] = hibiki::RtLaneInputV1{tone.input.data(), kTestToneInputChannels};
+    tone.sample_rate = output.config.sample_rate;
+    tone.block_frames = output.block_frames;
+    output.test_tone_enabled = true;
+    return true;
+}
+
+bool render_test_tone(TestToneState& tone,
+                      hibiki::AudioEngineModel& engine) noexcept {
+    constexpr double kFrequencyHz = 440.0;
+    constexpr float kAmplitude = 0.1F;  // approximately -20 dBFS
+    constexpr double kTwoPi = 6.28318530717958647692;
+    if (tone.sample_rate == 0U || tone.block_frames == 0U ||
+        tone.block_frames > kTestToneMaxFrames) {
+        return false;
+    }
+
+    const auto phase_increment = kTwoPi * kFrequencyHz /
+                                 static_cast<double>(tone.sample_rate);
+    for (std::uint32_t frame = 0U; frame < tone.block_frames; ++frame) {
+        const auto sample = kAmplitude * static_cast<float>(std::sin(tone.phase));
+        if (!std::isfinite(sample)) return false;
+        const auto offset = static_cast<std::size_t>(frame) * kTestToneInputChannels;
+        tone.input[offset] = sample;
+        tone.input[offset + 1U] = sample;
+        tone.phase += phase_increment;
+        if (tone.phase >= kTwoPi) tone.phase -= kTwoPi;
+    }
+    return engine.process_output_group_to_wasapi(
+        "main", std::span<const hibiki::RtLaneInputV1>(tone.lanes), tone.output.data(),
+        tone.block_frames);
+}
+
+bool has_rendered_blocks(const hibiki::WasapiSinkHandoffSnapshotV1& snapshot) noexcept {
+    return snapshot.primary.rendered_blocks > 0U || snapshot.secondary.rendered_blocks > 0U;
+}
+
 hibiki::ControlRouteHealthStateV1 wasapi_route_state(
     const WasapiOutputState& state,
     const hibiki::WasapiSinkHandoffSnapshotV1& snapshot) noexcept {
@@ -140,6 +211,9 @@ std::string_view wasapi_route_detail(
     }
     if (snapshot.state == hibiki::WasapiSinkHandoffStateV1::Synced &&
         snapshot.primary.endpoint_ready) {
+        if (state.test_tone_enabled && has_rendered_blocks(snapshot)) {
+            return "test tone rendering.";
+        }
         return "shared-mode WASAPI sink ready; graph/ASIO delivery remains an explicit source boundary.";
     }
     return "WASAPI sink warming; no audio is reported ready until the worker confirms the endpoint.";
@@ -512,6 +586,8 @@ int wmain(const int argc, wchar_t* const* argv) {
         has_command_line_flag(argc, argv, L"--enable-session-routing");
     const bool wasapi_output_requested =
         has_command_line_flag(argc, argv, L"--enable-wasapi-output");
+    const bool test_tone_requested =
+        has_command_line_flag(argc, argv, L"--enable-test-tone");
 
     hibiki::AudioEngineModel engine;
     hibiki::EngineControlWorkerV1 control_worker{engine};
@@ -527,6 +603,7 @@ int wmain(const int argc, wchar_t* const* argv) {
     WasapiOutputState wasapi_output;
     wasapi_output.engine = &engine;
     wasapi_output.requested = wasapi_output_requested;
+    TestToneState test_tone;
     const HRESULT com_result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     const bool com_initialized = SUCCEEDED(com_result) || com_result == RPC_E_CHANGED_MODE;
     IMMDeviceEnumerator* device_enumerator = nullptr;
@@ -548,7 +625,9 @@ int wmain(const int argc, wchar_t* const* argv) {
                                     ? start_default_wasapi_output(wasapi_output, engine,
                                                                  physical_catalog.catalog())
                                     : false;
-    (void)wasapi_started;
+    if (wasapi_started && test_tone_requested) {
+        (void)prepare_test_tone(test_tone, wasapi_output, engine);
+    }
     const auto initial_wasapi_snapshot = engine.wasapi_output_snapshot();
     const std::string catalog_detail = physical_catalog_ready
         ? "physical catalog ready; Preview sink disabled unless WASAPI opt-in is requested."
@@ -656,6 +735,7 @@ int wmain(const int argc, wchar_t* const* argv) {
     auto next_session_poll = std::chrono::steady_clock::now() + std::chrono::milliseconds{250};
     auto next_volume_poll = std::chrono::steady_clock::now() + std::chrono::milliseconds{50};
     auto next_volume_write = std::chrono::steady_clock::now();
+    auto next_test_tone_render = std::chrono::steady_clock::now();
     while (!g_stop.load(std::memory_order_acquire)) {
         const auto now = std::chrono::steady_clock::now();
         if (session_routing_requested && device_enumerator != nullptr &&
@@ -739,6 +819,10 @@ int wmain(const int argc, wchar_t* const* argv) {
             (void)physical_catalog.poll_and_refresh();
             next_catalog_poll = std::chrono::steady_clock::now() +
                                 std::chrono::milliseconds{250};
+        }
+        if (wasapi_output.test_tone_enabled && now >= next_test_tone_render) {
+            (void)render_test_tone(test_tone, engine);
+            next_test_tone_render = now + std::chrono::milliseconds{10};
         }
         const auto wasapi_snapshot = engine.wasapi_output_snapshot();
         const auto volume = engine.volume();
