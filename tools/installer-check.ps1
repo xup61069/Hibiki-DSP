@@ -204,6 +204,7 @@ $null = "sbom_digest"
 
     # Case 1g: Read-ReleaseManifest rejects oversized rfc3161_timestamp.
     $oversizeTsManifest = $validFullManifest.Clone()
+    $oversizeTsManifest['installer'] = $validFullManifest['installer'].Clone()
     $oversizeTsManifest['installer']['rfc3161_timestamp'] = 'x' * 129
     $oversizeTsPath = Join-Path $tempRoot 'oversize-ts-manifest.json'
     $oversizeTsManifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $oversizeTsPath -Encoding UTF8
@@ -231,6 +232,105 @@ $null = "sbom_digest"
     try { Read-ReleaseManifest $manyTestsPath } catch { $caught = $true }
     if (-not $caught) { throw 'SelfTest expected tests overflow rejection.' }
     $caseCount++
+
+    # Case 1j: Read-ReleaseManifest rejects unknown fields in unsigned_files entries.
+    $unknownFileFieldManifest = $validFullManifest.Clone()
+    $unknownFileFieldManifest['unsigned_files'] = @(
+      @{ path = 'tools/readme.txt'; sha256 = ('0' * 64); extra_field = 'rejected' }
+    )
+    $unknownFileFieldPath = Join-Path $tempRoot 'unknown-file-field-manifest.json'
+    $unknownFileFieldManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $unknownFileFieldPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $unknownFileFieldPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected unsigned_files unknown field rejection.' }
+    $caseCount++
+
+    # Case 1k: Read-ReleaseManifest rejects unsigned_files entries missing sha256.
+    $missingFileHashManifest = $validFullManifest.Clone()
+    $missingFileHashManifest['unsigned_files'] = @(
+      @{ path = 'tools/readme.txt' }
+    )
+    $missingFileHashPath = Join-Path $tempRoot 'missing-file-hash-manifest.json'
+    $missingFileHashManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $missingFileHashPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $missingFileHashPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected unsigned_files missing sha256 rejection.' }
+    $caseCount++
+
+    # Case 1l: Read-ReleaseManifest rejects invalid sha256 formats in unsigned_files.
+    $invalidFileHashManifest = $validFullManifest.Clone()
+    $invalidFileHashManifest['unsigned_files'] = @(
+      @{ path = 'tools/readme.txt'; sha256 = 'not-a-valid-digest' }
+    )
+    $invalidFileHashPath = Join-Path $tempRoot 'invalid-file-hash-manifest.json'
+    $invalidFileHashManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $invalidFileHashPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $invalidFileHashPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected unsigned_files invalid sha256 rejection.' }
+    $caseCount++
+
+    # Case 1m: Read-ReleaseManifest rejects non-array unsigned_files.
+    $nonArrayFilesManifest = $validFullManifest.Clone()
+    $nonArrayFilesManifest['unsigned_files'] = @{ path = 'tools/readme.txt'; sha256 = ('0' * 64) }
+    $nonArrayFilesPath = Join-Path $tempRoot 'non-array-files-manifest.json'
+    $nonArrayFilesManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $nonArrayFilesPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $nonArrayFilesPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected non-array unsigned_files rejection.' }
+    $caseCount++
+
+    # Case 1n: Read-ReleaseManifest rejects non-array tests.
+    $nonArrayTestsManifest = $validFullManifest.Clone()
+    $nonArrayTestsManifest['tests'] = 'unit-test-1'
+    $nonArrayTestsPath = Join-Path $tempRoot 'non-array-tests-manifest.json'
+    $nonArrayTestsManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $nonArrayTestsPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $nonArrayTestsPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected non-array tests rejection.' }
+    $caseCount++
+
+    # Case 1o: Read-ReleaseManifest rejects source_tag suffixes with disallowed characters.
+    $badTagManifest = $validFullManifest.Clone()
+    $badTagManifest['source_tag'] = 'v1.0.0-bad!'
+    $badTagPath = Join-Path $tempRoot 'bad-source-tag-manifest.json'
+    $badTagManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $badTagPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $badTagPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected invalid source_tag suffix rejection.' }
+    $caseCount++
+
+    # Case 1p: Read-ReleaseManifest rejects unknown fields in driver_package.
+    $driverExtraFieldManifest = $validFullManifest.Clone()
+    $driverExtraFieldManifest['driver_package'] = $validFullManifest['driver_package'].Clone()
+    $driverExtraFieldManifest['driver_package']['extra_field'] = 'rejected'
+    $driverExtraFieldPath = Join-Path $tempRoot 'driver-extra-field-manifest.json'
+    $driverExtraFieldManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $driverExtraFieldPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $driverExtraFieldPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected driver_package unknown field rejection.' }
+    $caseCount++
+
+    # Case 1q: Read-ReleaseManifest rejects unknown fields in installer.
+    $installerExtraFieldManifest = $validFullManifest.Clone()
+    $installerExtraFieldManifest['installer'] = $validFullManifest['installer'].Clone()
+    $installerExtraFieldManifest['installer']['extra_field'] = 'rejected'
+    $installerExtraFieldPath = Join-Path $tempRoot 'installer-extra-field-manifest.json'
+    $installerExtraFieldManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $installerExtraFieldPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $installerExtraFieldPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected installer unknown field rejection.' }
+    $caseCount++
+
+    # Case 1r: Read-ReleaseManifest rejects explicit null signed_installer_sha256.
+    $nullSigHashManifest = $validFullManifest.Clone()
+    $nullSigHashManifest['signed_installer_sha256'] = $null
+    $nullSigHashPath = Join-Path $tempRoot 'null-sig-hash-manifest.json'
+    $nullSigHashManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $nullSigHashPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $nullSigHashPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected null signed_installer_sha256 rejection.' }
+    $caseCount++
+
     # Case 2: destination rejects blank path.
     $caught = $false
     try { Resolve-HibikiDestination '' } catch { $caught = $true }
