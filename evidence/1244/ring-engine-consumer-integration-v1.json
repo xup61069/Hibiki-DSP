@@ -1,0 +1,57 @@
+{
+  "evidence_format": 2,
+  "issue": 1244,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "docs/specs/SPEC-0003-virtual-endpoints-and-routing.md",
+      "tests/unit/contract_tests.cpp"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "6485ede0f252cbfdd2b565eade603867b0a53edbdb8f11758b90ec7156d698b7"
+  },
+  "metadata": {
+    "scope": "ring-engine-consumer-integration",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-git-2.49.0-cmake-4.4.2",
+    "commands": [
+      "cmake -S . -B .local/build -DHIBIKI_BUILD_TESTS=ON",
+      "cmake --build .local/build --config RelWithDebInfo --target hibiki_contract_tests",
+      "ctest --test-dir .local/build -C RelWithDebInfo -R hibiki_contract_tests --output-on-failure",
+      "pwsh -NoProfile -File tools/verify.ps1",
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1244",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "git diff --check",
+      "pwsh tools/evidence-audit.ps1 -DescribeCurrentChange"
+    ],
+    "results": [
+      {
+        "command": "focused contract tests",
+        "status": "pass",
+        "detail": "hibiki_contract_tests passed after the new ring consumer integration fixture: empty-ring underrun yields no engine packet, a complete inbound render packet survives push/pop byte-for-byte and passes the engine gate, an identically prepared reference engine confirms deterministic transport output, outbound lane encode survives ring round-trip and validates, and corrupted packet storage remains fail closed."
+      },
+      {
+        "command": "full local verification",
+        "status": "pass",
+        "detail": "verify.ps1 built and passed all four local test executables, including hibiki_contract_tests."
+      },
+      {
+        "command": "always-run gates",
+        "status": "pass",
+        "detail": "handoff-check #1244, docs-check (88 required paths), source-policy (724 tracked paths), and git diff --check all exited 0 in the w-1244 worktree."
+      }
+    ],
+    "limitations": [
+      "Evidence covers user-space SPSC shared-memory ring and engine packet contracts only; it does not demonstrate physical WaveRT delivery, kernel mapping, driver installation, HLK validation, or signing.",
+      "The provenance digest binds this manifest to the staged SPEC-0003 and contract-test source set; it does not independently attest that declared commands ran."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1",
+      "cmake": "4.4.2"
+    },
+    "started_at": "2026-08-25T00:26:10+08:00",
+    "finished_at": "2026-08-25T01:01:30+08:00"
+  }
+}
