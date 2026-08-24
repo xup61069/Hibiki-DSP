@@ -17,12 +17,37 @@ function Get-Sha256([string]$Path) {
 function Read-ReleaseManifest([string]$Path) {
   if (-not (Test-Path -LiteralPath $Path)) { throw "Manifest not found: $Path" }
   $manifest = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+
+  # Reject unknown root-level fields (schema additionalProperties: false)
+  $allowedRootFields = @(
+    'schema_version', 'product_version', 'source_tag',
+    'source_commit', 'distribution_id', 'toolchain_digest',
+    'dependency_lock_digest', 'unsigned_files', 'driver_package',
+    'installer', 'sbom_digest', 'tests', 'signed_installer_sha256'
+  )
+  foreach ($prop in ($manifest | Get-Member -MemberType NoteProperty).Name) {
+    if ($allowedRootFields -notcontains $prop) {
+      throw "Manifest contains unknown field: $prop"
+    }
+  }
+  foreach ($required in @('unsigned_files', 'tests')) {
+    if (-not ($manifest.PSObject.Properties.Name -contains $required)) {
+      throw "Manifest is missing required field: $required"
+    }
+  }
+
   if ($manifest.schema_version -ne 1) { throw 'Unsupported ReleaseManifest schema.' }
   if ([string]::IsNullOrWhiteSpace($manifest.product_version)) {
     throw 'Manifest product_version must be a non-empty string.'
   }
+  if (($manifest.product_version -is [string]) -and $manifest.product_version.Length -gt 64) {
+    throw 'Manifest product_version exceeds maximum length of 64 characters.'
+  }
   if ($manifest.source_tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+') {
     throw 'Manifest source_tag is not a stable version tag.'
+  }
+  if (($manifest.source_tag -is [string]) -and $manifest.source_tag.Length -gt 48) {
+    throw 'Manifest source_tag suffix exceeds maximum of 32 characters after version prefix.'
   }
   if ([string]::IsNullOrWhiteSpace($manifest.source_commit) -or
       $manifest.source_commit -notmatch '^[0-9a-f]{40}$') {
@@ -52,9 +77,42 @@ function Read-ReleaseManifest([string]$Path) {
       [string]::IsNullOrWhiteSpace($manifest.installer.rfc3161_timestamp)) {
     throw 'Manifest installer must carry hash, signer thumbprint and RFC3161 timestamp.'
   }
+  if (($manifest.installer.rfc3161_timestamp -is [string]) -and $manifest.installer.rfc3161_timestamp.Length -gt 128) {
+    throw 'Manifest installer.rfc3161_timestamp exceeds maximum length of 128 characters.'
+  }
+
+  if (($manifest.PSObject.Properties.Name -contains 'distribution_id') -and
+      [string]::IsNullOrWhiteSpace($manifest.distribution_id)) {
+    throw 'Manifest distribution_id must be a non-empty string when present.'
+  }
+
+  if (($manifest.PSObject.Properties.Name -contains 'signed_installer_sha256')) {
+    $sigHash = $manifest.signed_installer_sha256
+    if ($null -ne $sigHash -and $sigHash -notmatch '^[0-9a-fA-F]{64}$') {
+      throw 'Manifest signed_installer_sha256 must be a SHA-256 digest when present.'
+    }
+  }
+
+  if (@($manifest.unsigned_files).Count -gt 1024) {
+    throw 'Manifest unsigned_files exceeds maximum count of 1024 entries.'
+  }
+  foreach ($entry in @($manifest.unsigned_files)) {
+    if ($entry.path.Length -gt 260) {
+      throw "Manifest unsigned_files path exceeds maximum length of 260 characters."
+    }
+  }
+
+  if (@($manifest.tests).Count -gt 256) {
+    throw 'Manifest tests exceeds maximum count of 256 entries.'
+  }
+  foreach ($test in @($manifest.tests)) {
+    if ([string]::IsNullOrWhiteSpace($test) -or $test.Length -gt 120) {
+      throw 'Manifest tests entries must be non-empty strings of at most 120 characters.'
+    }
+  }
+
   return $manifest
 }
-
 function Test-ManifestFiles($Manifest, [string]$Root) {
   foreach ($entry in @($Manifest.unsigned_files)) {
     if ([string]::IsNullOrWhiteSpace($entry.path) -or
