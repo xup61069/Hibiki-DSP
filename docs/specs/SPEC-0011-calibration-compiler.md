@@ -3,7 +3,7 @@ id: SPEC-0011
 status: accepted
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-24
 review_after_days: 30
 related_adrs: [ADR-0002]
 source_globs: ["src/hub/include/hibiki/calibration_compiler.hpp", "src/hub/src/calibration_compiler.cpp", "apps/control-model/CalibrationModel.cs", "schemas/calibration-response-v1.schema.json", "schemas/peq-filter-v1.schema.json"]
@@ -53,3 +53,6 @@ endpoint ID 邊界一致。多位元組文字即使不超過 260 個字元，也
 2. 過大的低頻誤差會被 cut cap 限制並標示 `limited`；超過 filter 數量也必須標示。
 3. unsorted、NaN、重複頻率、超過 512 點或非法 policy 一律 fail-closed。
 4. CTest、source-policy、docs-check 與既有 exporter checks 通過。
+5. 實際載入 repository schema 的 validator 對 `device_id` 驗證 U+0000–U+001F、U+007F–U+009F
+   在開頭、中間、結尾及 controls-only 位置皆拒絕，並保留合法 printable UTF-8；runtime 測試或
+   pattern 文字檢查不能取代 schema-instance 驗收。

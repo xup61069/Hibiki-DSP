@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "issue": 1151,
+  "scope_digest": "audio-calibration-schema-strict-end-v1",
+  "source_commit": "61f20de0ab55b896324445f9f71830f83d1061c4",
+  "environment_fingerprint": "windows-amd64-pwsh-7.6.4-schema-instance-validation",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1151",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/verify.ps1"
+  ],
+  "results": [
+    {"command": "handoff-check", "status": "pass"},
+    {"command": "docs-check -SelfTest", "status": "pass"},
+    {"command": "docs-check", "status": "pass"},
+    {"command": "source-policy", "status": "pass"},
+    {"command": "git diff --check", "status": "pass"},
+    {"command": "verify", "status": "pass", "detail": "3/3 CTest targets passed"}
+  ],
+  "limitations": [
+    "The docs-check gate loads the two repository schema files through Test-Json -SchemaFile and runs 1,827 negative instances across all 65 C0/C1/DEL code points, seven fields, four string positions, and U+2028-before-ESC cases, plus ten positive printable, U+2028-only, and empty-label instances.",
+    "The validator result is from PowerShell 7.6.4; it confirms the repository gate and JsonSchema.Net behavior in this environment, not every third-party JSON Schema implementation.",
+    "This slice covers only AudioSessionDescriptor v1 and CalibrationResponse v1. Other repository schemas with printable-string patterns were not audited or changed by Issue #1151.",
+    "Runtime code and DSP behavior are unchanged; no live audio, driver loading, WaveRT, HLK, signing, or release acceptance is implied.",
+    "source_commit is the main head at authoring time; under the current provenance convention, a post-squash source_commit repair is still required."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "7.6.4",
+    "git": "2.55.0.windows.3"
+  },
+  "started_at": "2026-08-24T14:35:55+08:00",
+  "finished_at": "2026-08-24T14:46:51+08:00"
+}
