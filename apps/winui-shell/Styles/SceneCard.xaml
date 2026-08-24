@@ -4,19 +4,26 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- Modern selectable scene card surface. Fluent theme brushes keep light
-         and dark themes consistent without hard-coded colors. -->
+    <!-- Modern selectable scene card surface with hover lift + accent glow.
+         Fluent theme brushes keep light and dark themes consistent. -->
     <Style x:Key="SceneCardStyle" TargetType="Button">
-        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorSecondaryBrush}" />
+        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
         <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Padding" Value="16" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="18" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Stretch" />
         <Setter Property="MinHeight" Value="84" />
+        <Setter Property="Transitions">
+            <Setter.Value>
+                <TransitionCollection>
+                    <EntranceThemeTransition FromVerticalOffset="16" />
+                </TransitionCollection>
+            </Setter.Value>
+        </Setter>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -27,6 +34,9 @@
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="{TemplateBinding CornerRadius}"
                                 Padding="{TemplateBinding Padding}">
+                            <Border.RenderTransform>
+                                <TranslateTransform x:Name="HoverTranslate" />
+                            </Border.RenderTransform>
                             <ContentPresenter
                                 Content="{TemplateBinding Content}"
                                 ContentTemplate="{TemplateBinding ContentTemplate}"
@@ -50,11 +60,15 @@
                                 <VisualState x:Name="PointerOver">
                                     <Storyboard>
                                         <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="Background">
-                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource CardBackgroundFillColorSecondaryBrush}" />
                                         </ObjectAnimationUsingKeyFrames>
                                         <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="BorderBrush">
                                             <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentFillColorDefaultBrush}" />
                                         </ObjectAnimationUsingKeyFrames>
+                                        <DoubleAnimation Storyboard.TargetName="HoverTranslate"
+                                                         Storyboard.TargetProperty="Y"
+                                                         To="-2"
+                                                         Duration="0:0:0.12" />
                                     </Storyboard>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">

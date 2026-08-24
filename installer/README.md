@@ -2,17 +2,15 @@
 
 The planned open-source bootstrapper will install the user-space app and
 virtual-driver package transactionally, preserve Scene/Calibration data, and
-rollback to the last-known-good package. Official builds are Authenticode-signed
-by Hibiki and contain a Microsoft-signed driver; the source is public and the
-binary is delivered through Gumroad only.
+rollback to the last-known-good package. The project does not require HLK or any
+code signing; source remains public and users rebuild from source.
 
 `HibikiSetup.ps1` is the public bootstrapper source. It accepts an externally
 delivered package plus `ReleaseManifest v1`, verifies source/toolchain/dependency/
 SBOM metadata and package hashes, defaults to a non-mutating dry-run, and
 requires explicit `-Apply` plus administrator rights before staging an INF with
-`pnputil.exe`. The manifest also records the Microsoft driver signature and
-Hibiki installer signer/RFC3161 timestamp; no package, certificate or Gumroad
-credential is stored here.
+`pnputil.exe`. The manifest records content hashes only; no package, certificate
+or credential is stored here.
 
 The same bootstrapper supports `-Uninstall` for the verified user-space payload.
 It validates the package manifest and destination before touching anything, removes
@@ -20,8 +18,8 @@ only manifest-declared files inside the destination, backs up every removal to a
 temporary directory, restores prior state on failure, and preserves existing
 `%LocalAppData%/Hibiki DSP` Scene and route-rule files. Dry-run reports the planned
 removals and preserved-data boundaries without deleting anything. This is a
-source-level capability only; it does not claim install, load, runtime audio, driver,
-HLK, Microsoft signing or Authenticode execution evidence.
+source-level capability only; it does not claim install, load, runtime audio,
+driver, or physical-audio evidence.
 
 ## User-space payload staging (source-level capability)
 
@@ -48,6 +46,6 @@ user-data boundaries without creating directories or files.
 ## Evidence scope
 
 This document describes source-level design and offline verification only.
-It does not claim install, load, runtime audio, driver, HLK, Microsoft signing,
-or Authenticode execution evidence. Running `-Apply` changes machine state and
+It does not claim install, load, runtime audio, driver, or physical-audio
+evidence. Running `-Apply` changes machine state and
 requires administrator privileges on a locked test machine.

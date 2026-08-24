@@ -29,6 +29,7 @@
 #include "hibiki/tab_bridge.hpp"
 #include "hibiki/asio_transport_v1.h"
 #include "hibiki/output_sink.hpp"
+#include "hibiki/virtual_mic.hpp"
 #include "hibiki/output_crossfade.hpp"
 #include "hibiki/output_handoff.hpp"
 #include "hibiki/output_fanout.hpp"
@@ -929,26 +930,65 @@ int main() {
                                           decoded_driver_block) &&
           decoded_driver_samples[0] == 0.0F && decoded_driver_block.interleaved == nullptr);
 
-    PersistentLinearResampler persistent_src;
-    CHECK(persistent_src.prepare(1, 1.0));
+    PersistentPolyphaseResampler persistent_src;
+    constexpr std::uint32_t kPolyphaseChannelsV1 = 2U;
+    CHECK(!persistent_src.prepare(0U, 1.0));
+    CHECK(!persistent_src.prepare(9U, 1.0));
+    CHECK(!persistent_src.prepare(kPolyphaseChannelsV1, 0.24));
+    CHECK(!persistent_src.prepare(kPolyphaseChannelsV1, 4.01));
+    CHECK(!persistent_src.prepare(kPolyphaseChannelsV1,
+                                  std::numeric_limits<double>::quiet_NaN()));
+    CHECK(persistent_src.prepare(kPolyphaseChannelsV1, 1.0));
     const float first_block[]{0.0F, 1.0F, 2.0F, 3.0F};
     const float second_block[]{4.0F, 5.0F, 6.0F, 7.0F};
-    float resampled[8]{};
+    float resampled[32]{};
     std::size_t output_frames = 0;
-    CHECK(persistent_src.process(first_block, 4, resampled, 8, output_frames));
-    CHECK(output_frames == 3 && resampled[0] == 0.0F && resampled[2] == 2.0F);
-    CHECK(persistent_src.process(second_block, 4, resampled, 8, output_frames));
-    CHECK(output_frames == 4 && resampled[0] == 3.0F && resampled[3] == 6.0F);
+    CHECK(!persistent_src.process(nullptr, 4U, resampled, 32U, output_frames));
+    CHECK(!persistent_src.process(first_block, 4U, nullptr, 32U, output_frames));
+    CHECK(output_frames == 0U);
+    const double first_phase = persistent_src.phase();
+    CHECK(persistent_src.process(first_block, 4U, resampled, 32U, output_frames));
+    CHECK(output_frames > 0U && output_frames <= 32U);
+    const auto first_output_frames = output_frames;
+    std::array<float, 64> first_output{};
+    std::copy_n(resampled, first_output_frames * kPolyphaseChannelsV1, first_output.data());
+    CHECK(std::all_of(
+        first_output.begin(),
+        first_output.begin() +
+            static_cast<std::ptrdiff_t>(first_output_frames * kPolyphaseChannelsV1),
+        [](const float value) { return std::isfinite(value); }));
+    CHECK(!persistent_src.set_source_step(0.0));
+    CHECK(!persistent_src.set_source_step(4.000001));
+    CHECK(persistent_src.process(second_block, 4U, resampled, 32U, output_frames));
+    CHECK(output_frames > 0U);
+    CHECK(std::all_of(
+        resampled, resampled + static_cast<std::ptrdiff_t>(output_frames * kPolyphaseChannelsV1),
+        [](const float value) { return std::isfinite(value); }));
+    CHECK(persistent_src.phase() == first_phase);
+
+    // Ratio changes must carry phase/history forward instead of resetting the
+    // stream; reset restores the prepared fractional state.
+    CHECK(persistent_src.set_source_step(1.25));
+    CHECK(persistent_src.source_step() == 1.25);
+    const double before_ratio_change = persistent_src.phase();
+    CHECK(persistent_src.process(second_block, 4U, resampled, 32U, output_frames));
+    CHECK(output_frames > 0U);
+    CHECK(persistent_src.phase() != before_ratio_change);
+    persistent_src.reset();
+    CHECK(persistent_src.phase() == 0.0);
+    CHECK(persistent_src.prepare(kPolyphaseChannelsV1, 1.0));
+    CHECK(persistent_src.process(first_block, 4U, resampled, 32U, output_frames));
+    CHECK(output_frames > 0U && persistent_src.phase() == first_phase);
     OutputSinkModel sink_model;
     CHECK(sink_model.prepare(1, 1.0));
     sink_model.observe_clock(48000.0, 48012.0, 1.0);
     CHECK(sink_model.snapshot().ratio > 1.0 && sink_model.snapshot().source_step < 1.0);
-    CHECK(sink_model.process(first_block, 4, resampled, 8, output_frames));
+    CHECK(sink_model.process(first_block, 4, resampled, 32, output_frames));
     CHECK(output_frames > 0);
     OutputSinkModel fast_sink;
     CHECK(fast_sink.prepare(1U, 4.0));
-    CHECK(fast_sink.process(first_block, 4U, resampled, 8U, output_frames));
-    CHECK(fast_sink.process(first_block, 4U, resampled, 8U, output_frames));
+    CHECK(fast_sink.process(first_block, 4U, resampled, 32U, output_frames));
+    CHECK(fast_sink.process(first_block, 4U, resampled, 32U, output_frames));
     const std::array<OutputFanoutSinkConfigV1, 3> clock_fanout_configs{{
         {"clock-main", 2U, true}, {"clock-movie", 2U, true}, {"clock-off", 2U, false}}};
     OutputFanoutPlanV1 clock_fanout_plan{};
@@ -978,7 +1018,7 @@ int main() {
         const auto slow_after_one = clock_sink.snapshot();
         CHECK(slow_after_one.drift_ppm < 0.0 && slow_after_one.ratio >= 1.0 - 500.0e-6 &&
               slow_after_one.source_step > 1.0);
-        CHECK(clock_sink.process(first_block, 4U, resampled, 8U, output_frames));
+        CHECK(clock_sink.process(first_block, 4U, resampled, 32U, output_frames));
         CHECK(output_frames > 0U && std::isfinite(clock_sink.snapshot().source_step));
 
         clock_sink.observe_clock(96000.0, 95904.0, 1.0);
@@ -990,7 +1030,7 @@ int main() {
         clock_sink.reset();
         CHECK(clock_sink.snapshot().ratio == 1.0 && clock_sink.snapshot().drift_ppm == 0.0 &&
               clock_sink.snapshot().source_step == 1.0);
-        CHECK(clock_sink.process(first_block, 4U, resampled, 8U, output_frames));
+        CHECK(clock_sink.process(first_block, 4U, resampled, 32U, output_frames));
         CHECK(clock_sink.snapshot().source_step == 1.0);
 
         OutputFanoutRuntimeV1 isolated_fanout;
@@ -5798,6 +5838,95 @@ int main() {
         const std::string oversized(
             hibiki::kVst3CrashReportMaxDocumentBytesV1 + 1U, ' ');
         CHECK(rejects(oversized));
+    }
+
+    // Issue 1316: sandbox lifecycle events feed the bounded crash report
+    // store (bridge from Issue 1303). All entries must be de-identified and
+    // schema-valid; the raw plugin path must never appear anywhere.
+    {
+        auto make_sandbox_launch = [](const wchar_t* worker,
+                                      const wchar_t* plugin) {
+            Vst3SandboxLaunchV1 launch{};
+            launch.worker_executable = worker;
+            launch.plugin_path = plugin;
+            launch.watchdog_timeout_ms = 250U;
+            launch.start_time_ms = 1U;
+            return launch;
+        };
+
+        // A missing worker executable fails before any process exists, so no
+        // crash entry may be recorded for pure setup failures.
+        Vst3SandboxProcess setup_failure_sandbox;
+        CHECK(!setup_failure_sandbox.launch(make_sandbox_launch(
+            L"hibiki-missing-worker-1316.exe", L"missing-plugin-1316.vst3")));
+        CHECK(setup_failure_sandbox.crash_report_store().size() == 0U);
+
+#if defined(_WIN32)
+        // Real worker timeout: launch the actual passthrough worker when it
+        // exists, never heartbeat, and let poll_watchdog quarantine it. The
+        // watchdog path must append exactly one de-identified entry.
+        Vst3SandboxProcess exit_capture_sandbox;
+        const wchar_t* worker_candidates[] = {
+            L".local/build/vst-host/RelWithDebInfo/hibiki_vst_worker.exe",
+            L"vst-host/RelWithDebInfo/hibiki_vst_worker.exe"};
+        bool worker_launched = false;
+        for (const auto* candidate : worker_candidates) {
+            if (GetFileAttributesW(candidate) != INVALID_FILE_ATTRIBUTES) {
+                worker_launched = exit_capture_sandbox.launch(
+                    make_sandbox_launch(candidate,
+                                        L"C:/plugins/vendor-a/secret-plugin.vst3"));
+                break;
+            }
+        }
+        if (worker_launched) {
+            CHECK(exit_capture_sandbox.poll_watchdog(1000000ULL));
+            CHECK(exit_capture_sandbox.state() == Vst3SandboxState::Quarantined);
+            const auto& exit_store = exit_capture_sandbox.crash_report_store();
+            // Exactly one entry: the watchdog timeout. No exit-path or
+            // quarantine double-recording may occur for a single failure.
+            CHECK(exit_store.size() == 1U);
+            // The first entry must be the de-identified watchdog timeout.
+            const auto& timeout_entry = exit_store.entry_at(0U);
+            CHECK(timeout_entry.reason ==
+                      Vst3CrashReportReasonV1::worker_timeout &&
+                  timeout_entry.exit_code == 0U &&
+                  timeout_entry.uptime_ms > 0U &&
+                  timeout_entry.captured_utc > 0);
+            bool digest_all_zero = true;
+            for (const auto byte : timeout_entry.module_sha256) {
+                if (byte != 0U) {
+                    digest_all_zero = false;
+                    break;
+                }
+            }
+            CHECK(!digest_all_zero);
+            // Redaction: serialize the store and confirm the raw path bytes
+            // never appear in the document.
+            std::array<char, 4096> redact_document{};
+            std::size_t redact_written = 0U;
+            CHECK(serialize_vst3_crash_report_store_v1(
+                      exit_store, redact_document, redact_written) ==
+                  Vst3CrashReportResultV1::ok);
+            const std::string_view leaked("secret-plugin");
+            bool leak_found = false;
+            for (std::size_t offset = 0U;
+                 offset + leaked.size() <= redact_written; ++offset) {
+                if (std::equal(leaked.begin(), leaked.end(),
+                               redact_document.begin() +
+                                   static_cast<std::ptrdiff_t>(offset))) {
+                    leak_found = true;
+                }
+            }
+            CHECK(!leak_found);
+        } else {
+            CHECK(true);  // Worker binary not built in this configuration.
+        }
+
+        // Watchdog on a stopped sandbox records nothing new.
+        Vst3SandboxProcess idle_sandbox;
+        CHECK(!idle_sandbox.poll_watchdog(1000000ULL));
+        CHECK(idle_sandbox.crash_report_store().size() == 0U);
+#endif
     }
 
     return 0;

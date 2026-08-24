@@ -4,7 +4,7 @@
 
 1. **硬性限制**：任何情況不得違反（安全、法律、隱私、誠實）。
 2. **產品與流程預設**：可以討論、可以用新 ADR/Spec 取代的預設值。
-3. **驗證門檻**：依變更範圍觸發的檢查；簽章與發行屬 release 階段，不是日常開發前置。
+3. **驗證門檻**：依變更範圍觸發的檢查；發行屬 release 階段，不是日常開發前置。
 
 開始工作前只先讀本檔與 `docs/START_HERE.md`，取得指派後再讀對應 Issue handoff 與其指定的
 Spec／ADR。`docs/AI_HANDOFF.md`、`docs/state/BASELINE.md`、`docs/PROJECT_MAP.md` 與完整
@@ -18,12 +18,13 @@ AI memory 與 IDE 規則都不是專案真值。
   連結。高流量 audio path 可使用契約化的固定容量 shared-memory/ring，不需要把 samples
   送進變長 control message。
 - 廠商 ASIO、WASAPI Exclusive、RAW 路徑不可宣稱受 Hibiki 控制。
-- 不提交 EXE、DLL、SYS、MSI、MSIX、VST3、PE/COFF、簽章憑證或私密金鑰。
+- 不提交 EXE、DLL、SYS、MSI、MSIX、VST3、PE/COFF、憑證或私密金鑰。
 - 真實裝置 ID、校正檔、序號、私人路徑放 `.local/`，不得進 Git。
 - 不反編譯或繞過閉源軟體保護；只用開源程式、官方文件與合法 black-box 觀察。
 - ISO 226 授權文件、掃描、完整表格與受限資料不可放入 repo、Issue、prompt 或 RAG。
-- 不宣稱未驗證的能力：user-space probe 不是 driver/WaveRT/HLK/Microsoft signing evidence；
-  控制命令入列不是已完成音訊套用。
+- 不宣稱未驗證的能力：user-space probe 不是 driver/WaveRT 或實體音訊 evidence；
+  控制命令入列不是已完成音訊套用。專案不需要 HLK 與任何簽章，也不得把它們描述為
+  待辦或驗收門檻。
 
 ## 第二層：產品與流程預設（可依 ADR/Spec 演進）
 
@@ -89,11 +90,7 @@ git diff --check
 | 改 extensions | `extension-check.ps1` |
 | 改 installer／distribution identity | `installer-check.ps1`、`distribution-check.ps1` |
 | 改 driver source boundary | `driver-source-check.ps1`；需要 WDK build evidence 時另跑 `build-driver.ps1` |
-| driver release 驗收（WDK package 存在時） | `driver-signability-check.ps1`（必要時加 `-PackageRoot <package> -RequireInf2Cat`） |
-| 明確 opt-in 的 live probe | `live-*-check.ps1` 系列；只輸出匿名資料，不改變機器狀態（`-WriteTest` 變體除外），結果不等於 driver/HLK/簽章 evidence |
-
-driver 安裝、載入、HLK 與 Microsoft 簽章屬於 release 階段工作：在取得鎖定 target 機器
-與正式憑證之前，沒有任何日常 gate 可以或應該宣稱完成這些項目。
+| 明確 opt-in 的 live probe | `live-*-check.ps1` 系列；只輸出匿名資料，不改變機器狀態（`-WriteTest` 變體除外），結果不等於 driver 或實體音訊 evidence |
 
 遇到環境差異先記錄 fingerprint 並更新 handoff block，不要自行重生
 `config/distribution-profile.yml` 裡的 endpoint、ASIO、IPC GUID。

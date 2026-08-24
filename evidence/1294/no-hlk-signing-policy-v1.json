@@ -1,0 +1,98 @@
+{
+  "evidence_format": 2,
+  "issue": 1294,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      ".github/workflows/verify.yml",
+      "AGENTS.md",
+      "CHANGELOG.md",
+      "CONTRIBUTING.md",
+      "README.md",
+      "SECURITY.md",
+      "SOURCE_POLICY.md",
+      "TRADEMARKS.md",
+      "docs/AI_HANDOFF.md",
+      "docs/PROJECT_MAP.md",
+      "docs/START_HERE.md",
+      "docs/TARGET_MACHINE_CHECKLIST.md",
+      "docs/VST3_STATE_COMPATIBILITY_REVIEW.md",
+      "docs/adr/0003-source-only-paid-signed-release.md",
+      "docs/adr/0006-no-hlk-no-signing-release.md",
+      "docs/adr/INDEX.md",
+      "docs/ai/CHANGE_CONTRACT.yml",
+      "docs/ai/CODEX_GOALS.md",
+      "docs/specs/INDEX.md",
+      "docs/specs/SPEC-0001-core-contracts.md",
+      "docs/specs/SPEC-0003-virtual-endpoints-and-routing.md",
+      "docs/specs/SPEC-0005-source-only-paid-release.md",
+      "docs/specs/SPEC-0007-output-sink-handoff.md",
+      "docs/specs/SPEC-0012-vst3-latency-graph-commit.md",
+      "docs/specs/SPEC-0017-control-status-snapshot.md",
+      "docs/state/BASELINE.md",
+      "driver/inf/README.md",
+      "driver/wdk/README.md",
+      "extensions/README.md",
+      "installer/HibikiSetup.ps1",
+      "installer/README.md",
+      "schemas/release-manifest-v1.schema.json",
+      "tools/build-preview.ps1",
+      "tools/docs-check.ps1",
+      "tools/driver-signability-check.ps1",
+      "tools/installer-check.ps1"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "1d1b581525a7b17342d3511af1f8f53d6f0004ac93358ac7d203539b14bd86c2"
+  },
+  "metadata": {
+    "scope": "no-hlk-signing-policy",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-git-2.49.0",
+    "commands": [
+      "pwsh -NoProfile -File tools/installer-check.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1294",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/distribution-check.ps1",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "git diff --check",
+      "CI self-test sweep replica over tools/*.ps1 -SelfTest (33 modes)",
+      "git rebase origin/main; gates rerun on rebased HEAD 9d0e6c2b"
+    ],
+    "results": [
+      {
+        "command": "ReleaseManifest and installer policy",
+        "status": "pass",
+        "detail": "release-manifest schema keeps content hashes only (driver sha256+catalog_sha256, installer sha256); installer gate rejects signed_installer_sha256 metadata including explicit null; installer self-test passed 33 cases."
+      },
+      {
+        "command": "CI and gate inventory",
+        "status": "pass",
+        "detail": "verify.yml signability step removed and renamed to Driver INF source gate; driver-signability-check.ps1 deleted; docs-check required-entry count updated to 87 and BASELINE pass list no longer names the removed gate; CI replica sweep passed 33 SelfTest modes (minimum 26)."
+      },
+      {
+        "command": "Documentation policy alignment",
+        "status": "pass",
+        "detail": "ADR-0006 supersedes ADR-0003; SPEC-0005 rewritten as unsigned delivery contract; SPEC/README/PROJECT_MAP wording no longer presents HLK, WHCP or signing as prerequisites or blockers; remaining mentions are historical records, superseded context, changelog removal notes, secret detectors, or rejection tests."
+      },
+      {
+        "command": "Gates after rebase onto origin/main",
+        "status": "pass",
+        "detail": "handoff-check #1294, docs-check (87 required paths), source-policy (728 tracked paths), installer SelfTest, distribution-check, source-only-ci-check and git diff --check all exited 0 in w-1294 worktree at rebased commit 9d0e6c2b."
+      }
+    ],
+    "limitations": [
+      "This is a policy, documentation, schema and gate change only; it does not demonstrate physical audio output, WaveRT streaming, driver installation/loading, or target-machine behavior.",
+      "The provenance digest binds this manifest to the staged source set for this slice; it does not independently attest that declared commands ran.",
+      "Historical ADR/evidence text about signing and HLK is intentionally preserved as history; ADR-0003 remains superseded by ADR-0006."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1"
+    },
+    "started_at": "2026-08-25T05:55:00+08:00",
+    "finished_at": "2026-08-25T06:22:25+08:00"
+  }
+}
+ 

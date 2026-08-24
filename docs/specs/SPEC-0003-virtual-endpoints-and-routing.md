@@ -27,11 +27,11 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
 - Chrome／Edge 單分頁擷取必須由使用者點擊 MV3 extension 啟動；Windows process routing
   不得假裝能靜默辨識 tab。
 - user-space output prototype 使用 caller-owned interleaved ring buffer、bounded clock-drift
-  ratio（±500 ppm）與無配置線性 SRC；真正 sink 必須保留相同的 no-allocation boundary，並
+  ratio（±500 ppm）與無配置多相位 SRC；真正 sink 必須保留相同的 no-allocation boundary，並
   在實體時鐘 fixture 上替換為持續相位／高品質 filter。
 - `sdk/include/hibiki/driver_control_v1.h` 定義 Apache-2.0 C ABI；`driver/` 的 validator
   保持 MS-PL，檢查固定 header、Q16.16 dB、格式與 endpoint GUID 邊界。這不是可載入的
-  WaveRT driver，不能替代 WDK／HLK／簽章驗收。
+  WaveRT driver，也不能替代 WDK build 與實機驗證。
 - `DeviceRecoveryCoordinator` 是 worker-side 的 platform-neutral recovery state machine：
   `IMMNotificationClient` snapshot 只能透過單調 sequence 投遞，失效、拔除、format change
   或 Audio Service restart 進入 `RebindPending`，再以 `begin → prepare → commit/rollback`
@@ -49,16 +49,16 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   Main=stereo render、Low Latency=stereo/64-frame render、Surround=7.1 render、Virtual Mic=stereo
   capture。未來 SYSVAD topology 必須消費此 catalog，不得只由 channel count 推斷排列。
 - `driver/inf/HibikiVirtualAudio.inf` 固定 Root\HibikiDSP hardware ID、四個 endpoint GUID
-  與 service/package 邊界；source-only `tools/driver-signability-check.ps1` 會先移除
+  與 service/package 邊界；source-only `tools/driver-source-check.ps1` 會先移除
   `;` 註解，再只在預期的 INF section 內驗證 Version、NTamd64 install mapping、CopyFiles、
   service 與 ServiceBinary；缺 section、錯置或只有註解的 directive 一律 fail closed，並拒絕
-  GPL/private payload 與 traversal path。它只引用未提交的 SYS/CAT，`Inf2Cat`、HLK、Microsoft
-  signing 與真正 PortCls/SYSVAD topology 仍是 release gate。
+  GPL/private payload 與 traversal path。專案不需要 HLK 或任何簽章；
+  真正 PortCls/SYSVAD topology 與實機驗證仍是 driver 完成度待辦。
 - `driver/include/hibiki/wavert_stream_v1.h` 與 `src/wavert_stream.c` 提供可由未來 pin
   callback 掛接的 portable WaveRT data-path core：caller-owned Float32 frame ring、完整
   block overrun reject、underrun silence fallback 與 dropped/underrun counters；它限制在
   2/6/8 channels、44.1/48/96/192 kHz、2–16 periods，且不配置、不等待。WDK miniport 仍
-  必須補上 interlocked publication、KS pin wiring、實體 endpoint 與 signed package。
+  必須補上 interlocked publication、KS pin wiring、實體 endpoint 與 delivery 驗證。
 - `driver/wdk/hibiki_stream_adapter.cpp` 示範 WDK-only 的 pin callback 邊界：以 spin lock
   保護 ring、submit render block、讀取時以 silence fallback 填滿 underrun，並提供 reset；
   `HibikiWaveRtPinInitializeEndpointV1` 與 `HibikiWaveRtBuildFormatV1` 只能以固定
@@ -66,14 +66,14 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   SYSVAD/PortCls 專案中編譯，不能單獨宣稱可載入 driver。
 - `HibikiWaveRtPinInitializeCaptureEndpointV1` 與 `HibikiWaveRtBuildFormatEndpointV1` 以同一
   topology catalog 覆蓋 Virtual Mic capture pin 與格式，避免 capture 端點另造聲道／取樣率
-  契約；仍需正式 PortCls wiring 與 signed package。
+  契約；仍需正式 PortCls wiring 與實機 capture delivery 驗證。
 - `HibikiPropertyContextInitializeEndpointV1` 同樣以 topology 的 endpoint GUID、聲道數與
   取樣率初始化每個 WDK property context，避免 miniport 另造一套 identity；它仍只是
-  MS-PL source boundary，未提供 `.sys`、HLK 或 Microsoft signature。
+  MS-PL source boundary，未提供可載入 `.sys`，也不代表實機 PnP start 已驗收。
 - `HibikiPropertyHandlerVolumeV1`／`HibikiPropertyHandlerMuteV1` 對
   `KSPROPERTY_TYPE_BASICSUPPORT` 回報 `KSPROPERTY_TYPE_GET | KSPROPERTY_TYPE_SET`，並在
   Value／Instance buffer 不足時先回報所需大小；這只是 WDK source boundary，尚未替代
-  目標 WDK build、HLK 或 signed `.sys` 驗收。
+  目標 WDK build 與實機 `.sys` 驗收。
 - `sdk/include/hibiki/driver_control_transport_v1.h` 定義固定 136-byte little-endian
   `endpoint-state`／`volume-notification` control packet；所有欄位以明確 offset 編碼，
   不依賴 C struct padding，並在 driver/user-space boundary 驗證 GUID、LPCM 格式、Q16.16
@@ -82,7 +82,7 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   fail closed。GPL engine 的 `DriverVolumeLinkV1` 只透過此 Apache
   ABI 解碼，套用 requested dB/mute 到 canonical output-group safety path，並可忽略已登記
   event-context 防止回授迴圈；這仍是 user-space/control-plane evidence，不是 loadable
-  WaveRT、PortCls、HLK 或 Microsoft-signing evidence。
+  WaveRT、PortCls 或實體音訊 evidence。
 - 同一 transport 另提供固定 16-byte little-endian header-only Hello/Ack/Error framing，
   以 request ID 建立 driver/user-space correlation；v1 不攜帶自由格式錯誤文字或未界定
   payload，避免把 kernel IPC 變成隱含的變長配置協定。`schemas/driver-control-v1.schema.json`
@@ -100,7 +100,7 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   caller-owned lane storage 並拒絕非有限 sample。`sequence` 與 `generation` 是 freshness／
   lifecycle 欄位，兩者必須非零；encode 與 validate 在接受 payload 前拒絕零值，但保留
   `UINT64_MAX` 為有效值。packet span 必須等於 header 宣告長度。這是 user-space packet
-  boundary 的 stale-state 防護，不是實體 driver、WaveRT、HLK 或 signing evidence。
+  boundary 的 stale-state 防護，不是實體 driver 或 WaveRT evidence。
 - `AudioEngineModel::process_driver_stream_packet` 只接受 render packet，要求 packet endpoint
   GUID、sample rate 與 engine、channel count 與 active lane 全部相同，通過後沿用
   `process_lane_block` 的 immutable graph／Group Master／limiter 路徑；capture packet、錯誤
@@ -109,7 +109,7 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   graph／Group Master／limiter 路徑處理，再以固定 80-byte header＋interleaved Float32 的 v1 ABI
   編成 outbound render packet；lane、格式、freshness 或非有限 sample 不符時 fail-closed，不會
   發出 partial packet。這是 user-space outbound encode evidence；真正送進 WaveRT ring 仍需要
-  kernel-mode IPC/shared-memory wiring，不能宣稱已完成實體 WaveRT delivery、HLK 或簽章驗收。
+  kernel-mode IPC/shared-memory wiring，不能宣稱已完成實體 WaveRT delivery 驗收。
 - `sdk/include/hibiki/driver_stream_ring_v1.h` 與 `sdk/src/driver_stream_ring_v1.c` 提供
   固定 layout 的 SPSC multi-slot shared-memory ring，用來搬運整個 v1 driver stream packet；
   RT push/pop 路徑不配置、不取得 mutex、不等待，僅以 interlocked sequence 發布與消費。
@@ -118,7 +118,7 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   穩定，可供未來跨 process 或 kernel mapping 重用。contract tests 另外證明：ring pop
   的完整 packet 可直接通過 engine render gate；engine outbound encode 經 ring 往返後
   逐位元組一致且 validate 通過；underrun 或損毀 packet 則 fail-closed。這些都是
-  user-space contract evidence；實體 WaveRT delivery、HLK 與簽章驗收尚未涵蓋。
+  user-space contract evidence；實體 WaveRT delivery 驗收尚未涵蓋。
 - `PersistentLinearResampler` 保存跨 block 的 phase 與 boundary frame，要求 caller 提供
   整個 input block 的 output capacity，並拒絕在不足時部分消耗；它是 clock-drift/SRC 的
   無配置 baseline，尚未宣稱 production-quality polyphase filter。
@@ -135,7 +135,7 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   仍可運作但 UI 必須顯示 detached／dropped blocks，不能宣稱已套用 Hibiki graph。shared-memory
   region 的 reserved header field 必須為零；push／pop 對非零值 fail closed，不消費或發布
   ring slot，也不改 caller-owned output counters。這是 user-space SPSC contract，不是 vendor
-  ASIO、實體 sink、driver、HLK 或 signing evidence。
+  ASIO、實體 sink 或實體 driver evidence。
 - `AudioEngineModel::process_asio_transport` 將一個已 pop 的 ASIO block 暫時置入指定 Lane，
   走現有 immutable graph 與唯一 Group Master，再寫入 caller-owned output；完成後還原 caller
   的 Lane view。它只證明 user-space graph data path，不代表已連接實體 sink、WaveRT endpoint
@@ -193,12 +193,12 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   monitor/output path，不能取代真正的 signed Virtual Mic capture driver。
 - `HibikiMiniportTopologyV1`、topology filter tables、WaveRT/topology subdevice pair 與 INF
   per-subdevice interfaces 提供 local WDK build／Inf2Cat 的 PortCls start-path wiring。這仍是
-  source/build evidence：不新增 guest 安裝、載入、實體 endpoint、HLK 或 Microsoft-signing
+  source/build evidence：不新增 guest 安裝、載入、實體 endpoint 或實體音訊
   證據；下一次 guest 測試必須重新驗證 PnP start。
 
 ## 未解問題（阻擋完整 driver 實作）
 
-1. 已固定 endpoint topology/channel mask；仍需 WaveRT／KS PortCls wiring 與 INF/HLK 測試矩陣。
+1. 已固定 endpoint topology/channel mask；仍需 WaveRT／KS PortCls wiring 與 INF/實機測試矩陣。
 2. 真實多輸出 endpoint 的 clock drift、ring buffer 與 adaptive SRC soak；portable stream
    ring 與 user-space per-sink SRC baseline 已存在。
 3. Virtual Mic 的 echo reference、privacy indicator 與卸載行為。

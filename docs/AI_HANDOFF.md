@@ -75,7 +75,8 @@ pwsh -File tools/context-pack.ps1 -Issue <issue> -NoSource
 - 不宣稱 vendor ASIO、WASAPI Exclusive、RAW、Atmos/DTS:X 或未經使用者手勢的 Chrome tab capture
   已受 Hibiki 控制。
 - 不把「控制命令已入列」或「預設已保存」寫成「已完成引擎／實體音訊套用」。
-- driver 安裝／載入／HLK／Microsoft signing 屬 release 階段；日常 probe 不可代替。
+- 專案不需要 HLK 與任何簽章；不得把 driver 安裝／載入或簽章描述為驗收前置，
+  日常 probe 也不可代替實際 driver/WaveRT evidence。
 
 ## 交接前最小完成條件
 

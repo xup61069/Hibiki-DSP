@@ -40,12 +40,12 @@ Preview 與桌面控制介面，可查看 Easy／Expert 控制流程、Scene、�
 | DSP／控制面 | C++20 RT graph、Scene transaction、輸出群組音量、Matrix／路由、limiter、PEQ／IR 基礎與多項 fail-closed contract tests | 真實喇叭／耳機的聲學效果、校正品質或第三方標準認證 |
 | Windows user-space | Engine Preview、裝置／session catalog、系統與 session 音量 write-through probe、route transaction、shared-mode WASAPI 邊界 | 實體 per-App capture/re-send、完整 DSP delivery 或長時間實機播放 |
 | UX | UI-independent C# control model、Desktop／WinUI compatibility preview、本機 formal XAML build 與 UIA smoke | 鎖定 target 機器上的完整 accessibility 與長時間驗收 |
-| Driver | WDK source build、Inf2Cat、self-signed test package；隔離 Hyper-V guest 已完成 test-signed 安裝、PnP start 與穩定重啟（ProblemCode 0） | 實體音訊播放、WaveRT streaming 行為、HLK、Microsoft 簽章 |
-| 發行 | source-only policy、ReleaseManifest schema、installer／rollback 來源與 gates | 正式 signed installer、consumer upgrade／rollback 驗收與 Gumroad 交付 |
+| Driver | WDK source build、Inf2Cat 與本機 package 建置；隔離 Hyper-V guest 已完成安裝、PnP start 與穩定重啟（ProblemCode 0） | 實體音訊播放與 WaveRT streaming 行為 |
+| 發行 | source-only policy、ReleaseManifest schema、installer／rollback 來源與 gates；專案不需要 HLK 或任何簽章 | consumer upgrade／rollback 驗收 |
 
 完整的 main 狀態、來源 commit 與限制以 [baseline](docs/state/BASELINE.md) 為準；子系統位置與
 契約看 [project map](docs/PROJECT_MAP.md)。Contract test、source gate、preview 或 live probe
-都不能單獨當成實體音訊、driver、HLK、簽章或 release evidence。
+都不能單獨當成實體音訊、driver 或 release evidence。
 
 ## 安全試跑
 
@@ -104,20 +104,19 @@ pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUI
 
 ## 距離 V1 還有什麼？
 
-[SPEC-0005](docs/specs/SPEC-0005-source-only-paid-release.md) 定義的 V1 是正式可安裝版本：
-Microsoft-signed 虛擬音訊 driver、Easy／Expert 控制面、Authenticode-signed installer，
-經隔離 release pipeline 驗證後由 Gumroad 交付。
+[SPEC-0005](docs/specs/SPEC-0005-source-only-paid-release.md) 定義的 V1 是可從 source 重建的
+正式版本：虛擬音訊 driver、Easy／Expert 控制面與 transactional installer，全程不需要
+HLK、Microsoft signing、Authenticode 或付費交付通道。
 
 目前仍需要：
 
 1. 鎖定 Windows 11 24H2+ target 機器與實體音訊測試環境。
 2. 完成引擎到 WaveRT 虛擬端點的實際 streaming、可聽輸出與長時間 soak。
 3. 在 target 環境複驗正式 WinUI、accessibility、安裝、升級、rollback 與 uninstall。
-4. 完成 HLK／WHCP、Microsoft driver signing、Authenticode 與 release custody。
-5. 完成 ISO 226 相關授權確認與正式交付所需帳號／行政流程。
+4. 完成 ISO 226 相關授權確認。
 
-因此目前沒有可信的 V1 日期。Test-signed driver 在隔離 guest 能安裝、PnP start 並穩定重啟，
-是重要的 driver 啟動證據，但不是實體播放、HLK、Microsoft signing 或可發行產品。
+因此目前沒有可信的 V1 日期。driver 在隔離 guest 能安裝、PnP start 並穩定重啟，是重要的
+driver 啟動證據，但不是實體播放或可發行產品。
 
 ## 專案真值與導覽
 
@@ -158,7 +157,7 @@ evidence 時才執行環境 probe；私人路徑與裝置資料只留在 `.local
 
 [github.com/xup61069/Hibiki-DSP](https://github.com/xup61069/Hibiki-DSP) 是唯一官方公開
 source 入口。GitHub 只存放 source、依賴鎖定、建置腳本、文字 manifest、SBOM 與 evidence；
-正式 signed payload 未來由隔離 release pipeline 產生與保管。詳見
+專案不使用簽章或 binary release。詳見
 [SOURCE_POLICY.md](SOURCE_POLICY.md) 與 [SPEC-0005](docs/specs/SPEC-0005-source-only-paid-release.md)。
 
 - user-space：GPL-3.0-only
@@ -169,5 +168,5 @@ source 入口。GitHub 只存放 source、依賴鎖定、建置腳本、文字 m
 完整授權與第三方資訊見 [LICENSES/README.md](LICENSES/README.md) 與
 [THIRD_PARTY.yml](THIRD_PARTY.yml)；商標政策見 [TRADEMARKS.md](TRADEMARKS.md)。
 
-禁止提交簽章金鑰、憑證、顧客資料、真實 endpoint／serial identity、私人校正檔、ISO 受限
+禁止提交金鑰、憑證、顧客資料、真實 endpoint／serial identity、私人校正檔、ISO 受限
 內容或任何編譯產物。

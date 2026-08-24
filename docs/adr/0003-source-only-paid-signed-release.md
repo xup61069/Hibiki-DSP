@@ -1,10 +1,10 @@
 # ---
 # id: ADR-0003
-# status: accepted
+# status: superseded
 # owner: hibiki-maintainers
 # authority: architecture
 # date: 2026-08-21
-# last_reviewed: 2026-08-21
+# last_reviewed: 2026-08-25
 # review_after_days: 90
 # supersedes: []
 # related_specs: [SPEC-0005]
@@ -15,7 +15,9 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR-0006](0006-no-hlk-no-signing-release.md)
+
+> 2026-08-25 起，本 ADR 描述的 Microsoft signing、Authenticode、Gumroad 付費交付與 HLK／WHCP 前置已由 ADR-0006 取代；Hibiki 不再需要 HLK 或任何簽章。本文僅保留歷史脈絡。
 
 ## Date
 
