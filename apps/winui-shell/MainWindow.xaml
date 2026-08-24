@@ -51,7 +51,16 @@
         </Grid>
 
         <ScrollViewer Grid.Row="1" Margin="0,12,0,0">
-            <StackPanel Spacing="14" MaxWidth="880">
+            <StackPanel Spacing="0">
+                <controls:InfoBar x:Name="DisconnectedBanner"
+                                  IsOpen="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}"
+                                  Severity="Warning"
+                                  Title="尚未連接引擎"
+                                  Message="連接後才能套用場景、音量與路由控制。點擊「連接引擎」開始。"
+                                  IsClosable="False"
+                                  Margin="0,0,0,12"
+                                  AutomationProperties.Name="引擎連線狀態提醒" />
+                <StackPanel Spacing="14" MaxWidth="880">
                 <Border Padding="24" CornerRadius="12"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
@@ -148,7 +157,7 @@
                                               IsActive="{Binding IsBusy}"
                                               Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"
                                               VerticalAlignment="Center" />
-                                <Button Content="連接引擎" Click="OnConnectClick"
+                                <Button x:Name="ConnectButton" Content="連接引擎" Click="OnConnectClick"
                                         AutomationProperties.Name="連接 Hibiki 音訊引擎"
                                         AutomationProperties.HelpText="連接後才能套用場景與音量控制"
                                         VerticalAlignment="Center" />
@@ -923,6 +932,7 @@
                     </StackPanel>
                     </Border>
                 </controls:Expander>
+            </StackPanel>
             </StackPanel>
         </ScrollViewer>
 

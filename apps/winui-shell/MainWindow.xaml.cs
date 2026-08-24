@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+using System.ComponentModel;
 using Hibiki.ControlModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -20,9 +21,23 @@ public sealed partial class MainWindow : Window
 #else
         InitializeComponent();
         RootGrid.DataContext = ViewModel;
+        ViewModel.PropertyChanged += OnViewModelPropertyChanged;
         ConfigureTitleBar();
 #endif
         Closed += OnClosed;
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(EasyControlViewModel.IsConnected))
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                ConnectButton.Content = ViewModel.IsConnected ? "重新連接" : "連接引擎";
+                if (DisconnectedBanner is not null)
+                    DisconnectedBanner.IsOpen = !ViewModel.IsConnected;
+            });
+        }
     }
 
 #if !HIBIKI_COMPATIBILITY_PREVIEW
