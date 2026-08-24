@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1139,
   "scope_digest": "baseline-clock-fixture-truth-v1",
-  "source_commit": "26afc5daeeb7afd9831c1c3472d492771ffe126d",
+  "source_commit": "46af44f3cd105e62eea764f61353484e0a4d7c07",
   "environment_fingerprint": "windows-amd64-pwsh-baseline-clock-fixture-truth",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1139",
