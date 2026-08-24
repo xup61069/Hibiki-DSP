@@ -6,6 +6,20 @@
 
 namespace hibiki {
 
+namespace {
+
+[[nodiscard]] bool is_printable_label(std::string_view value,
+                                      std::size_t maximum_bytes) noexcept {
+    if (value.empty() || value.size() > maximum_bytes) {
+        return false;
+    }
+    return std::all_of(value.begin(), value.end(), [](unsigned char ch) {
+        return ch >= 0x20U && ch != 0x7FU && !(ch >= 0x80U && ch <= 0x9FU);
+    });
+}
+
+}  // namespace
+
 bool validate_graph(const GraphConfigV1& graph) noexcept {
     if (graph.schema_version != 1 || graph.lanes.empty() || graph.lanes.size() > kMaxRtLanes ||
         (graph.output_channels != 2 && graph.output_channels != 6 && graph.output_channels != 8)) {
@@ -15,6 +29,8 @@ bool validate_graph(const GraphConfigV1& graph) noexcept {
     for (std::size_t lane_index = 0; lane_index < graph.lanes.size(); ++lane_index) {
         const auto& lane = graph.lanes[lane_index];
         if (lane.id.empty() || lane.output_group.empty() ||
+            !is_printable_label(lane.id, kMaxLaneIdBytes) ||
+            !is_printable_label(lane.output_group, kMaxOutputGroupBytes) ||
             lane.output_group.size() > kMaxOutputGroupBytes ||
             lane.output_group.find('\0') != std::string::npos ||
             (lane.channel_count != 2 && lane.channel_count != 6 && lane.channel_count != 8) ||
