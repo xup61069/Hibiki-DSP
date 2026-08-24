@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1151,
   "scope_digest": "audio-calibration-schema-strict-end-v1",
-  "source_commit": "61f20de0ab55b896324445f9f71830f83d1061c4",
+  "source_commit": "5b2b3212c7c1d87c6c15a932717c1f812f2ee363",
   "environment_fingerprint": "windows-amd64-pwsh-7.6.4-schema-instance-validation",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1151",
@@ -25,7 +25,7 @@
     "The validator result is from PowerShell 7.6.4; it confirms the repository gate and JsonSchema.Net behavior in this environment, not every third-party JSON Schema implementation.",
     "This slice covers only AudioSessionDescriptor v1 and CalibrationResponse v1. Other repository schemas with printable-string patterns were not audited or changed by Issue #1151.",
     "Runtime code and DSP behavior are unchanged; no live audio, driver loading, WaveRT, HLK, signing, or release acceptance is implied.",
-    "source_commit is the main head at authoring time; under the current provenance convention, a post-squash source_commit repair is still required."
+    "source_commit was updated by Issue #1160 to the #1155 squash merge that introduced this evidence file."
   ],
   "logs": {},
   "tool_versions": {
