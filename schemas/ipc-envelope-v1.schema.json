@@ -8,7 +8,7 @@
   "properties": {
     "schema_version": {"const": 1},
     "type": {"enum": ["hello", "volume-notification", "graph-prepare", "graph-commit", "graph-rollback", "scene-apply", "device-switch", "device-catalog-snapshot", "device-catalog-request", "control-status-snapshot", "control-status-request", "session-catalog-snapshot", "session-catalog-request", "session-volume-command", "session-route-command", "session-route-rule-command", "ir-prepare-command", "scene-catalog-command", "ack", "error"]},
-    "request_id": {"type": "integer", "minimum": 0},
+    "request_id": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
     "payload_bytes": {"type": "integer", "minimum": 0, "maximum": 1048576}
   }
 }

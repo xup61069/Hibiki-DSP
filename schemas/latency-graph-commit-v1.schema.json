@@ -7,8 +7,8 @@
   "required": ["schema_version", "base_graph_revision", "target_graph_revision", "lane_count", "maximum_latency_samples", "lanes"],
   "properties": {
     "schema_version": {"const": 1},
-    "base_graph_revision": {"type": "integer", "minimum": 0},
-    "target_graph_revision": {"type": "integer", "minimum": 1},
+    "base_graph_revision": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+    "target_graph_revision": {"type": "integer", "minimum": 1, "maximum": 18446744073709551615},
     "lane_count": {"type": "integer", "minimum": 0, "maximum": 32},
     "maximum_latency_samples": {"type": "integer", "minimum": 0, "maximum": 16384},
     "lanes": {
