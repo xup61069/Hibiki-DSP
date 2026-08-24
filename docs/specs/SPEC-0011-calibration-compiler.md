@@ -33,8 +33,9 @@ C# control model 以 `CalibrationModel.cs` 提供對應的強型別 `Calibration
 schema 層對 `measured_db` 與 `target_db` 限制為 -144 至 +12 dB，與系統
 volume floor 和 safety ceiling 一致，拒絕不合理量測值進入控制平面。
 `schemas/peq-filter-v1.schema.json` 的原子 JSON 載入／保存及相同演算法的編譯與匯出。
-schema 層的 `device_id` 上限為 260 字元（`maxLength: 260`），與
-`device-switch-request-v1.schema.json` 的 endpoint ID 邊界一致。
+schema 層的 `device_id` 上限為 260 字元（`maxLength: 260`）；C# 控制模型進一步
+以 UTF-8 位元組數實施 260-byte 上限，與 physical device catalog 的 endpoint ID
+邊界一致。多位元組文字即使不超過 260 個字元，也會在進入控制平面或校正檔前被拒絕。
 
 ## 限制與安全
 

@@ -26,6 +26,7 @@ public sealed record CalibrationResponseV1(
     IReadOnlyList<CalibrationPointV1> Points)
 {
     public const int MaxPoints = 512;
+    public const int MaxDeviceIdBytes = 260;
 
     public bool IsValid
     {
@@ -39,7 +40,9 @@ public sealed record CalibrationResponseV1(
                 return false;
             }
 
-            if (DeviceId is not null && (DeviceId.Length < 1 || DeviceId.Any(char.IsControl)))
+            if (DeviceId is not null && (DeviceId.Length < 1 ||
+                Encoding.UTF8.GetByteCount(DeviceId) > MaxDeviceIdBytes ||
+                DeviceId.Any(char.IsControl)))
             {
                 return false;
             }

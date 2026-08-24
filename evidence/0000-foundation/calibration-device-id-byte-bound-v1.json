@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "issue": 1015,
+  "scope_digest": "calibration-device-id-byte-bound-v1",
+  "source_commit": "192fd6035965442ef797bc68fa9d216988ab948d",
+  "environment_fingerprint": "windows-amd64-pwsh-calibration-device-id-byte-bound",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1015",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target DesktopCompat"
+  ],
+  "results": [
+    {"command": "handoff-check", "status": "pass"},
+    {"command": "docs-check", "status": "pass"},
+    {"command": "source-policy", "status": "pass"},
+    {"command": "git diff --check", "status": "pass"},
+    {"command": "control-model-check", "status": "pass"},
+    {"command": "build-preview -Target DesktopCompat", "status": "pass"}
+  ],
+  "limitations": [
+    "CalibrationResponseV1.DeviceId now enforces the documented 260-byte UTF-8 bound at model entry, save and load.",
+    "Control-model and compatibility-preview verification only; no engine, DSP or driver behavior modified."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-24T18:35:00+08:00",
+  "finished_at": "2026-08-24T19:05:00+08:00"
+}
