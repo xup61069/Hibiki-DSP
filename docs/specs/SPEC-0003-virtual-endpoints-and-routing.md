@@ -110,6 +110,13 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   編成 outbound render packet；lane、格式、freshness 或非有限 sample 不符時 fail-closed，不會
   發出 partial packet。這是 user-space outbound encode evidence；真正送進 WaveRT ring 仍需要
   kernel-mode IPC/shared-memory wiring，不能宣稱已完成實體 WaveRT delivery、HLK 或簽章驗收。
+- `sdk/include/hibiki/driver_stream_ring_v1.h` 與 `sdk/src/driver_stream_ring_v1.c` 提供
+  固定 layout 的 SPSC multi-slot shared-memory ring，用來搬運整個 v1 driver stream packet；
+  RT push/pop 路徑不配置、不取得 mutex、不等待，僅以 interlocked sequence 發布與消費。
+  格式不符、非有限 sample、零 sequence/generation 或非零 reserved 欄位一律 fail-closed；
+  ring 滿載時拒絕且不寫入 partial slot，underrun 回報 silence flag 並累計計數。binary layout
+  穩定，可供未來跨 process 或 kernel mapping 重用。這仍是 user-space contract evidence；
+  實體 WaveRT delivery、HLK 與簽章驗收尚未涵蓋。
 - `PersistentLinearResampler` 保存跨 block 的 phase 與 boundary frame，要求 caller 提供
   整個 input block 的 output capacity，並拒絕在不足時部分消耗；它是 clock-drift/SRC 的
   無配置 baseline，尚未宣稱 production-quality polyphase filter。
