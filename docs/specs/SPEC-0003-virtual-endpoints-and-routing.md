@@ -91,6 +91,8 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   且兩者的 correlation `request_id` 同樣必須非零
   （非空 GUID、LPCM 格式、Q16.16 dB、mute、非零 generation、actuator）。schema 的
   `endpoint_guid` 必須至少一個字元，與 GPL engine 拒絕空 endpoint GUID 的行為一致；
+  兩個 GUID 字串欄位都排除 C0/C1 控制字元與 DEL，使 persisted schema 驗證與 bounded
+  NUL-terminated wire/bridge identity 處理維持 fail-closed parity；
   `event_context_guid` 允許空字串，代表「沒有要忽略的 event context」。
 - `sdk/include/hibiki/driver_stream_transport_v1.h` 與 `sdk/src/driver_stream_transport_v1.c`
   定義 driver→engine 的固定 80-byte header＋interleaved Float32 packet；C ABI 提供
