@@ -41,6 +41,7 @@ struct GraphConfigV1 {
 
 constexpr std::size_t kMaxRtLanes = 32;
 constexpr std::size_t kMaxOutputGroupBytes = 64;
+constexpr std::size_t kMaxLaneIdBytes = 64;
 
 struct RtLaneSnapshotV1 {
     std::uint32_t input_channels{2};
