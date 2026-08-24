@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1100,
   "scope_digest": "scene-card-name-printable-v1",
-  "source_commit": "189960204bae8c97f8effd08c0de52beede0871f",
+  "source_commit": "98c85dd16b7f60a5b7291ae05e394dcab6240b2e",
   "environment_fingerprint": "windows-amd64-pwsh-scene-card-name-printable",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1100",
