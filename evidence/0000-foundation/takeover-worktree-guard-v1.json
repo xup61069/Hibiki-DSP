@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 124,
   "scope_digest": "takeover-worktree-guard-v1",
-  "source_commit": "039cb34ff4d37bd24615024dbf5c3ab5ac3dcccc",
+  "source_commit": "a56843de2e4b5b1e0e6e82dc708f81cc77aa582c",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-git-2.x; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/handoff-check.ps1 -Issue 124",

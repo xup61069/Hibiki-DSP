@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 789,
   "scope_digest": "iso226-frequency-validity-v1",
-  "source_commit": "e1f55321723b778c7f0bc9443dc9187530ce21a8",
+  "source_commit": "cc50f34b833ac32e43904ba4767cc8d609b0ea43",
   "environment_fingerprint": "windows-local-pwsh-7.6.4-cmake-4.4.2-msvc-19.51.36256.0-sdk-10.0.28000",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 789",

@@ -5,7 +5,7 @@
   "date": "2026-08-24",
   "issue": 952,
   "pr": null,
-  "source_commit": "43b29d4ef0818dc05b802c7344f5bc5b3ee88853",
+  "source_commit": "28f53599de84986a8d05c135d819198427ff24d0",
   "scope": [
     "docs/specs/SPEC-0002-volume-and-iso.md"
   ],

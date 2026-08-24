@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 30,
   "scope_digest": "doctor-sdk-qfe-detection-v1",
-  "source_commit": "68a156ebf1be34a77b89a154e6f4117ece125d40",
+  "source_commit": "69846bfd706df175261b53bd55069c161ac7ddeb",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.1-universal-sdk-wdk-10.0.28000.2526-cmake-4.3.1-dotnet-8.0.424-pwsh-7.6.5",
   "commands": [
     "pwsh -NoProfile -File tools/doctor.ps1 -SelfTest",

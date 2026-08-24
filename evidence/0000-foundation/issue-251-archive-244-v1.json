@@ -2,9 +2,9 @@
   "schema_version": 1,
   "issue": 251,
   "scope_digest": "issue-251-archive-244-v1",
-  "source_commit": "1fd76a74906d95ae65d5ece08410ab45b70a1b82",
+  "source_commit": "6088edca141401c7da974f7c0c662abab7bbefbc",
   "archive_commit": "f3db88f",
-  "main_sync_commit": "1fd76a74906d95ae65d5ece08410ab45b70a1b82",
+  "main_sync_commit": "6088edca141401c7da974f7c0c662abab7bbefbc",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-winget-msix; vs2026-sdk-wdk-on-disk; target-24h2-machine-missing",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 251",

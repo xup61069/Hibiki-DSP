@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 369,
   "scope_digest": "formal-winui-cmd-entry-v1",
-  "source_commit": "13c4a8a65e48f4308384c3381e80ec99f40c9c57",
+  "source_commit": "a56843de2e4b5b1e0e6e82dc708f81cc77aa582c",
   "change_summary": [
     "Added Start-HibikiPreview-FormalWinUI.cmd next to the existing double-click wrappers: checks for pwsh, then runs tools/run-preview.ps1 -Build -Ui FormalWinUI -SmokeTest with the same Bypass/pause conventions.",
     "Gives Windows users a one-click entry to the formal XAML shell that Issues #191/#348/#358 made buildable and launchable; requires Windows App Runtime 1.7 x64 (run-preview fails closed otherwise)."

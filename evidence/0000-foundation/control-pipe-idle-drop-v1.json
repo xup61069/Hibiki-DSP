@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 343,
   "scope_digest": "control-pipe-idle-drop-v1",
-  "source_commit": "1ff8d1ccfaba6792504e7bc3b6f5f5a0817cfd21",
+  "source_commit": "a56843de2e4b5b1e0e6e82dc708f81cc77aa582c",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-qfe-10.1.28000.2526-pwsh-7.6.5-dotnet-10.0.400",
   "root_cause": {
     "summary": "IpcNamedPipeServerV1::run used the single configured io_timeout_ms (1000 ms in the engine preview) as a hard deadline for every frame read; a connected client that sent nothing for just over one second had its session torn down.",

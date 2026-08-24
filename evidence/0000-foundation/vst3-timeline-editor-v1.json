@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 14,
   "scope_digest": "vst3-timeline-editor-v1",
-  "source_commit": "9f5f02e5d1445ef3e2ebcbfeffbb4b168502abf0",
+  "source_commit": "a56843de2e4b5b1e0e6e82dc708f81cc77aa582c",
   "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-msvc-19.44-dotnet-10.0.301-pwsh-7.6.5; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/verify.ps1",

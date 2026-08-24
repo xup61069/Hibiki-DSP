@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 39,
   "scope_digest": "distribution-profile-gate-v1",
-  "source_commit": "8c464296d9a4a40e55646da9037e41e5caa20415",
+  "source_commit": "894fad63c16c35ca457dfa18078fd31fca1c038c",
   "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-git-2.55.0-pwsh-7.6.5; target-vs2026-sdk-wdk-missing",
   "commands": [
     "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",

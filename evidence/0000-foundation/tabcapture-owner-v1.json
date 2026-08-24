@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 388,
   "scope_digest": "tabcapture-owner-v1",
-  "source_commit": "1520cd2afae608b2ec1a68292256332f568c2ad5",
+  "source_commit": "419ef53a7878fd3e3a32ac8e2b303747af4a7c66",
   "base_commit": "a5e3d54e5217e2cb2fec09485e67792b94a64592",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.12112.369-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526-cmake-4.4.2-pwsh-7.6.4",
   "target": "tools/extension-check.ps1",

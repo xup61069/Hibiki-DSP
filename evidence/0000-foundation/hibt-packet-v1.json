@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 287,
   "scope_digest": "hibt-packet-v1",
-  "source_commit": "c04415de8fb7369c8783d975fc2726e3b91df9a9",
+  "source_commit": "a56843de2e4b5b1e0e6e82dc708f81cc77aa582c",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.5-cmake-4.4.2-vs2026; wdk-missing",
   "commands": [
     "pwsh -File tools/verify.ps1",

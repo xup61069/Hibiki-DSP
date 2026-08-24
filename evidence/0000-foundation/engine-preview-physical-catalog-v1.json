@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "engine-preview-physical-catalog-v1",
-  "source_commit": "8275a8188c10ab2eb5015b4ee23f419b866ca1b9",
+  "source_commit": "a56843de2e4b5b1e0e6e82dc708f81cc77aa582c",
   "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/build-engine-preview.ps1",

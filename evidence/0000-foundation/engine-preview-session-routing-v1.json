@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "engine-preview-session-routing-v1",
-  "source_commit": "d6689827207bb8d2c1a2fa3b37444de0d1f9eae5",
+  "source_commit": "a56843de2e4b5b1e0e6e82dc708f81cc77aa582c",
   "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/build-engine-preview.ps1",

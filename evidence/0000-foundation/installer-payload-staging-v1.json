@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 745,
   "scope_digest": "installer-payload-staging-v1",
-  "source_commit": "a666fede6cdd8d94bd1e883a729850d1ebd34d2b",
+  "source_commit": "eace374211e53e7700567367f109fb80e0b7a35a",
   "environment_fingerprint": "windows-local-pwsh-7.6.4",
   "commands": [
     "pwsh -NoProfile -File tools/installer-check.ps1 -SelfTest",

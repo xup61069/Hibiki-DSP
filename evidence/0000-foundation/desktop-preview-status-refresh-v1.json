@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "desktop-preview-status-refresh-v1",
-  "source_commit": "07aa1fa16d2c338a8f38e20d176a190a78a718d1",
+  "source_commit": "a56843de2e4b5b1e0e6e82dc708f81cc77aa582c",
   "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/build-preview.ps1 -SmokeTest",

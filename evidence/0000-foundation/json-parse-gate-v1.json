@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 923,
   "scope_digest": "json-parse-gate-v1",
-  "source_commit": "9947a7a4316652dfc65ce8823aa8b92ad211b5b3",
+  "source_commit": "2d3a44f1fc54d890eb378db43c463923f386159a",
   "environment_fingerprint": "windows-local-pwsh-docs-check-audit",
   "commands": [
     "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",

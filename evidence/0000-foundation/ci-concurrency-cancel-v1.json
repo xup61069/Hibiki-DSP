@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 427,
   "scope_digest": "ci-concurrency-cancel-v1",
-  "source_commit": "6b59816c38b957f90b0ee1250a40f1cfc44fef7b",
+  "source_commit": "a56843de2e4b5b1e0e6e82dc708f81cc77aa582c",
   "environment_fingerprint": "windows-26200-amd64-dotnet-10.0.301-pwsh-7.6.4; target-24h2-wdk-missing",
   "commands": [
     "pwsh -File tools/source-only-ci-check.ps1",

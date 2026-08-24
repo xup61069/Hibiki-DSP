@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 395,
   "scope_digest": "vst3-timeline-editor-viewmodel-v1",
-  "source_commit": "b2f452391e854ceee4ac1c450f8c392c9bb6beb9",
+  "source_commit": "a7f301ed4334aa51158ff0f8cd5b346ada19470a",
   "environment_fingerprint": "windows-26200-amd64-dotnet-10.0.400-pwsh-7.6.5; target-24h2-wdk-missing",
   "commands": [
     "pwsh -File tools/control-model-check.ps1",

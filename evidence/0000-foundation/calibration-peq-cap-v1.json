@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 286,
   "scope_digest": "calibration-peq-cap-v1",
-  "source_commit": "6a244dca000476b822dd5fafa31db09e60fe1b50",
+  "source_commit": "56acdec6ae172e222c0e243e0102d01a6afd1c7d",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.1-msvc-19.51.36256-cmake-4.4.0-pwsh-7.6.4-sdk-26100; locked-wdk-28000-missing-on-host",
   "commands": [
     "pwsh -NoProfile -File tools/verify.ps1",

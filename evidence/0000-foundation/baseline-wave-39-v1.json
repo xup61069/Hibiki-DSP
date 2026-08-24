@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 964,
   "scope_digest": "baseline-wave-39-v1",
-  "source_commit": "fe1443003ad1775fa9b73a9bca3a35cdd917e51c",
+  "source_commit": "c41265c599efe719ea4fa6de716c45d1e1eb594c",
   "environment_fingerprint": "windows-amd64-pwsh-baseline-wave-39",
   "commands": [
     "pwsh -NoProfile -File tools/docs-check.ps1",
