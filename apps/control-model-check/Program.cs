@@ -1419,6 +1419,33 @@ static bool TryReadSceneCatalogOp(byte[] payload, out string operation, out stri
     return true;
 }
 
+static bool TryReadSceneCatalogIrReference(byte[] payload, out string irReference)
+{
+    irReference = string.Empty;
+    if (!TryReadSceneCatalogOp(payload, out var operation, out _) ||
+        operation != nameof(SessionRouteRuleOperationV1.Upsert) ||
+        payload.Length < 313)
+    {
+        return false;
+    }
+
+    var referenceLength = payload[20];
+    if (referenceLength is > 64 ||
+        (referenceLength > 0 && referenceLength < 8) ||
+        312 + referenceLength > payload.Length)
+    {
+        return false;
+    }
+
+    for (var index = 0; index < referenceLength; index++)
+    {
+        if (payload[312 + index] < 0x20) return false;
+    }
+
+    irReference = Encoding.UTF8.GetString(payload, 312, referenceLength);
+    return true;
+}
+
 static async Task ReadExactBytesAsync(Stream stream, byte[] buffer, CancellationToken token)
 {
     var offset = 0;
@@ -1513,7 +1540,8 @@ static async Task RunSceneCatalogCheckServerAsync(
         Check(syncViewModel.PendingSceneCatalogOpsCount == 0,
             "Offline scene sync queue must start empty.");
         Check(await syncViewModel.AddCustomSceneAsync(new SceneCard(
-                sceneSyncBaseId, "同步檢查", "離線新增後補送", "零額外緩衝", true)) &&
+                sceneSyncBaseId, "同步檢查", "離線新增後補送", "零額外緩衝", true,
+                "sync-calibration-a")) &&
               syncViewModel.StatusText.Contains("離線"),
             "Offline add must be reported as deferred, not synced.");
         Check(syncViewModel.PendingSceneCatalogOpsCount == 1,
@@ -1529,6 +1557,13 @@ static async Task RunSceneCatalogCheckServerAsync(
         Check(syncViewModel.LastCommand?.Type == ControlMessageType.SceneCatalogCommand &&
               syncViewModel.StatusText.Contains("引擎已同步"),
             "Flushed scene sync must be acknowledged and honestly reported.");
+        Check(syncViewModel.LastCommand?.Payload.ToArray() is { } flushedPayload &&
+              TryReadSceneCatalogOp(flushedPayload, out var flushedOperation, out var flushedSceneId) &&
+              flushedOperation == nameof(SessionRouteRuleOperationV1.Upsert) &&
+              flushedSceneId == sceneSyncBaseId &&
+              TryReadSceneCatalogIrReference(flushedPayload, out var flushedIrReference) &&
+              flushedIrReference == "sync-calibration-a",
+            "Flushed Scene catalog upsert must encode the card IR reference at the v1 wire offset.");
         Check(ackingCatalogIds.Contains(sceneSyncBaseId),
             "Engine-side check catalog must contain the flushed custom scene.");
         var flushedQueue = new CustomSceneSyncQueueV1();
