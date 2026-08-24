@@ -271,6 +271,97 @@ function Get-TbdHandoffFields {
   return @($fields)
 }
 
+function Get-HandoffScalar {
+  param(
+    [Parameter(Mandatory)] [string]$Body,
+    [Parameter(Mandatory)] [string]$Key
+  )
+  $match = [regex]::Match($Body, '(?s)<!-- hibiki:handoff-v1\s*(?<body>.*?)\s*-->')
+  if (-not $match.Success) { throw "Missing hibiki:handoff-v1 block while reading '$Key'." }
+  $line = [regex]::Match($match.Groups['body'].Value, "(?im)^\s*$([regex]::Escape($Key))\s*:\s*(?<value>[^\r\n]+)$")
+  if (-not $line.Success) { throw "Handoff block is missing required key '$Key'." }
+  $value = $line.Groups['value'].Value.Trim()
+  if (($value.StartsWith('"') -and $value.EndsWith('"') -and $value.Length -ge 2) -or
+      ($value.StartsWith("'") -and $value.EndsWith("'") -and $value.Length -ge 2)) {
+    $value = $value.Substring(1, $value.Length - 2)
+  }
+  if ([string]::IsNullOrWhiteSpace($value)) { throw "Handoff key '$Key' is empty." }
+  return $value
+}
+
+function Get-AdmissionIssueNumber {
+  param(
+    [Parameter(Mandatory)] [string]$Body,
+    [Parameter(Mandatory)] [string]$Key
+  )
+  return [int]::Parse((Get-HandoffScalar -Body $Body -Key $Key))
+}
+
+function Get-HandoffInlineArray {
+  param(
+    [Parameter(Mandatory)] [string]$Body,
+    [Parameter(Mandatory)] [string]$Key
+  )
+  $scalar = (Get-HandoffScalar -Body $Body -Key $Key).Trim()
+  if ($scalar -eq '[]') { return @() }
+  try { $parsed = $scalar | ConvertFrom-Json } catch { throw "Handoff key '$Key' must be a JSON array." }
+  if ($parsed -is [System.Array]) { return @($parsed | ForEach-Object { [string]$_ }) }
+  return @([string]$parsed)
+}
+
+function Get-AdmissionIssues {
+  param(
+    [Parameter(Mandatory)] [AllowEmptyCollection()] [object[]]$OpenIssues,
+    [Parameter(Mandatory)] [int]$SelectedIssueNumber
+  )
+  $issues = [System.Collections.Generic.List[object]]::new()
+  foreach ($candidate in $OpenIssues) {
+    if (-not ([string]$candidate.body).Contains('hibiki:handoff-v1')) { continue }
+    if (@(Get-TbdHandoffFields -Body ([string]$candidate.body)).Count -ne 0) { continue }
+    [void]$issues.Add($candidate)
+  }
+  if ($issues.Count -ge 500) { throw 'Open handoff Issue count reached admission cap 500; fail closed.' }
+  $selected = [System.Collections.Generic.List[object]]::new()
+  foreach ($item in $issues) {
+    if ([int]$item.number -eq [int]$SelectedIssueNumber) { [void]$selected.Add($item) }
+  }
+  if ($selected.Count -ne 1) { throw "Selected Issue #$SelectedIssueNumber does not have a complete handoff block." }
+  return @($selected[0])
+}
+
+function Assert-AdmissionOverlap {
+  param(
+    [Parameter(Mandatory)] [AllowEmptyCollection()] [object[]]$OpenIssues,
+    [Parameter(Mandatory)] [int]$SelectedIssueNumber
+  )
+  function New-ScopeRecord {
+    param([int]$IssueNumber, [string]$Scope)
+    [pscustomobject]@{ Issue = $IssueNumber; Scope = $Scope }
+  }
+  $seenScopes = [System.Collections.Generic.List[object]]::new()
+  $seenBranches = @{}
+  foreach ($issue in $OpenIssues) {
+    $path = "issue/$($issue.number)"
+    $branch = Get-HandoffScalar -Body $issue.body -Key 'branch'
+    Assert-SafeBranch -Value $branch -Key 'branch' -Path $path
+    Register-IssueBranch -SeenBranches $seenBranches -Branch $branch -IssueNumber $issue.number -Path $path
+    $scopeGlobs = @(Get-HandoffInlineArray -Body $issue.body -Key 'scope_globs')
+    if ($scopeGlobs.Count -lt 1 -or $scopeGlobs.Count -gt 32) {
+      throw "Issue handoff scope_globs must contain 1..32 items: $path"
+    }
+    Assert-UniqueItems -Values ([string[]]$scopeGlobs) -Key 'scope_globs' -Path $path
+    foreach ($scope in $scopeGlobs) {
+      Assert-SafeScopePath -Value $scope -Key 'scope_globs' -Path $path
+      foreach ($previous in $seenScopes) {
+        if ($previous.Issue -ne $issue.number -and (Test-GlobIntersection -Left $previous.Scope -Right $scope)) {
+          throw "Scope overlap: Issue #$($previous.Issue) '$($previous.Scope)' and Issue #$($issue.number) '$scope'"
+        }
+      }
+      [void]$seenScopes.Add((New-ScopeRecord -IssueNumber $issue.number -Scope $scope))
+    }
+  }
+}
+
 function Test-IssueState {
   param(
     [Parameter(Mandatory)] $IssueData,
@@ -438,7 +529,7 @@ if ($SelfTest) {
   } 'missing assignee'
   $caseCount++
 
-  $unclaimedDraft = New-MockIssue -Labels @() -Assignees @()
+  $unclaimedDraft = New-MockIssue -Number 100 -Branch 'codex/100-unclaimed-draft' -Labels @() -Assignees @()
   if (Test-IssueRequiresHandoff $unclaimedDraft) {
     throw 'handoff-check self-test failed: unassigned unlabeled draft requires a handoff.'
   }
@@ -470,6 +561,50 @@ if ($SelfTest) {
     throw "handoff-check self-test failed: filled handoff was treated as TBD draft."
   }
   $caseCount++
+
+  # Admission helper coverage: exact handoff parsing, selected-issue lookup,
+  # branch uniqueness, and scope overlap use the same fail-closed semantics.
+  if ((Get-HandoffScalar -Body $mock.body -Key 'branch') -ne 'codex/99-selftest') {
+    throw 'handoff-check self-test failed: admission scalar parser.'
+  }
+  $caseCount++
+  if ((Get-AdmissionIssueNumber -Body $mock.body -Key 'issue') -ne 99) {
+    throw 'handoff-check self-test failed: admission issue parser.'
+  }
+  Assert-Throws { Get-HandoffScalar -Body $mock.body -Key 'missing' } 'admission missing key'
+  $scopes = @(Get-HandoffInlineArray -Body $mock.body -Key 'scope_globs')
+  if ($scopes.Count -ne 1 -or $scopes[0] -ne 'src/selftest/**') {
+    throw 'handoff-check self-test failed: admission array parser.'
+  }
+  $caseCount++
+
+  $selected = @(Get-AdmissionIssues -OpenIssues @($mock, $unclaimedDraft) -SelectedIssueNumber 99)
+  $selectedArray = @($selected)
+  $selectedIssue = $null
+  foreach ($candidate in $selectedArray) {
+    if ([int]$candidate.number -eq 99) { $selectedIssue = $candidate; break }
+  }
+  if ($null -eq $selectedIssue -or [int]$selectedIssue.number -ne 99) {
+    throw 'handoff-check self-test failed: selected admission issue.'
+  }
+  $caseCount++
+  Assert-Throws {
+    Get-AdmissionIssues -OpenIssues @($mock) -SelectedIssueNumber 100
+  } 'admission selected issue missing'
+  Assert-Throws { Assert-SafeBranch '../escape' 'branch' 'selftest/admission' } 'admission unsafe branch'
+
+  $leftIssue = New-MockIssue -Number 101 -Branch 'codex/101-left' -ScopeGlobs '["src/shared/**"]'
+  $rightIssue = New-MockIssue -Number 102 -Branch 'codex/102-right' -ScopeGlobs '["src/other/**"]'
+  Assert-AdmissionOverlap -OpenIssues @($leftIssue, $rightIssue) -SelectedIssueNumber 102 | Out-Null
+  $caseCount++
+  $overlapIssue = New-MockIssue -Number 103 -Branch 'codex/103-overlap' -ScopeGlobs '["src/shared/audio/**"]'
+  Assert-Throws {
+    Assert-AdmissionOverlap -OpenIssues @($leftIssue, $overlapIssue) -SelectedIssueNumber 103
+  } 'admission scope overlap'
+  $sameBranch = New-MockIssue -Number 104 -Branch 'codex/101-left' -ScopeGlobs '["src/independent/**"]'
+  Assert-Throws {
+    Assert-AdmissionOverlap -OpenIssues @($leftIssue, $sameBranch) -SelectedIssueNumber 104
+  } 'admission duplicate branch'
 
   # claim-pending with claimed must fail closed (two lifecycle labels)
   Assert-Throws {

@@ -17,7 +17,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
   issues: write
   pull-requests: read
 
@@ -28,23 +28,110 @@ concurrency:
 jobs:
   admit:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Validate inputs and admit claim
+      - name: Checkout source for handoff-check
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - name: Validate, overlap-check, reserve branch, and admit claim
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SESSION_ID: ${{ inputs.session_id }}
           ISSUE_NUMBER: ${{ inputs.issue_number }}
           BRANCH: ${{ inputs.branch }}
-        run: |
+          REPO: ${{ github.repository }}
           $ErrorActionPreference = 'Stop'
+          Set-StrictMode -Version Latest
+
+          # --- Phase 1: Validate dispatch inputs ---
           if ($env:SESSION_ID -notmatch '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$') { throw 'session_id must be a valid UUID.' }
           $issueNum = [int]::Parse($env:ISSUE_NUMBER)
-          $issue = gh issue view $issueNum --json number,state,title,body,labels,assignees | ConvertFrom-Json
-          if (-not $issue) { throw 'Issue not found.' }
-          if ($issue.state -ne 'OPEN') { throw 'Issue is not open.' }
+          $branchName = $env:BRANCH.Trim()
+          if ($branchName -eq 'main') { throw 'Cannot use main as working branch.' }
+
+          # --- Phase 2: Read and validate target Issue ---
+          $issueJson = gh issue view $issueNum --json number,state,title,body,labels,assignees 2>&1
+          if ($LASTEXITCODE -ne 0) { throw "Could not read Issue #$issueNum : $issueJson" }
+          $issue = $issueJson | ConvertFrom-Json
+          if ($issue.state -ne 'OPEN') { throw "Issue #$issueNum is not open." }
           $labelNames = @($issue.labels | ForEach-Object { $_.name })
-          if ($labelNames -contains 'claimed' -or $labelNames -contains 'in-review') { throw 'already claimed/in-review; cannot admit.' }
-          if (@($issue.assignees).Count -gt 0) { throw 'already has an assignee; cannot admit.' }
-          if ($issue.body -notmatch 'hibiki:handoff-v1') { throw 'missing handoff block.' }
-          Write-Output ('Issue admitted: #' + $issueNum + ' session=' + $env:SESSION_ID)
+          foreach ($lifecycle in @('claimed', 'in-review', 'done', 'claim-pending')) {
+            if ($labelNames -contains $lifecycle) { throw "Issue #$issueNum already has lifecycle label $lifecycle; cannot admit." }
+          }
+          if (@($issue.assignees).Count -gt 0) { throw "Issue #$issueNum already has assignee(s); cannot admit." }
+          if ($issue.body -notmatch 'hibiki:handoff-v1') { throw "Issue #$issueNum missing handoff block." }
+
+          # --- Phase 3: Parse handoff block fields ---
+          $blockMatch = [regex]::Match($issue.body, '(?s)<!-- hibiki:handoff-v1\s*(?<body>.*?)\s*-->')
+          if (-not $blockMatch.Success) { throw "Cannot parse handoff block from Issue #$issueNum." }
+          $blockBody = $blockMatch.Groups['body'].Value
+
+          function Get-BlockScalar([string]$Key) {
+            $line = [regex]::Match($blockBody, "(?im)^\s*$Key\s*:\s*(?<value>[^\r\n]+)$")
+            if (-not $line.Success) { throw "Handoff block missing required key: $Key" }
+            return $line.Groups['value'].Value.Trim()
+          }
+
+          $declaredBranch = (Get-BlockScalar 'branch').Trim([char]34).Trim([char]39)
+          $ownerField = (Get-BlockScalar 'owner').Trim()
+          $baseCommit = (Get-BlockScalar 'base_commit').Trim()
+          if ($declaredBranch -ne $branchName) { throw "Handoff branch '$declaredBranch' does not match requested '$branchName'." }
+          if ([string]::IsNullOrWhiteSpace($ownerField) -or $ownerField -eq 'unassigned') { throw 'Handoff owner is not assigned.' }
+          if ([string]::IsNullOrWhiteSpace($baseCommit) -or $baseCommit -eq 'TBD') { throw 'Handoff base_commit is not set.' }
+
+          # --- Phase 4: Fresh-read all open Issues; check overlap via global handoff-check ---
+          Write-Output "Running global handoff-check.ps1..."
+          & ./tools/handoff-check.ps1 2>&1
+          if ($LASTEXITCODE -ne 0) { throw 'Global handoff-check failed; cannot admit claim.' }
+
+          # --- Phase 5: Atomically reserve the working branch via Git refs API ---
+          $refUrl = "repos/$env:REPO/git/refs/heads/$branchName"
+          $existingRef = gh api $refUrl 2>&1
+          if ($LASTEXITCODE -eq 0) { throw "Remote branch '$branchName' already exists." }
+          $baseSha = gh api "repos/$env:REPO/commits/$baseCommit" --jq .sha 2>&1
+          if ($LASTEXITCODE -ne 0) { throw "Could not resolve base commit $baseCommit." }
+          $refResult = gh api "repos/$env:REPO/git/refs" -f ref="refs/heads/$branchName" -f sha=$baseSha 2>&1
+          if ($LASTEXITCODE -ne 0) { throw "Failed to atomically create branch ref: $refResult" }
+          Write-Output "Branch reserved: refs/heads/$branchName @ $baseSha"
+
+          # --- Phase 6: Add claim-pending label ---
+          try {
+            gh issue edit $issueNum --add-label claim-pending 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to add claim-pending label.' }
+          } catch {
+            gh api -X DELETE $refUrl 2>&1 | Out-Null
+            throw "Rollback: failed to add claim-pending. Branch ref removed."
+          }
+
+          # --- Phase 7: Assign owner ---
+          try {
+            gh issue edit $issueNum --add-assignee $ownerField 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "Failed to assign $ownerField." }
+          } catch {
+            gh issue edit $issueNum --remove-label claim-pending 2>&1 | Out-Null
+            gh api -X DELETE $refUrl 2>&1 | Out-Null
+            throw "Rollback: failed to assign owner. Label and ref removed."
+          }
+
+          # --- Phase 8: Run post-admission global audit/readback ---
+          Write-Output "Running post-admission global audit..."
+          & ./tools/handoff-check.ps1 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            gh issue edit $issueNum --remove-label claim-pending 2>&1 | Out-Null
+            gh issue edit $issueNum --remove-assignee $ownerField 2>&1 | Out-Null
+            gh api -X DELETE $refUrl 2>&1 | Out-Null
+            throw "Post-admission audit failed; all changes rolled back."
+          }
+
+          # --- Phase 9: Transition to claimed and verify readback ---
+          gh issue edit $issueNum --remove-label claim-pending 2>&1 | Out-Null
+          gh issue edit $issueNum --add-label claimed 2>&1 | Out-Null
+          $finalCheck = gh issue view $issueNum --json labels,assignees 2>&1 | ConvertFrom-Json
+          $finalLabels = @($finalCheck.labels | ForEach-Object { $_.name })
+          $finalAssignees = @($finalCheck.assignees | ForEach-Object { $_.login })
+          if (-not ($finalLabels -contains 'claimed')) { throw 'Readback mismatch: expected claimed label.' }
+          if ($finalAssignees.Count -ne 1 -or $finalAssignees[0] -ne $ownerField) { throw "Readback mismatch: expected exactly one assignee $ownerField." }
+          Write-Output ("Claim admitted: #" + $issueNum + " session=" + $env:SESSION_ID + " branch=" + $branchName + " base=" + $baseSha)
