@@ -380,6 +380,14 @@ if ($SelfTest) {
     throw 'context-pack self-test expected mixed-language token pressure to fail closed.'
   }
   Write-Output 'Context-pack output budget self-test passed (section, final serialized, and estimated-token limits).'
+  $foundationOutput = & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'context-pack.ps1') -Issue 0 -NoSource 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    throw 'context-pack self-test expected -Issue 0 foundation bootstrap to exit successfully.'
+  }
+  if ((($foundationOutput | Out-String)) -notmatch 'Hibiki task context: Issue #0') {
+    throw 'context-pack self-test expected the foundation bootstrap pack header.'
+  }
+  Write-Output 'Context-pack foundation bootstrap self-test passed (-Issue 0 builds without a GitHub issue).'
   exit 0
 }
 
@@ -392,11 +400,17 @@ if ($IncludeRepositoryState -and
   throw 'IncludeRepositoryState requires explicit -MaxCharacters and -MaxEstimatedTokens values.'
 }
 
-$ghOutput = & gh issue view $Issue --json body --jq '.body' 2>$null
-if ($LASTEXITCODE -ne 0 -or -not $ghOutput) {
-  throw "Cannot read Issue $Issue via gh. Run 'gh issue view $Issue' manually and confirm the handoff block."
+if ($Issue -eq 0) {
+  # Foundation bootstrap pack (Issue 0) has no GitHub backing; it intentionally
+  # aggregates repository entry rules and tests/* bootstrap source files.
+  $handoffText = ''
+} else {
+  $ghOutput = & gh issue view $Issue --json body --jq '.body' 2>$null
+  if ($LASTEXITCODE -ne 0 -or -not $ghOutput) {
+    throw "Cannot read Issue $Issue via gh. Run 'gh issue view $Issue' manually and confirm the handoff block."
+  }
+  $handoffText = $ghOutput | Out-String
 }
-$handoffText = $ghOutput | Out-String
 $specIds = @([regex]::Matches($handoffText, 'SPEC-[0-9]{4}') | ForEach-Object Value | Sort-Object -Unique)
 $adrIds = @([regex]::Matches($handoffText, 'ADR-[0-9]{4}') | ForEach-Object Value | Sort-Object -Unique)
 $seenFiles = [System.Collections.Generic.HashSet[string]]::new(
@@ -426,7 +440,9 @@ if ($IncludeRepositoryState) {
   Write-ContextFile 'BASELINE' (Join-Path $repo 'docs/state/BASELINE.md')
 }
 
-Add-ContextSection -Label 'ISSUE BODY (handoff source)' -Content $handoffText
+if ($Issue -ne 0) {
+  Add-ContextSection -Label 'ISSUE BODY (handoff source)' -Content $handoffText
+}
 
 foreach ($id in $specIds) {
   $file = Get-ChildItem -LiteralPath (Join-Path $repo 'docs/specs') -Filter "$id-*.md" -File | Select-Object -First 1
