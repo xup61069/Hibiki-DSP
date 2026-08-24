@@ -18,7 +18,7 @@
     "safety_ceiling_db_q16_16": {"type": "integer", "minimum": -2147483648, "maximum": 2147483647},
     "effective_db_q16_16": {"type": "integer", "minimum": -2147483648, "maximum": 2147483647},
     "mute": {"type": "boolean"},
-    "generation": {"type": "integer", "minimum": 1},
+    "generation": {"type": "integer", "minimum": 1, "maximum": 18446744073709551615},
     "actuator": {"enum": ["internal-dsp", "device-hardware", "strict-direct"]}
   },
   "if": {

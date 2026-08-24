@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "issue": 1020,
+  "scope_digest": "driver-generation-maximum-v1",
+  "source_commit": null,
+  "environment_fingerprint": "windows-amd64-pwsh-driver-generation-maximum",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1020",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Schema-only change; no runtime behavior change.",
+    "Maximum matches uint64_t generation field in sdk/include/hibiki/driver_control_v1.h:43."
+  ],
+  "artifacts": [
+    "schemas/driver-control-v1.schema.json"
+  ]
+}
