@@ -154,6 +154,7 @@ $null = "sbom_digest"
       driver_package = @{ sha256 = ('e' * 64); catalog_sha256 = ('f' * 64); microsoft_signature_thumbprint = ('1' * 40) }
       installer = @{ sha256 = ('2' * 64); signer_thumbprint = ('3' * 40); rfc3161_timestamp = '2026-08-24T00:00:00Z' }
       unsigned_files = @()
+      tests = @('unit-test-1', 'integration-test-2')
     }
     $manifestPath = Join-Path $tempRoot 'missing-version-manifest.json'
     $missingVersionManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
@@ -169,6 +170,66 @@ $null = "sbom_digest"
     $validFullManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $validManifestPath -Encoding UTF8
     $parsed = Read-ReleaseManifest $validManifestPath
     if ($parsed.product_version -ne '1.0.0') { throw 'SelfTest expected valid manifest to parse.' }
+    $caseCount++
+
+    # Case 1d: Read-ReleaseManifest rejects unknown root fields.
+    $unknownFieldManifest = $validFullManifest.Clone()
+    $unknownFieldManifest['evil_extra'] = 'malicious'
+    $unknownFieldPath = Join-Path $tempRoot 'unknown-field-manifest.json'
+    $unknownFieldManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $unknownFieldPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $unknownFieldPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected unknown field rejection.' }
+    $caseCount++
+
+    # Case 1e: Read-ReleaseManifest rejects missing tests field.
+    $noTestsManifest = $validFullManifest.Clone()
+    $noTestsManifest.Remove('tests')
+    $noTestsPath = Join-Path $tempRoot 'no-tests-manifest.json'
+    $noTestsManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $noTestsPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $noTestsPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected missing tests rejection.' }
+    $caseCount++
+
+    # Case 1f: Read-ReleaseManifest rejects oversized product_version.
+    $oversizeVersionManifest = $validFullManifest.Clone()
+    $oversizeVersionManifest['product_version'] = 'a' * 65
+    $oversizeVersionPath = Join-Path $tempRoot 'oversize-version-manifest.json'
+    $oversizeVersionManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $oversizeVersionPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $oversizeVersionPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected oversize product_version rejection.' }
+    $caseCount++
+
+    # Case 1g: Read-ReleaseManifest rejects oversized rfc3161_timestamp.
+    $oversizeTsManifest = $validFullManifest.Clone()
+    $oversizeTsManifest['installer']['rfc3161_timestamp'] = 'x' * 129
+    $oversizeTsPath = Join-Path $tempRoot 'oversize-ts-manifest.json'
+    $oversizeTsManifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $oversizeTsPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $oversizeTsPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected oversize rfc3161_timestamp rejection.' }
+    $caseCount++
+
+    # Case 1h: Read-ReleaseManifest rejects unsigned_files exceeding 1024.
+    $manyFilesManifest = $validFullManifest.Clone()
+    $manyFilesManifest['unsigned_files'] = @(1..1025 | ForEach-Object { @{ path = ('f' + $_); sha256 = ('0' * 64) } })
+    $manyFilesPath = Join-Path $tempRoot 'many-files-manifest.json'
+    $manyFilesManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manyFilesPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $manyFilesPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected unsigned_files overflow rejection.' }
+    $caseCount++
+
+    # Case 1i: Read-ReleaseManifest rejects tests exceeding 256.
+    $manyTestsManifest = $validFullManifest.Clone()
+    $manyTestsManifest['tests'] = @(1..257 | ForEach-Object { 'test-' + $_ })
+    $manyTestsPath = Join-Path $tempRoot 'many-tests-manifest.json'
+    $manyTestsManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manyTestsPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $manyTestsPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected tests overflow rejection.' }
     $caseCount++
     # Case 2: destination rejects blank path.
     $caught = $false
