@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1071,
   "scope_digest": "route-rule-priority-schema-bounds-v1",
-  "source_commit": "3f6cb4fdd69347acc5ecede4c4b0685b45df6633",
+  "source_commit": "66c99725bfaa120f5af162660949a5bd484cd032",
   "environment_fingerprint": "windows-amd64-pwsh-route-rule-priority-schema-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1071",
