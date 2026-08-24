@@ -193,9 +193,9 @@ public sealed class CustomSceneSyncQueueV1
         if (operation.IsUpsert)
         {
             return !string.IsNullOrWhiteSpace(operation.Name) &&
-                   operation.Name.Length <= 120 &&
+                   Encoding.UTF8.GetByteCount(operation.Name) <= 120 &&
                    !string.IsNullOrWhiteSpace(operation.OutputGroup) &&
-                   operation.OutputGroup.Length <= 64;
+                   Encoding.UTF8.GetByteCount(operation.OutputGroup) <= 64;
         }
 
         return string.IsNullOrEmpty(operation.Name) &&
