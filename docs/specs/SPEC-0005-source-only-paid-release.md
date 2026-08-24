@@ -35,7 +35,9 @@ gates；任何 gate 失敗都不得視為可交付 source tag。
    為 1–64 字元的非空字串、`toolchain_digest` 必須符合 SHA-256 hex 格式（64 字元
    [0-9a-fA-F]）、`distribution_id` 不得為空字串；`installer.rfc3161_timestamp`
    最長 128 字元、`unsigned_files[]` 最多 1024 筆且每個路徑為 1–260 字元、每筆項目僅允許 path 與 sha256 兩個宣告欄位（additionalProperties false）、
-   `tests[]` 最多 256 項且每項為 1–120 字元的非空標籤，與安裝程式的嚴格模式一致。
+   `tests[]` 最多 256 項且每項為 1–120 字元的非空標籤；所有 SHA-256 digest 與簽章
+   thumbprint 欄位均帶明確 `maxLength`（64／40 字元），`source_tag` 必須完全符合
+   `v<major>.<minor>.<patch>` 加上至多 32 個 `[A-Za-z0-9._:+-]` 後綴，與安裝程式的嚴格模式一致。
 6. 由人類手動把同一份 canonical installer 上傳 Gumroad；AI 不接觸憑證、Partner Center
    或 Gumroad 帳密。
 

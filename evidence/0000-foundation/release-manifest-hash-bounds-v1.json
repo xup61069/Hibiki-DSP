@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "issue": 1065,
+  "scope_digest": "release-manifest-hash-bounds-v1",
+  "source_commit": "697f02b0d0ecfae0e91a6298efa0f048db2d3b54",
+  "environment_fingerprint": "windows-amd64-pwsh-release-manifest-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1065",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [],
+  "limitations": [
+    "Schema-only: all SHA-256 digest fields now carry explicit minLength/maxLength=64; thumbprint fields carry 40; source_tag is fully anchored with a bounded suffix charset.",
+    "Existing valid manifests remain valid."
+  ],
+  "logs": {},
+  "tool_versions": {"powershell": "pwsh local"}
+}
