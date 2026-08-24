@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1116,
   "scope_digest": "equal-loudness-anchor-id-printable-v1",
-  "source_commit": "98c85dd16b7f60a5b7291ae05e394dcab6240b2e",
+  "source_commit": "171053fdea34c183c5a333c680c992e69bd5195d",
   "environment_fingerprint": "windows-amd64-pwsh-equal-loudness-anchor-printable",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1116",
