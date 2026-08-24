@@ -651,7 +651,8 @@ if ($SelfTest) {
     throw 'handoff-check self-test failed: admission scalar parser.'
   }
   $caseCount++
-  $crlfMockBody = ($mock.body -replace '`n', '`r`n')
+  # Convert the LF-only mock body to CRLF without relying on escape parsing.
+  $crlfMockBody = $mock.body.Replace([string][char]10, [string][char]13 + [string][char]10)
   if ((Get-HandoffScalar -Body $crlfMockBody -Key 'branch') -ne 'codex/99-selftest') {
     throw 'handoff-check self-test failed: CRLF admission scalar parser.'
   }
