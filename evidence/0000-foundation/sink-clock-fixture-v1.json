@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "issue": 1118,
+  "scope_digest": "sink-clock-fixture-v1",
+  "source_commit": "0d38db358d74cf300880b1965c4362d162586a3e",
+  "environment_fingerprint": "windows-amd64-pwsh-sink-clock-fixture",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1118",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "name": "verify_and_contract_tests",
+      "outcome": "pass",
+      "details": "3/3 CTest suites passed; contract fixture covered invalid no-op observations, slow-clock adaptation, bounded drift, corrected source step and process boundary, reset recovery, and fan-out isolation for an addressed enabled sink."
+    }
+  ],
+  "limitations": [
+    "Deterministic synthetic user-space evidence only; no COM/audio/device/thread waits were introduced.",
+    "This is not real USB/HDMI/Bluetooth clock evidence, WaveRT evidence, HLK evidence, Microsoft signing evidence, or physical-audio delivery evidence."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
