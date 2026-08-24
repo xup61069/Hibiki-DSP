@@ -22,8 +22,8 @@ source_globs: ["apps/control-model/**", "apps/winui-shell/**", "evidence/0000-fo
 In：WinUI 3 視窗、Easy/Expert 顯示、固定輸出群組卡片、場景卡片、實體裝置目錄鏡像與
 DeviceSwitch request、Windows 音量與 IR 相位滑桿、有效音量／安全上限／來源／致動器的
 可讀摘要、Expert 的 Matrix／DSP Graph／VST3 隔離／校正唯讀摘要，以及 Windows session、
-process loopback、瀏覽器單分頁與 direct bypass 的路由健康卡片、版本化 named-pipe Hello／SceneApply／VolumeNotification／DeviceSwitch／IrPrepareCommand
-／DeviceCatalogRequest／DeviceCatalogSnapshot／ControlStatusRequest／ControlStatusSnapshot 命令、連線失敗回復；音量拖曳使用 40 ms bounded debounce 與 command serialization，
+process loopback、瀏覽器單分頁與 direct bypass 的路由健康卡片、App 工作階段清單與「刷新 App 工作階段清單」動作（附帶實體 per-App 擷取／重新送出未驗證的清楚邊界說明）、版本化 named-pipe Hello／SceneApply／VolumeNotification／DeviceSwitch／IrPrepareCommand
+／DeviceCatalogRequest／DeviceCatalogSnapshot／ControlStatusRequest／ControlStatusSnapshot／SessionCatalogRequest／SessionCatalogSnapshot 命令、連線失敗回復；音量拖曳使用 40 ms bounded debounce 與 command serialization，
 只送出最新的控制值。
 Expert 另提供 Vst3TimelineEditorViewModelV1 的本機時間軸編輯面：註冊／選取、草稿
 新增／修改／刪除列、commit／discard、undo／redo、保存基準與繁中狀態回饋。正式 shell 的清除歷史與保存基準動作只呼叫既有 surface-level

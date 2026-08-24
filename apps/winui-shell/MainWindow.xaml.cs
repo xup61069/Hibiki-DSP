@@ -100,6 +100,11 @@ public sealed partial class MainWindow : Window
             ViewModel.SelectSession(handle);
     }
 
+    private async void OnRefreshSessionCatalogClick(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.RefreshSessionCatalogAsync();
+    }
+
     private async void OnApplySessionRouteClick(object sender, RoutedEventArgs e)
     {
         await ViewModel.ApplySelectedSessionRouteAsync();
