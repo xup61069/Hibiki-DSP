@@ -946,6 +946,62 @@ int main() {
     CHECK(fast_sink.prepare(1U, 4.0));
     CHECK(fast_sink.process(first_block, 4U, resampled, 8U, output_frames));
     CHECK(fast_sink.process(first_block, 4U, resampled, 8U, output_frames));
+    const std::array<OutputFanoutSinkConfigV1, 3> clock_fanout_configs{{
+        {"clock-main", 2U, true}, {"clock-movie", 2U, true}, {"clock-off", 2U, false}}};
+    OutputFanoutPlanV1 clock_fanout_plan{};
+    CHECK(prepare_output_fanout_plan_v1(clock_fanout_configs, 2U, 12U, clock_fanout_plan));
+
+    {
+        OutputSinkModel clock_sink;
+        CHECK(clock_sink.prepare(1U, 1.0));
+        CHECK(clock_sink.snapshot().prepared && clock_sink.snapshot().ratio == 1.0 &&
+              clock_sink.snapshot().drift_ppm == 0.0 && clock_sink.snapshot().source_step == 1.0);
+
+        // Invalid observations must remain complete no-ops. OutputSinkModel
+        // intentionally returns void; the following snapshot equality is the
+        // deterministic assertion.
+        for (const auto invalid : {std::numeric_limits<double>::quiet_NaN(),
+                                   std::numeric_limits<double>::infinity(), 0.0, -1.0}) {
+            clock_sink.observe_clock(invalid, 48000.0, 1.0);
+            clock_sink.observe_clock(48000.0, invalid, 1.0);
+            clock_sink.observe_clock(48000.0, 48000.0, invalid);
+        }
+        CHECK(clock_sink.snapshot().ratio == 1.0 && clock_sink.snapshot().drift_ppm == 0.0 &&
+              clock_sink.snapshot().source_step == 1.0);
+
+        // A slow sink raises the effective source step; a fast sink lowers it.
+        // Both remain inside the bounded +/-500 ppm contract.
+        clock_sink.observe_clock(48000.0, 47952.0, 1.0);
+        const auto slow_after_one = clock_sink.snapshot();
+        CHECK(slow_after_one.drift_ppm < 0.0 && slow_after_one.ratio >= 1.0 - 500.0e-6 &&
+              slow_after_one.source_step > 1.0);
+        CHECK(clock_sink.process(first_block, 4U, resampled, 8U, output_frames));
+        CHECK(output_frames > 0U && std::isfinite(clock_sink.snapshot().source_step));
+
+        clock_sink.observe_clock(96000.0, 95904.0, 1.0);
+        const auto slow_after_two = clock_sink.snapshot();
+        CHECK(slow_after_two.drift_ppm < slow_after_one.drift_ppm &&
+              slow_after_two.source_step > slow_after_one.source_step &&
+              slow_after_two.ratio >= 1.0 - 500.0e-6);
+
+        clock_sink.reset();
+        CHECK(clock_sink.snapshot().ratio == 1.0 && clock_sink.snapshot().drift_ppm == 0.0 &&
+              clock_sink.snapshot().source_step == 1.0);
+        CHECK(clock_sink.process(first_block, 4U, resampled, 8U, output_frames));
+        CHECK(clock_sink.snapshot().source_step == 1.0);
+
+        OutputFanoutRuntimeV1 isolated_fanout;
+        CHECK(isolated_fanout.prepare(clock_fanout_plan, 1.0));
+        CHECK(isolated_fanout.observe_clock(1U, 48000.0, 47952.0, 1.0));
+        CHECK(!isolated_fanout.observe_clock(2U, 48000.0, 47952.0, 1.0));
+        CHECK(isolated_fanout.snapshot().sinks[0].ratio == 1.0 &&
+              isolated_fanout.snapshot().sinks[0].drift_ppm == 0.0);
+        CHECK(isolated_fanout.snapshot().sinks[1].ratio < 1.0 &&
+              isolated_fanout.snapshot().sinks[1].source_step > 1.0 &&
+              isolated_fanout.snapshot().sinks[1].drift_ppm >= -500.0);
+        CHECK(isolated_fanout.snapshot().sinks[2].ratio == 1.0 &&
+              isolated_fanout.snapshot().sinks[2].drift_ppm == 0.0);
+    }
 
     VirtualMicRouteModel virtual_mic;
     CHECK(virtual_mic.prepare(VirtualMicConfigV1{1U, 48000U, true}));
