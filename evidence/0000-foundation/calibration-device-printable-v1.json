@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "issue": 1074,
+  "scope_digest": "calibration-device-printable-v1",
+  "source_commit": "3f6cb4fd",
+  "environment_fingerprint": "windows-amd64-pwsh-calibration-device-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1074",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {"command": "handoff-check", "status": "pass"},
+    {"command": "docs-check", "status": "pass"},
+    {"command": "source-policy", "status": "pass"},
+    {"command": "verify", "status": "pass"},
+    {"command": "git diff --check", "status": "pass"}
+  ],
+  "limitations": [
+    "Calibration-response device_id schema now rejects C0/C1 control characters, matching the C# runtime IsControl check.",
+    "No runtime behavior change; no live audio, driver, HLK or signing evidence is implied."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
