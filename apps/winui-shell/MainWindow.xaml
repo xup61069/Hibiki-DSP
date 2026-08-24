@@ -67,20 +67,12 @@
         <KeyboardAccelerator Modifiers="Control" Key="Number4" />
       </controls:NavigationViewItem.KeyboardAccelerators>
     </controls:NavigationViewItem>
-    <controls:NavigationViewItem Content="VST3 時間軸" Tag="vst3" AutomationProperties.Name="VST3 時間軸頁面">
-      <controls:NavigationViewItem.Icon>
-        <FontIcon Glyph="" />
-      </controls:NavigationViewItem.Icon>
-      <controls:NavigationViewItem.KeyboardAccelerators>
-        <KeyboardAccelerator Modifiers="Control" Key="Number5" />
-      </controls:NavigationViewItem.KeyboardAccelerators>
-    </controls:NavigationViewItem>
     <controls:NavigationViewItem Content="路由健康" Tag="route" AutomationProperties.Name="路由健康頁面">
       <controls:NavigationViewItem.Icon>
         <FontIcon Glyph="" />
       </controls:NavigationViewItem.Icon>
       <controls:NavigationViewItem.KeyboardAccelerators>
-        <KeyboardAccelerator Modifiers="Control" Key="Number6" />
+        <KeyboardAccelerator Modifiers="Control" Key="Number5" />
       </controls:NavigationViewItem.KeyboardAccelerators>
     </controls:NavigationViewItem>
     <controls:NavigationViewItem Content="Expert Panel" Tag="expert" AutomationProperties.Name="Expert Panel 頁面">
@@ -88,7 +80,7 @@
         <FontIcon Glyph="" />
       </controls:NavigationViewItem.Icon>
       <controls:NavigationViewItem.KeyboardAccelerators>
-        <KeyboardAccelerator Modifiers="Control" Key="Number7" />
+        <KeyboardAccelerator Modifiers="Control" Key="Number6" />
       </controls:NavigationViewItem.KeyboardAccelerators>
     </controls:NavigationViewItem>
   </controls:NavigationView.MenuItems>
@@ -403,6 +395,11 @@
                                         <controls:ItemsRepeater.ItemTemplate>
                                             <DataTemplate>
                                                 <StackPanel Padding="12" Spacing="4" CornerRadius="8" AutomationProperties.Name="{Binding AccessibleSummary}" AutomationProperties.HelpText="{Binding Detail}" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                                     <StackPanel.Transitions>
+                                                         <TransitionCollection>
+                                                             <EntranceThemeTransition FromVerticalOffset="24" />
+                                                         </TransitionCollection>
+                                                     </StackPanel.Transitions>
                                                     <Grid ColumnSpacing="8">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="*" />
