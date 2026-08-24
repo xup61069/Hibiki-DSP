@@ -26,8 +26,9 @@
    `git worktree list --porcelain | rg -B2 -A1 --fixed-strings "branch refs/heads/<branch>"`。禁止在別的
    session 工作樹執行 `checkout`、`switch`、branch rename、reset、clean 或 rebase。
 4. Orchestrator（人類或被指定的 active session）在 GitHub Issue body 補齊 handoff block（owner、branch、base commit、
-   `scope_globs`、shared paths、dependencies）、指派 assignee 並加上 lifecycle label
-   （`claimed` 進行中／`in-review` 待審）；worker 從指派 base 的最新遠端 HEAD 建立 branch，
+   `scope_globs`、shared paths、dependencies）、指派 assignee。正式寫入需要 `claimed` lifecycle
+   label（進行中）或 `in-review` 待審；`claim-pending` 是非授權的 admission 標記，不授予寫入。
+   worker 從指派 base 的最新遠端 HEAD 建立 branch，
    並依第 3 步決定 workspace isolation 後即可開始。首次可審閱的 commit push 後就開 draft PR，
    不要建立空的認領 commit。
 5. 確認 branch、HEAD、working tree 與 dependency lock，再執行
