@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "issue": 1094,
+  "scope_digest": "route-lane-output-printable-v1",
+  "source_commit": "5b896f6a4a89ef1adb983138406a3cbddab7ffec",
+  "environment_fingerprint": "windows-amd64-pwsh-session-route-schema-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1094",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [],
+  "limitations": [
+    "Schema-only parity fix: session route rule schemas now reject C0/C1 controls and DEL in lane_id/output_group, matching SPEC-0013 and runtime validation.",
+    "source_commit pinned to main head at authoring time; post-merge squash-hash repair follows the follow-up tracker convention.",
+    "Source/contract/tooling evidence only; no physical audio, driver, HLK, signing, or release acceptance."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
