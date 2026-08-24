@@ -49,6 +49,29 @@ public sealed partial class MainWindow : Window
             SetTitleBar(dragRegion);
         }
     }
+
+    private void ShowNavigationSection(string tag)
+    {
+        SetSectionVisibility("ShellHomeSection", tag == "home");
+        SetSectionVisibility("ShellScenesSection", tag == "scenes");
+        SetSectionVisibility("ShellPresetsSection", tag == "presets");
+        SetSectionVisibility("ShellVolumeSection", tag == "volume");
+        SetSectionVisibility("ShellVst3Section", tag == "vst3");
+        SetSectionVisibility("ShellRouteSection", tag == "route");
+        SetSectionVisibility("ShellExpertSection", tag == "expert");
+    }
+
+    private void SetSectionVisibility(string sectionName, bool visible)
+    {
+        if (RootGrid.FindName(sectionName) is FrameworkElement section)
+            section.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnShellNavSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+    {
+        if (args.SelectedItem is NavigationViewItem item && item.Tag is string tag)
+            ShowNavigationSection(tag);
+    }
 #endif
 
     private async void OnConnectClick(object sender, RoutedEventArgs e)
