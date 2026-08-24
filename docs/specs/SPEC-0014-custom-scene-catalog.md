@@ -19,8 +19,9 @@ ID 維持原本行為；其他 ID 必須由 catalog 解析，且 payload 的 out
 Scene 完全相同，避免 UI 顯示一組 Scene 卻把音訊送到另一個 group。
 
 控制模型同時提供一個最多 32 筆的 UI Scene card mirror。它只保存可顯示的 ID、名稱（字串）、
-說明（字串）、延遲標籤（字串）與安全旗標；完整 graph、loudness 與 calibration 仍由引擎端
-`SceneDefinitionV1` 管理。UI mirror 不得覆寫四個內建 ID，選取自訂卡片仍只能送出既有
+說明（字串）、延遲標籤（字串）、optional IR 參照與安全旗標；完整 graph、loudness
+與 calibration 仍由引擎端 `SceneDefinitionV1` 管理。UI mirror 不得覆寫四個內建 ID，
+選取自訂卡片仍只能送出既有
 `SceneApply(scene_id, output_group)`，因此 output-group exact-match 與引擎端 fail-closed
 規則不會被繞過。
 
@@ -31,7 +32,8 @@ C0/C1 字元）；長度與非空白限制維持不變，讓外部 schema 驗證
 
 UI mirror 以 `custom-scene-cards-v1.schema.json` 保存到 user-space 的本機設定檔；寫入採同目錄
 暫存檔替換，載入先完整驗證後才交換 catalog。檔案只含顯示卡片，不含裝置 ID、校正資料、
-plugin state 或完整 graph；載入失敗時保留目前記憶體內容。
+plugin state 或完整 graph；卡片可另帶 8–64 bytes 的可列印 UTF-8 `ir_reference`，
+讓同一校準參照能進入引擎 SceneApply retention 判斷。載入失敗時保留目前記憶體內容。
 
 ## 引擎同步管線
 
@@ -89,13 +91,17 @@ payload 時解碼即拒收，同樣不觸碰既有 catalog。
 成功後，ViewModel 依原順序把佇列中的 Upsert／Remove 補送到引擎。持久化格式由
 `schemas/scene-sync-queue-v1.schema.json` 描述：頂層必須是 `schema_version`（固定 1）、
 `dropped_operations` 與最多 64 筆 `operations`；每筆操作只允許 `is_upsert`、`scene_id`、
-`name` 與 `output_group` 四個欄位。schema 以條件式規則直接強制：Upsert 操作必須有
+`name`、`output_group` 與 optional `ir_reference` 欄位。schema 以條件式規則直接強制：
+Upsert 操作必須有
 非空 `name` 與非空 `output_group`；「非空」在 schema 與執行期皆代表至少含一個非空白字元。
-控制模型對這兩個欄位以 UTF-8 位元組數套用與引擎一致的硬上限：`name` 最長 120 bytes、
-`output_group` 最長 64 bytes；超界名稱在輸入當下即被拒絕，離線佇列載入同樣 fail-closed，
-且兩欄都不得含控制字元（對齊引擎 bounded-string 的可列印 UTF-8 契約），持久化 schema 也以
+`ir_reference` 必須為空或 8–64 bytes 可列印 UTF-8；Remove 操作時必須為空字串。
+控制模型對這些欄位以 UTF-8 位元組數套用與引擎一致的硬上限：`name` 最長 120 bytes、
+`output_group` 最長 64 bytes、`ir_reference` 空或 8–64 bytes；超界名稱在輸入當下即被拒絕，
+離線佇列載入同樣 fail-closed，
+且附帶文字欄位都不得含控制字元（對齊引擎 bounded-string 的可列印 UTF-8 契約），持久化 schema 也以
 invisible-control exclusion pattern（anchored）拒收 U+0000-U+001F 與 U+007F-U+009F，不會等到送出
-同步指令或外部驗證才失敗。Remove 操作兩者必須為空字串，且欄位限制必須與控制模型執行期驗證一致。
+同步指令或外部驗證才失敗。Remove 操作三個附帶文字欄位都必須為空字串，且欄位限制必須與控制模型
+執行期驗證一致。
 全部成功才回報「引擎已同步」，
 同時保留先前捨棄數量並清空持久化佇列；中途失敗則保留剩餘操作與其持久化狀態，誠實顯示降級
 狀態，待下一次連線再補送。此重播只使用既有 `SceneCatalogCommandV1` wire format 與 Ack 語意，
