@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1137,
   "scope_digest": "release-manifest-printable-v1",
-  "source_commit": "2eb8bcf2f11f63cdb56fa2785b0422b1f453a7b6",
+  "source_commit": "994fa59f40cd0410f6de8aafbb9f0597d5fad70a",
   "environment_fingerprint": "windows-amd64-pwsh-release-manifest-printable",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1137",
