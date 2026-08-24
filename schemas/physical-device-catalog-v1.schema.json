@@ -23,8 +23,8 @@
       ],
       "properties": {
         "schema_version": {"const": 1},
-        "endpoint_id": {"type": "string", "minLength": 1, "maxLength": 260},
-        "display_name": {"type": "string", "minLength": 1, "maxLength": 128},
+        "endpoint_id": {"type": "string", "minLength": 1, "maxLength": 260, "pattern": "[^\u0000-\u001F\u007F-\u009F]*"},
+        "display_name": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "[^\u0000-\u001F\u007F-\u009F]*"},
         "flow": {"enum": ["render", "capture"]},
         "availability": {"enum": ["active", "disabled", "unplugged", "unknown"]},
         "channels": {"enum": [1, 2, 6, 8]},

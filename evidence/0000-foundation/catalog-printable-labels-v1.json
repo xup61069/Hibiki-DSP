@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "issue": 1085,
+  "scope_digest": "catalog-printable-labels-v1",
+  "source_commit": "5bd4e636a42acd80a2aaddf896bfa757e9b76cf7",
+  "environment_fingerprint": "windows-amd64-pwsh-catalog-printable-labels",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1085",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Physical-device-catalog endpoint_id and display_name schemas now reject C0/C1 control characters, matching the C# runtime IsControl check in IpcProtocol.cs.",
+    "No runtime behavior change; no live audio, driver, HLK or signing evidence is implied."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
