@@ -17,7 +17,7 @@
         "type": "object", "additionalProperties": false,
         "required": ["lane_token", "active", "channel_count", "reported_latency_samples", "compensation_delay_samples"],
         "properties": {
-          "lane_token": {"type": "integer", "minimum": 1},
+          "lane_token": {"type": "integer", "minimum": 1, "maximum": 18446744073709551615},
           "active": {"type": "boolean"},
           "channel_count": {"enum": [2, 6, 8]},
           "reported_latency_samples": {"type": "integer", "minimum": 0, "maximum": 16384},

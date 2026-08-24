@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "issue": 1028,
+  "scope_digest": "lane-token-revision-bounds-v1",
+  "source_commit": "65188772",
+  "environment_fingerprint": "windows-amd64-pwsh-lane-token-revision-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1028",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Added maximum: 18446744073709551615 to lane_token in latency-graph-commit-v1 and revision in output-fanout-plan-v1.",
+    "Matches uint64_t runtime types in vst-host latency_graph_commit.hpp and hub output_fanout.hpp."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
