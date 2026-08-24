@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "issue": 1071,
+  "scope_digest": "route-rule-priority-schema-bounds-v1",
+  "source_commit": "5db9c984b1f4175d3e60d66fb38dde1bccdf9c56",
+  "environment_fingerprint": "windows-amd64-pwsh-route-rule-priority-schema-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1071",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [],
+  "limitations": [
+    "Schema-only: aligns persisted priority bounds with SPEC-0013 and all other consumers.",
+    "Existing runtime store contract tests already reject +/-1000001; no new test needed."
+  ],
+  "logs": {},
+  "tool_versions": {"powershell": "pwsh local"}
+}
+

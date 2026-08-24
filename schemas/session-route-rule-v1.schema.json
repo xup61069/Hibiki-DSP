@@ -9,7 +9,7 @@
   "properties": {
     "schema_version": {"const": 1},
     "rule_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
-    "priority": {"type": "integer", "minimum": -2147483648, "maximum": 2147483647},
+    "priority": {"type": "integer", "minimum": -1000000, "maximum": 1000000},
     "enabled": {"type": "boolean"},
     "match": {
       "type": "object",
