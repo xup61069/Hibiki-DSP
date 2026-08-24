@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "issue": 1056,
+  "scope_digest": "audio-descriptor-printable-v1",
+  "source_commit": "TBD_MERGE_COMMIT",
+  "environment_fingerprint": "windows-amd64-pwsh-audio-descriptor-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1056",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/verify.ps1"
+  ],
+  "results": [
+    {"command": "handoff-check", "status": "pass"},
+    {"command": "docs-check", "status": "pass"},
+    {"command": "source-policy", "status": "pass"},
+    {"command": "git diff --check", "status": "pass"},
+    {"command": "verify", "status": "pass"}
+  ],
+  "limitations": [
+    "Schema and runtime now reject control characters in AudioSessionDescriptor text fields, matching session-route-rule pattern.",
+    "Contract tests cover tab/newline/NUL/DEL rejection in display_name, identity fields, lane_id and bind()."
+  ],
+  "logs": {},
+  "tool_versions": {"powershell": "pwsh local"},
+  "started_at": "2026-08-24T10:30:00+08:00",
+  "finished_at": "2026-08-24T10:45:00+08:00"
+}
