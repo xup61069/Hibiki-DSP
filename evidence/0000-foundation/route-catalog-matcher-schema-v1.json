@@ -4,8 +4,8 @@
   "title": "Session route catalog matcher emptiness aligned with C# resolver semantics",
   "date": "2026-08-24",
   "issue": 992,
-  "pr": null,
-  "source_commit": null,
+  "pr": 995,
+  "source_commit": "93702180ab0a3e6e79c7b5026ffd11d9f46dabe7",
   "scope": [
     "schemas/session-route-rules-v1.schema.json"
   ],
