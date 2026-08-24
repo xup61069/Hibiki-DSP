@@ -5,6 +5,7 @@ param(
   [switch]$NoSource,
   [switch]$IncludeRepositoryState,
   [ValidateRange(4096, 1000000)][int]$MaxCharacters = 48000,
+  [ValidateRange(1024, 250000)][int]$MaxEstimatedTokens = 12000,
   [switch]$SelfTest
 )
 
@@ -126,6 +127,25 @@ function Resolve-ContextPackPath {
 $contextSections = [System.Collections.Generic.List[string]]::new()
 $contextCharacters = 0
 
+function ConvertTo-ContextNewlines([string]$Text) {
+  $lf = $Text -replace "\r\n?", "`n"
+  return $lf.Replace("`n", [Environment]::NewLine)
+}
+
+function Get-ConservativeContextTokenEstimate([string]$Text) {
+  # Offline heuristic for ordinary mixed Chinese/code context: ASCII is charged
+  # at one token per four characters and every non-ASCII UTF-16 code unit at one.
+  # It is deliberately cautious for CJK-heavy packs, but is not an exact model
+  # tokenizer or a guaranteed mathematical upper bound.
+  $asciiCharacters = 0
+  $nonAsciiCharacters = 0
+  foreach ($character in $Text.ToCharArray()) {
+    if ([int][char]$character -le 127) { $asciiCharacters++ }
+    else { $nonAsciiCharacters++ }
+  }
+  return [int]([Math]::Ceiling($asciiCharacters / 4.0) + $nonAsciiCharacters)
+}
+
 function Add-ContextSection {
   param(
     [Parameter(Mandatory = $true)][string]$Label,
@@ -139,7 +159,8 @@ function Add-ContextSection {
   } else {
     "=== $Label :: $Source ==="
   }
-  $section = ($heading + [Environment]::NewLine + $Content.TrimEnd())
+  $normalizedContent = ConvertTo-ContextNewlines $Content
+  $section = ($heading + [Environment]::NewLine + $normalizedContent.TrimEnd())
   $separatorCharacters = if ($script:contextSections.Count -eq 0) { 0 } else { 2 }
   $nextCharacters = $script:contextCharacters + $separatorCharacters + $section.Length
   if ($nextCharacters -gt $Limit) {
@@ -152,6 +173,48 @@ function Add-ContextSection {
 
 function Get-ContextPackText {
   return ($script:contextSections -join ([Environment]::NewLine + [Environment]::NewLine))
+}
+
+function New-ContextPackOutput {
+  param(
+    [Parameter(Mandatory = $true)][int]$CharacterLimit,
+    [Parameter(Mandatory = $true)][int]$EstimatedTokenLimit,
+    [bool]$RepositoryStateIncluded = $false
+  )
+
+  $contentText = Get-ContextPackText
+  $packCharacters = 0
+  $estimatedTokens = 0
+  $candidate = ''
+  $stable = $false
+  for ($iteration = 0; $iteration -lt 8; $iteration++) {
+    $summary = @(
+      '=== PACK SUMMARY ==='
+      "content_characters: $contextCharacters"
+      "pack_characters: $packCharacters"
+      "estimated_tokens: $estimatedTokens"
+      "budget_characters: $CharacterLimit"
+      "budget_estimated_tokens: $EstimatedTokenLimit"
+      "repository_state_included: $($RepositoryStateIncluded.ToString().ToLowerInvariant())"
+    ) -join [Environment]::NewLine
+    $candidate = $contentText + [Environment]::NewLine + $summary + [Environment]::NewLine
+    $nextCharacters = $candidate.Length
+    $nextEstimatedTokens = Get-ConservativeContextTokenEstimate $candidate
+    if ($nextCharacters -eq $packCharacters -and $nextEstimatedTokens -eq $estimatedTokens) {
+      $stable = $true
+      break
+    }
+    $packCharacters = $nextCharacters
+    $estimatedTokens = $nextEstimatedTokens
+  }
+  if (-not $stable) { throw 'Context pack summary accounting did not converge.' }
+  if ($packCharacters -gt $CharacterLimit) {
+    throw "Context pack would exceed the $CharacterLimit character budget before output (complete serialized pack: $packCharacters). Use -NoSource, narrow the Issue Spec/ADR references, inspect files locally, or explicitly raise both budgets for a bounded audit."
+  }
+  if ($estimatedTokens -gt $EstimatedTokenLimit) {
+    throw "Context pack would exceed the conservative $EstimatedTokenLimit estimated-token budget before output (complete serialized pack estimate: $estimatedTokens). Use -NoSource, narrow the Issue Spec/ADR references, inspect files locally, or explicitly raise both budgets for a bounded audit."
+  }
+  return $candidate
 }
 
 if ($SelfTest) {
@@ -289,12 +352,44 @@ if ($SelfTest) {
   if (-not $budgetCaught -or $contextSections.Count -ne 1) {
     throw 'context-pack self-test expected an oversized section to fail before partial output.'
   }
-  Write-Output 'Context-pack output budget self-test passed (oversized pack rejected before output).'
+
+  $contextSections.Clear()
+  $contextCharacters = 0
+  Add-ContextSection -Label 'FINAL' -Content 'bounded' -Limit 512
+  $boundedOutput = New-ContextPackOutput -CharacterLimit 512 -EstimatedTokenLimit 512
+  if ($boundedOutput.Length -gt 512 -or $boundedOutput -notmatch "pack_characters: $($boundedOutput.Length)") {
+    throw 'context-pack self-test expected exact complete-output character accounting.'
+  }
+
+  $finalOverheadCaught = $false
+  try {
+    $null = New-ContextPackOutput -CharacterLimit 64 -EstimatedTokenLimit 512
+  } catch { $finalOverheadCaught = $_.Exception.Message -match 'complete serialized pack' }
+  if (-not $finalOverheadCaught) {
+    throw 'context-pack self-test expected final summary overhead to be included in the character budget.'
+  }
+
+  $contextSections.Clear()
+  $contextCharacters = 0
+  Add-ContextSection -Label 'TOKEN' -Content ('界' * 64) -Limit 4096
+  $tokenBudgetCaught = $false
+  try {
+    $null = New-ContextPackOutput -CharacterLimit 4096 -EstimatedTokenLimit 32
+  } catch { $tokenBudgetCaught = $_.Exception.Message -match 'estimated-token budget' }
+  if (-not $tokenBudgetCaught) {
+    throw 'context-pack self-test expected mixed-language token pressure to fail closed.'
+  }
+  Write-Output 'Context-pack output budget self-test passed (section, final serialized, and estimated-token limits).'
   exit 0
 }
 
 if (-not $PSBoundParameters.ContainsKey('Issue')) {
   throw "No Issue specified. Pass -Issue <number>."
+}
+if ($IncludeRepositoryState -and
+    (-not $PSBoundParameters.ContainsKey('MaxCharacters') -or
+     -not $PSBoundParameters.ContainsKey('MaxEstimatedTokens'))) {
+  throw 'IncludeRepositoryState requires explicit -MaxCharacters and -MaxEstimatedTokens values.'
 }
 
 $ghOutput = & gh issue view $Issue --json body --jq '.body' 2>$null
@@ -394,8 +489,7 @@ if (Test-Path $evidenceRoot) {
     ForEach-Object { Write-ContextFile 'EVIDENCE' $_.FullName }
 }
 
-Write-Output (Get-ContextPackText)
-Write-Output "=== PACK SUMMARY ==="
-Write-Output "content_characters: $contextCharacters"
-Write-Output "budget_characters: $MaxCharacters"
-Write-Output "repository_state_included: $($IncludeRepositoryState.IsPresent.ToString().ToLowerInvariant())"
+$packOutput = New-ContextPackOutput -CharacterLimit $MaxCharacters `
+  -EstimatedTokenLimit $MaxEstimatedTokens `
+  -RepositoryStateIncluded $IncludeRepositoryState.IsPresent
+[Console]::Out.Write($packOutput)
