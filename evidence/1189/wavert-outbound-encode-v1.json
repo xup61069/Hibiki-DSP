@@ -1,0 +1,61 @@
+{
+  "evidence_format": 2,
+  "issue": 1189,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "docs/specs/SPEC-0003-virtual-endpoints-and-routing.md",
+      "src/hub/include/hibiki/audio_engine.hpp",
+      "src/hub/src/audio_engine.cpp",
+      "tests/unit/contract_tests.cpp"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "c0c183a5889c7132acac373265ec841fcd02a551a2c0b4e3a84f162f7aece4fe"
+  },
+  "metadata": {
+    "scope": "wavert-outbound-encode-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-git-2.55.0",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1189",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/verify.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "outbound encode implementation and contract tests",
+        "status": "pass",
+        "detail": "Added AudioEngineModel::encode_driver_stream_packet_from_lane, which processes a caller-owned lane block through the same immutable graph / Group Master / limiter path as WASAPI output and encodes the result with the v1 SDK API (80-byte header plus interleaved Float32). Contract tests cover valid encode round-trip, invalid lane, format mismatch, zero generation, non-finite samples, and fail-closed behavior without partial packets."
+      },
+      {
+        "command": "handoff/docs/source/verify gates after rebase onto #1190 main",
+        "status": "pass",
+        "detail": "Issue ownership, scope, documentation checks, source-only policy, git diff whitespace check, and the unsigned local CMake/CTest verification (3/3 tests) all passed on top of the updated base."
+      },
+      {
+        "command": "SPEC-0003 outbound encode note",
+        "status": "pass",
+        "detail": "SPEC-0003 now records the user-space outbound encode capability with explicit limits: kernel-mode IPC/shared-memory delivery to the WaveRT ring is still required; this slice does not provide physical WaveRT delivery, HLK, or Microsoft signing evidence."
+      },
+      {
+        "command": "evidence-audit provenance binding",
+        "status": "pass",
+        "detail": "Derived the exact 4 non-evidence source paths and the sha256-git-source-set-v1 digest from the staged Git index relative to the candidate merge base."
+      }
+    ],
+    "limitations": [
+      "This is user-space outbound encode evidence only. It does not demonstrate kernel-mode IPC or shared-memory delivery into the WaveRT ring buffer, driver loading, HLK testing, Microsoft signing, or real-device audio.",
+      "The provenance digest binds this manifest to exact staged source paths and Git blob states; it does not independently attest that the declared commands ran."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.55.0.windows.3"
+    },
+    "started_at": "2026-08-24T20:00:00+08:00",
+    "finished_at": "2026-08-24T20:07:54+08:00"
+  }
+}

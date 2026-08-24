@@ -4674,6 +4674,50 @@ int main() {
     CHECK(!engine.process_driver_stream_packet(
         0U, "6d5706a4-b661-4bf6-9c2d-9c31b8f7df21", bad_engine_driver_packet,
         engine_driver_storage, engine_driver_inputs, engine_driver_output.data()));
+    std::array<std::uint8_t, 96> outbound_driver_packet{};
+    std::array<float, 4> outbound_driver_output{};
+    std::size_t outbound_driver_packet_bytes = 0U;
+    CHECK(engine.encode_driver_stream_packet_from_lane(
+              0U, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 44U, 11U, 0U,
+              driver_samples, 2U, 2U, engine_driver_inputs, outbound_driver_output.data(),
+              outbound_driver_packet, outbound_driver_packet_bytes) &&
+          outbound_driver_packet_bytes == outbound_driver_packet.size() &&
+          hibiki_driver_stream_packet_validate_v1(outbound_driver_packet.data(),
+                                                  outbound_driver_packet_bytes) == 1);
+    outbound_driver_packet.fill(0xA5U);
+    outbound_driver_packet_bytes = 123U;
+    CHECK(!engine.encode_driver_stream_packet_from_lane(
+              0U, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 45U, 0U, 0U,
+              driver_samples, 2U, 2U, engine_driver_inputs, outbound_driver_output.data(),
+              outbound_driver_packet, outbound_driver_packet_bytes) &&
+          outbound_driver_packet_bytes == 0U &&
+          std::all_of(outbound_driver_packet.begin(), outbound_driver_packet.end(),
+                      [](const std::uint8_t value) { return value == 0xA5U; }));
+    const float outbound_driver_nan = std::numeric_limits<float>::quiet_NaN();
+    const std::array<float, 4> nonfinite_driver_samples{
+        outbound_driver_nan, -0.25F, 0.5F, -0.5F};
+    outbound_driver_packet_bytes = 123U;
+    CHECK(!engine.encode_driver_stream_packet_from_lane(
+              0U, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 46U, 12U, 0U,
+              nonfinite_driver_samples.data(), 2U, 2U, engine_driver_inputs,
+              outbound_driver_output.data(), outbound_driver_packet, outbound_driver_packet_bytes) &&
+          outbound_driver_packet_bytes == 0U &&
+          std::all_of(outbound_driver_packet.begin(), outbound_driver_packet.end(),
+                      [](const std::uint8_t value) { return value == 0xA5U; }));
+    outbound_driver_packet_bytes = 123U;
+    CHECK(!engine.encode_driver_stream_packet_from_lane(
+              1U, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 47U, 13U, 0U,
+              driver_samples, 2U, 2U, engine_driver_inputs, outbound_driver_output.data(),
+              outbound_driver_packet, outbound_driver_packet_bytes) &&
+          outbound_driver_packet_bytes == 0U);
+    outbound_driver_packet_bytes = 123U;
+    CHECK(!engine.encode_driver_stream_packet_from_lane(
+              0U, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 48U, 14U, 0U,
+              driver_samples, 6U, 2U, engine_driver_inputs, outbound_driver_output.data(),
+              outbound_driver_packet, outbound_driver_packet_bytes) &&
+          outbound_driver_packet_bytes == 0U &&
+          std::all_of(outbound_driver_packet.begin(), outbound_driver_packet.end(),
+                      [](const std::uint8_t value) { return value == 0xA5U; }));
 
     AudioEngineModel limiter_reset_engine;
     GraphConfigV1 limiter_reset_graph;

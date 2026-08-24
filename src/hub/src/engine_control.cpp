@@ -202,6 +202,7 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
         if (!engine_.commit_loudness_peq()) {
             std::swap(active_scene_, candidate_scene);
             std::swap(active_loudness_, candidate_loudness);
+            engine_.rollback_graph();
             engine_.rollback_ir();
             engine_.rollback_loudness_peq();
             return EngineControlResultV1::Failed;
