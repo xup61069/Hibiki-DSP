@@ -5373,6 +5373,177 @@ int main() {
         hibiki_driver_stream_ring_reset_v1(ring);
         CHECK(ring->producer_sequence == 0U && ring->consumer_sequence == 0U &&
               ring->overrun_count == 0U && ring->underrun_count == 0U);
+
+        // Driver stream ring v1 consumer integration: a packet published by
+        // the producer must survive the SPSC slot round-trip and still satisfy
+        // the engine render gate; underrun and corrupt storage fail closed.
+        {
+            auto ring_storage = std::vector<std::uint64_t>(
+                (sizeof(hibiki_driver_stream_ring_v1) + sizeof(std::uint64_t) - 1U) /
+                sizeof(std::uint64_t));
+            auto* ring = reinterpret_cast<hibiki_driver_stream_ring_v1*>(
+                ring_storage.data());
+            const std::size_t region_bytes =
+                ring_storage.size() * sizeof(std::uint64_t);
+            CHECK(hibiki_driver_stream_ring_init_v1(
+                      ring, region_bytes, 2U, 48000U) ==
+                  HIBIKI_DRIVER_STREAM_RING_OK_V1);
+
+            const float ring_render_samples[] = {0.25F, -0.25F, 0.5F, -0.5F};
+            std::array<std::uint8_t, 96> inbound_ring_packet{};
+            std::size_t inbound_ring_packet_bytes = 0U;
+            CHECK(hibiki_driver_stream_packet_encode_v1(
+                      inbound_ring_packet.data(), inbound_ring_packet.size(),
+                      HIBIKI_DRIVER_STREAM_RENDER_V1, 51U,
+                      "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 2U, 48000U, 2U, 0U,
+                      12U, ring_render_samples,
+                      &inbound_ring_packet_bytes) == 1);
+
+            uint32_t consumer_silence = 0U;
+            std::size_t consumer_popped_bytes = 1234567U;
+            std::array<std::uint8_t,
+                       HIBIKI_DRIVER_STREAM_RING_SLOT_CAPACITY_BYTES_V1>
+                consumer_packet_buffer{};
+            CHECK(hibiki_driver_stream_ring_pop_v1(
+                      ring, region_bytes, consumer_packet_buffer.data(),
+                      consumer_packet_buffer.size(), &consumer_popped_bytes,
+                      &consumer_silence) ==
+                      HIBIKI_DRIVER_STREAM_RING_UNDERRUN_V1 &&
+              consumer_popped_bytes == 0U && consumer_silence == 1U);
+
+            // Keep the engines on the heap: this late fixture shares the
+            // harness's fixed 8 MiB stack with every earlier contract case.
+            // Two identically prepared engines compare ring transport against
+            // a fresh packet path without assuming unity default volume.
+            auto ring_engine = std::make_unique<AudioEngineModel>();
+            const auto prepare_ring_engine = [](AudioEngineModel& engine) -> bool {
+                GraphConfigV1 graph;
+                graph.lanes.push_back(
+                    LaneConfigV1{"game", "main", 2, 0.0, true});
+                if (!engine.prepare_graph(graph, 30U)) {
+                    return false;
+                }
+                engine.rollback_graph();
+                if (!engine.prepare_graph(graph, 31U) ||
+                    !engine.commit_graph()) {
+                    return false;
+                }
+                engine.set_sample_rate(48000U);
+                return true;
+            };
+            CHECK(prepare_ring_engine(*ring_engine));
+            std::array<RtLaneInputV1, 1> ring_lane_inputs{};
+            std::array<float, 4> ring_packet_sample_storage{};
+            std::array<float, 4> ring_engine_output{};
+            const auto empty_ring_packet =
+                std::span<const std::uint8_t>(consumer_packet_buffer.data(), 0U);
+            CHECK(!ring_engine->process_driver_stream_packet(
+                0U, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", empty_ring_packet,
+                ring_packet_sample_storage,
+                std::span<RtLaneInputV1>(ring_lane_inputs),
+                ring_engine_output.data()));
+
+            CHECK(hibiki_driver_stream_ring_push_v1(
+                      ring, region_bytes, inbound_ring_packet.data(),
+                      inbound_ring_packet_bytes) ==
+                  HIBIKI_DRIVER_STREAM_RING_OK_V1);
+            consumer_silence = 0U;
+            consumer_popped_bytes = 0U;
+            CHECK(hibiki_driver_stream_ring_pop_v1(
+                      ring, region_bytes, consumer_packet_buffer.data(),
+                      consumer_packet_buffer.size(), &consumer_popped_bytes,
+                      &consumer_silence) ==
+                      HIBIKI_DRIVER_STREAM_RING_OK_V1 &&
+              consumer_popped_bytes == inbound_ring_packet_bytes &&
+              consumer_silence == 0U);
+            CHECK(std::memcmp(consumer_packet_buffer.data(),
+                              inbound_ring_packet.data(),
+                              inbound_ring_packet_bytes) == 0);
+            auto ring_reference_engine = std::make_unique<AudioEngineModel>();
+            CHECK(prepare_ring_engine(*ring_reference_engine));
+            std::array<float, 4> ring_reference_output{};
+            const auto popped_ring_packet = std::span<const std::uint8_t>(
+                consumer_packet_buffer.data(), consumer_popped_bytes);
+            CHECK(ring_engine->process_driver_stream_packet(
+                0U, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10",
+                popped_ring_packet, ring_packet_sample_storage,
+                std::span<RtLaneInputV1>(ring_lane_inputs),
+                ring_engine_output.data()));
+            CHECK(ring_reference_engine->process_driver_stream_packet(
+                0U, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10",
+                std::span<const std::uint8_t>(inbound_ring_packet.data(),
+                                              inbound_ring_packet_bytes),
+                ring_packet_sample_storage,
+                std::span<RtLaneInputV1>(ring_lane_inputs),
+                ring_reference_output.data()));
+            CHECK(std::all_of(ring_engine_output.begin(),
+                              ring_engine_output.end(),
+                              [](const float value) {
+                                  return std::isfinite(value);
+                              }));
+            CHECK(std::equal(ring_engine_output.begin(),
+                             ring_engine_output.end(),
+                             ring_reference_output.begin()));
+
+            // Outbound lane encode survives the same ring round-trip
+            // byte-for-byte and still validates on pop.
+            std::array<float, 4> outbound_lane_input{
+                {0.25F, -0.25F, 0.5F, -0.5F}};
+            std::array<float, 4> outbound_processed_output{};
+            std::array<std::uint8_t, 96> outbound_ring_packet{};
+            std::size_t outbound_ring_packet_bytes = 0U;
+            CHECK(ring_engine->encode_driver_stream_packet_from_lane(
+                      0U, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 52U, 13U, 0U,
+                      outbound_lane_input.data(), 2U, 2U,
+                      std::span<RtLaneInputV1>(ring_lane_inputs),
+                      outbound_processed_output.data(), outbound_ring_packet,
+                      outbound_ring_packet_bytes) &&
+              outbound_ring_packet_bytes == outbound_ring_packet.size());
+            CHECK(hibiki_driver_stream_ring_push_v1(
+                      ring, region_bytes, outbound_ring_packet.data(),
+                      outbound_ring_packet_bytes) ==
+                  HIBIKI_DRIVER_STREAM_RING_OK_V1);
+            consumer_silence = 0U;
+            consumer_popped_bytes = 0U;
+            consumer_packet_buffer.fill(0xA5U);
+            CHECK(hibiki_driver_stream_ring_pop_v1(
+                      ring, region_bytes, consumer_packet_buffer.data(),
+                      consumer_packet_buffer.size(), &consumer_popped_bytes,
+                      &consumer_silence) ==
+                      HIBIKI_DRIVER_STREAM_RING_OK_V1 &&
+              consumer_popped_bytes == outbound_ring_packet_bytes &&
+              consumer_silence == 0U);
+            CHECK(std::memcmp(consumer_packet_buffer.data(),
+                              outbound_ring_packet.data(),
+                              outbound_ring_packet_bytes) == 0);
+            CHECK(hibiki_driver_stream_packet_validate_v1(
+                      consumer_packet_buffer.data(),
+                      consumer_popped_bytes) == 1);
+
+            // A stale/corrupt stored packet must not reach the engine graph.
+            const float corrupt_nan =
+                std::numeric_limits<float>::quiet_NaN();
+            std::memcpy(consumer_packet_buffer.data() +
+                            HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1,
+                        &corrupt_nan, sizeof(corrupt_nan));
+            const auto corrupted_ring_packet =
+                std::span<const std::uint8_t>(consumer_packet_buffer.data(),
+                                              consumer_popped_bytes);
+            std::fill(ring_packet_sample_storage.begin(),
+                      ring_packet_sample_storage.end(), 1.0F);
+            std::fill(ring_engine_output.begin(), ring_engine_output.end(),
+                      1.0F);
+            CHECK(!ring_engine->process_driver_stream_packet(
+                0U, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10",
+                corrupted_ring_packet, ring_packet_sample_storage,
+                std::span<RtLaneInputV1>(ring_lane_inputs),
+                ring_engine_output.data()));
+            CHECK(std::all_of(ring_engine_output.begin(),
+                              ring_engine_output.end(),
+                              [](const float value) {
+                                  return value == 1.0F;
+                              }));
+        }
     }
 
     return 0;
