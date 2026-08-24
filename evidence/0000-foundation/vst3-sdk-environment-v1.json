@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1148,
   "scope_digest": "vst3-sdk-environment-v1",
-  "source_commit": "c4ed5a43cc51b8d967464d6571fbf65e84c547c3",
+  "source_commit": "d3556c6fe99fe7124ccc79ad925b12af8ae64132",
   "environment_fingerprint": "windows-amd64-pwsh-vst3-sdk-environment-probe",
   "commands": [
     "pwsh -NoProfile -File tools/probe-vst3-sdk-environment.ps1 -SelfTest",
