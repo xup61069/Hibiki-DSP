@@ -194,8 +194,10 @@ public sealed class CustomSceneSyncQueueV1
         {
             return !string.IsNullOrWhiteSpace(operation.Name) &&
                    Encoding.UTF8.GetByteCount(operation.Name) <= 120 &&
+                   !operation.Name.Any(char.IsControl) &&
                    !string.IsNullOrWhiteSpace(operation.OutputGroup) &&
-                   Encoding.UTF8.GetByteCount(operation.OutputGroup) <= 64;
+                   Encoding.UTF8.GetByteCount(operation.OutputGroup) <= 64 &&
+                   !operation.OutputGroup.Any(char.IsControl);
         }
 
         return string.IsNullOrEmpty(operation.Name) &&
