@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "issue": 1140,
+  "scope_digest": "audio-calibration-schema-anchor-v1",
+  "source_commit": "26afc5daeeb7afd9831c1c3472d492771ffe126d",
+  "environment_fingerprint": "windows-amd64-pwsh-schema-anchor-audio-calibration",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1140",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Schema-only parity fix: AudioSessionDescriptor text fields and calibration device_id use anchored invisible-control exclusion patterns while retaining existing emptiness and length semantics.",
+    "Runtime validators already perform full-string control checks; persisted-schema validation now cannot accept a partial-match bypass.",
+    "source_commit is pinned to the main head at authoring time; post-merge squash-hash repair follows the established follow-up convention.",
+    "Source/schema/tooling evidence only; no physical audio, driver loading, WaveRT, HLK, signing, or release acceptance."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
