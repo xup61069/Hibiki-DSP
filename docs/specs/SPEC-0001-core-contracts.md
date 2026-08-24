@@ -20,6 +20,9 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
 ## 介面
 
 - `SceneProfile v1`：lane routing、DSP、output group、automation、calibration reference；
+  scene `id` 是 bounded 穩定識別碼（1..31 bytes；字元集為小寫英數加上 `.` `_` `-`，
+  首字元必須是小寫英數）。JSON schema、engine catalog validator 與 SceneApply wire
+  format 對同一欄位套用相同上限，過長或格式不合法的 id 在檔案載入時即被拒絕。
   `automation_timeline_ids` 只保存 bounded VST3 timeline snapshot 的穩定引用，實際 worker
   執行與 plugin state 不內嵌於 Scene JSON。需要跨版本的 plugin state 時，只能以
   `scene-vst3-state-binding-v1` metadata reference 經 identity／version／migration preflight，
