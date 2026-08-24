@@ -2,6 +2,8 @@
 
 #include "hibiki/session_route_rules.hpp"
 
+#include "hibiki/control_payloads.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -30,18 +32,61 @@ bool contains_ascii_folded(const std::string_view value,
     return false;
 }
 
+bool valid_rule_id_format(const std::string_view value) noexcept {
+    if (value.empty() || value.size() > kSessionRouteRuleMaxIdBytesV1) return false;
+    for (std::size_t index = 0U; index < value.size(); ++index) {
+        const auto character = static_cast<unsigned char>(value[index]);
+        const auto lowercase = character >= 'a' && character <= 'z';
+        const auto digit = character >= '0' && character <= '9';
+        const auto separator = character == '.' || character == '_' || character == '-';
+        if ((!lowercase && !digit && !separator) ||
+            (index == 0U && !lowercase && !digit)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool contains_non_ascii_space(std::string_view value) noexcept {
+    for (const auto character : value) {
+        switch (character) {
+        case ' ':
+        case '\t':
+        case '\n':
+        case '\v':
+        case '\f':
+        case '\r':
+            continue;
+        default:
+            return true;
+        }
+    }
+    return false;
+}
+
 }  // namespace
 
 bool SessionRouteRuleStoreV1::valid(const SessionRouteRuleV1& rule) noexcept {
-    const bool has_match = !rule.app_id.empty() || !rule.display_name_contains.empty();
+    const bool has_match =
+        (!rule.app_id.empty() && contains_non_ascii_space(rule.app_id)) ||
+        (!rule.display_name_contains.empty() &&
+         contains_non_ascii_space(rule.display_name_contains));
     return rule.schema_version == 1U && !rule.rule_id.empty() &&
            rule.rule_id.size() <= kSessionRouteRuleMaxIdBytesV1 &&
-           rule.rule_id.find('\0') == std::string::npos && has_match &&
+           valid_rule_id_format(rule.rule_id) &&
+           is_printable_utf8_v1(rule.rule_id) &&
+           rule.priority >= -1'000'000 && rule.priority <= 1'000'000 && has_match &&
            rule.app_id.size() <= kSessionRouteRuleMaxMatchBytesV1 &&
+           (rule.app_id.empty() || is_printable_utf8_v1(rule.app_id)) &&
            rule.display_name_contains.size() <= kSessionRouteRuleMaxMatchBytesV1 &&
+           (rule.display_name_contains.empty() ||
+            is_printable_utf8_v1(rule.display_name_contains)) &&
            !rule.lane_id.empty() && rule.lane_id.size() <= kSessionRouteRuleMaxRouteBytesV1 &&
+           contains_non_ascii_space(rule.lane_id) && is_printable_utf8_v1(rule.lane_id) &&
            !rule.output_group.empty() &&
            rule.output_group.size() <= kSessionRouteRuleMaxRouteBytesV1 &&
+           contains_non_ascii_space(rule.output_group) &&
+           is_printable_utf8_v1(rule.output_group) &&
            std::isfinite(rule.makeup_gain_db) && rule.makeup_gain_db >= -144.0 &&
            rule.makeup_gain_db <= 12.0;
 }

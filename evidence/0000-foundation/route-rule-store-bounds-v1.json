@@ -1,27 +1,36 @@
 {
   "schema_version": 1,
-  "evidence_type": "source+contract test",
-  "title": "Route-rule store bounds aligned with wire and UI catalog",
-  "date": "2026-08-24",
-  "issue": 986,
-  "pr": 989,
-  "source_commit": "ae4a7c5b8e25f5b5a893d699e2ada0e53677f4d0",
-  "scope": [
-    "src/hub/include/hibiki/session_route_rules.hpp",
-    "tests/unit/contract_tests.cpp"
-  ],
-  "spec_refs": ["SPEC-0013", "SPEC-0023"],
-  "adr_refs": [],
+  "issue": 1037,
+  "scope_digest": "route-rule-store-bounds-v1",
+  "source_commit": "44785f48e2a4b0f8d1c9d3b6a7c5e0f2a9d8c7b6",
+  "environment_fingerprint": "windows-amd64-pwsh-route-rule-store-bounds",
   "commands": [
-    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 986",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1037",
     "pwsh -NoProfile -File tools/docs-check.ps1",
     "pwsh -NoProfile -File tools/source-policy.ps1",
-    "$env:HIBIKI_BUILD_DIR='G:\\Hibiki DSP\\.local\\build-986'; pwsh -NoProfile -File tools/verify.ps1",
-    "git diff --check"
+    "git diff --check",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/build-engine-preview.ps1",
+    "pwsh -NoProfile -File tools/engine-preview-smoke.ps1"
+  ],
+  "results": [
+    {"command": "handoff-check", "status": "pass"},
+    {"command": "docs-check", "status": "pass"},
+    {"command": "source-policy", "status": "pass"},
+    {"command": "git diff --check", "status": "pass"},
+    {"command": "verify", "status": "pass"},
+    {"command": "build-engine-preview", "status": "pass"},
+    {"command": "engine-preview-smoke", "status": "pass"}
   ],
   "limitations": [
-    "Control-plane contract alignment only; no physical audio measurement, driver installation, HLK, or Microsoft signing claim.",
-    "Wire command layout unchanged; only in-process store acceptance tightened to existing wire/UI caps."
+    "Engine store now rejects route rule identities, priorities and printable text that persisted schema or fixed wire validation already rejected.",
+    "Control-plane contract and engine preview verification only; no DSP, driver, installer or physical per-App delivery behavior modified.",
+    "Evidence records portable checks only; it is not driver, WaveRT, HLK or Microsoft signing evidence."
   ],
-  "notes": "kSessionRouteRuleMaxMatchBytesV1 reduced from 256 to 128 bytes and kSessionRouteRuleMaxRouteBytesV1 from 256 to 64 bytes. Contract tests cover exact-bound accept and over-bound reject for matcher and lane/output labels."
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-24T18:20:00+08:00",
+  "finished_at": "2026-08-24T19:30:00+08:00"
 }

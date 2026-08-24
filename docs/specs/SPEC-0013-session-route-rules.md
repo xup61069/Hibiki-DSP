@@ -24,6 +24,11 @@ gain owner 與 makeup gain。規則套用後可交給既有 `AudioSessionRegistr
 - 兩者同時存在時必須同時符合；至少一個匹配欄位必須非空。
 - 優先序較高者勝出；相同優先序的多個匹配規則一律回報 `ambiguous`，不得依插入順序
   靜默選擇。
+- in-process store 與持久化 JSON、fixed wire command 套用同一組 fail-closed 界限：
+  rule ID 必須是小寫英數開頭且只含小寫英數、`.`、`_`、`-` 的 printable UTF-8；
+  priority 限制在 -1000000..1000000；rule ID、matcher、lane 與 output group 都不得含
+  control bytes 或非 printable UTF-8。matcher 不可只有 ASCII 空白；lane/output group
+  至少要有一個非空白字元。
 - `process_id` 只作 Windows session 的即時觀察，不進 rule schema、不作持久身份。
 - 規則上限 64 筆；rule ID 最長 64 bytes、app ID 與顯示名稱 matcher 最長 128 bytes、
   lane/output group 最長 64 bytes，與 SPEC-0023 wire command 和 Expert catalog 上限一致。
@@ -57,7 +62,8 @@ enumerate session，只有在 active routed session 存在且 `build_session_rou
 
 1. Chrome app ID 大小寫變化仍匹配；process ID 改變不影響匹配。
 2. 高優先序 app rule 勝過低優先序 display-name rule；同優先序衝突 fail-closed。
-3. 缺少匹配欄位、空 lane/output、超界 gain／文字與 65 筆規則都被拒絕。
+3. 缺少或全空白 matcher、空 lane/output、大寫或不合法 rule ID、priority ±1000001、
+   embedded control byte、超界 gain／文字與 65 筆規則都被拒絕。
 4. 套用前後 descriptor 的 atomicity、既有 session route graph 與 Strict Direct gain-owner
    規則測試通過。
 5. Windows session watcher 的 rule store 是 non-owning、只在 worker enumerate 套用；
