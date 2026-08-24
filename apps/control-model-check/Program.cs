@@ -707,6 +707,10 @@ Check(!new CalibrationResponseV1(2U, 48000.0, 2, "test", calibPoints).IsValid &&
       !new CalibrationResponseV1(1U, 48000.0, 3, "test", calibPoints).IsValid &&
       !new CalibrationResponseV1(1U, 48000.0, 2, "test", [new(200.0, 0.0, 0.0), new(100.0, 0.0, 0.0)]).IsValid,
     "Invalid calibration response must fail closed.");
+Check(new CalibrationResponseV1(1U, 48000.0, 2, new string('a', 260), calibPoints).IsValid &&
+      !new CalibrationResponseV1(1U, 48000.0, 2, new string('a', 261), calibPoints).IsValid &&
+      !new CalibrationResponseV1(1U, 48000.0, 2, new string('\u00e9', 260), calibPoints).IsValid,
+    "Calibration device_id must enforce its UTF-8 byte bound.");
 var validFilter = new PeqFilterV1("peaking", 1000.0, 3.0, 1.414);
 Check(validFilter.IsValid, "Valid PEQ filter must be accepted.");
 Check(!new PeqFilterV1("lowpass", 1000.0, 3.0, 1.414).IsValid &&
