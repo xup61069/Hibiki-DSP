@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1023,
   "scope_digest": "route-rule-match-control-chars-v1",
-  "source_commit": "901fe1ed",
+  "source_commit": "5861a6c9e38b6ef691afe60b0e9a7760f3668c2e",
   "environment_fingerprint": "windows-amd64-pwsh-route-rule-chars",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1023",

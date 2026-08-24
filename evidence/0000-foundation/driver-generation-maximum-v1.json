@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1020,
   "scope_digest": "driver-generation-maximum-v1",
-  "source_commit": null,
+  "source_commit": "caecd69398bc7b5d7b66b3cb02c157630e634ed7",
   "environment_fingerprint": "windows-amd64-pwsh-driver-generation-maximum",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1020",
