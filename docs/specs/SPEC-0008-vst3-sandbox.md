@@ -191,7 +191,7 @@ error、destination 不足與 allocation failure 分開回報。它只建立 wor
 目前已有固定 16-rule `Vst3PluginStateMigrationRegistryV1` primitive，但 handler 仍由受信任的
 control-plane caller 注入，未提供自動探測或遠端下載。
 
-`Vst3SceneStateCoordinatorV1` 將 Scene ID（與 state ID 相同 bounded ID 規則）、state ID、
+`Vst3SceneStateCoordinatorV1` 將 Scene ID（1..31 bytes，與引擎 catalog 一致；不同於 state ID 的 1..64 bytes）、state ID、
 plugin identity 與 target state version
 綁定到最多 16 筆固定容量 reference。Scene 啟用前會 inspect 私有 state、檢查 byte bound，
 並要求 exact version 或 registry 中唯一的 source→target rule；`restore` 只寫入 caller-owned
