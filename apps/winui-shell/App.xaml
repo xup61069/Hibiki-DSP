@@ -11,6 +11,8 @@
                 <ResourceDictionary Source="ms-appx:///Styles/SceneCard.xaml" />
                 <ResourceDictionary>
                     <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+                    <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter" />
+                    <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
                 </ResourceDictionary>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
