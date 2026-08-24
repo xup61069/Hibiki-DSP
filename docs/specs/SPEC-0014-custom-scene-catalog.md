@@ -91,7 +91,7 @@ payload 時解碼即拒收，同樣不觸碰既有 catalog。
 控制模型對這兩個欄位以 UTF-8 位元組數套用與引擎一致的硬上限：`name` 最長 120 bytes、
 `output_group` 最長 64 bytes；超界名稱在輸入當下即被拒絕，離線佇列載入同樣 fail-closed，
 且兩欄都不得含控制字元（對齊引擎 bounded-string 的可列印 UTF-8 契約），持久化 schema 也以
-invisible-control exclusion pattern 拒收 U+0000-U+001F 與 U+007F-U+009F，不會等到送出
+invisible-control exclusion pattern（anchored）拒收 U+0000-U+001F 與 U+007F-U+009F，不會等到送出
 同步指令或外部驗證才失敗。Remove 操作兩者必須為空字串，且欄位限制必須與控制模型執行期驗證一致。
 全部成功才回報「引擎已同步」，
 同時保留先前捨棄數量並清空持久化佇列；中途失敗則保留剩餘操作與其持久化狀態，誠實顯示降級

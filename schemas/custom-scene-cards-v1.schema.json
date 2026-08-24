@@ -22,8 +22,8 @@
             "maxLength": 120,
             "pattern": "\\S"
           },
-          "description": {"type": "string", "maxLength": 240, "pattern": "[^\u0000-\u001F\u007F-\u009F]*"},
-          "latency_label": {"type": "string", "maxLength": 64, "pattern": "[^\u0000-\u001F\u007F-\u009F]*"},
+          "description": {"type": "string", "maxLength": 240, "pattern": "^[^\u0000-\u001F\u007F-\u009F]*$"},
+          "latency_label": {"type": "string", "maxLength": 64, "pattern": "^[^\u0000-\u001F\u007F-\u009F]*$"},
           "safety_enabled": {"type": "boolean"}
         }
       }
