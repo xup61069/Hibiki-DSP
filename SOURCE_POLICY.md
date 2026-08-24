@@ -5,10 +5,10 @@ source archives, text manifests, SBOM and notices, but never compiled
 executables, drivers, installers, packages or opaque prebuilt dependencies.
 
 Public CI may compile and test in an ephemeral workspace. It must not upload
-binary artifacts, publish packages, persist build outputs in caches or expose
-production signing secrets. Official signed installers are canonical builds
-delivered through Gumroad; the application has no activation or runtime DRM.
+binary artifacts, publish packages, persist build outputs in caches or use
+signing permissions. The project does not use paid delivery, signing,
+activation or runtime DRM.
 
-Every official build maps to one immutable source tag and records toolchain,
-dependency lock, unsigned hashes, signed hashes and test evidence. Customers
-must be able to obtain the corresponding source at no additional charge.
+Every official source tag records toolchain, dependency lock, content hashes
+and test evidence. Anyone can obtain the corresponding source at no additional
+charge and rebuild it.

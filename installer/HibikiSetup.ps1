@@ -24,7 +24,7 @@ function Read-ReleaseManifest([string]$Path) {
     'schema_version', 'product_version', 'source_tag',
     'source_commit', 'distribution_id', 'toolchain_digest',
     'dependency_lock_digest', 'unsigned_files', 'driver_package',
-    'installer', 'sbom_digest', 'tests', 'signed_installer_sha256'
+    'installer', 'sbom_digest', 'tests'
   )
   foreach ($prop in ($manifest | Get-Member -MemberType NoteProperty).Name) {
     if ($allowedRootFields -notcontains $prop) {
@@ -70,8 +70,8 @@ function Read-ReleaseManifest([string]$Path) {
     $section = $manifest.$sectionName
     if ($null -eq $section) { continue }
     $allowedFields = @{
-      driver_package = @('sha256', 'catalog_sha256', 'microsoft_signature_thumbprint')
-      installer = @('sha256', 'signer_thumbprint', 'rfc3161_timestamp')
+      driver_package = @('sha256', 'catalog_sha256')
+      installer = @('sha256')
     }
     foreach ($prop in ($section | Get-Member -MemberType NoteProperty).Name) {
       if ($allowedFields[$sectionName] -notcontains $prop) {
@@ -82,21 +82,12 @@ function Read-ReleaseManifest([string]$Path) {
 
   if ($null -eq $manifest.driver_package -or
       $manifest.driver_package.sha256 -notmatch '^[0-9a-fA-F]{64}$' -or
-      $manifest.driver_package.catalog_sha256 -notmatch '^[0-9a-fA-F]{64}$' -or
-      $manifest.driver_package.microsoft_signature_thumbprint -notmatch '^[0-9a-fA-F]{40}$') {
-    throw 'Manifest driver_package must carry package/catalog hashes and Microsoft signature thumbprint.'
+      $manifest.driver_package.catalog_sha256 -notmatch '^[0-9a-fA-F]{64}$') {
+    throw 'Manifest driver_package must carry package/catalog SHA-256 hashes.'
   }
   if ($null -eq $manifest.installer -or
-      $manifest.installer.sha256 -notmatch '^[0-9a-fA-F]{64}$' -or
-      $manifest.installer.signer_thumbprint -notmatch '^[0-9a-fA-F]{40}$' -or
-      [string]::IsNullOrWhiteSpace($manifest.installer.rfc3161_timestamp)) {
-    throw 'Manifest installer must carry hash, signer thumbprint and RFC3161 timestamp.'
-  }
-  if (($manifest.installer.rfc3161_timestamp -is [string]) -and $manifest.installer.rfc3161_timestamp.Length -gt 128) {
-    throw 'Manifest installer.rfc3161_timestamp exceeds maximum length of 128 characters.'
-  }
-  if (($manifest.installer.rfc3161_timestamp -is [string]) -and $manifest.installer.rfc3161_timestamp -notmatch $printablePattern) {
-    throw 'Manifest installer.rfc3161_timestamp must not contain control characters.'
+      $manifest.installer.sha256 -notmatch '^[0-9a-fA-F]{64}$') {
+    throw 'Manifest installer must carry an installer SHA-256 hash.'
   }
 
   if (($manifest.PSObject.Properties.Name -contains 'distribution_id') -and
@@ -106,13 +97,6 @@ function Read-ReleaseManifest([string]$Path) {
   if (($manifest.PSObject.Properties.Name -contains 'distribution_id') -and
       ($manifest.distribution_id -is [string]) -and $manifest.distribution_id -notmatch $printablePattern) {
     throw 'Manifest distribution_id must not contain control characters.'
-  }
-
-  if (($manifest.PSObject.Properties.Name -contains 'signed_installer_sha256')) {
-    $sigHash = $manifest.signed_installer_sha256
-    if ($null -eq $sigHash -or $sigHash -isnot [string] -or $sigHash -notmatch '^[0-9a-fA-F]{64}$') {
-      throw 'Manifest signed_installer_sha256 must be a SHA-256 digest when present.'
-    }
   }
 
   if ($null -eq $manifest.unsigned_files -or $manifest.unsigned_files -isnot [array]) {

@@ -51,7 +51,7 @@ driver 或 per-App DSP delivery。
 graph，並在 control thread 以 bounded 440 Hz、約 -20 dBFS sine block 經 graph、limiter 與 WASAPI
 handoff 送出。sink snapshot 的 `rendered_blocks` 大於零後，`main-output` detail 會顯示
 `test tone rendering.`。此旗標永遠是 opt-in；它只證明 user-space 可聽路徑到 WASAPI sink worker，
-不構成真實裝置 delivery、WaveRT driver、HLK 或簽章證據。
+不構成真實裝置 delivery 或 WaveRT driver 證據。
 
 ## 失敗／fallback
 
@@ -59,7 +59,7 @@ handoff 送出。sink snapshot 的 `rendered_blocks` 大於零後，`main-output
   volume 一律拒絕。
 - status store 沒有 snapshot 時回 Error；UI 保留上一個狀態並顯示控制狀態暫不可用。
 - status snapshot 只描述 control-plane truth，不代表 physical per-App audio delivery、
-  Chrome tabCapture、signed driver 或 process-loopback runtime 已可用。
+  Chrome tabCapture、WaveRT driver 或 process-loopback runtime 已可用。
 - WASAPI opt-in 沒有支援的 active endpoint、格式不符、worker bind/start 失敗或 device
   invalidation 時，`main-output` 不得回報 `Ready`；應保持 `Pending`／`Degraded` 並 fail-closed。
 

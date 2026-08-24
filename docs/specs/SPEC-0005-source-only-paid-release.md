@@ -3,57 +3,49 @@ id: SPEC-0005
 status: accepted
 owner: hibiki-maintainers
 authority: release-policy
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-25
 review_after_days: 30
-related_adrs: [ADR-0001]
+related_adrs: [ADR-0001, ADR-0006]
 source_globs: ["installer/**", "tools/**", ".github/**", "schemas/release-manifest-v1.schema.json"]
 ---
 
-# SPEC-0005：source-only GitHub 與官方簽章交付
+# SPEC-0005：source-only GitHub 發布與無簽章交付
 
 ## 公開面
 
 GitHub 只放原始碼、依賴鎖定、建置腳本、測試證據、SBOM 與文字 release manifest。禁止
 release asset、Packages、container、Actions artifact 或任何 EXE／DLL／SYS／MSI／MSIX／
-VST3／PE-COFF 輸出。Public CI 可在 ephemeral runner 編譯與測試，job 結束即刪除輸出。
-公開 `verify.yml` 必須同時執行 CMake/CTest、docs/source policy、WinUI source shell、
-driver source boundary、extension/installer/control-model、stable identity 與 JSON parse
-gates；任何 gate 失敗都不得視為可交付 source tag。
+VST3／PE-COFF 輸出。Public CI 可在 ephemeral runner 編譯與測試，job 結束即刪除輸出，
+且不得要求、保存或使用任何 signing permission。公開 `verify.yml` 必須同時執行 CMake/CTest、
+docs/source policy、WinUI source shell、driver source boundary、extension/installer/control-model、
+stable identity 與 JSON parse gates；任何 gate 失敗都不得視為可交付 source tag。
 
-## 官方建置 custody
+## 發布流程
 
-1. 受保護 annotated source tag 觸發兩個 clean builder，產生並比對 unsigned hashes。
-2. 通過 user-space、DSP、Driver Verifier、HLK、升級／回復與音訊 soak 測試後，提交
-   exact driver package 給 Microsoft Partner Center。
-3. 將 Microsoft-signed driver 與 user-space payload 交給隔離 release builder；Hibiki
-   Authenticode 加 RFC3161 timestamp 簽署 installer。
-4. 在 Secure Boot/HVCI 開啟且 TESTSIGNING 關閉的乾淨環境安裝、升級、rollback、uninstall。
-5. 產生 `ReleaseManifest v1`，至少記錄 source tag、commit、toolchain、dependency lock、
-   unsigned/signed hash、driver package/catalog hash 與 Microsoft signature thumbprint、
-   installer hash/signer/RFC3161 timestamp、SBOM 與 test run。公開 repository 只放文字
-   manifest；實際 signed payload 仍由 Gumroad 交付。Schema 強制 `product_version`
-   為 1–64 字元的非空字串、`toolchain_digest` 必須符合 SHA-256 hex 格式（64 字元
-   [0-9a-fA-F]）、`distribution_id` 不得為空字串；`installer.rfc3161_timestamp`
-   最長 128 字元、`unsigned_files[]` 最多 1024 筆且每個路徑為 1–260 字元、每筆項目僅允許 path 與 sha256 兩個宣告欄位（additionalProperties false）、
-   `tests[]` 最多 256 項且每項為 1–120 字元的非空標籤；所有 SHA-256 digest 與簽章
-   thumbprint 欄位均帶明確 `maxLength`（64／40 字元），`source_tag` 必須完全符合
+1. 受保護 annotated source tag 觸發兩個 clean builder，產生並比對內容 hash。
+2. 通過 user-space、DSP、Driver Verifier（當 driver 有可測 package 時）、升級／回復與音訊 soak
+   測試。HLK／WHCP 與任何形式的簽章都不是驗收項目。
+3. 產生 `ReleaseManifest v1`，至少記錄 source tag、commit、toolchain digest、dependency lock
+   digest、payload SHA-256 清單、driver package/catalog 內容 hash、SBOM digest 與 test run。
+   Manifest 與 schema 不得包含 Microsoft signature thumbprint、installer signer thumbprint、
+   RFC3161 timestamp 或 signed payload hash 欄位。`product_version` 為 1–64 字元的非空字串、
+   `toolchain_digest` 必須符合 SHA-256 hex 格式（64 字元 [0-9a-fA-F]）、`distribution_id` 不得為
+   空字串；`unsigned_files[]` 最多 1024 筆且每個路徑為 1–260 字元、每筆項目僅允許 path 與
+   sha256 兩個宣告欄位（additionalProperties false）、`tests[]` 最多 256 項且每項為 1–120 字元的
+   非空標籤；所有 SHA-256 digest 欄位均帶明確 `maxLength`（64 字元），`source_tag` 必須完全符合
    `v<major>.<minor>.<patch>` 加上至多 32 個 `[A-Za-z0-9._:+-]` 後綴。人類可讀的
-   `product_version`、`distribution_id`、`unsigned_files[].path`、
-   `installer.rfc3161_timestamp` 與 `tests[]` 標籤皆拒絕 C0/C1 控制字元（含 DEL），
-   且保留既有長度上限，與安裝程式的嚴格模式一致。
-6. 由人類手動把同一份 canonical installer 上傳 Gumroad；AI 不接觸憑證、Partner Center
-   或 Gumroad 帳密。
+   `product_version`、`distribution_id`、`unsigned_files[].path` 與 `tests[]` 標籤皆拒絕 C0/C1 控制字元
+   （含 DEL），且保留既有長度上限，與安裝程式的嚴格模式一致。
+4. 官方 repository 不交付 binary；使用者依 source policy 自行從 source tag 重建。維護者若另外提供
+   成品，必須明示來源與責任邊界，且不得宣稱簽章或 HLK 保證。
 
 ## GPL 與更新語意
 
-付款取得的是官方簽章建置、便利交付、更新入口與支援，不是 runtime 授權。安裝後離線
-永久可用，無序號、activation、裝置綁定、功能鎖或遙停。GPL 允許買家再散布，因此同版
-所有買家取得相同 hash，不嵌 email、水印或 buyer-specific binary。
-
-App 只匿名讀取簽章 metadata；發現更新時開啟 Gumroad Library，不直接下載成品。若專案
-停止維護，最後一版官方 installer、manifest 與驗證資訊公開，保留既有使用者的離線使用權。
+專案沒有付費授權、activation、序號、裝置綁定、功能鎖或遙停。GPL 權利完整保留；任何人可重建、
+修改與再散布。更新資訊只能指向 source tag／release notes，不得內建 binary 下載、簽章 metadata
+讀取或憑證邏輯。
 
 ## 不可逾越的邊界
 
-簽章私鑰、購買的 ISO 標準文件、顧客資料與 Partner Center credentials 永不進 repository。
-簽章後檔案不是 bit-for-bit 可重建層；公開可重建的是 unsigned payload 與其 hash。
+私密金鑰、憑證、購買的 ISO 標準文件與顧客資料永不進 repository、Issue、prompt 或 CI log。公開面
+永遠以可重建的 source 與其內容 hash 為準。

@@ -45,7 +45,7 @@ source_globs: ["src/hub/**output*", "src/hub/**wasapi*", "src/hub/**audio_engine
   `AUDCLNT_E_SERVICE_NOT_RUNNING` 只在 dedicated worker 內執行 bounded bind/start retry；
   普通 event timeout 不會誤觸發重綁。重綁成功恢復 `endpoint_ready`，連續失敗才標記
   `degraded`，不會由 graph RT thread 直接操作 COM。
-- 真實 WaveRT endpoint、硬體 clock fixture、DPC/拔插 soak 與 WHCP/HLK 證據不在本機
+- 真實 WaveRT endpoint、硬體 clock fixture、DPC/拔插 soak 不在本機
   contract test 中，必須在 Windows 11 24H2+ test machine 完成。
 
 ## WASAPI endpoint handoff
@@ -61,7 +61,7 @@ audio graph 不重啟、不直接呼叫 COM。候選 submit、endpoint bind 或�
 `ReadyToCommit` 是唯一允許交換 active slot 的狀態；`commit` 停止舊 worker 後才翻轉
 active slot，`rollback` 保留仍在執行的舊 worker。這個 user-space handoff 只證明狀態機、
 bounded queue 與 source-level fallback；實體 endpoint 的暖機時間、音量連續性、拔插與
-Audio Service restart 仍需 Windows 11 24H2+ 實機／HLK evidence。
+Audio Service restart 仍需 Windows 11 24H2+ 實機 evidence。
 
 Rollback 之後只要舊 worker 仍然 `running` 且 `endpoint_ready`，狀態會保留為
 `RolledBack` 並允許下一次 `begin → prepare` 重試；不能要求重啟整個 engine 或先重新

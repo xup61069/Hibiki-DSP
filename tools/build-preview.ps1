@@ -510,7 +510,7 @@ if ($SmokeTest) {
       window_class   = $windowClass
       control_count  = $controlCount
       captured_at    = (Get-Date).ToUniversalTime().ToString('o')
-      limitations    = @('unsigned local preview', 'user-space only', 'not driver, HLK or signing evidence')
+      limitations    = @('unsigned local preview', 'user-space only', 'not driver or physical-audio evidence')
     }
     $summaryPath = Join-Path $previewRoot 'winui-launch-a11y-smoke.json'
     $summary | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $summaryPath -Encoding utf8NoBOM

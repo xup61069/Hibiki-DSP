@@ -42,4 +42,4 @@ doctor 全綠後，依序跑：
 
 1. `pwsh -File tools/verify.ps1`（contract suite）
 2. `pwsh -File tools/build-preview.ps1 -Target WinUI`（正式 XAML build）
-3. PortCls/driver 建置與簽章驗證（M2/M3/M4）
+3. PortCls/driver 建置與實機驗證（M2）

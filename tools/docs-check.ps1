@@ -506,7 +506,6 @@ function Assert-ExtendedPrintableContractSchemas {
 
   $digest64 = 'a' * 64
   $commit40 = 'b' * 40
-  $thumbprint40 = 'c' * 40
 
   $cases = @(
     [pscustomobject]@{
@@ -646,7 +645,7 @@ function Assert-ExtendedPrintableContractSchemas {
         'product_version',
         'distribution_id',
         'unsigned_files.0.path',
-        'installer.rfc3161_timestamp',
+        'source_tag',
         'tests.0'
       )
       Document = [ordered]@{
@@ -664,12 +663,9 @@ function Assert-ExtendedPrintableContractSchemas {
         driver_package = [ordered]@{
           sha256 = $digest64
           catalog_sha256 = $digest64
-          microsoft_signature_thumbprint = $thumbprint40
         }
         installer = [ordered]@{
           sha256 = $digest64
-          signer_thumbprint = $thumbprint40
-          rfc3161_timestamp = 'RFC3161 timestamp'
         }
         sbom_digest = $digest64
         tests = @('schema strict-end regression')
@@ -1330,7 +1326,7 @@ $required = @(
   'tools/build-preview.ps1',
   'tools/live-device-catalog-check.ps1', 'tools/live-wasapi-handoff-check.ps1',
   'tools/live-audio-session-check.ps1', 'tools/live-process-loopback-check.ps1',
-  'tools/driver-source-check.ps1', 'tools/driver-signability-check.ps1',
+  'tools/driver-source-check.ps1',
   'schemas/release-manifest-v1.schema.json', 'schemas/evidence-manifest-v2.schema.json',
   'schemas/printable-string-v1.schema.json',
   'docs/START_HERE.md', 'docs/AI_HANDOFF.md', 'docs/PROJECT_MAP.md', 'docs/state/BASELINE.md',

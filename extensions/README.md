@@ -2,7 +2,7 @@
 
 The MV3 extension starts single-tab capture only after an explicit user gesture.
 Captured audio is handed to a native lane; the extension never receives private
-Hibiki signing or Gumroad credentials.
+Hibiki credentials.
 
 The source includes a minimal MV3 popup, service worker and offscreen document.
 `tabCapture.getMediaStreamId` is requested only from the popup click path. The
