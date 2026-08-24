@@ -1932,8 +1932,8 @@ int main() {
     std::copy_n("Quiet Game", 10, catalog_command.name.data());
     catalog_command.output_group_bytes = 13;
     std::copy_n("custom-output", 13, catalog_command.output_group.data());
-    catalog_command.ir_reference_bytes = 19;
-    std::copy_n("studio-calibration-a", 19, catalog_command.ir_reference.data());
+    catalog_command.ir_reference_bytes = 20;
+    std::copy_n("studio-calibration-a", 20, catalog_command.ir_reference.data());
     catalog_command.standard_id = 1U;
     catalog_command.lanes[0].id_bytes = 15;
     std::copy_n("quiet-game-lane", 15, catalog_command.lanes[0].id.data());
