@@ -1,0 +1,60 @@
+{
+  "evidence_format": 2,
+  "schema_version": 1,
+  "issue": 1210,
+  "title": "standalone driver stream transport ABI test binary",
+  "captured_at_utc": "2026-08-24T13:40:03.907Z",
+  "environment": {
+    "platform": "windows-amd64",
+    "shell": "pwsh-7.6.4"
+  },
+  "source_provenance": {
+    "mode": "change",
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "9e55d1df5ad114b891037fa317eba9cd56f09bff9c47734c01a13704e154d88c",
+    "paths": [
+      "tests/CMakeLists.txt",
+      "tests/unit/driver_stream_transport_tests.cpp"
+    ]
+  },
+  "commands": [
+    {
+      "cmd": "cmake --preset windows-dev",
+      "result": "pass"
+    },
+    {
+      "cmd": "cmake --build .local/build --config RelWithDebInfo --target hibiki_driver_stream_tests",
+      "result": "pass"
+    },
+    {
+      "cmd": "ctest --test-dir .local/build -C RelWithDebInfo -R hibiki_driver_stream_tests --output-on-failure",
+      "result": "pass: 100% tests passed out of 1"
+    },
+    {
+      "cmd": "pwsh -File tools/handoff-check.ps1 -Issue 1210",
+      "result": "pass: AI handoff checks passed (#1210@codex/1210-driver-stream-abi-tests)"
+    },
+    {
+      "cmd": "pwsh -File tools/docs-check.ps1",
+      "result": "pass"
+    },
+    {
+      "cmd": "pwsh -File tools/source-policy.ps1",
+      "result": "pass"
+    }
+  ],
+  "limitations": [
+    "This is a user-space SDK ABI selftest binary only.",
+    "It does not prove driver, WaveRT, HLK, Microsoft signing, or real-device audio delivery.",
+    "The shared-memory ring is tracked separately as Issue #1209.",
+    "Local build evidence; not CI evidence until the draft PR pipeline runs."
+  ],
+  "tool_versions": {
+    "cmake": "4.4.2",
+    "pwsh": "7.6.4",
+    "git": "2.49.0.windows.1",
+    "visual_studio": "2026 Community 18.9.12112.369",
+    "windows_sdk": "10.0.28000.0"
+  },
+  "base_commit": "71e2d8b5653be00c5c6a0dc4f2274fb3052e4761"
+}
