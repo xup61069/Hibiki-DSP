@@ -25,7 +25,7 @@
     "The validator result is from PowerShell 7.6.4; it confirms the repository gate and JsonSchema.Net behavior in this environment, not every third-party JSON Schema implementation.",
     "This slice covers only AudioSessionDescriptor v1 and CalibrationResponse v1. Other repository schemas with printable-string patterns were not audited or changed by Issue #1151.",
     "Runtime code and DSP behavior are unchanged; no live audio, driver loading, WaveRT, HLK, signing, or release acceptance is implied.",
-    "source_commit is the main head at authoring time; under the current provenance convention, a post-squash source_commit repair is still required."
+    "source_commit was updated by Issue #1160 to the #1155 squash merge that introduced this evidence file."
   ],
   "logs": {},
   "tool_versions": {
