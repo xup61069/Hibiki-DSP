@@ -56,14 +56,17 @@ reference 字串分別佔用固定區間，timeline ID 表與最多 4 條 lane r
   的 `strict_direct` 必須一致。
 - `EngineControlWorkerV1` 只在 control worker 呼叫 resolver、執行 preflight 與
   Validate → Prepare → Commit；RT thread、pipe callback 不讀 catalog。
+- 成功的 `SceneApply` 必須把解析出的 `EqualLoudnessPolicyV1` 一起換入
+  `active_loudness()`；commit 失敗時連同 Scene、graph 與 revision 一併回復，讓控制端
+  可以檢查引擎實際接受的 loudness 設定。
 - catalog pointer 是 non-owning；其生命週期必須覆蓋所有 SceneApply 消費，換機／換 AI 不得
   靜默重建 Scene ID。
 
 ## 失敗與相容性
 
 未知 custom ID、output group 不一致、非法 definition 與容量耗盡都回傳 Invalid／Failed，
-並保留上一個 active graph、Scene 與 revision。內建 Game／Movie／Voice／Studio 不依賴
-catalog，讓沒有使用者 preset 的 fresh clone 維持向後相容。
+並保留上一個 active graph、Scene、loudness policy 與 revision。內建
+Game／Movie／Voice／Studio 不依賴 catalog，讓沒有使用者 preset 的 fresh clone 維持向後相容。
 wire format 解碼失敗不影響已存在的 catalog 內容或 active graph。
 
 ## 正式殼層的本機卡片移除與引擎同步
@@ -111,5 +114,8 @@ ViewModel 先更新記憶體 mirror，再以既有暫存檔替換流程保存；
 3. 32-entry capacity、remove/clear 與 replacement failure 不破壞既有 slot。
 4. wire format encode→decode 往返一致；破損 lane count 或非法 padding 拒收。
 5. CTest、docs-check、source-policy 與 source-only CI gate 通過；沒有 binary 或私人裝置
-  metadata 進入 catalog/schema。
+   metadata 進入 catalog/schema。
 6. custom-scene-cards-v1 schema 對 name/description/latency_label 強制 string 型別；非字串值在 schema 驗證即拒收。
+7. custom 與內建 `SceneApply` 成功後，`EngineControlWorkerV1::active_loudness()`
+   分別等於 catalog definition 或內建 Easy preset 的 `EqualLoudnessPolicyV1`；
+   套用失敗時保留先前的 active policy。

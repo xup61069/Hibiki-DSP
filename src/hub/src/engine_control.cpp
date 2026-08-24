@@ -130,10 +130,12 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
     try {
         SceneProfileV1 candidate_scene{};
         GraphConfigV1 candidate_graph{};
+        EqualLoudnessPolicyV1 candidate_loudness{};
         if (scene_kind_from_id(scene_id, kind)) {
             auto candidate = make_easy_scene(kind, std::string(output_group));
             candidate_scene = std::move(candidate.scene);
             candidate_graph = std::move(candidate.graph);
+            candidate_loudness = candidate.loudness;
         } else {
             if (active_scene_catalog() == nullptr) return EngineControlResultV1::Invalid;
             const auto* const definition = active_scene_catalog()->find(scene_id);
@@ -142,6 +144,7 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             }
             candidate_scene = definition->scene;
             candidate_graph = definition->graph;
+            candidate_loudness = definition->loudness;
         }
         if (scene_preflight_ != nullptr &&
             !scene_preflight_(candidate_scene, scene_preflight_context_)) {
@@ -172,14 +175,17 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             }
         }
         std::swap(active_scene_, candidate_scene);
+        std::swap(active_loudness_, candidate_loudness);
         if (!engine_.commit_graph()) {
             std::swap(active_scene_, candidate_scene);
+            std::swap(active_loudness_, candidate_loudness);
             engine_.rollback_graph();
             engine_.rollback_ir();
             return EngineControlResultV1::Failed;
         }
         if (!keep_referenced_ir && !engine_.commit_ir()) {
             std::swap(active_scene_, candidate_scene);
+            std::swap(active_loudness_, candidate_loudness);
             engine_.rollback_graph();
             engine_.rollback_ir();
             return EngineControlResultV1::Failed;

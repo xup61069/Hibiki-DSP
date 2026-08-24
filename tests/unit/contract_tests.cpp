@@ -1864,6 +1864,10 @@ int main() {
     auto custom_defaults = make_easy_scene(EasySceneKind::Movie, "custom-output");
     custom_defaults.scene.id = "quiet-game";
     custom_defaults.scene.name = "Quiet Game";
+    // Use a non-default loudness policy so the active_loudness() accessor can
+    // be verified against a value that is not the built-in Easy default.
+    custom_defaults.loudness.reference_phon = 70.0;
+    custom_defaults.loudness.strength = 0.55;
     SceneDefinitionV1 custom_definition;
     custom_definition.scene = std::move(custom_defaults.scene);
     custom_definition.graph = std::move(custom_defaults.graph);
@@ -1964,6 +1968,27 @@ int main() {
     CHECK(scene_catalog_worker.consume(catalog_apply_command) == EngineControlResultV1::Applied &&
           scene_catalog_worker.active_scene().id == "quiet-game" &&
           scene_catalog_worker.active_scene().output_group == "custom-output");
+
+    // The active loudness policy must survive SceneApply so callers can
+    // verify which equal-loudness settings the engine actually accepted.
+    const auto* const applied_definition =
+        scene_catalog_worker.mutable_scene_catalog()->find("quiet-game");
+    CHECK(applied_definition != nullptr);
+    CHECK(scene_catalog_worker.active_loudness().reference_phon ==
+          applied_definition->loudness.reference_phon);
+    CHECK(scene_catalog_worker.active_loudness().strength ==
+          applied_definition->loudness.strength);
+
+    // Built-in Easy presets must also expose their default policy.
+    ControlCommandV1 builtin_apply_command{};
+    builtin_apply_command.type = IpcMessageType::SceneApply;
+    CHECK(encode_scene_apply_payload_v1("game", "main", catalog_scene_payload));
+    CHECK(decode_scene_apply_payload_v1(catalog_scene_payload,
+                                        builtin_apply_command.scene));
+    CHECK(scene_catalog_worker.consume(builtin_apply_command) ==
+          EngineControlResultV1::Applied);
+    CHECK(std::abs(scene_catalog_worker.active_loudness().reference_phon - 80.0) < 1e-12);
+    CHECK(std::abs(scene_catalog_worker.active_loudness().strength - 0.30) < 1e-12);
 
     SceneCatalogCommandV1 remove_catalog_command{};
     remove_catalog_command.operation = SessionRouteRuleOperationV1::Remove;
