@@ -3,7 +3,7 @@ id: SPEC-0004
 status: accepted
 owner: hibiki-maintainers
 authority: repository-process
-last_reviewed: 2026-08-23
+last_reviewed: 2026-08-24
 review_after_days: 30
 related_adrs: [ADR-0001]
 source_globs: ["AGENTS.md", "README.md", "CONTRIBUTING.md", ".github/ISSUE_TEMPLATE/ai-task.yml", ".github/PULL_REQUEST_TEMPLATE.md", "docs/**", "evidence/**", "tools/**"]
@@ -53,15 +53,28 @@ tests 與 evidence。每個 active claim 各有一個 `Next safe action`，不�
 
 每次交接前必須記錄 owner、target branch、scope、dependencies、base commit、工作樹狀態、已完成
 內容、驗證命令、剩餘風險與該 Issue 唯一的 `Next safe action`。原 writer 完成 WIP commit、push、
-更新 handoff 並停止寫入後，新 AI 才能接手。新 AI 先讀 repository 與 Issue，再執行
-`handoff-check.ps1 -Issue <id>`、`context-pack.ps1` 與 scope 所需測試；只有需要 build／target
-environment evidence 時才執行 `doctor.ps1 -CheckOnly`。不得依賴
-聊天記憶、舊機 registry 或私人路徑。
+更新 handoff 並停止寫入後，新 AI 才能接手。新 AI 只先讀 `AGENTS.md`、`docs/START_HERE.md` 與
+active Issue handoff，再執行 `handoff-check.ps1 -Issue <id>`、`context-pack.ps1 -NoSource` 與 scope
+所需測試；只有需要 build／target environment evidence 時才執行 `doctor.ps1 -CheckOnly`。不得依賴
+聊天記憶、舊機 registry 或私人路徑，也不得把全域歷史當作每個 task 的固定前置。
 
-`tools/context-pack.ps1 -Issue <id>` 會讀 issue body handoff block 指定的 Spec/ADR，依各 Spec front matter
-的 `source_globs` 只輸出相關 source，並附上該 Issue 的 evidence JSON；`-NoSource` 可先取得
-最小文件包。Foundation integration Issue 是 foundation bootstrap，例外包含所有 tests 作為基準；後續 Issue
-不得把全 repository source 默認塞入 context，若需要跨子系統檔案必須在 Spec 明確加入 glob。
+## 上下文預算與分層載入
+
+`tools/context-pack.ps1 -Issue <id>` 預設只輸出 active Issue body、handoff 指定的 Spec／ADR 與該
+Issue 的 evidence JSON；它不再重複輸出啟動時已讀的 `AGENTS.md`／`START_HERE.md`，也不預載
+`MULTI_AGENT`、`AI_HANDOFF`、`PROJECT_MAP` 或 `BASELINE`。需要 source 時，工具依 Spec front matter
+的 `source_globs` 選取；`-NoSource` 是新視窗與交接的預設入口。
+
+pack 必須先在記憶體完成組裝，再一次輸出；預設 `-MaxCharacters 48000`，超過時在任何 pack 內容
+輸出前 fail closed。操作者應縮小 Issue 引用或改成本機按需查閱，不得只為繞過限制無界提高預算。
+只有明確的 repository-wide 稽核可以使用 `-IncludeRepositoryState`；需要超過預設上限時，必須同時
+明確給定較大的 `-MaxCharacters`，讓擴張可見且可重現。Foundation integration Issue 也不取消此上限
+或自動載入全域歷史；其 source 模式只保留既有 tests bootstrap 例外。後續 Issue 不得把全 repository
+source 默認塞入 context，跨子系統檔案必須在 Spec 明確加入 glob。
+
+每個里程碑完成時，Issue handoff 要保存已完成動作、有效假設、識別碼／commit、驗證結果、未解
+阻擋與唯一下一步。同一視窗發生第二次上下文壓縮，或工作切換到另一個里程碑時，writer 必須先
+完成 durable checkpoint，再由新視窗以核心入口、active Issue 與最小 pack 接續，不重播完整聊天。
 
 `handoff-check.ps1` 也必須對所有帶 handoff block 的 open Issue 做 bounded
 repository-relative glob intersection 檢查。完全相同、父子路徑與 wildcard 可相交的 claim

@@ -12,8 +12,9 @@
 `-SelfTest`（例：`tools/docs-check.ps1 -SelfTest`），可在不碰機器、不寫檔的前提下
 驗證 gate 自身邏輯。
 
-1. 讀 root `AGENTS.md`、本檔、`docs/AI_HANDOFF.md`、`docs/ai/MULTI_AGENT.md` 與
-   `docs/PROJECT_MAP.md`。
+1. 只先讀 root `AGENTS.md` 與本檔。不要在還不知道 Issue／角色前預載
+   `docs/AI_HANDOFF.md`、`docs/state/BASELINE.md`、`docs/PROJECT_MAP.md` 或完整
+   `docs/ai/MULTI_AGENT.md`；它們是後續依問題查閱的全域資料，不是每個視窗的固定 prompt。
 2. 執行 `git fetch --all --prune`，檢查 open Issue／PR、handoff block、遠端 branches 與本機
    worktrees。唯讀偵察可繼續；寫入必須有 maintainer／orchestrator 明確指派，不得自行挑選
    backlog。人類 maintainer 對目前 session 的直接要求算指派，active orchestrator 可在確認
@@ -32,12 +33,15 @@
 6. 需要 build、toolchain 或 target-machine evidence 時才執行
    `pwsh -File tools/doctor.ps1 -CheckOnly` 與 `pwsh -File tools/probe-environment.ps1`；
    文件／流程小改不必為了形式探測機器，任何環境資料只寫入 `.local/`。
-7. 讀 handoff block 指定的 Spec、ADR、source、tests 與 evidence。
-8. 先用最小 context pack 複製交接內容：
-`pwsh -File tools/context-pack.ps1 -Issue <issue> -NoSource`。Foundation integration Issue 只是 whole-repository
-   foundation 例外；其他工作不得用 foundation Issue 取代自己的 handoff block。再執行 handoff 的 baseline
-   smoke test；結果不一致時先標記 stale/conflict。需要完整 source context 時移除
-   `-NoSource`，不要把與該 Issue 無關的聊天內容帶入新工作階段。
+7. 先取得有上限的最小任務包：
+   `pwsh -File tools/context-pack.ps1 -Issue <issue> -NoSource`。預設只輸出 Issue body、其引用的
+   Spec／ADR 與該 Issue evidence，不重播已讀過的核心規則或全域快照；48,000 字元上限會在任何
+   內容輸出前拒絕過大的 pack。只有明確的 repository-wide 稽核才使用
+   `-IncludeRepositoryState`，並由操作者明確提高 `-MaxCharacters`。
+8. 依 handoff 與 pack 只讀當前 slice 需要的 source、tests 與 evidence，再執行 handoff 的
+   baseline smoke test；結果不一致時先標記 stale/conflict。需要 source pack 時移除 `-NoSource`，
+   但不得為了繞過上限載入無關檔案。Foundation integration Issue 也不會取消預設上限或自動載入
+   全域歷史，其他工作更不得用 foundation Issue 取代自己的 handoff block。
 9. 修改中定期把可建置的 WIP commit push 到自己的 branch，並同步 handoff block 的已完成內容、
    限制與下一個安全動作；不得靠未 push 的工作樹或聊天紀錄交接。
 10. 修改後執行 AGENTS.md 第三層的核心檢查（scoped handoff-check、docs-check、source-policy、
@@ -73,6 +77,9 @@ Issue body handoff block。兩份權威文件衝突時停止修改，建立 `DOC
 剩餘工作、`Next safe action` 與 resume commands。建立 WIP commit 並 push
 branch，確認前一個 AI 停止寫入後才把 owner 交給下一個 AI。真實裝置資料與 calibration
 留在 `.local/`，只提交 schema 和匿名 fixture。
+
+同一視窗若已發生第二次上下文壓縮，或下一步已切換到另一個里程碑，先完成上述 durable checkpoint
+再開新視窗接續；新視窗只載入核心入口、active Issue 與其最小 pack，不重播舊聊天或整份全域歷史。
 
 ## 目前能力與缺口去哪裡看
 
