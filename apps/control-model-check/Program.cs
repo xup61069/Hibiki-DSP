@@ -480,6 +480,25 @@ Check(ControlPayloadsV1.TryDecodeDeviceSwitch(viewModel.LastCommand!.Payload.Spa
       selectedEndpoint == "endpoint-a" && selectedChannels == 8 && selectedRate == 48000 &&
       selectedFrames == 128 && selectedSequence == 10UL,
     "Physical device switch payload did not round-trip.");
+foreach (var blockedEndpoint in (string[])["\u0007bell", "\u007f", "\u0085next-line", "\u009f"])
+{
+    var encodeRejected = false;
+    try
+    {
+        ControlPayloadsV1.EncodeDeviceSwitch(blockedEndpoint, 2, 48000, 128, 12UL);
+    }
+    catch (ArgumentException)
+    {
+        encodeRejected = true;
+    }
+    Check(ControlPayloadsV1.TryDecodeDeviceSwitch(
+        ControlPayloadsV1.EncodeDeviceSwitch("endpoint-a", 2, 48000, 128, 12UL).AsSpan(),
+        out var wireEndpointA, out _, out _, out _, out _),
+        "wire endpoint must round-trip");
+    Check(wireEndpointA == "endpoint-a", "wire endpoint must round-trip");
+    Check(encodeRejected,
+        $"DeviceSwitch endpoint {((int)blockedEndpoint[0]):X2} encode must fail closed.");
+}
 var snapshotSpeaker = speakers with { IsDefault = false };
 var snapshotMicrophone = new PhysicalDeviceCard("endpoint-mic", "麥克風",
     PhysicalDeviceFlowV1.Capture, PhysicalDeviceAvailabilityV1.Active, 2, 48000, 128, true, 11UL);

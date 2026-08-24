@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "issue": 1125,
+  "scope_digest": "device-switch-wire-printable-v1",
+  "source_commit": "171053fdea34c183c5a333c680c992e69bd5195d",
+  "environment_fingerprint": "windows-amd64-pwsh-device-switch-wire-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1125",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [],
+  "limitations": [
+    "DeviceSwitch wire codec now rejects C0, C1 and DEL control characters in endpoint_id during encode and decode; byte-length and reserved-byte contracts unchanged.",
+    "Contract checks cover BEL, DEL, NEL (U+0085), U+009F rejection plus the printable 260-character boundary round-trip.",
+    "Runtime contract evidence only; no schema change, DSP behavior change, physical audio, driver, HLK or signing acceptance is implied.",
+    "source_commit is pinned to the main head at authoring time; post-merge squash-hash repair follows the established follow-up convention."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
