@@ -93,6 +93,10 @@ sink 的 pointer／capacity 在第一次寫入前一次驗證；任何容量不�
 不會只更新部分 sink。每個 sink 後續仍由自己的 ring、clock drift 與 SRC worker 處理；fan-out
 本身不碰 COM、裝置或 physical endpoint。
 
+每個 sink 的 `sink_id` 是 1..64 bytes 的 printable label：JSON schema 與 runtime validator
+一致地拒絕 C0/C1 控制字元（含 NUL、tab、newline、CR、DEL 與 0x80–0x9F），只接受可顯示的
+UTF-8 名稱。這讓 UI 與 downstream consumer 不需要處理不可見字元的 edge case。
+
 `OutputFanoutRuntimeV1` 將每個 enabled sink 綁定一個 persistent `OutputSinkModel`。clock
 observation 只在 control/worker 邊界更新該 sink 的 ratio；audio-side process 先做有限值與
 容量上限 preflight，再把各 sink 的 SRC 結果寫入 prepare 階段配置的 scratch，所有 sink 成功

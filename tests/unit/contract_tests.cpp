@@ -984,6 +984,20 @@ int main() {
     const std::array<OutputFanoutSinkConfigV1, 2> duplicate_sinks{{
         {"same", 2U, true}, {"same", 2U, true}}};
     CHECK(!prepare_output_fanout_plan_v1(duplicate_sinks, 2U, 8U, fanout_plan));
+    const std::array<OutputFanoutSinkConfigV1, 1> control_sink{{
+        {"ok", 2U, true}}};
+    for (const auto invalid : {'\t', '\n', '\r', '\0', '\x7F',
+                               static_cast<char>(0x80), static_cast<char>(0x9F)}) {
+        auto bad = control_sink;
+        bad[0].sink_id = std::string("bad");
+        bad[0].sink_id[1] = invalid;
+        CHECK(!prepare_output_fanout_plan_v1(bad, 2U, 10U, fanout_plan));
+    }
+    const std::array<OutputFanoutSinkConfigV1, 1> boundary_sink{{
+        {std::string(64, 's'), 2U, true}}};
+    OutputFanoutPlanV1 boundary_plan{};
+    CHECK(prepare_output_fanout_plan_v1(boundary_sink, 2U, 11U, boundary_plan) &&
+          validate_output_fanout_plan_v1(boundary_plan));
     const float fanout_nan_input[] = {0.25F, std::numeric_limits<float>::quiet_NaN(),
                                       0.5F, -0.5F};
     CHECK(!fanout_interleaved_v1(fanout_plan, fanout_nan_input, 2U, fanout_outputs,
