@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "issue": 1003,
+  "scope_digest": "route-rule-schema-bounds-v1",
+  "source_commit": "1e590d6c",
+  "environment_fingerprint": "windows-amd64-pwsh-route-rule-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1003",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass",
+      "log": ".local/verify-1003.log"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "session-route-rule-v1.schema.json lane_id/output_group maxLength tightened from 256 to 64.",
+    "Matches IPC wire kSessionRouteRuleRouteMaxBytesV1 = 64 and catalog session-route-rules-v1.schema.json maxLength 64.",
+    "No existing fixture/test uses a route-rule lane_id or output_group longer than 64 characters."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
