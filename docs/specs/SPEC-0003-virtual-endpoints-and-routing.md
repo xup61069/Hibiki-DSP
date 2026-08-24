@@ -115,8 +115,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   RT push/pop 路徑不配置、不取得 mutex、不等待，僅以 interlocked sequence 發布與消費。
   格式不符、非有限 sample、零 sequence/generation 或非零 reserved 欄位一律 fail-closed；
   ring 滿載時拒絕且不寫入 partial slot，underrun 回報 silence flag 並累計計數。binary layout
-  穩定，可供未來跨 process 或 kernel mapping 重用。這仍是 user-space contract evidence；
-  實體 WaveRT delivery、HLK 與簽章驗收尚未涵蓋。
+  穩定，可供未來跨 process 或 kernel mapping 重用。contract tests 另外證明：ring pop
+  的完整 packet 可直接通過 engine render gate；engine outbound encode 經 ring 往返後
+  逐位元組一致且 validate 通過；underrun 或損毀 packet 則 fail-closed。這些都是
+  user-space contract evidence；實體 WaveRT delivery、HLK 與簽章驗收尚未涵蓋。
 - `PersistentLinearResampler` 保存跨 block 的 phase 與 boundary frame，要求 caller 提供
   整個 input block 的 output capacity，並拒絕在不足時部分消耗；它是 clock-drift/SRC 的
   無配置 baseline，尚未宣稱 production-quality polyphase filter。
