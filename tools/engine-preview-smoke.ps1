@@ -3,6 +3,7 @@
 param(
   [switch]$EnableSystemVolume,
   [switch]$EnableSessionRouting,
+  [switch]$EnableProcessDelivery,
   [switch]$EnableWasapiOutput,
   [switch]$EnableTestTone,
   [switch]$StatusOnly,
@@ -425,6 +426,11 @@ function Write-TestIrWav([string]$Path) {
 $engineArguments = @()
 if ($EnableSystemVolume) { $engineArguments += '--enable-system-volume' }
 if ($EnableSessionRouting) { $engineArguments += '--enable-session-routing' }
+if ($EnableProcessDelivery) {
+  if (-not $EnableSessionRouting) { throw 'EnableProcessDelivery requires EnableSessionRouting.' }
+  if (-not $EnableWasapiOutput) { throw 'EnableProcessDelivery requires EnableWasapiOutput.' }
+  $engineArguments += '--enable-process-delivery'
+}
 if ($EnableWasapiOutput) { $engineArguments += '--enable-wasapi-output' }
 if ($EnableTestTone) {
   if (-not $EnableWasapiOutput) { throw 'EnableTestTone requires EnableWasapiOutput.' }
@@ -507,6 +513,20 @@ try {
         throw "WASAPI main output route state is invalid: $mainOutputState."
       }
       $statusSummary += "WASAPI output route state=$mainOutputState; physical delivery is endpoint-dependent"
+    }
+    if ($EnableProcessDelivery) {
+      # Route 5 is process-loopback. When delivery is enabled the detail must
+      # eventually change from "waiting for captured audio" to "blocks rendered
+      # through WASAPI sink" (or stay waiting on a quiet machine, which is a
+      # pass because it proves the source started without crashing).
+      $processRouteOffset = 20 + 40 + (5 * 224)
+      $processDetailBytes = [BitConverter]::ToUInt16($statusReply, $processRouteOffset + 6)
+      $processDetail = [System.Text.Encoding]::UTF8.GetString(
+        $statusReply, $processRouteOffset + 104, $processDetailBytes)
+      if ($processDetail -notmatch 'per-App process delivery') {
+        throw "Process delivery route detail is unexpected: '$processDetail'."
+      }
+      $statusSummary += "process delivery enabled; route detail='$processDetail'"
     }
     if ($EnableTestTone) {
       $toneRendering = $false
