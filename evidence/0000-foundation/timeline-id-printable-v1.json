@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "issue": 1058,
+  "scope_digest": "timeline-id-printable-v1",
+  "source_commit": "b6ab601f478993e78e46fd118590523fb48e6fcd",
+  "environment_fingerprint": "windows-amd64-pwsh-timeline-id-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1058",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [],
+  "limitations": [
+    "Schema pattern now anchored and aligned with runtime contracts.cpp validation for automation_timeline_ids items.",
+    "No runtime behavior change."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}

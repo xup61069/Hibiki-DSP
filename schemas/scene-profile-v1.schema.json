@@ -15,7 +15,7 @@
     },
     "automation_timeline_ids": {
       "type": "array", "maxItems": 16,
-      "items": {"type": "string", "minLength": 1, "maxLength": 64}
+      "items": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[^\u0000-\u001F\u007F-\u009F]*$"}
     },
     "ir_reference": {
       "type": "string", "minLength": 8, "maxLength": 64,
