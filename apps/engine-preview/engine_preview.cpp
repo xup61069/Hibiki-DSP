@@ -215,6 +215,8 @@ bool rebuild_delivery_graph(ProcessDeliveryState& delivery,
     hibiki::GraphConfigV1 candidate{};
     if (!coordinator.copy_graph(candidate)) return false;
     if (candidate.lanes.empty()) {
+        // No routed sessions: keep the previous graph (which may be the
+        // test-tone graph or a prior delivery graph) so the sink stays valid.
         delivery.graph_ready = false;
         return true;  // No routed sessions yet; not an error.
     }
