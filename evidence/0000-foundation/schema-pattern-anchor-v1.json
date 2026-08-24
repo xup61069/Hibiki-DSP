@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "issue": 1048,
+  "scope_digest": "schema-pattern-anchor-v1",
+  "source_commit": "d4727c877c2b00013dea21eef15650f6ed6d8dcc",
+  "environment_fingerprint": "windows-amd64-pwsh-schema-pattern-anchors",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1048",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/verify.ps1"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Schema-level invisible-control exclusion patterns are now anchored so partial matches cannot bypass rejection.",
+    "Portable schema validation checks only; no driver, WaveRT, HLK or Microsoft signing evidence."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  },
+  "started_at": "2026-08-24T09:50:00+08:00",
+  "finished_at": "2026-08-24T10:05:00+08:00"
+}
