@@ -343,6 +343,7 @@
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <Button Content="提交草稿" Click="OnVst3CommitClick" Style="{StaticResource AccentButtonStyle}" AutomationProperties.Name="提交時間軸草稿" />
                                         <Button Content="捨棄草稿" Click="OnVst3DiscardClick" AutomationProperties.Name="捨棄時間軸草稿" />
+                                        <Border Width="1" Margin="4,0" Background="{ThemeResource CardStrokeColorDefaultBrush}" />
                                         <Button Content="復原" Click="OnVst3UndoClick" AutomationProperties.Name="復原時間軸操作" />
                                         <Button Content="重做" Click="OnVst3RedoClick" AutomationProperties.Name="重做時間軸操作" />
                                         <Button Content="清除歷史" Click="OnVst3ClearHistoryClick" AutomationProperties.Name="清除時間軸編輯歷史" AutomationProperties.HelpText="只清除復原與重做紀錄；保留目前內容、修改狀態與開啟中的草稿" />
