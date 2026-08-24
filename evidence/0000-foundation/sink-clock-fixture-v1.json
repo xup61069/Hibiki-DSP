@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1118,
   "scope_digest": "sink-clock-fixture-v1",
-  "source_commit": "0d38db358d74cf300880b1965c4362d162586a3e",
+  "source_commit": "d0f66f31848b77d601fd36b8bfd891ac1f43b64a",
   "environment_fingerprint": "windows-amd64-pwsh-sink-clock-fixture",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1118",

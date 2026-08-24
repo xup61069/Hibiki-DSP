@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1125,
   "scope_digest": "device-switch-wire-printable-v1",
-  "source_commit": "171053fdea34c183c5a333c680c992e69bd5195d",
+  "source_commit": "70b9b9943124b39889542d93669dac5d26d5d955",
   "environment_fingerprint": "windows-amd64-pwsh-device-switch-wire-printable",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1125",
