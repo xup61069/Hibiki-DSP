@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1074,
   "scope_digest": "calibration-device-printable-v1",
-  "source_commit": "3f6cb4fd",
+  "source_commit": "8dfbeef58788c44474c6c82c5fde7f0ca96573ac",
   "environment_fingerprint": "windows-amd64-pwsh-calibration-device-printable",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1074",
