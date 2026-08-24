@@ -17,6 +17,11 @@ Check(customScenes.Upsert(new SceneCard("quiet-game", "安靜遊戲", "遊戲音
 Check(!customScenes.Upsert(new SceneCard("game", "覆寫遊戲", "", "", true)) &&
       !customScenes.Upsert(new SceneCard("Bad ID", "錯誤", "", "", true)),
     "Custom Scene catalog must reject reserved or invalid IDs.");
+Check(!customScenes.Upsert(new SceneCard("desc-newline", "錯誤描述", "含換行\n說明", "", true)) &&
+      !customScenes.Upsert(new SceneCard("label-tab", "錯誤標籤", "", "零\t緩衝", true)) &&
+      customScenes.Upsert(new SceneCard("printable-fields", "可顯示欄位", "合法說明", "零額外緩衝", true)),
+    "Custom Scene display fields must reject control characters.");
+customScenes.Remove("printable-fields");
 Check(customScenes.Remove("quiet-game") && customScenes.Count == 0,
     "Custom Scene card removal failed.");
 var physicalDevices = new PhysicalDeviceCatalogV1();
@@ -58,6 +63,9 @@ try
         "{\"schema_version\":1,\"scenes\":[{\"id\":\"Bad ID\",\"name\":\"x\",\"description\":\"\",\"latency_label\":\"\",\"safety_enabled\":true}]}");
     Check(!loadedScenes.TryLoad(customScenePath, out _) && loadedScenes.Count == 1,
         "Invalid custom Scene load must preserve the previous catalog.");
+    File.WriteAllText(customScenePath, "{\"schema_version\":1,\"scenes\":[{\"id\":\"bad-desc\",\"name\":\"x\",\"description\":\"newline\\n\",\"latency_label\":\"\",\"safety_enabled\":true}]}");
+    Check(!loadedScenes.TryLoad(customScenePath, out _) && loadedScenes.Count == 1,
+        "Control-character description must fail closed against the printable contract.");
 }
 finally
 {
