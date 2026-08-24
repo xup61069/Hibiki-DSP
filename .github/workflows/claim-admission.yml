@@ -58,7 +58,7 @@ jobs:
           . {
             param([string]$ScriptPath)
             $content = Get-Content -LiteralPath $ScriptPath -Raw
-            $start = $content.IndexOf('function Get-AdmissionIssueData')
+            $start = $content.IndexOf('function Get-HandoffScalar')
             if ($start -lt 0) { throw 'Admission helpers are missing from tools/handoff-check.ps1.' }
             $end = $content.IndexOf('if ($AdmissionPrecheck)', $start)
             if ($end -lt 0) { throw 'Admission overlap helpers are missing from tools/handoff-check.ps1.' }
