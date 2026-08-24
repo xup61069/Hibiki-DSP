@@ -124,11 +124,11 @@ Authenticode 簽章 installer，經 Gumroad 交付。
 
 ## 給 AI 協作者
 
-**入口順序（canonical）**：先讀 [AGENTS.md](AGENTS.md)（三層規則與 scope-triggered gates），再依
-[AI 接手頁](docs/AI_HANDOFF.md) 操作，多 session 並行規則見
-[docs/ai/MULTI_AGENT.md](docs/ai/MULTI_AGENT.md)。它們會指向唯一的 active handoff、
-目前環境限制、已驗證命令、不能碰的資料，以及 **一個**下一步。不要從聊天紀錄、舊
-registry、私人裝置 ID 或未提交的 build output 推斷專案狀態。
+**入口順序（canonical）**：先讀 [AGENTS.md](AGENTS.md)（三層規則與 scope-triggered gates）與
+[START_HERE](docs/START_HERE.md)，取得指派後只載入對應 Issue handoff 與最小 context pack。
+[AI 接手路由](docs/AI_HANDOFF.md) 與 [多 session 並行規則](docs/ai/MULTI_AGENT.md) 只在角色或
+衝突判斷需要時查相關段落，不作每個視窗的固定前置。不要從聊天紀錄、舊 registry、私人裝置 ID
+或未提交的 build output 推斷專案狀態。
 
 **執行環境**：所有 `tools/*.ps1` gates 以 UTF-8（無 BOM）儲存並使用 .NET Core API，
 必須用 PowerShell 7（`pwsh`）執行。Windows 內建的 PowerShell 5.1 會把中文註解解成

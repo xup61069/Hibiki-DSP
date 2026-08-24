@@ -9,7 +9,7 @@
 ```powershell
 git fetch --all --prune
 git status --short --branch
-gh issue view <issue>
+gh issue view <issue> --json number,state,labels,assignees,updatedAt
 pwsh -File tools/handoff-check.ps1 -Issue <issue>
 pwsh -File tools/context-pack.ps1 -Issue <issue> -NoSource
 ```
@@ -21,7 +21,8 @@ pwsh -File tools/context-pack.ps1 -Issue <issue> -NoSource
 ## 上下文載入邊界
 
 - 預設只載入 `AGENTS.md`、`START_HERE.md`、active Issue handoff 與其指定的 Spec／ADR。
-- `context-pack.ps1 -NoSource` 是交接入口；它有 48,000 字元上限，不重播全域規則或快照。
+- `context-pack.ps1 -NoSource` 是 Issue body 的唯一啟動輸出；它有 48,000 字元與 12,000
+  conservative estimated-token 雙上限，不重播全域規則或快照。
 - 查 main 能力時用關鍵字讀 [BASELINE](state/BASELINE.md) 的相關段落，不把整份檔案貼進 prompt：
 
   ```powershell
@@ -36,7 +37,8 @@ pwsh -File tools/context-pack.ps1 -Issue <issue> -NoSource
   ```
 
 - 只有明確 repository-wide 稽核才使用 context pack 的 `-IncludeRepositoryState`，並明確指定
-  `-MaxCharacters`。同一視窗第二次壓縮或切換里程碑時先 checkpoint，再開新視窗接續。
+  `-MaxCharacters` 與 `-MaxEstimatedTokens`。同一視窗第二次壓縮或切換里程碑時先 checkpoint，
+  再開新視窗接續。
 
 ## 多 AI 並行入口
 
@@ -45,6 +47,8 @@ pwsh -File tools/context-pack.ps1 -Issue <issue> -NoSource
   handoff scope；人類 maintainer 的直接要求算指派，但仍須 materialize Issue 並檢查 overlap。
 - 有並行 writer、branch occupancy 或不確定狀態時使用獨立 worktree。首次可重建的
   WIP/reviewable commit push 後立即開 draft PR，不需要空認領 commit。
+- worktree 很多時只查目標 branch，不輸出完整 inventory：
+  `git worktree list --porcelain | rg -B2 -A1 --fixed-strings "branch refs/heads/<branch>"`。
 - 修改前以 Issue handoff 的 `scope_globs`、`shared_paths`、`depends_on` 與語意契約 ownership
   判定衝突；重疊時停止，由 integrator 指定 owner。
 - feature AI 只更新自己的 handoff、目標 Spec、tests 與 evidence；全域快照由 integrator 單寫。
@@ -55,7 +59,7 @@ pwsh -File tools/context-pack.ps1 -Issue <issue> -NoSource
 - main 已合併、可重跑的能力與限制：[BASELINE](state/BASELINE.md) 的相關段落。
 - 子系統位置與 contract 路由：[PROJECT_MAP](PROJECT_MAP.md)。
 - 實際命令、環境與 limitation：對應 Issue 的 `evidence/` JSON。
-- 整合先後與歷史變更：`git log origin/main`、merged PR 與各檔案 Git history。
+- 整合先後與歷史變更：`git log -12 --oneline origin/main`、bounded merged PR 與各檔案 Git history。
 
 ## 依任務載入順序
 

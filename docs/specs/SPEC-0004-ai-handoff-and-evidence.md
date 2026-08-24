@@ -60,15 +60,19 @@ active Issue handoff，再執行 `handoff-check.ps1 -Issue <id>`、`context-pack
 
 ## 上下文預算與分層載入
 
-`tools/context-pack.ps1 -Issue <id>` 預設只輸出 active Issue body、handoff 指定的 Spec／ADR 與該
+`tools/context-pack.ps1 -Issue <id>` 是啟動流程唯一一次輸出 active Issue body 的位置；它預設只輸出
+該 body、handoff 指定的 Spec／ADR 與該
 Issue 的 evidence JSON；它不再重複輸出啟動時已讀的 `AGENTS.md`／`START_HERE.md`，也不預載
 `MULTI_AGENT`、`AI_HANDOFF`、`PROJECT_MAP` 或 `BASELINE`。需要 source 時，工具依 Spec front matter
 的 `source_globs` 選取；`-NoSource` 是新視窗與交接的預設入口。
 
-pack 必須先在記憶體完成組裝，再一次輸出；預設 `-MaxCharacters 48000`，超過時在任何 pack 內容
-輸出前 fail closed。操作者應縮小 Issue 引用或改成本機按需查閱，不得只為繞過限制無界提高預算。
-只有明確的 repository-wide 稽核可以使用 `-IncludeRepositoryState`；需要超過預設上限時，必須同時
-明確給定較大的 `-MaxCharacters`，讓擴張可見且可重現。Foundation integration Issue 也不取消此上限
+pack 必須先在記憶體完成組裝，將換行與 summary 一併序列化，再檢查完整輸出後一次寫出；預設
+`-MaxCharacters 48000` 與 `-MaxEstimatedTokens 12000`。後者用離線、模型無關的保守 heuristic
+估算一般混合中文與 code 的 token 壓力，不冒充精確 tokenizer 或數學上界。任一超限都必須在任何
+pack 內容輸出前 fail closed。
+操作者應縮小 Issue 引用或改成本機按需查閱，不得只為繞過限制無界提高預算。只有明確的
+repository-wide 稽核可以使用 `-IncludeRepositoryState`；使用時必須同時明確給定
+`-MaxCharacters` 與 `-MaxEstimatedTokens`，讓擴張可見且可重現。Foundation integration Issue 也不取消此上限
 或自動載入全域歷史；其 source 模式只保留既有 tests bootstrap 例外。後續 Issue 不得把全 repository
 source 默認塞入 context，跨子系統檔案必須在 Spec 明確加入 glob。
 
@@ -77,10 +81,12 @@ source 默認塞入 context，跨子系統檔案必須在 Spec 明確加入 glob
 完成 durable checkpoint，再由新視窗以核心入口、active Issue 與最小 pack 接續，不重播完整聊天。
 
 `docs-check.ps1` 必須對固定 AI 入口執行字元預算：`AGENTS.md` 6,000、`START_HERE.md` 7,000、
-`AI_HANDOFF.md` 6,000、`PROJECT_MAP.md` 12,000、`CODEX_GOALS.md` 6,000。超限代表入口混入了
-應按需查詢的細節，必須 fail closed；不得為新增 changelog 直接調高上限。`PROJECT_MAP.md` 也不得
-重新要求新 AI 先讀 `AI_HANDOFF.md`。整合歷史由 BASELINE、evidence、merged PR 與 Git history
-保存，`AI_HANDOFF.md` 只保留 live routing 與安全邊界。
+四個生成 adapter 各 1,000、`AI_HANDOFF.md` 6,000、`PROJECT_MAP.md` 12,000、`MULTI_AGENT.md`
+9,000、`CODEX_GOALS.md` 6,000、root `README.md` 20,000。超限代表入口混入了應按需查詢的細節，
+必須 fail closed；不得為新增 changelog 直接調高上限。README／PROJECT_MAP 不得重新要求新 AI
+預載 `AI_HANDOFF.md`，啟動文件不得先全文輸出 Issue body 再由 pack 重播，也不得使用未經 filter
+的 `git worktree list`。整合歷史由 BASELINE、evidence、merged PR 與 Git history 保存，
+`AI_HANDOFF.md` 只保留 live routing 與安全邊界。
 
 `handoff-check.ps1` 也必須對所有帶 handoff block 的 open Issue 做 bounded
 repository-relative glob intersection 檢查。完全相同、父子路徑與 wildcard 可相交的 claim

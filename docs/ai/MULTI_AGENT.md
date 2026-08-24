@@ -59,9 +59,10 @@ Orchestrator 可以在正式指派前先建立 pre-claim 草稿：Issue body 已
 
 ### #124 occupancy fallback
 
-若需要隔離但工具無法提供 worktree，或接手／推送非自己開始的 branch 前，
-必須執行 `git worktree list` 確認 branch 未被本機任何 worktree 佔用，並在該 Issue 宣告意圖；
-這是 fallback 檢查；occupancy 仍不明時不得開始寫入。
+若需要隔離但工具無法提供 worktree，或接手／推送非自己開始的 branch 前，必須用 bounded filter
+確認目標 branch 未被本機任何 worktree 佔用：
+`git worktree list --porcelain | rg -B2 -A1 --fixed-strings "branch refs/heads/<branch>"`。不要把完整
+worktree inventory 輸出到 prompt；在該 Issue 宣告意圖，occupancy 仍不明時不得開始寫入。
 
 worktree 的實際本機路徑屬環境資訊，不寫入 repository。禁止在別的 AI 正在使用的 worktree 執行
 `checkout`、`switch`、branch rename、reset、clean 或 rebase。
@@ -73,8 +74,8 @@ worktree 的實際本機路徑屬環境資訊，不寫入 repository。禁止在
 
 - worktree 隔離是絕對的；不得讀寫、build、commit 或 cleanup 別的 session 的 worktree，
   即使看起來「只是幫忙」。
-- 接手前以 GitHub handoff block 為真值確認 owner，也要 `git ls-remote --heads` 與
-  `git worktree list` 確認 branch 未被佔位——另一個 session 可能仍有未 push 的 edits；
+- 接手前以 GitHub handoff block 為真值確認 owner，也要 `git ls-remote --heads` 與上述 bounded
+  worktree branch filter 確認 branch 未被佔位——另一個 session 可能仍有未 push 的 edits；
   workers 不自行挑選未被指派的 open Issue。
 - 回到先前中斷的 slice 時：先 fetch，以遠端 HEAD 與 Issue body handoff block 為唯一真值重新確認；
   本機未 push 的 edits 若已被遠端接手完成，接受遠端版本、獨立重跑 scope 所需 gates 驗證，
