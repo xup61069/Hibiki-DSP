@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "issue": 1137,
+  "scope_digest": "release-manifest-printable",
+  "source_commit": "26afc5da",
+  "environment_fingerprint": "windows-amd64-pwsh-release-manifest-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1137",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/installer-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "installer-check -SelfTest",
+      "status": "pass (35 cases)"
+    },
+    {
+      "command": "verify",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Schema and installer preflight parity fix only; no runtime audio, DSP, or driver behavior change.",
+    "No physical audio, driver loading, WaveRT, HLK, signing, real installer apply/uninstall, or release acceptance is implied."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
+
