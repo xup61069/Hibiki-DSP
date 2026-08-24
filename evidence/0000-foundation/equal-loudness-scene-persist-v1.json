@@ -1,0 +1,65 @@
+{
+  "evidence_format": 2,
+  "issue": 1173,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "docs/specs/SPEC-0014-custom-scene-catalog.md",
+      "src/hub/include/hibiki/engine_control.hpp",
+      "src/hub/src/engine_control.cpp",
+      "tests/unit/contract_tests.cpp"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "957ed44a30c25106df9470b77170226c3d0ca416936d007221cff713fb302fcc"
+  },
+  "metadata": {
+    "scope": "equal-loudness-scene-persist-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-git-2.49.0.windows.1",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1173",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/verify.ps1",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "handoff-check -Issue 1173",
+        "status": "pass",
+        "detail": "Issue ownership, scope_globs and Git state validated."
+      },
+      {
+        "command": "docs-check",
+        "status": "pass",
+        "detail": "86 required paths and 24 specs checked."
+      },
+      {
+        "command": "source-policy",
+        "status": "pass",
+        "detail": "703 tracked source-only paths passed."
+      },
+      {
+        "command": "verify.ps1",
+        "status": "pass",
+        "detail": "Unsigned local CMake build completed; all 3 CTest targets passed (asio_transport_selftest, tab_bridge_selftest, contract_tests)."
+      },
+      {
+        "command": "git diff --check",
+        "status": "pass",
+        "detail": "No whitespace errors detected."
+      }
+    ],
+    "limitations": [
+      "Control-plane persistence only: active_loudness() accessor and SceneApply transactional copy of EqualLoudnessPolicyV1.",
+      "No RT-side equal-loudness processing, no physical-audio delivery, no driver loading or WaveRT streaming evidence.",
+      "No IPC schema change, no new commands, no ISO conformance claim."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1"
+    },
+    "started_at": "2026-08-24T17:02:00+08:00",
+    "finished_at": "2026-08-24T17:08:48+08:00"
+  }
+}
