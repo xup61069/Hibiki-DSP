@@ -103,6 +103,44 @@ lifecycle label 的 open Issue 缺少 handoff 必須讓全域 audit fail closed�
 Handoff 資料只存在於 issue body block；`schemas/task-handoff-v1.schema.json` 已刪除，
 `docs/ai/HANDOFF_SCHEMA.json` 保留為穩定入口，不再指向 JSON schema 檔。
 
+## Evidence provenance v2
+
+沒有 `evidence_format` 的既有 manifest 是 legacy evidence，無論它的產品資料
+`schema_version` 是 1、2 或缺省，都維持 `source_commit` 相容稽核；legacy 檔案不得再新增、覆寫、
+刪除或 rename，也不做 repository-wide migration。新紀錄唯一格式是
+`schemas/evidence-manifest-v2.schema.json` 定義的 `evidence_format: 2`，根層不得同時含
+`source_commit` 或 `schema_version`。
+
+v2 manifest 是 append-only assertion。`metadata.scope` 只是人類可讀 label，不是 digest；
+`source_provenance` 才是來源綁定：
+
+- `change` 綁定目前候選相對動態 merge base 的完整非 `evidence/**` change set。
+- `snapshot` 只允許 evidence-only 候選，並綁定一個已存在、可由 prior main 到達的
+  `snapshot_commit`；paths 是該 commit 相對 first parent 的完整非-evidence change set。
+- paths 必須是 ordinal-sorted、case-insensitive unique、ASCII repo-relative exact paths；拒絕
+  evidence、`.git`、glob、反斜線、絕對／traversal、symlink、submodule 與無法安全解析的 path。
+- `sha256-git-source-set-v1` 對每個 path 變更前後的存在狀態、regular-blob mode、raw Git blob
+  byte count 與 SHA-256 作 domain-separated canonical digest。rename 使用 `--no-renames`，因此穩定
+  表示為 delete + add；不得從 checkout 後可能經 CRLF/smudge 改寫的 bytes 計算。
+
+canonical byte stream 使用 UTF-8、無 BOM 與 NUL 分隔：先寫
+`hibiki-evidence-source-set-v1\0`；每個 ordinal-sorted path 寫 `P\0<path>\0`，接著依序寫 before、
+after state。absent state 是 `0\0`；present state 是
+`1\0<mode>\0<size-invariant-decimal>\0<sha256-raw-blob>\0`。最外層再取 SHA-256 lowercase hex。
+固定 self-test vector 鎖定此 encoding，修改演算法必須改名／升版，不能靜默重算既有紀錄。
+
+pre-merge audit 從 main/head 推導 merge base，要求所有非-evidence source 已 staged、v2 record 是新增，
+並重算完整 paths/digest。squash merge 後，audit 從 main first-parent history 推導 record commit 與其
+first parent，要求目前 record blob 等於 introduction blob，再重算同一 source set；manifest 不保存
+未知的 future merge SHA，因此不得產生 post-merge hash repair。更正另加新的 v2 record，以
+`supersedes` 指向 prior-main 已存在的紀錄，不回寫原 assertion。
+
+required `verify` 必須跑完整 `evidence-audit.ps1`，不能只跑 `-SelfTest`。audit 不得執行 manifest
+內的 `commands`；內容 digest 只證明 assertion 綁到哪些 Git bytes，不證明命令確實執行，也不取代
+trusted CI、review、signed attestation、live-device 或 release evidence。workflow／audit 本身仍可在
+PR 中被修改，是既有 repository trust boundary；需要對抗惡意 writer 時，另由 default-branch
+required workflow、GitHub App 或簽章 attestation 建立不可由同一 PR 關閉的 trust root。
+
 ## 文件與驗證閘門
 
 public contract 變更必須在同一 slice 更新相關 Spec/schema、source、tests 與 evidence；純文件

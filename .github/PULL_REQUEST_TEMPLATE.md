@@ -32,6 +32,7 @@ source-policy／`git diff --check`）與範圍相關的條件式 gates：
 - [ ] always-run checks 全綠（命令與結果記錄在 handoff block）
 - [ ] 範圍相關的條件式 gates 已執行或明確標註不適用
 - [ ] 已附 evidence manifest 或說明為何不適用
+- [ ] 新／更正 evidence 使用 append-only `evidence_format: 2`，完整 `evidence-audit.ps1` 已通過；未覆寫 legacy manifest
 
 ## 開源與隱私
 

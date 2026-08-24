@@ -61,6 +61,10 @@ jobs:
         shell: pwsh
         run: ./tools/source-only-ci-check.ps1
 
+      - name: Evidence provenance gate
+        shell: pwsh
+        run: ./tools/evidence-audit.ps1
+
       - name: Gate self-test sweep
         shell: pwsh
         run: |
