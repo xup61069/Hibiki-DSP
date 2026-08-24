@@ -17,7 +17,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
   issues: write
   pull-requests: read
 
@@ -28,23 +28,70 @@ concurrency:
 jobs:
   admit:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - name: Validate inputs and admit claim
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - name: Validate inputs and reserve claim atomically
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SESSION_ID: ${{ inputs.session_id }}
           ISSUE_NUMBER: ${{ inputs.issue_number }}
           BRANCH: ${{ inputs.branch }}
+          OWNER_REPO: ${{ github.repository }}
         run: |
           $ErrorActionPreference = 'Stop'
-          if ($env:SESSION_ID -notmatch '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$') { throw 'session_id must be a valid UUID.' }
-          $issueNum = [int]::Parse($env:ISSUE_NUMBER)
-          $issue = gh issue view $issueNum --json number,state,title,body,labels,assignees | ConvertFrom-Json
-          if (-not $issue) { throw 'Issue not found.' }
-          if ($issue.state -ne 'OPEN') { throw 'Issue is not open.' }
-          $labelNames = @($issue.labels | ForEach-Object { $_.name })
-          if ($labelNames -contains 'claimed' -or $labelNames -contains 'in-review') { throw 'already claimed/in-review; cannot admit.' }
-          if (@($issue.assignees).Count -gt 0) { throw 'already has an assignee; cannot admit.' }
-          if ($issue.body -notmatch 'hibiki:handoff-v1') { throw 'missing handoff block.' }
-          Write-Output ('Issue admitted: #' + $issueNum + ' session=' + $env:SESSION_ID)
+          if ($env:SESSION_ID -notmatch '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$') {
+            throw 'session_id must be a valid UUID.'
+          }
+          $issueNumber = [int]::Parse($env:ISSUE_NUMBER)
+          $branch = $env:BRANCH.Trim()
+          if ($branch -eq '' -or $branch -eq 'main') { throw 'branch must be a unique working branch.' }
+
+          # Parse the handoff block without executing the main audit path.
+          & {
+            param([string]$ScriptPath)
+            $content = Get-Content -LiteralPath $ScriptPath -Raw
+            $start = $content.IndexOf('function Get-AdmissionIssueData')
+            if ($start -lt 0) { throw 'Admission helpers are missing from tools/handoff-check.ps1.' }
+            $end = $content.IndexOf('if ($AdmissionPrecheck)', $start)
+            if ($end -lt 0) { throw 'Admission overlap helpers are missing from tools/handoff-check.ps1.' }
+            Invoke-Expression $content.Substring($start, $end - $start)
+          } (Join-Path (Get-Location) 'tools/handoff-check.ps1')
+
+          $issue = gh issue view $issueNumber --json number,state,title,body,labels,assignees | ConvertFrom-Json
+          if (-not $issue -or [int]$issue.number -ne $issueNumber) { throw "Issue #$issueNumber not found." }
+          Test-AdmissionIssueEligibility -IssueData $issue
+          $owner = Get-AdmissionOwner -Body ([string]$issue.body) -IssueNumber $issueNumber
+
+          pwsh -NoProfile -File tools/handoff-check.ps1 -AdmissionPrecheck -Issue $issueNumber
+
+          $baseCommit = Get-AdmissionBaseCommit -Body ([string]$issue.body) -IssueNumber $issueNumber
+          $apiArgs = @(
+            '--method', 'POST', '/repos/{owner}/{repo}/git/refs',
+            '-F', ('ref=refs/heads/' + $branch),
+            '-f', ('sha=' + $baseCommit),
+            '--jq', '.ref'
+          )
+          & gh @apiArgs | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Branch reservation failed for '$branch'; fail closed." }
+
+          try {
+            Add-IssueLabelSafe -IssueNumber $issueNumber -Label 'claim-pending'
+            gh issue edit $issueNumber --add-assignee $owner
+            pwsh -NoProfile -File tools/handoff-check.ps1
+            $readback = ConvertTo-AdmissionReadback -GhArgs @(
+              'issue', 'view', "$issueNumber", '--json', 'labels,assignees,state'
+            )
+            Test-ClaimPendingReadback -Readback $readback -IssueNumber $issueNumber -Owner $owner
+            Set-IssueLabelsSafe -IssueNumber $issueNumber -Add @('claimed') -Remove @('claim-pending')
+            Write-Output ("Admitted Issue #" + $issueNumber + " session=" + $env:SESSION_ID +
+              " owner=" + $owner + " branch=" + $branch)
+          } catch {
+            Remove-IssueClaimPendingSafe -IssueNumber $issueNumber -Owner $owner -Branch $branch -OwnerRepo $env:OWNER_REPO
+            throw
+          }
