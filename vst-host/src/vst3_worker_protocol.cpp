@@ -49,6 +49,8 @@ bool valid_type(Vst3WorkerMessageTypeV1 type) noexcept {
     case Vst3WorkerMessageTypeV1::Shutdown:
     case Vst3WorkerMessageTypeV1::Error:
     case Vst3WorkerMessageTypeV1::ProcessBlockWithParameters:
+    case Vst3WorkerMessageTypeV1::ProcessBlockMultiBus:
+    case Vst3WorkerMessageTypeV1::ProcessBlockMultiBusResponse:
       return true;
   }
   return false;
@@ -56,7 +58,9 @@ bool valid_type(Vst3WorkerMessageTypeV1 type) noexcept {
 bool audio_type(Vst3WorkerMessageTypeV1 type) noexcept {
   return type == Vst3WorkerMessageTypeV1::ProcessBlock ||
          type == Vst3WorkerMessageTypeV1::ProcessBlockResponse ||
-         type == Vst3WorkerMessageTypeV1::ProcessBlockWithParameters;
+         type == Vst3WorkerMessageTypeV1::ProcessBlockWithParameters ||
+         type == Vst3WorkerMessageTypeV1::ProcessBlockMultiBus ||
+         type == Vst3WorkerMessageTypeV1::ProcessBlockMultiBusResponse;
 }
 bool valid_channels(std::uint32_t channels) noexcept {
   return channels == 2U || channels == 6U || channels == 8U;
@@ -310,6 +314,207 @@ bool validate_vst3_worker_parameter_frame_v1(
   point_count = count;
   samples = std::span<const float>(reinterpret_cast<const float*>(sample_bytes_ptr),
                                    sample_bytes / sizeof(float));
+  return true;
+}
+
+bool encode_vst3_worker_multibus_frame_v1(
+    const Vst3WorkerFrameV1& input_frame,
+    const Vst3BusLayoutV1& layout,
+    std::span<const float> samples,
+    std::span<std::uint8_t> destination,
+    std::size_t& bytes_written) noexcept {
+  bytes_written = 0U;
+  if (input_frame.type != Vst3WorkerMessageTypeV1::ProcessBlockMultiBus &&
+      input_frame.type != Vst3WorkerMessageTypeV1::ProcessBlockMultiBusResponse) {
+    return false;
+  }
+  if (validate_vst3_bus_layout_v1(layout) != Vst3BusLayoutResultV1::Valid) return false;
+  if (input_frame.frames == 0U || input_frame.frames > kVst3WorkerMultibusMaxFramesV1) {
+    return false;
+  }
+  // Recompute geometry from the validated layout; the caller-supplied frame
+  // must agree with it exactly.
+  std::size_t input_channels = 0U;
+  for (std::uint32_t index = 0U; index < layout.input_bus_count; ++index) {
+    if (layout.inputs[index].active == 1U) input_channels += layout.inputs[index].channels;
+  }
+  std::size_t output_channels = 0U;
+  for (std::uint32_t index = 0U; index < layout.output_bus_count; ++index) {
+    if (layout.outputs[index].active == 1U) output_channels += layout.outputs[index].channels;
+  }
+  const auto total_samples = (input_channels + output_channels) * input_frame.frames;
+  if (samples.size() != total_samples) return false;
+  for (const auto value : samples) {
+    if (!std::isfinite(value)) return false;
+  }
+  const auto payload_bytes = kVst3WorkerMultibusPrefixBytesV1 +
+                             kVst3WorkerMultibusBusTableBytesV1 +
+                             total_samples * sizeof(float);
+  if (payload_bytes > kVst3WorkerMaxPayloadBytesV1 ||
+      payload_bytes != input_frame.payload_bytes ||
+      destination.size() < kVst3WorkerHeaderBytesV1 + payload_bytes) {
+    return false;
+  }
+  Vst3WorkerFrameV1 header = input_frame;
+  std::size_t header_written = 0U;
+  if (!encode_vst3_worker_frame_v1(header, destination.subspan(0U, kVst3WorkerHeaderBytesV1),
+                                   header_written)) {
+    return false;
+  }
+  auto* payload = destination.data() + kVst3WorkerHeaderBytesV1;
+  write_u32(payload, 1U);
+  write_u32(payload + 4U, layout.input_bus_count);
+  write_u32(payload + 8U, layout.output_bus_count);
+  for (std::size_t index = 12U; index < kVst3WorkerMultibusPrefixBytesV1; ++index) {
+    payload[index] = 0U;
+  }
+  auto* table = payload + kVst3WorkerMultibusPrefixBytesV1;
+  for (std::size_t index = 0U; index < kVst3MaxAudioBusesV1; ++index) {
+    auto* record = table + index * kVst3WorkerMultibusBusRecordBytesV1;
+    record[0] = static_cast<std::uint8_t>(layout.inputs[index].role);
+    record[1] = layout.inputs[index].active;
+    record[2] = static_cast<std::uint8_t>(layout.inputs[index].reserved & 0xffU);
+    record[3] = static_cast<std::uint8_t>(layout.inputs[index].reserved >> 8U);
+    write_u32(record + 4U, layout.inputs[index].channels);
+  }
+  auto* out_table = table + kVst3MaxAudioBusesV1 * kVst3WorkerMultibusBusRecordBytesV1;
+  for (std::size_t index = 0U; index < kVst3MaxAudioBusesV1; ++index) {
+    auto* record = out_table + index * kVst3WorkerMultibusBusRecordBytesV1;
+    record[0] = static_cast<std::uint8_t>(layout.outputs[index].role);
+    record[1] = layout.outputs[index].active;
+    record[2] = static_cast<std::uint8_t>(layout.outputs[index].reserved & 0xffU);
+    record[3] = static_cast<std::uint8_t>(layout.outputs[index].reserved >> 8U);
+    write_u32(record + 4U, layout.outputs[index].channels);
+  }
+  std::memcpy(payload + kVst3WorkerMultibusPrefixBytesV1 + kVst3WorkerMultibusBusTableBytesV1,
+              samples.data(), samples.size() * sizeof(float));
+  bytes_written = kVst3WorkerHeaderBytesV1 + payload_bytes;
+  return true;
+}
+
+bool validate_vst3_worker_multibus_frame_v1(
+    const std::span<const std::uint8_t> packet,
+    Vst3WorkerFrameV1& frame,
+    Vst3WorkerMultibusViewV1& view,
+    std::span<const float>& samples,
+    Vst3WorkerProtocolErrorV1& error) noexcept {
+  samples = {};
+  view = {};
+  if (!decode_vst3_worker_frame_v1(packet, frame, error) ||
+      (frame.type != Vst3WorkerMessageTypeV1::ProcessBlockMultiBus &&
+       frame.type != Vst3WorkerMessageTypeV1::ProcessBlockMultiBusResponse)) {
+    if (error == Vst3WorkerProtocolErrorV1::None) error = Vst3WorkerProtocolErrorV1::InvalidFormat;
+    return false;
+  }
+  if (frame.payload_bytes < kVst3WorkerMultibusPrefixBytesV1 + kVst3WorkerMultibusBusTableBytesV1 ||
+      frame.frames == 0U || frame.frames > kVst3WorkerMultibusMaxFramesV1) {
+    error = Vst3WorkerProtocolErrorV1::PayloadMismatch;
+    return false;
+  }
+  const auto* payload = packet.data() + kVst3WorkerHeaderBytesV1;
+  if (read_u32(payload) != 1U) {
+    error = Vst3WorkerProtocolErrorV1::InvalidFormat;
+    return false;
+  }
+  Vst3BusLayoutV1 layout{};
+  layout.schema_version = 1U;
+  layout.input_bus_count = read_u32(payload + 4U);
+  layout.output_bus_count = read_u32(payload + 8U);
+  for (std::size_t index = 12U; index < kVst3WorkerMultibusPrefixBytesV1; ++index) {
+    if (payload[index] != 0U) {
+      error = Vst3WorkerProtocolErrorV1::InvalidFormat;
+      return false;
+    }
+  }
+  const auto* table = payload + kVst3WorkerMultibusPrefixBytesV1;
+  for (std::size_t index = 0U; index < kVst3MaxAudioBusesV1; ++index) {
+    const auto* record = table + index * kVst3WorkerMultibusBusRecordBytesV1;
+    layout.inputs[index].role = static_cast<Vst3BusRoleV1>(record[0]);
+    layout.inputs[index].active = record[1];
+    layout.inputs[index].reserved =
+        static_cast<std::uint16_t>(record[2]) |
+        static_cast<std::uint16_t>(static_cast<std::uint16_t>(record[3]) << 8U);
+    layout.inputs[index].channels = read_u32(record + 4U);
+  }
+  const auto* out_table = table + kVst3MaxAudioBusesV1 * kVst3WorkerMultibusBusRecordBytesV1;
+  for (std::size_t index = 0U; index < kVst3MaxAudioBusesV1; ++index) {
+    const auto* record = out_table + index * kVst3WorkerMultibusBusRecordBytesV1;
+    layout.outputs[index].role = static_cast<Vst3BusRoleV1>(record[0]);
+    layout.outputs[index].active = record[1];
+    layout.outputs[index].reserved =
+        static_cast<std::uint16_t>(record[2]) |
+        static_cast<std::uint16_t>(static_cast<std::uint16_t>(record[3]) << 8U);
+    layout.outputs[index].channels = read_u32(record + 4U);
+  }
+  if (validate_vst3_bus_layout_v1(layout) != Vst3BusLayoutResultV1::Valid) {
+    error = Vst3WorkerProtocolErrorV1::InvalidFormat;
+    return false;
+  }
+  // Recompute sample geometry from the validated embedded layout.
+  std::size_t input_channels = 0U;
+  for (std::uint32_t index = 0U; index < layout.input_bus_count; ++index) {
+    if (layout.inputs[index].active == 1U) input_channels += layout.inputs[index].channels;
+  }
+  std::size_t output_channels = 0U;
+  for (std::uint32_t index = 0U; index < layout.output_bus_count; ++index) {
+    if (layout.outputs[index].active == 1U) output_channels += layout.outputs[index].channels;
+  }
+  const std::size_t input_sample_count = input_channels * frame.frames;
+  const std::size_t output_sample_count = output_channels * frame.frames;
+  const auto expected_payload = kVst3WorkerMultibusPrefixBytesV1 +
+                                kVst3WorkerMultibusBusTableBytesV1 +
+                                (input_sample_count + output_sample_count) * sizeof(float);
+  if (frame.payload_bytes != expected_payload) {
+    error = Vst3WorkerProtocolErrorV1::PayloadMismatch;
+    return false;
+  }
+  const auto* sample_bytes_ptr = payload + kVst3WorkerMultibusPrefixBytesV1 +
+                                 kVst3WorkerMultibusBusTableBytesV1;
+  const std::size_t total_samples = input_sample_count + output_sample_count;
+  for (std::size_t index = 0U; index < total_samples; ++index) {
+    float value = 0.0F;
+    std::memcpy(&value, sample_bytes_ptr + index * sizeof(float), sizeof(float));
+    if (!std::isfinite(value)) {
+      error = Vst3WorkerProtocolErrorV1::NonFiniteSample;
+      return false;
+    }
+  }
+  view.layout = layout;
+  view.frames = frame.frames;
+  view.input_sample_count = input_sample_count;
+  view.output_sample_offset = input_sample_count;
+  view.output_sample_count = output_sample_count;
+  samples = std::span<const float>(
+      reinterpret_cast<const float*>(sample_bytes_ptr), total_samples);
+  return true;
+}
+
+bool vst3_worker_multibus_bus_samples_v1(
+    const Vst3WorkerMultibusViewV1& view,
+    const std::span<const float> samples,
+    const bool input,
+    const std::uint32_t bus_index,
+    std::span<const float>& bus_samples) noexcept {
+  bus_samples = {};
+  if (view.frames == 0U || view.frames > kVst3WorkerMultibusMaxFramesV1) return false;
+  if (samples.size() < view.input_sample_count + view.output_sample_count) return false;
+  const auto& buses = input ? view.layout.inputs : view.layout.outputs;
+  const auto bus_count =
+      input ? view.layout.input_bus_count : view.layout.output_bus_count;
+  if (bus_index >= bus_count) return false;
+  const auto& bus = buses[bus_index];
+  if (bus.active != 1U || bus.channels == 0U) return false;
+  // Walk active slots before the requested one to find its offset.
+  std::size_t offset_samples = 0U;
+  for (std::uint32_t index = 0U; index < bus_index; ++index) {
+    if (buses[index].active == 1U) {
+      offset_samples += static_cast<std::size_t>(buses[index].channels) * view.frames;
+    }
+  }
+  if (!input) offset_samples += view.output_sample_offset;
+  const std::size_t count = static_cast<std::size_t>(bus.channels) * view.frames;
+  if (offset_samples + count > samples.size()) return false;
+  bus_samples = samples.subspan(offset_samples, count);
   return true;
 }
 

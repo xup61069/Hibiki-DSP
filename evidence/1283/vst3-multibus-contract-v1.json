@@ -1,0 +1,53 @@
+{
+  "evidence_format": 2,
+  "issue": 1283,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "docs/specs/SPEC-0008-vst3-sandbox.md",
+      "tests/CMakeLists.txt",
+      "tests/unit/contract_tests.cpp",
+      "vst-host/include/hibiki/vst3_worker_protocol.hpp",
+      "vst-host/src/vst3_worker_protocol.cpp"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "e8f3504180636950005eca0225d90d530d21adb3de9bfeeaa32b7ad08b510608"
+  },
+  "metadata": {
+    "scope": "vst3-multibus-sidechain-worker-contract",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-git-2.55.0-cmake-4.4.0",
+    "commands": [
+      "pwsh -NoProfile -File tools/verify.ps1",
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1283",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "git diff --check",
+      "pwsh tools/evidence-audit.ps1 -DescribeCurrentChange"
+    ],
+    "results": [
+      {
+        "command": "full local verification",
+        "status": "pass",
+        "detail": "verify.ps1 built all targets and passed all four local test executables, including hibiki_contract_tests with the new Issue 1283 multi-bus frame fixtures."
+      },
+      {
+        "command": "always-run gates",
+        "status": "pass",
+        "detail": "handoff-check #1283 (claimed ownership, scope and Git state), docs-check (88 required paths), source-policy (725 tracked paths), and git diff --check all exited 0 in the isolated worktree."
+      }
+    ],
+    "limitations": [
+      "Evidence covers the user-space worker protocol wire contract only: multi-bus frame encoding, validation, and per-bus sample slicing for side-chain and auxiliary buses.",
+      "It does not demonstrate a live VST3 worker process consuming these frames, WaveRT delivery, kernel mapping, driver installation, HLK validation, or signing.",
+      "The provenance digest binds this manifest to the staged SPEC-0008, contract-test and vst-host source set; it does not independently attest that declared commands ran."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.55.0.windows.3",
+      "cmake": "4.4.0"
+    },
+    "started_at": "2026-08-25T04:22:00+08:00",
+    "finished_at": "2026-08-25T04:46:15+08:00"
+  }
+}
