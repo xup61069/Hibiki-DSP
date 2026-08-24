@@ -2220,6 +2220,24 @@ int main() {
     over_capacity_rule.output_group = "main";
     CHECK(route_rules->size() == kMaxSessionRouteRulesV1 &&
           route_rules->upsert(over_capacity_rule) == SessionRouteRuleResultV1::capacity_exhausted);
+    // Store caps must agree with the fixed wire command and UI catalog:
+    // matchers accept 128 bytes and route labels accept exactly 64 bytes.
+    chrome_rule.display_name_contains.clear();
+    chrome_rule.app_id.assign(kSessionRouteRuleMaxMatchBytesV1, 'a');
+    CHECK(route_rules->upsert(chrome_rule) == SessionRouteRuleResultV1::applied);
+    chrome_rule.app_id.assign(kSessionRouteRuleMaxMatchBytesV1 + 1U, 'a');
+    CHECK(route_rules->upsert(chrome_rule) == SessionRouteRuleResultV1::invalid_argument);
+    chrome_rule.app_id = "Chrome.EXE";
+    chrome_rule.lane_id.assign(kSessionRouteRuleMaxRouteBytesV1, 'l');
+    CHECK(route_rules->upsert(chrome_rule) == SessionRouteRuleResultV1::applied);
+    chrome_rule.lane_id.assign(kSessionRouteRuleMaxRouteBytesV1 + 1U, 'l');
+    CHECK(route_rules->upsert(chrome_rule) == SessionRouteRuleResultV1::invalid_argument);
+    chrome_rule.lane_id = "vlog-noise";
+    chrome_rule.output_group.assign(kSessionRouteRuleMaxRouteBytesV1, 'g');
+    CHECK(route_rules->upsert(chrome_rule) == SessionRouteRuleResultV1::applied);
+    chrome_rule.output_group.assign(kSessionRouteRuleMaxRouteBytesV1 + 1U, 'g');
+    CHECK(route_rules->upsert(chrome_rule) == SessionRouteRuleResultV1::invalid_argument);
+    chrome_rule.output_group = "headphones";
     CHECK(session_registry.bind(chrome_tab_a, "vlog-noise", "headphones"));
     CHECK(session_registry.bind(chrome_tab_b, "music", "speakers"));
     CHECK(session_registry.set_gain_owner(chrome_tab_a, SessionGainOwner::HibikiInternal));

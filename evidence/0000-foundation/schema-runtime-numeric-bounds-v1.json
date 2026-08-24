@@ -5,7 +5,7 @@
   "date": "2026-08-24",
   "issue": 949,
   "pr": null,
-  "source_commit": null,
+  "source_commit": "03048b80c782ed0b018e3cdee1cfc64b99380ec5",
   "scope": [
     "schemas/acoustic-anchor-v1.schema.json",
     "schemas/virtual-mic-policy-v1.schema.json"

@@ -5,7 +5,7 @@
   "date": "2026-08-24",
   "issue": 939,
   "pr": null,
-  "source_commit": null,
+  "source_commit": "4ccc8cb8e072fde10995ec92c54a7387c2925e3b",
   "scope": [
     "schemas/release-manifest-v1.schema.json"
   ],
