@@ -44,7 +44,7 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   owner 與 per-session makeup dB；JSON schema 是跨語言／跨 AI 的欄位真值。
   `display_name`／`app_id`／`lane_id` 是有界 optional labels：schema 允許空字串，但最長
   256 字元，與 runtime `kMaxLabelLength` 一致。所有文字欄位（identity、display_name、
-  app_id、lane_id、output_group）拒絕控制字元與非可印 UTF-8；schema pattern 與 runtime
+  app_id、lane_id、output_group）拒絕控制字元與非可印 UTF-8；schema 使用 anchored pattern，與 runtime
   `AudioSessionRegistry::valid()` 使用相同的 fail-closed 契約。
 - `OutputGroupVolumeState v1`：requested/effective/safety dB、mute、generation、origin、actuator。
 - `DistributionProfile v1`：driver hardware ID、endpoint GUID、ASIO CLSID、IPC namespace、schema version。

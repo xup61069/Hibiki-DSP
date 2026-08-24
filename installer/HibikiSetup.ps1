@@ -17,6 +17,7 @@ function Get-Sha256([string]$Path) {
 function Read-ReleaseManifest([string]$Path) {
   if (-not (Test-Path -LiteralPath $Path)) { throw "Manifest not found: $Path" }
   $manifest = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+  $printablePattern = '^[^\u0000-\u001F\u007F-\u009F]*$'
 
   # Reject unknown root-level fields (schema additionalProperties: false)
   $allowedRootFields = @(
@@ -42,6 +43,9 @@ function Read-ReleaseManifest([string]$Path) {
   }
   if (($manifest.product_version -is [string]) -and $manifest.product_version.Length -gt 64) {
     throw 'Manifest product_version exceeds maximum length of 64 characters.'
+  }
+  if (($manifest.product_version -is [string]) -and ($manifest.product_version -notmatch $printablePattern)) {
+    throw 'Manifest product_version must not contain control characters.'
   }
   if ($manifest.source_tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9._:+-]{0,32}$') {
     throw 'Manifest source_tag must match v<major>.<minor>.<patch> with at most 32 allowed suffix characters.'
@@ -91,10 +95,17 @@ function Read-ReleaseManifest([string]$Path) {
   if (($manifest.installer.rfc3161_timestamp -is [string]) -and $manifest.installer.rfc3161_timestamp.Length -gt 128) {
     throw 'Manifest installer.rfc3161_timestamp exceeds maximum length of 128 characters.'
   }
+  if (($manifest.installer.rfc3161_timestamp -is [string]) -and $manifest.installer.rfc3161_timestamp -notmatch $printablePattern) {
+    throw 'Manifest installer.rfc3161_timestamp must not contain control characters.'
+  }
 
   if (($manifest.PSObject.Properties.Name -contains 'distribution_id') -and
       [string]::IsNullOrWhiteSpace($manifest.distribution_id)) {
     throw 'Manifest distribution_id must be a non-empty string when present.'
+  }
+  if (($manifest.PSObject.Properties.Name -contains 'distribution_id') -and
+      ($manifest.distribution_id -is [string]) -and $manifest.distribution_id -notmatch $printablePattern) {
+    throw 'Manifest distribution_id must not contain control characters.'
   }
 
   if (($manifest.PSObject.Properties.Name -contains 'signed_installer_sha256')) {
@@ -128,6 +139,9 @@ function Read-ReleaseManifest([string]$Path) {
     if ($entry.path -isnot [string] -or $entry.path.Length -lt 1 -or $entry.path.Length -gt 260) {
       throw 'Manifest unsigned_files path must be a string of 1..260 characters.'
     }
+    if ($entry.path -notmatch $printablePattern) {
+      throw ('Manifest unsigned_files path must not contain control characters: ' + $entry.path)
+    }
     if ($entry.sha256 -isnot [string] -or $entry.sha256 -notmatch '^[0-9a-fA-F]{64}$') {
       throw ("Manifest unsigned_files sha256 must be a 64-character hexadecimal digest: " + $entry.path)
     }
@@ -143,10 +157,14 @@ function Read-ReleaseManifest([string]$Path) {
     if ([string]::IsNullOrWhiteSpace($test) -or $test.Length -gt 120) {
       throw 'Manifest tests entries must be non-empty strings of at most 120 characters.'
     }
+    if ($test -notmatch $printablePattern) {
+      throw ('Manifest tests entry must not contain control characters.')
+    }
   }
 
   return $manifest
 }
+
 function Test-ManifestFiles($Manifest, [string]$Root) {
   foreach ($entry in @($Manifest.unsigned_files)) {
     if ([string]::IsNullOrWhiteSpace($entry.path) -or
