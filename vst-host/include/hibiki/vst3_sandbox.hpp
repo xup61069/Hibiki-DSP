@@ -9,6 +9,7 @@
 
 #include "hibiki/vst3_worker_pipe.hpp"
 #include "hibiki/vst3_worker_protocol.hpp"
+#include "hibiki/vst3_crash_report.hpp"
 
 namespace hibiki {
 
@@ -109,10 +110,19 @@ public:
         return Vst3SandboxDiagnosticV1{1U, state_, diagnostic_reason_,
                                        worker_pipe_.server_ready(), worker_pipe_.connected()};
     }
+    // Bounded de-identified crash report ring fed by sandbox lifecycle
+    // events (worker exit, watchdog timeout, exchange failure). The store
+    // never holds raw paths, PIDs, handles, or command lines.
+    [[nodiscard]] const Vst3CrashReportStoreV1& crash_report_store() const noexcept {
+        return crash_reports_;
+    }
 
 private:
     void quarantine(Vst3SandboxDiagnosticReasonV1 reason) noexcept;
     void close_handles() noexcept;
+    void record_crash_entry(Vst3CrashReportReasonV1 reason,
+                            std::uint32_t exit_code,
+                            std::uint64_t now_ms) noexcept;
 
     Vst3SandboxState state_{Vst3SandboxState::Stopped};
     Vst3SandboxDiagnosticReasonV1 diagnostic_reason_{
@@ -122,6 +132,9 @@ private:
     void* process_handle_{nullptr};
     void* job_handle_{nullptr};
     Vst3WorkerPipeV1 worker_pipe_{};
+    Vst3CrashReportStoreV1 crash_reports_{};
+    Vst3Sha256DigestV1 module_digest_{};
+    std::uint64_t launched_at_ms_{0};
 };
 
 }  // namespace hibiki

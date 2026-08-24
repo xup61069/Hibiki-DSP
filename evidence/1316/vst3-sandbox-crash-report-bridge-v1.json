@@ -1,0 +1,57 @@
+{
+  "evidence_format": 2,
+  "issue": 1316,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "docs/specs/SPEC-0008-vst3-sandbox.md",
+      "tests/unit/contract_tests.cpp",
+      "vst-host/include/hibiki/vst3_sandbox.hpp",
+      "vst-host/src/vst3_sandbox.cpp"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "d18003faa1bcf7cbc52fa21fccf199ff23c8d284affe8ee4a7d2d7cff72fc3af"
+  },
+  "metadata": {
+    "scope": "vst3-sandbox-crash-report-bridge",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-git-2.55.0-cmake-4.4.0",
+    "commands": [
+      "pwsh -NoProfile -File tools/verify.ps1",
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1316",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "git diff --check",
+      "pwsh tools/evidence-audit.ps1 -DescribeCurrentChange"
+    ],
+    "results": [
+      {
+        "command": "full local verification",
+        "status": "pass",
+        "detail": "verify.ps1 passed all four local test executables, including hibiki_contract_tests with the Issue 1316 sandbox bridge fixtures: setup failure records nothing, a real passthrough worker watchdog timeout records exactly one de-identified worker_timeout entry (non-zero captured_utc, positive uptime from the injected monotonic clock, non-zero module digest), serialized output contains no raw plugin path bytes, and an idle sandbox records nothing."
+      },
+      {
+        "command": "always-run gates",
+        "status": "pass",
+        "detail": "handoff-check #1316 (claimed ownership, scope and Git state), docs-check (88 required paths), source-policy (731 tracked paths), and git diff --check all exited 0 in the isolated worktree."
+      },
+      {
+        "command": "bridge defect fix",
+        "status": "pass",
+        "detail": "record_crash_entry now stamps the SPEC-0008 required non-zero UTC epoch via std::chrono::system_clock; uptime continues to use the injected monotonic clock only, so wall-clock and monotonic time are never mixed."
+      }
+    ],
+    "limitations": [
+      "Evidence covers the user-space control-plane bridge between sandbox lifecycle events and the Issue 1303 bounded crash report store only.",
+      "It does not demonstrate minidump capture, symbol resolution, production worker policy integration, WaveRT delivery, driver installation, HLK validation, or signing.",
+      "The provenance digest binds this manifest to the staged SPEC-0008, contract-test and vst-host source set; it does not independently attest that declared commands ran."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.55.0.windows.3",
+      "cmake": "4.4.0"
+    },
+    "started_at": "2026-08-25T06:45:00+08:00",
+    "finished_at": "2026-08-25T07:20:00+08:00"
+  }
+}

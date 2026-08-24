@@ -235,6 +235,14 @@ ring，滿溢淘汰最舊，invalid entry（schema version 不符、時間戳為
 SHA-256 以空字串與 "abc" 已知向量驗證，僅供 redaction digest 使用。這是 user-space control-plane
 evidence 契約：不擷取 minidump、不解 symbol、不連接 production worker policy。
 
+`Vst3SandboxProcessV1`（vst3_sandbox.hpp）把 sandbox 生命週期事件橋接進該 store：
+worker 以非零碼退出、watchdog timeout、pipe 收送失敗與 handshake/exchange protocol
+error 各記錄一筆去敏化 entry；capture instant 使用系統 UTC 時鐘，uptime 只使用注入的
+單調時鐘，兩個時鐘不得混用。module digest 在 launch 時由 plugin path 位元組一次性算出，
+path 本身不留存。setup 失敗（worker 執行檔不存在等）在 process 存在前即結束，不產生任何
+entry。bridge 屬 user-space control-plane 觀測契約，不代表 minidump capture 或 production
+crash policy。
+
 ## 尚未完成的邊界
 
 plugin scan 的 factory metadata catalog、單一主 bus SDK dispatch adapter、multi-bus/side-chain

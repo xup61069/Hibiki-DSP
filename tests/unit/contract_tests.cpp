@@ -5840,6 +5840,95 @@ int main() {
         CHECK(rejects(oversized));
     }
 
+    // Issue 1316: sandbox lifecycle events feed the bounded crash report
+    // store (bridge from Issue 1303). All entries must be de-identified and
+    // schema-valid; the raw plugin path must never appear anywhere.
+    {
+        auto make_sandbox_launch = [](const wchar_t* worker,
+                                      const wchar_t* plugin) {
+            Vst3SandboxLaunchV1 launch{};
+            launch.worker_executable = worker;
+            launch.plugin_path = plugin;
+            launch.watchdog_timeout_ms = 250U;
+            launch.start_time_ms = 1U;
+            return launch;
+        };
+
+        // A missing worker executable fails before any process exists, so no
+        // crash entry may be recorded for pure setup failures.
+        Vst3SandboxProcess setup_failure_sandbox;
+        CHECK(!setup_failure_sandbox.launch(make_sandbox_launch(
+            L"hibiki-missing-worker-1316.exe", L"missing-plugin-1316.vst3")));
+        CHECK(setup_failure_sandbox.crash_report_store().size() == 0U);
+
+#if defined(_WIN32)
+        // Real worker timeout: launch the actual passthrough worker when it
+        // exists, never heartbeat, and let poll_watchdog quarantine it. The
+        // watchdog path must append exactly one de-identified entry.
+        Vst3SandboxProcess exit_capture_sandbox;
+        const wchar_t* worker_candidates[] = {
+            L".local/build/vst-host/RelWithDebInfo/hibiki_vst_worker.exe",
+            L"vst-host/RelWithDebInfo/hibiki_vst_worker.exe"};
+        bool worker_launched = false;
+        for (const auto* candidate : worker_candidates) {
+            if (GetFileAttributesW(candidate) != INVALID_FILE_ATTRIBUTES) {
+                worker_launched = exit_capture_sandbox.launch(
+                    make_sandbox_launch(candidate,
+                                        L"C:/plugins/vendor-a/secret-plugin.vst3"));
+                break;
+            }
+        }
+        if (worker_launched) {
+            CHECK(exit_capture_sandbox.poll_watchdog(1000000ULL));
+            CHECK(exit_capture_sandbox.state() == Vst3SandboxState::Quarantined);
+            const auto& exit_store = exit_capture_sandbox.crash_report_store();
+            // Exactly one entry: the watchdog timeout. No exit-path or
+            // quarantine double-recording may occur for a single failure.
+            CHECK(exit_store.size() == 1U);
+            // The first entry must be the de-identified watchdog timeout.
+            const auto& timeout_entry = exit_store.entry_at(0U);
+            CHECK(timeout_entry.reason ==
+                      Vst3CrashReportReasonV1::worker_timeout &&
+                  timeout_entry.exit_code == 0U &&
+                  timeout_entry.uptime_ms > 0U &&
+                  timeout_entry.captured_utc > 0);
+            bool digest_all_zero = true;
+            for (const auto byte : timeout_entry.module_sha256) {
+                if (byte != 0U) {
+                    digest_all_zero = false;
+                    break;
+                }
+            }
+            CHECK(!digest_all_zero);
+            // Redaction: serialize the store and confirm the raw path bytes
+            // never appear in the document.
+            std::array<char, 4096> redact_document{};
+            std::size_t redact_written = 0U;
+            CHECK(serialize_vst3_crash_report_store_v1(
+                      exit_store, redact_document, redact_written) ==
+                  Vst3CrashReportResultV1::ok);
+            const std::string_view leaked("secret-plugin");
+            bool leak_found = false;
+            for (std::size_t offset = 0U;
+                 offset + leaked.size() <= redact_written; ++offset) {
+                if (std::equal(leaked.begin(), leaked.end(),
+                               redact_document.begin() +
+                                   static_cast<std::ptrdiff_t>(offset))) {
+                    leak_found = true;
+                }
+            }
+            CHECK(!leak_found);
+        } else {
+            CHECK(true);  // Worker binary not built in this configuration.
+        }
+
+        // Watchdog on a stopped sandbox records nothing new.
+        Vst3SandboxProcess idle_sandbox;
+        CHECK(!idle_sandbox.poll_watchdog(1000000ULL));
+        CHECK(idle_sandbox.crash_report_store().size() == 0U);
+#endif
+    }
+
     return 0;
 }
 
