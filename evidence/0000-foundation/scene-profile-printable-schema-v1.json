@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1034,
   "scope_digest": "scene-profile-printable-schema-v1",
-  "source_commit": "514b07a4",
+  "source_commit": "0b0f19e5eca607df1cbd958865658e1bcc8e8d07",
   "environment_fingerprint": "windows-amd64-pwsh-scene-profile-printable",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1034",
