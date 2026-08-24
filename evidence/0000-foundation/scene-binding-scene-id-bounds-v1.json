@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1014,
   "scope_digest": "scene-binding-scene-id-bounds-v1",
-  "source_commit": "1ae62964",
+  "source_commit": "901fe1ed9201ff1afd440c494a168ea05f89afe8",
   "environment_fingerprint": "windows-amd64-pwsh-scene-binding-id",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1014",
