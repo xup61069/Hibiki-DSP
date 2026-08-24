@@ -176,6 +176,8 @@ public sealed class CustomSceneCatalogV1
             Encoding.UTF8.GetByteCount(scene.Name) > 120 ||
             scene.Name.Any(char.IsControl) ||
             scene.Description.Length > 240 || scene.LatencyLabel.Length > 64 ||
+            scene.Description.Any(char.IsControl) ||
+            scene.LatencyLabel.Any(char.IsControl) ||
             ScenePresetCatalog.EasyDefaults.Any(item => item.Id == scene.Id))
             return false;
 
