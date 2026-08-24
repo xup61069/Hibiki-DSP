@@ -31,7 +31,7 @@
         "sample_rate": {"enum": [44100, 48000, 96000, 192000]},
         "buffer_frames": {"type": "integer", "minimum": 16, "maximum": 4096},
         "is_default": {"type": "boolean"},
-        "last_sequence": {"type": "integer", "minimum": 0}
+        "last_sequence": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615}
       }
     }
   }
