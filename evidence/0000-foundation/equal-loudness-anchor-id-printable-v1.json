@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "issue": 1116,
+  "scope_digest": "equal-loudness-anchor-id-printable-v1",
+  "source_commit": "98c85dd16b7f60a5b7291ae05e394dcab6240b2e",
+  "environment_fingerprint": "windows-amd64-pwsh-equal-loudness-anchor-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1116",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [],
+  "limitations": [
+    "Schema-only parity fix: equal-loudness-policy anchor_id now rejects C0/C1 control characters and DEL while retaining nullable, non-empty and 64-character bounds.",
+    "SPEC-0002 documents printable-only persisted anchor IDs; runtime and DSP behavior unchanged.",
+    "source_commit pinned to main head at authoring time; post-merge squash-hash repair follows the follow-up tracker convention.",
+    "Source/contract/tooling evidence only; no physical audio, driver, HLK, signing, or release acceptance."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
