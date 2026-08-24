@@ -15,7 +15,7 @@
         "required": ["parameter_id", "sample_position", "normalized_value"],
         "properties": {
           "parameter_id": {"type": "integer", "minimum": 0, "maximum": 4294967295},
-          "sample_position": {"type": "integer", "minimum": 0},
+          "sample_position": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
           "normalized_value": {"type": "number", "minimum": 0, "maximum": 1}
         }
       }

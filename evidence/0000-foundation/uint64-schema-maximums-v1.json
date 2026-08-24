@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "issue": 1011,
+  "scope_digest": "uint64-schema-maximums-v1",
+  "source_commit": "8b2ecd5c",
+  "environment_fingerprint": "windows-amd64-pwsh-uint64-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1011",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass",
+      "log": ".local/verify-1011.log"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Added maximum: 18446744073709551615 (UINT64_MAX) to request_id, catalog_sequence, base/target_graph_revision, sample_position, last_sequence.",
+    "Matches std::uint64_t runtime types in control_payloads.hpp, vst3_parameter_timeline.hpp, and IpcProtocol.cs."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
