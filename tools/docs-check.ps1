@@ -80,6 +80,57 @@ function Get-CTestRegistrations {
   return @($registrations | Sort-Object -Unique)
 }
 
+function Convert-GlobToRegex {
+  param([Parameter(Mandatory = $true)][string]$Glob)
+  # Supports the conventions used by Spec/ADR source_globs:
+  # '**/'  matches zero or more directory levels; trailing '**' matches everything below;
+  # '*'    matches any characters within one path segment; other characters are literal.
+  $pattern = ''
+  for ($i = 0; $i -lt $Glob.Length; $i++) {
+    $ch = $Glob[$i]
+    if ($ch -eq '*') {
+      if ($i + 1 -lt $Glob.Length -and $Glob[$i + 1] -eq '*') {
+        if ($i + 2 -lt $Glob.Length -and $Glob[$i + 2] -eq '/') { $pattern += '(?:[^/]*/)*'; $i += 2 }
+        else { $pattern += '.*'; $i += 1 }
+      } else { $pattern += '[^/]*' }
+    } elseif ($ch -eq '?') { $pattern += '[^/]' }
+    else { $pattern += [regex]::Escape([string]$ch) }
+  }
+  return ('^' + $pattern + '$')
+}
+
+function Get-SourceGlobViolations {
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Globs,
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$TrackedFiles
+  )
+  $violations = @()
+  foreach ($glob in $Globs) {
+    $trimmed = $glob.Trim().Trim('"').Trim("'")
+    if ([string]::IsNullOrWhiteSpace($trimmed)) { continue }
+    $regexText = Convert-GlobToRegex -Glob $trimmed
+    $matched = 0
+    foreach ($file in $TrackedFiles) {
+      if ($file -match $regexText) { $matched++ }
+    }
+    if ($matched -eq 0) { $violations += $glob }
+  }
+  # Preserve array identity so empty results still expose .Count under strict mode.
+  return ,@($violations)
+}
+
+function ConvertFrom-FrontMatterArray {
+  param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Raw)
+  # Parse the single-line YAML-style array syntax used by Spec/ADR frontmatter.
+  $trimmed = $Raw.Trim()
+  if (-not $trimmed.StartsWith('[') -or -not $trimmed.EndsWith(']')) {
+    throw ("Frontmatter array value must be a bracketed list: " + $Raw)
+  }
+  $inner = $trimmed.Substring(1, $trimmed.Length - 2).Trim()
+  if (-not $inner) { return @() }
+  return @($inner -split ',' | ForEach-Object { $_.Trim().Trim('"').Trim("'") } | Where-Object { $_ })
+}
+
 function Convert-CommandOutputToText {
   param(
     [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Lines
@@ -1092,6 +1143,30 @@ if ($SelfTest) {
   if ($liveTracked.Count -lt 1) {
     throw 'docs-check self-test failed: live git ls-files returned zero files in a real repository.'
   }
+  # source_globs existence gate: glob translation and violation detection.
+  $globCases = @(
+    @{ Glob = 'src/hub/scene_graph.cpp'; File = 'src/hub/scene_graph.cpp'; ExpectMatch = $true },
+    @{ Glob = 'src/hub/*.cpp';           File = 'src/hub/scene_graph.cpp'; ExpectMatch = $true },
+    @{ Glob = 'src/hub/*.cpp';           File = 'src/hub/nested/x.cpp';    ExpectMatch = $false },
+    @{ Glob = 'src/**';                  File = 'src/hub/deep/x.cpp';      ExpectMatch = $true },
+    @{ Glob = 'apps/**/*.cs';            File = 'apps/control-model/a.cs'; ExpectMatch = $true },
+    @{ Glob = 'docs/**';                 File = 'evidence/a.json';         ExpectMatch = $false }
+  )
+  foreach ($case in $globCases) {
+    $regexText = Convert-GlobToRegex -Glob $case.Glob
+    $didMatch = ($case.File -match $regexText)
+    if ($didMatch -ne $case.ExpectMatch) {
+      throw ("docs-check self-test failed: glob '{0}' against '{1}' expected match={2}." -f $case.Glob, $case.File, $case.ExpectMatch)
+    }
+  }
+  $caseCount++
+
+  $violationFree = Get-SourceGlobViolations -Globs @('tools/*.ps1') -TrackedFiles @('tools/docs-check.ps1', 'README.md')
+  if ($violationFree.Count -ne 0) { throw 'docs-check self-test failed: matching glob reported as violation.' }
+  $withViolation = Get-SourceGlobViolations -Globs @('renamed/away/*.ps1') -TrackedFiles @('tools/docs-check.ps1')
+  if ($withViolation.Count -ne 1) { throw 'docs-check self-test failed: dead glob was not reported.' }
+  $emptyOk = Get-SourceGlobViolations -Globs @() -TrackedFiles @()
+  if ($emptyOk.Count -ne 0) { throw 'docs-check self-test failed: empty globs must not violate.' }
   $caseCount++
   $liveJson = @($liveTracked | Where-Object { $_.ToLowerInvariant().EndsWith('.json') })
   if ($liveJson.Count -lt 1) {
@@ -1351,6 +1426,8 @@ if (-not $handoffSchemaIndex.PSObject.Properties['$comment']) {
 }
 
 $specs = Get-ChildItem -LiteralPath (Join-Path $repo 'docs/specs') -Filter 'SPEC-*.md' -File
+$trackedFiles = @(git -C $repo ls-files)
+if ($LASTEXITCODE -ne 0) { throw 'docs-check could not list tracked files.' }
 $ids = @($specs | ForEach-Object { Select-String -LiteralPath $_.FullName -Pattern '^id:\s*(\S+)' | ForEach-Object { $_.Matches.Groups[1].Value } })
 if (($ids | Sort-Object -Unique).Count -ne $ids.Count) { throw 'Duplicate Spec IDs detected.' }
 
@@ -1363,6 +1440,10 @@ foreach ($adr in $adrs) {
     Assert-AdrFrontmatter -Fields $fields -FileName $adr.Name
     if ($fields['id'] -notmatch '^ADR-[0-9]{4}$') { throw ($adr.Name + ' id must match ADR-NNNN pattern.') }
     if (-not $raw.Contains(('# ' + $fields['id']))) { throw ($adr.Name + ' heading does not contain the declared ID ' + $fields['id'] + '.') }
+    $adrGlobViolations = Get-SourceGlobViolations -Globs (ConvertFrom-FrontMatterArray -Raw ([string]$fields['source_globs'])) -TrackedFiles $trackedFiles
+    if ($adrGlobViolations.Count -gt 0) {
+      throw ($adr.Name + ' source_globs no longer match any tracked file: ' + ($adrGlobViolations -join ', ') + '.')
+    }
   } catch {
     throw ('ADR frontmatter validation failed for ' + $adr.Name + ': ' + $_.Exception.Message)
   }
@@ -1385,6 +1466,10 @@ foreach ($spec in ($specs | Sort-Object Name)) {
     $stem = [System.IO.Path]::GetFileNameWithoutExtension($spec.Name)
     $expectedId = ($stem -split '-')[0..1] -join '-'
     if ($expectedId -ne $specFields['id']) { throw ($spec.Name + ' filename stem ID mismatch: expected ' + $expectedId + ' but got ' + $specFields['id'] + '.') }
+    $specGlobViolations = Get-SourceGlobViolations -Globs (ConvertFrom-FrontMatterArray -Raw ([string]$specFields['source_globs'])) -TrackedFiles $trackedFiles
+    if ($specGlobViolations.Count -gt 0) {
+      throw ($spec.Name + ' source_globs no longer match any tracked file: ' + ($specGlobViolations -join ', ') + '.')
+    }
   } catch {
     throw ('Spec frontmatter validation failed for ' + $spec.Name + ': ' + $_.Exception.Message)
   }
@@ -1421,7 +1506,6 @@ foreach ($adapter in $adapters) {
 }
 
 $baselineText = Get-Content -LiteralPath (Join-Path $repo 'docs/state/BASELINE.md') -Raw
-$trackedFiles = @(git -C $repo ls-files)
 if ($LASTEXITCODE -ne 0) { throw 'docs-check could not list tracked files.' }
 $jsonFiles = @(git -C $repo ls-files -- '*.json')
 # Every tracked JSON file must be syntactically valid.

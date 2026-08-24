@@ -30,9 +30,13 @@ assignee、lifecycle label 與 handoff block；linked draft PR 在第一個 WIP 
    `scope_globs`、語意契約 ownership 與 open Issue/draft PR 狀態；目錄 lane 表（見下節）
    只是 orchestrator 的路由提示，不是全域單寫者瓶頸。
 2. Orchestrator 在 Issue body 加入 handoff block（branch、base_commit、owner、scope_globs、
-   shared_paths、depends_on），指派 assignee 並加上 `claimed` label；branch 由 worker 建立，
-   不需要空認領 commit 佔位。
-3. Worker 收到指派後，從 handoff block 的 base/target branch 最新遠端 HEAD 建立非 `main`
+   shared_paths、depends_on），但不得直接指派 assignee 或加 `claimed` label。正式寫入權由
+   序列化 claim-admission workflow（SPEC-0004）授予：請求 session 以 UUID dispatch
+   `.github/workflows/claim-admission.yml`，workflow 會 fresh-read 全部 open issues 做 overlap
+   驗證、以 Git refs API 原子保留 branch、先貼非授權的 `claim-pending` 標記並完成全域
+   audit/readback，通過後才 swap 成 `claimed` 並綁定 owner。`claim-pending` 本身不授予寫入權。
+3. Worker 收到指派後（issue 變 `claimed` 且 assignee 已設定），從 handoff block 的 base/target
+   branch 最新遠端 HEAD 建立非 `main`
    branch。並行、occupied 或不確定時必須建立獨立 clone/worktree；單一 writer 時可在已確認
    乾淨且未被別人使用的 clone 建 branch。例如：
 
@@ -54,8 +58,9 @@ Orchestrator 可以在正式指派前先建立 pre-claim 草稿：Issue body 已
 `branch` 欄位填寫 `TBD`（例如 branch 寫 `codex/TBD-<slug>`）。`handoff-check.ps1` 會偵測 TBD 欄位並
 跳過該草稿的完整驗證（含 lifecycle label），不會阻擋其他 active claim 的檢查；這是 #439／PR
 #442 導入的行為。TBD 草稿不是指派：它沒有 assignee、沒有 claimed label、也沒有 linked draft PR。
-正式認領時必須補上實際 issue 號與 branch 名、加 assignee 與 `claimed` label、從最新 origin/main
-建立 branch，並依 occupancy 決定是否必須建立獨立 worktree；之後才適用一般 claim 的全部規則。
+正式認領時必須補上實際 issue 號與 branch 名、從最新 origin/main 建立 branch，並依 occupancy 決定
+是否必須建立獨立 worktree；之後同樣要經過序列化 claim-admission workflow 才能取得 assignee、
+`claimed` label 與寫入權。TBD 草稿本身仍不會被 admission 接受，也不授予任何寫入權。
 
 ### #124 occupancy fallback
 
