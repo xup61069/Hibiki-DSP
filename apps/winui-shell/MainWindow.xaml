@@ -39,36 +39,57 @@
       <controls:NavigationViewItem.Icon>
         <FontIcon Glyph="" />
       </controls:NavigationViewItem.Icon>
+      <controls:NavigationViewItem.KeyboardAccelerators>
+        <KeyboardAccelerator Modifiers="Control" Key="Number1" />
+      </controls:NavigationViewItem.KeyboardAccelerators>
     </controls:NavigationViewItem>
     <controls:NavigationViewItem Content="場景" Tag="scenes" AutomationProperties.Name="場景頁面">
       <controls:NavigationViewItem.Icon>
         <FontIcon Glyph="" />
       </controls:NavigationViewItem.Icon>
+      <controls:NavigationViewItem.KeyboardAccelerators>
+        <KeyboardAccelerator Modifiers="Control" Key="Number2" />
+      </controls:NavigationViewItem.KeyboardAccelerators>
     </controls:NavigationViewItem>
     <controls:NavigationViewItem Content="自訂預設" Tag="presets" AutomationProperties.Name="自訂預設頁面">
       <controls:NavigationViewItem.Icon>
         <FontIcon Glyph="" />
       </controls:NavigationViewItem.Icon>
+      <controls:NavigationViewItem.KeyboardAccelerators>
+        <KeyboardAccelerator Modifiers="Control" Key="Number3" />
+      </controls:NavigationViewItem.KeyboardAccelerators>
     </controls:NavigationViewItem>
     <controls:NavigationViewItem Content="音量保護" Tag="volume" AutomationProperties.Name="音量保護頁面">
       <controls:NavigationViewItem.Icon>
         <FontIcon Glyph="" />
       </controls:NavigationViewItem.Icon>
+      <controls:NavigationViewItem.KeyboardAccelerators>
+        <KeyboardAccelerator Modifiers="Control" Key="Number4" />
+      </controls:NavigationViewItem.KeyboardAccelerators>
     </controls:NavigationViewItem>
     <controls:NavigationViewItem Content="VST3 時間軸" Tag="vst3" AutomationProperties.Name="VST3 時間軸頁面">
       <controls:NavigationViewItem.Icon>
         <FontIcon Glyph="" />
       </controls:NavigationViewItem.Icon>
+      <controls:NavigationViewItem.KeyboardAccelerators>
+        <KeyboardAccelerator Modifiers="Control" Key="Number5" />
+      </controls:NavigationViewItem.KeyboardAccelerators>
     </controls:NavigationViewItem>
     <controls:NavigationViewItem Content="路由健康" Tag="route" AutomationProperties.Name="路由健康頁面">
       <controls:NavigationViewItem.Icon>
         <FontIcon Glyph="" />
       </controls:NavigationViewItem.Icon>
+      <controls:NavigationViewItem.KeyboardAccelerators>
+        <KeyboardAccelerator Modifiers="Control" Key="Number6" />
+      </controls:NavigationViewItem.KeyboardAccelerators>
     </controls:NavigationViewItem>
     <controls:NavigationViewItem Content="Expert Panel" Tag="expert" AutomationProperties.Name="Expert Panel 頁面">
       <controls:NavigationViewItem.Icon>
         <FontIcon Glyph="" />
       </controls:NavigationViewItem.Icon>
+      <controls:NavigationViewItem.KeyboardAccelerators>
+        <KeyboardAccelerator Modifiers="Control" Key="Number7" />
+      </controls:NavigationViewItem.KeyboardAccelerators>
     </controls:NavigationViewItem>
   </controls:NavigationView.MenuItems>
   <controls:NavigationView.Content>
