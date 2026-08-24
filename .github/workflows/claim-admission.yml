@@ -103,6 +103,6 @@ jobs:
             Write-Output ("Admitted Issue #" + $issueNumber + " session=" + $env:SESSION_ID +
               " owner=" + $owner + " branch=" + $branch)
           } catch {
-            Remove-IssueClaimPendingSafe -IssueNumber $issueNumber -Owner $owner -Branch $branch -OwnerRepo $env:OWNER_REPO
+            Remove-IssueAdmissionStateSafe -IssueNumber $issueNumber -Owner $owner -Branch $branch -OwnerRepo $env:OWNER_REPO
             throw
           }
