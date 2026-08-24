@@ -2,6 +2,7 @@
 
 ## 已完成（有 commit 與 evidence）
 
+第四十波整合增量已合併：physical sink clock-drift 的離線契約 fixture 覆蓋 invalid no-op observations、slow-clock adaptation、bounded drift、corrected source step、process boundary 與 reset recovery，並以 sink-clock-fixture-v1 evidence 記錄可重跑驗證；這是 deterministic user-space evidence，不是 real-device clock soak 或實體音訊播放（Issue #1118 / PR #1128）。
 第三十九波整合增量已合併：calibration response 的 measured_db／target_db schema 契約收緊到 -144..12，SPEC-0011 同步記錄 bounded dB contract；本切片為 schema/spec/evidence 變更，runtime compiler 行為不變（Issue #957 / PR #960）。
 - AI handoff now has a short canonical entry, Git-ancestry/document gate and source-only local
   preview command. A Compatibility Preview builds and completes a launch smoke on the non-target
@@ -373,8 +374,10 @@
 - Worker-side session volume read/write now uses `ISimpleAudioVolume` with dB↔scalar conversion,
   event-context GUIDs and readback; unbound/exclusive/vendor ASIO paths remain explicit bypasses.
 - `OutputSinkModel` now joins clock-drift estimation to persistent SRC per sink, preserving
-  phase while applying bounded `base_step / sink_source_ratio` correction; physical clock fixtures
-  are still pending.
+  phase while applying bounded `base_step / sink_source_ratio` correction. Deterministic offline
+  physical-sink clock-drift fixtures cover invalid no-op observations, slow-clock adaptation,
+  bounded drift, corrected source step, process boundaries and reset recovery (Issue #1118 /
+  PR #1128); real-device clock evidence/soak is still pending.
 - Optional source-only native ASIO COM transport now builds when a local pinned ASIO SDK is
   supplied: stable CLSID, eight Float32 output channels, 32--4096 frame buffers, supported
   sample rates, callbacks, sample position and ASIO registry routines. It remains disabled in
@@ -500,8 +503,8 @@
 ## 尚未開始
 
 - 可載入的 WaveRT/SYSVAD-derived driver、ASIO physical sink delivery、Scene-wired out-of-process
-  VST3 SDK plugin host、WinUI 3 SDK/build and accessibility validation、physical sink clock
-  fixtures 與 signed package delivery。
+  VST3 SDK plugin host、WinUI 3 SDK/build and accessibility validation、real-device sink clock
+  evidence/soak 與 signed package delivery。
 - ISO 226:2023 合法係數來源與正式 conformance oracle（公式本身已完成，但係數資料仍待
   授權／法務確認）。
 - Microsoft driver signing、Gumroad release artifact 與 production installer。

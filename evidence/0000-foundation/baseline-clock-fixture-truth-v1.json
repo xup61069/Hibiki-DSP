@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "issue": 1139,
+  "scope_digest": "baseline-clock-fixture-truth-v1",
+  "source_commit": "26afc5daeeb7afd9831c1c3472d492771ffe126d",
+  "environment_fingerprint": "windows-amd64-pwsh-baseline-clock-fixture-truth",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1139",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "name": "documentation_truthfulness_update",
+      "outcome": "pass",
+      "details": "BASELINE now distinguishes merged deterministic offline physical-sink clock-drift fixtures from pending real-device clock evidence/soak."
+    }
+  ],
+  "limitations": [
+    "Documentation-only provenance record; no runtime execution or machine-state change.",
+    "This is not real USB/HDMI/Bluetooth clock evidence, WaveRT evidence, HLK evidence, Microsoft signing evidence, or physical-audio delivery evidence.",
+    "Post-merge squash-hash repair follows repository convention if required."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
