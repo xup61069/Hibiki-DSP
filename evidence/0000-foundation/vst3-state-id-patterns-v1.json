@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 919,
   "scope_digest": "vst3-state-id-patterns-v1",
-  "source_commit": "a5e41c2d94c16f875e03bb79c2cdee3f32ee90ba",
+  "source_commit": "ce75f507d2da898920954204813c6013a8cd3386",
   "environment_fingerprint": "windows-local-pwsh-schema-id-tightening",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 919",

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 396,
   "scope_digest": "vst3-timeline-binding-state-v1",
-  "source_commit": "b4d38cf9335bdd0588ff7d01b49a0705e521e460",
+  "source_commit": "b27c75d6fa36dc0505a3248b7eda8a12edb0962c",
   "environment_fingerprint": "windows-26200-amd64-msvc-19.51.36256-dotnet-10.0.400-pwsh-7.6.5; target-24h2-wdk-missing",
   "commands": [
     "pwsh -NoProfile -File tools/control-model-check.ps1",

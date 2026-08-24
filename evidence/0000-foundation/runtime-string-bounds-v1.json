@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 980,
   "scope_digest": "runtime-string-bounds-v1",
-  "source_commit": "61cf2f3fa61a4f9555fe3f94cafbe3f4e464905e",
+  "source_commit": "c41265c599efe719ea4fa6de716c45d1e1eb594c",
   "environment_fingerprint": "windows-amd64-pwsh-runtime-string-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 980",

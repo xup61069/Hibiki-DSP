@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 279,
   "scope_digest": "verify-selftest-expand-v1",
-  "source_commit": "c6516e1262ad65a8483ef9bc8295281ad9914572",
+  "source_commit": "87a7e865bbbe2d164631a3cea171965ff87007df",
   "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -NoProfile -File tools/verify.ps1 -SelfTest",

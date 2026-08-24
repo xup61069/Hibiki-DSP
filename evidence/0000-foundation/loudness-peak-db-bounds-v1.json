@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 958,
   "scope_digest": "loudness-peak-db-bounds-v1",
-  "source_commit": "5ae6e71d06ed5912a94b2bfd0f802d28bf8fd17e",
+  "source_commit": "c41265c599efe719ea4fa6de716c45d1e1eb594c",
   "environment_fingerprint": "windows-amd64-pwsh-schema-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 958",

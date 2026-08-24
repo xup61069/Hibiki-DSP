@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 420,
   "scope_digest": "asio-transport-reserved-zero-v1",
-  "source_commit": "2351ff74203337f4647b3859d35d76a6c048ee7d",
+  "source_commit": "f68f852c94aae5e4927e3cfc6f7b8841fd93540b",
   "environment_fingerprint": "windows-26200-amd64-msvc-19.51.36256-dotnet-10.0.400-pwsh-7.6.5-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526",
   "commands": [
     "pwsh -NoProfile -File tools/verify.ps1",

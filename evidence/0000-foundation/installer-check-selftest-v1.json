@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 226,
   "scope_digest": "installer-check-selftest-v1",
-  "source_commit": "1345618edb43faa47cf00f20e09f6a1ace311b67",
+  "source_commit": "fa5b5330c2a4085ae1bc07e50d37b18494d594d7",
   "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -NoProfile -File tools/installer-check.ps1 -SelfTest",

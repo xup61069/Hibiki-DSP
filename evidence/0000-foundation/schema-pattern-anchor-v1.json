@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1048,
   "scope_digest": "schema-pattern-anchor-v1",
-  "source_commit": "d4727c877c2b00013dea21eef15650f6ed6d8dcc",
+  "source_commit": "b1a32704d69edae22601a9e8620d229eacd96cd0",
   "environment_fingerprint": "windows-amd64-pwsh-schema-pattern-anchors",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1048",

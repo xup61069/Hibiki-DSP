@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 703,
   "scope_digest": "compat-mrt-evidence-audit-v1",
-  "source_commit": "d2ccb55e2d624f7baa35e9459f6399d9da286905",
+  "source_commit": "73fca86afe9f268ca3a3c7c288dcd28b18fce901",
   "environment_fingerprint": "windows-11-26200-x64-dotnet-sdk-10.0.400-pwsh7-windows-app-runtime-1.7; host has VS2026 with Microsoft.Build.AppxPackage tasks installed; dotnet CLI builds do not load them",
   "commands": [
     "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUICompat -SmokeTest",

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 260,
   "scope_digest": "driver-signability-selftest-v1",
-  "source_commit": "fa3dc232f37715f76b0c5cf0161bb924ba276ff2",
+  "source_commit": "4f3ae86b87333c5cad65814eda1861db97200490",
   "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-10.0.28000.2526-wdk-10.0.28000.2526-cmake-pwsh-7.6.5; source-only-no-package",
   "commands": [
     "pwsh -NoProfile -File tools/driver-signability-check.ps1 -SelfTest",

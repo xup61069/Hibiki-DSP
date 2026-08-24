@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 643,
   "scope_digest": "handoff-shared-branch-selftest-v1",
-  "source_commit": "e46346d0a21308cce4c661673d87a38160a89d8a",
+  "source_commit": "a56843de2e4b5b1e0e6e82dc708f81cc77aa582c",
   "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.4-local-vs2026-sdk-28000",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -SelfTest",

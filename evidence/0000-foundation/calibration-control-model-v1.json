@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 16,
   "scope_digest": "calibration-control-model-v1",
-  "source_commit": "12ee53b8e30c5a6f696253d3d1a34cdb827368eb",
+  "source_commit": "3a00a88e448ae84a37a21fefcab6fe5794e7d1f9",
   "environment_fingerprint": "windows-26200-amd64-cmake-4.4.0-msvc-17.14-dotnet-10.0.301-pwsh-7.6.5",
   "commands": [
     "pwsh -File tools/control-model-check.ps1",

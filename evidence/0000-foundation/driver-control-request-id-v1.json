@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 417,
   "scope_digest": "driver-control-request-id-v1",
-  "source_commit": "1fb24353e98e6a065f9f804fb6337dd98dd9811e",
+  "source_commit": "5ea18fc3c48eb4e784bfc8bb2b4057683e5c02c2",
   "environment_fingerprint": "windows-26200-amd64-msvc-19.51.36256-dotnet-10.0.400-pwsh-7.6.5-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526",
   "commands": [
     "pwsh -NoProfile -File tools/verify.ps1",

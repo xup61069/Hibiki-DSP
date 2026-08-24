@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 309,
   "scope_digest": "extension-csp-allowlist-v1",
-  "source_commit": "feb07c86c0238210b910a14b891137dadf10307a",
+  "source_commit": "b3eaf356986bcfdfb2709cb969cab780a0d8ea3f",
   "main_sync_commit": "f18e57d37b363bebbcbb470220b5e7cdbebf2b61",
   "specs": ["SPEC-0009"],
   "commands": [

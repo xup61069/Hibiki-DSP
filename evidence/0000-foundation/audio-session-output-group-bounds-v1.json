@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 987,
   "scope_digest": "audio-session-output-group-bounds-v1",
-  "source_commit": "28f53599de84986a8d05c135d819198427ff24d0",
+  "source_commit": "c41265c599efe719ea4fa6de716c45d1e1eb594c",
   "environment_fingerprint": "windows-amd64-pwsh-audio-session-og-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 987",

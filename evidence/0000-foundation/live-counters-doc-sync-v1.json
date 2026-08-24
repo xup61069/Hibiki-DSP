@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 256,
   "scope_digest": "live-counters-doc-sync-v1",
-  "source_commit": "5e5573f78653c87d36229979ad4c95aaa3cb2cda",
+  "source_commit": "5739dc2bc8642ce35cdec800636a5d838cc587f6",
   "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 256",

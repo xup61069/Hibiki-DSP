@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "control-model-engine-roundtrip-v1",
-  "source_commit": "a2c42cca56e41b479c0e9b82fcf6d30a5fc9aab1",
+  "source_commit": "a56843de2e4b5b1e0e6e82dc708f81cc77aa582c",
   "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet10; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/engine-preview-smoke.ps1",

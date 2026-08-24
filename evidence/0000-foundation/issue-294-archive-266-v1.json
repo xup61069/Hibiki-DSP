@@ -2,8 +2,8 @@
   "schema_version": 1,
   "issue": 294,
   "scope_digest": "issue-294-archive-266-v1",
-  "source_commit": "a0c64b081d8174b393346539bb38e7652a1c7f55",
-  "archive_commit": "a0c64b081d8174b393346539bb38e7652a1c7f55",
+  "source_commit": "099935eb02ffe3cc6fba615d9d382a890acf4493",
+  "archive_commit": "099935eb02ffe3cc6fba615d9d382a890acf4493",
   "main_sync_commit": "b89a284c8e6dad0bdb7a3768b6265b985e51c954",
   "archived_issue": 266,
   "merged_pr": 269,
@@ -27,7 +27,7 @@
       "coverage": [
         "moved docs/tasks/active/266.md to docs/tasks/completed/2026/266.md",
         "preserved Issue 266 scope and recorded PR #269 merge commit",
-        "recorded corrective archive commit a0c64b081d8174b393346539bb38e7652a1c7f55"
+        "recorded corrective archive commit 099935eb02ffe3cc6fba615d9d382a890acf4493"
       ],
       "compiled_artifacts": false
     },

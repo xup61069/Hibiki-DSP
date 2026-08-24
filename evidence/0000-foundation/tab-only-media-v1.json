@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 391,
   "scope_digest": "tab-only-media-v1",
-  "source_commit": "8dedc2168a631881ca505d0c02503833560a2192",
+  "source_commit": "e751744a5320628b42b3f695e09b7f685a9a98c1",
   "base_commit": "93d3a4cf3d9a1854212b0c5bf9c4fcce4799d65d",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.12112.369-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526-cmake-4.4.2-pwsh-7.6.4",
   "target": "tools/extension-check.ps1",

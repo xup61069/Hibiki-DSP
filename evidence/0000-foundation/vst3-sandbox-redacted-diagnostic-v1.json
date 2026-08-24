@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 408,
   "scope_digest": "vst3-sandbox-redacted-diagnostic-v1",
-  "source_commit": "3cbbc316e9e061961116d9b5044d384728715efc",
+  "source_commit": "f5117c34c0821e55a9e781c3060a1a628b887454",
   "environment_fingerprint": "windows-26200-amd64-msvc-19.51.36256-dotnet-10.0.400-pwsh-7.6.5-sdk-qfe-10.1.28000.2526",
   "commands": [
     "pwsh -NoProfile -File tools/verify.ps1",

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 390,
   "scope_digest": "vst3-timeline-surface-model-v1",
-  "source_commit": "8e058ed318e839f9c9b503e01c8b97672330181d",
+  "source_commit": "85c0dc62560f9539607c95a9d86d845d670544ec",
   "environment_fingerprint": "windows-26200-amd64-dotnet-10.0.400-pwsh-7.6.5; target-24h2-wdk-missing",
   "commands": [
     "pwsh -File tools/control-model-check.ps1",

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 60,
   "scope_digest": "control-model-check-selftest-v1",
-  "source_commit": "43bae2f585695d711b9884f243b322aa23e8a897",
+  "source_commit": "debe4561b49c09ed34c497d09ec8d4a2c559cd5b",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.1-universal-sdk-wdk-10.0.28000.2526-cmake-4.3.1-dotnet-8.0.424-pwsh-7.6.5",
   "commands": [
     "pwsh -NoProfile -File tools/control-model-check.ps1 -SelfTest",

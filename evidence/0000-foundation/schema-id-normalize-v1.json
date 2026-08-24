@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 886,
   "scope_digest": "schema-id-normalize-v1",
-  "source_commit": "012b4c0298294f7719b18b2e55678ecdb237d41d",
+  "source_commit": "15d9cc7846df9e2c2b7d8840e302e40139dacf21",
   "environment_fingerprint": "windows-local-pwsh-7.6-schema-metadata-fix",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 886",

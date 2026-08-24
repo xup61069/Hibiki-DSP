@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 0,
   "scope_digest": "expert-route-rule-presets-v1",
-  "source_commit": "5b78003711ef9d17f0b0d81018ef6319b4ae871f",
+  "source_commit": "a56843de2e4b5b1e0e6e82dc708f81cc77aa582c",
   "environment_fingerprint": "windows-22631-vs17-sdk-26100-dotnet8-local",
   "commands": [
     "pwsh -File tools/verify.ps1",

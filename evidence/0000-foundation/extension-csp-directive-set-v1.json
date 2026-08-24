@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 380,
   "scope_digest": "extension-csp-directive-set-v1",
-  "source_commit": "1cd261710e77dc029da8b294e6f58fe60f9a378d",
+  "source_commit": "873614fc86a819608fabfee754a0a9fe5069318d",
   "base_commit": "7e6ad729a588c98c35ff3f9a7cb4e93fbf3e8c69",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.12112.369-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526-cmake-4.4.2-pwsh-7.6.4",
   "target": "tools/extension-check.ps1",

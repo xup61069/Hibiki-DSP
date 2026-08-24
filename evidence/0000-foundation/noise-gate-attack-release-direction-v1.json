@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 636,
   "scope_digest": "noise-gate-attack-release-direction-v1",
-  "source_commit": "81308569eb26f6c068d014e99bfc59e7cfa8e49f",
+  "source_commit": "a56843de2e4b5b1e0e6e82dc708f81cc77aa582c",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.12112.369-msvc-19.51.36256.0-sdk-10.0.28000.0-pwsh-7.6.4",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 636",

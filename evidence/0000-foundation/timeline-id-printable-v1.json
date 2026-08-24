@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1058,
   "scope_digest": "timeline-id-printable-v1",
-  "source_commit": "b6ab601f478993e78e46fd118590523fb48e6fcd",
+  "source_commit": "697f02b0d0ecfae0e91a6298efa0f048db2d3b54",
   "environment_fingerprint": "windows-amd64-pwsh-timeline-id-printable",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1058",

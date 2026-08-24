@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 244,
   "scope_digest": "issue-244-distribution-selftest-crlf-v1",
-  "source_commit": "4f5e2c6f975970fcaf1aa371dca0907d433d04c5",
+  "source_commit": "03d1bab103cef11b6f87b327c76173c573814e94",
   "implementation_commit": "cf845d7",
   "merge_commit": "1fd76a74906d95ae65d5ece08410ab45b70a1b82",
   "corrective_archive_commit": "f3db88f",
