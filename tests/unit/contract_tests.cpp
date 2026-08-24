@@ -1032,6 +1032,22 @@ int main() {
     graph.output_channels = 8;
     graph.lanes.push_back(LaneConfigV1{"game", "main", 8, 0.0, true});
     CHECK(validate_graph(graph));
+    graph.lanes[0].id = std::string(64, 'a');
+    CHECK(validate_graph(graph));
+    graph.lanes[0].id = std::string(65, 'a');
+    CHECK(!validate_graph(graph));
+    for (const auto invalid : {'\t', '\n', '\r', '\0', '\x7F', static_cast<char>(0x80),
+                               static_cast<char>(0x9F)}) {
+        graph.lanes[0].id = std::string("bad");
+        graph.lanes[0].id[1] = invalid;
+        CHECK(!validate_graph(graph));
+        graph.lanes[0].output_group = std::string("bad");
+        graph.lanes[0].output_group[1] = invalid;
+        CHECK(!validate_graph(graph));
+    }
+    graph.lanes[0].id = std::string(64, 'a');
+    graph.lanes[0].output_group = std::string(64, 'g');
+    CHECK(validate_graph(graph));
     graph.strict_direct = true;
     graph.lanes[0].makeup_gain_db = 1.0;
     CHECK(!validate_graph(graph));
