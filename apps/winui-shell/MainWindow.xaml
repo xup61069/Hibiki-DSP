@@ -631,10 +631,26 @@
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                     BorderThickness="1">
                                 <StackPanel Spacing="10">
-                                    <TextBlock Text="App 工作階段（暫時選取清單）" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="App 工作階段（暫時選取清單）" Style="{ThemeResource SubtitleTextBlockStyle}"
+                                                   Foreground="{ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Content="刷新 App 清單"
+                                                Click="OnRefreshSessionCatalogClick"
+                                                AutomationProperties.Name="刷新 App 工作階段清單"
+                                                AutomationProperties.HelpText="向引擎要求最新的 bounded App 清單；失敗時保留上一份清單"
+                                                VerticalAlignment="Center" />
+                                    </Grid>
                                     <TextBlock Text="{Binding SessionCatalogSequenceDisplayText}"
                                                Style="{ThemeResource CaptionTextBlockStyle}"
                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                    <TextBlock Text="套用 App 音量／路由命令只代表控制面已回覆 Ack；實體 per-App 重新送出尚未驗證。"
+                                               TextWrapping="Wrap"
+                                               Style="{ThemeResource CaptionTextBlockStyle}"
+                                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                                     <controls:ItemsRepeater ItemsSource="{Binding SessionCatalog}">
                                         <controls:ItemsRepeater.ItemTemplate>
                                             <DataTemplate>

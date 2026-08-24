@@ -71,6 +71,11 @@ public sealed partial class MainWindow : Window
         await ViewModel.RefreshPhysicalDevicePickerAsync();
     }
 
+    private async void OnRefreshSessionCatalogClick(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.RefreshSessionCatalogAsync();
+    }
+
     private async void OnSceneClick(object sender, RoutedEventArgs e)
     {
         if (sender is Button { Tag: string sceneId })

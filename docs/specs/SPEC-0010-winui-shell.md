@@ -20,7 +20,7 @@ source_globs: ["apps/control-model/**", "apps/winui-shell/**", "evidence/0000-fo
 ## In / Out
 
 In：WinUI 3 視窗、Easy/Expert 顯示、固定輸出群組卡片、場景卡片、實體裝置目錄鏡像與
-DeviceSwitch request、Windows 音量與 IR 相位滑桿、有效音量／安全上限／來源／致動器的
+DeviceSwitch request、App 工作階段目錄鏡像與刷新、Windows 音量與 IR 相位滑桿、有效音量／安全上限／來源／致動器的
 可讀摘要、Expert 的 Matrix／DSP Graph／VST3 隔離／校正唯讀摘要，以及 Windows session、
 process loopback、瀏覽器單分頁與 direct bypass 的路由健康卡片、版本化 named-pipe Hello／SceneApply／VolumeNotification／DeviceSwitch／IrPrepareCommand
 ／DeviceCatalogRequest／DeviceCatalogSnapshot／ControlStatusRequest／ControlStatusSnapshot 命令、連線失敗回復；音量拖曳使用 40 ms bounded debounce 與 command serialization，

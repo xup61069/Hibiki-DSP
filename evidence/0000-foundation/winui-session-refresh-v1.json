@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "slice": "winui-session-refresh-v1",
+  "issue": "https://github.com/xup61069/Hibiki-DSP/issues/1162",
+  "base_commit": "c3845aa684b11e2821a653a7993ab9c43a8a2409",
+  "product_outcome": [
+    "The formal WinUI shell exposes an accessible App session catalog refresh action beside the section header.",
+    "Refresh is connection-aware, reports progress and outcome through existing status text, and requests one bounded session-catalog snapshot.",
+    "Failures, timeouts and stale snapshots preserve the previous picker instead of fabricating sessions.",
+    "The Expert App section now displays a readable boundary note: route command Ack is control-plane evidence only; physical per-App capture/re-send delivery remains unverified."
+  ],
+  "verification": {
+    "handoff_check": "PASS",
+    "docs_check": "PASS (86 required paths, 24 specs)",
+    "source_policy": "PASS (702 tracked paths)",
+    "git_diff_check": "PASS",
+    "control_model_check": "PASS including disconnected session-catalog-refresh failure",
+    "winui_shell_check": "PASS; formal accessibility scan found 55 named interactive controls and requires the session refresh seam",
+    "winui_shell_check_selftest": "PASS (10 cases)",
+    "build_preview_desktop_compat_smoke": "PASS on non-target host; compatibility launch/build evidence only"
+  },
+  "evidence_boundary": [
+    "Static source, contract-model and source gate evidence only.",
+    "No runtime UI Automation or screen-reader audit, no formal WinUI XAML build on this host, no physical audio, no driver install/load/HLK or Microsoft signing claim.",
+    "Route command Ack does not claim physical per-App reroute or DSP lane delivery."
+  ],
+  "source_commit": null
+}
+

@@ -218,6 +218,7 @@ foreach ($requiredText in @('x:Name="RootGrid"', 'ItemsSource="{Binding Scenes}"
     'ItemsSource="{Binding PhysicalDevices}"', 'SelectedPhysicalDeviceId',
     'DeviceSwitchStatusText', 'OnSwitchDeviceClick',
     'OnRefreshPhysicalDevicesClick', 'AutomationProperties.Name="重新掃描實體輸出裝置"',
+    'OnRefreshSessionCatalogClick', 'AutomationProperties.Name="刷新 App 工作階段清單"',
     'RequestedVolumeDb', 'Muted', 'IrAddedDelayMs', 'x:Name="ExpertPanel"',
     'EffectiveVolumeDb', 'SafetyStatusText', 'VolumeOriginText', 'VolumeActuatorText',
     'ItemsSource="{Binding Expert.RouteHealth}"', 'Expert.RouteSummary',
