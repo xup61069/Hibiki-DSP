@@ -128,6 +128,7 @@ public:
                                      std::size_t max_commands = ControlCommandQueueV1::kCapacity) noexcept;
 
     [[nodiscard]] const SceneProfileV1& active_scene() const noexcept { return active_scene_; }
+    [[nodiscard]] const EqualLoudnessPolicyV1& active_loudness() const noexcept { return active_loudness_; }
     [[nodiscard]] bool has_active_scene() const noexcept { return has_active_scene_; }
     [[nodiscard]] std::uint64_t revision() const noexcept { return revision_; }
 
@@ -138,6 +139,7 @@ private:
 
     AudioEngineModel& engine_;
     SceneProfileV1 active_scene_{};
+    EqualLoudnessPolicyV1 active_loudness_{};
     std::uint64_t revision_{0U};
     bool has_active_scene_{false};
     ScenePreflightFnV1 scene_preflight_{nullptr};
