@@ -18,6 +18,8 @@
 [CmdletBinding()]
 param(
   [switch]$SelfTest,
+  # Kept for interface parity with git commit-msg hook conventions; the gate
+  # reads the message from -MessageFile, not from the staged content.
   [string]$MessageFile
 )
 

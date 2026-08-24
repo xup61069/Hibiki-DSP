@@ -196,6 +196,7 @@ bytes，導致 U+FFFD mojibake、C0/C1 控制字元殘留或字面 backslash-n �
   4. subject 不得為空。
 
 此閘門不取代 code review；它只偵測已知的 encoding/escaping 損壞模式，不做主觀風格審查。
+
 ## 對人回報與 Codex Goal 契約
 
 AI 對 maintainer 的進度與完成回報以產品結果為主：先用白話說明正在建立或修正的能力、使用者
