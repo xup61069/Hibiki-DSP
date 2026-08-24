@@ -14,8 +14,8 @@ namespace hibiki {
 
 constexpr std::size_t kMaxSessionRouteRulesV1 = 64U;
 constexpr std::size_t kSessionRouteRuleMaxIdBytesV1 = 64U;
-constexpr std::size_t kSessionRouteRuleMaxMatchBytesV1 = 256U;
-constexpr std::size_t kSessionRouteRuleMaxRouteBytesV1 = 256U;
+constexpr std::size_t kSessionRouteRuleMaxMatchBytesV1 = 128U;
+constexpr std::size_t kSessionRouteRuleMaxRouteBytesV1 = 64U;
 
 // Rules match stable Windows app/session metadata. process_id is deliberately
 // excluded: it is an advisory observation and cannot be used as a persistent

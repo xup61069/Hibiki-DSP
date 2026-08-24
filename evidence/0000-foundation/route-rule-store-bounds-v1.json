@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "evidence_type": "source+contract test",
+  "title": "Route-rule store bounds aligned with wire and UI catalog",
+  "date": "2026-08-24",
+  "issue": 986,
+  "pr": null,
+  "source_commit": null,
+  "scope": [
+    "src/hub/include/hibiki/session_route_rules.hpp",
+    "tests/unit/contract_tests.cpp"
+  ],
+  "spec_refs": ["SPEC-0013", "SPEC-0023"],
+  "adr_refs": [],
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 986",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "$env:HIBIKI_BUILD_DIR='G:\\Hibiki DSP\\.local\\build-986'; pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "limitations": [
+    "Control-plane contract alignment only; no physical audio measurement, driver installation, HLK, or Microsoft signing claim.",
+    "Wire command layout unchanged; only in-process store acceptance tightened to existing wire/UI caps."
+  ],
+  "notes": "kSessionRouteRuleMaxMatchBytesV1 reduced from 256 to 128 bytes and kSessionRouteRuleMaxRouteBytesV1 from 256 to 64 bytes. Contract tests cover exact-bound accept and over-bound reject for matcher and lane/output labels."
+}
