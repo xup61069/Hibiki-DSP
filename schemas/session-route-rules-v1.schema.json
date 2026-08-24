@@ -20,13 +20,19 @@
           "enabled": { "type": "boolean" },
           "gain_owner": { "enum": [0, 1] },
           "makeup_gain_db": { "type": "number", "minimum": -144, "maximum": 12 },
-          "app_id": { "type": "string", "maxLength": 128, "pattern": "\\S" },
-          "display_name": { "type": "string", "maxLength": 128, "pattern": "\\S" },
+          "app_id": { "type": "string", "maxLength": 128, "pattern": "[^\\u0000-\\u001F\\u007F-\\u009F]*" },
+          "display_name": { "type": "string", "maxLength": 128, "pattern": "[^\\u0000-\\u001F\\u007F-\\u009F]*" },
           "lane_id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "\\S" },
           "output_group": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "\\S" },
           "anyOf": [
-            { "required": ["app_id"], "properties": { "app_id": { "minLength": 1 } } },
-            { "required": ["display_name"], "properties": { "display_name": { "minLength": 1 } } }
+            {
+              "required": ["app_id"],
+              "properties": { "app_id": { "minLength": 1, "pattern": "\\S" } }
+            },
+            {
+              "required": ["display_name"],
+              "properties": { "display_name": { "minLength": 1, "pattern": "\\S" } }
+            }
           ]
         }
       }
