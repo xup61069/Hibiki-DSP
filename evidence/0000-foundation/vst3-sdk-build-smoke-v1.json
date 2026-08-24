@@ -1,0 +1,58 @@
+{
+  "evidence_format": 2,
+  "issue": 1177,
+  "source_provenance": {
+    "mode": "snapshot",
+    "snapshot_commit": "77cadeb027ead56b3a723b78cda96d2096a58215",
+    "paths": [
+      ".github/ISSUE_TEMPLATE/ai-task.yml",
+      ".github/PULL_REQUEST_TEMPLATE.md",
+      ".github/workflows/claim-admission.yml",
+      "AGENTS.md",
+      "docs/START_HERE.md",
+      "docs/specs/SPEC-0004-ai-handoff-and-evidence.md",
+      "tools/claim-issue.ps1",
+      "tools/handoff-check.ps1"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "464184d35b3ea35af15099bac0a1d59ea2bb84e7bbc28ce2b3205330954f3d2f"
+  },
+  "metadata": {
+    "scope": "vst3-sdk-build-smoke-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-msbuild-18.9.1-cmake-vst3sdk-3.8.1",
+    "commands": [
+      "cmake -S . -B .local/vst3-build -DHIBIKI_ENABLE_VST3_SDK=ON -DHIBIKI_VST3_SDK_ROOT=C:/AI/vst3sdk",
+      "cmake --build .local/vst3-build --config RelWithDebInfo --target hibiki_vst3_sdk_catalog hibiki_vst3_sdk_worker",
+      ".local/vst3-build/vst-host/RelWithDebInfo/hibiki_vst3_sdk_worker.exe (no arguments, fail-closed smoke)"
+    ],
+    "results": [
+      {
+        "command": "configure + build optional SDK targets",
+        "status": "pass",
+        "detail": "MSVC RelWithDebInfo build produced hibiki_vst3_sdk_catalog.lib and hibiki_vst3_sdk_worker.exe with no compile errors; /W4 /permissive- flags applied."
+      },
+      {
+        "command": "worker fail-closed smoke",
+        "status": "pass",
+        "detail": "hibiki_vst3_sdk_worker.exe exits 2 when required arguments are missing; executable loads, no plugin is loaded."
+      }
+    ],
+    "limitations": [
+      "Local unsigned build evidence only; no plugin certification or third-party compatibility claim.",
+      "No physical audio delivery, no driver/WaveRT/HLK/signing progress.",
+      "SDK processing is not wired into the RT graph or engine control plane."
+    ],
+    "logs": {
+      "build_log_excerpt": "hibiki_vst3_sdk_catalog.vcxproj -> .local/vst3-build/vst-host/RelWithDebInfo/hibiki_vst3_sdk_catalog.lib; hibiki_vst3_sdk_worker.vcxproj -> .local/vst3-build/vst-host/RelWithDebInfo/hibiki_vst3_sdk_worker.exe; exit=0",
+      "smoke_result": "exit=2 on missing required arguments"
+    },
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1",
+      "msbuild": "18.9.1+a81b43525",
+      "vst3sdk": "3.8.1_build_84 commit 3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96"
+    },
+    "started_at": "2026-08-24T17:33:00+08:00",
+    "finished_at": "2026-08-24T17:38:30+08:00"
+  }
+}
