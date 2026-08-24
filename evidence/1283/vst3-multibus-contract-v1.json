@@ -5,12 +5,13 @@
     "mode": "change",
     "paths": [
       "docs/specs/SPEC-0008-vst3-sandbox.md",
+      "tests/CMakeLists.txt",
       "tests/unit/contract_tests.cpp",
       "vst-host/include/hibiki/vst3_worker_protocol.hpp",
       "vst-host/src/vst3_worker_protocol.cpp"
     ],
     "digest_algorithm": "sha256-git-source-set-v1",
-    "digest": "226d3ec4253737afdbdef3de745b9fdcf91f41ee2783fcb4d0244f998f930ecb"
+    "digest": "e8f3504180636950005eca0225d90d530d21adb3de9bfeeaa32b7ad08b510608"
   },
   "metadata": {
     "scope": "vst3-multibus-sidechain-worker-contract",
