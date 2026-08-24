@@ -2,6 +2,8 @@
 
 ## 已完成（有 commit 與 evidence）
 
+第四十一波整合增量已合併：equal-loudness policy 已進入 bounded RT output attachment，render 順序為 graph → IR → loudness PEQ → Group Master → limiter，Strict Direct 維持 bypass；這是 user-space DSP/control evidence，不是 ISO 226 conformance、實體音訊播放或 driver/WaveRT 證據（Issue #1178 / PR #1188）。
+第四十二波整合增量已合併五項能力與流程快照：(1) optional VST3 SDK 可在本機 unsigned build，worker 缺參數時 fail-closed，但 SDK processing 尚未接進 RT graph（Issue #1177 / PR #1180）；(2) claim admission 新增非授權 `claim-pending` lifecycle、序列化 GitHub workflow 與離線 pre-flight tool，降低同帳號多 AI 搶 claim 的風險（Issue #1176 / PR #1179）；(3) 十七個 schema 改用 shared printable-string `$ref`，語意契約不變（Issue #1181 / PR #1186）；(4) `DescribeSnapshotSourceSet` 讓 evidence snapshot provenance 可重建 source-set digest，並在審計中綁定 candidate index（Issue #1187 / PR #1190）；(5) `apply_scene` 在 loudness/PEQ commit 失敗時也會 rollback graph，避免 prepared transaction 殘留造成後續 revision conflict（Issue #1196 / PR #1197）。
 第四十波整合增量已合併：physical sink clock-drift 的離線契約 fixture 覆蓋 invalid no-op observations、slow-clock adaptation、bounded drift、corrected source step、process boundary 與 reset recovery，並以 sink-clock-fixture-v1 evidence 記錄可重跑驗證；這是 deterministic user-space evidence，不是 real-device clock soak 或實體音訊播放（Issue #1118 / PR #1128）。
 第三十九波整合增量已合併：calibration response 的 measured_db／target_db schema 契約收緊到 -144..12，SPEC-0011 同步記錄 bounded dB contract；本切片為 schema/spec/evidence 變更，runtime compiler 行為不變（Issue #957 / PR #960）。
 - AI handoff now has a short canonical entry, Git-ancestry/document gate and source-only local

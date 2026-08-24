@@ -1,0 +1,44 @@
+{
+  "evidence_format": 2,
+  "issue": 1193,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      ".github/workflows/claim-admission.yml",
+      "tools/handoff-check.ps1"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "536e676b0b74e9ab732628fc2512dd1ce2e872b17711d1db94e61c87f092f5f2"
+  },
+  "metadata": {
+    "scope": "claim-admission-completion-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-git-2.49.0",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1",
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "claim-admission workflow completion",
+        "status": "pass",
+        "detail": "Implemented fresh-read overlap validation, atomic branch reservation, claim-pending assignment, global handoff audit/readback, claimed transition with session binding, and failure rollback; added admission precheck mode and self-test coverage to handoff-check."
+      }
+    ],
+    "limitations": [
+      "Workflow behavior on GitHub Actions runners is not exercised locally; live dispatch evidence requires a maintainer-triggered run.",
+      "This is process/tooling evidence only; it does not provide DSP, physical audio, driver loading, WaveRT, HLK, Microsoft signing, or release evidence."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1"
+    },
+    "started_at": "2026-08-24T19:55:00+08:00",
+    "finished_at": "2026-08-24T20:20:00+08:00"
+  }
+}

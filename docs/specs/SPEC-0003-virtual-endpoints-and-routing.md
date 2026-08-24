@@ -105,6 +105,11 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   GUID、sample rate 與 engine、channel count 與 active lane 全部相同，通過後沿用
   `process_lane_block` 的 immutable graph／Group Master／limiter 路徑；capture packet、錯誤
   endpoint、NaN 或格式不符都不會進 graph。
+- `AudioEngineModel::encode_driver_stream_packet_from_lane` 會把 caller-owned lane block 沿用同一條
+  graph／Group Master／limiter 路徑處理，再以固定 80-byte header＋interleaved Float32 的 v1 ABI
+  編成 outbound render packet；lane、格式、freshness 或非有限 sample 不符時 fail-closed，不會
+  發出 partial packet。這是 user-space outbound encode evidence；真正送進 WaveRT ring 仍需要
+  kernel-mode IPC/shared-memory wiring，不能宣稱已完成實體 WaveRT delivery、HLK 或簽章驗收。
 - `PersistentLinearResampler` 保存跨 block 的 phase 與 boundary frame，要求 caller 提供
   整個 input block 的 output capacity，並拒絕在不足時部分消耗；它是 clock-drift/SRC 的
   無配置 baseline，尚未宣稱 production-quality polyphase filter。

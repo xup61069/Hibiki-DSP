@@ -212,6 +212,7 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
         return EngineControlResultV1::Applied;
     } catch (...) {
         engine_.rollback_graph();
+        engine_.rollback_ir();
         engine_.rollback_loudness_peq();
         return EngineControlResultV1::Failed;
     }
