@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 972,
   "scope_digest": "output-group-anchor-id-maxlength-v1",
-  "source_commit": "4ccc8cb8",
+  "source_commit": "4ccc8cb8e072fde10995ec92c54a7387c2925e3b",
   "environment_fingerprint": "windows-amd64-pwsh-schema-string-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 972",

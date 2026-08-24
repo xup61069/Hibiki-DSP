@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 979,
   "scope_digest": "calib-dbruntime-bounds-v1",
-  "source_commit": "61cf2f3f",
+  "source_commit": "61cf2f3fa61a4f9555fe3f94cafbe3f4e464905e",
   "environment_fingerprint": "windows-amd64-pwsh-calib-dbruntime-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 979",

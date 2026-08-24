@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 988,
   "scope_digest": "scene-id-schema-bounds-v1",
-  "source_commit": "cc2bc900",
+  "source_commit": "cc2bc900fa1c4cfc331df87b8a86737e9aaf6d69",
   "environment_fingerprint": "windows-amd64-pwsh-scene-id-schema-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 988",

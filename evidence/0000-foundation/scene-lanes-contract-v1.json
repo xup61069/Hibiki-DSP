@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 941,
   "scope_digest": "scene-lanes-contract-v1",
-  "source_commit": "cdbe05b744100a1d9cebedb1de4e98dfb8a8c0c9",
+  "source_commit": "5ae6e71d06ed5912a94b2bfd0f802d28bf8fd17e",
   "environment_fingerprint": "windows-amd64-pwsh-scene-lanes-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 941",
