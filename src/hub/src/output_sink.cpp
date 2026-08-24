@@ -267,7 +267,6 @@ std::size_t PersistentPolyphaseResampler::required_output_frames(
         !std::isfinite(source_step_) || source_step_ <= 0.0 || source_step_ > 4.0) {
         return 0U;
     }
-    constexpr std::size_t half = kPolyphaseTapsPerPhaseV1 / 2U;
     const std::size_t virtual_end = has_previous_
                                         ? kPolyphaseHistoryFramesV1 + input_frames
                                         : input_frames;

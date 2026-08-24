@@ -931,15 +931,54 @@ int main() {
           decoded_driver_samples[0] == 0.0F && decoded_driver_block.interleaved == nullptr);
 
     PersistentPolyphaseResampler persistent_src;
-    CHECK(persistent_src.prepare(1, 1.0));
+    constexpr std::uint32_t kPolyphaseChannelsV1 = 2U;
+    CHECK(!persistent_src.prepare(0U, 1.0));
+    CHECK(!persistent_src.prepare(9U, 1.0));
+    CHECK(!persistent_src.prepare(kPolyphaseChannelsV1, 0.24));
+    CHECK(!persistent_src.prepare(kPolyphaseChannelsV1, 4.01));
+    CHECK(!persistent_src.prepare(kPolyphaseChannelsV1,
+                                  std::numeric_limits<double>::quiet_NaN()));
+    CHECK(persistent_src.prepare(kPolyphaseChannelsV1, 1.0));
     const float first_block[]{0.0F, 1.0F, 2.0F, 3.0F};
     const float second_block[]{4.0F, 5.0F, 6.0F, 7.0F};
     float resampled[32]{};
     std::size_t output_frames = 0;
-    CHECK(persistent_src.process(first_block, 4, resampled, 32, output_frames));
-    CHECK(output_frames > 0 && output_frames <= 32);
-    CHECK(persistent_src.process(second_block, 4, resampled, 32, output_frames));
-    CHECK(output_frames > 0);
+    CHECK(!persistent_src.process(nullptr, 4U, resampled, 32U, output_frames));
+    CHECK(!persistent_src.process(first_block, 4U, nullptr, 32U, output_frames));
+    CHECK(output_frames == 0U);
+    const double first_phase = persistent_src.phase();
+    CHECK(persistent_src.process(first_block, 4U, resampled, 32U, output_frames));
+    CHECK(output_frames > 0U && output_frames <= 32U);
+    const auto first_output_frames = output_frames;
+    std::array<float, 64> first_output{};
+    std::copy_n(resampled, first_output_frames * kPolyphaseChannelsV1, first_output.data());
+    CHECK(std::all_of(
+        first_output.begin(),
+        first_output.begin() +
+            static_cast<std::ptrdiff_t>(first_output_frames * kPolyphaseChannelsV1),
+        [](const float value) { return std::isfinite(value); }));
+    CHECK(!persistent_src.set_source_step(0.0));
+    CHECK(!persistent_src.set_source_step(4.000001));
+    CHECK(persistent_src.process(second_block, 4U, resampled, 32U, output_frames));
+    CHECK(output_frames > 0U);
+    CHECK(std::all_of(
+        resampled, resampled + static_cast<std::ptrdiff_t>(output_frames * kPolyphaseChannelsV1),
+        [](const float value) { return std::isfinite(value); }));
+    CHECK(persistent_src.phase() == first_phase);
+
+    // Ratio changes must carry phase/history forward instead of resetting the
+    // stream; reset restores the prepared fractional state.
+    CHECK(persistent_src.set_source_step(1.25));
+    CHECK(persistent_src.source_step() == 1.25);
+    const double before_ratio_change = persistent_src.phase();
+    CHECK(persistent_src.process(second_block, 4U, resampled, 32U, output_frames));
+    CHECK(output_frames > 0U);
+    CHECK(persistent_src.phase() != before_ratio_change);
+    persistent_src.reset();
+    CHECK(persistent_src.phase() == 0.0);
+    CHECK(persistent_src.prepare(kPolyphaseChannelsV1, 1.0));
+    CHECK(persistent_src.process(first_block, 4U, resampled, 32U, output_frames));
+    CHECK(output_frames > 0U && persistent_src.phase() == first_phase);
     OutputSinkModel sink_model;
     CHECK(sink_model.prepare(1, 1.0));
     sink_model.observe_clock(48000.0, 48012.0, 1.0);
