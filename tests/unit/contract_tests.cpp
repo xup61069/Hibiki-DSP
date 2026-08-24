@@ -2305,6 +2305,20 @@ int main() {
     CHECK(session_registry.remove(chrome_tab_b));
     CHECK(session_registry.find(chrome_tab_b) == nullptr);
 
+    // Issue #987: output_group must be aligned to 64-byte canonical bound.
+    AudioSessionRegistry og_bounds_registry;
+    const std::string og_64(64U, 'a');
+    const std::string og_65(65U, 'a');
+    const AudioSessionIdentityV1 og_identity{"hibiki-main", "og-bounds", 1U};
+    CHECK(og_bounds_registry.upsert(AudioSessionDescriptorV1{
+        1, og_identity, "OG", "app.exe", true,
+        SessionGainOwner::WindowsSession, {}, og_64, 0.0}));
+    CHECK(!og_bounds_registry.upsert(AudioSessionDescriptorV1{
+        1, og_identity, "OG", "app.exe", true,
+        SessionGainOwner::WindowsSession, {}, og_65, 0.0}));
+    CHECK(og_bounds_registry.bind(og_identity, "lane-x", og_64));
+    CHECK(!og_bounds_registry.bind(og_identity, "lane-x", og_65));
+
     Vst3BusLayoutV1 sidechain_layout{};
     sidechain_layout.input_bus_count = 2U;
     sidechain_layout.output_bus_count = 1U;

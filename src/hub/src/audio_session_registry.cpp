@@ -10,6 +10,7 @@ namespace {
 constexpr std::size_t kMaxSessions = 256;
 constexpr std::size_t kMaxIdentityLength = 512;
 constexpr std::size_t kMaxLabelLength = 256;
+constexpr std::size_t kMaxOutputGroupLength = 64;
 
 }  // namespace
 
@@ -26,7 +27,7 @@ bool AudioSessionRegistry::valid(const AudioSessionDescriptorV1& descriptor) noe
            descriptor.identity.session_instance_id.size() <= kMaxIdentityLength &&
            descriptor.display_name.size() <= kMaxLabelLength &&
            descriptor.app_id.size() <= kMaxLabelLength && descriptor.lane_id.size() <= kMaxLabelLength &&
-           descriptor.output_group.size() <= kMaxLabelLength &&
+           descriptor.output_group.size() <= kMaxOutputGroupLength &&
            std::isfinite(descriptor.makeup_gain_db) && descriptor.makeup_gain_db >= -144.0 &&
            descriptor.makeup_gain_db <= 12.0;
 }
@@ -70,7 +71,7 @@ bool AudioSessionRegistry::bind(const AudioSessionIdentityV1& identity,
                                 std::string lane_id,
                                 std::string output_group) {
     if (lane_id.empty() || lane_id.size() > kMaxLabelLength || output_group.empty() ||
-        output_group.size() > kMaxLabelLength) {
+        output_group.size() > kMaxOutputGroupLength) {
         return false;
     }
     auto* session = find(identity);

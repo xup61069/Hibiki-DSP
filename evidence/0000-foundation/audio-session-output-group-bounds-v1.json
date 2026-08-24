@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "issue": 987,
+  "scope_digest": "audio-session-output-group-bounds-v1",
+  "source_commit": "28f53599",
+  "environment_fingerprint": "windows-amd64-pwsh-audio-session-og-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 987",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {"command": "handoff-check", "status": "pass"},
+    {"command": "docs-check", "status": "pass"},
+    {"command": "source-policy", "status": "pass"},
+    {"command": "verify", "status": "pass", "log": ".local/verify-987.log"},
+    {"command": "git diff --check", "status": "pass"}
+  ],
+  "limitations": [
+    "audio-session-descriptor-v1.schema.json output_group maxLength tightened from 256 to 64.",
+    "AudioSessionRegistry valid() and bind() now reject output_group longer than kMaxOutputGroupLength (64).",
+    "Contract tests cover the 64/65-char boundary for upsert and bind paths.",
+    "SPEC-0019 documents the layered bound: registry/schema at 64, wire command at 48."
+  ],
+  "logs": {},
+  "tool_versions": {"powershell": "pwsh local"}
+}
