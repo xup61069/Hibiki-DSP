@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1082,
   "scope_digest": "fanout-sink-id-printable-v1",
-  "source_commit": "3cecb887173883bee7846d315fcb56b159355a69",
+  "source_commit": "83984dd8db8009988f740777de8737c0ce85b554",
   "environment_fingerprint": "windows-amd64-pwsh-fanout-sink-id-printable",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1082",
