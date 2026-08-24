@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "issue": 1001,
+  "scope_digest": "scene-name-byte-bounds-v1",
+  "source_commit": "c1a4b0fd",
+  "environment_fingerprint": "windows-amd64-pwsh-scene-name-byte-bounds",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1001",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "pwsh -NoProfile -File tools/control-model-check.ps1"
+  ],
+  "results": [
+    {"command": "handoff-check", "status": "pass"},
+    {"command": "docs-check", "status": "pass"},
+    {"command": "source-policy", "status": "pass"},
+    {"command": "git diff --check", "status": "pass"},
+    {"command": "verify", "status": "pass"},
+    {"command": "control-model-check", "status": "pass"}
+  ],
+  "limitations": [
+    "CustomSceneCatalog.IsValid and CustomSceneSyncQueue.IsValid now measure name/output_group in UTF-8 bytes matching kMaxSceneNameBytesV1/kMaxOutputGroupBytes.",
+    "Display-only card fields stay char-based to match custom-scene-cards-v1.schema.json coarse bounds.",
+    "No engine, DSP or driver behavior modified."
+  ],
+  "logs": {},
+  "tool_versions": {"powershell": "pwsh local"},
+  "started_at": "2026-08-24T09:05:00+08:00",
+  "finished_at": "2026-08-24T09:30:00+08:00"
+}
