@@ -695,7 +695,7 @@ public static class ControlPayloadsV1
     {
         var endpoint = StrictUtf8.GetBytes(endpointId ?? string.Empty);
         if (endpoint.Length is < 1 or > DeviceSwitchEndpointMaxBytes ||
-            endpoint.Any(value => value < 0x20) ||
+            (endpointId ?? string.Empty).Any(char.IsControl) ||
             channels is not (1 or 2 or 6 or 8) ||
             sampleRate is not (44100 or 48000 or 96000 or 192000) ||
             bufferFrames is < 16 or > 4096)
@@ -736,7 +736,7 @@ public static class ControlPayloadsV1
         {
             return false;
         }
-        if (endpointId.Any(value => value < 0x20)) return false;
+        if (endpointId.Any(char.IsControl)) return false;
         channels = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(payload[264..]));
         sampleRate = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(payload[268..]));
         bufferFrames = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(payload[272..]));
