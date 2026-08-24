@@ -3,7 +3,7 @@ id: SPEC-0001
 status: accepted
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-24
 review_after_days: 30
 related_adrs: [ADR-0001, ADR-0002]
 source_globs: ["src/**", "schemas/**", "config/distribution-profile.yml"]
@@ -140,3 +140,7 @@ payload 一律回 Error，避免 UI 任意注入未驗證 graph。SceneApply pay
 
 Schema 使用明確 `schema_version`；新增欄位必須向後相容，破壞性變更建立新版本與 migration。用
 合成 fixture 測試 2.0、5.1、7.1 與裝置切換。
+`AudioSessionDescriptor v1` 的 schema-instance 驗收必須載入 repository 內的實際 schema，確認
+六個文字欄位對 U+0000–U+001F、U+007F–U+009F 在開頭、中間、結尾及 controls-only 位置皆
+fail-closed，同時保留 printable UTF-8 與 optional 空字串；只跑 runtime CTest 或只檢查 pattern
+文字不算 schema/runtime parity evidence。

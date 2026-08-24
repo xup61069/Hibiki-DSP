@@ -192,6 +192,174 @@ function Test-JsonParseAll {
   return ,@($errors)
 }
 
+function Assert-JsonSchemaExpectation {
+  param(
+    [Parameter(Mandatory = $true)][string]$SchemaFile,
+    [Parameter(Mandatory = $true)]$Document,
+    [Parameter(Mandatory = $true)][bool]$ExpectedValid,
+    [Parameter(Mandatory = $true)][string]$CaseName
+  )
+
+  $json = $Document | ConvertTo-Json -Depth 10 -Compress
+  $validationErrors = @()
+  try {
+    $validationResult = @(Test-Json -Json $json -SchemaFile $SchemaFile `
+      -ErrorAction SilentlyContinue -ErrorVariable +validationErrors)
+  } catch {
+    throw ("JSON schema validator failed for '{0}' using '{1}': {2}" -f
+      $CaseName, $SchemaFile, $_.Exception.Message)
+  }
+
+  if ($validationResult.Count -ne 1 -or $validationResult[0] -isnot [bool]) {
+    throw ("JSON schema validator did not return exactly one Boolean for '{0}' using '{1}'." -f
+      $CaseName, $SchemaFile)
+  }
+
+  $actualValid = [bool]$validationResult[0]
+  if ($actualValid -ne $ExpectedValid) {
+    throw ("JSON schema expectation failed for '{0}' using '{1}': expected={2}, actual={3}, validator_errors={4}." -f
+      $CaseName, $SchemaFile, $ExpectedValid, $actualValid, $validationErrors.Count)
+  }
+}
+
+function Assert-PrintableContractSchemas {
+  param(
+    [Parameter(Mandatory = $true)][string]$RepositoryRoot
+  )
+
+  $audioSchemaFile = Join-Path $RepositoryRoot 'schemas/audio-session-descriptor-v1.schema.json'
+  $calibrationSchemaFile = Join-Path $RepositoryRoot 'schemas/calibration-response-v1.schema.json'
+
+  $audioDocument = [ordered]@{
+    schema_version = 1
+    identity = [ordered]@{
+      endpoint_id = 'endpoint-音訊'
+      session_instance_id = 'session-工作階段'
+      process_id = 1
+    }
+    display_name = 'Hibiki 音訊'
+    app_id = 'app.音訊'
+    active = $true
+    gain_owner = 'windows-session'
+    lane_id = 'lane-音訊'
+    output_group = 'group-音訊'
+    makeup_gain_db = 0
+  }
+  Assert-JsonSchemaExpectation -SchemaFile $audioSchemaFile -Document $audioDocument `
+    -ExpectedValid $true -CaseName 'audio printable UTF-8 baseline'
+
+  $audioEmptyOptionalDocument = $audioDocument | ConvertTo-Json -Depth 10 -Compress |
+    ConvertFrom-Json -AsHashtable
+  foreach ($field in @('display_name', 'app_id', 'lane_id', 'output_group')) {
+    $audioEmptyOptionalDocument[$field] = ''
+  }
+  Assert-JsonSchemaExpectation -SchemaFile $audioSchemaFile -Document $audioEmptyOptionalDocument `
+    -ExpectedValid $true -CaseName 'audio optional empty labels'
+
+  $calibrationDocument = [ordered]@{
+    schema_version = 1
+    sample_rate = 48000
+    channels = 2
+    device_id = '裝置-1'
+    points = @(
+      [ordered]@{
+        frequency_hz = 1000
+        measured_db = 0
+        target_db = 0
+      }
+    )
+  }
+  Assert-JsonSchemaExpectation -SchemaFile $calibrationSchemaFile -Document $calibrationDocument `
+    -ExpectedValid $true -CaseName 'calibration printable UTF-8 baseline'
+
+  $controlCodePoints = @(0x00..0x1F) + @(0x7F) + @(0x80..0x9F)
+  $positions = @('leading', 'middle', 'trailing', 'controls-only')
+  $audioFields = @(
+    'identity.endpoint_id',
+    'identity.session_instance_id',
+    'display_name',
+    'app_id',
+    'lane_id',
+    'output_group'
+  )
+
+  foreach ($field in $audioFields) {
+    foreach ($codePoint in $controlCodePoints) {
+      $control = [char]$codePoint
+      foreach ($position in $positions) {
+        $value = switch ($position) {
+          'leading' { ([string]$control) + 'post' }
+          'middle' { 'pre' + ([string]$control) + 'post' }
+          'trailing' { 'pre' + ([string]$control) }
+          'controls-only' { [string]$control }
+        }
+        $document = $audioDocument | ConvertTo-Json -Depth 10 -Compress |
+          ConvertFrom-Json -AsHashtable
+        if ($field.StartsWith('identity.')) {
+          $document['identity'][$field.Substring('identity.'.Length)] = $value
+        } else {
+          $document[$field] = $value
+        }
+        $caseName = 'audio {0} U+{1:X4} {2}' -f $field, $codePoint, $position
+        Assert-JsonSchemaExpectation -SchemaFile $audioSchemaFile -Document $document `
+          -ExpectedValid $false -CaseName $caseName
+      }
+    }
+
+    $document = $audioDocument | ConvertTo-Json -Depth 10 -Compress |
+      ConvertFrom-Json -AsHashtable
+    $unicodeLineSeparatorThenEscape = 'pre' + ([char]0x2028) + ([char]0x1B) + 'post'
+    if ($field.StartsWith('identity.')) {
+      $document['identity'][$field.Substring('identity.'.Length)] = $unicodeLineSeparatorThenEscape
+    } else {
+      $document[$field] = $unicodeLineSeparatorThenEscape
+    }
+    Assert-JsonSchemaExpectation -SchemaFile $audioSchemaFile -Document $document `
+      -ExpectedValid $false -CaseName ('audio {0} U+2028 before U+001B' -f $field)
+
+    $document = $audioDocument | ConvertTo-Json -Depth 10 -Compress |
+      ConvertFrom-Json -AsHashtable
+    $unicodeLineSeparator = 'pre' + ([char]0x2028) + 'post'
+    if ($field.StartsWith('identity.')) {
+      $document['identity'][$field.Substring('identity.'.Length)] = $unicodeLineSeparator
+    } else {
+      $document[$field] = $unicodeLineSeparator
+    }
+    Assert-JsonSchemaExpectation -SchemaFile $audioSchemaFile -Document $document `
+      -ExpectedValid $true -CaseName ('audio {0} printable U+2028' -f $field)
+  }
+
+  foreach ($codePoint in $controlCodePoints) {
+    $control = [char]$codePoint
+    foreach ($position in $positions) {
+      $value = switch ($position) {
+        'leading' { ([string]$control) + 'post' }
+        'middle' { 'pre' + ([string]$control) + 'post' }
+        'trailing' { 'pre' + ([string]$control) }
+        'controls-only' { [string]$control }
+      }
+      $document = $calibrationDocument | ConvertTo-Json -Depth 10 -Compress |
+        ConvertFrom-Json -AsHashtable
+      $document['device_id'] = $value
+      $caseName = 'calibration device_id U+{0:X4} {1}' -f $codePoint, $position
+      Assert-JsonSchemaExpectation -SchemaFile $calibrationSchemaFile -Document $document `
+        -ExpectedValid $false -CaseName $caseName
+    }
+  }
+
+  $document = $calibrationDocument | ConvertTo-Json -Depth 10 -Compress |
+    ConvertFrom-Json -AsHashtable
+  $document['device_id'] = 'pre' + ([char]0x2028) + ([char]0x1B) + 'post'
+  Assert-JsonSchemaExpectation -SchemaFile $calibrationSchemaFile -Document $document `
+    -ExpectedValid $false -CaseName 'calibration device_id U+2028 before U+001B'
+
+  $document = $calibrationDocument | ConvertTo-Json -Depth 10 -Compress |
+    ConvertFrom-Json -AsHashtable
+  $document['device_id'] = 'pre' + ([char]0x2028) + 'post'
+  Assert-JsonSchemaExpectation -SchemaFile $calibrationSchemaFile -Document $document `
+    -ExpectedValid $true -CaseName 'calibration device_id printable U+2028'
+}
+
 function ConvertFrom-AdrFrontmatter([string]$RawText) {
   # Parse the comment-style frontmatter block used by all ADR files.
   # Returns a hashtable of key -> string value, or throws on structural errors.
@@ -486,6 +654,11 @@ if ($SelfTest) {
   }
   $caseCount++
 
+  # Printable contract schemas: real repository schemas enforce runtime-equivalent
+  # whole-string C0/C1/DEL rejection through the actual JSON Schema validator.
+  Assert-PrintableContractSchemas -RepositoryRoot $repo
+  $caseCount++
+
   if (-not (Test-BaselineChangedByHead -ChangedPaths @('docs/state/BASELINE.md'))) {
     throw 'docs-check self-test failed: a head BASELINE edit was not detected.'
   }
@@ -662,7 +835,7 @@ if ($SelfTest) {
 if ($caseCount -lt 12) {
     throw "docs-check self-test failed: expected at least 12 passing cases, saw $caseCount."
   }
-  Write-Output "docs-check self-test passed ($caseCount cases; structural parser, multiline normalization, branch mode detection, BASELINE edit detection, AI context budgets, live measurement, ADR frontmatter, Spec frontmatter, markdown relative links)."
+  Write-Output "docs-check self-test passed ($caseCount cases; structural parser, schema-instance validation, multiline normalization, branch mode detection, BASELINE edit detection, AI context budgets, live measurement, ADR frontmatter, Spec frontmatter, markdown relative links)."
   exit 0
 }
 
@@ -764,6 +937,7 @@ $schemaStructureErrors = Get-SchemaStructureErrors -SchemaEntries $schemaEntries
 if ($schemaStructureErrors.Count -gt 0) {
   throw ('Contract schema structure validation failed: ' + ($schemaStructureErrors -join '; '))
 }
+Assert-PrintableContractSchemas -RepositoryRoot $repo
 
 $handoffSchemaIndex = Get-Content -LiteralPath (Join-Path $repo 'docs/ai/HANDOFF_SCHEMA.json') -Raw |
   ConvertFrom-Json

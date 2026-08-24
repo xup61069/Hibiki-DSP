@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1140,
   "scope_digest": "audio-calibration-schema-anchor-v1",
-  "source_commit": "26afc5daeeb7afd9831c1c3472d492771ffe126d",
+  "source_commit": "61f20de0ab55b896324445f9f71830f83d1061c4",
   "environment_fingerprint": "windows-amd64-pwsh-schema-anchor-audio-calibration",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1140",
@@ -34,9 +34,9 @@
     }
   ],
   "limitations": [
-    "Schema-only parity fix: AudioSessionDescriptor text fields and calibration device_id use anchored invisible-control exclusion patterns while retaining existing emptiness and length semantics.",
-    "Runtime validators already perform full-string control checks; persisted-schema validation now cannot accept a partial-match bypass.",
-    "source_commit is pinned to the main head at authoring time; post-merge squash-hash repair follows the established follow-up convention.",
+    "Issue #1140 added start/end anchors while retaining existing emptiness and length semantics, but PowerShell 7.6.4 Test-Json still accepts a final LF because the dollar end anchor can match immediately before that line terminator.",
+    "The listed commands did not run actual schema instances through Test-Json, so this historical record does not establish full persisted-schema/runtime parity. The trailing-LF gap and validator coverage were corrected by Issue #1151.",
+    "source_commit was corrected by Issue #1151 to the #1146 squash merge that introduced this evidence file.",
     "Source/schema/tooling evidence only; no physical audio, driver loading, WaveRT, HLK, signing, or release acceptance."
   ],
   "logs": {},

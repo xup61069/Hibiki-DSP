@@ -19,8 +19,8 @@
     {"command": "verify", "status": "pass"}
   ],
   "limitations": [
-    "Schema and runtime now reject control characters in AudioSessionDescriptor text fields, matching session-route-rule pattern.",
-    "Contract tests cover tab/newline/NUL/DEL rejection in display_name, identity fields, lane_id and bind()."
+    "The Issue #1056 runtime validator and C++ contract tests reject control characters in AudioSessionDescriptor text fields, but the unanchored schema pattern recorded by this historical run did not enforce whole-string rejection.",
+    "The listed CTest and verify run covered runtime rejection for tab/newline/NUL/DEL cases; it did not load the repository JSON Schema or provide schema-instance validation evidence. That coverage was added later by Issue #1151."
   ],
   "logs": {},
   "tool_versions": {"powershell": "pwsh local"},

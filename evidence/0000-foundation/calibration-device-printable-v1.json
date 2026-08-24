@@ -19,7 +19,8 @@
     {"command": "git diff --check", "status": "pass"}
   ],
   "limitations": [
-    "Calibration-response device_id schema now rejects C0/C1 control characters, matching the C# runtime IsControl check.",
+    "The C# runtime already rejected control characters in calibration device_id, but the unanchored schema pattern added by this historical change did not enforce whole-string C0/C1/DEL rejection.",
+    "The listed commands did not execute an actual schema-instance validator, so this record does not establish persisted-schema enforcement. That coverage was added later by Issue #1151.",
     "No runtime behavior change; no live audio, driver, HLK or signing evidence is implied."
   ],
   "logs": {},
