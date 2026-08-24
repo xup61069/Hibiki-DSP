@@ -8,7 +8,7 @@
   "properties": {
     "schema_version": {"const": 1},
     "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,30}$"},
-    "name": {"type": "string", "minLength": 1, "maxLength": 120, "pattern": "[^\u0000-\u001F\u007F-\u009F]*"},
+    "name": {"type": "string", "minLength": 1, "maxLength": 120, "pattern": "^[^\u0000-\u001F\u007F-\u009F]*$"},
     "lanes": {
       "type": "array", "maxItems": 32,
       "items": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "\\S"}
@@ -21,7 +21,7 @@
       "type": "string", "minLength": 8, "maxLength": 64,
       "description": "Stable caller-owned calibration label for a previously prepared IR. Opaque comparison token only; never IR samples, file paths, or ISO 226 coefficients."
     },
-    "output_group": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "[^\u0000-\u001F\u007F-\u009F]*"},
+    "output_group": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[^\u0000-\u001F\u007F-\u009F]*$"},
     "latency_mode": {"enum": ["game", "balanced", "movie-linear-phase", "strict-direct"]},
     "ir_phase": {
       "$ref": "ir-phase-policy-v1.schema.json"
