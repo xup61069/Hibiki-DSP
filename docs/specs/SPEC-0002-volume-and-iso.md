@@ -157,7 +157,8 @@ schema 要求 `anchor_id` 在非 null 時為 non-empty printable UTF-8 且最長
 控制字元與 DEL；runtime validator 維持既有非空與 64 字邊界檢查，
 與專案 ID 不可為空、輸出群組同為 64 字上限的慣例一致；
 `EqualLoudnessStatusV1.diagnostic` 是 bounded 文字欄位（0..256 字元），空字串合法，
-超過上限的診斷文字在 metadata contract 層即被拒絕。
+schema 要求 printable UTF-8，拒絕 C0/C1 控制字元與 DEL；超過上限或含控制字元的
+診斷文字在 metadata contract 層即被拒絕。
 `Program-aware` 另有 `ProgramAwareLevelControllerV1` 的慢速內容音量控制：預設保留無配置的
 RMS 代理；`KWeightedProxy` 會在固定容量狀態內串接高通與高頻 shelf 兩段 K-weighting，並
 可選排除呼叫端標示的 LFE channel。兩者都使用 3 秒分析窗、靜音門、增益上限與 dB/s

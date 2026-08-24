@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "issue": 1142,
+  "scope_digest": "loudness-diagnostic-printable-v1",
+  "source_commit": "26afc5daeeb7afd9831c1c3472d492771ffe126d",
+  "environment_fingerprint": "windows-amd64-pwsh-loudness-diagnostic-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1142",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [],
+  "limitations": [
+    "Schema-only parity fix: EqualLoudnessStatusV1.diagnostic now rejects C0/C1 control characters and DEL while retaining empty-string validity and the 256-character bound.",
+    "SPEC-0002 documents printable-only bounded diagnostics; runtime and DSP behavior unchanged.",
+    "source_commit pinned to main head at authoring time; post-merge squash-hash repair follows the established convention.",
+    "Source/contract/tooling evidence only; no physical audio, driver, HLK, signing, or release acceptance."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
+
