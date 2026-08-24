@@ -62,6 +62,10 @@ public:
         const Vst3CrashReportEntryV1& entry) noexcept;
 
     [[nodiscard]] std::size_t size() const noexcept { return count_; }
+    [[nodiscard]] const Vst3CrashReportEntryV1& entry_at(
+        std::size_t index) const noexcept {
+        return entries_[index];
+    }
     void clear() noexcept;
 
 private:
