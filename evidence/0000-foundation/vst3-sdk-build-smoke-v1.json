@@ -5,17 +5,10 @@
     "mode": "snapshot",
     "snapshot_commit": "77cadeb027ead56b3a723b78cda96d2096a58215",
     "paths": [
-      ".github/ISSUE_TEMPLATE/ai-task.yml",
-      ".github/PULL_REQUEST_TEMPLATE.md",
-      ".github/workflows/claim-admission.yml",
-      "AGENTS.md",
-      "docs/START_HERE.md",
-      "docs/specs/SPEC-0004-ai-handoff-and-evidence.md",
-      "tools/claim-issue.ps1",
-      "tools/handoff-check.ps1"
+      "vst-host/CMakeLists.txt"
     ],
     "digest_algorithm": "sha256-git-source-set-v1",
-    "digest": "464184d35b3ea35af15099bac0a1d59ea2bb84e7bbc28ce2b3205330954f3d2f"
+    "digest": "0bbf8a0b34ec32cece5ab823af294cd970198a987a1d8705deb1234988eb687e"
   },
   "metadata": {
     "scope": "vst3-sdk-build-smoke-v1",
