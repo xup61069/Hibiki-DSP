@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "issue": 1010,
+  "scope_digest": "scene-name-control-chars-v1",
+  "source_commit": "8b2ecd5c",
+  "environment_fingerprint": "windows-amd64-pwsh-scene-name-control-chars",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1010",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/control-model-check.ps1",
+    "pwsh -NoProfile -File tools/build-preview.ps1 -Target DesktopCompat"
+  ],
+  "results": [
+    {"command": "handoff-check", "status": "pass"},
+    {"command": "docs-check", "status": "pass"},
+    {"command": "source-policy", "status": "pass"},
+    {"command": "git diff --check", "status": "pass"},
+    {"command": "control-model-check", "status": "pass"},
+    {"command": "build-preview -Target DesktopCompat", "status": "pass"}
+  ],
+  "limitations": [
+    "Name/output_group now reject control characters at entry time, matching the engine strict-printable wire contract.",
+    "Follow-up hardening to #1002; no engine, DSP or driver behavior modified."
+  ],
+  "logs": {},
+  "tool_versions": {"powershell": "pwsh local"},
+  "started_at": "2026-08-24T10:05:00+08:00",
+  "finished_at": "2026-08-24T10:25:00+08:00"
+}
