@@ -7,7 +7,7 @@
   "required": ["schema_version", "id", "name", "lanes", "output_group", "latency_mode", "safety"],
   "properties": {
     "schema_version": {"const": 1},
-    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"},
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,30}$"},
     "name": {"type": "string", "minLength": 1, "maxLength": 120},
     "lanes": {
       "type": "array", "maxItems": 32,
