@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "issue": 1148,
+  "scope_digest": "vst3-sdk-environment-v1",
+  "source_commit": "c4ed5a43cc51b8d967464d6571fbf65e84c547c3",
+  "environment_fingerprint": "windows-amd64-pwsh-vst3-sdk-environment-probe",
+  "commands": [
+    "pwsh -NoProfile -File tools/probe-vst3-sdk-environment.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/probe-vst3-sdk-environment.ps1",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1148",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "name": "vst3_sdk_environment_probe",
+      "outcome": "pass",
+      "details": "Offline read-only probe passed; anonymous local result reports pinned SDK root absent and all CMake-required files missing."
+    }
+  ],
+  "limitations": [
+    "Local environment evidence only; no SDK download, install, build, worker execution, or machine-state change.",
+    "Anonymous result intentionally does not record the configured root path or SDK contents.",
+    "This is not third-party plugin certification, physical audio delivery, driver loading, WaveRT streaming, HLK, or signing evidence.",
+    "Post-merge squash-hash repair follows repository convention if required."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
