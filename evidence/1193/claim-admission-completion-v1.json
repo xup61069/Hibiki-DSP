@@ -4,10 +4,11 @@
   "source_provenance": {
     "mode": "change",
     "paths": [
-      ".github/workflows/claim-admission.yml"
+      ".github/workflows/claim-admission.yml",
+      "tools/handoff-check.ps1"
     ],
     "digest_algorithm": "sha256-git-source-set-v1",
-    "digest": "5b1e5a9cebc92b9d43d7f031f3a8f5f09d0e14d958220ab8283dc904fe326dca"
+    "digest": "7765cac12af66b522b45c56e0c4c9c4811e959726e0842a255dd344d1fc6de08"
   },
   "metadata": {
     "scope": "claim-admission-completion-v1",
@@ -25,7 +26,7 @@
       {
         "command": "claim-admission workflow completion",
         "status": "pass",
-        "detail": "Implemented fresh-read overlap validation, atomic branch reservation, claim-pending assignment, global handoff audit/readback, claimed transition with session binding, and failure rollback."
+        "detail": "Implemented fresh-read overlap validation, atomic branch reservation, claim-pending assignment, global handoff audit/readback, claimed transition with session binding, and failure rollback; added admission precheck mode and self-test coverage to handoff-check."
       }
     ],
     "limitations": [
@@ -38,6 +39,6 @@
       "git": "2.49.0.windows.1"
     },
     "started_at": "2026-08-24T19:55:00+08:00",
-    "finished_at": "2026-08-24T20:03:30+08:00"
+    "finished_at": "2026-08-24T20:20:00+08:00"
   }
 }

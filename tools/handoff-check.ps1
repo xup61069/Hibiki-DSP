@@ -3,6 +3,7 @@
 param(
   [ValidateRange(-1, 2147483647)]
   [int]$Issue = -1,
+  [switch]$AdmissionPrecheck,
   [switch]$SelfTest
 )
 
@@ -618,6 +619,127 @@ if ($SelfTest) {
 
   if ($caseCount -lt 5) { throw "handoff-check self-test failed: expected at least 5 passing cases, saw $caseCount." }
   Write-Output "handoff-check self-test passed (issue-block parsing, TBD draft skip, state/labels, owner mismatch, glob overlap, safe paths and arrays)."
+  exit 0
+}
+
+function Get-AdmissionIssueData {
+  param(
+    [Parameter(Mandatory)] [int]$IssueNumber,
+    [Parameter(Mandatory)] [AllowEmptyCollection()] [object[]]$OpenIssues
+  )
+  $selected = [System.Collections.Generic.List[object]]::new()
+  foreach ($candidate in $OpenIssues) {
+    if ([int]$candidate.number -eq $IssueNumber) { [void]$selected.Add($candidate) }
+  }
+  if ($selected.Count -ne 1) { throw "Expected exactly one Issue #$IssueNumber, found $($selected.Count)." }
+  return $selected[0]
+}
+
+function Test-AdmissionIssueEligibility {
+  param([Parameter(Mandatory)] [psobject]$IssueData)
+  if ([string]$IssueData.state -ne 'OPEN') { throw "Issue #$($IssueData.number) is not open." }
+  $labelNames = @($IssueData.labels | ForEach-Object { $_.name })
+  foreach ($forbiddenLabel in @('claim-pending', 'claimed', 'in-review', 'done')) {
+    if ($labelNames -contains $forbiddenLabel) {
+      throw "Issue #$($IssueData.number) already has lifecycle label '$forbiddenLabel'."
+    }
+  }
+  if (@($IssueData.assignees).Count -gt 0) {
+    throw "Issue #$($IssueData.number) already has an assignee."
+  }
+}
+
+function Get-AdmissionOwner {
+  param([Parameter(Mandatory)] [string]$Body, [Parameter(Mandatory)] [int]$IssueNumber)
+  $owner = Get-HandoffScalar -Body $Body -Key 'owner'
+  if ($owner -eq 'TBD') { throw "Issue #$IssueNumber owner is still TBD." }
+  if ($owner -match '\s') { throw "Issue #$IssueNumber owner is not a single account name." }
+  return $owner
+}
+
+function Get-AdmissionBaseCommit {
+  param([Parameter(Mandatory)] [string]$Body, [Parameter(Mandatory)] [int]$IssueNumber)
+  $base = Get-HandoffScalar -Body $Body -Key 'base_commit'
+  if ($base -notmatch '^[0-9a-fA-F]{40}$') { throw "Issue #$IssueNumber base_commit is not a full Git SHA." }
+  return $base.ToLowerInvariant()
+}
+
+function Add-IssueLabelSafe {
+  param(
+    [Parameter(Mandatory)] [int]$IssueNumber,
+    [Parameter(Mandatory)] [string]$Label
+  )
+  & gh label create $Label --color D4C5F9 2>$null | Out-Null
+  if ($LASTEXITCODE -notin @(0, 1)) { throw "Unable to ensure lifecycle label '$Label' exists." }
+  & gh issue edit $IssueNumber --add-label $Label
+  if ($LASTEXITCODE -ne 0) { throw "Unable to add lifecycle label '$Label' to Issue #$IssueNumber." }
+}
+
+function Test-ClaimPendingReadback {
+  param(
+    [Parameter(Mandatory)] [psobject]$Readback,
+    [Parameter(Mandatory)] [int]$IssueNumber,
+    [Parameter(Mandatory)] [string]$Owner
+  )
+  $labels = @($Readback.labels | ForEach-Object { $_.name })
+  $owners = @($Readback.assignees | ForEach-Object { $_.login })
+  if ([string]$Readback.state -ne 'OPEN') { throw "Issue #$IssueNumber readback is not open." }
+  if ($labels -notcontains 'claim-pending' -or ($labels | Where-Object { $_ -in @('claimed', 'in-review', 'done') }).Count -ne 0) {
+    throw "Issue #$IssueNumber claim-pending label readback mismatch."
+  }
+  if ($owners.Count -ne 1 -or $owners[0] -ne $Owner) {
+    throw "Issue #$IssueNumber owner readback mismatch."
+  }
+}
+
+function ConvertTo-AdmissionReadback {
+  param([Parameter(Mandatory)] [string[]]$GhArgs)
+  $json = & gh @GhArgs 2>&1
+  if ($LASTEXITCODE -ne 0) { throw "Issue readback failed: $json" }
+  return ($json | ConvertFrom-Json)
+}
+
+if ($AdmissionPrecheck) {
+  if ($Issue -lt 0) { throw '-AdmissionPrecheck requires -Issue.' }
+  $maxOpenIssues = 500
+  $ghArgs = @('issue', 'list', '--state', 'open', '--limit', "$maxOpenIssues",
+    '--json', 'number,state,title,body,labels,assignees')
+  $issuesJson = & gh @ghArgs 2>&1
+  if ($LASTEXITCODE -ne 0) { throw "gh issue list failed: $issuesJson" }
+  $openIssues = @($issuesJson | ConvertFrom-Json)
+  if ($openIssues.Count -ge $maxOpenIssues) {
+    throw "Open Issue count reached cap $maxOpenIssues; raise the explicit limit rather than silently truncating."
+  }
+  $selectedIssues = @(Get-AdmissionIssues -OpenIssues $openIssues -SelectedIssueNumber $Issue)
+  if ($selectedIssues.Count -ne 1 -or [int]$selectedIssues[0].number -ne $Issue) {
+    throw "Selected Issue #$Issue does not have exactly one complete admission handoff."
+  }
+  $selectedIssue = $selectedIssues[0]
+  if ($selectedIssue.state -ine 'OPEN') { throw "Selected Issue #$Issue is not open." }
+  $labels = @($selectedIssue.labels | ForEach-Object { $_.name })
+  foreach ($forbiddenLabel in @('claim-pending', 'claimed', 'in-review', 'done')) {
+    if ($labels -contains $forbiddenLabel) {
+      throw "Selected Issue #$Issue already has lifecycle label '$forbiddenLabel'; cannot admit."
+    }
+  }
+  if (@($selectedIssue.assignees).Count -gt 0) {
+    throw "Selected Issue #$Issue already has an assignee; cannot admit."
+  }
+  $normalizedTitles = @{}
+  foreach ($candidate in $openIssues) {
+    $titleKey = ([string]$candidate.title).Trim().ToLowerInvariant()
+    if (-not $normalizedTitles.ContainsKey($titleKey)) {
+      $normalizedTitles[$titleKey] = [System.Collections.Generic.List[int]]::new()
+    }
+    [void]$normalizedTitles[$titleKey].Add([int]$candidate.number)
+  }
+  $selectedTitleKey = ([string]$selectedIssue.title).Trim().ToLowerInvariant()
+  if ($normalizedTitles[$selectedTitleKey].Count -gt 1) {
+    $others = @($normalizedTitles[$selectedTitleKey] | Where-Object { $_ -ne $Issue })
+    throw "Normalized exact-title conflict for Issue #$Issue with Issue(s): $($others -join ', ')"
+  }
+  Assert-AdmissionOverlap -OpenIssues $openIssues -SelectedIssueNumber $Issue | Out-Null
+  Write-Output "claim-admission preflight passed for Issue #$Issue ($($openIssues.Count) open issues scanned)."
   exit 0
 }
 # Main path: enumerate open issues and validate their hibiki:handoff-v1 blocks.
