@@ -1,0 +1,80 @@
+{
+  "evidence_format": 2,
+  "issue": 1166,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      ".github/PULL_REQUEST_TEMPLATE.md",
+      ".github/workflows/verify.yml",
+      "AGENTS.md",
+      "docs/specs/SPEC-0004-ai-handoff-and-evidence.md",
+      "docs/state/BASELINE.md",
+      "schemas/evidence-manifest-v2.schema.json",
+      "tools/docs-check.ps1",
+      "tools/evidence-audit.ps1"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "360569239f1e9edb6274a08bd27e7a796b22b8b2ed5a9dd0a95d4bcc6859367e"
+  },
+  "metadata": {
+    "scope": "evidence-provenance-v2",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-git-2.55.0",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1166",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "pwsh -NoProfile -File tools/verify.ps1",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "evidence-audit -SelfTest",
+        "status": "pass",
+        "detail": "48 offline cases passed, including legacy compatibility, strict schema negatives, raw Git blob hashing, rename/delete, local unstaged deletion, snapshot mode, exact-case deletion inventory, and pre/post-squash digest equality."
+      },
+      {
+        "command": "evidence-audit -DescribeCurrentChange",
+        "status": "pass",
+        "detail": "Derived the eight exact non-evidence paths and this manifest's source digest from the staged Git index."
+      },
+      {
+        "command": "evidence-audit",
+        "status": "pass",
+        "detail": "Checked 311 records, including one v2 record bound to candidate-index, with zero findings."
+      },
+      {
+        "command": "handoff/docs/source/diff gates",
+        "status": "pass",
+        "detail": "Issue ownership and scope passed; docs-check passed 87 required paths and 24 specs; docs-check SelfTest passed 46 cases; source policy passed 704 tracked paths; git diff check was clean."
+      },
+      {
+        "command": "source-only-ci-check",
+        "status": "pass",
+        "detail": "Validated two workflows and 704 tracked source-only paths."
+      },
+      {
+        "command": "verify",
+        "status": "pass",
+        "detail": "Unsigned local CMake build completed and all three CTest targets passed."
+      }
+    ],
+    "limitations": [
+      "The source digest binds this assertion to exact Git paths and before/after blob states; it does not prove that author-declared commands ran or provide a signed external attestation.",
+      "The verifier and workflow remain modifiable in the same pull request, so resistance to a malicious writer still requires a separately trusted required workflow, GitHub App, review policy, or signed attestation.",
+      "The 311 legacy records remain in place under compatibility audit and are not migrated or reinterpreted by this slice.",
+      "Repository-process and source-only evidence only; no DSP behavior, physical audio, driver loading, WaveRT streaming, HLK, Microsoft signing, or release acceptance is implied."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.55.0.windows.3"
+    },
+    "started_at": "2026-08-24T15:38:43+08:00",
+    "finished_at": "2026-08-24T16:41:54+08:00"
+  }
+}

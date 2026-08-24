@@ -53,6 +53,9 @@ AI memory 與 IDE 規則都不是專案真值。
 - Accepted ADR 不可改寫；新決策建立新 ADR 並標示 supersedes。
 - 修改 public API、schema、DSP 順序、安全規則或建置方式時，同一 PR 更新對應 Spec/ADR
   與 evidence。
+- 新 evidence 使用 `evidence_format: 2` 的 append-only manifest，以非 evidence Git blob 的內容摘要
+  綁定來源；不得預填尚不存在的 squash commit，也不得覆寫 legacy evidence。更正時新增
+  `supersedes` 紀錄。
 - 換 AI 或電腦前：更新 Issue body handoff block、建立 WIP commit、push branch、寫明
   下一個安全動作。
 
@@ -77,6 +80,7 @@ git diff --check
 | 需要 build／toolchain evidence | `doctor.ps1 -CheckOnly` |
 | 改 C/C++、CMake、schema、contract 或 tests | `verify.ps1` |
 | 改 workflow、公開 release／artifact policy | `source-only-ci-check.ps1` |
+| 新增或更正 evidence | `evidence-audit.ps1`（change 模式先以 `-DescribeCurrentChange` 產生來源摘要） |
 | 改 UI／control model | `control-model-check.ps1`、`build-preview.ps1`（DesktopCompat 或鎖定機上的 `-Target WinUI`）、`winui-shell-check.ps1` |
 | 改 engine/control plane 整合 | `build-engine-preview.ps1`、`engine-preview-smoke.ps1`、`control-model-check.ps1`、`control-model-engine-smoke.ps1` |
 | 改 extensions | `extension-check.ps1` |

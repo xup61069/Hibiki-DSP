@@ -1173,7 +1173,7 @@ $required = @(
   'tools/live-device-catalog-check.ps1', 'tools/live-wasapi-handoff-check.ps1',
   'tools/live-audio-session-check.ps1', 'tools/live-process-loopback-check.ps1',
   'tools/driver-source-check.ps1', 'tools/driver-signability-check.ps1',
-  'schemas/release-manifest-v1.schema.json',
+  'schemas/release-manifest-v1.schema.json', 'schemas/evidence-manifest-v2.schema.json',
   'docs/START_HERE.md', 'docs/AI_HANDOFF.md', 'docs/PROJECT_MAP.md', 'docs/state/BASELINE.md',
   'docs/specs/INDEX.md', 'docs/specs/SPEC-0001-core-contracts.md',
   'docs/specs/SPEC-0002-volume-and-iso.md', 'docs/specs/SPEC-0003-virtual-endpoints-and-routing.md',

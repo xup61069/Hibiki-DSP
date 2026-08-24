@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.local/schemas/evidence-manifest-v2.schema.json",
+  "title": "Hibiki evidence manifest v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["evidence_format", "issue", "source_provenance", "metadata"],
+  "properties": {
+    "evidence_format": {"const": 2},
+    "issue": {"type": "integer", "minimum": 1},
+    "source_provenance": {
+      "oneOf": [
+        {"$ref": "#/$defs/changeProvenance"},
+        {"$ref": "#/$defs/snapshotProvenance"}
+      ]
+    },
+    "metadata": {"$ref": "#/$defs/metadata"},
+    "supersedes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/evidencePath"}
+    }
+  },
+  "$defs": {
+    "changeProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "paths", "digest_algorithm", "digest"],
+      "properties": {
+        "mode": {"const": "change"},
+        "paths": {"$ref": "#/$defs/sourcePaths"},
+        "digest_algorithm": {"const": "sha256-git-source-set-v1"},
+        "digest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "snapshotProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "snapshot_commit", "paths", "digest_algorithm", "digest"],
+      "properties": {
+        "mode": {"const": "snapshot"},
+        "snapshot_commit": {
+          "type": "string",
+          "minLength": 40,
+          "maxLength": 40,
+          "pattern": "^[0-9a-f]{40}(?![\\s\\S])"
+        },
+        "paths": {"$ref": "#/$defs/sourcePaths"},
+        "digest_algorithm": {"const": "sha256-git-source-set-v1"},
+        "digest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "sourcePaths": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/sourcePath"}
+    },
+    "sourcePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^(?![Ee][Vv][Ii][Dd][Ee][Nn][Cc][Ee](?:/|$))(?!\\.[Gg][Ii][Tt](?:/|$))(?!.*(?:^|/)\\.{1,2}(?:/|$))[A-Za-z0-9._@+() -]+(?:/[A-Za-z0-9._@+() -]+)*(?![\\s\\S])"
+    },
+    "evidencePath": {
+      "type": "string",
+      "minLength": 15,
+      "maxLength": 240,
+      "pattern": "^[Ee][Vv][Ii][Dd][Ee][Nn][Cc][Ee]/(?!\\.{1,2}(?:/|$))(?!.*/\\.{1,2}(?:/|$))[A-Za-z0-9._@+() -]+(?:/[A-Za-z0-9._@+() -]+)*\\.json(?![\\s\\S])"
+    },
+    "sha256": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "environment_fingerprint",
+        "commands",
+        "results",
+        "limitations",
+        "tool_versions",
+        "started_at",
+        "finished_at"
+      ],
+      "properties": {
+        "scope": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?![\\s\\S])"
+        },
+        "environment_fingerprint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]*(?![\\s\\S])"
+        },
+        "commands": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {"$ref": "#/$defs/printableString"}
+        },
+        "results": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": {"$ref": "#/$defs/result"}
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {"$ref": "#/$defs/printableString"}
+        },
+        "logs": {
+          "type": "object",
+          "maxProperties": 32,
+          "propertyNames": {
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?![\\s\\S])"
+          },
+          "additionalProperties": {"$ref": "#/$defs/printableString"}
+        },
+        "tool_versions": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 32,
+          "propertyNames": {
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?![\\s\\S])"
+          },
+          "additionalProperties": {"$ref": "#/$defs/shortPrintableString"}
+        },
+        "started_at": {"$ref": "#/$defs/timestamp"},
+        "finished_at": {"$ref": "#/$defs/timestamp"}
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "status"],
+      "properties": {
+        "command": {"$ref": "#/$defs/shortPrintableString"},
+        "status": {"enum": ["pass", "fail", "partial", "skipped"]},
+        "detail": {"$ref": "#/$defs/printableString"}
+      }
+    },
+    "timestamp": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 35,
+      "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,9})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])(?![\\s\\S])"
+    },
+    "printableString": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^(?![\\s\\S]*[\\u0000-\\u001F\\u007F-\\u009F])"
+    },
+    "shortPrintableString": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^(?![\\s\\S]*[\\u0000-\\u001F\\u007F-\\u009F])"
+    }
+  }
+}
