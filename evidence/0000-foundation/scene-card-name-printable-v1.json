@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "issue": 1100,
+  "scope_digest": "scene-card-name-printable-v1",
+  "source_commit": "189960204bae8c97f8effd08c0de52beede0871f",
+  "environment_fingerprint": "windows-amd64-pwsh-scene-card-name-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1100",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Schema-only parity fix: custom Scene card names now reject C0/C1 control characters and DEL while retaining the existing non-whitespace and length bounds.",
+    "The C# runtime parser already rejected control characters; persisted-schema validation now matches that fail-closed behavior.",
+    "source_commit is pinned to the main head at authoring time; post-merge squash-hash repair follows the established follow-up convention.",
+    "Source/schema/tooling evidence only; no physical audio, driver, HLK, signing, or release acceptance."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
