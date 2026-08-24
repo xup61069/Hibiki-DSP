@@ -20,8 +20,8 @@
         "display_name_contains": {"type": "string", "maxLength": 128}
       }
     },
-    "lane_id": {"type": "string", "minLength": 1, "maxLength": 256},
-    "output_group": {"type": "string", "minLength": 1, "maxLength": 256},
+    "lane_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "output_group": {"type": "string", "minLength": 1, "maxLength": 64},
     "gain_owner": {"enum": ["windows-session", "hibiki-internal"]},
     "makeup_gain_db": {"type": "number", "minimum": -144, "maximum": 12}
   }
