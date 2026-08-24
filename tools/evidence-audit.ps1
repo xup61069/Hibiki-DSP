@@ -3,6 +3,8 @@
 param(
   [switch]$SelfTest,
   [switch]$DescribeCurrentChange,
+  [switch]$DescribeSnapshotSourceSet,
+  [string]$SnapshotCommit = '',
   [ValidateSet('auto', 'pull_request', 'push', 'merge_group', 'workflow_dispatch')]
   [string]$CandidateKind = 'auto'
 )
@@ -604,6 +606,31 @@ function Get-V2SourceSetFinding {
   return (Compare-ProvenanceV2Snapshot -Record $Record -ExpectedPaths ([string[]]$snapshot.Paths) -ExpectedDigest ([string]$snapshot.Digest))
 }
 
+function New-SnapshotProvenanceRecord {
+  param(
+    [Parameter(Mandatory)] [string]$Repository,
+    [Parameter(Mandatory)] [ValidatePattern('^[0-9a-f]{40}$')] [string]$SnapshotCommit
+  )
+
+  if (-not (Test-GitCommand -Repository $Repository -GitArgs @('cat-file', '-e', "$SnapshotCommit^{commit}"))) {
+    throw "Snapshot commit '$SnapshotCommit' does not exist."
+  }
+  $originMain = Get-GitCommit -Repository $Repository -Ref 'origin/main'
+  if (-not (Test-GitAncestor -Repository $Repository -Ancestor $SnapshotCommit -Descendant $originMain)) {
+    throw "Snapshot commit '$SnapshotCommit' is not reachable from origin/main."
+  }
+  $snapshotParent = Get-CommitFirstParent -Repository $Repository -Commit $SnapshotCommit
+  $snapshot = Get-CommitSnapshot -Repository $Repository -BaseCommit $snapshotParent -TargetCommit $SnapshotCommit
+  if ($snapshot.Paths.Count -eq 0) { throw "Snapshot commit '$SnapshotCommit' has no non-evidence source changes to describe." }
+  return [ordered]@{
+    mode = 'snapshot'
+    snapshot_commit = $SnapshotCommit
+    paths = [string[]]$snapshot.Paths
+    digest_algorithm = $script:DigestAlgorithm
+    digest = [string]$snapshot.Digest
+  }
+}
+
 function Assert-Finding {
   param([Parameter(Mandatory)] [AllowEmptyString()] [string]$Expected, [Parameter(Mandatory)] [AllowNull()] [object]$Actual)
   if ([string]::IsNullOrEmpty($Expected)) {
@@ -689,9 +716,27 @@ function Invoke-GitIntegrationSelfTest {
     [IO.File]::WriteAllText((Join-Path $testRoot 'evidence/record.json'), "{`"tamper`":true}`n", [Text.UTF8Encoding]::new($false))
     Invoke-GitText -Repository $testRoot -GitArgs @('add', '--all') | Out-Null
     Invoke-GitText -Repository $testRoot -GitArgs @('commit', '-m', 'tamper') | Out-Null
+    $tamperCommit = Get-GitCommit -Repository $testRoot -Ref 'HEAD'
     [IO.File]::WriteAllText((Join-Path $testRoot 'evidence/record.json'), "{}`n", [Text.UTF8Encoding]::new($false))
     Invoke-GitText -Repository $testRoot -GitArgs @('add', '--all') | Out-Null
     Invoke-GitText -Repository $testRoot -GitArgs @('commit', '-m', 'restore-bytes') | Out-Null
+    Invoke-GitText -Repository $testRoot -GitArgs @('update-ref', 'refs/remotes/origin/main', (Get-GitCommit -Repository $testRoot -Ref 'HEAD')) | Out-Null
+    $featureTip = Get-GitCommit -Repository $testRoot -Ref 'feature'
+    $describedSnapshot = New-SnapshotProvenanceRecord -Repository $testRoot -SnapshotCommit $squash
+    Assert-Equal -Expected 'snapshot' -Actual ([string]$describedSnapshot.mode) -Label 'describe snapshot mode'
+    Assert-Equal -Expected $squash -Actual ([string]$describedSnapshot.snapshot_commit) -Label 'describe snapshot commit'
+    Assert-Equal -Expected ($afterSquash.Paths -join ',') -Actual (@($describedSnapshot.paths) -join ',') -Label 'describe snapshot paths'
+    Assert-Equal -Expected ([string]$afterSquash.Digest) -Actual ([string]$describedSnapshot.digest) -Label 'describe snapshot digest'
+    $missingThrew = $false
+    try { New-SnapshotProvenanceRecord -Repository $testRoot -SnapshotCommit ('f' * 40) | Out-Null } catch { $missingThrew = ($_.Exception.Message -like '*does not exist*') }
+    if (-not $missingThrew) { throw 'Missing snapshot commit did not fail closed.' }
+    $unreachableThrew = $false
+    try { New-SnapshotProvenanceRecord -Repository $testRoot -SnapshotCommit $featureTip | Out-Null } catch { $unreachableThrew = ($_.Exception.Message -like '*not reachable*') }
+    if (-not $unreachableThrew) { throw 'Unreachable snapshot commit did not fail closed.' }
+    $emptyErr = ''
+    try { New-SnapshotProvenanceRecord -Repository $testRoot -SnapshotCommit $tamperCommit | Out-Null } catch { $emptyErr = $_.Exception.Message }
+    if ([string]::IsNullOrEmpty($emptyErr)) { throw 'Evidence-only snapshot commit did not fail closed.' }
+    if ($emptyErr -notlike '*no non-evidence source changes*') { throw "Unexpected empty-case error: $emptyErr" }
     if ((Get-LatestTouchCommit -Repository $testRoot -HistoryRef 'HEAD' -Path 'evidence/record.json') -ceq $squash) {
       throw 'Latest-touch immutability check ignored a reverted evidence mutation.'
     }
@@ -718,7 +763,7 @@ function Invoke-GitIntegrationSelfTest {
 }
 
 if ($SelfTest) {
-  if ($DescribeCurrentChange) { throw '-SelfTest and -DescribeCurrentChange are mutually exclusive.' }
+  if ($DescribeCurrentChange -or $DescribeSnapshotSourceSet) { throw '-SelfTest cannot be combined with -DescribeCurrentChange or -DescribeSnapshotSourceSet.' }
   $caseCount = 0
   $valid = [pscustomobject]@{ source_commit = 'a' * 40 }
   $history = @(('b' * 40), ('a' * 40))
@@ -842,6 +887,14 @@ if ($resolvedKind -eq 'push' -and $env:GITHUB_REF_NAME -eq 'main') {
   $mergeBaseLines = @(Invoke-GitText -Repository $repo -GitArgs @('merge-base', $mainRef, $headCommit))
   if ($mergeBaseLines.Count -ne 1 -or $mergeBaseLines[0] -notmatch '^[0-9a-f]{40,64}$') { throw 'Unable to derive the candidate merge base.' }
   $candidateBase = $mergeBaseLines[0]
+}
+
+if ($DescribeSnapshotSourceSet -and $DescribeCurrentChange) { throw '-DescribeCurrentChange and -DescribeSnapshotSourceSet are mutually exclusive.' }
+
+if ($DescribeSnapshotSourceSet) {
+  if ($SnapshotCommit -notmatch '^[0-9a-f]{40}$') { throw '-SnapshotCommit must be a full 40-hex commit id.' }
+  New-SnapshotProvenanceRecord -Repository $repo -SnapshotCommit $SnapshotCommit | ConvertTo-Json -Depth 5
+  exit 0
 }
 
 if ($DescribeCurrentChange) {
