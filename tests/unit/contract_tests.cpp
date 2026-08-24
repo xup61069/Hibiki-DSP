@@ -270,6 +270,21 @@ int main() {
     scene.lanes.push_back(std::string("lane\0hidden", 11U));
     CHECK(!validate_scene(scene));
     scene.lanes.clear();
+    scene.lanes.push_back("lane\ttabbed");
+    CHECK(!validate_scene(scene));
+    scene.lanes.clear();
+    scene.lanes.push_back("lane\nnewline");
+    CHECK(!validate_scene(scene));
+    scene.lanes.clear();
+    scene.lanes.push_back("lane\x7F" "del");
+    CHECK(!validate_scene(scene));
+    scene.lanes.clear();
+    scene.lanes.push_back("lane\x80" "c1");
+    CHECK(!validate_scene(scene));
+    scene.lanes.clear();
+    scene.lanes.push_back("lane\x9F" "c1");
+    CHECK(!validate_scene(scene));
+    scene.lanes.clear();
     for (std::size_t i = 0U; i < 32U; ++i) {
         scene.lanes.push_back("lane-" + std::to_string(i));
     }
@@ -292,6 +307,16 @@ int main() {
     scene.ir_reference.push_back('a');
     scene.ir_reference.push_back('\0');
     scene.ir_reference.append("calibration");
+    CHECK(!validate_scene(scene));
+    scene.ir_reference = "calibration\ttab";
+    CHECK(!validate_scene(scene));
+    scene.ir_reference = "calibration\nnewline";
+    CHECK(!validate_scene(scene));
+    scene.ir_reference = "calibration\x7F" "del";
+    CHECK(!validate_scene(scene));
+    scene.ir_reference = "calibration\x80" "c1";
+    CHECK(!validate_scene(scene));
+    scene.ir_reference = "calibration\x9F" "c1";
     CHECK(!validate_scene(scene));
     scene.ir_reference.clear();
     CHECK(validate_scene(scene));
