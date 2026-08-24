@@ -152,6 +152,15 @@ Group Master → limiter；失敗時保留既有 active attachment。SceneApply 
 的校正鏈意外殘留。此 attachment 仍不代表已連接實體 sink、WaveRT driver 或完成聲學校正，且
 production concurrent RT/control swap 仍需 epoch/RCU 驗證。
 
+`AudioEngineModel::prepare_loudness_peq` 把 caller-supplied ISO formula points、current phon
+與 `EqualLoudnessPolicyV1` 先送入既有 `build_formula_compensation`，再在 control plane 編成最多
+16 段固定容量 PEQ。commit 才會替換指定 output group 的 active attachment；prepare/clear rollback
+保留舊 attachment。RT render 順序為 graph → IR → equal-loudness PEQ → Group Master → limiter；
+Strict Direct 時可準備或保留 attachment，但 render 會 fail-open bypass，確保輸出不變。SceneApply 成功路徑會在同一個 control
+transaction 清掉上一個 loudness EQ，避免不相關 Scene 的音色殘留。這是 bounded proxy 與音色控制，
+不是 ISO 226 conformance、正式係數 fit、實體 sink delivery 或 driver/WaveRT evidence；production
+concurrent swap 仍需 epoch/RCU 驗證，100–200 ms crossfade 仍未實作。
+
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
 schema 要求 `anchor_id` 在非 null 時為 non-empty printable UTF-8 且最長 64 字，拒絕 C0/C1
 控制字元與 DEL；runtime validator 維持既有非空與 64 字邊界檢查，
@@ -190,4 +199,6 @@ GPL source 前必須由人類 reviewer 完成法務 gate。
 ## Safety
 
 一般 boost 上限 +6 dB，Expert calibrated 上限 +12 dB；低於實測 F3 不 boost；最後一級 −1 dBTP
-limiter。曲線以 immutable coefficient bank 與 100–200 ms crossfade 更新。
+limiter。`build_formula_compensation` 已提供 bounded gain cap；目前 engine attachment 以
+control-thread prepare/commit 替換固定容量 PEQ，尚未提供 immutable bank 的 100–200 ms crossfade，
+因此不得宣稱無感切換或正式 ISO 曲線更新。

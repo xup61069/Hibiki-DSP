@@ -4341,6 +4341,192 @@ int main() {
     CHECK(!prepare_ir_convolver_from_wav_v1(bypass_convolver, decoded_ir.data,
                                             bypass_resolution));
 
+    // Equal-loudness policy is now a fixed-capacity output attachment. The
+    // formula points remain caller-supplied legal test values; no ISO table
+    // is embedded. A low-frequency boost and high-frequency cut must reach
+    // the selected group only, after IR and before Group Master.
+    {
+        auto loudness_engine = std::make_unique<AudioEngineModel>();
+        GraphConfigV1 loudness_graph;
+        loudness_graph.lanes.push_back(LaneConfigV1{"loudness-main", "main", 2, 0.0, true});
+        loudness_graph.lanes.push_back(LaneConfigV1{"loudness-side", "side", 2, 0.0, true});
+        loudness_graph.strict_direct = false;
+        CHECK(loudness_engine->prepare_graph(loudness_graph, 1U) &&
+              loudness_engine->commit_graph());
+        loudness_engine->set_sample_rate(48000U);
+        const std::array<Iso226FormulaPointV1, 3> legal_points{{
+            {100.0, 0.35, 50.0, 0.0},
+            {1000.0, 0.30, 2.4, 0.0},
+            {8000.0, 0.25, 50.0, 0.0}}};
+        EqualLoudnessPolicyV1 loudness_policy{};
+        loudness_policy.reference_phon = 80.0;
+        loudness_policy.strength = 1.0;
+        loudness_policy.max_boost_db = 6.0;
+        CHECK(loudness_engine->has_active_loudness_peq("main") == false);
+        CHECK(loudness_engine->loudness_peq_transaction_idle());
+        CHECK(!loudness_engine->prepare_loudness_peq("main", {}, 60.0,
+                                                     loudness_policy));
+        CHECK(!loudness_engine->prepare_loudness_peq(
+            "missing", legal_points, 60.0, loudness_policy));
+        CHECK(!loudness_engine->prepare_loudness_peq(
+            "main", legal_points, 19.0, loudness_policy));
+        CHECK(!loudness_engine->has_active_loudness_peq("main"));
+        CHECK(loudness_engine->loudness_peq_transaction_idle());
+
+        std::array<float, 2048> loudness_input{};
+        std::array<float, 2048> loudness_output{};
+        for (std::size_t frame_index = 0U; frame_index < 1024U; ++frame_index) {
+            const float sample = (frame_index % 64U) < 32U ? 0.125F : -0.125F;
+            loudness_input[frame_index * 2U] = sample;
+            loudness_input[frame_index * 2U + 1U] = -sample;
+        }
+        const RtLaneInputV1 loudness_view{loudness_input.data(), 2U};
+        std::array<float, 2048> loudness_side_input{};
+        const std::array<RtLaneInputV1, 2> loudness_main_views{{
+            loudness_view, {loudness_side_input.data(), 2U}}};
+        CHECK(loudness_engine->prepare_loudness_peq(
+            "main", legal_points, 60.0, loudness_policy));
+        loudness_engine->rollback_loudness_peq();
+        CHECK(!loudness_engine->has_active_loudness_peq("main"));
+        CHECK(loudness_engine->prepare_loudness_peq(
+            "main", legal_points, 60.0, loudness_policy));
+        CHECK(loudness_engine->commit_loudness_peq() &&
+              loudness_engine->has_active_loudness_peq("main") &&
+              !loudness_engine->has_active_loudness_peq("side"));
+        // Render an identically configured unattached control block so the
+        // comparison includes the shared Group Master attack ramp instead of
+        // aliasing the render output over its own input.
+        auto main_control_engine = std::make_unique<AudioEngineModel>();
+        GraphConfigV1 main_control_graph;
+        main_control_graph.lanes.push_back(
+            LaneConfigV1{"loudness-main", "main", 2, 0.0, true});
+        main_control_graph.lanes.push_back(
+            LaneConfigV1{"loudness-side", "side", 2, 0.0, true});
+        CHECK(main_control_engine->prepare_graph(main_control_graph, 1U) &&
+              main_control_engine->commit_graph());
+        main_control_engine->set_sample_rate(48000U);
+        std::array<float, 2048> loudness_reference{};
+        CHECK(main_control_engine->process_output_group(
+            "main", loudness_main_views,
+            loudness_reference.data(), 1024U));
+        CHECK(loudness_engine->process_output_group(
+            "main", loudness_main_views,
+            loudness_output.data(), 1024U));
+        CHECK(std::all_of(loudness_output.begin(), loudness_output.end(),
+                          [](const float value) { return std::isfinite(value); }));
+        const auto low_energy = [](const std::array<float, 2048>& block) {
+            double sum = 0.0;
+            for (const float value : block) {
+                sum += static_cast<double>(value) * static_cast<double>(value);
+            }
+            return sum;
+        };
+        // The PEQ transient response is bounded, but the shaped block differs
+        // from the unshaped reference and remains below limiter engagement.
+        const double reference_energy = low_energy(loudness_reference);
+        const double shaped_energy = low_energy(loudness_output);
+        CHECK(reference_energy > 0.0);
+        CHECK(std::abs(reference_energy - shaped_energy) > 1e-8);
+        CHECK(*std::max_element(loudness_output.begin(), loudness_output.end()) <=
+              *std::max_element(loudness_reference.begin(), loudness_reference.end()) +
+                  1e-4F);
+
+        // A second group must remain untouched by the main attachment.
+        std::array<float, 512> side_reference{};
+        std::array<float, 512> side_output{};
+        for (std::size_t side_frame = 0U; side_frame < 256U; ++side_frame) {
+            const float sample = (side_frame % 32U) < 16U ? 0.125F : -0.125F;
+            side_reference[side_frame * 2U] = sample;
+            side_reference[side_frame * 2U + 1U] = -sample;
+        }
+        side_output = side_reference;
+        const RtLaneInputV1 side_view{side_output.data(), 2U};
+        const std::array<RtLaneInputV1, 2> loudness_side_views{{
+            {loudness_side_input.data(), 2U},
+            side_view}};
+        CHECK(loudness_engine->process_output_group(
+            "side", loudness_side_views,
+            side_output.data(), 256U));
+        // Group Master starts at -60 dB and ramps over its fixed 8 ms window;
+        // compare against an identically rendered unattached control block.
+        std::array<float, 512> side_control_reference{};
+        for (std::size_t side_frame = 0U; side_frame < 256U; ++side_frame) {
+            const float sample = (side_frame % 32U) < 16U ? 0.125F : -0.125F;
+            side_control_reference[side_frame * 2U] = sample;
+            side_control_reference[side_frame * 2U + 1U] = -sample;
+        }
+        auto side_control_engine = std::make_unique<AudioEngineModel>();
+        GraphConfigV1 side_control_graph;
+        side_control_graph.lanes.push_back(
+            LaneConfigV1{"loudness-main", "main", 2, 0.0, true});
+        side_control_graph.lanes.push_back(
+            LaneConfigV1{"loudness-side", "side", 2, 0.0, true});
+        CHECK(side_control_engine->prepare_graph(side_control_graph, 1U) &&
+              side_control_engine->commit_graph());
+        CHECK(side_control_engine->process_output_group("side", loudness_side_views,
+                                                       side_control_reference.data(),
+                                                       256U));
+        CHECK(side_output == side_control_reference);
+
+        // Clear is transactional: rollback keeps the active attachment and
+        // commit detaches only the selected output group.
+        CHECK(loudness_engine->prepare_loudness_peq_clear());
+        loudness_engine->rollback_loudness_peq();
+        CHECK(loudness_engine->has_active_loudness_peq("main"));
+        CHECK(loudness_engine->prepare_loudness_peq_clear());
+        CHECK(loudness_engine->commit_loudness_peq() &&
+              !loudness_engine->has_active_loudness_peq("main"));
+        loudness_engine->reset_loudness_peq_state();
+        CHECK(loudness_engine->prepare_loudness_peq(
+            "main", legal_points, 60.0, loudness_policy));
+        CHECK(loudness_engine->commit_loudness_peq());
+
+        // A committed attachment survives a graph switch, but Strict Direct
+        // render bypasses it.
+        loudness_graph.strict_direct = true;
+        CHECK(loudness_engine->prepare_graph(loudness_graph, 2U) &&
+              loudness_engine->commit_graph());
+        CHECK(loudness_engine->has_active_loudness_peq("main"));
+
+        std::array<float, 512> strict_reference{};
+        std::array<float, 512> strict_output{};
+        for (std::size_t strict_frame = 0U; strict_frame < 256U; ++strict_frame) {
+            const float sample =
+                (strict_frame % 32U) < 16U ? 0.125F : -0.125F;
+            strict_reference[strict_frame * 2U] = sample;
+            strict_reference[strict_frame * 2U + 1U] = -sample;
+        }
+        const RtLaneInputV1 strict_main_view{strict_reference.data(), 2U};
+        const RtLaneInputV1 strict_side_view{loudness_side_input.data(), 2U};
+        const std::array<RtLaneInputV1, 2> strict_views{
+            {strict_main_view, strict_side_view}};
+        CHECK(loudness_engine->process_output_group(
+            "main", strict_views, strict_output.data(), 256U));
+        CHECK(strict_output == strict_reference);
+
+        // SceneApply clears any prior equal-loudness attachment in the same
+        // control transaction, while preserving active_loudness persistence.
+        loudness_graph.strict_direct = false;
+        CHECK(loudness_engine->prepare_graph(loudness_graph, 3U) &&
+              loudness_engine->commit_graph());
+        CHECK(loudness_engine->prepare_loudness_peq(
+            "main", legal_points, 60.0, loudness_policy));
+        CHECK(loudness_engine->commit_loudness_peq());
+        EngineControlWorkerV1 loudness_scene_worker(*loudness_engine);
+        ControlCommandV1 loudness_scene_command{};
+        loudness_scene_command.type = IpcMessageType::SceneApply;
+        std::array<std::uint8_t, kSceneApplyPayloadBytesV1> loudness_scene_payload{};
+        CHECK(encode_scene_apply_payload_v1("game", "main",
+                                            loudness_scene_payload));
+        CHECK(decode_scene_apply_payload_v1(loudness_scene_payload,
+                                            loudness_scene_command.scene));
+        CHECK(loudness_scene_worker.consume(loudness_scene_command) ==
+              EngineControlResultV1::Applied);
+        CHECK(loudness_engine->loudness_peq_transaction_idle() &&
+              !loudness_engine->has_active_loudness_peq("main"));
+        CHECK(std::abs(loudness_scene_worker.active_loudness().reference_phon -
+                       80.0) < 1e-12);
+    }
     AudioEngineModel ir_graph_engine;
     GraphConfigV1 ir_graph;
     ir_graph.lanes.push_back(LaneConfigV1{"ir-lane", "main", 2, 0.0, true});

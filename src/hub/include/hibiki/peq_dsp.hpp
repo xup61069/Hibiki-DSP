@@ -22,7 +22,7 @@ public:
                                std::uint32_t channels) noexcept;
     void reset() noexcept;
     [[nodiscard]] bool process_interleaved(float* interleaved,
-                                           std::size_t frames) noexcept;
+                                           std::size_t frames) const noexcept;
     [[nodiscard]] bool prepared() const noexcept { return prepared_; }
     [[nodiscard]] std::uint32_t sample_rate() const noexcept { return sample_rate_; }
     [[nodiscard]] std::uint32_t channels() const noexcept { return channels_; }
@@ -38,10 +38,10 @@ private:
     };
 
     struct State {
-        float x1{0.0F};
-        float x2{0.0F};
-        float y1{0.0F};
-        float y2{0.0F};
+        mutable float x1{0.0F};
+        mutable float x2{0.0F};
+        mutable float y1{0.0F};
+        mutable float y2{0.0F};
     };
 
     std::array<Section, kMaxRealtimePeqFiltersV1> sections_{};
