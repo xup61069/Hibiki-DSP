@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1090,
   "scope_digest": "scene-calibration-label-printable-v1",
-  "source_commit": "225920ad9cb094851a789e368a929d16ae25c58e",
+  "source_commit": "5b896f6a4a89ef1adb983138406a3cbddab7ffec",
   "environment_fingerprint": "windows-amd64-pwsh-scene-calibration-label-printable",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1090",
