@@ -88,13 +88,18 @@ jobs:
 
           try {
             Add-IssueLabelSafe -IssueNumber $issueNumber -Label 'claim-pending'
-            gh issue edit $issueNumber --add-assignee $owner
             pwsh -NoProfile -File tools/handoff-check.ps1
             $readback = ConvertTo-AdmissionReadback -GhArgs @(
               'issue', 'view', "$issueNumber", '--json', 'labels,assignees,state'
             )
-            Test-ClaimPendingReadback -Readback $readback -IssueNumber $issueNumber -Owner $owner
+            Test-PendingNoAssigneeReadback -Readback $readback -IssueNumber $issueNumber
             Set-IssueLabelsSafe -IssueNumber $issueNumber -Add @('claimed') -Remove @('claim-pending')
+            gh issue edit $issueNumber --add-assignee $owner
+            if ($LASTEXITCODE -ne 0) { throw "Assignee assignment failed for Issue #$issueNumber." }
+            $claimedReadback = ConvertTo-AdmissionReadback -GhArgs @(
+              'issue', 'view', "$issueNumber", '--json', 'labels,assignees,state'
+            )
+            Test-ClaimedAdmissionReadback -Readback $claimedReadback -IssueNumber $issueNumber -Owner $owner
             Write-Output ("Admitted Issue #" + $issueNumber + " session=" + $env:SESSION_ID +
               " owner=" + $owner + " branch=" + $branch)
           } catch {

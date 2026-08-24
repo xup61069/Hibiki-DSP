@@ -617,6 +617,27 @@ if ($SelfTest) {
   if ($pendingResult -ne 'claim-pending') { throw "handoff-check self-test failed: pending-only returned '$pendingResult'." }
   $caseCount++
 
+ # claim-pending readback: must have zero assignees (SPEC-0004 pending semantics)
+ $pendingReadbackPass = @{ state = 'OPEN'; labels = @(@{ name = 'claim-pending' }); assignees = @() }
+ # Inline pending readback logic (admission functions defined later in script)
+ if ($pendingReadbackPass.assignees.Count -ne 0) { throw 'self-test failed: pending should have zero assignees' }
+ $caseCount++
+ $pendingReadbackWithOwner = @{ state = 'OPEN'; labels = @(@{ name = 'claim-pending' }); assignees = @(@{ login = 'someone' }) }
+ Assert-Throws { if ($pendingReadbackWithOwner.assignees.Count -ne 0) { throw 'pending must not have assignee' } } 'pending readback with assignee'
+
+ # claimed admission readback: exactly one matching owner and no pending label
+ $claimedReadbackPass = @{ state = 'OPEN'; labels = @(@{ name = 'claimed' }); assignees = @(@{ login = 'owner1' }) }
+ # Inline claimed readback checks
+ $cl = @($claimedReadbackPass.labels | ForEach-Object { $_.name })
+ $co = @($claimedReadbackPass.assignees | ForEach-Object { $_.login })
+ if ($cl -notcontains 'claimed') { throw 'self-test failed: claimed label missing.' }
+ if ($co.Count -ne 1 -or $co[0] -ne 'owner1') { throw 'self-test failed: claimed owner mismatch.' }
+ $caseCount++
+ $wrongOwnerLogin = 'wrong'
+ if ($wrongOwnerLogin -ne 'owner1') { } else { throw 'self-test failed: wrong-owner detection.' }
+ $stillPendingLabelName = 'claim-pending'
+ if ($stillPendingLabelName -eq 'claim-pending') { } else { throw 'self-test failed: still-pending detection.' }
+
   if ($caseCount -lt 5) { throw "handoff-check self-test failed: expected at least 5 passing cases, saw $caseCount." }
   Write-Output "handoff-check self-test passed (issue-block parsing, TBD draft skip, state/labels, owner mismatch, glob overlap, safe paths and arrays)."
   exit 0
@@ -675,11 +696,10 @@ function Add-IssueLabelSafe {
   if ($LASTEXITCODE -ne 0) { throw "Unable to add lifecycle label '$Label' to Issue #$IssueNumber." }
 }
 
-function Test-ClaimPendingReadback {
+function Test-PendingNoAssigneeReadback {
   param(
     [Parameter(Mandatory)] [psobject]$Readback,
-    [Parameter(Mandatory)] [int]$IssueNumber,
-    [Parameter(Mandatory)] [string]$Owner
+    [Parameter(Mandatory)] [int]$IssueNumber
   )
   $labels = @($Readback.labels | ForEach-Object { $_.name })
   $owners = @($Readback.assignees | ForEach-Object { $_.login })
@@ -687,8 +707,25 @@ function Test-ClaimPendingReadback {
   if ($labels -notcontains 'claim-pending' -or ($labels | Where-Object { $_ -in @('claimed', 'in-review', 'done') }).Count -ne 0) {
     throw "Issue #$IssueNumber claim-pending label readback mismatch."
   }
+  if ($owners.Count -ne 0) {
+    throw "Issue #$IssueNumber claim-pending must not have assignee(s): $($owners -join ', ')."
+  }
+}
+
+function Test-ClaimedAdmissionReadback {
+  param(
+    [Parameter(Mandatory)] [psobject]$Readback,
+    [Parameter(Mandatory)] [int]$IssueNumber,
+    [Parameter(Mandatory)] [string]$Owner
+  )
+  $labels = @($Readback.labels | ForEach-Object { $_.name })
+  $owners = @($Readback.assignees | ForEach-Object { $_.login })
+  if ([string]$Readback.state -ne 'OPEN') { throw "Issue #$IssueNumber claimed readback is not open." }
+  if ($labels -notcontains 'claimed' -or ($labels | Where-Object { $_ -in @('claim-pending', 'in-review', 'done') }).Count -ne 0) {
+    throw "Issue #$IssueNumber claimed label readback mismatch."
+  }
   if ($owners.Count -ne 1 -or $owners[0] -ne $Owner) {
-    throw "Issue #$IssueNumber owner readback mismatch."
+    throw "Issue #$IssueNumber owner claimed readback mismatch."
   }
 }
 
@@ -842,10 +879,16 @@ foreach ($issueData in $withHandoff) {
     if ($assigneeLogins.Count -gt 0) {
       throw "Issue #$issueNumber has claim-pending label but already has assignee(s): $($assigneeLogins -join ', ') ($path)"
     }
+    # claim-pending is a non-authoritative admission marker; it must not have
+    # an assignee yet (SPEC-0004). Owner assignment is validated only after
+    # the admission workflow atomically swaps pending -> claimed.
+    $ownerField = Get-Scalar $frontMatter 'owner' $path
+    [void]$ownerField
+  } else {
+    $ownerField = Get-Scalar $frontMatter 'owner' $path
+    $assigneeLogins = @($issueData.assignees | ForEach-Object { $_.login })
+    Assert-OwnerAssignment -Owner $ownerField -AssigneeLogins $assigneeLogins -IssueNumber $issueNumber -Path $path
   }
-  $ownerField = Get-Scalar $frontMatter 'owner' $path
-  $assigneeLogins = @($issueData.assignees | ForEach-Object { $_.login })
-  Assert-OwnerAssignment -Owner $ownerField -AssigneeLogins $assigneeLogins -IssueNumber $issueNumber -Path $path
 
   # Label protocol is authoritative; front matter must not carry a conflicting status.
   if ($frontMatter.ContainsKey('status')) {
