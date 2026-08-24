@@ -43,6 +43,7 @@
 extern "C" {
 #include "hibiki/driver_control_v1.h"
 #include "hibiki/driver_control_transport_v1.h"
+#include "hibiki/driver_stream_ring_v1.h"
 #include "hibiki/driver_stream_transport_v1.h"
 #include "hibiki/driver_validation_v1.h"
 #include "hibiki/wavert_endpoint_state_v1.h"
@@ -5257,6 +5258,122 @@ int main() {
         "main", {}, wasapi_graph_buffer.data(), 2U));
     fanout_engine.stop_wasapi_fanout();
 #endif
+
+    // Driver stream ring v1: fixed-layout publication, overrun rejection and
+    // fail-closed underrun/reserved-field handling.
+    {
+        std::vector<std::uint64_t> ring_storage(
+            (sizeof(hibiki_driver_stream_ring_v1) + sizeof(std::uint64_t) - 1U) /
+            sizeof(std::uint64_t));
+        auto* ring = reinterpret_cast<hibiki_driver_stream_ring_v1*>(ring_storage.data());
+        const std::size_t region_bytes = ring_storage.size() * sizeof(std::uint64_t);
+        CHECK(hibiki_driver_stream_ring_region_size_v1() ==
+                  sizeof(hibiki_driver_stream_ring_v1) &&
+              hibiki_driver_stream_ring_region_size_v1() <= (std::size_t{1U} << 20U));
+        CHECK(hibiki_driver_stream_ring_init_v1(ring, region_bytes, 2U, 48000U) ==
+              HIBIKI_DRIVER_STREAM_RING_OK_V1);
+        CHECK(ring->magic == HIBIKI_DRIVER_STREAM_RING_MAGIC_V1 &&
+              ring->abi_version == HIBIKI_DRIVER_STREAM_RING_ABI_V1 &&
+              ring->slot_count == HIBIKI_DRIVER_STREAM_RING_SLOT_COUNT_V1 &&
+              ring->slot_capacity_bytes ==
+                  HIBIKI_DRIVER_STREAM_RING_SLOT_CAPACITY_BYTES_V1 &&
+              ring->producer_sequence == 0U && ring->consumer_sequence == 0U);
+
+        CHECK(hibiki_driver_stream_ring_init_v1(nullptr, region_bytes, 2U, 48000U) ==
+              HIBIKI_DRIVER_STREAM_RING_REJECTED_V1);
+        CHECK(hibiki_driver_stream_ring_init_v1(ring, 4U, 2U, 48000U) ==
+              HIBIKI_DRIVER_STREAM_RING_REJECTED_V1);
+        CHECK(hibiki_driver_stream_ring_init_v1(ring, region_bytes, 3U, 48000U) ==
+              HIBIKI_DRIVER_STREAM_RING_REJECTED_V1);
+        CHECK(hibiki_driver_stream_ring_init_v1(ring, region_bytes, 2U, 8000U) ==
+              HIBIKI_DRIVER_STREAM_RING_REJECTED_V1);
+
+        const float test_samples[] = {0.25F, -0.25F, 0.5F, -0.5F};
+        std::array<std::uint8_t, 128> test_packet{};
+        std::size_t test_packet_bytes = 0U;
+        CHECK(hibiki_driver_stream_packet_encode_v1(
+                  test_packet.data(), test_packet.size(), HIBIKI_DRIVER_STREAM_RENDER_V1,
+                  42U, "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 2U, 48000U, 2U, 0U, 10U,
+                  test_samples, &test_packet_bytes) == 1);
+
+        uint32_t silence = 0U;
+        std::array<std::uint8_t, HIBIKI_DRIVER_STREAM_RING_SLOT_CAPACITY_BYTES_V1>
+            pop_buffer{};
+        std::size_t popped_bytes = 1234567U;
+        // Empty-region invalid calls must not report underrun or mutate state.
+        CHECK(hibiki_driver_stream_ring_pop_v1(ring, region_bytes, nullptr,
+                                               test_packet_bytes, &popped_bytes,
+                                               &silence) ==
+              HIBIKI_DRIVER_STREAM_RING_INVALID_V1);
+        CHECK(hibiki_driver_stream_ring_pop_v1(ring, 4U, pop_buffer.data(),
+                                               test_packet_bytes, &popped_bytes,
+                                               &silence) ==
+              HIBIKI_DRIVER_STREAM_RING_INVALID_V1);
+        CHECK(hibiki_driver_stream_ring_push_v1(
+                  ring, region_bytes, nullptr, test_packet_bytes) ==
+              HIBIKI_DRIVER_STREAM_RING_REJECTED_V1);
+        CHECK(hibiki_driver_stream_ring_push_v1(ring, region_bytes,
+                                                test_packet.data(), 79U) ==
+              HIBIKI_DRIVER_STREAM_RING_REJECTED_V1);
+        CHECK(hibiki_driver_stream_ring_push_v1(
+                  ring, region_bytes, test_packet.data(),
+                  HIBIKI_DRIVER_STREAM_RING_SLOT_CAPACITY_BYTES_V1 + 1U) ==
+              HIBIKI_DRIVER_STREAM_RING_REJECTED_V1);
+
+        const auto producer_before_reserved = ring->producer_sequence;
+        const auto consumer_before_reserved = ring->consumer_sequence;
+        ring->reserved[0] = 1U;
+        CHECK(hibiki_driver_stream_ring_push_v1(
+                  ring, region_bytes, test_packet.data(), test_packet_bytes) ==
+              HIBIKI_DRIVER_STREAM_RING_INVALID_V1);
+        CHECK(hibiki_driver_stream_ring_pop_v1(
+                  ring, region_bytes, pop_buffer.data(), pop_buffer.size(),
+                  &popped_bytes, &silence) == HIBIKI_DRIVER_STREAM_RING_INVALID_V1);
+        CHECK(ring->producer_sequence == producer_before_reserved &&
+              ring->consumer_sequence == consumer_before_reserved &&
+              popped_bytes == 0U);
+        ring->reserved[0] = 0U;
+
+        silence = 0U;
+        popped_bytes = 0U;
+        CHECK(hibiki_driver_stream_ring_pop_v1(
+                  ring, region_bytes, pop_buffer.data(), pop_buffer.size(),
+                  &popped_bytes, &silence) == HIBIKI_DRIVER_STREAM_RING_UNDERRUN_V1 &&
+              popped_bytes == 0U && silence == 1U && ring->underrun_count == 1U);
+
+        CHECK(hibiki_driver_stream_ring_push_v1(
+                  ring, region_bytes, test_packet.data(), test_packet_bytes) ==
+              HIBIKI_DRIVER_STREAM_RING_OK_V1);
+        CHECK(ring->producer_sequence == 1U);
+        silence = 0U;
+        CHECK(hibiki_driver_stream_ring_pop_v1(
+                  ring, region_bytes, pop_buffer.data(), pop_buffer.size(),
+                  &popped_bytes, &silence) == HIBIKI_DRIVER_STREAM_RING_OK_V1 &&
+              popped_bytes == test_packet_bytes && silence == 0U);
+        CHECK(std::memcmp(pop_buffer.data(), test_packet.data(), test_packet_bytes) == 0);
+        CHECK(ring->consumer_sequence == 1U);
+        silence = 0U;
+        popped_bytes = 1234567U;
+        CHECK(hibiki_driver_stream_ring_pop_v1(
+                  ring, region_bytes, nullptr, test_packet_bytes - 1U,
+                  &popped_bytes, &silence) == HIBIKI_DRIVER_STREAM_RING_INVALID_V1 &&
+              popped_bytes == 0U && silence == 0U && ring->underrun_count == 1U);
+
+        for (uint32_t index = 0; index < HIBIKI_DRIVER_STREAM_RING_SLOT_COUNT_V1;
+             ++index) {
+            CHECK(hibiki_driver_stream_ring_push_v1(
+                      ring, region_bytes, test_packet.data(), test_packet_bytes) ==
+                  HIBIKI_DRIVER_STREAM_RING_OK_V1);
+        }
+        const auto overruns_before = ring->overrun_count;
+        CHECK(hibiki_driver_stream_ring_push_v1(
+                  ring, region_bytes, test_packet.data(), test_packet_bytes) ==
+              HIBIKI_DRIVER_STREAM_RING_OVERRUN_V1 &&
+              ring->overrun_count == overruns_before + 1U);
+        hibiki_driver_stream_ring_reset_v1(ring);
+        CHECK(ring->producer_sequence == 0U && ring->consumer_sequence == 0U &&
+              ring->overrun_count == 0U && ring->underrun_count == 0U);
+    }
 
     return 0;
 }
