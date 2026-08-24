@@ -2,6 +2,8 @@
 
 #include "hibiki/vst3_sandbox.hpp"
 
+#include <chrono>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -113,10 +115,20 @@ bool Vst3SandboxProcess::launch(const Vst3SandboxLaunchV1& launch_config) {
     CloseHandle(process_info.hThread);
     process_handle_ = as_pointer(process_info.hProcess);
     job_handle_ = as_pointer(job);
+    // Compute the de-identified module digest once at launch; only the
+    // 32-byte SHA-256 of the plugin path bytes is retained, never the path.
+    {
+        const auto* narrow = reinterpret_cast<const std::uint8_t*>(
+            launch_config.plugin_path.data());
+        const auto narrow_bytes = launch_config.plugin_path.size() * sizeof(wchar_t);
+        module_digest_ = vst3_sha256_v1({narrow, narrow_bytes});
+    }
     watchdog_timeout_ms_ = launch_config.watchdog_timeout_ms;
     last_heartbeat_ms_ = launch_config.start_time_ms == 0U ? 1U : launch_config.start_time_ms;
+    launched_at_ms_ = last_heartbeat_ms_;
     state_ = Vst3SandboxState::Running;
     diagnostic_reason_ = Vst3SandboxDiagnosticReasonV1::None;
+    crash_reports_.clear();
     return true;
 }
 
@@ -141,6 +153,7 @@ void Vst3SandboxProcess::stop() noexcept {
     state_ = Vst3SandboxState::Stopped;
     diagnostic_reason_ = Vst3SandboxDiagnosticReasonV1::None;
     last_heartbeat_ms_ = 0;
+    launched_at_ms_ = 0;
 }
 
 bool Vst3SandboxProcess::mark_heartbeat(const std::uint64_t now_ms) noexcept {
@@ -158,10 +171,40 @@ void Vst3SandboxProcess::quarantine(const Vst3SandboxDiagnosticReasonV1 reason) 
     if (job_handle_ != nullptr) TerminateJobObject(as_handle(job_handle_), 1U);
 }
 
+void Vst3SandboxProcess::record_crash_entry(
+    const Vst3CrashReportReasonV1 reason,
+    const std::uint32_t exit_code,
+    const std::uint64_t now_ms) noexcept {
+    Vst3CrashReportEntryV1 entry{};
+    // Wall-clock UTC capture instant (SPEC-0008 requires a non-zero UTC
+    // epoch); uptime below keeps using the injected monotonic clock so the
+    // two clocks never mix.
+    entry.captured_utc = std::chrono::duration_cast<std::chrono::seconds>(
+                             std::chrono::system_clock::now().time_since_epoch())
+                             .count();
+    entry.reason = reason;
+    entry.exit_code = exit_code;
+    // Uptime derived from the monotonic heartbeat clock: delta between now
+    // and launch. Zero if the clock went backwards or was not initialized.
+    entry.uptime_ms = now_ms > launched_at_ms_ ? now_ms - launched_at_ms_ : 0U;
+    entry.module_sha256 = module_digest_;
+    static_cast<void>(crash_reports_.append(entry));
+}
+
 bool Vst3SandboxProcess::poll_watchdog(const std::uint64_t now_ms) noexcept {
     if (state_ != Vst3SandboxState::Running || process_handle_ == nullptr) return false;
     if (WaitForSingleObject(as_handle(process_handle_), 0U) == WAIT_OBJECT_0) {
+        std::uint32_t worker_exit_code = 0U;
+        DWORD raw_exit_code = 0U;
+        if (GetExitCodeProcess(as_handle(process_handle_), &raw_exit_code) != FALSE &&
+            raw_exit_code != 0U && raw_exit_code != STILL_ACTIVE) {
+            worker_exit_code = static_cast<std::uint32_t>(raw_exit_code);
+        }
         quarantine(Vst3SandboxDiagnosticReasonV1::WorkerExited);
+        if (worker_exit_code != 0U) {
+            record_crash_entry(Vst3CrashReportReasonV1::worker_exit_nonzero,
+                               worker_exit_code, now_ms);
+        }
         return true;
     }
     if (last_heartbeat_ms_ == 0U || now_ms < last_heartbeat_ms_ ||
@@ -169,6 +212,7 @@ bool Vst3SandboxProcess::poll_watchdog(const std::uint64_t now_ms) noexcept {
         return false;
     }
     quarantine(Vst3SandboxDiagnosticReasonV1::WatchdogTimeout);
+    record_crash_entry(Vst3CrashReportReasonV1::worker_timeout, 0U, now_ms);
     return true;
 }
 
@@ -182,6 +226,8 @@ bool Vst3SandboxProcess::send_worker_frame(const std::span<const std::uint8_t> f
         !worker_pipe_.send(frame)) {
         if (state_ == Vst3SandboxState::Running) {
             quarantine(Vst3SandboxDiagnosticReasonV1::WorkerExchangeFailed);
+            record_crash_entry(Vst3CrashReportReasonV1::pipe_failure, 0U,
+                               last_heartbeat_ms_);
         }
         return false;
     }
@@ -199,6 +245,8 @@ bool Vst3SandboxProcess::receive_worker_frame(const std::span<std::uint8_t> dest
     }
     if (!worker_pipe_.receive(destination, bytes_read)) {
         quarantine(Vst3SandboxDiagnosticReasonV1::WorkerExchangeFailed);
+        record_crash_entry(Vst3CrashReportReasonV1::pipe_failure, 0U,
+                           last_heartbeat_ms_);
         return false;
     }
     return true;
@@ -314,10 +362,14 @@ Vst3WorkerExchangeResultV1 Vst3SandboxProcess::handshake_worker(
             std::span<const std::uint8_t>(response.data(), bytes_read), frame, error) ||
         frame.request_id != request_id || frame.payload_bytes != 0U) {
         quarantine(Vst3SandboxDiagnosticReasonV1::WorkerExchangeFailed);
+        record_crash_entry(Vst3CrashReportReasonV1::protocol_error, 0U,
+                           last_heartbeat_ms_);
         return Vst3WorkerExchangeResultV1::invalid_response;
     }
     if (frame.type == Vst3WorkerMessageTypeV1::Error) {
         quarantine(Vst3SandboxDiagnosticReasonV1::WorkerExchangeFailed);
+        record_crash_entry(Vst3CrashReportReasonV1::protocol_error, 0U,
+                           last_heartbeat_ms_);
         return Vst3WorkerExchangeResultV1::worker_error;
     }
     if (frame.type != Vst3WorkerMessageTypeV1::HelloAck) {
@@ -397,10 +449,14 @@ Vst3WorkerExchangeResultV1 Vst3SandboxProcess::process_worker_block(
         if (!decode_vst3_worker_frame_v1(response_packet, response_frame, protocol_error) ||
             response_frame.request_id != request_id) {
             quarantine(Vst3SandboxDiagnosticReasonV1::WorkerExchangeFailed);
+            record_crash_entry(Vst3CrashReportReasonV1::protocol_error, 0U,
+                               last_heartbeat_ms_);
             return Vst3WorkerExchangeResultV1::invalid_response;
         }
         if (response_frame.type == Vst3WorkerMessageTypeV1::Error) {
             quarantine(Vst3SandboxDiagnosticReasonV1::WorkerExchangeFailed);
+            record_crash_entry(Vst3CrashReportReasonV1::protocol_error, 0U,
+                               last_heartbeat_ms_);
             return Vst3WorkerExchangeResultV1::worker_error;
         }
         std::span<const float> response_samples;
