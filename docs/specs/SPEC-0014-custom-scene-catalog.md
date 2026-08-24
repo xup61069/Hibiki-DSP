@@ -25,8 +25,9 @@ Scene 完全相同，避免 UI 顯示一組 Scene 卻把音訊送到另一個 gr
 規則不會被繞過。
 
 UI Scene card mirror 的 `name`、`description` 與 `latency_label` 在持久化 schema 中
-必須明確宣告為字串；長度與非空白限制維持不變，讓外部驗證與 C# runtime parser 對欄位型別
-有一致的 fail-closed 行為。
+必須明確宣告為字串，且三個可顯示文字欄位都拒絕控制字元（含換行、tab 與不可見
+C0/C1 字元）；長度與非空白限制維持不變，讓外部 schema 驗證、C# runtime parser
+與 UI 顯示面對 printable contract 有一致的 fail-closed 行為。
 
 UI mirror 以 `custom-scene-cards-v1.schema.json` 保存到 user-space 的本機設定檔；寫入採同目錄
 暫存檔替換，載入先完整驗證後才交換 catalog。檔案只含顯示卡片，不含裝置 ID、校正資料、
