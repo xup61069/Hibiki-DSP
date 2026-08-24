@@ -277,7 +277,7 @@
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" Header="Expert" IsOn="{Binding IsExpert, Mode=TwoWay}" AutomationProperties.Name="Expert 詳細模式" AutomationProperties.HelpText="顯示 Matrix、DSP Graph、VST3 與校正狀態" />
                         </Grid>
-                        <Slider Minimum="-60" Maximum="0" Value="{Binding RequestedVolumeDb, Mode=TwoWay}" ValueChanged="OnVolumeChanged" AutomationProperties.Name="系統音量" AutomationProperties.HelpText="以 dB 調整音量；安全限制會優先套用" />
+                        <Slider Header="系統音量（dB）" Minimum="-60" Maximum="0" Value="{Binding RequestedVolumeDb, Mode=TwoWay}" ValueChanged="OnVolumeChanged" AutomationProperties.Name="系統音量" AutomationProperties.HelpText="以 dB 調整音量；安全限制會優先套用" />
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <Border CornerRadius="999" Padding="12,5" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                                 <TextBlock Text="{Binding RequestedVolumeDisplayText}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -302,7 +302,7 @@
                             <StackPanel Spacing="12">
                                 <TextBlock Text="IR 相位塑形" Style="{ThemeResource BodyStrongTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                 <ComboBox Header="IR 相位模式" ItemsSource="{Binding IrPhaseModeOptions}" DisplayMemberPath="Label" SelectedValuePath="Mode" SelectedValue="{Binding IrPhaseMode, Mode=TwoWay}" AutomationProperties.Name="IR 相位模式" AutomationProperties.HelpText="Game 低延遲、Balanced 混合相位、Movie 線性相位或 Bypass" HorizontalAlignment="Stretch" MaxWidth="360" />
-                                <Slider Minimum="0" Maximum="1" StepFrequency="0.05" Value="{Binding IrPhaseStrength, Mode=TwoWay}" IsEnabled="{Binding IrPhaseUsesFir}" AutomationProperties.Name="IR 相位強度" AutomationProperties.HelpText="調整 mixed-phase 或 linear-phase 的延遲與相位折衷" />
+                                <Slider Header="IR 相位強度" Minimum="0" Maximum="1" StepFrequency="0.05" Value="{Binding IrPhaseStrength, Mode=TwoWay}" IsEnabled="{Binding IrPhaseUsesFir}" AutomationProperties.Name="IR 相位強度" AutomationProperties.HelpText="調整 mixed-phase 或 linear-phase 的延遲與相位折衷" />
                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                     <Border CornerRadius="999" Padding="12,5" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                                         <TextBlock Text="{Binding IrPhaseModeText}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -442,7 +442,7 @@
                                     <TextBlock Text="{Binding SelectedSessionDisplayText}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     <TextBlock Text="{Binding SessionVolumeDisplayText}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     <TextBlock Text="{Binding SelectedRouteRuleSummary}" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.Name="目前 App 路由預設預覽" />
-                                    <Slider Minimum="-60" Maximum="6" StepFrequency="0.5" Value="{Binding SessionVolumeDb, Mode=TwoWay}" AutomationProperties.Name="App 工作階段音量" />
+                                    <Slider Header="App 音量（dB）" Minimum="-60" Maximum="6" StepFrequency="0.5" Value="{Binding SessionVolumeDb, Mode=TwoWay}" AutomationProperties.Name="App 工作階段音量" />
                                     <CheckBox Content="App 靜音" IsChecked="{Binding SessionMuted, Mode=TwoWay}" IsEnabled="{Binding HasSelectedSession}" AutomationProperties.Name="App 工作階段靜音" />
                                     <Button Content="套用選取 App 音量" Click="OnApplySessionVolumeClick" IsEnabled="{Binding HasSelectedSession}" HorizontalAlignment="Left" AutomationProperties.Name="套用選取 App 音量" />
                                     <TextBox Header="Lane ID" Text="{Binding SessionRouteLaneId, Mode=TwoWay}" AutomationProperties.Name="App Lane ID" />
