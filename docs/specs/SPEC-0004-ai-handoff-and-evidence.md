@@ -76,6 +76,12 @@ source 默認塞入 context，跨子系統檔案必須在 Spec 明確加入 glob
 阻擋與唯一下一步。同一視窗發生第二次上下文壓縮，或工作切換到另一個里程碑時，writer 必須先
 完成 durable checkpoint，再由新視窗以核心入口、active Issue 與最小 pack 接續，不重播完整聊天。
 
+`docs-check.ps1` 必須對固定 AI 入口執行字元預算：`AGENTS.md` 6,000、`START_HERE.md` 7,000、
+`AI_HANDOFF.md` 6,000、`PROJECT_MAP.md` 12,000、`CODEX_GOALS.md` 6,000。超限代表入口混入了
+應按需查詢的細節，必須 fail closed；不得為新增 changelog 直接調高上限。`PROJECT_MAP.md` 也不得
+重新要求新 AI 先讀 `AI_HANDOFF.md`。整合歷史由 BASELINE、evidence、merged PR 與 Git history
+保存，`AI_HANDOFF.md` 只保留 live routing 與安全邊界。
+
 `handoff-check.ps1` 也必須對所有帶 handoff block 的 open Issue 做 bounded
 repository-relative glob intersection 檢查。完全相同、父子路徑與 wildcard 可相交的 claim
 都必須 fail closed，錯誤訊息列出兩個 Issue 與兩個 scope；若 matcher 在固定狀態上限內無法

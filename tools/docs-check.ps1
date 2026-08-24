@@ -95,6 +95,27 @@ function Test-BaselineChangedByHead {
   return @($ChangedPaths | Where-Object { $_ -eq 'docs/state/BASELINE.md' }).Count -gt 0
 }
 
+function Get-AiContextBudgetErrors {
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()]$Entries
+  )
+
+  $errors = @()
+  foreach ($entry in $Entries) {
+    $length = ([string]$entry.Content).Length
+    if ($length -gt [int]$entry.MaxCharacters) {
+      $errors += ("{0}: {1} characters exceeds the AI context budget of {2}" -f
+        $entry.Path, $length, $entry.MaxCharacters)
+    }
+    foreach ($pattern in @($entry.ForbiddenPatterns)) {
+      if ([regex]::IsMatch([string]$entry.Content, [string]$pattern)) {
+        $errors += ("{0}: contains a forbidden AI startup route ({1})" -f $entry.Path, $pattern)
+      }
+    }
+  }
+  return $errors
+}
+
 function Get-MissingRequiredSchemas {
   # Every tracked JSON Schema is a durable public contract and therefore must be
   # a required docs-check entry. Keep this pure so -SelfTest can cover the
@@ -359,6 +380,33 @@ if ($SelfTest) {
   }
   $caseCount++
 
+  # AI context budgets and forbidden startup routes stay fail closed.
+  $validContextEntries = @(
+    [pscustomobject]@{ Path = 'docs/AI_HANDOFF.md'; Content = 'short live router'; MaxCharacters = 64; ForbiddenPatterns = @() },
+    [pscustomobject]@{ Path = 'docs/PROJECT_MAP.md'; Content = 'query relevant rows'; MaxCharacters = 64; ForbiddenPatterns = @('read AI_HANDOFF first') }
+  )
+  $validContextErrors = @(Get-AiContextBudgetErrors -Entries $validContextEntries)
+  if ($validContextErrors.Count -ne 0) {
+    throw 'docs-check self-test failed: bounded AI context entries were rejected.'
+  }
+  $caseCount++
+
+  $overBudgetErrors = @(Get-AiContextBudgetErrors -Entries @(
+    [pscustomobject]@{ Path = 'docs/AI_HANDOFF.md'; Content = ('x' * 65); MaxCharacters = 64; ForbiddenPatterns = @() }
+  ))
+  if ($overBudgetErrors.Count -ne 1 -or $overBudgetErrors[0] -notmatch 'exceeds the AI context budget') {
+    throw 'docs-check self-test failed: oversized AI context entry was not rejected.'
+  }
+  $caseCount++
+
+  $staleRouteErrors = @(Get-AiContextBudgetErrors -Entries @(
+    [pscustomobject]@{ Path = 'docs/PROJECT_MAP.md'; Content = 'read AI_HANDOFF first'; MaxCharacters = 64; ForbiddenPatterns = @('read AI_HANDOFF first') }
+  ))
+  if ($staleRouteErrors.Count -ne 1 -or $staleRouteErrors[0] -notmatch 'forbidden AI startup route') {
+    throw 'docs-check self-test failed: stale AI_HANDOFF preload route was not rejected.'
+  }
+  $caseCount++
+
   # Required schema coverage: all tracked contract schemas must be covered.
   if ((Get-MissingRequiredSchemas -TrackedPaths @('schemas/a-v1.schema.json', 'docs/example.json') -RequiredEntries @('schemas/a-v1.schema.json')).Count -ne 0) {
     throw 'docs-check self-test failed: a covered schema was reported as missing.'
@@ -593,7 +641,7 @@ if ($SelfTest) {
 if ($caseCount -lt 12) {
     throw "docs-check self-test failed: expected at least 12 passing cases, saw $caseCount."
   }
-  Write-Output "docs-check self-test passed ($caseCount cases; structural parser, multiline normalization, branch mode detection, BASELINE edit detection, live measurement, ADR frontmatter, Spec frontmatter, markdown relative links)."
+  Write-Output "docs-check self-test passed ($caseCount cases; structural parser, multiline normalization, branch mode detection, BASELINE edit detection, AI context budgets, live measurement, ADR frontmatter, Spec frontmatter, markdown relative links)."
   exit 0
 }
 
@@ -657,6 +705,18 @@ $required = @(
 
 $missing = @($required | Where-Object { -not (Test-Path (Join-Path $repo $_)) })
 if ($missing.Count -gt 0) { throw "Missing required documentation: $($missing -join ', ')" }
+
+$aiContextEntries = @(
+  [pscustomobject]@{ Path = 'AGENTS.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'AGENTS.md') -Raw); MaxCharacters = 6000; ForbiddenPatterns = @() },
+  [pscustomobject]@{ Path = 'docs/START_HERE.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/START_HERE.md') -Raw); MaxCharacters = 7000; ForbiddenPatterns = @() },
+  [pscustomobject]@{ Path = 'docs/AI_HANDOFF.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/AI_HANDOFF.md') -Raw); MaxCharacters = 6000; ForbiddenPatterns = @() },
+  [pscustomobject]@{ Path = 'docs/PROJECT_MAP.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/PROJECT_MAP.md') -Raw); MaxCharacters = 12000; ForbiddenPatterns = @('新 AI 先讀\s+`docs/AI_HANDOFF\.md`') },
+  [pscustomobject]@{ Path = 'docs/ai/CODEX_GOALS.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/ai/CODEX_GOALS.md') -Raw); MaxCharacters = 6000; ForbiddenPatterns = @() }
+)
+$aiContextErrors = @(Get-AiContextBudgetErrors -Entries $aiContextEntries)
+if ($aiContextErrors.Count -gt 0) {
+  throw ('AI startup context contract failed: ' + ($aiContextErrors -join '; '))
+}
 
 $trackedSchemas = @(git -C $repo ls-files -- 'schemas/*.schema.json')
 if ($LASTEXITCODE -ne 0) { throw 'docs-check could not list tracked contract schemas.' }
