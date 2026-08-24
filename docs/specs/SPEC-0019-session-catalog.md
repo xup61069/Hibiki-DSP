@@ -22,6 +22,11 @@ Windows session-instance identifier。每次路由 generation 變更都產生新
 vendor ASIO 攔截或實體音量控制。per-session `ISimpleAudioVolume` 的 worker API 仍受
 SPEC-0018 約束。
 
+AudioSessionDescriptorV1 的 `output_group` 上限為 64 bytes（與 scene graph 和 volume
+bank 的 canonical bound 一致）；超過上限的 descriptor 會在 schema 驗證與
+AudioSessionRegistry::upsert()/bind() 時 fail-closed。session-route wire command 的
+48-byte 上限是更窄的傳輸層邊界。
+
 ## Wire v1
 
 `SessionCatalogSnapshot` 固定 little-endian header 24 bytes、entry 256 bytes、最多 32 筆。
