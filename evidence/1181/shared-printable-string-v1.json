@@ -25,7 +25,7 @@
       "tools/docs-check.ps1"
     ],
     "digest_algorithm": "sha256-git-source-set-v1",
-    "digest": "af7a884bb8de0d03f45afc3d828b9ee7315f77c817cd749237d0b791b8284a3b"
+    "digest": "3abd09e1e738b6349fc9489f32846b15df559a6faf6bf98821e0bbdb032a1dae"
   },
   "metadata": {
     "scope": "shared-printable-string-v1",
@@ -33,6 +33,7 @@
     "commands": [
       "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1181",
       "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
       "pwsh -NoProfile -File tools/source-policy.ps1",
       "pwsh -NoProfile -File tools/verify.ps1",
       "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange",
@@ -48,7 +49,7 @@
       {
         "command": "handoff/docs/source/verify gates",
         "status": "pass",
-        "detail": "Issue ownership, offline schema-reference registration, documentation checks, source-only policy, and the unsigned local CMake/CTest verification passed."
+        "detail": "Issue ownership, offline schema-reference registration in both normal and self-test modes, documentation checks, source-only policy, and the unsigned local CMake/CTest verification passed."
       },
       {
         "command": "evidence-audit -DescribeCurrentChange",
@@ -66,6 +67,6 @@
       "git": "2.55.0.windows.3"
     },
     "started_at": "2026-08-24T18:15:00+08:00",
-    "finished_at": "2026-08-24T18:43:06+08:00"
+    "finished_at": "2026-08-24T18:51:52+08:00"
   }
 }

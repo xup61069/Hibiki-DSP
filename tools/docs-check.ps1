@@ -986,6 +986,7 @@ if ($SelfTest) {
 
   # Printable contract schemas: real repository schemas enforce runtime-equivalent
   # whole-string C0/C1/DEL rejection through the actual JSON Schema validator.
+  Register-PrintableStringSchema -SchemaFile (Join-Path $repo 'schemas/printable-string-v1.schema.json')
   Assert-PrintableContractSchemas -RepositoryRoot $repo
   Assert-ExtendedPrintableContractSchemas -RepositoryRoot $repo
   $caseCount++
