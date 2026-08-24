@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "issue": 1130,
+  "scope_digest": "driver-control-guid-printable-v1",
+  "source_commit": "d0f66f31848b77d601fd36b8bfd891ac1f43b64a",
+  "environment_fingerprint": "windows-amd64-pwsh-driver-control-guid-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1130",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Schema-only parity fix: driver-control endpoint and event-context GUID strings reject C0/C1 control characters and DEL while retaining existing emptiness semantics and the 39-character bound.",
+    "The fixed wire codec already requires bounded NUL-terminated GUID storage; persisted-schema validation now excludes invisible controls for audit parity.",
+    "source_commit is pinned to the main head at authoring time; post-merge squash-hash repair follows the established follow-up convention.",
+    "Source/schema/tooling evidence only; no physical audio, driver loading, WaveRT, HLK, signing, or release acceptance."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
