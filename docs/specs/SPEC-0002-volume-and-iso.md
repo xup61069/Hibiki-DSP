@@ -89,7 +89,7 @@ schema 與 runtime validator 一致地把相對增益 `endpoint_gain_db` 限制�
 在 metadata contract 層即被拒絕；
 `measured_f3_hz` 允許 0 作為「未量測」sentinel（schema 與 runtime 一致），上限 20000 Hz；
 `uncertainty_db` 上限 36 dB；`EqualLoudnessPolicyV1.measured_f3_hz` 同樣限制在 0..20000 Hz。
-JSON schema 的 `anchor_id` 欄位要求非空字串或 null，空字串一律拒絕。
+JSON schema 的 `anchor_id` 欄位要求非空字串或 null，空字串與 C0/C1 控制字元、DEL 一律拒絕。
 只有 speaker／headphone-coupler 才能回報 calibrated phon，`headphone-estimated` 永遠
 標示為估算，不能包裝成 HATS/coupler 測量。
 
@@ -153,7 +153,8 @@ Group Master → limiter；失敗時保留既有 active attachment。SceneApply 
 production concurrent RT/control swap 仍需 epoch/RCU 驗證。
 
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
-schema 與 runtime validator 一致地要求 `anchor_id` 在非 null 時為非空字串且最長 64 字，
+schema 要求 `anchor_id` 在非 null 時為 non-empty printable UTF-8 且最長 64 字，拒絕 C0/C1
+控制字元與 DEL；runtime validator 維持既有非空與 64 字邊界檢查，
 與專案 ID 不可為空、輸出群組同為 64 字上限的慣例一致；
 `EqualLoudnessStatusV1.diagnostic` 是 bounded 文字欄位（0..256 字元），空字串合法，
 超過上限的診斷文字在 metadata contract 層即被拒絕。
