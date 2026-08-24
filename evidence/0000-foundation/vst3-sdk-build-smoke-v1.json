@@ -3,15 +3,13 @@
   "issue": 1177,
   "source_provenance": {
     "mode": "snapshot",
-    "snapshot_commit": "4058affc1b2edbff88750527c4102209204436c9",
+    "snapshot_commit": "77cadeb027ead56b3a723b78cda96d2096a58215",
     "paths": [
-      "docs/specs/SPEC-0014-custom-scene-catalog.md",
-      "src/hub/include/hibiki/engine_control.hpp",
-      "src/hub/src/engine_control.cpp",
-      "tests/unit/contract_tests.cpp"
+      ".github/workflows/verify.yml",
+      "vst-host/CMakeLists.txt"
     ],
     "digest_algorithm": "sha256-git-source-set-v1",
-    "digest": "957ed44a30c25106df9470b77170226c3d0ca416936d007221cff713fb302fcc"
+    "digest": "99ecc6075d7605cce0dd9a90e65cc207368a81ead9f3c62296051b7e2ce1e25e"
   },
   "metadata": {
     "scope": "vst3-sdk-build-smoke-v1",
@@ -52,4 +50,3 @@
     "finished_at": "2026-08-24T17:38:30+08:00"
   }
 }
-
