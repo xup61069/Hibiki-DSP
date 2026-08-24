@@ -207,6 +207,41 @@ function Assert-LifecycleLabel {
   return $lifecycleLabels[0]
 }
 
+function Get-AuditedLifecycleLabel {
+  param(
+    [Parameter(Mandatory)] [AllowEmptyCollection()] [string[]]$Labels,
+    [Parameter(Mandatory)] [int]$IssueNumber,
+    [Parameter(Mandatory)] [string]$State,
+    [Parameter(Mandatory)] [string]$Path,
+    [Parameter(Mandatory)] [scriptblock]$IssueLookup,
+    [ValidateRange(1, 10000)][int]$RetryDelayMilliseconds = 3000
+  )
+  $lifecycleLabels = @($Labels | Where-Object { $_ -in @('claim-pending', 'claimed', 'in-review', 'done') })
+  if ($lifecycleLabels.Count -eq 1) {
+    return $lifecycleLabels[0]
+  }
+  if ($lifecycleLabels.Count -gt 1) {
+    throw "Issue #$IssueNumber must have exactly one of claim-pending/claimed/in-review/done, got: $($lifecycleLabels -join ', ') ($Path)"
+  }
+  # Admission swaps remove the old lifecycle label before adding the new one.
+  # A global audit racing that window sees zero labels for one snapshot; re-read
+  # the single issue a bounded number of times instead of failing immediately.
+  # Persistent violations (still zero or still multiple labels) fail closed.
+  for ($attempt = 1; $attempt -le 3; $attempt++) {
+    Start-Sleep -Milliseconds ($RetryDelayMilliseconds * $attempt)
+    $fresh = & $IssueLookup $IssueNumber
+    if (-not $fresh) { break }
+    $freshLabels = @($fresh.labels | ForEach-Object { $_.name })
+    $freshLifecycle = @($freshLabels | Where-Object { $_ -in @('claim-pending', 'claimed', 'in-review', 'done') })
+    if ($freshLifecycle.Count -gt 1) { break }
+    if ($freshLifecycle.Count -eq 1) {
+      Write-Host ("Issue #{0} showed a transient lifecycle state during the global audit; re-read confirmed '{1}'." -f $IssueNumber, $freshLifecycle[0])
+      return $freshLifecycle[0]
+    }
+  }
+  throw "Issue #$IssueNumber must have exactly one lifecycle label but none was present after bounded re-reads ($Path)"
+}
+
 function Test-IssueRequiresHandoff {
   param([Parameter(Mandatory)] $IssueData)
   $labelNames = @($IssueData.labels | ForEach-Object { $_.name })
@@ -653,6 +688,37 @@ if ($SelfTest) {
   if ($pendingResult -ne 'claim-pending') { throw "handoff-check self-test failed: pending-only returned '$pendingResult'." }
   $caseCount++
 
+  # Global audit re-read: transient zero-label snapshot recovers to claimed.
+  $script:selfTestIssueReads = 0
+  $recovered = Get-AuditedLifecycleLabel -Labels @() -IssueNumber 77 -State 'OPEN' -Path 'selftest/audit-transient-recovery' `
+    -RetryDelayMilliseconds 1 -IssueLookup {
+      param([int]$n)
+      $script:selfTestIssueReads++
+      return @{ labels = @(@{ name = 'claimed' }) }
+    }
+  if ($recovered -ne 'claimed') { throw "handoff-check self-test failed: transient recovery returned '$recovered'." }
+  $caseCount++
+
+  # Global audit re-read: persistent zero-label state must still fail closed.
+  Assert-Throws {
+    Get-AuditedLifecycleLabel -Labels @() -IssueNumber 78 -State 'OPEN' -Path 'selftest/audit-transient-persistent' `
+      -RetryDelayMilliseconds 1 -IssueLookup { param([int]$n) return @{ labels = @() } }
+  } 'audit persistent lifecycle violation'
+  $caseCount++
+
+  # Global audit re-read: two labels stay a hard violation without retry.
+  $script:selfTestTwoLabelReads = 0
+  Assert-Throws {
+    Get-AuditedLifecycleLabel -Labels @('claimed', 'in-review') -IssueNumber 79 -State 'OPEN' -Path 'selftest/audit-two-labels' `
+      -RetryDelayMilliseconds 1 -IssueLookup {
+        param([int]$n)
+        $script:selfTestTwoLabelReads++
+        return @{ labels = @(@{ name = 'claimed' }, @{ name = 'in-review' }) }
+      }
+  } 'audit duplicate lifecycle violation'
+  if ($script:selfTestTwoLabelReads -ne 0) { throw 'handoff-check self-test failed: duplicate lifecycle labels should not trigger re-read.' }
+  $caseCount++
+
   # Admission readbacks exercise the real helper functions (SPEC-0004 semantics).
   $pendingPass = @{ state = 'OPEN'; labels = @(@{ name = 'claim-pending' }); assignees = @() }
   Test-PendingNoAssigneeReadback -Readback $pendingPass -IssueNumber 99
@@ -895,7 +961,12 @@ foreach ($issueData in $withHandoff) {
   Register-IssueBranch -SeenBranches $seenBranches -Branch $branch `
     -IssueNumber $issueNumber -Path $path
   $labels = @($issueData.labels | ForEach-Object { $_.name })
-  Assert-LifecycleLabel -Labels $labels -IssueNumber $issueNumber -State $issueData.state -Path $path
+  if ($Issue -ge 0) {
+    Assert-LifecycleLabel -Labels $labels -IssueNumber $issueNumber -State $issueData.state -Path $path
+  } else {
+    Get-AuditedLifecycleLabel -Labels $labels -IssueNumber $issueNumber -State $issueData.state -Path $path `
+      -IssueLookup { param([int]$n) Get-IssueHandoff -IssueNumber $n } | Out-Null
+  }
   $hasPendingLabel = $labels -contains 'claim-pending'
   if ($hasPendingLabel) {
     $assigneeLogins = @($issueData.assignees | ForEach-Object { $_.login })
