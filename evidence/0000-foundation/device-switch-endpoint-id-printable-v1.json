@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1119,
   "scope_digest": "device-switch-endpoint-id-printable-v1",
-  "source_commit": "0d38db358d74cf300880b1965c4362d162586a3e",
+  "source_commit": "98e105e48473f495aa41edb23f41982d13d60b34",
   "environment_fingerprint": "windows-amd64-pwsh-device-switch-endpoint-id-printable",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1119",
