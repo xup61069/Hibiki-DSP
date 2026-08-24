@@ -2218,8 +2218,69 @@ int main() {
     over_capacity_rule.app_id = "overflow.exe";
     over_capacity_rule.lane_id = "overflow";
     over_capacity_rule.output_group = "main";
-    CHECK(route_rules->size() == kMaxSessionRouteRulesV1 &&
-          route_rules->upsert(over_capacity_rule) == SessionRouteRuleResultV1::capacity_exhausted);
+    CHECK(route_rules->upsert(over_capacity_rule) ==
+          SessionRouteRuleResultV1::capacity_exhausted);
+    CHECK(route_rules->remove("capacity-0"));
+    CHECK(route_rules->size() == kMaxSessionRouteRulesV1 - 1U);
+    // The engine store enforces the same identity, priority and printable-text
+    // bounds as the persisted JSON and fixed wire command.
+    SessionRouteRuleV1 boundary_rule;
+    boundary_rule.rule_id = std::string(kSessionRouteRuleMaxIdBytesV1, '0');
+    boundary_rule.rule_id.front() = 'a';
+    boundary_rule.priority = 1000000;
+    boundary_rule.app_id = "Boundary.exe";
+    boundary_rule.lane_id = "boundary-lane";
+    boundary_rule.output_group = "boundary-output";
+    CHECK(route_rules->upsert(boundary_rule) == SessionRouteRuleResultV1::applied);
+    boundary_rule.priority = -1000000;
+    CHECK(route_rules->upsert(boundary_rule) == SessionRouteRuleResultV1::applied);
+
+    auto uppercase_rule = boundary_rule;
+    uppercase_rule.rule_id[0] = 'A';
+    CHECK(route_rules->upsert(uppercase_rule) == SessionRouteRuleResultV1::invalid_argument);
+
+    auto leading_separator_rule = boundary_rule;
+    leading_separator_rule.rule_id = "-leading";
+    CHECK(route_rules->upsert(leading_separator_rule) ==
+          SessionRouteRuleResultV1::invalid_argument);
+
+    auto oversized_id_rule = boundary_rule;
+    oversized_id_rule.rule_id.assign(kSessionRouteRuleMaxIdBytesV1 + 1U, 'b');
+    CHECK(route_rules->upsert(oversized_id_rule) == SessionRouteRuleResultV1::invalid_argument);
+
+    auto high_priority_rule = boundary_rule;
+    high_priority_rule.priority = 1000001;
+    CHECK(route_rules->upsert(high_priority_rule) == SessionRouteRuleResultV1::invalid_argument);
+
+    auto low_priority_rule = boundary_rule;
+    low_priority_rule.priority = -1000001;
+    CHECK(route_rules->upsert(low_priority_rule) == SessionRouteRuleResultV1::invalid_argument);
+
+    auto tab_matcher_rule = boundary_rule;
+    tab_matcher_rule.app_id = "Boundary\t.exe";
+    CHECK(route_rules->upsert(tab_matcher_rule) == SessionRouteRuleResultV1::invalid_argument);
+
+    auto newline_matcher_rule = boundary_rule;
+    newline_matcher_rule.display_name_contains = "Boundary\n";
+    CHECK(route_rules->upsert(newline_matcher_rule) == SessionRouteRuleResultV1::invalid_argument);
+
+    auto nul_matcher_rule = boundary_rule;
+    nul_matcher_rule.app_id = "Boundary.exe";
+    nul_matcher_rule.app_id.push_back('\0');
+    CHECK(route_rules->upsert(nul_matcher_rule) == SessionRouteRuleResultV1::invalid_argument);
+
+    auto whitespace_matcher_rule = boundary_rule;
+    whitespace_matcher_rule.app_id = " ";
+    whitespace_matcher_rule.display_name_contains.clear();
+    CHECK(route_rules->upsert(whitespace_matcher_rule) == SessionRouteRuleResultV1::invalid_argument);
+
+    auto whitespace_lane_rule = boundary_rule;
+    whitespace_lane_rule.lane_id = " \t";
+    CHECK(route_rules->upsert(whitespace_lane_rule) == SessionRouteRuleResultV1::invalid_argument);
+
+    auto whitespace_output_rule = boundary_rule;
+    whitespace_output_rule.output_group = " ";
+    CHECK(route_rules->upsert(whitespace_output_rule) == SessionRouteRuleResultV1::invalid_argument);
     // Store caps must agree with the fixed wire command and UI catalog:
     // matchers accept 128 bytes and route labels accept exactly 64 bytes.
     chrome_rule.display_name_contains.clear();
