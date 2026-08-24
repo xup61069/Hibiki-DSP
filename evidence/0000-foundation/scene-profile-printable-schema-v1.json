@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "issue": 1034,
+  "scope_digest": "scene-profile-printable-schema-v1",
+  "source_commit": "514b07a4",
+  "environment_fingerprint": "windows-amd64-pwsh-scene-profile-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1034",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass",
+      "log": ".local/verify-1034.log"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Added invisible-control exclusion pattern to scene-profile name/output_group and scene-sync-queue upsert name/output_group.",
+    "Runtime validation already enforced this; schema now matches the executable contract.",
+    "SPEC-0014 wording extended to document the persisted schema exclusion."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}

@@ -3,10 +3,10 @@ id: SPEC-0014
 status: accepted
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-23
+last_reviewed: 2026-08-24
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["src/hub/**scene_catalog*", "src/hub/**engine_control*", "apps/control-model/**Scene*", "apps/winui-shell/**", "schemas/scene-definition-v1.schema.json", "schemas/custom-scene-cards-v1.schema.json", "schemas/scene-sync-queue-v1.schema.json", "tests/**"]
+source_globs: ["src/hub/**scene_catalog*", "src/hub/**engine_control*", "apps/control-model/**Scene*", "apps/winui-shell/**", "schemas/scene-definition-v1.schema.json", "schemas/custom-scene-cards-v1.schema.json", "schemas/scene-profile-v1.schema.json", "schemas/scene-sync-queue-v1.schema.json", "tests/**"]
 ---
 
 # SPEC-0014：自定義 Scene catalog 與 SceneApply resolver
@@ -90,8 +90,9 @@ payload 時解碼即拒收，同樣不觸碰既有 catalog。
 非空 `name` 與非空 `output_group`；「非空」在 schema 與執行期皆代表至少含一個非空白字元。
 控制模型對這兩個欄位以 UTF-8 位元組數套用與引擎一致的硬上限：`name` 最長 120 bytes、
 `output_group` 最長 64 bytes；超界名稱在輸入當下即被拒絕，離線佇列載入同樣 fail-closed，
-且兩欄都不得含控制字元（對齊引擎 bounded-string 的可列印 UTF-8 契約），不會等到送出
-同步指令才失敗。Remove 操作兩者必須為空字串，且欄位限制必須與控制模型執行期驗證一致。
+且兩欄都不得含控制字元（對齊引擎 bounded-string 的可列印 UTF-8 契約），持久化 schema 也以
+invisible-control exclusion pattern 拒收 U+0000-U+001F 與 U+007F-U+009F，不會等到送出
+同步指令或外部驗證才失敗。Remove 操作兩者必須為空字串，且欄位限制必須與控制模型執行期驗證一致。
 全部成功才回報「引擎已同步」，
 同時保留先前捨棄數量並清空持久化佇列；中途失敗則保留剩餘操作與其持久化狀態，誠實顯示降級
 狀態，待下一次連線再補送。此重播只使用既有 `SceneCatalogCommandV1` wire format 與 Ack 語意，
