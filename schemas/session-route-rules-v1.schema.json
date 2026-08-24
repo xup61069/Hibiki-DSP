@@ -22,8 +22,8 @@
           "makeup_gain_db": { "type": "number", "minimum": -144, "maximum": 12 },
           "app_id": { "type": "string", "maxLength": 128, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]*$" },
           "display_name": { "type": "string", "maxLength": 128, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]*$" },
-          "lane_id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "\\S" },
-          "output_group": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "\\S" },
+          "lane_id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]*$" },
+          "output_group": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]*$" },
           "anyOf": [
             {
               "required": ["app_id"],
