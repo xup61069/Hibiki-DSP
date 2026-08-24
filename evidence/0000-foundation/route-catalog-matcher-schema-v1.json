@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "evidence_type": "schema-only",
+  "title": "Session route catalog matcher emptiness aligned with C# resolver semantics",
+  "date": "2026-08-24",
+  "issue": 992,
+  "pr": null,
+  "source_commit": null,
+  "scope": [
+    "schemas/session-route-rules-v1.schema.json"
+  ],
+  "spec_refs": ["SPEC-0024"],
+  "adr_refs": [],
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 992",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "limitations": [
+    "Schema/spec alignment only; no runtime behavior change.",
+    "C# catalog remains the authoritative resolver implementation; empty matchers are ignored during resolution."
+  ],
+  "notes": "Matcher fields now accept an empty string as absent, reject control characters via explicit Unicode ranges, and anyOf requires at least one non-whitespace matcher. This matches the C# catalog that already saves and resolves this shape."
+}
