@@ -27,7 +27,14 @@
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                 <Border CornerRadius="999" Padding="12,4" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" BorderThickness="1">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                        <Ellipse Width="8" Height="8" Fill="{ThemeResource SystemFillColorSuccessBrush}" VerticalAlignment="Center" />
+                        <Ellipse Width="8" Height="8"
+                                 Fill="{ThemeResource SystemFillColorSuccessBrush}"
+                                 Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibilityConverter}}"
+                                 VerticalAlignment="Center" />
+                        <Ellipse Width="8" Height="8"
+                                 Fill="{ThemeResource SystemFillColorCautionBrush}"
+                                 Visibility="{Binding IsConnected, Converter={StaticResource InverseBoolToVisibilityConverter}}"
+                                 VerticalAlignment="Center" />
                         <TextBlock Text="{Binding ConnectionStatusText}" Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" AutomationProperties.LiveSetting="Polite" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                     </StackPanel>
                 </Border>

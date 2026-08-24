@@ -34,6 +34,9 @@
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="{TemplateBinding CornerRadius}"
                                 Padding="{TemplateBinding Padding}">
+                            <Border.RenderTransform>
+                                <TranslateTransform x:Name="HoverTranslate" />
+                            </Border.RenderTransform>
                             <ContentPresenter
                                 Content="{TemplateBinding Content}"
                                 ContentTemplate="{TemplateBinding ContentTemplate}"
