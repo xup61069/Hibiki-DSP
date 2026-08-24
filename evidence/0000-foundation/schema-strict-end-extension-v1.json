@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1167,
   "scope_digest": "schema-strict-end-extension-v1",
-  "source_commit": "ced31fcd9552b44d3d38d496eb7cb2b29eceeae3",
+  "source_commit": "3115df6c7d697e1b183bbf13b5ad02348cfa453c",
   "environment_fingerprint": "windows-amd64-pwsh-7.6.4-schema-instance-validation",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1163",
@@ -24,7 +24,7 @@
     "This provenance record was added after PR #1167; it documents that already-completed verification and adds no new runtime execution.",
     "The validator result is from PowerShell 7.6.4; it confirms repository gates and JsonSchema.Net behavior in this environment, not every third-party JSON Schema implementation.",
     "Runtime code and DSP behavior are unchanged; no live audio, driver loading, WaveRT, HLK, signing, or release acceptance is implied.",
-    "source_commit records the #1167 squash merge hash directly."
+    "source_commit was updated by Issue #1170 to the #1169 squash merge that introduced this evidence file."
   ],
   "logs": {},
   "tool_versions": {
