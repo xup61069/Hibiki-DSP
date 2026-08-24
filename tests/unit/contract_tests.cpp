@@ -2398,6 +2398,36 @@ int main() {
     CHECK(og_bounds_registry.bind(og_identity, "lane-x", og_64));
     CHECK(!og_bounds_registry.bind(og_identity, "lane-x", og_65));
 
+    // Issue #1056: all text fields reject control characters and non-printable UTF-8.
+    AudioSessionRegistry printable_registry;
+    const AudioSessionIdentityV1 printable_identity{"hibiki-main", "printable-test", 1U};
+    CHECK(printable_registry.upsert(AudioSessionDescriptorV1{
+        1, printable_identity, "Chrome", "chrome.exe", true,
+        SessionGainOwner::WindowsSession, {}, {}, 0.0}));
+    CHECK(!printable_registry.upsert(AudioSessionDescriptorV1{
+        1, printable_identity, "Tab\tName", "chrome.exe", true,
+        SessionGainOwner::WindowsSession, {}, {}, 0.0}));
+    CHECK(!printable_registry.upsert(AudioSessionDescriptorV1{
+        1, printable_identity, "Newline\nName", "chrome.exe", true,
+        SessionGainOwner::WindowsSession, {}, {}, 0.0}));
+    const std::string nul_display_name = std::string("NUL") + '\0' + "Name";
+    CHECK(!printable_registry.upsert(AudioSessionDescriptorV1{
+        1, printable_identity, nul_display_name, "chrome.exe", true,
+        SessionGainOwner::WindowsSession, {}, {}, 0.0}));
+    CHECK(!printable_registry.upsert(AudioSessionDescriptorV1{
+        1, printable_identity, "DEL\x7FName", "chrome.exe", true,
+        SessionGainOwner::WindowsSession, {}, {}, 0.0}));
+    CHECK(!printable_registry.upsert(AudioSessionDescriptorV1{
+        1, {"hibiki-main", "ctrl\x01id", 1U}, "OK", "app.exe", true,
+        SessionGainOwner::WindowsSession, {}, {}, 0.0}));
+    CHECK(!printable_registry.upsert(AudioSessionDescriptorV1{
+        1, printable_identity, "OK", "app.exe", true,
+        SessionGainOwner::WindowsSession, {}, "lane\tctrl", 0.0}));
+    CHECK(printable_registry.upsert(AudioSessionDescriptorV1{
+        1, printable_identity, "OK", "app.exe", true,
+        SessionGainOwner::WindowsSession, {}, {}, 0.0}));  // empty optional labels are valid
+    CHECK(!printable_registry.bind(printable_identity, "lane\nctrl", "og"));
+
     Vst3BusLayoutV1 sidechain_layout{};
     sidechain_layout.input_bus_count = 2U;
     sidechain_layout.output_bus_count = 1U;
