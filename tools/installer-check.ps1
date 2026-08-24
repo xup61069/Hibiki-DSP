@@ -321,6 +321,24 @@ $null = "sbom_digest"
     if (-not $caught) { throw 'SelfTest expected installer unknown field rejection.' }
     $caseCount++
 
+    # Cases 1s-1w: Read-ReleaseManifest rejects C0/C1/DEL in printable-only fields.
+    foreach ($controlCase in @(
+      @{ Name = 'product_version'; Action = { param($m) $m['product_version'] = ('bad' + [char]7) } },
+      @{ Name = 'distribution_id'; Action = { param($m) $m['distribution_id'] = ('dist' + [char]0x9F) } },
+      @{ Name = 'unsigned_files_path'; Action = { param($m) $m['unsigned_files'] = @(@{ path = ('tools/' + [char]1 + '/payload.bin'); sha256 = ('0' * 64) }) } },
+      @{ Name = 'rfc3161_timestamp'; Action = { param($m) $m['installer'] = $m['installer'].Clone(); $m['installer']['rfc3161_timestamp'] = ([char]0x1B).ToString() + '2026-08-24T00:00:00Z' } },
+      @{ Name = 'tests_label'; Action = { param($m) $m['tests'] = @(('test-' + [char]0x7F)) } }
+    )) {
+      $controlManifest = $validFullManifest.Clone()
+      & $controlCase.Action $controlManifest
+      $controlPath = Join-Path $tempRoot ('control-' + $controlCase.Name + '-manifest.json')
+      $controlManifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $controlPath -Encoding UTF8
+      $caught = $false
+      try { Read-ReleaseManifest $controlPath } catch { $caught = $true }
+      if (-not $caught) { throw 'SelfTest expected control-character rejection for ' + $controlCase.Name + '.' }
+      $caseCount++
+    }
+
     # Case 1r: Read-ReleaseManifest rejects explicit null signed_installer_sha256.
     $nullSigHashManifest = $validFullManifest.Clone()
     $nullSigHashManifest['signed_installer_sha256'] = $null
