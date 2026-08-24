@@ -718,6 +718,10 @@ Check(!new PeqFilterV1("lowpass", 1000.0, 3.0, 1.414).IsValid &&
       !new PeqFilterV1("peaking", 1000.0, 30.0, 1.0).IsValid &&
       !new PeqFilterV1("peaking", 1000.0, 0.0, 0.05).IsValid,
     "Invalid PEQ filter must fail closed.");
+Check(!new PeqFilterV1("PEAKING", 1000.0, 3.0, 1.414).IsValid &&
+      !new PeqFilterV1("Peaking", 1000.0, 3.0, 1.414).IsValid &&
+      new PeqFilterV1("peaking", 1000.0, 3.0, 1.414).IsValid,
+    "PEQ type must exactly match the lowercase schema contract.");
 var validPreset = new PeqPresetV1(1U, [validFilter]);
 Check(validPreset.IsValid, "Valid PEQ preset must be accepted.");
 Check(!new PeqPresetV1(2U, [validFilter]).IsValid &&
@@ -799,6 +803,9 @@ Check(CalibrationCompilerV1.TrySavePreset(presetPath, validPreset, out _),
     File.WriteAllText(presetPath, "{\"schema_version\":1,\"filters\":[{\"type\":\"invalid\",\"frequency_hz\":1000,\"gain_db\":0,\"q\":1}]}");
     Check(!CalibrationCompilerV1.TryLoadPreset(presetPath, out _, out _),
         "Invalid PEQ preset load must fail closed.");
+    File.WriteAllText(presetPath, "{\"schema_version\":1,\"filters\":[{\"type\":\"PEAKING\",\"frequency_hz\":1000,\"gain_db\":0,\"q\":1}]}");
+    Check(!CalibrationCompilerV1.TryLoadPreset(presetPath, out _, out _),
+        "Mixed-case PEQ type must fail closed against the lowercase schema contract.");
 }
 finally
 {
