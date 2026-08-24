@@ -3,6 +3,8 @@
 param(
   [int]$Issue,
   [switch]$NoSource,
+  [switch]$IncludeRepositoryState,
+  [ValidateRange(4096, 1000000)][int]$MaxCharacters = 48000,
   [switch]$SelfTest
 )
 
@@ -119,6 +121,37 @@ function Resolve-ContextPackPath {
     return $null
   }
   return $resolvedPath
+}
+
+$contextSections = [System.Collections.Generic.List[string]]::new()
+$contextCharacters = 0
+
+function Add-ContextSection {
+  param(
+    [Parameter(Mandatory = $true)][string]$Label,
+    [string]$Source,
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Content,
+    [int]$Limit = $MaxCharacters
+  )
+
+  $heading = if ([string]::IsNullOrWhiteSpace($Source)) {
+    "=== $Label ==="
+  } else {
+    "=== $Label :: $Source ==="
+  }
+  $section = ($heading + [Environment]::NewLine + $Content.TrimEnd())
+  $separatorCharacters = if ($script:contextSections.Count -eq 0) { 0 } else { 2 }
+  $nextCharacters = $script:contextCharacters + $separatorCharacters + $section.Length
+  if ($nextCharacters -gt $Limit) {
+    throw "Context pack would exceed the $Limit character budget before output (next section: $Label). Use -NoSource, narrow the Issue Spec/ADR references, inspect files locally, or explicitly raise -MaxCharacters for a bounded audit."
+  }
+
+  [void]$script:contextSections.Add($section)
+  $script:contextCharacters = $nextCharacters
+}
+
+function Get-ContextPackText {
+  return ($script:contextSections -join ([Environment]::NewLine + [Environment]::NewLine))
 }
 
 if ($SelfTest) {
@@ -245,6 +278,18 @@ if ($SelfTest) {
   $pathCases++
 
   Write-Output "Context-pack path guard self-test passed ($pathCases cases)."
+
+  $contextSections.Clear()
+  $contextCharacters = 0
+  Add-ContextSection -Label 'BUDGET/ONE' -Content '1234567890' -Limit 64
+  $budgetCaught = $false
+  try {
+    Add-ContextSection -Label 'BUDGET/TWO' -Content ('x' * 64) -Limit 64
+  } catch { $budgetCaught = $_.Exception.Message -match 'before output' }
+  if (-not $budgetCaught -or $contextSections.Count -ne 1) {
+    throw 'context-pack self-test expected an oversized section to fail before partial output.'
+  }
+  Write-Output 'Context-pack output budget self-test passed (oversized pack rejected before output).'
   exit 0
 }
 
@@ -268,18 +313,25 @@ function Write-ContextFile([string]$label, [string]$path) {
   $resolved = Resolve-ContextPackPath -Path $path -Root $repo -Kind File -AllowMissingLeaf
   if ($null -eq $resolved) { throw "Context file missing: $path" }
   if (-not $seenFiles.Add($resolved)) { return }
-  Write-Output "=== $label :: $path ==="
-  Get-Content -LiteralPath $resolved
+  Add-ContextSection -Label $label -Source $path -Content (Get-Content -LiteralPath $resolved -Raw)
 }
 
-Write-Output "=== Hibiki context pack: Issue #$Issue ==="
-Write-ContextFile 'RULES' (Join-Path $repo 'AGENTS.md')
-Write-ContextFile 'MULTI_AGENT' (Join-Path $repo 'docs/ai/MULTI_AGENT.md')
-Write-ContextFile 'START' (Join-Path $repo 'docs/START_HERE.md')
-Write-ContextFile 'MAP' (Join-Path $repo 'docs/PROJECT_MAP.md')
-Write-ContextFile 'BASELINE' (Join-Path $repo 'docs/state/BASELINE.md')
-Write-Output '=== ISSUE BODY (handoff source) ==='
-Write-Output $handoffText
+Add-ContextSection -Label "Hibiki task context: Issue #$Issue" -Content @'
+Preflight contract: read AGENTS.md and docs/START_HERE.md once from the checked-out repository,
+then treat the active Issue handoff, referenced Spec/ADR, source, tests and evidence as task truth.
+This pack intentionally does not replay global rules or repository snapshots by default.
+'@
+
+if ($IncludeRepositoryState) {
+  Write-ContextFile 'RULES' (Join-Path $repo 'AGENTS.md')
+  Write-ContextFile 'START' (Join-Path $repo 'docs/START_HERE.md')
+  Write-ContextFile 'MULTI_AGENT' (Join-Path $repo 'docs/ai/MULTI_AGENT.md')
+  Write-ContextFile 'AI_HANDOFF' (Join-Path $repo 'docs/AI_HANDOFF.md')
+  Write-ContextFile 'MAP' (Join-Path $repo 'docs/PROJECT_MAP.md')
+  Write-ContextFile 'BASELINE' (Join-Path $repo 'docs/state/BASELINE.md')
+}
+
+Add-ContextSection -Label 'ISSUE BODY (handoff source)' -Content $handoffText
 
 foreach ($id in $specIds) {
   $file = Get-ChildItem -LiteralPath (Join-Path $repo 'docs/specs') -Filter "$id-*.md" -File | Select-Object -First 1
@@ -341,3 +393,9 @@ if (Test-Path $evidenceRoot) {
     Sort-Object Name |
     ForEach-Object { Write-ContextFile 'EVIDENCE' $_.FullName }
 }
+
+Write-Output (Get-ContextPackText)
+Write-Output "=== PACK SUMMARY ==="
+Write-Output "content_characters: $contextCharacters"
+Write-Output "budget_characters: $MaxCharacters"
+Write-Output "repository_state_included: $($IncludeRepositoryState.IsPresent.ToString().ToLowerInvariant())"
