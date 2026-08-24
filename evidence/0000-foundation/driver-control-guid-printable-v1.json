@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1130,
   "scope_digest": "driver-control-guid-printable-v1",
-  "source_commit": "d0f66f31848b77d601fd36b8bfd891ac1f43b64a",
+  "source_commit": "3806c03af1f72cfd3c04cfc7f10db7101291754f",
   "environment_fingerprint": "windows-amd64-pwsh-driver-control-guid-printable",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1130",
