@@ -9,6 +9,97 @@
 
 namespace hibiki {
 
+namespace {
+
+constexpr std::size_t kMaxLoudnessFormulaPointsV1 = 64U;
+
+struct LoudnessPeqCompileResultV1 {
+    PeqFilterV1 filters[kMaxRealtimePeqFiltersV1]{};
+    std::size_t filter_count{0U};
+};
+
+// Deterministic control-plane conversion from normalized compensation points
+// to at most 16 peaking filters. Points must be sorted by frequency and every
+// retained point keeps its already policy-limited gain. Q follows neighboring
+// octave spacing; a single point falls back to a wide musical band.
+bool compile_loudness_peq_v1(const CompensationResult& compensation,
+                             LoudnessPeqCompileResultV1& result) noexcept {
+    result = {};
+    if (compensation.points.empty() || compensation.points.size() > kMaxLoudnessFormulaPointsV1) {
+        return false;
+    }
+    for (std::size_t index = 1U; index < compensation.points.size(); ++index) {
+        if (!(compensation.points[index - 1U].frequency_hz <
+              compensation.points[index].frequency_hz)) {
+            return false;
+        }
+    }
+
+    struct Candidate {
+        double frequency_hz;
+        double gain_db;
+        double magnitude_db;
+    };
+    Candidate candidates[kMaxLoudnessFormulaPointsV1];
+    std::size_t candidate_count = 0U;
+    for (const auto& point : compensation.points) {
+        if (!std::isfinite(point.frequency_hz) || !std::isfinite(point.gain_db) ||
+            point.frequency_hz <= 0.0) {
+            return false;
+        }
+        candidates[candidate_count++] =
+            Candidate{point.frequency_hz, point.gain_db, std::abs(point.gain_db)};
+    }
+
+    bool retained[kMaxLoudnessFormulaPointsV1]{};
+    while (result.filter_count < kMaxRealtimePeqFiltersV1 &&
+           result.filter_count < candidate_count) {
+        std::size_t best = std::numeric_limits<std::size_t>::max();
+        double best_magnitude = -1.0;
+        for (std::size_t index = 0U; index < candidate_count; ++index) {
+            if (retained[index]) continue;
+            bool too_close = false;
+            for (std::size_t selected = 0U; selected < candidate_count; ++selected) {
+                if (retained[selected] &&
+                    std::abs(std::log2(candidates[selected].frequency_hz /
+                                       candidates[index].frequency_hz)) < (1.0 / 12.0)) {
+                    too_close = true;
+                    break;
+                }
+            }
+            if (!too_close && candidates[index].magnitude_db > best_magnitude) {
+                best_magnitude = candidates[index].magnitude_db;
+                best = index;
+            }
+        }
+        if (best == std::numeric_limits<std::size_t>::max()) break;
+        retained[best] = true;
+        ++result.filter_count;
+    }
+
+    if (result.filter_count == 0U) return false;
+    std::size_t output_index = 0U;
+    for (std::size_t index = 0U; index < candidate_count; ++index) {
+        if (!retained[index]) continue;
+        const auto& point = candidates[index];
+        const std::size_t previous = index == 0U ? std::min(index + 1U, candidate_count - 1U)
+                                                 : index - 1U;
+        const std::size_t next = index + 1U >= candidate_count ? previous : index + 1U;
+        const double lower_spacing = std::abs(std::log2(point.frequency_hz /
+                                                        candidates[previous].frequency_hz));
+        const double upper_spacing = std::abs(std::log2(candidates[next].frequency_hz /
+                                                        point.frequency_hz));
+        const double bandwidth_octaves =
+            std::clamp((lower_spacing + upper_spacing) * 0.5, 0.125, 2.0);
+        const double q = std::clamp(1.0 / (2.0 * std::sinh(std::log(2.0) *
+                                                            bandwidth_octaves * 0.5)), 0.3, 12.0);
+        result.filters[output_index++] = PeqFilterV1{point.frequency_hz, point.gain_db, q};
+    }
+    return true;
+}
+
+}  // namespace
+
 AudioEngineModel::AudioEngineModel() : volume_bank_(std::make_unique<OutputGroupVolumeBankV1>()) {}
 
 AudioEngineModel::~AudioEngineModel() = default;
@@ -138,6 +229,84 @@ void AudioEngineModel::rollback_ir() noexcept {
     has_pending_ir_ = false;
 }
 
+bool AudioEngineModel::prepare_loudness_peq(
+    const std::string_view output_group,
+    const std::span<const Iso226FormulaPointV1> points,
+    const double current_phon,
+    const EqualLoudnessPolicyV1& policy) noexcept {
+    if (points.data() == nullptr && !points.empty()) return false;
+    if (output_group.empty() || output_group.size() > kMaxOutputGroupBytes ||
+        output_group.find('\0') != std::string_view::npos || volume_bank_ == nullptr ||
+        !volume_bank_->has_group(output_group) ||
+        points.size() > kMaxLoudnessFormulaPointsV1) {
+        has_pending_loudness_peq_ = false;
+        return false;
+    }
+    const auto compensation = build_formula_compensation(points, current_phon, policy);
+    if (compensation.points.empty()) {
+        has_pending_loudness_peq_ = false;
+        return false;
+    }
+    LoudnessPeqCompileResultV1 compiled{};
+    if (!compile_loudness_peq_v1(compensation, compiled)) {
+        has_pending_loudness_peq_ = false;
+        return false;
+    }
+    LoudnessGraphAttachmentV1 candidate{};
+    candidate.attached = true;
+    candidate.output_group_bytes = static_cast<std::uint8_t>(output_group.size());
+    std::copy(output_group.begin(), output_group.end(),
+              candidate.output_group.begin());
+    if (!candidate.peq.prepare(
+            std::span<const PeqFilterV1>(compiled.filters, compiled.filter_count),
+            sample_rate_.load(std::memory_order_acquire),
+            has_active_graph_ ? active_graph_.output_channels : 2U)) {
+        pending_loudness_peq_ = {};
+        has_pending_loudness_peq_ = false;
+        return false;
+    }
+    pending_loudness_peq_ = std::move(candidate);
+    has_pending_loudness_peq_ = true;
+    return true;
+}
+
+bool AudioEngineModel::prepare_loudness_peq_clear() noexcept {
+    pending_loudness_peq_ = {};
+    has_pending_loudness_peq_ = true;
+    return true;
+}
+
+bool AudioEngineModel::commit_loudness_peq() noexcept {
+    if (!has_pending_loudness_peq_) return false;
+    active_loudness_peq_ = std::move(pending_loudness_peq_);
+    has_active_loudness_peq_ = active_loudness_peq_.attached;
+    has_pending_loudness_peq_ = false;
+    return true;
+}
+
+void AudioEngineModel::rollback_loudness_peq() noexcept {
+    pending_loudness_peq_ = {};
+    has_pending_loudness_peq_ = false;
+}
+
+bool AudioEngineModel::loudness_peq_transaction_idle() const noexcept {
+    return !has_pending_loudness_peq_;
+}
+
+bool AudioEngineModel::has_active_loudness_peq(const std::string_view output_group) const noexcept {
+    return has_active_loudness_peq_ && active_loudness_peq_.attached &&
+           active_loudness_peq_.output_group_bytes == output_group.size() &&
+           std::equal(output_group.begin(), output_group.end(),
+                      active_loudness_peq_.output_group.begin());
+}
+
+void AudioEngineModel::reset_loudness_peq_state() noexcept {
+    active_loudness_peq_ = {};
+    pending_loudness_peq_ = {};
+    has_active_loudness_peq_ = false;
+    has_pending_loudness_peq_ = false;
+}
+
 bool AudioEngineModel::has_active_ir(const std::string_view output_group) const noexcept {
     return has_active_ir_ && active_ir_.attached &&
            active_ir_.output_group_bytes == output_group.size() &&
@@ -165,13 +334,14 @@ VolumeNotificationResult AudioEngineModel::apply_windows_volume(
 
 bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
                                float* const output_interleaved,
-                               const std::size_t frames) const noexcept {
+                               const std::size_t frames) noexcept {
     if (!has_active_graph_ ||
         !process_graph(active_graph_, inputs, output_interleaved, frames,
                        &active_latency_bank_)) {
         return false;
     }
     if (!apply_ir("main", output_interleaved, frames)) return false;
+    if (!apply_loudness_peq("main", output_interleaved, frames)) return false;
     if (!apply_group_master("main", output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
         auto* const main_limiter =
@@ -190,13 +360,14 @@ bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
 bool AudioEngineModel::process_output_group(const std::string_view output_group,
                                             const std::span<const RtLaneInputV1> inputs,
                                             float* const output_interleaved,
-                                            const std::size_t frames) const noexcept {
+                                            const std::size_t frames) noexcept {
     if (!has_active_graph_ ||
         !process_graph_for_output_group(active_graph_, output_group, inputs,
                                         output_interleaved, frames, &active_latency_bank_)) {
         return false;
     }
     if (!apply_ir(output_group, output_interleaved, frames)) return false;
+    if (!apply_loudness_peq(output_group, output_interleaved, frames)) return false;
     if (!apply_group_master(output_group, output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
         auto* const group_limiter =
@@ -232,7 +403,7 @@ bool AudioEngineModel::process_output_group_fanout(
     const std::size_t frames,
     const std::span<float* const> outputs,
     const std::span<const std::size_t> output_capacities,
-    const std::span<std::size_t> output_frames) const noexcept {
+    const std::span<std::size_t> output_frames) noexcept {
     const auto fanout = output_fanout_.snapshot();
     if (!fanout.prepared || !has_active_graph_ ||
         fanout.output_channels != active_graph_.output_channels ||
@@ -316,7 +487,7 @@ bool AudioEngineModel::process_driver_stream_packet(
     const std::span<const std::uint8_t> packet,
     const std::span<float> packet_sample_storage,
     const std::span<RtLaneInputV1> lane_inputs,
-    float* const output_interleaved) const noexcept {
+    float* const output_interleaved) noexcept {
     if (!has_active_graph_ || expected_endpoint_guid.empty() || expected_endpoint_guid.size() >=
                                       HIBIKI_DRIVER_STREAM_ENDPOINT_GUID_CAPACITY_V1 ||
         lane_index >= active_graph_.lane_count ||
@@ -443,7 +614,7 @@ bool AudioEngineModel::process_lane_block(const std::size_t lane_index,
                                           const std::uint32_t input_channels,
                                           const std::size_t frames,
                                           const std::span<RtLaneInputV1> lane_inputs,
-                                          float* const output_interleaved) const noexcept {
+                                          float* const output_interleaved) noexcept {
     if (!has_active_graph_ || lane_index >= active_graph_.lane_count ||
         lane_inputs.size() < active_graph_.lane_count || input_interleaved == nullptr ||
         output_interleaved == nullptr || frames == 0U ||
@@ -478,7 +649,7 @@ bool AudioEngineModel::process_lane_block_to_wasapi(
 
 bool AudioEngineModel::apply_group_master(const std::string_view output_group,
                                           float* const output_interleaved,
-                                          const std::size_t frames) const noexcept {
+                                          const std::size_t frames) noexcept {
     if (active_graph_.strict_direct) return true;
     return volume_bank_ != nullptr && volume_bank_->apply_to_interleaved(
         output_group, output_interleaved, frames, active_graph_.output_channels,
@@ -487,7 +658,7 @@ bool AudioEngineModel::apply_group_master(const std::string_view output_group,
 
 bool AudioEngineModel::apply_ir(const std::string_view output_group,
                                 float* const output_interleaved,
-                                const std::size_t frames) const noexcept {
+                                const std::size_t frames) noexcept {
     if (active_graph_.strict_direct || !has_active_ir_ || !active_ir_.attached ||
         output_interleaved == nullptr || frames == 0U ||
         active_ir_.output_group_bytes != output_group.size() ||
@@ -496,6 +667,26 @@ bool AudioEngineModel::apply_ir(const std::string_view output_group,
     }
     return active_ir_.convolver.process_interleaved(output_interleaved, frames,
                                                     active_graph_.output_channels);
+}
+
+bool AudioEngineModel::apply_loudness_peq(const std::string_view output_group,
+                                          float* const output_interleaved,
+                                          const std::size_t frames) noexcept {
+    if ((has_active_graph_ && active_graph_.strict_direct) ||
+        !has_active_loudness_peq_ ||
+        !active_loudness_peq_.attached || frames == 0U ||
+        active_loudness_peq_.output_group_bytes != output_group.size() ||
+        !std::equal(output_group.begin(), output_group.end(),
+                    active_loudness_peq_.output_group.begin())) {
+        return true;
+    }
+    if (output_interleaved == nullptr || !active_loudness_peq_.peq.prepared() ||
+        active_loudness_peq_.peq.sample_rate() !=
+            sample_rate_.load(std::memory_order_relaxed) ||
+        active_loudness_peq_.peq.channels() != active_graph_.output_channels) {
+        return false;
+    }
+    return active_loudness_peq_.peq.process_interleaved(output_interleaved, frames);
 }
 
 }  // namespace hibiki

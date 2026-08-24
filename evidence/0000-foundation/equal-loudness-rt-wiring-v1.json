@@ -1,0 +1,81 @@
+{
+  "evidence_format": 2,
+  "issue": 1178,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "docs/specs/SPEC-0002-volume-and-iso.md",
+      "src/hub/include/hibiki/audio_engine.hpp",
+      "src/hub/include/hibiki/peq_dsp.hpp",
+      "src/hub/src/audio_engine.cpp",
+      "src/hub/src/engine_control.cpp",
+      "src/hub/src/peq_dsp.cpp",
+      "tests/unit/contract_tests.cpp"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "fb1db31bfe1ce0df4356cf5fdc9edeb0d2a0eb58ae2788c4e7738f00988fae95"
+  },
+  "metadata": {
+    "scope": "equal-loudness-rt-wiring-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-git-2.49.0.windows.1",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1178",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "pwsh -NoProfile -File tools/verify.ps1",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "handoff-check -Issue 1178",
+        "status": "pass",
+        "detail": "Issue ownership, scope_globs and Git state validated."
+      },
+      {
+        "command": "docs-check",
+        "status": "pass",
+        "detail": "87 required paths and 24 specs checked."
+      },
+      {
+        "command": "source-policy",
+        "status": "pass",
+        "detail": "706 tracked source-only paths passed."
+      },
+      {
+        "command": "evidence-audit -DescribeCurrentChange",
+        "status": "pass",
+        "detail": "Derived the seven exact non-evidence paths and this manifest's source digest from the staged Git index."
+      },
+      {
+        "command": "evidence-audit",
+        "status": "pass",
+        "detail": "Checked 313 records, including two v2 records, with zero findings before adding this candidate manifest; final rerun follows evidence creation."
+      },
+      {
+        "command": "verify",
+        "status": "pass",
+        "detail": "Unsigned local CMake build completed and all three CTest targets passed."
+      },
+      {
+        "command": "git diff --check",
+        "status": "pass",
+        "detail": "No whitespace errors detected."
+      }
+    ],
+    "limitations": [
+      "Equal-loudness processing is a bounded user-space PEQ proxy compiled from caller-supplied formula points; no ISO conformance, licensed table, formal coefficient fit or physical-audio delivery claim.",
+      "Strict Direct bypasses the attachment; SceneApply clears it transactionally, but immutable bank crossfade, production epoch/RCU swap and concurrent RT/control validation remain future work.",
+      "No IPC schema change, no driver loading, WaveRT streaming, HLK testing or signing progress.",
+      "Repository-process and source-only evidence only; digest binds source states but does not provide signed external attestation."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1"
+    },
+    "started_at": "2026-08-24T18:35:00+08:00",
+    "finished_at": "2026-08-24T18:54:00+08:00"
+  }
+}

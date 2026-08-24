@@ -55,7 +55,7 @@ void PeqProcessorV1::reset() noexcept {
 }
 
 bool PeqProcessorV1::process_interleaved(float* const interleaved,
-                                         const std::size_t frames) noexcept {
+                                         const std::size_t frames) const noexcept {
     if (!prepared_ || interleaved == nullptr || frames == 0U) return false;
     for (std::size_t frame = 0U; frame < frames; ++frame) {
         for (std::uint32_t channel = 0U; channel < channels_; ++channel) {

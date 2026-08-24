@@ -5,6 +5,8 @@
 #include "hibiki/scene_graph.hpp"
 #include "hibiki/asio_transport_consumer.hpp"
 #include "hibiki/driver_stream_bridge.hpp"
+#include "hibiki/iso226.hpp"
+#include "hibiki/peq_dsp.hpp"
 #include "hibiki/wav_ir.hpp"
 #include "hibiki/output_fanout.hpp"
 #include "hibiki/volume_state.hpp"
@@ -15,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <atomic>
+#include <algorithm>
 #include <memory>
 #include <span>
 #include <string_view>
@@ -47,6 +50,37 @@ public:
     [[nodiscard]] bool prepare_ir_clear() noexcept;
     [[nodiscard]] bool commit_ir() noexcept;
     void rollback_ir() noexcept;
+    // Equal-loudness is an independent fixed-capacity output attachment.
+    // Prepare evaluates caller-supplied ISO formula points on the control
+    // worker and compiles them into bounded PEQ coefficients; commit is the
+    // only RT-visible swap. The callback never allocates, waits, or reads a
+    // path. This is user-space tone shaping, not ISO conformance evidence.
+
+    [[nodiscard]] bool prepare_loudness_peq(
+
+        std::string_view output_group,
+
+        std::span<const Iso226FormulaPointV1> points,
+
+        double current_phon,
+
+        const EqualLoudnessPolicyV1& policy) noexcept;
+
+    [[nodiscard]] bool prepare_loudness_peq_clear() noexcept;
+
+    [[nodiscard]] bool commit_loudness_peq() noexcept;
+
+    void rollback_loudness_peq() noexcept;
+
+    // True when no equal-loudness prepare/clear transaction is pending.
+
+    [[nodiscard]] bool loudness_peq_transaction_idle() const noexcept;
+
+    [[nodiscard]] bool has_active_loudness_peq(
+
+        std::string_view output_group = "main") const noexcept;
+
+    void reset_loudness_peq_state() noexcept;
     // True when no IR prepare/clear transaction is pending. SceneApply uses
     // this to decide whether an unchanged calibration reference can keep the
     // current attachment untouched instead of running a clear transaction.
@@ -61,11 +95,11 @@ public:
         const VolumeNotificationV1& notification) noexcept;
     [[nodiscard]] bool process(std::span<const RtLaneInputV1> inputs,
                                float* output_interleaved,
-                               std::size_t frames) const noexcept;
+                               std::size_t frames) noexcept;
     [[nodiscard]] bool process_output_group(std::string_view output_group,
                                              std::span<const RtLaneInputV1> inputs,
                                              float* output_interleaved,
-                                             std::size_t frames) const noexcept;
+                                             std::size_t frames) noexcept;
     [[nodiscard]] bool prepare_output_fanout(const OutputFanoutPlanV1& plan,
                                               double source_step = 1.0) noexcept;
     [[nodiscard]] bool observe_output_fanout_clock(std::size_t sink_index,
@@ -79,7 +113,7 @@ public:
         std::size_t frames,
         std::span<float* const> outputs,
         std::span<const std::size_t> output_capacities,
-        std::span<std::size_t> output_frames) const noexcept;
+        std::span<std::size_t> output_frames) noexcept;
     [[nodiscard]] OutputFanoutRuntimeSnapshotV1 output_fanout_snapshot() const noexcept;
     void set_sample_rate(std::uint32_t sample_rate) noexcept;
     [[nodiscard]] bool bind_asio_transport(std::wstring_view mapping_name,
@@ -110,7 +144,7 @@ public:
         std::span<const std::uint8_t> packet,
         std::span<float> packet_sample_storage,
         std::span<RtLaneInputV1> lane_inputs,
-        float* output_interleaved) const noexcept;
+        float* output_interleaved) noexcept;
     [[nodiscard]] bool process_driver_stream_packet_to_wasapi(
         std::size_t lane_index,
         std::string_view expected_endpoint_guid,
@@ -152,7 +186,7 @@ public:
                                           std::uint32_t input_channels,
                                           std::size_t frames,
                                           std::span<RtLaneInputV1> lane_inputs,
-                                          float* output_interleaved) const noexcept;
+                                          float* output_interleaved) noexcept;
     [[nodiscard]] bool process_lane_block_to_wasapi(std::size_t lane_index,
                                                     const float* input_interleaved,
                                                     std::uint32_t input_channels,
@@ -192,6 +226,20 @@ private:
     IrGraphAttachmentV1 pending_ir_{};
     bool has_active_ir_{false};
     bool has_pending_ir_{false};
+    struct LoudnessGraphAttachmentV1 {
+        bool attached{false};
+        std::uint8_t output_group_bytes{0U};
+        std::array<char, kMaxOutputGroupBytes> output_group{};
+        PeqProcessorV1 peq{};
+    };
+
+    LoudnessGraphAttachmentV1 active_loudness_peq_{};
+
+    LoudnessGraphAttachmentV1 pending_loudness_peq_{};
+
+    bool has_active_loudness_peq_{false};
+
+    bool has_pending_loudness_peq_{false};
     EngineTransactionState state_{EngineTransactionState::Ready};
     bool has_active_graph_{false};
     bool has_pending_graph_{false};
@@ -202,10 +250,13 @@ private:
 
     [[nodiscard]] bool apply_group_master(std::string_view output_group,
                                           float* output_interleaved,
-                                          std::size_t frames) const noexcept;
+                               std::size_t frames) noexcept;
     [[nodiscard]] bool apply_ir(std::string_view output_group,
                                 float* output_interleaved,
-                                std::size_t frames) const noexcept;
+                                             std::size_t frames) noexcept;
+    [[nodiscard]] bool apply_loudness_peq(std::string_view output_group,
+                                          float* output_interleaved,
+                                          std::size_t frames) noexcept;
 };
 
 }  // namespace hibiki

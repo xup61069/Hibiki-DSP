@@ -171,8 +171,15 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             if (!engine_.prepare_ir_clear()) {
                 engine_.rollback_graph();
                 engine_.rollback_ir();
+                engine_.rollback_loudness_peq();
                 return EngineControlResultV1::Failed;
             }
+        }
+        if (!engine_.prepare_loudness_peq_clear()) {
+            engine_.rollback_graph();
+            engine_.rollback_ir();
+            engine_.rollback_loudness_peq();
+            return EngineControlResultV1::Failed;
         }
         std::swap(active_scene_, candidate_scene);
         std::swap(active_loudness_, candidate_loudness);
@@ -181,6 +188,7 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             std::swap(active_loudness_, candidate_loudness);
             engine_.rollback_graph();
             engine_.rollback_ir();
+            engine_.rollback_loudness_peq();
             return EngineControlResultV1::Failed;
         }
         if (!keep_referenced_ir && !engine_.commit_ir()) {
@@ -188,6 +196,14 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             std::swap(active_loudness_, candidate_loudness);
             engine_.rollback_graph();
             engine_.rollback_ir();
+            engine_.rollback_loudness_peq();
+            return EngineControlResultV1::Failed;
+        }
+        if (!engine_.commit_loudness_peq()) {
+            std::swap(active_scene_, candidate_scene);
+            std::swap(active_loudness_, candidate_loudness);
+            engine_.rollback_ir();
+            engine_.rollback_loudness_peq();
             return EngineControlResultV1::Failed;
         }
         revision_ = next_revision;
@@ -195,6 +211,7 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
         return EngineControlResultV1::Applied;
     } catch (...) {
         engine_.rollback_graph();
+        engine_.rollback_loudness_peq();
         return EngineControlResultV1::Failed;
     }
 }
