@@ -699,6 +699,31 @@ function ConvertTo-AdmissionReadback {
   return ($json | ConvertFrom-Json)
 }
 
+function Set-IssueLabelsSafe {
+  param(
+    [Parameter(Mandatory)] [int]$IssueNumber,
+    [Parameter(Mandatory)] [string[]]$Add,
+    [Parameter(Mandatory)] [string[]]$Remove
+  )
+  foreach ($label in $Add) { Add-IssueLabelSafe -IssueNumber $IssueNumber -Label $label }
+  foreach ($label in $Remove) {
+    & gh issue edit $IssueNumber --remove-label $label
+    if ($LASTEXITCODE -ne 0) { throw "Unable to remove label '$label' from Issue #$IssueNumber." }
+  }
+}
+
+function Remove-IssueClaimPendingSafe {
+  param(
+    [Parameter(Mandatory)] [int]$IssueNumber,
+    [Parameter(Mandatory)] [string]$Owner,
+    [Parameter(Mandatory)] [string]$Branch,
+    [Parameter(Mandatory)] [string]$OwnerRepo
+  )
+  & gh issue edit $IssueNumber --remove-label 'claim-pending' 2>$null | Out-Null
+  & gh issue edit $IssueNumber --remove-assignee $Owner 2>$null | Out-Null
+  & gh api --method DELETE ('/repos/' + $OwnerRepo + '/git/refs/heads/' + $Branch) 2>$null | Out-Null
+}
+
 if ($AdmissionPrecheck) {
   if ($Issue -lt 0) { throw '-AdmissionPrecheck requires -Issue.' }
   $maxOpenIssues = 500

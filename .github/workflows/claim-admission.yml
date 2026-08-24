@@ -56,9 +56,9 @@ jobs:
           & {
             param([string]$ScriptPath)
             $content = Get-Content -LiteralPath $ScriptPath -Raw
-            $start = $content.IndexOf('function Get-HandoffScalar')
-            if ($start -lt 0) { throw 'Get-HandoffScalar helper is missing from tools/handoff-check.ps1.' }
-            $end = $content.IndexOf('function Assert-AdmissionOverlap', $start)
+            $start = $content.IndexOf('function Get-AdmissionIssueData')
+            if ($start -lt 0) { throw 'Admission helpers are missing from tools/handoff-check.ps1.' }
+            $end = $content.IndexOf('if ($AdmissionPrecheck)', $start)
             if ($end -lt 0) { throw 'Admission overlap helpers are missing from tools/handoff-check.ps1.' }
             Invoke-Expression $content.Substring($start, $end - $start)
           } (Join-Path (Get-Location) 'tools/handoff-check.ps1')
@@ -88,13 +88,10 @@ jobs:
               'issue', 'view', "$issueNumber", '--json', 'labels,assignees,state'
             )
             Test-ClaimPendingReadback -Readback $readback -IssueNumber $issueNumber -Owner $owner
-            Add-IssueLabelSafe -IssueNumber $issueNumber -Label 'claimed'
-            gh issue edit $issueNumber --remove-label claim-pending
+            Set-IssueLabelsSafe -IssueNumber $issueNumber -Add @('claimed') -Remove @('claim-pending')
             Write-Output ("Admitted Issue #" + $issueNumber + " session=" + $env:SESSION_ID +
               " owner=" + $owner + " branch=" + $branch)
           } catch {
-            gh issue edit $issueNumber --remove-label claim-pending 2>$null | Out-Null
-            gh issue edit $issueNumber --remove-assignee $owner 2>$null | Out-Null
-            gh api --method DELETE ("/repos/" + $env:OWNER_REPO + "/git/refs/heads/" + $branch) 2>$null | Out-Null
+            Remove-IssueClaimPendingSafe -IssueNumber $issueNumber -Owner $owner -Branch $branch -OwnerRepo $env:OWNER_REPO
             throw
           }
