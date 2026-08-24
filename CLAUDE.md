@@ -2,5 +2,5 @@
 
 <!-- GENERATED_FROM: AGENTS.md -->
 
-請先載入 `@AGENTS.md`，再依 `docs/START_HERE.md` 與 `docs/AI_HANDOFF.md` 的流程工作。不要在本檔
-新增另一套專案規則；長期決策寫入 Spec、ADR 或 handoff。
+請先載入 `@AGENTS.md` 與 `docs/START_HERE.md`，取得指派後只讀對應 Issue handoff 與它指定的
+Spec／ADR。不要預載全域歷史或在本檔新增另一套專案規則；長期決策寫入 Spec、ADR 或 handoff。
