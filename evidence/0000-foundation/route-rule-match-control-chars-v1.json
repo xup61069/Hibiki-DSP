@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "issue": 1023,
+  "scope_digest": "route-rule-match-control-chars-v1",
+  "source_commit": "901fe1ed",
+  "environment_fingerprint": "windows-amd64-pwsh-route-rule-chars",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1023",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "Added control-character exclusion pattern to match.app_id and match.display_name_contains in session-route-rule-v1.",
+    "Matches pattern already used by plural session-route-rules-v1."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}

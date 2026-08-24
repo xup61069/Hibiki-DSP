@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "issue": 1014,
-  "scope_digest": "scene-binding-scene-id-bounds-v1",
-  "source_commit": "901fe1ed9201ff1afd440c494a168ea05f89afe8",
-  "environment_fingerprint": "windows-amd64-pwsh-scene-binding-id",
+  "issue": 1028,
+  "scope_digest": "lane-token-revision-bounds-v1",
+  "source_commit": "65188772",
+  "environment_fingerprint": "windows-amd64-pwsh-lane-token-revision-bounds",
   "commands": [
-    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1014",
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1028",
     "pwsh -NoProfile -File tools/docs-check.ps1",
     "pwsh -NoProfile -File tools/source-policy.ps1",
     "pwsh -NoProfile -File tools/verify.ps1",
@@ -27,7 +27,7 @@
     {
       "command": "verify",
       "status": "pass",
-      "log": ".local/verify-1014.log"
+      "log": ".local/verify-1028.log"
     },
     {
       "command": "git diff --check",
@@ -35,8 +35,8 @@
     }
   ],
   "limitations": [
-    "scene-vst3-state-binding-v1 scene_id tightened from maxLength 64 to 31, matching kMaxSceneIdBytesV1 and SPEC-0001.",
-    "state_id remains at 64 (VST3-internal namespace)."
+    "Added maximum: 18446744073709551615 to lane_token in latency-graph-commit-v1 and revision in output-fanout-plan-v1.",
+    "Matches uint64_t runtime types in vst-host latency_graph_commit.hpp and hub output_fanout.hpp."
   ],
   "logs": {},
   "tool_versions": {

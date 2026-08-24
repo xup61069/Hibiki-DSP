@@ -16,8 +16,8 @@
       "additionalProperties": false,
       "minProperties": 1,
       "properties": {
-        "app_id": {"type": "string", "maxLength": 128},
-        "display_name_contains": {"type": "string", "maxLength": 128}
+        "app_id": {"type": "string", "maxLength": 128, "pattern": "[^\\u0000-\\u001F\\u007F-\\u009F]*"},
+        "display_name_contains": {"type": "string", "maxLength": 128, "pattern": "[^\\u0000-\\u001F\\u007F-\\u009F]*"}
       }
     },
     "lane_id": {"type": "string", "minLength": 1, "maxLength": 64},

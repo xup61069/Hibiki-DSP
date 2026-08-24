@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1003,
   "scope_digest": "route-rule-schema-bounds-v1",
-  "source_commit": "1e590d6c",
+  "source_commit": "1e590d6c78627ae7b588120f358c512fc5ba4d3b",
   "environment_fingerprint": "windows-amd64-pwsh-route-rule-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1003",
