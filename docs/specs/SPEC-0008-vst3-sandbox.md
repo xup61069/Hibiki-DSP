@@ -223,6 +223,17 @@ quarantined，不得進入 trusted/certified 或 Low Latency Lane。
 worker pipe ready/connected 布林值，作為 control-plane 的去敏化事故摘要。它不保留或輸出
 worker/plugin path、PID、handle、command line、raw exception、endpoint identity 或 opaque
 plugin bytes；它不是 crash dump capture，也不會取代 production worker policy。
+`Vst3CrashReportStoreV1`（vst3_crash_report.hpp）是版本化 bounded crash report
+capture/redaction 契約：entry 只含 schema version、非零 UTC epoch、固定 reason enum、
+exit code、uptime ms 與 32-byte module SHA-256 digest；原始路徑、PID、handle、
+command line 與 opaque plugin bytes 一律不進 entry。store 是固定 16 筆 oldest-first
+ring，滿溢淘汰最舊，invalid entry（schema version 不符、時間戳為零、未知 reason、
+全零 digest）直接拒收且不改變既有內容。serialize 只輸出固定鍵組 canonical JSON
+（上限 64 KiB）；parse 是嚴格 fail-closed tokenizer，未知或重複鍵、未知 reason 拼法、
+越界數值、非 hex 或錯誤長度 digest、截斷或尾隨內容一律拒絕，目的地只在整份文件驗證
+通過後才替換；serialize→parse→serialize 往返逐位元組穩定（含負時間戳）。內建小型
+SHA-256 以空字串與 "abc" 已知向量驗證，僅供 redaction digest 使用。這是 user-space control-plane
+evidence 契約：不擷取 minidump、不解 symbol、不連接 production worker policy。
 
 ## 尚未完成的邊界
 
