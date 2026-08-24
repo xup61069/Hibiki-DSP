@@ -307,6 +307,80 @@ void AudioEngineModel::reset_loudness_peq_state() noexcept {
     has_pending_loudness_peq_ = false;
 }
 
+bool AudioEngineModel::prepare_program_aware(
+    const std::string_view output_group,
+    const ProgramAwareLevelPolicyV1& policy) noexcept {
+    if (output_group.empty() || output_group.size() > kMaxOutputGroupBytes ||
+        output_group.find('\0') != std::string_view::npos || volume_bank_ == nullptr ||
+        !volume_bank_->has_group(output_group)) {
+        pending_program_aware_ = {};
+        has_pending_program_aware_ = false;
+        return false;
+    }
+    if (!validate_program_aware_policy(policy)) {
+        pending_program_aware_ = {};
+        has_pending_program_aware_ = false;
+        return false;
+    }
+    auto candidate_bank = std::make_unique<ProgramAwareLevelBankV1>();
+    if (!candidate_bank->register_group(output_group)) {
+        pending_program_aware_ = {};
+        has_pending_program_aware_ = false;
+        return false;
+    }
+    const auto sample_rate = sample_rate_.load(std::memory_order_acquire);
+    if (!candidate_bank->configure_group(output_group, policy, sample_rate)) {
+        pending_program_aware_ = {};
+        has_pending_program_aware_ = false;
+        return false;
+    }
+    pending_program_aware_.attached = true;
+    pending_program_aware_.output_group_bytes = static_cast<std::uint8_t>(output_group.size());
+    std::copy(output_group.begin(), output_group.end(),
+              pending_program_aware_.output_group.begin());
+    pending_program_aware_.bank = std::move(candidate_bank);
+    has_pending_program_aware_ = true;
+    return true;
+}
+
+bool AudioEngineModel::prepare_program_aware_clear() noexcept {
+    pending_program_aware_ = {};
+    has_pending_program_aware_ = true;
+    return true;
+}
+
+bool AudioEngineModel::commit_program_aware() noexcept {
+    if (!has_pending_program_aware_) return false;
+    active_program_aware_ = std::move(pending_program_aware_);
+    has_active_program_aware_ = active_program_aware_.attached;
+    has_pending_program_aware_ = false;
+    return true;
+}
+
+void AudioEngineModel::rollback_program_aware() noexcept {
+    pending_program_aware_ = {};
+    has_pending_program_aware_ = false;
+}
+
+bool AudioEngineModel::program_aware_transaction_idle() const noexcept {
+    return !has_pending_program_aware_;
+}
+
+bool AudioEngineModel::has_active_program_aware(
+    const std::string_view output_group) const noexcept {
+    return has_active_program_aware_ && active_program_aware_.attached &&
+           active_program_aware_.output_group_bytes == output_group.size() &&
+           std::equal(output_group.begin(), output_group.end(),
+                      active_program_aware_.output_group.begin());
+}
+
+void AudioEngineModel::reset_program_aware_state() noexcept {
+    active_program_aware_ = {};
+    pending_program_aware_ = {};
+    has_active_program_aware_ = false;
+    has_pending_program_aware_ = false;
+}
+
 bool AudioEngineModel::has_active_ir(const std::string_view output_group) const noexcept {
     return has_active_ir_ && active_ir_.attached &&
            active_ir_.output_group_bytes == output_group.size() &&
@@ -368,6 +442,7 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
     }
     if (!apply_ir(output_group, output_interleaved, frames)) return false;
     if (!apply_loudness_peq(output_group, output_interleaved, frames)) return false;
+    if (!apply_program_aware(output_group, output_interleaved, frames)) return false;
     if (!apply_group_master(output_group, output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
         auto* const group_limiter =
@@ -745,6 +820,32 @@ bool AudioEngineModel::apply_loudness_peq(const std::string_view output_group,
         return false;
     }
     return active_loudness_peq_.peq.process_interleaved(output_interleaved, frames);
+}
+
+bool AudioEngineModel::apply_program_aware(const std::string_view output_group,
+                                            float* const output_interleaved,
+                                            const std::size_t frames) noexcept {
+    if ((has_active_graph_ && active_graph_.strict_direct) ||
+        !has_active_program_aware_ || !active_program_aware_.attached ||
+        active_program_aware_.bank == nullptr) {
+        return true;
+    }
+    if (output_interleaved == nullptr || frames == 0U ||
+        output_group.empty() || output_group.size() >= kMaxOutputGroupBytes ||
+        output_group.find('\0') != std::string_view::npos) {
+        return false;
+    }
+    auto* controller =
+        active_program_aware_.bank->controller_for_group(output_group);
+    // A freshly committed controller has not rendered a block yet, so its
+    // status flag is still false; validity is enforced inside
+    // process_interleaved via the configured policy instead of here.
+    if (controller == nullptr) return true;
+    if (controller->sample_rate() != sample_rate_.load(std::memory_order_relaxed)) {
+        return true;
+    }
+    return controller->process_interleaved(output_interleaved, frames,
+                                           active_graph_.output_channels);
 }
 
 }  // namespace hibiki
