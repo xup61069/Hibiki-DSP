@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "issue": 1061,
+  "scope_digest": "graph-config-printable-v1",
+  "source_commit": "697f02b0d0ecfae0e91a6298efa0f048db2d3b54",
+  "environment_fingerprint": "windows-amd64-pwsh-graph-config-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1061",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [],
+  "limitations": [
+    "Graph-config lane ids and output groups now reject C0/C1 controls and the runtime enforces the same printable 64-byte bound.",
+    "Contract tests cover printable boundaries, control rejection and oversized lane id rejection.",
+    "Schema/runtime validation only; no live audio delivery, driver, HLK or signing evidence is implied."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
