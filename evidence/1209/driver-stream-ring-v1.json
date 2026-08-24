@@ -1,0 +1,77 @@
+{
+  "evidence_format": 2,
+  "issue": 1209,
+  "source_provenance": {
+    "mode": "snapshot",
+    "snapshot_commit": "fe7ba36e3aaace88d3aece1f43b95eeaf32e990a",
+    "paths": [
+      "docs/specs/SPEC-0003-virtual-endpoints-and-routing.md",
+      "sdk/CMakeLists.txt",
+      "sdk/include/hibiki/driver_stream_ring_v1.h",
+      "sdk/src/driver_stream_ring_v1.c",
+      "tests/unit/contract_tests.cpp"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "0fd9214d863c48af2b1169978b6b54940214b8ce497657436a8181c10fe13f19"
+  },
+  "metadata": {
+    "scope": "driver-stream-ring-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-git-2.49.0-msvc-19.51-cmake-4.4.2",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1209",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "git diff --check",
+      "cmake -S . -B <outside-worktree-dir> -G Visual Studio 18 2026 -A x64",
+      "cmake --build <outside-worktree-dir> --config Release --target hibiki_contract_tests",
+      "hibiki_contract_tests.exe",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeSnapshotSourceSet -SnapshotCommit fe7ba36e3aaace88d3aece1f43b95eeaf32e990a"
+    ],
+    "results": [
+      {
+        "command": "driver stream ring v1 implementation and contract tests",
+        "status": "pass",
+        "detail": "Added fixed-layout SPSC multi-slot shared-memory ring (HDSR ABI v1, 4 slots x 131104-byte packets, region <= 1 MiB) with allocation-free interlocked push/pop. Contract tests cover init validation, underrun silence fallback, invalid-parameter rejection, reserved-field corruption fail-closed behavior, byte-exact round trip, capacity overrun rejection, and reset."
+      },
+      {
+        "command": "always-run gates after rebase onto #1212 main",
+        "status": "pass",
+        "detail": "handoff-check (#1209 ownership/scope/Git state), docs-check (88 required paths), source-policy (720 tracked paths), and git diff --check all passed on top of origin/main 44eff715."
+      },
+      {
+        "command": "unsigned local build and contract tests on rebased base",
+        "status": "pass",
+        "detail": "CMake configure plus Release build of hibiki_contract_tests exited 0; test executable exited 0 outside the Git worktree so no untracked build output touched the staged source set."
+      },
+      {
+        "command": "SPEC-0003 driver stream ring note",
+        "status": "pass",
+        "detail": "SPEC-0003 now records the fixed-layout SPSC ring contract with RT no-allocation/no-lock/no-wait boundaries, fail-closed format/reserved handling, overrun reject without partial slot writes, underrun silence flag, and explicit limits: user-space contract evidence only; physical WaveRT delivery, HLK, and signing are not covered."
+      },
+      {
+        "command": "evidence-audit provenance binding",
+        "status": "pass",
+        "detail": "Derived the exact 5 non-evidence source paths and the sha256-git-source-set-v1 digest from the staged Git index relative to the candidate merge base."
+      },
+      {
+        "command": "snapshot provenance derivation after PR 1217 merge",
+        "status": "pass",
+        "detail": "Re-derived the non-evidence source set and sha256-git-source-set-v1 digest directly from merged commit fe7ba36e3aaace88d3aece1f43b95eeaf32e990a on origin/main; paths and digest match the originally prepared change-mode manifest."
+      }
+    ],
+    "limitations": [
+      "This is user-space SPSC ring contract evidence only. It does not demonstrate kernel-mode IPC or shared-memory mapping into a WaveRT pin, driver loading, HLK testing, Microsoft signing, or real-device audio.",
+      "The provenance digest binds this manifest to exact staged source paths and Git blob states; it does not independently attest that the declared commands ran."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1",
+      "cmake": "4.4.2",
+      "msvc": "19.51.36256"
+    },
+    "started_at": "2026-08-24T20:55:00+08:00",
+    "finished_at": "2026-08-24T22:03:04+08:00"
+  }
+}
