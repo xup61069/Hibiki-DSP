@@ -10,14 +10,16 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 
 function Get-CounterClaims([string]$Text) {
-  # Parse structural counters (required entries, specs) from BASELINE prose.
+  # Parse structural counters (required entries, specs, CTest summary) from
+  # BASELINE prose.
   # Volatile tracked-path / repository-JSON counts are measured live via git ls-files
   # and reported as informational output only; they are never compared against
   # committed numbers.
-  $claims = [pscustomobject]@{ Required = 0; Specs = 0 }
+  $claims = [pscustomobject]@{ Required = 0; Specs = 0; CTests = 0; CTestNames = @() }
   $patterns = [ordered]@{
     Required = @('docs-check\.ps1`\s*的\s*(?<count>\d+)\s*個必要入口', 'docs-check required-entry')
     Specs    = @('個必要入口與\s*(?<count>\d+)\s*份\s*Spec\s*通過', 'spec')
+    CTests   = @('verify\.ps1`\s*的\s*(?<count>\d+)\s*個\s*CTest（(?<names>[^）]+)）通過', 'CTest verification summary')
   }
   foreach ($key in $patterns.Keys) {
     $match = [regex]::Match($Text, [string]$patterns[$key][0])
@@ -26,6 +28,10 @@ function Get-CounterClaims([string]$Text) {
              "verification-summary sentence in docs/state/BASELINE.md up to date.") -f $patterns[$key][1]
     }
     $claims.$key = [int]$match.Groups['count'].Value
+    if ($key -eq 'CTests') {
+      $claims.CTestNames = @($match.Groups['names'].Value -split '、' |
+        ForEach-Object { $_.Trim().Trim('`') } | Where-Object { $_ })
+    }
   }
   return $claims
 }
@@ -34,7 +40,8 @@ function Assert-StructuralClaims {
   param(
     [Parameter(Mandatory = $true)]$Claims,
     [Parameter(Mandatory = $true)][int]$Required,
-    [Parameter(Mandatory = $true)][int]$Specs
+    [Parameter(Mandatory = $true)][int]$Specs,
+    [AllowEmptyCollection()][string[]]$CTestRegistrations = @()
   )
   if ($Claims.Required -ne $Required) {
     throw ("BASELINE.md claims {0} docs-check required entries but docs-check defines {1}; " +
@@ -44,6 +51,33 @@ function Assert-StructuralClaims {
     throw ("BASELINE.md claims {0} specs but the repository tracks {1}; " +
            "update the BASELINE.md verification summary.") -f $Claims.Specs, $Specs
   }
+  if ($Claims.CTests -ne $CTestRegistrations.Count) {
+    throw ("BASELINE.md claims {0} CTest(s) but CMake registers {1}; " +
+           "update the BASELINE.md verification summary.") -f $Claims.CTests, $CTestRegistrations.Count
+  }
+  foreach ($name in $Claims.CTestNames) {
+    if ($CTestRegistrations -notcontains $name) {
+      throw ("BASELINE.md verification summary lists unknown CTest '{0}'; registered tests are: {1}.") -f $name, ($CTestRegistrations -join ', ')
+    }
+  }
+  if ($Claims.CTestNames.Count -ne $Claims.CTests) {
+    throw ("BASELINE.md claims {0} CTest(s) but lists {1} name(s); keep count and list consistent.") -f $Claims.CTests, $Claims.CTestNames.Count
+  }
+}
+
+function Get-CTestRegistrations {
+  param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
+  $registrations = [System.Collections.Generic.List[string]]::new()
+  $cmakeFiles = @(Get-ChildItem -LiteralPath $RepositoryRoot -Filter 'CMakeLists.txt' -Recurse -File |
+    Where-Object { $_.FullName -notmatch '[\\/]\.local[\\/]|[\\/]build[\\/]|[\\/]\.git[\\/]' })
+  foreach ($file in $cmakeFiles) {
+    $lines = Get-Content -LiteralPath $file.FullName
+    foreach ($line in $lines) {
+      $match = [regex]::Match($line, 'add_test\s*\(\s*NAME\s+(?:"(?<name>[^"]+)"|(?<name>[A-Za-z0-9_:-]+))')
+      if ($match.Success) { [void]$registrations.Add($match.Groups['name'].Value) }
+    }
+  }
+  return @($registrations | Sort-Object -Unique)
 }
 
 function Convert-CommandOutputToText {
@@ -999,10 +1033,12 @@ if ($SelfTest) {
   # Structural counter parser: valid summary parses correctly.
   $summaryOk = @'
 目前驗證摘要：`docs-check.ps1` 的 85 個必要入口與
-24 份 Spec 通過。
+24 份 Spec 通過；`verify.ps1` 的 2 個 CTest（contract_tests、asio_transport_selftest）通過。
 '@
   $ok = Get-CounterClaims $summaryOk
-  if ($ok.Required -ne 85 -or $ok.Specs -ne 24) {
+  if ($ok.Required -ne 85 -or $ok.Specs -ne 24 -or $ok.CTests -ne 2 -or
+      $ok.CTestNames.Count -ne 2 -or $ok.CTestNames[0] -ne 'contract_tests' -or
+      $ok.CTestNames[1] -ne 'asio_transport_selftest') {
     throw 'docs-check self-test failed: canonical summary did not parse to expected structural counters.'
   }
   $caseCount++
@@ -1015,8 +1051,41 @@ if ($SelfTest) {
   }
 
   # Structural assertion passes with matching values.
-  Assert-StructuralClaims -Claims $ok -Required 85 -Specs 24
+  Assert-StructuralClaims -Claims $ok -Required 85 -Specs 24 `
+    -CTestRegistrations @('asio_transport_selftest', 'contract_tests')
   $caseCount++
+
+  # A registered-but-unlisted extra CTest must also fail closed (silent drift).
+  $caughtExtraRegistration = $false
+  try { Assert-StructuralClaims -Claims $ok -Required 85 -Specs 24 `
+    -CTestRegistrations @('asio_transport_selftest', 'contract_tests', 'newly_added_test') | Out-Null } catch { $caughtExtraRegistration = $true }
+  if (-not $caughtExtraRegistration) {
+    throw 'docs-check self-test failed: an unregistered extra CTest should fail the structural assertion.'
+  }
+
+  # CTest count mismatch must fail closed.
+  $caughtCtestCount = $false
+  try { Assert-StructuralClaims -Claims $ok -Required 85 -Specs 24 `
+    -CTestRegistrations @('contract_tests') | Out-Null } catch { $caughtCtestCount = $true }
+  if (-not $caughtCtestCount) {
+    throw 'docs-check self-test failed: CTest count drift should fail the structural assertion.'
+  }
+  $caseCount++
+
+  # An unknown listed CTest name must fail closed.
+  $caughtUnknownName = $false
+  try { Assert-StructuralClaims -Claims $ok -Required 85 -Specs 24 `
+    -CTestRegistrations @('asio_transport_selftest', 'tab_bridge_selftest', 'extra_unlisted') | Out-Null } catch { $caughtUnknownName = $true }
+  if (-not $caughtUnknownName) {
+    throw 'docs-check self-test failed: an unknown listed CTest name should fail the structural assertion.'
+  }
+  $caseCount++
+
+  # Live discovery: the real repository registers at least one known test.
+  $liveRegistrations = Get-CTestRegistrations -RepositoryRoot $repo
+  if ($liveRegistrations.Count -lt 4 -or $liveRegistrations -notcontains 'hibiki_contract_tests') {
+    throw 'docs-check self-test failed: live CMake discovery did not find the expected registrations.'
+  }
 
   # Live measurement: git ls-files returns at least some files in a real repo.
   $liveTracked = @(git ls-files)
@@ -1373,7 +1442,8 @@ $claims = Get-CounterClaims $baselineText
 # Structural counters (required entries and specs) are always verified against
 # the tree being tested; they change rarely, so keeping them strict costs
 # parallel lanes nothing.
-Assert-StructuralClaims -Claims $claims -Required $required.Count -Specs $specs.Count
+Assert-StructuralClaims -Claims $claims -Required $required.Count -Specs $specs.Count `
+  -CTestRegistrations (Get-CTestRegistrations -RepositoryRoot $repo)
 
 # Volatile volatile volatile — NO, these are measured LIVE and reported as
 # informational output only. No committed counter numbers are read or compared.
