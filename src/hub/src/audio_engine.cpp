@@ -535,6 +535,64 @@ bool AudioEngineModel::process_driver_stream_packet_to_wasapi(
                                         block.frames, lane_inputs, output_interleaved);
 }
 
+bool AudioEngineModel::encode_driver_stream_packet_from_lane(
+    const std::size_t lane_index,
+    const std::string_view endpoint_guid,
+    const std::uint64_t sequence,
+    const std::uint64_t generation,
+    const std::uint32_t flags,
+    const float* const input_interleaved,
+    const std::uint32_t input_channels,
+    const std::size_t frames,
+    const std::span<RtLaneInputV1> lane_inputs,
+    float* const processed_output_interleaved,
+    const std::span<std::uint8_t> packet,
+    std::size_t& written_bytes) noexcept {
+    written_bytes = 0U;
+    const auto sample_rate = sample_rate_.load(std::memory_order_acquire);
+    const auto output_channels = active_graph_.output_channels;
+    if (!has_active_graph_ || lane_index >= active_graph_.lane_count ||
+        lane_inputs.size() < active_graph_.lane_count || input_interleaved == nullptr ||
+        processed_output_interleaved == nullptr || packet.data() == nullptr ||
+        endpoint_guid.empty() ||
+        endpoint_guid.size() >= HIBIKI_DRIVER_STREAM_ENDPOINT_GUID_CAPACITY_V1 ||
+        std::find(endpoint_guid.begin(), endpoint_guid.end(), '\0') != endpoint_guid.end() ||
+        sequence == 0U || generation == 0U ||
+        (flags & ~(HIBIKI_DRIVER_STREAM_FLAG_DISCONTINUITY_V1 |
+                   HIBIKI_DRIVER_STREAM_FLAG_SILENCE_V1)) != 0U ||
+        frames == 0U || frames > HIBIKI_DRIVER_STREAM_MAX_FRAMES_V1 ||
+        input_channels != active_graph_.lanes[lane_index].input_channels ||
+        (output_channels != 2U && output_channels != 6U && output_channels != 8U) ||
+        (sample_rate != 44100U && sample_rate != 48000U && sample_rate != 96000U &&
+         sample_rate != 192000U)) {
+        return false;
+    }
+
+    const auto input_samples = frames * static_cast<std::size_t>(input_channels);
+    const auto output_samples = frames * static_cast<std::size_t>(output_channels);
+    const auto packet_bytes = HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1 +
+                              output_samples * sizeof(float);
+    if (packet.size() < packet_bytes) return false;
+    for (std::size_t index = 0U; index < input_samples; ++index) {
+        if (!std::isfinite(input_interleaved[index])) return false;
+    }
+
+    std::array<char, HIBIKI_DRIVER_STREAM_ENDPOINT_GUID_CAPACITY_V1> endpoint_guid_c{};
+    std::copy(endpoint_guid.begin(), endpoint_guid.end(), endpoint_guid_c.begin());
+    if (!process_lane_block(lane_index, input_interleaved, input_channels, frames, lane_inputs,
+                            processed_output_interleaved)) {
+        return false;
+    }
+    for (std::size_t index = 0U; index < output_samples; ++index) {
+        if (!std::isfinite(processed_output_interleaved[index])) return false;
+    }
+    return hibiki_driver_stream_packet_encode_v1(
+               packet.data(), packet.size(), HIBIKI_DRIVER_STREAM_RENDER_V1, sequence,
+               endpoint_guid_c.data(), output_channels, sample_rate,
+               static_cast<std::uint32_t>(frames), flags, generation,
+               processed_output_interleaved, &written_bytes) == 1;
+}
+
 bool AudioEngineModel::start_wasapi_output(const WasapiOutputConfigV1& config,
                                            const std::uint32_t block_frames) noexcept {
     return wasapi_handoff_.start_initial(config, block_frames);
