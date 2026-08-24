@@ -348,6 +348,27 @@ var invalidUtf8Scene = viewModel.LastCommand.Payload.ToArray();
 invalidUtf8Scene[1] = 0xFF;
 Check(!ControlPayloadsV1.TryDecodeSceneApply(invalidUtf8Scene, out _, out _),
     "SceneApply decoder must reject invalid UTF-8 rather than substitute characters.");
+var fortyHanName = new string('場', 40);
+Check(Encoding.UTF8.GetByteCount(fortyHanName) == 120 &&
+      viewModel.UpsertCustomScene(new SceneCard("han-name-max", fortyHanName,
+                                                "位元組邊界", "零額外緩衝", true)) &&
+      viewModel.Scenes.Count == 6,
+    "Custom Scene name must accept exactly 120 UTF-8 bytes.");
+Check(Encoding.UTF8.GetByteCount(new string('場', 41)) == 123 &&
+      !viewModel.UpsertCustomScene(new SceneCard("han-name-over",
+                                                 new string('場', 41),
+                                                 "超過位元組上限", "零額外緩衝", true)) &&
+      viewModel.Scenes.Count == 6,
+    "Custom Scene name must reject names above the 120-byte engine bound.");
+var sceneQueueBounds = new CustomSceneSyncQueueV1();
+Check(sceneQueueBounds.Enqueue(new SceneCatalogQueueCard(true, "han-queue",
+                                                         fortyHanName, "main")) &&
+      !sceneQueueBounds.Enqueue(new SceneCatalogQueueCard(true, "han-name-over",
+                                                          new string('場', 41), "main")) &&
+      !sceneQueueBounds.Enqueue(new SceneCatalogQueueCard(true, "han-group-over",
+                                                          "名稱", new string('組', 22))),
+    "Offline scene queue must enforce UTF-8 byte bounds for name/output_group.");
+viewModel.RemoveCustomSceneAsync("han-name-max").GetAwaiter().GetResult();
 var removableScenePath = Path.Combine(
     Path.GetTempPath(), $"hibiki-removable-scene-check-{Guid.NewGuid():N}.json");
 var removableQueuePath = Path.Combine(
