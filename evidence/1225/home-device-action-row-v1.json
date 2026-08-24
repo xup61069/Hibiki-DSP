@@ -1,0 +1,63 @@
+{
+  "evidence_format": 2,
+  "issue": 1225,
+  "source_provenance": {
+    "mode": "snapshot",
+    "snapshot_commit": "3c1d8bee997838c53d4f965a2fbf89ad9f23ad74",
+    "paths": [
+      "apps/winui-shell/MainWindow.xaml"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "bac90f79ff1ef1906b49441c02013478c9fa671bb293eb5b73e292cad1e4505e"
+  },
+  "metadata": {
+    "scope": "winui-home-device-action-row",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-git-2.49.0-dotnet-sdk-10.0.400-windows-app-sdk-1.7.250401001",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1225",
+      "pwsh -NoProfile -File tools/winui-shell-check.ps1",
+      "pwsh -NoProfile -File tools/control-model-check.ps1",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "git diff --check",
+      "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUI",
+      "local WinUI executable smoke launch and stop",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange"
+    ],
+    "results": [
+      {
+        "command": "home device action row grouping",
+        "status": "pass",
+        "detail": "Grouped switch and rescan controls inside one labeled bordered row; switch remains AccentButtonStyle and rescan is secondary with a refresh SymbolIcon. Click handlers, data bindings, IsEnabled bindings, control names, and automation semantics were not changed."
+      },
+      {
+        "command": "WinUI shell accessibility scan",
+        "status": "pass",
+        "detail": "winui-shell-check passed for interactive-control, Compatibility Preview source, and DesktopCompat source scans on Windows App SDK 1.7.250401001."
+      },
+      {
+        "command": "always-run gates",
+        "status": "pass",
+        "detail": "control-model-check, docs-check (88 required paths), source-policy (723 tracked paths), git diff --check, and issue-based handoff-check all exited 0."
+      },
+      {
+        "command": "formal WinUI build and executable smoke",
+        "status": "pass",
+        "detail": "build-preview -Target WinUI completed with Visual Studio MSBuild, zero warnings and zero errors; the generated unsigned local executable launched, remained running through the six-second observation window, and was stopped cleanly."
+      }
+    ],
+    "limitations": [
+      "Smoke evidence covers local user-space rendering and process startup only; no physical audio output or driver behavior is demonstrated.",
+      "The provenance digest binds the manifest to the staged XAML source set; it does not independently attest that declared commands ran."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1",
+      "dotnet_sdk": "10.0.400",
+      "windows_app_sdk": "1.7.250401001"
+    },
+    "started_at": "2026-08-24T23:30:00+08:00",
+    "finished_at": "2026-08-25T00:12:00+08:00"
+  }
+}
