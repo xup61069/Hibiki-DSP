@@ -2,7 +2,7 @@
 
 本文件是第三方 VST3 plugin state 進入 Hibiki `Vst3PluginStateMigrationRegistryV1`
 前的人工審查清單。VST3 state 是 plugin 定義的 opaque bytes；Hibiki 不解析、不修改，
-也不把未審查的 state 放進 GitHub、Issue、AI context、CI artifact 或 Gumroad 交付物。
+也不把未審查的 state 放進 GitHub、Issue、AI context 或 CI artifact。
 
 ## 准入資料
 
@@ -35,4 +35,3 @@
   不得進入 Low Latency Lane 的 trusted/certified 清單。
 - 審查結果需附 `TaskHandoff`／`EvidenceManifest` 的 commit、toolchain 與測試範圍，
   以便換裝置或換 AI 後重做，而不是依賴聊天記憶。
-

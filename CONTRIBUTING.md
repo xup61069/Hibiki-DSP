@@ -38,8 +38,9 @@ points at them instead of restating them so it cannot drift.
 ## Evidence honesty
 
 Record what was actually executed in anonymous evidence under `evidence/`, and keep
-limitation statements explicit: user-space probes are not physical-audio, driver/WaveRT,
-HLK or Microsoft-signing evidence, and opt-in live checks must never be triggered implicitly.
+limitation statements explicit: user-space probes are not physical-audio or driver/WaveRT
+evidence, and opt-in live checks must never be triggered implicitly. This project does not
+require HLK or any code signing.
 
 ## Licenses and dependencies
 

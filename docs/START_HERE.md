@@ -55,20 +55,17 @@
    source-only-ci-check；UI、engine、extensions、installer、distribution 與 driver 各跑表列 gate。
    live-* probes 一律是明確 opt-in：預設只輸出匿名資料且不改變機器狀態；帶 `-WriteTest`
    的變體會短暫改變本機音量並在結束前恢復。任何 live probe 的結果都只能算 user-space
-   evidence，不得宣稱 driver/WaveRT/HLK/Microsoft signing 或實體音訊 delivery 已完成；
+   evidence，不得宣稱 driver/WaveRT 或實體音訊 delivery 已完成；專案不需要 HLK 與任何簽章；
    各 probe 的詳細邊界說明見各工具腳本開頭註解。
 
-## Driver 簽章分階段
+## Driver 建置邊界
 
-- source、DSP、UI、driver source contract 與一般 CI 不需要 Microsoft Hardware Developer
-  帳號，也不應把帳號或正式憑證當作開始開發的前置。
-- 本機或隔離 VM 的 driver 開發可用 WDK build、Inf2Cat 與 self-signed test-signing；啟用
-  TESTSIGNING、匯入憑證或安裝 driver 都會改變機器，只能由使用者明確同意。詳見
-  [Microsoft test-signing 指南](https://learn.microsoft.com/en-us/windows-hardware/drivers/install/test-signing)。
-- 一般使用者環境的 kernel driver 發布才需要 Microsoft 簽章與 Hardware Program；正式路線依
-  release Spec 執行 HLK／WHCP、Secure Boot／HVCI 與 installer 驗收。官方要求見
-  [driver signing](https://learn.microsoft.com/en-us/windows-hardware/drivers/install/driver-signing) 與
-  [Hardware Program registration](https://learn.microsoft.com/en-us/windows-hardware/drivers/dashboard/hardware-program-register)。
+- source、DSP、UI、driver source contract 與一般 CI 不需要任何簽章、Hardware Developer 帳號
+  或付費憑證，也不應把這些項目當作開始開發或完成產品的前置。
+- 本機或隔離 VM 的 driver 開發可用 WDK build 與 Inf2Cat；安裝或載入 driver 都會改變機器，
+  只能由使用者明確同意。專案不以 HLK／WHCP 或 test-signing 作為目標。
+- 未簽章 kernel driver 可能被 Secure Boot/HVCI 環境拒絕載入；這是使用者環境的平台限制，
+  不是專案的待辦 signing 工作。
 
 ## 文件權威順序
 

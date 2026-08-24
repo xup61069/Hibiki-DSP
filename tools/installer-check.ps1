@@ -24,8 +24,7 @@ $script:RequiredBoundaries = @(
   'sha256',
   'dependency_lock_digest',
   'driver_package',
-  'microsoft_signature_thumbprint',
-  'rfc3161_timestamp',
+  'catalog_sha256',
   'sbom_digest'
 )
 
@@ -91,8 +90,7 @@ $null = [IO.Path]::IsPathRooted("test")
 $null = "sha256"
 $null = "dependency_lock_digest"
 $null = "driver_package"
-$null = "microsoft_signature_thumbprint"
-$null = "rfc3161_timestamp"
+$null = "catalog_sha256"
 $null = "sbom_digest"
 '@
 
@@ -151,8 +149,8 @@ $null = "sbom_digest"
       toolchain_digest = ('b' * 64)
       dependency_lock_digest = ('c' * 64)
       sbom_digest = ('d' * 64)
-      driver_package = @{ sha256 = ('e' * 64); catalog_sha256 = ('f' * 64); microsoft_signature_thumbprint = ('1' * 40) }
-      installer = @{ sha256 = ('2' * 64); signer_thumbprint = ('3' * 40); rfc3161_timestamp = '2026-08-24T00:00:00Z' }
+      driver_package = @{ sha256 = ('e' * 64); catalog_sha256 = ('f' * 64) }
+      installer = @{ sha256 = ('2' * 64) }
       unsigned_files = @()
       tests = @('unit-test-1', 'integration-test-2')
     }
@@ -200,17 +198,6 @@ $null = "sbom_digest"
     $caught = $false
     try { Read-ReleaseManifest $oversizeVersionPath } catch { $caught = $true }
     if (-not $caught) { throw 'SelfTest expected oversize product_version rejection.' }
-    $caseCount++
-
-    # Case 1g: Read-ReleaseManifest rejects oversized rfc3161_timestamp.
-    $oversizeTsManifest = $validFullManifest.Clone()
-    $oversizeTsManifest['installer'] = $validFullManifest['installer'].Clone()
-    $oversizeTsManifest['installer']['rfc3161_timestamp'] = 'x' * 129
-    $oversizeTsPath = Join-Path $tempRoot 'oversize-ts-manifest.json'
-    $oversizeTsManifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $oversizeTsPath -Encoding UTF8
-    $caught = $false
-    try { Read-ReleaseManifest $oversizeTsPath } catch { $caught = $true }
-    if (-not $caught) { throw 'SelfTest expected oversize rfc3161_timestamp rejection.' }
     $caseCount++
 
     # Case 1h: Read-ReleaseManifest rejects unsigned_files exceeding 1024.
@@ -326,7 +313,6 @@ $null = "sbom_digest"
       @{ Name = 'product_version'; Action = { param($m) $m['product_version'] = ('bad' + [char]7) } },
       @{ Name = 'distribution_id'; Action = { param($m) $m['distribution_id'] = ('dist' + [char]0x9F) } },
       @{ Name = 'unsigned_files_path'; Action = { param($m) $m['unsigned_files'] = @(@{ path = ('tools/' + [char]1 + '/payload.bin'); sha256 = ('0' * 64) }) } },
-      @{ Name = 'rfc3161_timestamp'; Action = { param($m) $m['installer'] = $m['installer'].Clone(); $m['installer']['rfc3161_timestamp'] = ([char]0x1B).ToString() + '2026-08-24T00:00:00Z' } },
       @{ Name = 'tests_label'; Action = { param($m) $m['tests'] = @(('test-' + [char]0x7F)) } }
     )) {
       $controlManifest = $validFullManifest.Clone()

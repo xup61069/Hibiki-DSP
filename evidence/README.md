@@ -31,6 +31,6 @@ v2 紀錄是 append-only：不得覆寫、刪除或 rename。需要更正時新�
 引用先前路徑。legacy 紀錄（沒有 `evidence_format`）保留現有 `source_commit` 稽核，但不得再新增或
 修改，無需批次遷移。
 
-來源 digest 能證明 manifest 綁定到哪批 Git bytes，不能證明 `commands` 真的執行，也不等於簽章、
-GitHub-hosted attestation、實體裝置、WaveRT、HLK 或 Microsoft signing evidence；這些仍需各自的
-可信 gate、review 與 release evidence。
+來源 digest 能證明 manifest 綁定到哪批 Git bytes，不能證明 `commands` 真的執行，也不等於
+GitHub-hosted attestation、實體裝置或 WaveRT evidence；這些仍需各自的可信 gate、review 與
+release evidence。

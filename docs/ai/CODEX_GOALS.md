@@ -37,7 +37,7 @@ Codex 的 `/goal` 適合跨多輪長任務，但不是「永遠從待辦清單�
 仍是可驗證的 V1 驗收；每個里程碑完成後先 checkpoint。
 
 ```text
-/goal 把 Hibiki DSP 推進到 accepted V1 驗收條目全部可重跑通過；先讀 AGENTS.md、docs/START_HERE.md 與 active handoffs，不預載整份 AI_HANDOFF、BASELINE、PROJECT_MAP 或舊聊天，只依當前決策查相關段落。每輪只選一個不與其他視窗重疊、可獨立驗收的最高價值里程碑；只有尚未分配且 write scope 明確歸本視窗的工作才自行實作或整合，不搶占已分配範圍。每個里程碑完成後把成果、驗證、限制與唯一下一步 checkpoint 到 Issue。每次先用白話說產品變好了什麼、怎麼確認與還缺什麼。除非全部 V1 驗收通過，或遇到需要我決定、外部帳號／付費／硬體、安裝或簽章、會改變機器狀態、scope 衝突或無法安全前進的阻擋，否則持續工作。
+/goal 把 Hibiki DSP 推進到 accepted V1 驗收條目全部可重跑通過；先讀 AGENTS.md、docs/START_HERE.md 與 active handoffs，不預載整份 AI_HANDOFF、BASELINE、PROJECT_MAP 或舊聊天，只依當前決策查相關段落。每輪只選一個不與其他視窗重疊、可獨立驗收的最高價值里程碑；只有尚未分配且 write scope 明確歸本視窗的工作才自行實作或整合，不搶占已分配範圍。每個里程碑完成後把成果、驗證、限制與唯一下一步 checkpoint 到 Issue。每次先用白話說產品變好了什麼、怎麼確認與還缺什麼。除非全部 V1 驗收通過，或遇到需要我決定、外部帳號／付費／硬體、安裝、會改變機器狀態、scope 衝突或無法安全前進的阻擋，否則持續工作。
 ```
 
 ### 2. 介面與操作體驗
@@ -55,7 +55,7 @@ Codex 的 `/goal` 適合跨多輪長任務，但不是「永遠從待辦清單�
 ### 4. Windows 系統整合與 driver
 
 ```text
-/goal 解決 maintainer 或長駐 V1 總管明確分配給這個視窗的一個具名、可重現的 Windows 音訊整合或 driver 阻擋，直到取得對應層級的通過證據或收斂成可驗證的最小根因；先讀專案入口、active handoff、driver／Windows runtime 的 Spec、官方文件、source、tests 與既有 evidence，確認自己的範圍不與其他視窗重疊。先做 source、build、模擬或隔離 VM 能安全完成的工作；沒有我明確同意，不申請 Microsoft Hardware 帳號、不購買憑證、不啟用 TESTSIGNING、不安裝或載入 driver，也不改真實裝置設定。先用白話回報 Windows 現在卡在哪一層、修好後使用者會得到什麼、證據能證明到哪裡，GitHub 細節只放最後。取得該阻擋的驗收證據後停止；若尚未有具名分配，或需要外部帳號、硬體、簽章、安裝或改變機器狀態，停下列出最小決定。
+/goal 解決 maintainer 或長駐 V1 總管明確分配給這個視窗的一個具名、可重現的 Windows 音訊整合或 driver 阻擋，直到取得對應層級的通過證據或收斂成可驗證的最小根因；先讀專案入口、active handoff、driver／Windows runtime 的 Spec、官方文件、source、tests 與既有 evidence，確認自己的範圍不與其他視窗重疊。專案不需要 HLK、簽章、Hardware 帳號或憑證，不得把這些當作阻擋。先做 source、build、模擬或隔離 VM 能安全完成的工作；沒有我明確同意，不安裝或載入 driver，也不改真實裝置設定。先用白話回報 Windows 現在卡在哪一層、修好後使用者會得到什麼、證據能證明到哪裡，GitHub 細節只放最後。取得該阻擋的驗收證據後停止；若尚未有具名分配，或需要外部帳號、硬體、安裝或改變機器狀態，停下列出最小決定。
 ```
 
 ### 5. 獨立驗證與找錯
