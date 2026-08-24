@@ -8,9 +8,10 @@ if(MSVC)
   target_compile_options(hibiki_contract_tests PRIVATE /W4 /permissive- /EHsc)
   # contract_tests intentionally exercises every fixed-size wire fixture in one
   # process; keep the test harness from exhausting the Windows default stack
-  # as new versioned payloads are added. Runtime/RT code has no dependency on
-  # this linker setting.
-  target_link_options(hibiki_contract_tests PRIVATE /STACK:8388608)
+  # as new versioned payloads are added, and engine-control scene fixtures
+  # stage full IR attachments on the stack. Runtime/RT code has no
+  # dependency on this linker setting.
+  target_link_options(hibiki_contract_tests PRIVATE /STACK:16777216)
 else()
   target_compile_options(hibiki_contract_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 endif()
