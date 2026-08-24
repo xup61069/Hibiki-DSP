@@ -47,6 +47,12 @@ descriptor 建立 `WasapiOutputConfigV1` 並啟動既有 dedicated shared-mode s
 沒有 graph source block 時 sink 維持安全 silence，不得把 route `Ready` 說成完整播放、WaveRT
 driver 或 per-App DSP delivery。
 
+只有同時傳入 `--enable-wasapi-output --enable-test-tone` 時，Engine Preview 才會建立最小 `main`
+graph，並在 control thread 以 bounded 440 Hz、約 -20 dBFS sine block 經 graph、limiter 與 WASAPI
+handoff 送出。sink snapshot 的 `rendered_blocks` 大於零後，`main-output` detail 會顯示
+`test tone rendering.`。此旗標永遠是 opt-in；它只證明 user-space 可聽路徑到 WASAPI sink worker，
+不構成真實裝置 delivery、WaveRT driver、HLK 或簽章證據。
+
 ## 失敗／fallback
 
 - unknown type、錯誤長度、非零 padding、非法 UTF-8、重複 route ID、過期 sequence 或 unsafe
@@ -68,4 +74,6 @@ driver 或 per-App DSP delivery。
    邊界保留。
 5. Engine Preview normal path 維持 sink disabled；`--enable-wasapi-output -StatusOnly` 只在
    worker 回報 endpoint-ready 時呈現 `main-output=Ready`，且 smoke 不輸出 endpoint ID。
+   `--enable-wasapi-output --enable-test-tone` 則只在 sink 回報 rendered block 後顯示
+   `test tone rendering.`；此結果限於 user-space WASAPI path。
 6. public repository 不包含編譯後 payload、driver、endpoint identity 或私人 calibration。
