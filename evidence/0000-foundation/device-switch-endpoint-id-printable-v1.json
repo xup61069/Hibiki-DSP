@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "issue": 1119,
+  "scope_digest": "device-switch-endpoint-id-printable-v1",
+  "source_commit": "0d38db358d74cf300880b1965c4362d162586a3e",
+  "environment_fingerprint": "windows-amd64-pwsh-device-switch-endpoint-id-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1119",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [],
+  "limitations": [
+    "device-switch-request-v1 schema now rejects C0/C1 control characters and DEL in endpoint_id while retaining the non-empty and 260-character bounds.",
+    "Runtime wire encoding, physical-device catalog validation, and DSP behavior are unchanged.",
+    "source_commit is pinned to the main head at authoring time; final squash-hash repair follows the post-merge convention used by prior printable-label rounds.",
+    "Source/schema/tooling evidence only; no physical audio, driver, HLK, signing, or release acceptance."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
