@@ -84,8 +84,9 @@ source 默認塞入 context，跨子系統檔案必須在 Spec 明確加入 glob
 四個生成 adapter 各 1,000、`AI_HANDOFF.md` 6,000、`PROJECT_MAP.md` 12,000、`MULTI_AGENT.md`
 9,000、`CODEX_GOALS.md` 6,000、root `README.md` 20,000。超限代表入口混入了應按需查詢的細節，
 必須 fail closed；不得為新增 changelog 直接調高上限。README／PROJECT_MAP 不得重新要求新 AI
-預載 `AI_HANDOFF.md`，啟動文件不得先全文輸出 Issue body 再由 pack 重播，也不得使用未經 filter
-的 `git worktree list`。整合歷史由 BASELINE、evidence、merged PR 與 Git history 保存，
+預載 `AI_HANDOFF.md`，四個自動 adapter 不得直接指向全域快照；啟動文件不得先全文輸出 Issue body
+再由 pack 重播，也不得使用未經 filter 的 `git worktree list` 或未明確限制筆數的 Git／GitHub 歷史
+清單。整合歷史由 BASELINE、evidence、merged PR 與 Git history 保存，
 `AI_HANDOFF.md` 只保留 live routing 與安全邊界。
 
 `handoff-check.ps1` 也必須對所有帶 handoff block 的 open Issue 做 bounded
