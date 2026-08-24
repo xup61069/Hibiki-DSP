@@ -140,7 +140,8 @@ public sealed class CustomSceneCatalogV1
                 if (item is null) { error = "Preset 含有空場景"; return false; }
                 var scene = new SceneCard(item.Id ?? string.Empty, item.Name ?? string.Empty,
                                           item.Description ?? string.Empty,
-                                          item.LatencyLabel ?? string.Empty, item.SafetyEnabled);
+                                          item.LatencyLabel ?? string.Empty, item.SafetyEnabled,
+                                          item.IrReference ?? string.Empty);
                 if (!IsValid(scene) || candidate.Any(existing => existing.Id == scene.Id))
                 {
                     error = "Preset 含有無效或重複場景";
@@ -166,7 +167,8 @@ public sealed class CustomSceneCatalogV1
         Name = scene.Name,
         Description = scene.Description,
         LatencyLabel = scene.LatencyLabel,
-        SafetyEnabled = scene.SafetyEnabled
+        SafetyEnabled = scene.SafetyEnabled,
+        IrReference = scene.IrReference
     };
 
     private static bool IsValid(SceneCard scene)
@@ -178,6 +180,9 @@ public sealed class CustomSceneCatalogV1
             scene.Description.Length > 240 || scene.LatencyLabel.Length > 64 ||
             scene.Description.Any(char.IsControl) ||
             scene.LatencyLabel.Any(char.IsControl) ||
+            Encoding.UTF8.GetByteCount(scene.IrReference) > 64 ||
+            (scene.IrReference.Length > 0 && Encoding.UTF8.GetByteCount(scene.IrReference) < 8) ||
+            scene.IrReference.Any(char.IsControl) ||
             ScenePresetCatalog.EasyDefaults.Any(item => item.Id == scene.Id))
             return false;
 
@@ -218,5 +223,8 @@ public sealed class CustomSceneCatalogV1
 
         [JsonPropertyName("safety_enabled")]
         public bool SafetyEnabled { get; set; }
+
+        [JsonPropertyName("ir_reference")]
+        public string? IrReference { get; set; }
     }
 }

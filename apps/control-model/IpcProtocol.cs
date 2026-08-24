@@ -556,7 +556,8 @@ public static class ControlPayloadsV1
         SessionRouteRuleOperationV1 operation,
         string sceneId,
         string name = "",
-        string outputGroup = "")
+        string outputGroup = "",
+        string irReference = "")
     {
         var id = StrictUtf8.GetBytes(sceneId ?? string.Empty);
         var payload = new byte[SceneCatalogPayloadBytes];
@@ -581,8 +582,16 @@ public static class ControlPayloadsV1
             outputBytes.Length is < 1 or > 64 ||
             nameBytes.Any(value => value < 0x20) || outputBytes.Any(value => value < 0x20))
             throw new ArgumentException("Scene name/output group are outside the v1 limit.");
+        var irRefBytes = StrictUtf8.GetBytes(irReference ?? string.Empty);
+        if (irRefBytes.Length is > 64 ||
+            (irRefBytes.Length > 0 && irRefBytes.Length < 8) ||
+            irRefBytes.Any(value => value < 0x20))
+            throw new ArgumentException("IR reference must be empty or 8..64 printable UTF-8 bytes.",
+                                        nameof(irReference));
         nameBytes.CopyTo(payload.AsSpan(128));
         outputBytes.CopyTo(payload.AsSpan(248));
+        if (irRefBytes.Length > 0)
+            irRefBytes.CopyTo(payload.AsSpan(312));
 
         BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(4), 0U);   // Game latency mode.
         BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(8), 3U);   // IR phase bypass.
@@ -598,6 +607,7 @@ public static class ControlPayloadsV1
         payload[15] = 1;                                                   // One lane.
         payload[18] = (byte)nameBytes.Length;
         payload[19] = (byte)outputBytes.Length;
+        payload[20] = (byte)irRefBytes.Length;
         payload[22] = 1;                                                   // ISO derived standard.
 
         var laneId = StrictUtf8.GetBytes(sceneId + "-lane");
@@ -1169,10 +1179,12 @@ public sealed class ControlCommandFactoryV1
             ControlPayloadsV1.EncodeSceneApply(sceneId, outputGroup));
 
     public IpcEnvelopeV1 UpsertSceneCatalog(string sceneId, string name,
-                                             string outputGroup) =>
+                                             string outputGroup,
+                                             string irReference = "") =>
         _requests.Create(ControlMessageType.SceneCatalogCommand,
             ControlPayloadsV1.EncodeSceneCatalogCommand(
-                SessionRouteRuleOperationV1.Upsert, sceneId, name, outputGroup));
+                SessionRouteRuleOperationV1.Upsert, sceneId, name, outputGroup,
+                irReference));
 
     public IpcEnvelopeV1 RemoveSceneCatalog(string sceneId) =>
         _requests.Create(ControlMessageType.SceneCatalogCommand,

@@ -24,6 +24,12 @@
           },
           "description": {"type": "string", "maxLength": 240, "$ref": "printable-string-v1.schema.json#/$defs/printableString"},
           "latency_label": {"type": "string", "maxLength": 64, "$ref": "printable-string-v1.schema.json#/$defs/printableString"},
+          "ir_reference": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 64,
+            "$ref": "printable-string-v1.schema.json#/$defs/printableString"
+          },
           "safety_enabled": {"type": "boolean"}
         }
       }

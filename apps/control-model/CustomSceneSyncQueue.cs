@@ -8,7 +8,8 @@ namespace Hibiki.ControlModel;
 
 // One bounded, replayable offline scene catalog operation.
 public sealed record SceneCatalogQueueCard(
-    bool IsUpsert, string SceneId, string Name, string OutputGroup);
+    bool IsUpsert, string SceneId, string Name, string OutputGroup,
+    string IrReference = "");
 
 // Persisted companion to the custom scene card mirror. It keeps only the
 // bounded replay operations needed to resume engine synchronization after a
@@ -146,7 +147,8 @@ public sealed class CustomSceneSyncQueueV1
                 }
                 var operation = new SceneCatalogQueueCard(
                     item.IsUpsert, item.SceneId ?? string.Empty, item.Name ?? string.Empty,
-                    item.OutputGroup ?? string.Empty);
+                    item.OutputGroup ?? string.Empty,
+                    item.IrReference ?? string.Empty);
                 if (!IsValid(operation))
                 {
                     error = "場景同步佇列含有無效操作";
@@ -173,7 +175,8 @@ public sealed class CustomSceneSyncQueueV1
         IsUpsert = operation.IsUpsert,
         SceneId = operation.SceneId,
         Name = operation.Name,
-        OutputGroup = operation.OutputGroup
+        OutputGroup = operation.OutputGroup,
+        IrReference = operation.IrReference
     };
 
     private static bool IsValid(SceneCatalogQueueCard operation)
@@ -197,11 +200,16 @@ public sealed class CustomSceneSyncQueueV1
                    !operation.Name.Any(char.IsControl) &&
                    !string.IsNullOrWhiteSpace(operation.OutputGroup) &&
                    Encoding.UTF8.GetByteCount(operation.OutputGroup) <= 64 &&
-                   !operation.OutputGroup.Any(char.IsControl);
+                   !operation.OutputGroup.Any(char.IsControl) &&
+                   Encoding.UTF8.GetByteCount(operation.IrReference) <= 64 &&
+                   (operation.IrReference.Length == 0 ||
+                    Encoding.UTF8.GetByteCount(operation.IrReference) >= 8) &&
+                   !operation.IrReference.Any(char.IsControl);
         }
 
         return string.IsNullOrEmpty(operation.Name) &&
-               string.IsNullOrEmpty(operation.OutputGroup);
+               string.IsNullOrEmpty(operation.OutputGroup) &&
+               string.IsNullOrEmpty(operation.IrReference);
     }
 
     private sealed class QueueDocument
@@ -229,5 +237,8 @@ public sealed class CustomSceneSyncQueueV1
 
         [JsonPropertyName("output_group")]
         public string? OutputGroup { get; set; }
+
+        [JsonPropertyName("ir_reference")]
+        public string? IrReference { get; set; }
     }
 }

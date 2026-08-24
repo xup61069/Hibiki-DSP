@@ -1932,6 +1932,8 @@ int main() {
     std::copy_n("Quiet Game", 10, catalog_command.name.data());
     catalog_command.output_group_bytes = 13;
     std::copy_n("custom-output", 13, catalog_command.output_group.data());
+    catalog_command.ir_reference_bytes = 20;
+    std::copy_n("studio-calibration-a", 20, catalog_command.ir_reference.data());
     catalog_command.standard_id = 1U;
     catalog_command.lanes[0].id_bytes = 15;
     std::copy_n("quiet-game-lane", 15, catalog_command.lanes[0].id.data());
@@ -1950,12 +1952,15 @@ int main() {
     auto owned_scene_catalog_engine = std::make_unique<AudioEngineModel>();
     EngineControlWorkerV1 scene_catalog_worker(*owned_scene_catalog_engine);
     scene_catalog_worker.ensure_owned_scene_catalog();
-    CHECK(scene_catalog_worker.consume(decoded_catalog_command) == EngineControlResultV1::Applied);
+    const auto catalog_upsert_result =
+        scene_catalog_worker.consume(decoded_catalog_command);
+    CHECK(catalog_upsert_result == EngineControlResultV1::Applied);
     const auto* const stored_definition =
         scene_catalog_worker.mutable_scene_catalog()->find("quiet-game");
     CHECK(stored_definition != nullptr &&
           stored_definition->scene.name == "Quiet Game" &&
           stored_definition->scene.output_group == "custom-output" &&
+          stored_definition->scene.ir_reference == "studio-calibration-a" &&
           stored_definition->graph.lanes.size() == 1U &&
           stored_definition->graph.lanes[0].id == "quiet-game-lane");
 
