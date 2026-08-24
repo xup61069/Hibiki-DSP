@@ -4,8 +4,8 @@
   "title": "Route-rule store bounds aligned with wire and UI catalog",
   "date": "2026-08-24",
   "issue": 986,
-  "pr": null,
-  "source_commit": null,
+  "pr": 989,
+  "source_commit": "ae4a7c5b8e25f5b5a893d699e2ada0e53677f4d0",
   "scope": [
     "src/hub/include/hibiki/session_route_rules.hpp",
     "tests/unit/contract_tests.cpp"
