@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 766,
   "scope_digest": "installer-uninstall-v1",
-  "source_commit": "42076ca4fd378b951231e55dbcd5b0eb8a0dfca5",
+  "source_commit": "36d5bc8d8ddf7c810c2b2ad7fb09772375124a7e",
   "environment_fingerprint": "windows-local-pwsh-7.6.4",
   "commands": [
     "pwsh -NoProfile -File tools/installer-check.ps1 -SelfTest",

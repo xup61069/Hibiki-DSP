@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 398,
   "scope_digest": "vst3-supervisor-history-introspection",
-  "source_commit": "9acadafa920d6c75650bd0f7d2e1d02cd56bee33",
+  "source_commit": "0211e3d6609588762222ee0b25f1566adf4de239",
   "base_commit": "40b4a4a459e696e4eb5edbb4c7339be9c39f4556",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-10.0.26100-cmake-4.4.0-pwsh-7.6.4",
   "commands": [

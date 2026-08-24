@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 208,
   "scope_digest": "issue-208-archive-193-v1",
-  "source_commit": "c66ea9523e0c3b3a362f1569352347abac0adadc",
+  "source_commit": "80b3888a093c57b497dd363fb5c86b838c7ad340",
   "archive_commit": "f33f5784507e663d23f58ac134fc5fbead9ea495",
   "main_sync_commit": "1adf947a50f836ee6371050ff5db58a09485df0e",
   "counter_refresh_commit": "641adc2d7d6cf0b6c02e6d19ab322c46453282b4",
@@ -24,7 +24,7 @@
       "status": "pass",
       "coverage": [
         "Issue 193 is closed",
-        "PR 194 is merged at c66ea9523e0c3b3a362f1569352347abac0adadc",
+        "PR 194 is merged at 80b3888a093c57b497dd363fb5c86b838c7ad340",
         "SPEC-0005 is accepted",
         "target-machine checklist evidence is documentation-only and preserves non-claims"
       ],

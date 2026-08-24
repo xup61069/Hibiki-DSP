@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 304,
   "scope_digest": "issue-304-archive-268-v1",
-  "source_commit": "564de44a73060d80f8790c1848a06a50370e17eb",
+  "source_commit": "393df98132ca7e0fcbf7111947e2fb023c2d1d59",
   "base_commit": "adf8b491df471401ffe226d6be22aa32560d7106",
   "archived_issue": 268,
   "merged_pr": {

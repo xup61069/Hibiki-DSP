@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 263,
   "scope_digest": "handoff-detached-context-v1",
-  "source_commit": "7fb98d642f6c31dd0e82f430def6a4bbc682cd5a",
+  "source_commit": "9419179a2db8bd3ffe558702756087e9cd3e6e7b",
   "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-10.0.28000.2526-wdk-10.0.28000.2526-cmake-4.4.2-pwsh-7.6.4",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -SelfTest",

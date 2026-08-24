@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1027,
   "scope_digest": "scene-display-fields-printable-v1",
-  "source_commit": "65188772e55c7ae64d0a2023f08b5122515359b6",
+  "source_commit": "672fca572ae5137119d8dfd16e282a82ea50025b",
   "environment_fingerprint": "windows-amd64-pwsh-scene-display-fields-printable",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1027",

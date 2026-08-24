@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1021,
   "scope_digest": "peq-type-exact-lowercase-v1",
-  "source_commit": "901fe1ed9201ff1afd440c494a168ea05f89afe8",
+  "source_commit": "65188772e55c7ae64d0a2023f08b5122515359b6",
   "environment_fingerprint": "windows-amd64-pwsh-peq-type-exact-lowercase",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1021",

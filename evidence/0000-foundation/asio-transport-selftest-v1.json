@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 285,
   "scope_digest": "asio-transport-selftest-v1",
-  "source_commit": "0e26e60ee45b4cc2dc00c7b41708c895fd3621ae",
+  "source_commit": "be3df148f63a0d951ff10df92d4da7858b380082",
   "base_commit": "b89a284c8e6dad0bdb7a3768b6265b985e51c954",
   "environment_fingerprint": "windows-26200-amd64-vs2026-sdk-10.0.28000.2526-wdk-10.0.28000.2526-cmake-4.4.2-pwsh-7.6.5",
   "case_count": 12,

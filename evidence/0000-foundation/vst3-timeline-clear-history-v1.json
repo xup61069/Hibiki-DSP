@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 403,
   "scope_digest": "vst3-timeline-clear-history-v1",
-  "source_commit": "8029c11288f185945baec1349ca0ed0db419a3bd",
+  "source_commit": "37586c352d1104e25d4d357645ae2eb8dc3624cb",
   "environment_fingerprint": "windows-26200-amd64-msvc-19.51.36256-dotnet-10.0.400-pwsh-7.6.5-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526",
   "commands": [
     "pwsh -NoProfile -File tools/control-model-check.ps1",

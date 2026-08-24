@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 411,
   "scope_digest": "driver-stream-freshness-v1",
-  "source_commit": "2eb93eae5aaa631e0194fa023fff279c2509c39a",
+  "source_commit": "ff7f0c4c472a0e4c87a51049b67b0eee1feb0dcc",
   "environment_fingerprint": "windows-26200-amd64-msvc-19.51.36256-dotnet-10.0.400-pwsh-7.6.5-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526",
   "commands": [
     "pwsh -NoProfile -File tools/verify.ps1",

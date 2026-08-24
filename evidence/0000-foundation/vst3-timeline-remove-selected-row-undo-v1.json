@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 419,
   "scope_digest": "vst3-timeline-remove-selected-row-undo-v1",
-  "source_commit": "75d8107e40f07f29e6cbb82afef94a2255650af1",
+  "source_commit": "ddf1eed343c6e7b79ac6f4502d392e4eb71ca457",
   "environment_fingerprint": "windows-26200-amd64-dotnet-10.0.301-pwsh-7.6.4; target-24h2-wdk-missing",
   "commands": [
     "pwsh -File tools/control-model-check.ps1",

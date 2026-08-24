@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 195,
   "scope_digest": "driver-portcls-filter-tables-v1",
-  "source_commit": "8c9b9157b732dd407da520603fecb7572593c9db",
+  "source_commit": "a56843de2e4b5b1e0e6e82dc708f81cc77aa582c",
   "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -File tools/driver-source-check.ps1",

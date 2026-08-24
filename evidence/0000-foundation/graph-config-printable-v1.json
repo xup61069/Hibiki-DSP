@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1061,
   "scope_digest": "graph-config-printable-v1",
-  "source_commit": "697f02b0d0ecfae0e91a6298efa0f048db2d3b54",
+  "source_commit": "5257b249a4ac4a539b152432bf1e1e77d0f87225",
   "environment_fingerprint": "windows-amd64-pwsh-graph-config-printable",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1061",

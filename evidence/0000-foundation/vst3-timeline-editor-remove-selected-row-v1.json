@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 407,
   "scope_digest": "vst3-timeline-editor-remove-selected-row-v1",
-  "source_commit": "3a9d50afa6570bcd4372c75ee1ac5b86378ef2a7",
+  "source_commit": "b81c5a0c5c7e7d97c393240b1d47e3fd3c94e534",
   "environment_fingerprint": "windows-26200-amd64-dotnet-10.0.301-pwsh-7.6.4; target-24h2-wdk-missing",
   "commands": [
     "pwsh -File tools/control-model-check.ps1",

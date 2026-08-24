@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1037,
   "scope_digest": "route-rule-store-bounds-v1",
-  "source_commit": "44785f48e2a4b0f8d1c9d3b6a7c5e0f2a9d8c7b6",
+  "source_commit": "d4727c877c2b00013dea21eef15650f6ed6d8dcc",
   "environment_fingerprint": "windows-amd64-pwsh-route-rule-store-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1037",

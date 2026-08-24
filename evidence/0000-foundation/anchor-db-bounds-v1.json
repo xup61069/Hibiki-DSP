@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 961,
   "scope_digest": "anchor-db-bounds-v1",
-  "source_commit": "acf5f3182028f00594a6067050b72f3ef6dccbfd",
+  "source_commit": "c41265c599efe719ea4fa6de716c45d1e1eb594c",
   "environment_fingerprint": "windows-amd64-pwsh-anchor-db-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 961",

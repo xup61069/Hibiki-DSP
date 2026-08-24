@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1015,
   "scope_digest": "calibration-device-id-byte-bound-v1",
-  "source_commit": "192fd6035965442ef797bc68fa9d216988ab948d",
+  "source_commit": "aa16dd06c5f17884035864c4cc66f3b0d7166e5c",
   "environment_fingerprint": "windows-amd64-pwsh-calibration-device-id-byte-bound",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1015",

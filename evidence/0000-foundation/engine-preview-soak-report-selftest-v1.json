@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 799,
   "scope_digest": "engine-preview-soak-report-selftest-v1",
-  "source_commit": "cfa5a9a70206a3f41632f1e32e5993fc2b81f5c6",
+  "source_commit": "1da6761bc95a1548c699d829cecba32983a21add",
   "environment_fingerprint": "windows-local-pwsh7-git-origin-main-cfa5a9a7",
   "commands": [
     "pwsh -NoProfile -File tools/engine-preview-soak.ps1 -SelfTest",

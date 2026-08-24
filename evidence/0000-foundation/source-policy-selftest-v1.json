@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 232,
   "scope_digest": "source-policy-selftest-v1",
-  "source_commit": "bf9e38b17be01f124e4ec0f490784211bff7e755",
+  "source_commit": "399a67b223a8dd4c82ed6c42f0ba4b1f7293836d",
   "environment_fingerprint": "windows-26200-amd64-vs17-sdk-26100-dotnet10-winapp-runtime-1.7.7000.785; target-24h2-vs2026-wdk-missing",
   "commands": [
     "pwsh -NoProfile -File tools/source-policy.ps1 -SelfTest",

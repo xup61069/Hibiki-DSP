@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1001,
   "scope_digest": "scene-name-byte-bounds-v1",
-  "source_commit": "c1a4b0fd3499cca8fc4dc6cf92af86246bd1ca4a",
+  "source_commit": "c41265c599efe719ea4fa6de716c45d1e1eb594c",
   "environment_fingerprint": "windows-amd64-pwsh-scene-name-byte-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1001",

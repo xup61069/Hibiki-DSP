@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 358,
   "scope_digest": "run-preview-formal-winui-v1",
-  "source_commit": "915a77d08631177c40c9d83ac01260c13d9c9c4d",
+  "source_commit": "a56843de2e4b5b1e0e6e82dc708f81cc77aa582c",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9-sdk-wdk-qfe-10.1.28000.2526-winapp-runtime-1.7-pwsh-7.6.5",
   "change_summary": [
     "tools/run-preview.ps1 accepts -Ui FormalWinUI: selects .local/preview/WinUI/Hibiki.WinUI.exe (the formal MSBuild/XAML shell from build-preview.ps1 -Target WinUI), requires Windows App Runtime 1.7 x64 exactly like WinUICompat (fail-closed with an actionable message otherwise), builds via -Target WinUI when missing or with -Build, and flows through the existing -SmokeTest and engine-flag paths.",

@@ -3,8 +3,8 @@
   "issue": 225,
   "title": "archive merged Issue 184 handoff",
   "type": "documentation-archive",
-  "source_commit": "1345618edb43faa47cf00f20e09f6a1ace311b67",
-  "merge_commit": "1345618edb43faa47cf00f20e09f6a1ace311b67",
+  "source_commit": "a1892c09e1294e763655100ed6ede64a3a25c6e2",
+  "merge_commit": "a1892c09e1294e763655100ed6ede64a3a25c6e2",
   "archived_handoff": "docs/tasks/completed/2026/184.md",
   "acceptance": [
     "Issue #184 handoff moved to completed/2026/184.md",

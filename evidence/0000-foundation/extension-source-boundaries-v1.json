@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 383,
   "scope_digest": "extension-source-boundaries-v1",
-  "source_commit": "15bf1c5536f0c19c9286bbbcb92457d30a5c1d4e",
+  "source_commit": "03138f15ffb25bccdf7e626da39d61c4d032c532",
   "base_commit": "196a404d76f56a5b76e99a6a58c6fa222ef3de47",
   "environment_fingerprint": "windows-26200-amd64-vs2026-18.9.12112.369-sdk-qfe-10.1.28000.2526-wdk-qfe-10.1.28000.2526-cmake-4.4.2-pwsh-7.6.4",
   "target": "tools/extension-check.ps1",
