@@ -1,5 +1,7 @@
 #include "hibiki/audio_session_registry.hpp"
 
+#include "hibiki/control_payloads.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -23,11 +25,18 @@ bool AudioSessionRegistry::same_identity(const AudioSessionIdentityV1& left,
 bool AudioSessionRegistry::valid(const AudioSessionDescriptorV1& descriptor) noexcept {
     return descriptor.schema_version == 1 && !descriptor.identity.endpoint_id.empty() &&
            descriptor.identity.endpoint_id.size() <= kMaxIdentityLength &&
+           is_printable_utf8_v1(descriptor.identity.endpoint_id) &&
            !descriptor.identity.session_instance_id.empty() &&
            descriptor.identity.session_instance_id.size() <= kMaxIdentityLength &&
+           is_printable_utf8_v1(descriptor.identity.session_instance_id) &&
            descriptor.display_name.size() <= kMaxLabelLength &&
-           descriptor.app_id.size() <= kMaxLabelLength && descriptor.lane_id.size() <= kMaxLabelLength &&
+           is_printable_utf8_v1(descriptor.display_name) &&
+           descriptor.app_id.size() <= kMaxLabelLength &&
+           is_printable_utf8_v1(descriptor.app_id) &&
+           descriptor.lane_id.size() <= kMaxLabelLength &&
+           is_printable_utf8_v1(descriptor.lane_id) &&
            descriptor.output_group.size() <= kMaxOutputGroupLength &&
+           is_printable_utf8_v1(descriptor.output_group) &&
            std::isfinite(descriptor.makeup_gain_db) && descriptor.makeup_gain_db >= -144.0 &&
            descriptor.makeup_gain_db <= 12.0;
 }
