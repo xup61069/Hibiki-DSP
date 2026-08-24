@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "issue": 1167,
+  "scope_digest": "schema-strict-end-extension-v1",
+  "source_commit": "ced31fcd9552b44d3d38d496eb7cb2b29eceeae3",
+  "environment_fingerprint": "windows-amd64-pwsh-7.6.4-schema-instance-validation",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1163",
+    "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "git diff --check",
+    "pwsh -NoProfile -File tools/verify.ps1"
+  ],
+  "results": [
+    {"command": "handoff-check", "status": "pass"},
+    {"command": "docs-check -SelfTest", "status": "pass"},
+    {"command": "docs-check", "status": "pass"},
+    {"command": "source-policy", "status": "pass"},
+    {"command": "git diff --check", "status": "pass"},
+    {"command": "verify", "status": "pass", "detail": "3/3 CTest targets passed"}
+  ],
+  "limitations": [
+    "This provenance record was added after PR #1167; it documents that already-completed verification and adds no new runtime execution.",
+    "The validator result is from PowerShell 7.6.4; it confirms repository gates and JsonSchema.Net behavior in this environment, not every third-party JSON Schema implementation.",
+    "Runtime code and DSP behavior are unchanged; no live audio, driver loading, WaveRT, HLK, signing, or release acceptance is implied.",
+    "source_commit records the #1167 squash merge hash directly."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "7.6.4",
+    "git": "2.49.0.windows.1"
+  },
+  "started_at": "2026-08-24T15:30:00+08:00",
+  "finished_at": "2026-08-24T15:50:13+08:00"
+}
