@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "issue": 1014,
+  "scope_digest": "scene-binding-scene-id-bounds-v1",
+  "source_commit": "1ae62964",
+  "environment_fingerprint": "windows-amd64-pwsh-scene-binding-id",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1014",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass",
+      "log": ".local/verify-1014.log"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "scene-vst3-state-binding-v1 scene_id tightened from maxLength 64 to 31, matching kMaxSceneIdBytesV1 and SPEC-0001.",
+    "state_id remains at 64 (VST3-internal namespace)."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
