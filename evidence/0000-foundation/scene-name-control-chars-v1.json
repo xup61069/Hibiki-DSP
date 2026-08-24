@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1010,
   "scope_digest": "scene-name-control-chars-v1",
-  "source_commit": "8b2ecd5c",
+  "source_commit": "8b2ecd5cfb1e0a78d58ae6feca9ab00c032d0ad1",
   "environment_fingerprint": "windows-amd64-pwsh-scene-name-control-chars",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1010",

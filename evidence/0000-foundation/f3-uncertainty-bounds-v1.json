@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 970,
   "scope_digest": "f3-uncertainty-bounds-v1",
-  "source_commit": "61cf2f3f",
+  "source_commit": "61cf2f3fa61a4f9555fe3f94cafbe3f4e464905e",
   "environment_fingerprint": "windows-local-pwsh-f3-uncertainty-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 970",

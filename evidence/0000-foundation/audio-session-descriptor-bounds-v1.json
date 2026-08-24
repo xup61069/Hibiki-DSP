@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 947,
   "scope_digest": "audio-session-descriptor-bounds-v1",
-  "source_commit": "6529040a",
+  "source_commit": "6529040ab25a0a6c4830b03334c598927c31476f",
   "environment_fingerprint": "windows-amd64-pwsh-schema-bound",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 947",

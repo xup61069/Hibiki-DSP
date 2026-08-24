@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 957,
   "scope_digest": "calibration-response-db-bounds-v1",
-  "source_commit": "71373222",
+  "source_commit": "713732227f9ef4c8060e09dd43c396de53f74679",
   "environment_fingerprint": "windows-local-pwsh-calibration-response-db-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 957",
