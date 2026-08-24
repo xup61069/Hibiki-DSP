@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "issue": 1137,
+  "scope_digest": "release-manifest-printable-v1",
+  "source_commit": "2eb8bcf2f11f63cdb56fa2785b0422b1f453a7b6",
+  "environment_fingerprint": "windows-amd64-pwsh-release-manifest-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1137",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/installer-check.ps1 -SelfTest",
+    "pwsh -NoProfile -File tools/installer-check.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "installer-check",
+      "status": "pass"
+    },
+    {
+      "command": "installer-check -SelfTest",
+      "status": "pass (35 cases)"
+    },
+    {
+      "command": "verify",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    "ReleaseManifest v1 schema and installer runtime now reject C0/C1 control characters and DEL in product_version, distribution_id, unsigned_files paths, RFC3161 timestamps and test labels while preserving existing length bounds.",
+    "Installer self-test covers one rejection case for each printable-only manifest field offline; no real package staging or uninstall is performed.",
+    "source_commit is pinned to the main head at authoring time; post-merge squash-hash repair follows the established follow-up convention.",
+    "Schema/tooling/installer evidence only; no physical audio, driver loading, WaveRT, HLK, signing, real installer apply, uninstall, or release acceptance."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
