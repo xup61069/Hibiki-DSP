@@ -279,9 +279,15 @@ function Get-BodyBlock {
     [Parameter(Mandatory)] [string]$Body,
     [Parameter(Mandatory)] [string]$Path
   )
-  if (-not $Body.Contains('<!-- hibiki:handoff-v1')) { throw "Issue body is missing the hibiki:handoff-v1 block: $Path" }
-  $match = [regex]::Match($Body, '(?s)<!-- hibiki:handoff-v1\s*(?<body>.*?)\s*-->')
-  if (-not $match.Success -or [string]::IsNullOrWhiteSpace($match.Groups['body'].Value)) {
+  # Only a line-start marker opens a handoff block. Prose, quotes or code that
+  # merely mention the marker text must not create a false block boundary
+  # (#1289); otherwise audit parses documentation as front matter and fails.
+  $normalizedBody = $Body -replace "\r\n", "`n"
+  $match = [regex]::Match($normalizedBody, '(?ms)^[ \t]*<!-- hibiki:handoff-v1[ \t]*\n(?<body>.*?)\n[ \t]*-->[ \t]*$')
+  if (-not $match.Success) {
+    throw "Issue body is missing the hibiki:handoff-v1 block: $Path"
+  }
+  if ([string]::IsNullOrWhiteSpace($match.Groups['body'].Value)) {
     throw "Issue body hibiki:handoff-v1 block is empty or unterminated: $Path"
   }
   return ("---`n" + $match.Groups['body'].Value + "`n---")
@@ -294,7 +300,7 @@ function Get-TbdHandoffFields {
   # Issue bodies can arrive as CRLF. Normalize before line-anchored matching;
   # otherwise the end anchor sees CR before LF and cannot match line ends.
   $normalizedBody = $Body -replace "\r\n", "`n"
-  $match = [regex]::Match($normalizedBody, '(?s)<!-- hibiki:handoff-v1\s*(?<body>.*?)\s*-->')
+  $match = [regex]::Match($normalizedBody, '(?ms)^[ \t]*<!-- hibiki:handoff-v1[ \t]*\n(?<body>.*?)\n[ \t]*-->[ \t]*$')
   if (-not $match.Success) { return @() }
   $fields = [System.Collections.Generic.List[string]]::new()
   foreach ($key in @('issue', 'branch')) {
@@ -317,7 +323,7 @@ function Get-HandoffScalar {
   )
   # Keep admission and audit parsing identical for CRLF issue bodies.
   $normalizedBody = $Body -replace "\r\n", "`n"
-  $match = [regex]::Match($normalizedBody, '(?s)<!-- hibiki:handoff-v1\s*(?<body>.*?)\s*-->')
+  $match = [regex]::Match($normalizedBody, '(?ms)^[ \t]*<!-- hibiki:handoff-v1[ \t]*\n(?<body>.*?)\n[ \t]*-->[ \t]*$')
   if (-not $match.Success) { throw "Missing hibiki:handoff-v1 block while reading '$Key'." }
   $line = [regex]::Match($match.Groups['body'].Value, "(?im)^\s*$([regex]::Escape($Key))\s*:\s*(?<value>[^\r\n]+)$")
   if (-not $line.Success) { throw "Handoff block is missing required key '$Key'." }
@@ -655,6 +661,13 @@ if ($SelfTest) {
   $crlfMockBody = $mock.body.Replace([string][char]10, [string][char]13 + [string][char]10)
   if ((Get-HandoffScalar -Body $crlfMockBody -Key 'branch') -ne 'codex/99-selftest') {
     throw 'handoff-check self-test failed: CRLF admission scalar parser.'
+  }
+  $caseCount++
+  # Prose that merely mentions the marker text must not create a false block
+  # boundary; the real block at line start still wins (#1289).
+  $proseMentionBody = "# Objective`n`nThe body quotes the handoff opening marker inline: <!-- hibiki:handoff-v1 --> inside a sentence.`n`n" + ($mock.body -replace '^', '')
+  if ((Get-HandoffScalar -Body $proseMentionBody -Key 'branch') -ne 'codex/99-selftest') {
+    throw 'handoff-check self-test failed: prose marker mention must not hijack block parsing.'
   }
   $caseCount++
   if ((Get-AdmissionIssueNumber -Body $mock.body -Key 'issue') -ne 99) {
