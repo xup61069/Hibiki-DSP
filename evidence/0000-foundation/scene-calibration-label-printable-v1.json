@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "issue": 1090,
+  "scope_digest": "scene-calibration-label-printable-v1",
+  "source_commit": "225920ad9cb094851a789e368a929d16ae25c58e",
+  "environment_fingerprint": "windows-amd64-pwsh-scene-calibration-label-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1090",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [],
+  "limitations": [
+    "Schema and runtime validators now reject C0/C1 control characters and DEL in ir_reference, lane ids, timeline ids, and microphone_calibration_id; wire-path SceneApply behavior unchanged.",
+    "source_commit is pinned to the main head at authoring time; final squash-hash repair follows the post-merge convention used by prior printable-label rounds.",
+    "Source/contract/tooling evidence only; no physical audio, driver, HLK, signing, or release acceptance."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
