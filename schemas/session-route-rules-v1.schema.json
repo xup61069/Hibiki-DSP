@@ -20,10 +20,10 @@
           "enabled": { "type": "boolean" },
           "gain_owner": { "enum": [0, 1] },
           "makeup_gain_db": { "type": "number", "minimum": -144, "maximum": 12 },
-          "app_id": { "type": "string", "maxLength": 128, "pattern": "^(?![\\s\\S]*[\u0000-\u001F\u007F-\u009F])" },
-          "display_name": { "type": "string", "maxLength": 128, "pattern": "^(?![\\s\\S]*[\u0000-\u001F\u007F-\u009F])" },
-          "lane_id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^(?![\\s\\S]*[\u0000-\u001F\u007F-\u009F])" },
-          "output_group": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^(?![\\s\\S]*[\u0000-\u001F\u007F-\u009F])" }
+          "app_id": { "type": "string", "maxLength": 128, "$ref": "printable-string-v1.schema.json#/$defs/printableString" },
+          "display_name": { "type": "string", "maxLength": 128, "$ref": "printable-string-v1.schema.json#/$defs/printableString" },
+          "lane_id": { "type": "string", "minLength": 1, "maxLength": 64, "$ref": "printable-string-v1.schema.json#/$defs/printableString" },
+          "output_group": { "type": "string", "minLength": 1, "maxLength": 64, "$ref": "printable-string-v1.schema.json#/$defs/printableString" }
         },
         "anyOf": [
             {
