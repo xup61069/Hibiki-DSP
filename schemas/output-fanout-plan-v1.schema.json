@@ -16,7 +16,8 @@
         "type": "object", "additionalProperties": false,
         "required": ["sink_id", "channels", "enabled"],
         "properties": {
-          "sink_id": {"type": "string", "minLength": 1, "maxLength": 64},
+          "sink_id": {"type": "string", "minLength": 1, "maxLength": 64,
+                      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]*$"},
           "channels": {"enum": [2, 6, 8]},
           "enabled": {"type": "boolean"}
         }

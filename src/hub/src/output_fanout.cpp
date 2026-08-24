@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 #include <new>
+#include <string_view>
 #include <utility>
 
 namespace hibiki {
@@ -11,6 +12,12 @@ namespace {
 
 bool valid_channels(const std::uint32_t channels) noexcept {
     return channels == 2U || channels == 6U || channels == 8U;
+}
+
+bool is_printable_sink_id(std::string_view value) noexcept {
+    return std::all_of(value.begin(), value.end(), [](unsigned char ch) {
+        return ch >= 0x20U && ch != 0x7FU && !(ch >= 0x80U && ch <= 0x9FU);
+    });
 }
 
 }  // namespace
@@ -28,8 +35,8 @@ bool validate_output_fanout_plan_v1(const OutputFanoutPlanV1& plan) noexcept {
             sink.channels != plan.output_channels) {
             return false;
         }
-        if (std::any_of(sink.sink_id.begin(), sink.sink_id.begin() + sink.id_bytes,
-                        [](const char value) { return value == '\0'; })) {
+        if (!is_printable_sink_id(
+                std::string_view(sink.sink_id.data(), sink.id_bytes))) {
             return false;
         }
         for (std::size_t prior = 0U; prior < index; ++prior) {
@@ -59,8 +66,10 @@ bool prepare_output_fanout_plan_v1(
     candidate.sink_count = static_cast<std::uint32_t>(configs.size());
     for (std::size_t index = 0U; index < configs.size(); ++index) {
         const auto& source = configs[index];
-        if (source.sink_id.empty() || source.sink_id.size() > kOutputFanoutMaxIdBytesV1 ||
-            source.sink_id.find('\0') != std::string::npos || source.channels != output_channels) {
+        if (source.sink_id.empty() ||
+            source.sink_id.size() > kOutputFanoutMaxIdBytesV1 ||
+            !is_printable_sink_id(source.sink_id) ||
+            source.channels != output_channels) {
             return false;
         }
         auto& target = candidate.sinks[index];

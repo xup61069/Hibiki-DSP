@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "issue": 1082,
+  "scope_digest": "fanout-sink-id-printable-v1",
+  "source_commit": "99758f6f437c07c4f5392dc836aa14cd6abd907a",
+  "environment_fingerprint": "windows-amd64-pwsh-fanout-sink-id-printable",
+  "commands": [
+    "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1082",
+    "pwsh -NoProfile -File tools/docs-check.ps1",
+    "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
+    "git diff --check"
+  ],
+  "results": [],
+  "limitations": [
+    "OutputFanoutPlanV1 sink_id schema and runtime now reject C0/C1 control characters consistently.",
+    "Contract tests cover printable boundaries, control rejection and oversized/empty sink ID rejection.",
+    "Schema/runtime validation only; no live audio delivery, driver, HLK or signing evidence is implied."
+  ],
+  "logs": {},
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
+}
+

@@ -991,6 +991,26 @@ int main() {
     const std::array<OutputFanoutSinkConfigV1, 1> disabled_sinks{{
         {"disabled", 2U, false}}};
     CHECK(!prepare_output_fanout_plan_v1(disabled_sinks, 2U, 9U, fanout_plan));
+    // Issue #1082: fan-out sink IDs reject C0/C1 control characters.
+    OutputFanoutPlanV1 printable_test_plan{};
+    const std::array<char, 7> fanout_control_bytes{{'\t', '\n', '\r', '\0', '\x7F',
+                                                     static_cast<char>(0x80), static_cast<char>(0x9F)}};
+    for (const auto invalid : fanout_control_bytes) {
+        std::string bad_id = "sink";
+        bad_id[1] = invalid;
+        const std::array<OutputFanoutSinkConfigV1, 1> bad_sink{{{bad_id, 2U, true}}};
+        CHECK(!prepare_output_fanout_plan_v1(bad_sink, 2U, 10U, printable_test_plan));
+    }
+    {
+        const std::string long_id(64, 'a');
+        const std::array<OutputFanoutSinkConfigV1, 1> long_sink{{{long_id, 2U, true}}};
+        CHECK(prepare_output_fanout_plan_v1(long_sink, 2U, 11U, printable_test_plan) &&
+              validate_output_fanout_plan_v1(printable_test_plan));
+    }
+    {
+        const std::array<OutputFanoutSinkConfigV1, 1> empty_sink{{{"", 2U, true}}};
+        CHECK(!prepare_output_fanout_plan_v1(empty_sink, 2U, 12U, printable_test_plan));
+    }
     OutputFanoutRuntimeV1 fanout_runtime;
     CHECK(fanout_runtime.prepare(fanout_plan, 1.0));
     std::array<float, 16> runtime_a{};
@@ -2042,6 +2062,7 @@ int main() {
         between_config.pipe_name = between_pipe;
         between_config.max_frame_bytes = 1024U;
         between_config.io_timeout_ms = 1000U;
+        between_config.require_first_pipe_instance = true;
         CHECK(between_stop_server.start(between_config, acknowledge_ipc_request, nullptr));
 
         HANDLE between_client = INVALID_HANDLE_VALUE;
@@ -4912,3 +4933,4 @@ int main() {
 }
 
 #undef CHECK
+
