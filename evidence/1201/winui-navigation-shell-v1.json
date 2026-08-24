@@ -1,0 +1,46 @@
+{
+  "evidence_format": 2,
+  "issue": 1201,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "apps/winui-shell/MainWindow.xaml",
+      "apps/winui-shell/MainWindow.xaml.cs"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "9641e9bfcc2854c4c43b403d3de8cf64dd4c53b0591411e54e1b57dc098a00d1"
+  },
+  "metadata": {
+    "scope": "winui-navigation-shell-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-windows-app-sdk-1.7.250401001",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1201",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "git diff --check",
+      "pwsh -NoProfile -File tools/control-model-check.ps1",
+      "pwsh -NoProfile -File tools/winui-shell-check.ps1",
+      "pwsh -NoProfile -File tools/build-preview.ps1 -Target WinUI",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -SelfTest"
+    ],
+    "results": [
+      {"command":"handoff-check","status":"pass","detail":"Scoped handoff passed for Issue 1201 navigation shell rebuild."},
+      {"command":"docs-check","status":"pass","detail":"88 required paths, 24 specs, 715 tracked paths, 354 repository JSON files."},
+      {"command":"source-policy","status":"pass","detail":"Source-only policy passed for 715 tracked paths."},
+      {"command":"git diff --check","status":"pass","detail":"Whitespace check clean after trailing-whitespace fix."},
+      {"command":"control-model-check","status":"pass","detail":"Control model checks passed."},
+      {"command":"winui-shell-check","status":"pass","detail":"WinUI 55, Compatibility Preview 50, DesktopCompat 44 controls; all required bindings and accessibility names preserved."},
+      {"command":"build-preview -Target WinUI","status":"pass","detail":"Formal Visual Studio MSBuild build succeeded with 0 warnings and 0 errors; MainWindow.xbf produced."},
+      {"command":"evidence-audit -SelfTest","status":"pass","detail":"48 cases pass."}
+    ],
+    "limitations": [
+      "Local formal WinUI compile is unsigned preview evidence only.",
+      "Physical-device touch, keyboard, screen-reader and live audio navigation acceptance remains unverified.",
+      "Expert Panel page is gated by IsExpert toggle; Easy mode shows a hint instead of expert content.",
+      "Route Health page combines route health summary, App session list and App route presets from the previous Expert expander."
+    ],
+    "tool_versions":{"powershell":"7.6.4","git":"2.49.0.windows.1","windows-app-sdk":"1.7.250401001"},
+    "started_at":"2026-08-24T20:10:00+08:00",
+    "finished_at":"2026-08-24T20:45:00+08:00"
+  }
+}
