@@ -234,7 +234,9 @@ foreach ($requiredText in @('x:Name="RootGrid"', 'ItemsSource="{Binding Scenes}"
     'OnVst3ClearHistoryClick',
     'OnVst3SaveBaselineClick',
     'AutomationProperties.Name="清除時間軸編輯歷史"',
-    'AutomationProperties.Name="保存時間軸基準"')) {
+    'AutomationProperties.Name="保存時間軸基準"',
+    'OnRefreshSessionCatalogClick',
+    'AutomationProperties.Name="刷新 App 工作階段清單"')) {
   if (-not $xaml.Contains($requiredText)) { throw "WinUI shell binding missing: $requiredText" }
 }
 if (-not $codeBehind.Contains('RootGrid.DataContext = ViewModel') -or

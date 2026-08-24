@@ -697,6 +697,9 @@ Check(!await noEngine.OneTapEnhanceAsync(),
 Check(!await noEngine.RefreshPhysicalDevicesAsync() &&
       noEngine.StatusText.Contains("未連線"),
     "Disconnected device catalog refresh must fail closed.");
+Check(!await noEngine.RefreshSessionCatalogAsync() &&
+      noEngine.StatusText.Contains("未連線"),
+    "Disconnected session catalog refresh must fail closed.");
 Check(!await noEngine.QueueVolumeAsync(TimeSpan.FromMilliseconds(1)),
     "Disconnected volume debounce must fail closed.");
 var invalidDebounceRejected = false;
