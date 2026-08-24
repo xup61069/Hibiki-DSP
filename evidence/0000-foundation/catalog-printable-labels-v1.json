@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1095,
   "scope_digest": "catalog-printable-labels-v1",
-  "source_commit": "5b896f6a4a89ef1adb983138406a3cbddab7ffec",
+  "source_commit": "7a3e1e2af0977c34928fda18fcbefb65c8f22aba",
   "environment_fingerprint": "windows-amd64-pwsh-catalog-printable-labels",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1095",

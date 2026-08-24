@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1094,
   "scope_digest": "route-lane-output-printable-v1",
-  "source_commit": "5b896f6a4a89ef1adb983138406a3cbddab7ffec",
+  "source_commit": "189960204bae8c97f8effd08c0de52beede0871f",
   "environment_fingerprint": "windows-amd64-pwsh-session-route-schema-printable",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1094",
