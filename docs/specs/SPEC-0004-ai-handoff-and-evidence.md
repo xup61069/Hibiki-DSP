@@ -38,6 +38,19 @@ assignee、lifecycle label 或 linked PR。正式 claim 必須原子式補齊實
 write scope，指定唯一且與 `owner` 相同的 assignee，再加入 `claimed`。AI Issue form 不得在仍含 placeholder
 的 Issue 上自動加 `claimed`。
 
+## Claim admission serialization
+
+`claim-pending` 是非授權的 admission 標記：它表示一個 writer session 已通過初步驗證但尚未取得寫入權。
+`claim-pending` 加 assignee 或加 claimed/in-review/done 均 fail closed；TBD handoff 加任何 lifecycle
+label（含 `claim-pending`）也 fail closed。
+
+正式 claim admission 由 `.github/workflows/claim-admission.yml` 提供全 repo 單一 concurrency 的
+序列化 workflow：請求 session 提供 UUID、fresh-read 全部 open Issues、驗證 normalized exact title、
+case-insensitive branch、scope overlap（exact/父子/wildcard/case variant），再以 Git refs API 原子
+保留工作 branch；完成全域 audit/readback 後才把 `claim-pending` 轉成 `claimed` 並綁定 session identity。
+失敗/cancel/readback mismatch 不得留下有效 `claimed` 狀態。第一個 WIP push 必須匹配該 session；
+遠端 branch lease 不符即停止。API 列表必須完整分頁或在明確 cap fail closed。
+
 handoff block 必須宣告 `branch`、`target_branch`、`base_commit`、`owner`、`scope_globs`、
 `shared_paths`、`depends_on` 與 `resume_commands`。Lifecycle 由 labels 表達：`claimed` 表示進行中，
 `in-review` 表示待審；Issue 關閉即代表 done。`scope_globs` 是獨占預告 write-set；scope 重疊、public contract 語意重疊或共享整合

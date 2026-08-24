@@ -196,19 +196,20 @@ function Assert-LifecycleLabel {
     [Parameter(Mandatory)] [string]$State,
     [Parameter(Mandatory)] [string]$Path
   )
-  $lifecycleLabels = @($Labels | Where-Object { $_ -in @('claimed', 'in-review', 'done') })
+  $lifecycleLabels = @($Labels | Where-Object { $_ -in @('claim-pending', 'claimed', 'in-review', 'done') })
   if ($lifecycleLabels.Count -ne 1) {
     throw "Issue #$IssueNumber must have exactly one of claimed/in-review/done, got: $($lifecycleLabels -join ', ') ($Path)"
   }
   if ($lifecycleLabels[0] -eq 'done') {
     throw "Issue #$IssueNumber has done label but is still $State; close it instead ($Path)"
   }
+  return $lifecycleLabels[0]
 }
 
 function Test-IssueRequiresHandoff {
   param([Parameter(Mandatory)] $IssueData)
   $labelNames = @($IssueData.labels | ForEach-Object { $_.name })
-  $hasLifecycle = @($labelNames | Where-Object { $_ -in @('claimed', 'in-review', 'done') }).Count -gt 0
+  $hasLifecycle = @($labelNames | Where-Object { $_ -in @('claim-pending', 'claimed', 'in-review', 'done') }).Count -gt 0
   $hasAssignee = @($IssueData.assignees).Count -gt 0
   return $hasLifecycle -or $hasAssignee
 }
@@ -470,16 +471,30 @@ if ($SelfTest) {
   }
   $caseCount++
 
+  # claim-pending with claimed must fail closed (two lifecycle labels)
+  Assert-Throws {
+    Assert-LifecycleLabel -Labels @('claim-pending', 'claimed') -IssueNumber 99 -State 'OPEN' -Path 'selftest/pending-plus-claimed'
+  } 'claim-pending plus claimed'
+
+  # claim-pending alone is a valid single lifecycle label (non-authoritative marker)
+  $pendingResult = Assert-LifecycleLabel -Labels @('claim-pending') -IssueNumber 99 -State 'OPEN' -Path 'selftest/pending-only'
+  if ($pendingResult -ne 'claim-pending') { throw "handoff-check self-test failed: pending-only returned '$pendingResult'." }
+  $caseCount++
+
   if ($caseCount -lt 5) { throw "handoff-check self-test failed: expected at least 5 passing cases, saw $caseCount." }
   Write-Output "handoff-check self-test passed (issue-block parsing, TBD draft skip, state/labels, owner mismatch, glob overlap, safe paths and arrays)."
   exit 0
 }
 # Main path: enumerate open issues and validate their hibiki:handoff-v1 blocks.
-$ghArgs = @('issue', 'list', '--state', 'open', '--limit', '200',
+$maxOpenIssues = 500
+$ghArgs = @('issue', 'list', '--state', 'open', '--limit', "$maxOpenIssues",
   '--json', 'number,state,title,body,labels,assignees')
 $issuesJson = & gh @ghArgs 2>&1
 if ($LASTEXITCODE -ne 0) { throw "gh issue list failed: $issuesJson" }
 $issues = $issuesJson | ConvertFrom-Json
+if (@($issues).Count -ge $maxOpenIssues) {
+  throw "Open Issue count reached cap $maxOpenIssues; raise the explicit limit rather than silently truncating."
+}
 
 $withHandoff = @($issues | Where-Object { $_.body -match 'hibiki:handoff-v1' })
 $withoutRequiredHandoff = @($issues | Where-Object {
@@ -511,6 +526,11 @@ foreach ($issueData in $withHandoff) {
 
   $tbdFields = @(Get-TbdHandoffFields -Body $issueData.body)
   if ($tbdFields.Count -gt 0) {
+    $labelNamesForSkip = @($issueData.labels | ForEach-Object { $_.name })
+    $hasLifecycleLabel = @($labelNamesForSkip | Where-Object { $_ -in @('claim-pending', 'claimed', 'in-review') }).Count -gt 0
+    if ($hasLifecycleLabel) {
+      throw "Issue #$issueNumber has lifecycle label but still contains TBD in handoff block; fail closed. ($path)"
+    }
     [void]$skippedTbdDrafts.Add("$path ($($tbdFields -join ', '))")
     continue
   }
@@ -534,6 +554,13 @@ foreach ($issueData in $withHandoff) {
     -IssueNumber $issueNumber -Path $path
   $labels = @($issueData.labels | ForEach-Object { $_.name })
   Assert-LifecycleLabel -Labels $labels -IssueNumber $issueNumber -State $issueData.state -Path $path
+  $hasPendingLabel = $labels -contains 'claim-pending'
+  if ($hasPendingLabel) {
+    $assigneeLogins = @($issueData.assignees | ForEach-Object { $_.login })
+    if ($assigneeLogins.Count -gt 0) {
+      throw "Issue #$issueNumber has claim-pending label but already has assignee(s): $($assigneeLogins -join ', ') ($path)"
+    }
+  }
   $ownerField = Get-Scalar $frontMatter 'owner' $path
   $assigneeLogins = @($issueData.assignees | ForEach-Object { $_.login })
   Assert-OwnerAssignment -Owner $ownerField -AssigneeLogins $assigneeLogins -IssueNumber $issueNumber -Path $path
