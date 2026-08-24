@@ -17,6 +17,20 @@ endif()
 
 add_test(NAME hibiki_contract_tests COMMAND hibiki_contract_tests)
 
+add_executable(hibiki_driver_stream_tests
+  unit/driver_stream_transport_tests.cpp
+)
+
+target_link_libraries(hibiki_driver_stream_tests PRIVATE hibiki_sdk)
+
+if(MSVC)
+  target_compile_options(hibiki_driver_stream_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_driver_stream_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_driver_stream_tests COMMAND hibiki_driver_stream_tests)
+
 if(HIBIKI_BUILD_LIVE_PROBES AND WIN32)
   add_executable(hibiki_live_device_catalog_probe
     live_device_catalog_probe.cpp

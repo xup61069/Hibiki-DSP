@@ -1,0 +1,83 @@
+{
+  "evidence_format": 2,
+  "issue": 1210,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "tests/CMakeLists.txt",
+      "tests/unit/driver_stream_transport_tests.cpp"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "9e55d1df5ad114b891037fa317eba9cd56f09bff9c47734c01a13704e154d88c"
+  },
+  "metadata": {
+    "scope": "driver-stream-abi-tests-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-cmake-msvc",
+    "commands": [
+      "cmake --preset windows-dev",
+      "cmake --build .local/build --config RelWithDebInfo --target hibiki_driver_stream_tests",
+      "ctest --test-dir .local/build -C RelWithDebInfo -R hibiki_driver_stream_tests --output-on-failure",
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1210",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "git diff --check",
+      "pwsh -NoProfile -File tools/verify.ps1"
+    ],
+    "results": [
+      {
+        "command": "cmake configure",
+        "status": "pass",
+        "detail": "Visual Studio 18 2026 generator; Windows SDK 10.0.28000.0."
+      },
+      {
+        "command": "cmake build target",
+        "status": "pass",
+        "detail": "hibiki_driver_stream_tests.exe linked against hibiki_sdk static library."
+      },
+      {
+        "command": "ctest focused",
+        "status": "pass",
+        "detail": "hibiki_driver_stream_tests passed in 0.03 seconds."
+      },
+      {
+        "command": "handoff-check",
+        "status": "pass",
+        "detail": "Scoped handoff passed for Issue 1210 driver stream ABI tests."
+      },
+      {
+        "command": "docs-check",
+        "status": "pass",
+        "detail": "88 required paths, 24 specs, 723 tracked paths, 359 repository JSON files."
+      },
+      {
+        "command": "source-policy",
+        "status": "pass",
+        "detail": "Source-only policy passed for 723 tracked paths."
+      },
+      {
+        "command": "git diff --check",
+        "status": "pass",
+        "detail": "Whitespace check clean."
+      },
+      {
+        "command": "verify",
+        "status": "pass",
+        "detail": "Full local verification: 4 of 4 tests passed including the new focused binary."
+      }
+    ],
+    "limitations": [
+      "This is a user-space SDK ABI test binary only.",
+      "It does not prove driver, WaveRT, HLK, Microsoft signing, or real-device audio delivery.",
+      "The shared-memory ring contract is tracked separately as Issue #1209.",
+      "Local build evidence; CI evidence requires the draft PR verify workflow to pass."
+    ],
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "cmake": "4.4.2",
+      "git": "2.49.0.windows.1",
+      "visual-studio": "2026 Community 18.9"
+    },
+    "started_at": "2026-08-24T21:35:00+08:00",
+    "finished_at": "2026-08-24T21:55:00+08:00"
+  }
+}
