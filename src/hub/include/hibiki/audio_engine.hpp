@@ -152,6 +152,23 @@ public:
         std::span<float> packet_sample_storage,
         std::span<RtLaneInputV1> lane_inputs,
         float* output_interleaved) noexcept;
+    // Processes one caller-owned lane block through the normal graph, Group
+    // Master and limiter path, then writes a complete outbound render packet.
+    // This is a user-space transport boundary only; delivery to a WaveRT ring
+    // remains the caller's responsibility.
+    [[nodiscard]] bool encode_driver_stream_packet_from_lane(
+        std::size_t lane_index,
+        std::string_view endpoint_guid,
+        std::uint64_t sequence,
+        std::uint64_t generation,
+        std::uint32_t flags,
+        const float* input_interleaved,
+        std::uint32_t input_channels,
+        std::size_t frames,
+        std::span<RtLaneInputV1> lane_inputs,
+        float* processed_output_interleaved,
+        std::span<std::uint8_t> packet,
+        std::size_t& written_bytes) noexcept;
     // Windows/WASAPI sink boundary. The graph remains the only producer of
     // audio blocks; handoff owns the two bounded sink workers and never
     // restarts this engine during a device switch.
