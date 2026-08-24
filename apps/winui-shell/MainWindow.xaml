@@ -25,15 +25,18 @@
                 <TextBlock Text="Hibiki DSP" VerticalAlignment="Center" Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" />
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                <Border CornerRadius="999" Padding="10,3" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                    <TextBlock Text="{Binding ConnectionStatusText}" Style="{ThemeResource CaptionTextBlockStyle}" AutomationProperties.LiveSetting="Polite" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Border CornerRadius="999" Padding="12,4" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Ellipse Width="8" Height="8" Fill="{ThemeResource SystemFillColorSuccessBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding ConnectionStatusText}" Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" AutomationProperties.LiveSetting="Polite" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                    </StackPanel>
                 </Border>
             </StackPanel>
         </Grid>
 
 
 
-        <controls:NavigationView x:Name="ShellNav" IsBackButtonVisible="Collapsed" IsSettingsVisible="False" OpenPaneLength="216" SelectionChanged="OnShellNavSelectionChanged" AutomationProperties.Name="主要導覽">
+        <controls:NavigationView x:Name="ShellNav" IsBackButtonVisible="Collapsed" IsSettingsVisible="False" OpenPaneLength="228" SelectionChanged="OnShellNavSelectionChanged" AutomationProperties.Name="主要導覽">
   <controls:NavigationView.MenuItems>
     <controls:NavigationViewItem Content="快速開始" Tag="home" IsSelected="True" AutomationProperties.Name="快速開始頁面">
       <controls:NavigationViewItem.Icon>
@@ -90,9 +93,9 @@
         <RowDefinition Height="Auto" />
         <RowDefinition Height="*" />
       </Grid.RowDefinitions>
-      <controls:InfoBar x:Name="DisconnectedBanner" IsOpen="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}" Severity="Warning" Title="尚未連接引擎" Message="連接後才能套用場景、音量與路由控制。點擊「連接引擎」開始。" IsClosable="False" Margin="28,12,24,0" AutomationProperties.Name="引擎連線狀態提醒" Grid.Row="0" /><ScrollViewer Grid.Row="1" Padding="28,0,24,28">
-        <StackPanel MaxWidth="1080" Spacing="16">
-          <Grid x:Name="ShellHomeSection"><Border Padding="24" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
+      <controls:InfoBar x:Name="DisconnectedBanner" IsOpen="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}" Severity="Warning" Title="尚未連接引擎" Message="連接後才能套用場景、音量與路由控制。點擊「連接引擎」開始。" IsClosable="False" Margin="32,12,28,0" AutomationProperties.Name="引擎連線狀態提醒" Grid.Row="0" /><ScrollViewer Grid.Row="1" Padding="32,0,28,32">
+        <StackPanel MaxWidth="1080" Spacing="20">
+        <Grid x:Name="ShellHomeSection"><Border Padding="24" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
                     <Grid x:Name="HeroLayout" ColumnSpacing="32" RowSpacing="16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" MinWidth="300" />
@@ -124,8 +127,8 @@
 
                         <StackPanel Spacing="12">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon Glyph="" FontSize="18" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
-                                <TextBlock Text="先選輸出，再一鍵變好聽" Style="{ThemeResource SubtitleTextBlockStyle}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                <FontIcon Glyph="" FontSize=" 20 " Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                                <TextBlock Text="先選輸出，再一鍵變好聽" Style="{ThemeResource TitleTextBlockStyle}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             </StackPanel>
                             <ComboBox Header="輸出群組" AutomationProperties.Name="輸出群組" AutomationProperties.HelpText="選擇 Main、Low Latency 或 Surround 輸出" ItemsSource="{Binding OutputGroups}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding SelectedOutputGroup, Mode=TwoWay}" HorizontalAlignment="Stretch" />
                             <ComboBox Header="實體輸出裝置" AutomationProperties.Name="實體輸出裝置" AutomationProperties.HelpText="只顯示引擎已驗證且目前 Active 的 render 裝置" ItemsSource="{Binding PhysicalDevices}" DisplayMemberPath="DisplayName" SelectedValuePath="EndpointId" SelectedValue="{Binding SelectedPhysicalDeviceId, Mode=TwoWay}" HorizontalAlignment="Stretch" />
@@ -159,7 +162,7 @@
                         </StackPanel>
                     </Grid>
                 </Border></Grid>
-          <Grid x:Name="ShellScenesSection" Visibility="Collapsed"><Border Padding="24" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
+          <Grid x:Name="ShellScenesSection" Visibility="Collapsed"><Border Padding="24" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
                     <StackPanel Spacing="12">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
@@ -197,7 +200,7 @@
                         </controls:ItemsRepeater>
                     </StackPanel>
                 </Border></Grid>
-          <Grid x:Name="ShellPresetsSection" Visibility="Collapsed"><Border Padding="24" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
+          <Grid x:Name="ShellPresetsSection" Visibility="Collapsed"><Border Padding="24" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
                     <StackPanel Spacing="12">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
@@ -513,7 +516,7 @@
                             </Border></Grid>
           <Grid x:Name="ShellExpertSection" Visibility="Collapsed">
             <TextBlock Text="Easy 模式已隱藏 Expert 內容；切換「Expert」後就會顯示這一頁。" TextWrapping="Wrap" Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="{Binding IsExpert, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
-            <Border x:Name="ExpertPanel" Padding="20" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
+            <Border x:Name="ExpertPanel" Padding="20" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
               <StackPanel x:Name="ShellExpertContent" Spacing="16" Visibility="{Binding IsExpert, Converter={StaticResource BoolToVisibilityConverter}}"><TextBlock Text="{Binding Expert.StatusText}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" /><Border Padding="16" CornerRadius="8" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                                 <StackPanel Spacing="10">
                                     <TextBlock Text="Matrix" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
@@ -596,8 +599,11 @@
       </ScrollViewer>
     </Grid>
   </controls:NavigationView.Content>
-</controls:NavigationView><Border Grid.Row="2" Padding="12,5" Margin="0,10,0,14" HorizontalAlignment="Left" CornerRadius="999" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-            <TextBlock Text="Easy 模式只顯示安全操作；切換 Expert 才會顯示 Matrix、DSP Graph、IR 與 VST3。" Style="{ThemeResource CaptionTextBlockStyle}" TextWrapping="Wrap" MaxWidth="640" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+</controls:NavigationView><Border Grid.Row="2" Padding="14,6" Margin="4,10,0,16" HorizontalAlignment="Left" CornerRadius="999" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <FontIcon FontSize="12" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                <TextBlock Text="Easy 模式只顯示安全操作；切換 Expert 才會顯示 Matrix、DSP Graph、IR 與 VST3。" Style="{ThemeResource CaptionTextBlockStyle}" TextWrapping="Wrap" MaxWidth="640" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+            </StackPanel>
         </Border>
     </Grid>
 </Window>
