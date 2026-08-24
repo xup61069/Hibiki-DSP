@@ -15,12 +15,15 @@
 1. 只先讀 root `AGENTS.md` 與本檔。不要在還不知道 Issue／角色前預載
    `docs/AI_HANDOFF.md`、`docs/state/BASELINE.md`、`docs/PROJECT_MAP.md` 或完整
    `docs/ai/MULTI_AGENT.md`；它們是後續依問題查閱的全域資料，不是每個視窗的固定 prompt。
-2. 執行 `git fetch --all --prune`，檢查 open Issue／PR、handoff block、遠端 branches 與本機
-   worktrees。唯讀偵察可繼續；寫入必須有 maintainer／orchestrator 明確指派，不得自行挑選
-   backlog。人類 maintainer 對目前 session 的直接要求算指派，active orchestrator 可在確認
-   `scope_globs` 不重疊後建立或正式 claim Issue。
+2. 執行 `git fetch --all --prune`；Issue／PR 清單只取 bounded metadata（例如 `--limit 30`），
+   Issue body 留給第 7 步的 context pack 載入一次，不要先全文輸出再由 pack 重播。唯讀偵察可
+   繼續；寫入必須有 maintainer／orchestrator 明確指派，不得自行挑選 backlog。人類 maintainer
+   對目前 session 的直接要求算指派，active orchestrator 可在確認 `scope_globs` 不重疊後建立或
+   正式 claim Issue。
 3. 寫入一律使用非 `main` branch。有其他 writer、branch 已被 worktree 佔用或 occupancy 不確定
-   時，在 repository 外建立獨立 clone/worktree；確認只有單一 writer 時仍建議隔離。禁止在別的
+   時，在 repository 外建立獨立 clone/worktree；確認只有單一 writer 時仍建議隔離。大型 checkout
+   不得把完整 worktree inventory 輸出到 prompt；只查目標 branch：
+   `git worktree list --porcelain | rg -B2 -A1 --fixed-strings "branch refs/heads/<branch>"`。禁止在別的
    session 工作樹執行 `checkout`、`switch`、branch rename、reset、clean 或 rebase。
 4. Orchestrator（人類或被指定的 active session）在 GitHub Issue body 補齊 handoff block（owner、branch、base commit、
    `scope_globs`、shared paths、dependencies）、指派 assignee 並加上 lifecycle label
@@ -34,10 +37,11 @@
    `pwsh -File tools/doctor.ps1 -CheckOnly` 與 `pwsh -File tools/probe-environment.ps1`；
    文件／流程小改不必為了形式探測機器，任何環境資料只寫入 `.local/`。
 7. 先取得有上限的最小任務包：
-   `pwsh -File tools/context-pack.ps1 -Issue <issue> -NoSource`。預設只輸出 Issue body、其引用的
-   Spec／ADR 與該 Issue evidence，不重播已讀過的核心規則或全域快照；48,000 字元上限會在任何
-   內容輸出前拒絕過大的 pack。只有明確的 repository-wide 稽核才使用
-   `-IncludeRepositoryState`，並由操作者明確提高 `-MaxCharacters`。
+   `pwsh -File tools/context-pack.ps1 -Issue <issue> -NoSource`。預設只輸出一次 Issue body、其引用的
+   Spec／ADR 與該 Issue evidence，不重播已讀過的核心規則或全域快照；完整序列化輸出受 48,000
+   字元與 12,000 conservative estimated-token 雙上限約束，過大時會在任何 pack 內容輸出前拒絕。
+   只有明確的 repository-wide 稽核才使用 `-IncludeRepositoryState`，並由操作者同時明確指定
+   `-MaxCharacters` 與 `-MaxEstimatedTokens`。
 8. 依 handoff 與 pack 只讀當前 slice 需要的 source、tests 與 evidence，再執行 handoff 的
    baseline smoke test；結果不一致時先標記 stale/conflict。需要 source pack 時移除 `-NoSource`，
    但不得為了繞過上限載入無關檔案。Foundation integration Issue 也不會取消預設上限或自動載入

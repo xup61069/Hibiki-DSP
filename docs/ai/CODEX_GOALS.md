@@ -24,8 +24,9 @@ Codex 的 `/goal` 適合跨多輪長任務，但不是「永遠從待辦清單�
 
 - 每個視窗一開始只讀 `AGENTS.md`、`docs/START_HERE.md` 與 active Issue handoff；Spec、ADR、source、
   tests、evidence 依 handoff 載入，全域 handoff／baseline／project map 只查當前決策需要的段落。
-- 使用 `tools/context-pack.ps1 -Issue <issue> -NoSource` 取得有 48,000 字元上限的最小包。不要把
-  repository 規則、全域歷史或上一個視窗聊天再貼一次；repository-wide state 必須明確 opt in。
+- 使用 `tools/context-pack.ps1 -Issue <issue> -NoSource` 取得有 48,000 字元與 12,000 conservative
+  estimated-token 雙上限的最小包。不要把 repository 規則、全域歷史或上一個視窗聊天再貼一次；
+  repository-wide state 必須明確 opt in 並提高兩種上限。
 - 每完成一個里程碑就把已完成、驗證、限制、ID／commit 與唯一下一步寫回 Issue handoff。若同一
   視窗發生第二次上下文壓縮，完成 checkpoint 後換新視窗，不在反覆壓縮的上下文繼續擴張工作。
 
