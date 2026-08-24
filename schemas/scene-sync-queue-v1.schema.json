@@ -23,7 +23,12 @@
           "is_upsert": {"type": "boolean"},
           "scene_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,30}$"},
           "name": {"type": "string"},
-          "output_group": {"type": "string"}
+          "output_group": {"type": "string"},
+          "ir_reference": {
+            "type": "string",
+            "maxLength": 64,
+            "$ref": "printable-string-v1.schema.json#/$defs/printableString"
+          }
         },
         "if": {
           "properties": {"is_upsert": {"const": true}},
@@ -40,17 +45,24 @@
               "minLength": 1,
               "maxLength": 64,
               "$ref": "printable-string-v1.schema.json#/$defs/printableString"
+            },
+            "ir_reference": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 64,
+              "$ref": "printable-string-v1.schema.json#/$defs/printableString"
             }
           }
         },
         "else": {
           "properties": {
             "name": {"maxLength": 0},
-            "output_group": {"maxLength": 0}
+            "output_group": {"maxLength": 0},
+            "ir_reference": {"maxLength": 0}
           }
         }
       }
     }
   },
-  "$comment": "The if/then/else on each operation enforces: upsert requires non-empty name (max 120) and output_group (max 64); remove requires both exactly empty. The runtime parser additionally validates complete candidates before replacing the in-memory queue."
+  "$comment": "The if/then/else on each operation enforces: upsert requires non-empty name (max 120), output_group (max 64), and ir_reference empty or 8..64 printable bytes; remove requires all three exactly empty. The runtime parser additionally validates complete candidates before replacing the in-memory queue."
 }

@@ -291,7 +291,10 @@ function Get-TbdHandoffFields {
   param(
     [Parameter(Mandatory)] [string]$Body
   )
-  $match = [regex]::Match($Body, '(?s)<!-- hibiki:handoff-v1\s*(?<body>.*?)\s*-->')
+  # Issue bodies can arrive as CRLF. Normalize before line-anchored matching;
+  # otherwise the end anchor sees CR before LF and cannot match line ends.
+  $normalizedBody = $Body -replace "\r\n", "`n"
+  $match = [regex]::Match($normalizedBody, '(?s)<!-- hibiki:handoff-v1\s*(?<body>.*?)\s*-->')
   if (-not $match.Success) { return @() }
   $fields = [System.Collections.Generic.List[string]]::new()
   foreach ($key in @('issue', 'branch')) {
@@ -312,7 +315,9 @@ function Get-HandoffScalar {
     [Parameter(Mandatory)] [string]$Body,
     [Parameter(Mandatory)] [string]$Key
   )
-  $match = [regex]::Match($Body, '(?s)<!-- hibiki:handoff-v1\s*(?<body>.*?)\s*-->')
+  # Keep admission and audit parsing identical for CRLF issue bodies.
+  $normalizedBody = $Body -replace "\r\n", "`n"
+  $match = [regex]::Match($normalizedBody, '(?s)<!-- hibiki:handoff-v1\s*(?<body>.*?)\s*-->')
   if (-not $match.Success) { throw "Missing hibiki:handoff-v1 block while reading '$Key'." }
   $line = [regex]::Match($match.Groups['body'].Value, "(?im)^\s*$([regex]::Escape($Key))\s*:\s*(?<value>[^\r\n]+)$")
   if (-not $line.Success) { throw "Handoff block is missing required key '$Key'." }
@@ -629,6 +634,12 @@ if ($SelfTest) {
     throw "handoff-check self-test failed: TBD draft fields were not detected."
   }
   $caseCount++
+  $crlfTbdBody = ($tbdDraftBody -replace "`n", "`r`n")
+  $crlfTbdFields = @(Get-TbdHandoffFields -Body $crlfTbdBody)
+  if ($crlfTbdFields.Count -ne 2 -or $crlfTbdFields -notcontains "issue" -or $crlfTbdFields -notcontains "branch") {
+    throw "handoff-check self-test failed: CRLF TBD draft fields were not detected."
+  }
+  $caseCount++
   if (@(Get-TbdHandoffFields -Body $mock.body).Count -ne 0) {
     throw "handoff-check self-test failed: filled handoff was treated as TBD draft."
   }
@@ -638,6 +649,12 @@ if ($SelfTest) {
   # branch uniqueness, and scope overlap use the same fail-closed semantics.
   if ((Get-HandoffScalar -Body $mock.body -Key 'branch') -ne 'codex/99-selftest') {
     throw 'handoff-check self-test failed: admission scalar parser.'
+  }
+  $caseCount++
+  # Convert the LF-only mock body to CRLF without relying on escape parsing.
+  $crlfMockBody = $mock.body.Replace([string][char]10, [string][char]13 + [string][char]10)
+  if ((Get-HandoffScalar -Body $crlfMockBody -Key 'branch') -ne 'codex/99-selftest') {
+    throw 'handoff-check self-test failed: CRLF admission scalar parser.'
   }
   $caseCount++
   if ((Get-AdmissionIssueNumber -Body $mock.body -Key 'issue') -ne 99) {

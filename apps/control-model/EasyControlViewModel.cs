@@ -508,7 +508,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         _pendingSceneCatalogOps.ToArray();
 
     internal sealed record PendingSceneCatalogOp(
-        bool IsUpsert, string SceneId, string Name, string OutputGroup);
+        bool IsUpsert, string SceneId, string Name, string OutputGroup,
+        string IrReference = "");
 
     public string CustomSceneQueuePath
     {
@@ -577,7 +578,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         }
         if (!IsConnected &&
             !TryPersistOfflineSceneOp(new PendingSceneCatalogOp(
-                true, scene.Id, scene.Name, _session.ActiveOutputGroup ?? "main")))
+                true, scene.Id, scene.Name, _session.ActiveOutputGroup ?? "main",
+                scene.IrReference)))
         {
             _session.CustomScenes.Remove(scene.Id);
             if (previous is not null) _session.CustomScenes.Upsert(previous);
@@ -593,12 +595,13 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         {
             var sent = await SendSceneCatalogCommandAsync(
                 _commands.UpsertSceneCatalog(scene.Id, scene.Name,
-                    _session.ActiveOutputGroup ?? "main"),
+                    _session.ActiveOutputGroup ?? "main", scene.IrReference),
                 cancellationToken).ConfigureAwait(true);
             if (!sent)
             {
                 EnqueueSceneCatalogOp(new PendingSceneCatalogOp(
-                    true, scene.Id, scene.Name, _session.ActiveOutputGroup ?? "main"));
+                    true, scene.Id, scene.Name, _session.ActiveOutputGroup ?? "main",
+                    scene.IrReference));
                 StatusText = $"已加入自訂場景：{scene.Name}；同步未完成，連線恢復後自動重試";
                 return false;
             }
@@ -1298,7 +1301,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         {
             if (!queue.Enqueue(new SceneCatalogQueueCard(
                     operation.IsUpsert, operation.SceneId, operation.Name,
-                    operation.OutputGroup)))
+                    operation.OutputGroup, operation.IrReference)))
             {
                 return false;
             }
@@ -1340,7 +1343,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         {
             _pendingSceneCatalogOps.Enqueue(new PendingSceneCatalogOp(
                 operation.IsUpsert, operation.SceneId, operation.Name,
-                operation.OutputGroup));
+                operation.OutputGroup, operation.IrReference));
         }
         _droppedSceneCatalogOperations = droppedCount;
         return true;
@@ -1471,7 +1474,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             {
                 command = operation.IsUpsert
                     ? _commands.UpsertSceneCatalog(operation.SceneId, operation.Name,
-                          operation.OutputGroup)
+                          operation.OutputGroup, operation.IrReference)
                     : _commands.RemoveSceneCatalog(operation.SceneId);
             }
             catch (ArgumentException)
