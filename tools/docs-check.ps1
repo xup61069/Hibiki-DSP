@@ -222,6 +222,19 @@ function Assert-JsonSchemaExpectation {
   }
 }
 
+function Register-PrintableStringSchema {
+  param(
+    [Parameter(Mandatory = $true)][string]$SchemaFile
+  )
+
+  # Test-Json resolves external references from the global schema registry.
+  # Register the local shared fragment under its canonical $id before validating
+  # schemas that reference it.
+  $null = Test-Json -Json '{}' -SchemaFile $SchemaFile -ErrorAction Stop
+  $schema = [Json.Schema.JsonSchema]::FromFile($SchemaFile)
+  [Json.Schema.SchemaRegistry]::Global.Register($schema)
+}
+
 function Assert-PrintableContractSchemas {
   param(
     [Parameter(Mandatory = $true)][string]$RepositoryRoot
@@ -973,6 +986,7 @@ if ($SelfTest) {
 
   # Printable contract schemas: real repository schemas enforce runtime-equivalent
   # whole-string C0/C1/DEL rejection through the actual JSON Schema validator.
+  Register-PrintableStringSchema -SchemaFile (Join-Path $repo 'schemas/printable-string-v1.schema.json')
   Assert-PrintableContractSchemas -RepositoryRoot $repo
   Assert-ExtendedPrintableContractSchemas -RepositoryRoot $repo
   $caseCount++
@@ -1174,6 +1188,7 @@ $required = @(
   'tools/live-audio-session-check.ps1', 'tools/live-process-loopback-check.ps1',
   'tools/driver-source-check.ps1', 'tools/driver-signability-check.ps1',
   'schemas/release-manifest-v1.schema.json', 'schemas/evidence-manifest-v2.schema.json',
+  'schemas/printable-string-v1.schema.json',
   'docs/START_HERE.md', 'docs/AI_HANDOFF.md', 'docs/PROJECT_MAP.md', 'docs/state/BASELINE.md',
   'docs/specs/INDEX.md', 'docs/specs/SPEC-0001-core-contracts.md',
   'docs/specs/SPEC-0002-volume-and-iso.md', 'docs/specs/SPEC-0003-virtual-endpoints-and-routing.md',
@@ -1255,6 +1270,8 @@ $schemaStructureErrors = Get-SchemaStructureErrors -SchemaEntries $schemaEntries
 if ($schemaStructureErrors.Count -gt 0) {
   throw ('Contract schema structure validation failed: ' + ($schemaStructureErrors -join '; '))
 }
+$printableStringSchemaFile = Join-Path $repo 'schemas/printable-string-v1.schema.json'
+Register-PrintableStringSchema -SchemaFile $printableStringSchemaFile
 Assert-PrintableContractSchemas -RepositoryRoot $repo
 Assert-ExtendedPrintableContractSchemas -RepositoryRoot $repo
 

@@ -1,0 +1,72 @@
+{
+  "evidence_format": 2,
+  "issue": 1181,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "docs/state/BASELINE.md",
+      "schemas/acoustic-anchor-v1.schema.json",
+      "schemas/audio-session-descriptor-v1.schema.json",
+      "schemas/calibration-response-v1.schema.json",
+      "schemas/custom-scene-cards-v1.schema.json",
+      "schemas/device-switch-request-v1.schema.json",
+      "schemas/driver-control-v1.schema.json",
+      "schemas/equal-loudness-policy-v1.schema.json",
+      "schemas/equal-loudness-status-v1.schema.json",
+      "schemas/graph-config-v1.schema.json",
+      "schemas/output-fanout-plan-v1.schema.json",
+      "schemas/physical-device-catalog-v1.schema.json",
+      "schemas/printable-string-v1.schema.json",
+      "schemas/release-manifest-v1.schema.json",
+      "schemas/scene-profile-v1.schema.json",
+      "schemas/scene-sync-queue-v1.schema.json",
+      "schemas/session-route-rule-v1.schema.json",
+      "schemas/session-route-rules-v1.schema.json",
+      "tools/docs-check.ps1"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "3abd09e1e738b6349fc9489f32846b15df559a6faf6bf98821e0bbdb032a1dae"
+  },
+  "metadata": {
+    "scope": "shared-printable-string-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-git-2.55.0",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1181",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/verify.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "shared printable-string schema extraction",
+        "status": "pass",
+        "detail": "Replaced 40 identical control-character pattern fields in 16 schemas with one externally referenced printable-string fragment while retaining each field's local type and length constraints."
+      },
+      {
+        "command": "handoff/docs/source/verify gates",
+        "status": "pass",
+        "detail": "Issue ownership, offline schema-reference registration in both normal and self-test modes, documentation checks, source-only policy, and the unsigned local CMake/CTest verification passed."
+      },
+      {
+        "command": "evidence-audit -DescribeCurrentChange",
+        "status": "pass",
+        "detail": "Derived the exact 19 non-evidence paths and source digest from the staged Git index."
+      }
+    ],
+    "limitations": [
+      "This is a schema-structure and validation-tooling change only; it does not provide DSP, physical audio, driver loading, WaveRT, HLK, Microsoft signing, or release evidence.",
+      "The provenance digest binds this manifest to exact staged source paths and Git blob states; it does not independently attest that the declared commands ran."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.55.0.windows.3"
+    },
+    "started_at": "2026-08-24T18:15:00+08:00",
+    "finished_at": "2026-08-24T18:51:52+08:00"
+  }
+}
