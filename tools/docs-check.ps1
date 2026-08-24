@@ -116,6 +116,13 @@ function Get-AiContextBudgetErrors {
   return $errors
 }
 
+$unboundedWorktreePattern = 'git worktree list(?![^\r\n`]*\|\s*(?:rg|Select-String)\b)'
+$unboundedGitLogPattern = 'git log(?![^\r\n`]*(?:-\d+\b|--max-count(?:=|\s+)\d+\b))[^\r\n`]*origin/main'
+$unboundedGitHubListPattern = 'gh (?:issue|pr) list(?![^\r\n`]*--limit\s+\d+\b)'
+$duplicateIssueBodyPattern = 'gh issue view\s+[^\s`]+(?![^\r\n`]*--json\b)'
+$staleGlobalHandoffRoutePattern = '\[AI 接手頁\]\(docs/AI_HANDOFF\.md\)\s*操作|新 AI 先讀\s+`docs/AI_HANDOFF\.md`'
+$adapterGlobalPreloadPattern = 'docs/(?:AI_HANDOFF|state/BASELINE|PROJECT_MAP|ai/MULTI_AGENT)\.md'
+
 function Get-MissingRequiredSchemas {
   # Every tracked JSON Schema is a durable public contract and therefore must be
   # a required docs-check entry. Keep this pure so -SelfTest can cover the
@@ -383,7 +390,10 @@ if ($SelfTest) {
   # AI context budgets and forbidden startup routes stay fail closed.
   $validContextEntries = @(
     [pscustomobject]@{ Path = 'docs/AI_HANDOFF.md'; Content = 'short live router'; MaxCharacters = 64; ForbiddenPatterns = @() },
-    [pscustomobject]@{ Path = 'docs/PROJECT_MAP.md'; Content = 'query relevant rows'; MaxCharacters = 64; ForbiddenPatterns = @('read AI_HANDOFF first') }
+    [pscustomobject]@{ Path = 'CLAUDE.md'; Content = 'read AGENTS and START'; MaxCharacters = 64; ForbiddenPatterns = @() },
+    [pscustomobject]@{ Path = 'docs/PROJECT_MAP.md'; Content = 'query relevant rows'; MaxCharacters = 64; ForbiddenPatterns = @('read AI_HANDOFF first') },
+    [pscustomobject]@{ Path = 'docs/ai/MULTI_AGENT.md'; Content = 'git worktree list --porcelain | rg --fixed-strings branch'; MaxCharacters = 128; ForbiddenPatterns = @($unboundedWorktreePattern) },
+    [pscustomobject]@{ Path = 'docs/AI_HANDOFF.md'; Content = 'gh issue view <issue> --json number,state'; MaxCharacters = 128; ForbiddenPatterns = @($duplicateIssueBodyPattern) }
   )
   $validContextErrors = @(Get-AiContextBudgetErrors -Entries $validContextEntries)
   if ($validContextErrors.Count -ne 0) {
@@ -392,20 +402,31 @@ if ($SelfTest) {
   $caseCount++
 
   $overBudgetErrors = @(Get-AiContextBudgetErrors -Entries @(
-    [pscustomobject]@{ Path = 'docs/AI_HANDOFF.md'; Content = ('x' * 65); MaxCharacters = 64; ForbiddenPatterns = @() }
+    [pscustomobject]@{ Path = 'CLAUDE.md'; Content = ('x' * 65); MaxCharacters = 64; ForbiddenPatterns = @() }
   ))
   if ($overBudgetErrors.Count -ne 1 -or $overBudgetErrors[0] -notmatch 'exceeds the AI context budget') {
     throw 'docs-check self-test failed: oversized AI context entry was not rejected.'
   }
   $caseCount++
 
-  $staleRouteErrors = @(Get-AiContextBudgetErrors -Entries @(
-    [pscustomobject]@{ Path = 'docs/PROJECT_MAP.md'; Content = 'read AI_HANDOFF first'; MaxCharacters = 64; ForbiddenPatterns = @('read AI_HANDOFF first') }
-  ))
-  if ($staleRouteErrors.Count -ne 1 -or $staleRouteErrors[0] -notmatch 'forbidden AI startup route') {
-    throw 'docs-check self-test failed: stale AI_HANDOFF preload route was not rejected.'
+  $forbiddenContextCases = @(
+    [pscustomobject]@{ Name = 'stale project-map route'; Path = 'docs/PROJECT_MAP.md'; Content = 'read AI_HANDOFF first'; Pattern = 'read AI_HANDOFF first' },
+    [pscustomobject]@{ Name = 'stale README route'; Path = 'README.md'; Content = '[AI 接手頁](docs/AI_HANDOFF.md) 操作'; Pattern = $staleGlobalHandoffRoutePattern },
+    [pscustomobject]@{ Name = 'adapter global preload'; Path = 'CLAUDE.md'; Content = 'load docs/AI_HANDOFF.md'; Pattern = $adapterGlobalPreloadPattern },
+    [pscustomobject]@{ Name = 'unbounded worktree output'; Path = 'docs/ai/MULTI_AGENT.md'; Content = 'run `git worktree list` now'; Pattern = $unboundedWorktreePattern },
+    [pscustomobject]@{ Name = 'unbounded Git history'; Path = 'docs/AI_HANDOFF.md'; Content = 'git log origin/main'; Pattern = $unboundedGitLogPattern },
+    [pscustomobject]@{ Name = 'unbounded GitHub list'; Path = 'docs/AI_HANDOFF.md'; Content = 'gh pr list --state merged'; Pattern = $unboundedGitHubListPattern },
+    [pscustomobject]@{ Name = 'duplicate Issue body output'; Path = 'docs/AI_HANDOFF.md'; Content = 'gh issue view 123'; Pattern = $duplicateIssueBodyPattern }
+  )
+  foreach ($case in $forbiddenContextCases) {
+    $routeErrors = @(Get-AiContextBudgetErrors -Entries @(
+      [pscustomobject]@{ Path = $case.Path; Content = $case.Content; MaxCharacters = 256; ForbiddenPatterns = @($case.Pattern) }
+    ))
+    if ($routeErrors.Count -ne 1 -or $routeErrors[0] -notmatch 'forbidden AI startup route') {
+      throw "docs-check self-test failed: $($case.Name) was not rejected."
+    }
+    $caseCount++
   }
-  $caseCount++
 
   # Required schema coverage: all tracked contract schemas must be covered.
   if ((Get-MissingRequiredSchemas -TrackedPaths @('schemas/a-v1.schema.json', 'docs/example.json') -RequiredEntries @('schemas/a-v1.schema.json')).Count -ne 0) {
@@ -708,10 +729,16 @@ if ($missing.Count -gt 0) { throw "Missing required documentation: $($missing -j
 
 $aiContextEntries = @(
   [pscustomobject]@{ Path = 'AGENTS.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'AGENTS.md') -Raw); MaxCharacters = 6000; ForbiddenPatterns = @() },
-  [pscustomobject]@{ Path = 'docs/START_HERE.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/START_HERE.md') -Raw); MaxCharacters = 7000; ForbiddenPatterns = @() },
-  [pscustomobject]@{ Path = 'docs/AI_HANDOFF.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/AI_HANDOFF.md') -Raw); MaxCharacters = 6000; ForbiddenPatterns = @() },
-  [pscustomobject]@{ Path = 'docs/PROJECT_MAP.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/PROJECT_MAP.md') -Raw); MaxCharacters = 12000; ForbiddenPatterns = @('新 AI 先讀\s+`docs/AI_HANDOFF\.md`') },
-  [pscustomobject]@{ Path = 'docs/ai/CODEX_GOALS.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/ai/CODEX_GOALS.md') -Raw); MaxCharacters = 6000; ForbiddenPatterns = @() }
+  [pscustomobject]@{ Path = 'CLAUDE.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'CLAUDE.md') -Raw); MaxCharacters = 1000; ForbiddenPatterns = @($adapterGlobalPreloadPattern) },
+  [pscustomobject]@{ Path = 'GEMINI.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'GEMINI.md') -Raw); MaxCharacters = 1000; ForbiddenPatterns = @($adapterGlobalPreloadPattern) },
+  [pscustomobject]@{ Path = '.github/copilot-instructions.md'; Content = (Get-Content -LiteralPath (Join-Path $repo '.github/copilot-instructions.md') -Raw); MaxCharacters = 1000; ForbiddenPatterns = @($adapterGlobalPreloadPattern) },
+  [pscustomobject]@{ Path = '.cursor/rules/project.mdc'; Content = (Get-Content -LiteralPath (Join-Path $repo '.cursor/rules/project.mdc') -Raw); MaxCharacters = 1000; ForbiddenPatterns = @($adapterGlobalPreloadPattern) },
+  [pscustomobject]@{ Path = 'README.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'README.md') -Raw); MaxCharacters = 20000; ForbiddenPatterns = @($staleGlobalHandoffRoutePattern, $unboundedWorktreePattern, $unboundedGitLogPattern, $unboundedGitHubListPattern) },
+  [pscustomobject]@{ Path = 'docs/START_HERE.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/START_HERE.md') -Raw); MaxCharacters = 7000; ForbiddenPatterns = @($unboundedWorktreePattern, $unboundedGitLogPattern, $unboundedGitHubListPattern) },
+  [pscustomobject]@{ Path = 'docs/AI_HANDOFF.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/AI_HANDOFF.md') -Raw); MaxCharacters = 6000; ForbiddenPatterns = @($unboundedWorktreePattern, $unboundedGitLogPattern, $unboundedGitHubListPattern, $duplicateIssueBodyPattern) },
+  [pscustomobject]@{ Path = 'docs/PROJECT_MAP.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/PROJECT_MAP.md') -Raw); MaxCharacters = 12000; ForbiddenPatterns = @($staleGlobalHandoffRoutePattern, $unboundedWorktreePattern, $unboundedGitLogPattern, $unboundedGitHubListPattern) },
+  [pscustomobject]@{ Path = 'docs/ai/MULTI_AGENT.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/ai/MULTI_AGENT.md') -Raw); MaxCharacters = 9000; ForbiddenPatterns = @($unboundedWorktreePattern, $unboundedGitLogPattern, $unboundedGitHubListPattern) },
+  [pscustomobject]@{ Path = 'docs/ai/CODEX_GOALS.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/ai/CODEX_GOALS.md') -Raw); MaxCharacters = 6000; ForbiddenPatterns = @($unboundedWorktreePattern, $unboundedGitLogPattern, $unboundedGitHubListPattern) }
 )
 $aiContextErrors = @(Get-AiContextBudgetErrors -Entries $aiContextEntries)
 if ($aiContextErrors.Count -gt 0) {
