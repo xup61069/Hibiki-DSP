@@ -178,6 +178,24 @@ Issue/branch、v2 ownership/scope/dependency、Git ancestry、必要 headings �
 CI 失敗時不可宣稱該變更可交接。Handoff 檔案已由 issue body handoff block 取代；
 `schemas/task-handoff-v2.schema.json` 已刪除。
 
+## 提交訊息完整性
+
+所有 AI 產生的 commit 必須以 ``git commit -F <utf8-file>`` 方式提供完整訊息檔，禁止以
+``-m`` 內嵌多行字串。跨 shell 邊界拼接多行訊息時，PowerShell 與 cmd 對編碼與跳脫的處理會損壞
+bytes，導致 U+FFFD mojibake、C0/C1 控制字元殘留或字面 backslash-n 殘留。
+
+``tools/check-commit-message.ps1`` 是機器可判定的提交訊息完整性閘門：
+
+- ``-SelfTest``：離線自檢（9 cases），涵蓋亂碼、ESC/BEL/C1 控制字元、字面 backslash-n、
+  空 subject 與乾淨多行訊息等案例；不碰網路與機器狀態。
+- ``-MessageFile <path>``：讀取 UTF-8 訊息檔做檢查，供 CI 或 hook 使用。
+- 檢查規則（全部 fail closed）：
+  1. 禁止 U+FFFD replacement character。
+  2. 禁止 C0/C1 控制字元（LF 與 HT 允許）。
+  3. 禁止字面 ``\n`` 殘留（subject 與 body 皆檢查）。
+  4. subject 不得為空。
+
+此閘門不取代 code review；它只偵測已知的 encoding/escaping 損壞模式，不做主觀風格審查。
 ## 對人回報與 Codex Goal 契約
 
 AI 對 maintainer 的進度與完成回報以產品結果為主：先用白話說明正在建立或修正的能力、使用者
