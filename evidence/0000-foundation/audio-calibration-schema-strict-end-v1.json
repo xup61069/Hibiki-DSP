@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1151,
   "scope_digest": "audio-calibration-schema-strict-end-v1",
-  "source_commit": "61f20de0ab55b896324445f9f71830f83d1061c4",
+  "source_commit": "5b2b3212c7c1d87c6c15a932717c1f812f2ee363",
   "environment_fingerprint": "windows-amd64-pwsh-7.6.4-schema-instance-validation",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1151",
