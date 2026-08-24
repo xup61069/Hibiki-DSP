@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1142,
   "scope_digest": "loudness-diagnostic-printable-v1",
-  "source_commit": "26afc5daeeb7afd9831c1c3472d492771ffe126d",
+  "source_commit": "c4ed5a43cc51b8d967464d6571fbf65e84c547c3",
   "environment_fingerprint": "windows-amd64-pwsh-loudness-diagnostic-printable",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1142",
