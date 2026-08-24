@@ -80,7 +80,8 @@ bool AudioSessionRegistry::bind(const AudioSessionIdentityV1& identity,
                                 std::string lane_id,
                                 std::string output_group) {
     if (lane_id.empty() || lane_id.size() > kMaxLabelLength || output_group.empty() ||
-        output_group.size() > kMaxOutputGroupLength) {
+        output_group.size() > kMaxOutputGroupLength ||
+        !is_printable_utf8_v1(lane_id) || !is_printable_utf8_v1(output_group)) {
         return false;
     }
     auto* session = find(identity);

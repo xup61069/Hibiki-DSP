@@ -2410,8 +2410,9 @@ int main() {
     CHECK(!printable_registry.upsert(AudioSessionDescriptorV1{
         1, printable_identity, "Newline\nName", "chrome.exe", true,
         SessionGainOwner::WindowsSession, {}, {}, 0.0}));
+    const std::string nul_display_name = std::string("NUL") + '\0' + "Name";
     CHECK(!printable_registry.upsert(AudioSessionDescriptorV1{
-        1, printable_identity, "NUL\0Name", "chrome.exe", true,
+        1, printable_identity, nul_display_name, "chrome.exe", true,
         SessionGainOwner::WindowsSession, {}, {}, 0.0}));
     CHECK(!printable_registry.upsert(AudioSessionDescriptorV1{
         1, printable_identity, "DEL\x7FName", "chrome.exe", true,
@@ -2422,10 +2423,9 @@ int main() {
     CHECK(!printable_registry.upsert(AudioSessionDescriptorV1{
         1, printable_identity, "OK", "app.exe", true,
         SessionGainOwner::WindowsSession, {}, "lane\tctrl", 0.0}));
-    CHECK(!printable_registry.upsert(AudioSessionDescriptorV1{
+    CHECK(printable_registry.upsert(AudioSessionDescriptorV1{
         1, printable_identity, "OK", "app.exe", true,
-        SessionGainOwner::WindowsSession, {}, {}, 0.0}) ||
-          true);  // output_group empty is valid (optional)
+        SessionGainOwner::WindowsSession, {}, {}, 0.0}));  // empty optional labels are valid
     CHECK(!printable_registry.bind(printable_identity, "lane\nctrl", "og"));
 
     Vst3BusLayoutV1 sidechain_layout{};
