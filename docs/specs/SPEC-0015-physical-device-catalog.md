@@ -42,6 +42,8 @@ sequence 以單調規則更新；較舊的 descriptor／狀態事件直接拒絕
 WinUI／engine 的 `DeviceSwitch` request 使用 `schemas/device-switch-request-v1.schema.json`
 描述的欄位，再以 288-byte IPC payload 傳輸；UI 只有在 catalog entry 為 Active render 時
 才產生 request，engine 未回 ACK 前不顯示已同步。
+
+schema 的 `endpoint_id` 必須為不含 C0/C1 控制字元與 DEL 的 printable UTF-8，與 288-byte IPC wire 的 `is_printable_utf8` fail-closed 檢查一致。
 UI 可送出空 payload 的 `DeviceCatalogRequest` 取得當前快照；control service 只有在註冊
 snapshot provider 時才回傳 `DeviceCatalogSnapshot`，否則回 Error，避免把空目錄誤報為成功。
 正式 WinUI 殼層提供「重新掃描裝置」入口，只呼叫 ViewModel 的 bounded IPC refresh；UI 不
