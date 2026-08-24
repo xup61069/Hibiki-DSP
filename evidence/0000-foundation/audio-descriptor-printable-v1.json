@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1056,
   "scope_digest": "audio-descriptor-printable-v1",
-  "source_commit": "e259e1781b0dc0f7dc5b7d51a6c5e5b8859be928",
+  "source_commit": "697f02b0d0ecfae0e91a6298efa0f048db2d3b54",
   "environment_fingerprint": "windows-amd64-pwsh-audio-descriptor-printable",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1056",
