@@ -25,7 +25,9 @@ gain owner 與 makeup gain。規則套用後可交給既有 `AudioSessionRegistr
 - 優先序較高者勝出；相同優先序的多個匹配規則一律回報 `ambiguous`，不得依插入順序
   靜默選擇。
 - `process_id` 只作 Windows session 的即時觀察，不進 rule schema、不作持久身份。
-- 規則上限 64 筆；lane/output、rule ID、匹配文字與 gain 都有固定長度／數值上限。
+- 規則上限 64 筆；rule ID 最長 64 bytes、app ID 與顯示名稱 matcher 最長 128 bytes、
+  lane/output group 最長 64 bytes，與 SPEC-0023 wire command 和 Expert catalog 上限一致。
+  超出這些長度的規則在 in-process store 就會被拒絕，不會等到送進 wire 或 UI 才失敗。
 
 ## 資料流與安全
 
