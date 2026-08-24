@@ -15,6 +15,7 @@ Closes #
 - `depends_on`:
 
 - [ ] 一個 Issue、唯一非 main branch、單一 active writer；並行／occupied／不確定時使用獨立 worktree
+- [ ] Issue lifecycle 是 `claimed` 或 `in-review`；`claim-pending` 不授予寫入權，不得以此 label push
 - [ ] 已檢查 open Issue／draft PR 與其他 Issue 的 handoff block，沒有未協調的 scope overlap
 - [ ] 超出 scope 或共享整合檔已由 integrator 指定 owner／合併順序
 - [ ] branch 未 force-push，且 handoff 的 base/owner/next action 已更新

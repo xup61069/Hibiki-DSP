@@ -27,9 +27,10 @@ AI memory 與 IDE 規則都不是專案真值。
 
 ## 第二層：產品與流程預設（可依 ADR/Spec 演進）
 
-- 目前產品目標是 Windows 11 24H2+ x64、C++20 即時核心與 C# WinUI 3 UI；這是 accepted
-  architecture/product baseline，不是不可討論的永久禁令。改變時以新 Spec／ADR 與測試取代，
-  不在單一 feature PR 中順手偏離。
+- 對 maintainer 的進度與完成回報必須先用白話說明：現在讓產品多了／修好了什麼、使用者會
+  感覺到什麼、如何確認，以及還缺什麼。不要用 push、commit、branch、PR、merge 或 CI 當標題
+  或主要敘事；這些只在影響風險、阻擋、驗證可信度，或 maintainer 明確詢問時，放在末尾的短版
+  開發紀錄。
 - 對 maintainer 的進度與完成回報必須先用白話說明：現在讓產品多了／修好了什麼、使用者會
   感覺到什麼、如何確認，以及還缺什麼。不要用 push、commit、branch、PR、merge 或 CI 當標題
   或主要敘事；這些只在影響風險、阻擋、驗證可信度，或 maintainer 明確詢問時，放在末尾的短版
@@ -38,7 +39,9 @@ AI memory 與 IDE 規則都不是專案真值。
 - 唯讀偵察不需要認領。寫入需要 maintainer／orchestrator 明確指派、GitHub Issue、非 `main`
   branch、Issue body 內的 `<!-- hibiki:handoff-v1 -->` block 與 write scope。人類 maintainer
   對目前 session 的直接要求算明確指派；active orchestrator 可在檢查 overlap 後建立並正式
-  claim Issue，worker 不得自行挑選 backlog。
+  claim Issue，worker 不得自行挑選 backlog。正式 claim 前可使用非授權的 `claim-pending`
+  標記；`claim-pending` 不授予寫入權，必須由序列化的 claim-admission workflow 在全域
+  overlap/audit/readback 完成後才轉成 `claimed`。
 - 有其他 writer、branch 已被 worktree 佔用或 occupancy 不確定時，必須使用獨立 worktree；
   確認只有單一 writer 時仍建議隔離，但不是文件小改的硬性前置。
 - 首次可重建的 WIP/reviewable commit push 後立即開 draft PR，不需要空認領 commit。

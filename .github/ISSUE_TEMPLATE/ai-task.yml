@@ -9,7 +9,9 @@ body:
         one non-main branch, one handoff block and one draft PR. A dedicated clone/worktree
         is mandatory when another writer is active or occupancy is uncertain, and recommended
         otherwise. The orchestrator fills the Issue number, branch, base and owner before
-        adding an assignee and the `claimed` label.
+        adding an assignee. `claim-pending` is a non-authoritative admission marker; it does
+        not authorize writes. The serialized claim-admission workflow must complete global
+        overlap/audit/readback before replacing it with `claimed`.
   - type: textarea
     id: objective
     attributes:
