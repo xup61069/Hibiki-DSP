@@ -14,6 +14,7 @@
 #include "hibiki/plugin_host.hpp"
 #include "hibiki/vst3_sandbox.hpp"
 #include "hibiki/vst3_worker_protocol.hpp"
+#include "hibiki/vst3_crash_report.hpp"
 #include "hibiki/vst3_worker_pipe.hpp"
 #include "hibiki/latency_compensation.hpp"
 #include "hibiki/latency_graph_commit.hpp"
@@ -88,6 +89,7 @@ extern "C" {
 #include <cmath>
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -5645,6 +5647,157 @@ int main() {
                                   return value == 1.0F;
                               }));
         }
+    }
+
+    // Issue 1303: bounded crash report capture/redaction contract.
+    {
+        // SHA-256 known vectors (empty and "abc").
+        const auto empty_digest = hibiki::vst3_sha256_v1({});
+        constexpr std::array<std::uint8_t, 32> kEmptyExpected{
+            0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb,
+            0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4,
+            0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52,
+            0xb8, 0x55};
+        CHECK(empty_digest == kEmptyExpected);
+
+        const std::string_view abc = "abc";
+        const auto abc_digest = hibiki::vst3_sha256_v1(
+            {reinterpret_cast<const std::uint8_t*>(abc.data()), abc.size()});
+        constexpr std::array<std::uint8_t, 32> kAbcExpected{
+            0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea, 0x41, 0x41,
+            0x40, 0xde, 0x5d, 0xae, 0x22, 0x23, 0xb0, 0x03, 0x61, 0xa3,
+            0x96, 0x17, 0x7a, 0x9c, 0xb4, 0x10, 0xff, 0x61, 0xf2, 0x00,
+            0x15, 0xad};
+        CHECK(abc_digest == kAbcExpected);
+
+        // Block-boundary lengths exercise both padding branches.
+        const std::vector<std::uint8_t> block55(55U, 0xABU);
+        const std::vector<std::uint8_t> block56(56U, 0xABU);
+        const std::vector<std::uint8_t> block64(64U, 0xCDU);
+        CHECK(hibiki::vst3_sha256_v1(block55) != hibiki::vst3_sha256_v1(block56));
+        CHECK(hibiki::vst3_sha256_v1(block64) == hibiki::vst3_sha256_v1(block64));
+
+        // Entry factory: valid by construction, unique per exit code.
+        auto make_entry = [](std::int64_t captured_utc,
+                             hibiki::Vst3CrashReportReasonV1 reason,
+                             std::uint32_t exit_code) {
+            hibiki::Vst3CrashReportEntryV1 entry{};
+            entry.captured_utc = captured_utc;
+            entry.reason = reason;
+            entry.exit_code = exit_code;
+            entry.uptime_ms = 1000ULL + static_cast<std::uint64_t>(exit_code);
+            const std::string module =
+                "C:/plugins/vendor_" + std::to_string(exit_code) + ".vst3";
+            entry.module_sha256 = hibiki::vst3_sha256_v1(
+                {reinterpret_cast<const std::uint8_t*>(module.data()),
+                 module.size()});
+            return entry;
+        };
+
+        // Append validation and oldest-first eviction.
+        hibiki::Vst3CrashReportStoreV1 store;
+        CHECK(store.size() == 0U);
+        hibiki::Vst3CrashReportEntryV1 invalid{};
+        CHECK(store.append(invalid) ==
+              hibiki::Vst3CrashReportResultV1::invalid_argument);
+        CHECK(store.size() == 0U);
+        for (std::uint32_t index = 1U; index <= 20U; ++index) {
+            const auto entry = make_entry(
+                1700000000LL + static_cast<std::int64_t>(index),
+                hibiki::Vst3CrashReportReasonV1::worker_exit_nonzero, index);
+            CHECK(store.append(entry) == hibiki::Vst3CrashReportResultV1::ok);
+            CHECK(store.size() ==
+                  (index < 16U ? static_cast<std::size_t>(index) : 16U));
+        }
+        CHECK(store.entry_at(0U).exit_code == 5U);
+        CHECK(store.entry_at(15U).exit_code == 20U);
+        store.clear();
+        CHECK(store.size() == 0U);
+
+        // Redaction: only the digest survives, never the raw path bytes.
+        const std::string raw_path = "C:/Users/dev/secret-plugin.vst3";
+        const auto path_digest = hibiki::vst3_sha256_v1(
+            {reinterpret_cast<const std::uint8_t*>(raw_path.data()),
+             raw_path.size()});
+        bool leak_found = false;
+        for (std::size_t offset = 0U;
+             offset + raw_path.size() <= path_digest.size(); ++offset) {
+            if (std::equal(raw_path.begin(), raw_path.end(),
+                           path_digest.begin() +
+                               static_cast<std::ptrdiff_t>(offset))) {
+                leak_found = true;
+            }
+        }
+        CHECK(!leak_found);
+
+        // Serialize then parse round-trip is byte-stable, including a
+        // negative UTC timestamp.
+        CHECK(store.append(make_entry(
+                  -1LL, hibiki::Vst3CrashReportReasonV1::pipe_failure, 2U)) ==
+              hibiki::Vst3CrashReportResultV1::ok);
+        CHECK(store.append(make_entry(
+                  1700000456LL,
+                  hibiki::Vst3CrashReportReasonV1::job_object_failure,
+                  9U)) == hibiki::Vst3CrashReportResultV1::ok);
+        std::array<char, 4096> document{};
+        std::size_t written = 0U;
+        CHECK(hibiki::serialize_vst3_crash_report_store_v1(
+                  store, document, written) ==
+              hibiki::Vst3CrashReportResultV1::ok);
+        CHECK(written > 0U);
+        hibiki::Vst3CrashReportStoreV1 parsed;
+        CHECK(hibiki::parse_vst3_crash_report_store_v1(
+                  {document.data(), written}, parsed) ==
+              hibiki::Vst3CrashReportResultV1::ok);
+        CHECK(parsed.size() == store.size());
+        CHECK(parsed.entry_at(0U).captured_utc == store.entry_at(0U).captured_utc);
+        CHECK(parsed.entry_at(0U).reason == store.entry_at(0U).reason);
+        CHECK(parsed.entry_at(0U).exit_code == store.entry_at(0U).exit_code);
+        CHECK(parsed.entry_at(0U).module_sha256 == store.entry_at(0U).module_sha256);
+        CHECK(parsed.entry_at(1U).uptime_ms == store.entry_at(1U).uptime_ms);
+        std::array<char, 4096> document_again{};
+        std::size_t written_again = 0U;
+        CHECK(hibiki::serialize_vst3_crash_report_store_v1(
+                  parsed, document_again, written_again) ==
+              hibiki::Vst3CrashReportResultV1::ok);
+        CHECK(written == written_again);
+        CHECK(std::memcmp(document.data(), document_again.data(), written) == 0);
+
+        // Fail-closed rejections: malformed structure, unknown enum spelling,
+        // out-of-range values, wrong digest length, oversized documents.
+        const auto rejects = [&](const std::string& text) {
+            hibiki::Vst3CrashReportStoreV1 sink;
+            return hibiki::parse_vst3_crash_report_store_v1(
+                       {text.data(), text.size()}, sink) !=
+                   hibiki::Vst3CrashReportResultV1::ok;
+        };
+        constexpr const char* kDigestHex =
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852"
+            "b855";
+        CHECK(rejects(""));
+        CHECK(rejects("not json"));
+        CHECK(rejects("{}"));
+        CHECK(rejects("{\"schema_version\":2,\"entries\":[]}"));
+        CHECK(rejects("{\"schema_version\":1}"));
+        CHECK(rejects("{\"schema_version\":1,\"entries\":{},}"));
+        CHECK(rejects("{\"schema_version\":1,\"entries\":[],\"extra\":true}"));
+        CHECK(rejects(std::string("{\"schema_version\":1,\"entries\":[{") +
+                      "\"schema_version\":1,\"captured_utc\":1700000000," +
+                      "\"reason\":\"segfault\",\"exit_code\":1," +
+                      "\"uptime_ms\":10,\"module_sha256\":\"" +
+                      kDigestHex + "\"}]}"));
+        CHECK(rejects(std::string("{\"schema_version\":1,\"entries\":[{") +
+                      "\"schema_version\":1,\"captured_utc\":1700000000," +
+                      "\"reason\":\"none\",\"exit_code\":4294967296," +
+                      "\"uptime_ms\":10,\"module_sha256\":\"" +
+                      kDigestHex + "\"}]}"));
+        CHECK(rejects(std::string("{\"schema_version\":1,\"entries\":[{") +
+                      "\"schema_version\":1,\"captured_utc\":1700000000," +
+                      "\"reason\":\"none\",\"exit_code\":1," +
+                      "\"uptime_ms\":10,\"module_sha256\":\"nothex\"}]}"));
+        const std::string oversized(
+            hibiki::kVst3CrashReportMaxDocumentBytesV1 + 1U, ' ');
+        CHECK(rejects(oversized));
     }
 
     return 0;

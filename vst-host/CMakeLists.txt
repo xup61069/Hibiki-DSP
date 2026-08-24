@@ -16,6 +16,7 @@ add_library(hibiki_vst_host STATIC
   src/vst3_scene_state.cpp
   src/vst3_scene_state_preflight.cpp
   src/vst3_bus_layout.cpp
+  src/vst3_crash_report.cpp
 )
 
 add_executable(hibiki_vst_worker
