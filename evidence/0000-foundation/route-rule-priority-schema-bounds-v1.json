@@ -8,14 +8,37 @@
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1071",
     "pwsh -NoProfile -File tools/docs-check.ps1",
     "pwsh -NoProfile -File tools/source-policy.ps1",
+    "pwsh -NoProfile -File tools/verify.ps1",
     "git diff --check"
   ],
-  "results": [],
+  "results": [
+    {
+      "command": "handoff-check",
+      "status": "pass"
+    },
+    {
+      "command": "docs-check",
+      "status": "pass"
+    },
+    {
+      "command": "source-policy",
+      "status": "pass"
+    },
+    {
+      "command": "verify",
+      "status": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass"
+    }
+  ],
   "limitations": [
     "Schema-only: aligns persisted priority bounds with SPEC-0013 and all other consumers.",
     "Existing runtime store contract tests already reject +/-1000001; no new test needed."
   ],
   "logs": {},
-  "tool_versions": {"powershell": "pwsh local"}
+  "tool_versions": {
+    "powershell": "pwsh local"
+  }
 }
-
