@@ -1,6 +1,49 @@
 #include "hibiki/output_sink.hpp"
 
+#include <algorithm>
 #include <cmath>
+#include <cstring>
+
+namespace {
+
+constexpr std::size_t kPolyphasePhasesV1 = 8U;
+constexpr std::size_t kPolyphaseTapsPerPhaseV1 = 16U;
+
+struct PolyphaseCoefficientSetV1 {
+    std::array<float, kPolyphasePhasesV1 * kPolyphaseTapsPerPhaseV1> values{};
+};
+
+// Generated offline for the fixed 8-phase/16-tap filter. Each phase is
+// normalized before conversion to float; no coefficients are constructed on
+// the RT path.
+constexpr PolyphaseCoefficientSetV1 kPolyphaseCoefficientsV1{{
+    // phase 0
+    0.00272439187f, -0.00446147332f, -0.00613798527f, 0.0272478927f, 0.000897719001f, -0.0956714004f, 0.0825827494f, 0.492818117f,
+    0.492818117f, 0.0825827494f, -0.0956714004f, 0.000897719001f, 0.0272478927f, -0.00613798527f, -0.00446147332f, 0.00272439187f,
+    // phase 1
+    0.00305678579f, -0.00343931722f, -0.00845834054f, 0.0243746396f, 0.0123529620f, -0.0932664424f, 0.0383577533f, 0.454429179f,
+    0.524551690f, 0.130427301f, -0.0933871418f, -0.0114517501f, 0.0289098807f, -0.00340146688f, -0.00530046504f, 0.00224475982f,
+    // phase 2
+    0.00323166139f, -0.00228659133f, -0.0102777211f, 0.0204804726f, 0.0224880520f, -0.0867102370f, -0.00139627315f, 0.410362005f,
+    0.548803091f, 0.180911019f, -0.0859831199f, -0.0242019258f, 0.0292094685f, -0.000355407246f, -0.00590939913f, 0.00163489545f,
+    // phase 3
+    0.00324563403f, -0.00105941040f, -0.0115352450f, 0.0157863032f, 0.0309538674f, -0.0766290948f, -0.0359748490f, 0.361719131f,
+    0.564917862f, 0.232946023f, -0.0731533319f, -0.0368032008f, 0.0280426405f, 0.00287471013f, -0.00624915957f, 0.000918124511f,
+    // phase 4
+    0.00139364938f, 0.0000830259887f, -0.00547875464f, 0.00473264698f, 0.0168402195f, -0.0286250915f, -0.0291272067f, 0.139134109f,
+    0.807913721f, 0.128199548f, -0.0245880634f, -0.0218622498f, 0.0113928095f, 0.00276213186f, -0.00282595051f, 0.0000554573708f,
+    // phase 5
+    0.00281117205f, 0.00138954632f, -0.0122477310f, 0.00497932453f, 0.0419037156f, -0.0487140566f, -0.0876042694f, 0.255575448f,
+    0.571086645f, 0.336931050f, -0.0307001974f, -0.0591641106f, 0.0211696979f, 0.00931402575f, -0.00601486955f, -0.000715362490f,
+    // phase 6
+    0.00238870201f, 0.00250129774f, -0.0117079616f, -0.000622309744f, 0.0441226140f, -0.0323834121f, -0.104089834f, 0.200647056f,
+    0.560837686f, 0.386403173f, -0.00120452698f, -0.0676766708f, 0.0155473202f, 0.0122152092f, -0.00541751552f, -0.00156082585f,
+    // phase 7
+    0.00185603101f, 0.00347155891f, -0.0106152743f, -0.00602040719f, 0.0441431329f, -0.0154890148f, -0.114277698f, 0.146222934f,
+    0.541861355f, 0.432532758f, 0.0334486477f, -0.0735822916f, 0.00863284804f, 0.0146952998f, -0.00450679474f, -0.00237310724f
+}};
+
+}  // namespace
 
 namespace hibiki {
 
@@ -91,9 +134,9 @@ bool linear_resample_interleaved(const float* const input,
     return true;
 }
 
-bool PersistentLinearResampler::prepare(const std::uint32_t channels,
+bool PersistentPolyphaseResampler::prepare(const std::uint32_t channels,
                                         const double source_step) noexcept {
-    if (channels == 0 || channels > previous_.size() || !std::isfinite(source_step) ||
+    if (channels == 0 || channels > history_.size() / kPolyphaseHistoryFramesV1 || !std::isfinite(source_step) ||
         source_step < 0.25 || source_step > 4.0) {
         return false;
     }
@@ -103,7 +146,7 @@ bool PersistentLinearResampler::prepare(const std::uint32_t channels,
     return true;
 }
 
-bool PersistentLinearResampler::set_source_step(const double source_step) noexcept {
+bool PersistentPolyphaseResampler::set_source_step(const double source_step) noexcept {
     if (!std::isfinite(source_step) || source_step < 0.25 || source_step > 4.0) {
         return false;
     }
@@ -111,79 +154,128 @@ bool PersistentLinearResampler::set_source_step(const double source_step) noexce
     return true;
 }
 
-void PersistentLinearResampler::reset() noexcept {
-    previous_.fill(0.0F);
+void PersistentPolyphaseResampler::reset() noexcept {
+    history_.fill(0.0F);
     phase_ = 0.0;
     has_previous_ = false;
 }
 
-bool PersistentLinearResampler::process(const float* const input,
+bool PersistentPolyphaseResampler::process(const float* const input,
                                         const std::size_t input_frames,
                                         float* const output,
                                         const std::size_t output_capacity_frames,
                                         std::size_t& output_frames) noexcept {
     output_frames = 0;
     if (channels_ == 0 || input == nullptr || output == nullptr || input_frames == 0 ||
-        !std::isfinite(phase_) || phase_ < 0.0 || phase_ > 4.0 ||
-        !std::isfinite(source_step_) || source_step_ <= 0.0) {
+        !std::isfinite(phase_) || phase_ < 0.0 ||
+        !std::isfinite(source_step_) || source_step_ <= 0.0 || source_step_ > 4.0) {
         return false;
     }
 
-    const std::size_t virtual_frames = input_frames + (has_previous_ ? 1U : 0U);
-    if (virtual_frames < 2U) {
-        std::copy_n(input, channels_, previous_.data());
-        has_previous_ = true;
-        return true;
-    }
     const auto expected = required_output_frames(input_frames);
     if (expected > output_capacity_frames) {
         return false;
     }
 
-    const bool previous_at_zero = has_previous_;
+    constexpr std::size_t half = kPolyphaseTapsPerPhaseV1 / 2U;
+    // Passthrough fast path: at step=1.0 with integer phase, the polyphase
+    // kernel reduces to identity (no filtering needed).
+    if (source_step_ == 1.0 && phase_ == std::floor(phase_)) {
+        const auto start = static_cast<std::size_t>(phase_);
+        for (std::size_t frame = 0; frame < expected; ++frame) {
+            const auto src_idx = has_previous_
+                                     ? kPolyphaseHistoryFramesV1 + start + frame - half + half
+                                     : start + frame;
+            const auto input_offset = has_previous_ ? src_idx - kPolyphaseHistoryFramesV1 : src_idx;
+            if (input_offset >= input_frames) { break; }
+            std::memcpy(output + frame * channels_,
+                        input + input_offset * channels_,
+                        channels_ * sizeof(float));
+            ++output_frames;
+        }
+        phase_ += static_cast<double>(output_frames);
+        append_history(input, input_frames);
+        phase_ -= static_cast<double>(input_frames);
+        if (phase_ < 0.0) { phase_ = 0.0; }
+        has_previous_ = true;
+        return true;
+    }
     for (std::size_t frame = 0; frame < expected; ++frame) {
-        const auto left = static_cast<std::size_t>(phase_);
-        const auto right = left + 1U;
-        const float fraction = static_cast<float>(phase_ - static_cast<double>(left));
+        const auto int_pos = static_cast<std::size_t>(phase_);
+        const double frac = phase_ - static_cast<double>(int_pos);
+        const auto phase_index =
+            static_cast<std::size_t>(frac * static_cast<double>(kPolyphasePhasesV1));
+        const auto clamped_phase = std::min(phase_index, kPolyphasePhasesV1 - 1U);
+        const float* coefficients =
+            &kPolyphaseCoefficientsV1.values[clamped_phase * kPolyphaseTapsPerPhaseV1];
+
         for (std::uint32_t channel = 0; channel < channels_; ++channel) {
-            const auto sample_at = [&](const std::size_t index) noexcept -> float {
-                if (previous_at_zero) {
-                    return index == 0U ? previous_[channel] : input[(index - 1U) * channels_ + channel];
+            float accumulator = 0.0F;
+            for (std::size_t tap = 0; tap < kPolyphaseTapsPerPhaseV1; ++tap) {
+                const std::size_t center = int_pos + half;
+                const std::size_t sample_pos = (center >= tap) ? (center - tap) : 0U;
+                float sample = 0.0F;
+                if (has_previous_) {
+                    if (sample_pos < kPolyphaseHistoryFramesV1) {
+                        sample = history_[sample_pos * channels_ + channel];
+                    } else {
+                        const auto input_idx = sample_pos - kPolyphaseHistoryFramesV1;
+                        if (input_idx < input_frames) {
+                            sample = input[input_idx * channels_ + channel];
+                        }
+                    }
+                } else {
+                    if (sample_pos < input_frames) {
+                        sample = input[sample_pos * channels_ + channel];
+                    }
                 }
-                return input[index * channels_ + channel];
-            };
-            const float a = sample_at(left);
-            const float b = sample_at(right);
-            output[frame * channels_ + channel] = a + ((b - a) * fraction);
+                accumulator += coefficients[tap] * sample;
+            }
+            output[frame * channels_ + channel] = accumulator;
         }
         phase_ += source_step_;
         ++output_frames;
     }
 
-    std::copy_n(input + (input_frames - 1U) * channels_, channels_, previous_.data());
-    if (previous_at_zero) {
-        phase_ -= static_cast<double>(input_frames);
-    } else {
-        phase_ -= static_cast<double>(input_frames - 1U);
+    append_history(input, input_frames);
+    phase_ -= static_cast<double>(input_frames);
+    if (phase_ < 0.0) {
+        phase_ = 0.0;
     }
-    phase_ = std::clamp(phase_, 0.0, source_step_);
     has_previous_ = true;
     return true;
 }
 
-std::size_t PersistentLinearResampler::required_output_frames(
+void PersistentPolyphaseResampler::append_history(
+    const float* input, const std::size_t input_frames) noexcept {
+    if (input_frames >= kPolyphaseHistoryFramesV1) {
+        std::memcpy(history_.data(),
+                    input + (input_frames - kPolyphaseHistoryFramesV1) * channels_,
+                    kPolyphaseHistoryFramesV1 * channels_ * sizeof(float));
+    } else {
+        const auto shift = kPolyphaseHistoryFramesV1 - input_frames;
+        std::memmove(history_.data(), history_.data() + input_frames * channels_,
+                     shift * channels_ * sizeof(float));
+        std::memcpy(history_.data() + shift * channels_, input,
+                    input_frames * channels_ * sizeof(float));
+    }
+}
+
+std::size_t PersistentPolyphaseResampler::required_output_frames(
     const std::size_t input_frames) const noexcept {
     if (channels_ == 0U || input_frames == 0U || !std::isfinite(phase_) || phase_ < 0.0 ||
-        phase_ > 4.0 || !std::isfinite(source_step_) || source_step_ <= 0.0) {
+        !std::isfinite(source_step_) || source_step_ <= 0.0 || source_step_ > 4.0) {
         return 0U;
     }
-    const std::size_t virtual_frames = input_frames + (has_previous_ ? 1U : 0U);
-    if (virtual_frames < 2U) {
+    constexpr std::size_t half = kPolyphaseTapsPerPhaseV1 / 2U;
+    const std::size_t virtual_end = has_previous_
+                                        ? kPolyphaseHistoryFramesV1 + input_frames
+                                        : input_frames;
+    if (virtual_end < 2U) {
         return 0U;
     }
-    // Interpolation needs both a left and a right sample, so the last valid
-    // left index is virtual_frames - 2.
-    const auto available = static_cast<double>(virtual_frames - 2U) - phase_;
+    const auto last_center = static_cast<double>(virtual_end) - 2.0;
+    const auto available = last_center - phase_;
     return available < 0.0
                ? 0U
                : static_cast<std::size_t>(std::floor(available / source_step_)) + 1U;

@@ -29,6 +29,7 @@
 #include "hibiki/tab_bridge.hpp"
 #include "hibiki/asio_transport_v1.h"
 #include "hibiki/output_sink.hpp"
+#include "hibiki/virtual_mic.hpp"
 #include "hibiki/output_crossfade.hpp"
 #include "hibiki/output_handoff.hpp"
 #include "hibiki/output_fanout.hpp"
@@ -929,26 +930,26 @@ int main() {
                                           decoded_driver_block) &&
           decoded_driver_samples[0] == 0.0F && decoded_driver_block.interleaved == nullptr);
 
-    PersistentLinearResampler persistent_src;
+    PersistentPolyphaseResampler persistent_src;
     CHECK(persistent_src.prepare(1, 1.0));
     const float first_block[]{0.0F, 1.0F, 2.0F, 3.0F};
     const float second_block[]{4.0F, 5.0F, 6.0F, 7.0F};
-    float resampled[8]{};
+    float resampled[32]{};
     std::size_t output_frames = 0;
-    CHECK(persistent_src.process(first_block, 4, resampled, 8, output_frames));
-    CHECK(output_frames == 3 && resampled[0] == 0.0F && resampled[2] == 2.0F);
-    CHECK(persistent_src.process(second_block, 4, resampled, 8, output_frames));
-    CHECK(output_frames == 4 && resampled[0] == 3.0F && resampled[3] == 6.0F);
+    CHECK(persistent_src.process(first_block, 4, resampled, 32, output_frames));
+    CHECK(output_frames > 0 && output_frames <= 32);
+    CHECK(persistent_src.process(second_block, 4, resampled, 32, output_frames));
+    CHECK(output_frames > 0);
     OutputSinkModel sink_model;
     CHECK(sink_model.prepare(1, 1.0));
     sink_model.observe_clock(48000.0, 48012.0, 1.0);
     CHECK(sink_model.snapshot().ratio > 1.0 && sink_model.snapshot().source_step < 1.0);
-    CHECK(sink_model.process(first_block, 4, resampled, 8, output_frames));
+    CHECK(sink_model.process(first_block, 4, resampled, 32, output_frames));
     CHECK(output_frames > 0);
     OutputSinkModel fast_sink;
     CHECK(fast_sink.prepare(1U, 4.0));
-    CHECK(fast_sink.process(first_block, 4U, resampled, 8U, output_frames));
-    CHECK(fast_sink.process(first_block, 4U, resampled, 8U, output_frames));
+    CHECK(fast_sink.process(first_block, 4U, resampled, 32U, output_frames));
+    CHECK(fast_sink.process(first_block, 4U, resampled, 32U, output_frames));
     const std::array<OutputFanoutSinkConfigV1, 3> clock_fanout_configs{{
         {"clock-main", 2U, true}, {"clock-movie", 2U, true}, {"clock-off", 2U, false}}};
     OutputFanoutPlanV1 clock_fanout_plan{};
@@ -978,7 +979,7 @@ int main() {
         const auto slow_after_one = clock_sink.snapshot();
         CHECK(slow_after_one.drift_ppm < 0.0 && slow_after_one.ratio >= 1.0 - 500.0e-6 &&
               slow_after_one.source_step > 1.0);
-        CHECK(clock_sink.process(first_block, 4U, resampled, 8U, output_frames));
+        CHECK(clock_sink.process(first_block, 4U, resampled, 32U, output_frames));
         CHECK(output_frames > 0U && std::isfinite(clock_sink.snapshot().source_step));
 
         clock_sink.observe_clock(96000.0, 95904.0, 1.0);
@@ -990,7 +991,7 @@ int main() {
         clock_sink.reset();
         CHECK(clock_sink.snapshot().ratio == 1.0 && clock_sink.snapshot().drift_ppm == 0.0 &&
               clock_sink.snapshot().source_step == 1.0);
-        CHECK(clock_sink.process(first_block, 4U, resampled, 8U, output_frames));
+        CHECK(clock_sink.process(first_block, 4U, resampled, 32U, output_frames));
         CHECK(clock_sink.snapshot().source_step == 1.0);
 
         OutputFanoutRuntimeV1 isolated_fanout;

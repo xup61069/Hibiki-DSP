@@ -27,7 +27,7 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
 - Chrome／Edge 單分頁擷取必須由使用者點擊 MV3 extension 啟動；Windows process routing
   不得假裝能靜默辨識 tab。
 - user-space output prototype 使用 caller-owned interleaved ring buffer、bounded clock-drift
-  ratio（±500 ppm）與無配置線性 SRC；真正 sink 必須保留相同的 no-allocation boundary，並
+  ratio（±500 ppm）與無配置多相位 SRC；真正 sink 必須保留相同的 no-allocation boundary，並
   在實體時鐘 fixture 上替換為持續相位／高品質 filter。
 - `sdk/include/hibiki/driver_control_v1.h` 定義 Apache-2.0 C ABI；`driver/` 的 validator
   保持 MS-PL，檢查固定 header、Q16.16 dB、格式與 endpoint GUID 邊界。這不是可載入的
