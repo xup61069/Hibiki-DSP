@@ -20,15 +20,24 @@ Codex 的 `/goal` 適合跨多輪長任務，但不是「永遠從待辦清單�
 遇到專有名詞時，第一次出現就順手翻成白話。內部仍須完整遵守 handoff、scope、驗證與 evidence
 規則；只是不要把維護者不關心的 Git 流程當成對話主角。
 
+## 上下文控制
+
+- 每個視窗一開始只讀 `AGENTS.md`、`docs/START_HERE.md` 與 active Issue handoff；Spec、ADR、source、
+  tests、evidence 依 handoff 載入，全域 handoff／baseline／project map 只查當前決策需要的段落。
+- 使用 `tools/context-pack.ps1 -Issue <issue> -NoSource` 取得有 48,000 字元上限的最小包。不要把
+  repository 規則、全域歷史或上一個視窗聊天再貼一次；repository-wide state 必須明確 opt in。
+- 每完成一個里程碑就把已完成、驗證、限制、ID／commit 與唯一下一步寫回 Issue handoff。若同一
+  視窗發生第二次上下文壓縮，完成 checkpoint 後換新視窗，不在反覆壓縮的上下文繼續擴張工作。
+
 ## 五個主要視窗
 
-### 1. 長駐 V1 總管（最長時間使用）
+### 1. V1 總管（跨里程碑協調、定期換窗）
 
 這個視窗負責排序、拆分、整合與維持「目前到底完成到哪裡」的真實狀態。它可以跑很久，但終點
-仍是可驗證的 V1 驗收，而不是無限制擴張產品。
+仍是可驗證的 V1 驗收，而不是無限制擴張產品；每個里程碑完成後先 checkpoint，反覆壓縮時換窗。
 
 ```text
-/goal 把 Hibiki DSP 推進到 accepted V1 驗收條目全部可重跑通過；先讀 AGENTS.md、docs/START_HERE.md、docs/AI_HANDOFF.md、docs/state/BASELINE.md 與 active handoffs，建立或整理可驗證的 V1 缺口，每輪只選一個不與其他視窗重疊、可獨立驗收的最高價值里程碑，完成協調與驗證後再進下一輪；只有尚未分配且 write scope 明確歸本視窗的工作才自行實作或整合，不搶占已分配的 UI、音訊核心、Windows／driver 或驗證範圍。每次先用白話說產品變好了什麼、使用者會感覺到什麼、怎麼確認與還缺什麼，GitHub 細節只放末尾短記錄。除非全部 V1 驗收通過，或遇到需要我決定、外部帳號／付費／硬體、安裝或簽章、會改變機器狀態、scope 衝突或無法安全前進的阻擋，否則持續工作。
+/goal 把 Hibiki DSP 推進到 accepted V1 驗收條目全部可重跑通過；先讀 AGENTS.md、docs/START_HERE.md 與 active handoffs，不預載整份 AI_HANDOFF、BASELINE、PROJECT_MAP 或舊聊天，只依當前決策查相關段落。每輪只選一個不與其他視窗重疊、可獨立驗收的最高價值里程碑；只有尚未分配且 write scope 明確歸本視窗的工作才自行實作或整合，不搶占已分配範圍。每個里程碑完成後把成果、驗證、限制與唯一下一步 checkpoint 到 Issue；同一視窗第二次壓縮時停止擴張，交由新視窗從最小 pack 接續。每次先用白話說產品變好了什麼、怎麼確認與還缺什麼。除非全部 V1 驗收通過，或遇到需要我決定、外部帳號／付費／硬體、安裝或簽章、會改變機器狀態、scope 衝突或無法安全前進的阻擋，否則持續工作。
 ```
 
 ### 2. 介面與操作體驗
@@ -57,7 +66,8 @@ Codex 的 `/goal` 適合跨多輪長任務，但不是「永遠從待辦清單�
 
 ## 怎麼開最實用
 
-- 平常先開 **長駐 V1 總管**，由它把當前缺口整理成具名里程碑，再開一至三個專門視窗；不必五個全開。
+- 平常先開 **V1 總管**，由它把當前缺口整理成具名里程碑，再開一至三個專門視窗；不必五個全開。
 - 專門視窗負責做深，總管負責避免重複、確認成果能接回產品。
 - 想問進度時直接問「現在產品多了什麼、還差什麼？」；不需要追問 branch 或 PR。
-- Goal 跑完一個具名成果就讓它停止、換下一個 Goal；不要把互不相關的 backlog 塞進同一個 Goal。
+- Goal 跑完一個具名成果就 checkpoint 並停止；下一個里程碑或第二次壓縮後換新視窗，不把互不相關
+  backlog 塞進同一個 Goal。

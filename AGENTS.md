@@ -6,8 +6,10 @@
 2. **產品與流程預設**：可以討論、可以用新 ADR/Spec 取代的預設值。
 3. **驗證門檻**：依變更範圍觸發的檢查；簽章與發行屬 release 階段，不是日常開發前置。
 
-開始工作前先讀本檔、`docs/START_HERE.md` 與 `docs/AI_HANDOFF.md`；聊天紀錄、AI memory
-與 IDE 規則都不是專案真值。
+開始工作前只先讀本檔與 `docs/START_HERE.md`，取得指派後再讀對應 Issue handoff 與其指定的
+Spec／ADR。`docs/AI_HANDOFF.md`、`docs/state/BASELINE.md`、`docs/PROJECT_MAP.md` 與完整
+`docs/ai/MULTI_AGENT.md` 依角色與當前問題按需查閱，不得在每個視窗預載或重複貼入；聊天紀錄、
+AI memory 與 IDE 規則都不是專案真值。
 
 ## 第一層：硬性限制（不可協商）
 

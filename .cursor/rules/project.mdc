@@ -5,7 +5,7 @@ alwaysApply: true
 
 <!-- GENERATED_FROM: AGENTS.md -->
 
-Read `AGENTS.md`, `docs/START_HERE.md` and `docs/AI_HANDOFF.md` before editing. Never invent stable
-IDs, private device data, licenses or binary release artifacts. Follow the
-Issue handoff and update the relevant Spec/ADR/evidence with every public
+Read `AGENTS.md` and `docs/START_HERE.md` first. Once assigned, load only the active Issue handoff
+and its referenced Spec/ADR; do not preload global history. Never invent stable IDs, private device
+data, licenses or binary release artifacts. Update relevant Spec/ADR/evidence with every public
 contract change.
