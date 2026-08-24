@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1028,
   "scope_digest": "lane-token-revision-bounds-v1",
-  "source_commit": "65188772",
+  "source_commit": "9fc89f926aa3bb8d51efeb3c38dc02beb47a9af2",
   "environment_fingerprint": "windows-amd64-pwsh-lane-token-revision-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1028",

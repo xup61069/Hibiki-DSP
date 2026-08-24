@@ -2,7 +2,7 @@
   "schema_version": 1,
   "issue": 1020,
   "scope_digest": "driver-generation-bounds-v1",
-  "source_commit": "901fe1ed",
+  "source_commit": "514b07a49dc090feae101927f86eb6adae60f76b",
   "environment_fingerprint": "windows-amd64-pwsh-driver-generation-bounds",
   "commands": [
     "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1020",
