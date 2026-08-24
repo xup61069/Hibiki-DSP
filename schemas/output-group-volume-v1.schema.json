@@ -11,7 +11,7 @@
     "safety_ceiling_db": {"type": "number", "minimum": -144, "maximum": 12},
     "effective_db": {"type": "number", "minimum": -144, "maximum": 12},
     "mute": {"type": "boolean"},
-    "generation": {"type": "integer", "minimum": 0},
+    "generation": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
     "origin": {"enum": ["windows", "hibiki-ui", "safety", "scene", "session"]},
     "actuator": {"enum": ["internal-dsp", "device-hardware", "strict-direct"]}
   }
