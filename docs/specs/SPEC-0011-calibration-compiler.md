@@ -34,7 +34,7 @@ schema 層對 `measured_db` 與 `target_db` 限制為 -144 至 +12 dB，與系�
 volume floor 和 safety ceiling 一致，拒絕不合理量測值進入控制平面。
 `schemas/peq-filter-v1.schema.json` 的原子 JSON 載入／保存及相同演算法的編譯與匯出。
 schema 層的 `device_id` 上限為 260 字元（`maxLength: 260`）且拒絕 C0/C1 控制字元
-（printable exclusion pattern）；C# 控制模型進一步以 UTF-8 位元組數實施 260-byte
+（anchored printable exclusion pattern）；C# 控制模型進一步以 UTF-8 位元組數實施 260-byte
 上限，並用 `char.IsControl` 執行相同的控制字元排除，與 physical device catalog 的
 endpoint ID 邊界一致。多位元組文字即使不超過 260 個字元，也會在進入控制平面或
 校正檔前被拒絕。
