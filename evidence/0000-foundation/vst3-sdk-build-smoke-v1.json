@@ -2,10 +2,13 @@
   "evidence_format": 2,
   "issue": 1177,
   "source_provenance": {
-    "mode": "change",
-    "paths": [],
+    "mode": "snapshot",
+    "snapshot_commit": "77cadeb027ead56b3a723b78cda96d2096a58215",
+    "paths": [
+      "vst-host/CMakeLists.txt"
+    ],
     "digest_algorithm": "sha256-git-source-set-v1",
-    "digest": "b171090323ecb715157554f235af12629142a7b256da2bed7d0bfe6e759ddb1e"
+    "digest": "0bbf8a0b34ec32cece5ab823af294cd970198a987a1d8705deb1234988eb687e"
   },
   "metadata": {
     "scope": "vst3-sdk-build-smoke-v1",
