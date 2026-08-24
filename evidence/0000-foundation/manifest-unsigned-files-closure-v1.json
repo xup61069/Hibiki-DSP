@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "issue": 1052,
-  "scope_digest": "release-manifest-item-props-v1",
+  "scope_digest": "manifest-unsigned-files-closure-v1",
   "source_commit": "b1a32704d69edae22601a9e8620d229eacd96cd0",
   "environment_fingerprint": "windows-amd64-pwsh-release-manifest-props",
   "commands": [
