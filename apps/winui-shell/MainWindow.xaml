@@ -33,7 +33,7 @@
 
 
 
-        <controls:NavigationView xmlns:controls="using:Microsoft.UI.Xaml.Controls" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Name="ShellNav" IsBackButtonVisible="Collapsed" IsSettingsVisible="False" OpenPaneLength="216" SelectionChanged="OnShellNavSelectionChanged" AutomationProperties.Name="主要導覽">
+        <controls:NavigationView x:Name="ShellNav" IsBackButtonVisible="Collapsed" IsSettingsVisible="False" OpenPaneLength="216" SelectionChanged="OnShellNavSelectionChanged" AutomationProperties.Name="主要導覽">
   <controls:NavigationView.MenuItems>
     <controls:NavigationViewItem Content="快速開始" Tag="home" IsSelected="True" AutomationProperties.Name="快速開始頁面">
       <controls:NavigationViewItem.Icon>
@@ -79,7 +79,7 @@
       </Grid.RowDefinitions>
       <controls:InfoBar x:Name="DisconnectedBanner" IsOpen="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}" Severity="Warning" Title="尚未連接引擎" Message="連接後才能套用場景、音量與路由控制。點擊「連接引擎」開始。" IsClosable="False" Margin="28,12,24,0" AutomationProperties.Name="引擎連線狀態提醒" Grid.Row="0" /><ScrollViewer Grid.Row="1" Padding="28,0,24,28">
         <StackPanel MaxWidth="1080" Spacing="16">
-          <Grid x:Name="ShellHomeSection"><Border Padding="24" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+          <Grid x:Name="ShellHomeSection"><Border Padding="24" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
                     <Grid x:Name="HeroLayout" ColumnSpacing="32" RowSpacing="16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" MinWidth="300" />
@@ -139,7 +139,7 @@
                         </StackPanel>
                     </Grid>
                 </Border></Grid>
-          <Grid x:Name="ShellScenesSection" Visibility="Collapsed"><Border Padding="24" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+          <Grid x:Name="ShellScenesSection" Visibility="Collapsed"><Border Padding="24" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
                     <StackPanel Spacing="12">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
@@ -177,7 +177,7 @@
                         </controls:ItemsRepeater>
                     </StackPanel>
                 </Border></Grid>
-          <Grid x:Name="ShellPresetsSection" Visibility="Collapsed"><Border Padding="24" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+          <Grid x:Name="ShellPresetsSection" Visibility="Collapsed"><Border Padding="24" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
                     <StackPanel Spacing="12">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
@@ -186,7 +186,7 @@
                         <TextBlock Text="建立最多 32 個自訂卡片；完整 DSP graph 由引擎端 Scene catalog 驗證。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         <controls:ItemsRepeater ItemsSource="{Binding CustomSceneCards}">
                             <controls:ItemsRepeater.Layout>
-                                <controls:StackLayout Spacing="8" />
+                                <controls:UniformGridLayout MaximumRowsOrColumns="2" MinItemWidth="260" MinItemHeight="72" />
                             </controls:ItemsRepeater.Layout>
                             <controls:ItemsRepeater.ItemTemplate>
                                 <DataTemplate>
@@ -243,7 +243,7 @@
                         <Button Content="加入自訂預設" Click="OnAddCustomSceneClick" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" MinHeight="40" FontWeight="SemiBold" AutomationProperties.Name="加入自訂預設" AutomationProperties.HelpText="加入後會保存到本機 user-space preset 檔案" />
                     </StackPanel>
                 </Border></Grid>
-          <Grid x:Name="ShellVolumeSection" Visibility="Collapsed"><Border Padding="24" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+          <Grid x:Name="ShellVolumeSection" Visibility="Collapsed"><Border Padding="24" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
                     <StackPanel Spacing="12">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -297,7 +297,7 @@
                         </Border>
                     </StackPanel>
                 </Border></Grid>
-          <Grid x:Name="ShellVst3Section" Visibility="Collapsed"><Border Padding="16" CornerRadius="8" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+          <Grid x:Name="ShellVst3Section" Visibility="Collapsed"><Border Padding="16" CornerRadius="8" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
                                 <StackPanel Spacing="10">
                                     <TextBlock Text="VST3 時間軸編輯器（本機草稿）" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                     <TextBlock Text="選取時間軸後即可新增、修改或刪除自動化事件；提交前不會觸碰引擎。" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -366,7 +366,7 @@
                                     </Border>
                                 </StackPanel>
                             </Border></Grid>
-          <Grid x:Name="ShellRouteSection" Visibility="Collapsed"><Border Padding="16" CornerRadius="8" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+          <Grid x:Name="ShellRouteSection" Visibility="Collapsed"><Border Padding="16" CornerRadius="8" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
                                 <StackPanel Spacing="10">
                                     <TextBlock Text="來源與路由狀態" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                     <TextBlock Text="{Binding Expert.RouteSummary}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
@@ -487,7 +487,7 @@
                             </Border></Grid>
           <Grid x:Name="ShellExpertSection" Visibility="Collapsed">
             <TextBlock Text="Easy 模式已隱藏 Expert 內容；切換「Expert」後就會顯示這一頁。" TextWrapping="Wrap" Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="{Binding IsExpert, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
-            <Border x:Name="ExpertPanel" Padding="20" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+            <Border x:Name="ExpertPanel" Padding="20" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
               <StackPanel x:Name="ShellExpertContent" Spacing="16" Visibility="{Binding IsExpert, Converter={StaticResource BoolToVisibilityConverter}}"><TextBlock Text="{Binding Expert.StatusText}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" /><Border Padding="16" CornerRadius="8" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                                 <StackPanel Spacing="10">
                                     <TextBlock Text="Matrix" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
