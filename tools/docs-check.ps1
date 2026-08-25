@@ -571,7 +571,7 @@ function Assert-ExtendedPrintableContractSchemas {
       Fields = @('anchor_id')
       Document = [ordered]@{
         schema_version = 1
-        standard = 'iso-226-2023-derived'
+        standard = 'equal-loudness-derived'
         mode = 'relative'
         reference_phon = 40
         strength = 0.5

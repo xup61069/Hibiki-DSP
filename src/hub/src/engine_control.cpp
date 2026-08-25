@@ -89,10 +89,10 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene_catalog(
     definition.loudness.schema_version = 1U;
     switch (payload.standard_id) {
         case 1U:
-            definition.loudness.standard = "iso-226-2023-derived";
+            definition.loudness.standard = "equal-loudness-derived";
             break;
         case 2U:
-            definition.loudness.standard = "iso-226-2023-calibrated";
+            definition.loudness.standard = "equal-loudness-calibrated";
             break;
         default:
             definition.loudness.standard = "invalid";
@@ -193,11 +193,11 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             candidate_loudness.live_update_enabled &&
             validate_policy(candidate_loudness);
         if (mount_loudness_peq) {
-            const Iso226FormulaPointV1 live_points{
+            const EqualLoudnessFormulaPointV1 live_points{
                 1000.0, 0.30, 2.4, 0.0};
             if (!engine_.prepare_loudness_peq(
                     output_group,
-                    std::span<const Iso226FormulaPointV1>(&live_points, 1U),
+                    std::span<const EqualLoudnessFormulaPointV1>(&live_points, 1U),
                     candidate_loudness.reference_phon,
                     candidate_loudness)) {
                 engine_.rollback_graph();
@@ -425,7 +425,7 @@ std::size_t EngineControlWorkerV1::drain(ControlCommandQueueV1& queue,
         // Bounded low-shelf proxy: represent the applied gain as a simple
         // four-point curve that decays toward unity above the correction
         // band. This shows what the level controller changed, not a formal
-        // BS.1770 or ISO 226 response.
+        // BS.1770 or equal-loudness response.
         const double gain = pa.applied_gain_db;
         constexpr std::array<double, 4> frequencies{31.0, 120.0, 1000.0, 8000.0};
         constexpr double shelf_ratios[4] = {1.0, 0.7, 0.3, 0.0};

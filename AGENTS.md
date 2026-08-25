@@ -21,7 +21,7 @@ AI memory 與 IDE 規則都不是專案真值。
 - 不提交 EXE、DLL、SYS、MSI、MSIX、VST3、PE/COFF、憑證或私密金鑰。
 - 真實裝置 ID、校正檔、序號、私人路徑放 `.local/`，不得進 Git。
 - 不反編譯或繞過閉源軟體保護；只用開源程式、官方文件與合法 black-box 觀察。
-- ISO 226 授權文件、掃描、完整表格與受限資料不可放入 repo、Issue、prompt 或 RAG。
+- equal-loudness 授權文件、掃描、完整表格與受限資料不可放入 repo、Issue、prompt 或 RAG。
 - 不宣稱未驗證的能力：user-space probe 不是 driver/WaveRT 或實體音訊 evidence；
   控制命令入列不是已完成音訊套用。專案不需要 HLK 與任何簽章，也不得把它們描述為
   待辦或驗收門檻。
