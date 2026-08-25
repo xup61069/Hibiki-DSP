@@ -2063,6 +2063,15 @@ int main() {
     CHECK(!decode_control_command_v1(corrupted_catalog_frame,
                                      corrupted_catalog_command));
 
+    std::vector<std::uint8_t> reserved_zero_payload = catalog_payload;
+    reserved_zero_payload[84U] = 1U;
+    IpcFrameV1 reserved_zero_frame;
+    reserved_zero_frame.header.type = IpcMessageType::SceneCatalogCommand;
+    reserved_zero_frame.payload = reserved_zero_payload;
+    ControlCommandV1 reserved_zero_command{};
+    CHECK(!decode_control_command_v1(reserved_zero_frame,
+                                     reserved_zero_command));
+
     AudioEngineModel control_engine;
     EngineControlWorkerV1 control_worker(control_engine);
     ControlCommandQueueV1 control_queue;
