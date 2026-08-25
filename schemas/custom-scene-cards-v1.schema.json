@@ -31,7 +31,7 @@
             "$ref": "printable-string-v1.schema.json#/$defs/printableString"
           },
           "safety_enabled": {"type": "boolean"},
-          "loudness_live_update": {"type": "boolean"}
+          "loudness_live_update": {"type": "boolean", "default": false}
         }
       }
     }

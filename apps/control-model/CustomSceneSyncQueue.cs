@@ -245,6 +245,7 @@ public sealed class CustomSceneSyncQueueV1
         public string? IrReference { get; set; }
 
         [JsonPropertyName("loudness_live_update")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public bool LoudnessLiveUpdate { get; set; }
     }
 }
