@@ -34,6 +34,7 @@ add_library(hibiki_hub STATIC
   src/output_handoff.cpp
   src/peq_dsp.cpp
   src/program_loudness.cpp
+  src/vst3_lane_bridge.cpp
   src/scene_graph.cpp
   src/scene_catalog.cpp
   src/scene_presets.cpp
