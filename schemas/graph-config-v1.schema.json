@@ -4,11 +4,12 @@
   "title": "Hibiki GraphConfig v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "lanes", "output_channels", "strict_direct"],
+  "required": ["schema_version", "lanes", "output_channels", "strict_direct", "sample_format"],
   "properties": {
     "schema_version": {"const": 1},
     "output_channels": {"enum": [2, 6, 8]},
     "strict_direct": {"type": "boolean"},
+    "sample_format": {"enum": [0, 1]},
     "lanes": {
       "type": "array",
       "minItems": 1,
