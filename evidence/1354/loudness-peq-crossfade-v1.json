@@ -13,7 +13,7 @@
       "tests/unit/contract_tests.cpp"
     ],
     "digest_algorithm": "sha256-git-source-set-v1",
-    "digest": "2b89b28dc70b79bbb40f2a8eb9e2e4d63647e83753f588efa6d87b5b5ee193aa"
+    "digest": "c79c1d975e730d3bb788b64b2bd767ba5cdb0f15e8384cdd8f0eb621e5cb3c9d"
   },
   "metadata": {
     "scope": "loudness-peq-bounded-rt-crossfade",
