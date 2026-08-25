@@ -106,7 +106,9 @@ public sealed class ListeningDoseModelV1
         // A different local date discards the previous day's accumulation and
         // starts a fresh window anchored at this sample; the date check runs
         // before any gap/trapezoid math so nothing leaks across midnight.
-        var sampleDate = atUtc.LocalDateTime.Date;
+        // DateTime (not LocalDateTime) keeps the wall clock in the sample's
+        // own offset; LocalDateTime would re-anchor to the host time zone.
+        var sampleDate = atUtc.DateTime.Date;
         if (_hasWindowDate && sampleDate != _windowLocalDate)
         {
             _accumulatedDosePercent = 0.0;
