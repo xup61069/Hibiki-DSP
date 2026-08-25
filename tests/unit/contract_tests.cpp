@@ -4146,6 +4146,7 @@ int main() {
     tab_packet[8] = 2U;
     tab_packet[12] = 0x80U; tab_packet[13] = 0xBBU; tab_packet[14] = 0U; tab_packet[15] = 0U;
     const float tab_samples[4] = {0.25F, -0.25F, 0.5F, -0.5F};
+    const float quantum_tab_samples[2U * 128U] = {0.125F, -0.125F};
     std::memcpy(tab_packet.data() + 16U, tab_samples, sizeof(tab_samples));
     TabCapturePacketViewV1 tab_view{};
     TabPacketError tab_error{TabPacketError::None};
@@ -5779,6 +5780,27 @@ int main() {
         engine, 0U, *tab_wasapi_queue, tab_lane_input, 2U, tab_lane_inputs, tab_lane_output, 2U,
         tab_wasapi_block, &tab_effects));
     CHECK(tab_wasapi_block.frames == 0U && tab_wasapi_block.channels == 0U);
+    // A browser render quantum must pass the same frame-capacity contract as
+    // WASAPI: channel count is not frame capacity, while oversized blocks remain
+    // fail-closed.
+    auto quantum_tab_queue = std::make_unique<TabCaptureQueueV1>();
+    const TabCapturePacketViewV1 quantum_tab_view{
+        2U, 128U, 48000U, reinterpret_cast<const std::uint8_t*>(quantum_tab_samples),
+        static_cast<std::size_t>(2U) * 128U};
+    CHECK(quantum_tab_queue->push(quantum_tab_view));
+    std::array<float, 2U * 128U> quantum_tab_input{};
+    std::array<float, 8 * 4096U> quantum_tab_output{};
+    TabCaptureBlockV1 quantum_tab_block{};
+    CHECK(!process_tab_capture_lane_v1(
+        engine, 0U, *quantum_tab_queue, quantum_tab_input.data(), 128U, tab_lane_inputs,
+        quantum_tab_output.data(), 8U, quantum_tab_block));
+    CHECK(quantum_tab_block.frames == 0U && quantum_tab_block.channels == 0U);
+
+    CHECK(quantum_tab_queue->push(quantum_tab_view));
+    CHECK(process_tab_capture_lane_v1(
+        engine, 0U, *quantum_tab_queue, quantum_tab_input.data(), 128U, tab_lane_inputs,
+        quantum_tab_output.data(), 4096U, quantum_tab_block));
+    CHECK(quantum_tab_block.frames == 128U && quantum_tab_block.channels == 2U);
     VirtualMicRouteModel lane_mic;
     CHECK(lane_mic.prepare(VirtualMicConfigV1{2U, 48000U, true}));
     float lane_mic_input[4] = {0.75F, -0.75F, 0.5F, -0.5F};

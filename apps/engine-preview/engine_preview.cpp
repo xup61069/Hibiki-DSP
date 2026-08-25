@@ -1124,7 +1124,7 @@ int wmain(const int argc, wchar_t* const* argv) {
                 engine, 0U, tab_bridge.queue,
                 tab_bridge.input_buffer.data(), kTabBridgeMaxFrames,
                 std::span<hibiki::RtLaneInputV1>(tab_bridge.lane_inputs),
-                tab_bridge.output_buffer.data(), kTabBridgeMaxOutputChannels,
+                tab_bridge.output_buffer.data(), kTabBridgeMaxFrames,
                 block);
             if (delivered) {
                 ++tab_bridge.received_blocks;
