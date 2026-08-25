@@ -2,12 +2,14 @@ const button = document.getElementById('capture');
 const stopButton = document.getElementById('stop');
 const retryButton = document.getElementById('retry-bridge');
 const status = document.getElementById('status');
+const diagnosticsButton = document.getElementById('copy-diagnostics');
 
 let capturing = false;
 let bridgeConnected = false;
 let bridgeReconnectState = 'idle';
 let droppedPackets = 0;
 let retryBusy = false;
+let diagnosticsTimer = 0;
 
 function render() {
   button.disabled = capturing;
@@ -37,6 +39,34 @@ function reconnectText() {
       return `擷取中 — Hibiki 已停止有限次重試；分頁播放繼續${droppedPacketsText()}`;
     default:
       return `擷取中 — 未偵測到 native bridge${droppedPacketsText()}`;
+  }
+}
+
+function buildDiagnosticsSnapshot() {
+  return [
+    'Hibiki tab capture diagnostics',
+    'capturing=' + (capturing ? 'true' : 'false'),
+    'bridgeConnected=' + (bridgeConnected ? 'true' : 'false'),
+    'bridgeReconnectState=' + bridgeReconnectState,
+    'droppedPackets=' + (Number.isFinite(droppedPackets) && droppedPackets >= 0 ? Math.floor(droppedPackets) : 0),
+    'timestampUtc=' + new Date().toISOString(),
+  ].join('\n');
+}
+
+async function copyDiagnosticsSnapshot(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (_) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try { document.execCommand('copy'); } catch (_) {}
+    document.body.removeChild(textarea);
+    return false;
   }
 }
 
@@ -149,6 +179,17 @@ retryButton.addEventListener('click', async () => {
 });
 
 refreshState();
+
+diagnosticsButton.addEventListener('click', async () => {
+  delete status.dataset.error;
+  clearTimeout(diagnosticsTimer);
+  const snapshot = buildDiagnosticsSnapshot();
+  const usedFallback = !(await copyDiagnosticsSnapshot(snapshot));
+  status.textContent = usedFallback ? '已複製（備援模式）' : '診斷資訊已複製';
+  diagnosticsTimer = setTimeout(() => {
+    if (!status.dataset.error) render();
+  }, 2000);
+});
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
