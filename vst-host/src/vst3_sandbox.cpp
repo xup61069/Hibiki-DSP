@@ -145,7 +145,18 @@ void Vst3SandboxProcess::close_handles() noexcept {
 
 void Vst3SandboxProcess::stop() noexcept {
     if (job_handle_ != nullptr) {
-        TerminateJobObject(as_handle(job_handle_), 0U);
+        // Issue 1335: a failed forced termination means kernel containment
+        // could not be enforced; record one de-identified entry so the
+        // control plane can observe the breakdown. The injected test flag
+        // mirrors the real API failure without touching OS handles. stop()
+        // is its own terminal event, so it opens a fresh entry slot first.
+        crash_entry_slot_taken_ = false;
+        const bool force_failure = job_terminate_failure_for_test_;
+        job_terminate_failure_for_test_ = false;
+        if (TerminateJobObject(as_handle(job_handle_), 0U) == FALSE || force_failure) {
+            record_crash_entry(Vst3CrashReportReasonV1::job_object_failure, 0U,
+                               last_heartbeat_ms_);
+        }
         if (process_handle_ != nullptr) WaitForSingleObject(as_handle(process_handle_), 1000U);
     }
     close_handles();
@@ -168,13 +179,31 @@ bool Vst3SandboxProcess::mark_heartbeat(const std::uint64_t now_ms) noexcept {
 void Vst3SandboxProcess::quarantine(const Vst3SandboxDiagnosticReasonV1 reason) noexcept {
     state_ = Vst3SandboxState::Quarantined;
     diagnostic_reason_ = reason;
-    if (job_handle_ != nullptr) TerminateJobObject(as_handle(job_handle_), 1U);
+    if (job_handle_ != nullptr) {
+        // Issue 1335: mirror the stop() path here so a containment
+        // enforcement failure lands in the bounded store. Because
+        // quarantine() always runs before the caller records the original
+        // reason, a recorded job_object_failure naturally claims the
+        // single-event entry slot first and prevents any duplicate.
+        const bool force_failure = job_terminate_failure_for_test_;
+        job_terminate_failure_for_test_ = false;
+        if (TerminateJobObject(as_handle(job_handle_), 1U) == FALSE || force_failure) {
+            record_crash_entry(Vst3CrashReportReasonV1::job_object_failure, 0U,
+                               last_heartbeat_ms_);
+        }
+    }
 }
 
 void Vst3SandboxProcess::record_crash_entry(
     const Vst3CrashReportReasonV1 reason,
     const std::uint32_t exit_code,
     const std::uint64_t now_ms) noexcept {
+    // Issue 1335: one lifecycle event yields at most one entry. The first
+    // reason recorded for an event wins; later callers recording another
+    // reason for the same event are dropped so no duplicate or override
+    // can occur.
+    if (crash_entry_slot_taken_) return;
+    crash_entry_slot_taken_ = true;
     Vst3CrashReportEntryV1 entry{};
     // Wall-clock UTC capture instant (SPEC-0008 requires a non-zero UTC
     // epoch); uptime below keeps using the injected monotonic clock so the
