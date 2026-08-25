@@ -3,7 +3,7 @@ id: SPEC-0009
 status: accepted
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-23
+last_reviewed: 2026-08-25
 review_after_days: 30
 related_adrs: [ADR-0002]
 source_globs: ["extensions/**", "tools/extension-check.ps1"]

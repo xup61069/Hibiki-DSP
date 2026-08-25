@@ -3,7 +3,7 @@ id: SPEC-0010
 status: accepted
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-24
+last_reviewed: 2026-08-25
 review_after_days: 30
 related_adrs: [ADR-0002]
 source_globs: ["apps/control-model/**", "apps/winui-shell/**", "evidence/0000-foundation/winui-vst3-history-clear-v1.json", "tools/winui-shell-check.ps1"]

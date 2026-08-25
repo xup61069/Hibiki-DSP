@@ -3,7 +3,7 @@ id: SPEC-0003
 status: draft
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-22
+last_reviewed: 2026-08-25
 review_after_days: 14
 related_adrs: [ADR-0002, ADR-0004]
 source_globs: ["driver/**", "sdk/**", "apps/**", "asio/**", "extensions/**", "src/**"]

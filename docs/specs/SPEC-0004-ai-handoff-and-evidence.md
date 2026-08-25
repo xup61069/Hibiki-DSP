@@ -3,7 +3,7 @@ id: SPEC-0004
 status: accepted
 owner: hibiki-maintainers
 authority: repository-process
-last_reviewed: 2026-08-24
+last_reviewed: 2026-08-25
 review_after_days: 30
 related_adrs: [ADR-0001]
 source_globs: ["AGENTS.md", "README.md", "CONTRIBUTING.md", ".github/ISSUE_TEMPLATE/ai-task.yml", ".github/PULL_REQUEST_TEMPLATE.md", "docs/**", "evidence/**", "tools/**"]
