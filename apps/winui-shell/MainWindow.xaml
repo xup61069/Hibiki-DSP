@@ -532,7 +532,7 @@
                                     <controls:ItemsRepeater ItemsSource="{Binding Expert.DspGraph}">
                                         <controls:ItemsRepeater.ItemTemplate>
                                             <DataTemplate>
-                                                <StackPanel Padding="12" Spacing="4" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                                <StackPanel Style="{StaticResource RouteItemCardStackStyle}" Spacing="4">
                                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
                                                     <TextBlock Text="{Binding Detail}" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                 </StackPanel>
