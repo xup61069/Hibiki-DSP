@@ -1329,6 +1329,69 @@ int main() {
     multi_group_graph.lanes[0].output_group.assign(kMaxOutputGroupBytes + 1U, 'x');
     CHECK(!validate_graph(multi_group_graph));
 
+    GraphConfigV1 f64_graph;
+    f64_graph.output_channels = 2U;
+    f64_graph.lanes.push_back(LaneConfigV1{"f64", "main", 2U, -6.0205999, true});
+    f64_graph.sample_format = kGraphSampleFormatFloat32V1;
+    CHECK(validate_graph(f64_graph));
+    RtGraphSnapshotV1 f64_snapshot;
+    CHECK(compile_rt_snapshot(f64_graph, 11U, f64_snapshot));
+    CHECK(f64_snapshot.sample_format == kGraphSampleFormatFloat32V1);
+    const double f64_input[] = {0.1, -0.2, 1.0, 0.25};
+    const RtLaneInputF64V1 f64_view{f64_input, 2U};
+    double f64_rendered[2]{};
+    CHECK(process_graph_f64(f64_snapshot, std::span<const RtLaneInputF64V1>(&f64_view, 1),
+                            f64_rendered, 1U));
+    // Legacy float32 default stays source-compatible: the f64 render API is
+    // valid on a default snapshot and accumulates in the double domain.
+    CHECK(std::abs(f64_rendered[0] - 0.05) < 1e-12 &&
+          std::abs(f64_rendered[1] + 0.1) < 1e-12);
+
+    f64_graph.lanes[0].matrix_enabled = true;
+    for (auto& row : f64_graph.lanes[0].channel_matrix) {
+        row.fill(0.0F);
+    }
+    f64_graph.lanes[0].channel_matrix[0][0] = 0.5F;
+    f64_graph.lanes[0].channel_matrix[1][1] = 0.5F;
+    f64_graph.lanes[0].makeup_gain_db = -6.0205999;
+    f64_graph.sample_format = kGraphSampleFormatFloat64V1;
+    CHECK(validate_graph(f64_graph));
+    RtGraphSnapshotV1 f64_explicit_snapshot;
+    CHECK(compile_rt_snapshot(f64_graph, 12U, f64_explicit_snapshot));
+    CHECK(f64_explicit_snapshot.sample_format == kGraphSampleFormatFloat64V1);
+    double f64_explicit_rendered[4]{};
+    std::array<RtLaneInputF64V1, 2> f64_views{};
+    f64_views[0] = RtLaneInputF64V1{f64_input, 2U};
+    f64_views[1] = RtLaneInputF64V1{f64_input + 2U, 2U};
+    CHECK(process_graph_f64(f64_explicit_snapshot,
+                            std::span<const RtLaneInputF64V1>(f64_views.data(), 2),
+                            f64_explicit_rendered, 2U));
+    // The diagonal 0.5 matrix with a -6.02 dB makeup is an effective ~0.25
+    // path gain; the exact value carries the float32 snapshot rounding of the
+    // linear makeup coefficient, so assertions use a 1e-6 tolerance. Every
+    // accumulated sample must stay finite in the double accumulator.
+    CHECK(std::isfinite(f64_explicit_rendered[0]) &&
+          std::isfinite(f64_explicit_rendered[3]));
+    CHECK(std::abs(f64_explicit_rendered[0] - 0.025) < 1e-6F);
+    CHECK(std::abs(f64_explicit_rendered[3] - 0.0625) < 1e-6F);
+    CHECK(process_graph_for_output_group_f64(
+        f64_explicit_snapshot, "main",
+        std::span<const RtLaneInputF64V1>(f64_views.data(), 2),
+        f64_explicit_rendered, 1U));
+    CHECK(std::abs(f64_explicit_rendered[1] + 0.05) < 1e-12);
+    CHECK(!process_graph_for_output_group_f64(
+        f64_explicit_snapshot, "missing",
+        std::span<const RtLaneInputF64V1>(f64_views.data(), 2),
+        f64_explicit_rendered, 1U));
+    CHECK(!process_graph_for_output_group_f64(f64_explicit_snapshot, {},
+                                              std::span<const RtLaneInputF64V1>(
+                                                  f64_views.data(), 2),
+                                              f64_explicit_rendered, 1U));
+    f64_graph.sample_format = 7U;
+    CHECK(!validate_graph(f64_graph));
+    RtGraphSnapshotV1 f64_bad_snapshot;
+    CHECK(!compile_rt_snapshot(f64_graph, 13U, f64_bad_snapshot));
+
     DeviceSwitchTransaction transaction;
     CHECK(transaction.begin(DeviceTargetV1{"endpoint-a", 2, 48000, 128}));
     CHECK(transaction.prepare_complete());
