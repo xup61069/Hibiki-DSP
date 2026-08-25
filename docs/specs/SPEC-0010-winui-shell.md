@@ -80,6 +80,10 @@ Bypass、過期／不存在檔案、格式或 tap 上限錯誤都 fail-closed；
 Hello 與裝置 catalog 成功後，ViewModel 會以序列化的 `ControlStatusRequest` 取得一次完整
 狀態；status store 未掛載時顯示控制狀態暫不可用，但不把整個音訊連線誤判為失敗。
 
+
+視窗大小與位置會在正常關閉時保存到 `%LOCALAPPDATA%\Hibiki DSP\window-placement-v1.json`，
+下次啟動前先還原；讀取或寫入失敗時使用內建預設 1080x720 佈局，不影響引擎連線。
+位置與尺寸都經 bounded clamp，避免還原到螢幕外或小於最小可用尺寸。
 ## 失敗與安全
 
 - 沒有輸出群組時 One-Tap Enhance fail-closed，不產生 SceneApply。
