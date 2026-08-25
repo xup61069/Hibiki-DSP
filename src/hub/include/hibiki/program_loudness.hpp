@@ -10,7 +10,9 @@
 
 namespace hibiki {
 
-inline constexpr std::size_t kTelemetryDoubleCountV1 = 3U;
+// Adds night_compression_gain_db to the bounded lock-free telemetry
+// projection. The fifth slot is reserved for future growth.
+inline constexpr std::size_t kTelemetryDoubleCountV2 = 5U;
 
 // Slow content-aware level correction. The default remains a bounded RMS proxy
 // for backwards compatibility. KWeightedProxy adds the two fixed K-weighting
@@ -43,6 +45,15 @@ struct ProgramAwareLevelPolicyV1 {
     // on the RT thread when bass clearly dominates.
     bool bass_correction_enabled{false};
     double bass_max_cut_db{6.0};
+    // Opt-in night-mode dynamics compression. A fast attack / slow release
+    // peak envelope tracks the loudest recent content; when the crest factor
+    // (peak minus RMS, in dB) exceeds the knee threshold the RT path applies
+    // a bounded gain reduction so quiet dialogue stays intelligible while
+    // loud moments stop jumping out. Release slews back at the shared dB/s
+    // rate so the compressor never clicks.
+    bool night_compression_enabled{false};
+    double night_compression_max_reduction_db{9.0};
+    double night_compression_knee_db{12.0};
 };
 
 struct ProgramAwareLevelStatusV1 {
@@ -55,6 +66,9 @@ struct ProgramAwareLevelStatusV1 {
     double applied_gain_db{0.0};
     ProgramAwareMeterModeV1 meter_mode{ProgramAwareMeterModeV1::RmsProxy};
     double bass_correction_gain_db{0.0};
+    // Instantaneous (post-slew) night-compression reduction in dB; 0 when
+    // disabled or not engaged. Always <= 0.
+    double night_compression_gain_db{0.0};
 };
 
 // Control-plane projection of RT-owned status. This is bounded visual
@@ -67,6 +81,7 @@ struct ProgramAwareTelemetrySnapshotV1 {
     double measured_dbfs{-144.0};
     double applied_gain_db{0.0};
     double bass_correction_gain_db{0.0};
+    double night_compression_gain_db{0.0};
     std::uint64_t sequence{0U};
 };
 
@@ -153,6 +168,12 @@ private:
     bool configured_{false};
     double smoothed_energy_{0.0};
     double bass_cut_db_{0.0};
+    // Night-mode compression state: fast-attack/slow-release peak envelope
+    // (linear), its slewing dB reduction, and a first-block latch. Scalars
+    // only; the RT path never allocates or locks.
+    double night_peak_env_{0.0};
+    double night_reduction_db_{0.0};
+    bool night_envelope_started_{false};
     BassExcessDetectorV1 bass_detector_{};
 
     std::array<Biquad, 2U> k_weighting_{};
@@ -160,7 +181,7 @@ private:
     Biquad bass_shelf_{};
     std::array<BiquadState, 8U> bass_shelf_state_{};
 
-    mutable std::array<std::atomic<double>, kTelemetryDoubleCountV1>
+    mutable std::array<std::atomic<double>, kTelemetryDoubleCountV2>
         telemetry_doubles_{};
     mutable std::atomic<bool> telemetry_valid_{false};
     mutable std::atomic<bool> telemetry_enabled_{false};

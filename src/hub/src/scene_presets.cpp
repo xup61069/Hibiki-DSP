@@ -37,6 +37,9 @@ EasySceneDefaultsV1 make_easy_scene(const EasySceneKind kind,
             defaults.program_aware.max_cut_db = 12.0;
             defaults.program_aware.bass_correction_enabled = true;
             defaults.program_aware.bass_max_cut_db = 4.0;
+            defaults.program_aware.night_compression_enabled = true;
+            defaults.program_aware.night_compression_max_reduction_db = 9.0;
+            defaults.program_aware.night_compression_knee_db = 12.0;
             break;
         case EasySceneKind::Voice:
             defaults.scene.latency_mode = LatencyMode::Balanced;
