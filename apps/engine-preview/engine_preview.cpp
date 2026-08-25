@@ -140,6 +140,16 @@ struct DriverLoopbackState final {
 
 constexpr std::uint32_t kWavSourceMaxFrames = 4096U;
 constexpr std::uint32_t kWavSourceMaxOutputChannels = kTestToneMaxOutputChannels;
+constexpr std::uint32_t kOfflineRenderOutputSampleRateV1 = 48000U;
+constexpr std::uint16_t kOfflineRenderOutputChannelsV1 = 2U;
+
+struct OfflineRenderResult final {
+    std::size_t frames{0U};
+    std::uint32_t file_sample_rate{0U};
+    std::uint32_t output_sample_rate{0U};
+    bool file_rate_matches{false};
+    bool resampled{false};
+};
 constexpr std::size_t kWavSourceResampleFlushInputFramesV1 = 64U;
 
 // Bounded WAV file playback source. The file is decoded once on the control
@@ -408,19 +418,16 @@ bool render_driver_loopback(DriverLoopbackState& loopback,
     return true;
 }
 
-bool prepare_wav_file_source(WavFileSourceState& source,
-                             const std::filesystem::path& path,
-                             WasapiOutputState& output,
-                             hibiki::AudioEngineModel& engine) {
-    source.active = false;
-    if (!output.active || output.config.sample_rate == 0U || output.block_frames == 0U ||
-        output.block_frames > kWavSourceMaxFrames ||
-        output.config.channels > kWavSourceMaxOutputChannels ||
-        !supported_wasapi_layout(output.config.channels) ||
-        !supported_wasapi_rate(output.config.sample_rate)) {
-        return false;
-    }
-
+// Decode a bounded WAV file and, when its sample rate differs from the sink,
+// convert the whole buffer offline with the shared polyphase bank. Both the
+// live WASAPI source and the device-free offline render path use this helper;
+// neither converts inside a realtime callback.
+bool decode_wav_for_sink_rate(const std::filesystem::path& path,
+                              const std::uint32_t sink_rate,
+                              hibiki::IrWavDataV1& decoded_out,
+                              std::uint32_t& file_rate_out,
+                              bool& resampled) {
+    resampled = false;
     try {
         std::ifstream file(path, std::ios::binary | std::ios::ate);
         if (!file) return false;
@@ -435,17 +442,94 @@ bool prepare_wav_file_source(WavFileSourceState& source,
                        static_cast<std::streamsize>(size))) {
             return false;
         }
-
-        const auto decoded = hibiki::decode_ir_wav_v1(bytes);
-        if (!decoded.valid) {
-            return false;
-        }
+        auto decoded = hibiki::decode_ir_wav_v1(bytes);
+        if (!decoded.valid) return false;
         if (decoded.data.channels == 0U || decoded.data.frames() == 0U) return false;
-        if (decoded.data.channels != 1U &&
-            decoded.data.channels != output.config.channels) {
+        decoded_out = std::move(decoded.data);
+        file_rate_out = decoded_out.sample_rate;
+        if (decoded_out.sample_rate == sink_rate || sink_rate == 0U) return true;
+        // Bounded polyphase conversion (0.25x-4.0x), identical to the live path.
+        const double step = static_cast<double>(decoded_out.sample_rate) /
+                            static_cast<double>(sink_rate);
+        if (!std::isfinite(step) || step < 0.25 || step > 4.0) return false;
+        const auto nominal = static_cast<std::size_t>(std::llround(
+            static_cast<double>(decoded_out.frames()) *
+            static_cast<double>(sink_rate) /
+            static_cast<double>(decoded_out.sample_rate)));
+        if (nominal == 0U) return false;
+        hibiki::PersistentPolyphaseResampler resampler;
+        if (!resampler.prepare(decoded_out.channels, step)) return false;
+        const auto channel_count = static_cast<std::size_t>(decoded_out.channels);
+        // process() only emits centers fully covered by real input; reserve
+        // bounded tail room so every flush call has enough output space.
+        const auto flush_output_frames = static_cast<std::size_t>(
+            (static_cast<double>(kWavSourceResampleFlushInputFramesV1 + 13U) /
+             step)) + 1U;
+        std::vector<float> converted(
+            (nominal + flush_output_frames) * channel_count, 0.0F);
+        constexpr std::size_t kChunkFrames = 4096U;
+        std::size_t produced = 0U;
+        for (std::size_t offset = 0U; offset < decoded_out.frames(); offset += kChunkFrames) {
+            const auto chunk = (std::min)(kChunkFrames, decoded_out.frames() - offset);
+            float* out_base = converted.data() + produced * channel_count;
+            const auto capacity = converted.size() / channel_count - produced;
+            std::size_t got = 0U;
+            if (!resampler.process(
+                    decoded_out.interleaved_samples.data() + offset * channel_count,
+                    chunk, out_base, capacity, got)) {
+                return false;
+            }
+            produced += got;
+        }
+        const std::vector<float> zeros(
+            kWavSourceResampleFlushInputFramesV1 * channel_count, 0.0F);
+        while (produced < nominal) {
+            float* out_base = converted.data() + produced * channel_count;
+            const auto capacity = converted.size() / channel_count - produced;
+            std::size_t got = 0U;
+            if (!resampler.process(zeros.data(), kWavSourceResampleFlushInputFramesV1,
+                                   out_base, capacity, got)) {
+                return false;
+            }
+            if (got == 0U) break;
+            produced += got;
+        }
+        if (produced < nominal) return false;
+        decoded_out.interleaved_samples.resize(nominal * channel_count);
+        decoded_out.sample_rate = sink_rate;
+        resampled = true;
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool prepare_wav_file_source(WavFileSourceState& source,
+                             const std::filesystem::path& path,
+                             WasapiOutputState& output,
+                             hibiki::AudioEngineModel& engine) {
+    source.active = false;
+    if (!output.active || output.config.sample_rate == 0U || output.block_frames == 0U ||
+        output.block_frames > kWavSourceMaxFrames ||
+        output.config.channels > kWavSourceMaxOutputChannels ||
+        !supported_wasapi_layout(output.config.channels) ||
+        !supported_wasapi_rate(output.config.sample_rate)) {
+        return false;
+    }
+
+    hibiki::IrWavDataV1 decoded_data{};
+    bool resampled = false;
+    std::uint32_t input_file_rate = 0U;
+    if (!decode_wav_for_sink_rate(path, output.config.sample_rate, decoded_data,
+                                  input_file_rate, resampled)) {
+        return false;
+    }
+    try {
+        if (decoded_data.channels != 1U &&
+            decoded_data.channels != output.config.channels) {
             return false;
         }
-        if (output.config.channels > 2U && decoded.data.channels == 1U) {
+        if (output.config.channels > 2U && decoded_data.channels == 1U) {
             // Mono broadcast is only defined for stereo here; multi-channel
             // sinks keep their explicit layout contract.
             return false;
@@ -459,99 +543,23 @@ bool prepare_wav_file_source(WavFileSourceState& source,
             return false;
         }
 
-        source.file_sample_rate = decoded.data.sample_rate;
-        if (decoded.data.sample_rate == output.config.sample_rate) {
-            source.data = decoded.data;
-        } else {
-            std::size_t produced = 0U;
-            // Offline control-plane conversion: the whole file is already in
-            // memory, so the RT path stays a plain copy. The resampler is the
-            // same bounded polyphase bank used by the output sink.
-            const double step = static_cast<double>(decoded.data.sample_rate) /
-                                static_cast<double>(output.config.sample_rate);
-            const auto nominal = static_cast<std::size_t>(std::llround(
-                static_cast<double>(decoded.data.frames()) *
-                static_cast<double>(output.config.sample_rate) /
-                static_cast<double>(decoded.data.sample_rate)));
-            if (nominal == 0U) return false;
-
-            hibiki::PersistentPolyphaseResampler resampler;
-            if (!resampler.prepare(decoded.data.channels, step)) return false;
-            const auto channel_count =
-                static_cast<std::size_t>(decoded.data.channels);
-            // process() only emits centers fully covered by real input, so
-            // reserve bounded tail room and drive the FIR history out with
-            // silence instead of assuming one flush reaches nominal length.
-            // One flush chunk emits floor((input + history - 2)/step) + 1
-            // frames (see required_output_frames); reserve exactly that so
-            // every flush call has enough bounded output room.
-            const auto flush_output_frames = static_cast<std::size_t>(
-                (static_cast<double>(kWavSourceResampleFlushInputFramesV1 + 13U) /
-                 step)) + 1U;
-            std::vector<float> converted(
-                (nominal + flush_output_frames) * channel_count, 0.0F);
-            constexpr std::size_t kChunkFrames = 4096U;
-            const auto total_input = decoded.data.frames();
-            for (std::size_t offset = 0U; offset < total_input; offset += kChunkFrames) {
-                const auto chunk = (std::min)(kChunkFrames, total_input - offset);
-                float* out_base =
-                    converted.data() + produced * static_cast<std::size_t>(decoded.data.channels);
-                const auto capacity = converted.size() /
-                                          static_cast<std::size_t>(decoded.data.channels) -
-                                      produced;
-                std::size_t got = 0U;
-                if (!resampler.process(
-                    decoded.data.interleaved_samples.data() +
-                        offset * static_cast<std::size_t>(decoded.data.channels),
-                    chunk, out_base, capacity, got)) {
-                    engine.rollback_graph();
-                    return false;
-                }
-                produced += got;
-            }
-            {
-                const std::vector<float> zeros(
-                    kWavSourceResampleFlushInputFramesV1 * channel_count, 0.0F);
-                while (produced < nominal) {
-                    float* out_base = converted.data() + produced * channel_count;
-                    const auto capacity =
-                        converted.size() / channel_count - produced;
-                    std::size_t got = 0U;
-                    if (!resampler.process(zeros.data(),
-                                           kWavSourceResampleFlushInputFramesV1,
-                                           out_base, capacity, got)) {
-                        engine.rollback_graph();
-                        return false;
-                    }
-                    if (got == 0U) break;
-                    produced += got;
-                }
-            }
-            if (produced < nominal) {
-                engine.rollback_graph();
-                return false;
-            }
-            produced = nominal;
-            source.data.sample_rate = output.config.sample_rate;
-            source.data.channels = decoded.data.channels;
-            source.data.interleaved_samples.resize(
-                nominal * static_cast<std::size_t>(decoded.data.channels));
-            std::copy_n(converted.begin(),
-                        produced * static_cast<std::size_t>(decoded.data.channels),
-                        source.data.interleaved_samples.begin());
-        }
+        source.file_sample_rate = input_file_rate;
+        // decode_wav_for_sink_rate already converted to the sink rate when
+        // needed, so the live path stays a plain move into the source state.
+        source.data = std::move(decoded_data);
+        (void)resampled;
         source.input_block.resize(
             static_cast<std::size_t>(kWavSourceMaxFrames) *
             static_cast<std::size_t>(
-                decoded.data.channels == 1U ? 2U : decoded.data.channels));
+                source.data.channels == 1U ? 2U : source.data.channels));
         source.output_block.resize(
             static_cast<std::size_t>(kWavSourceMaxFrames) *
             static_cast<std::size_t>(output.config.channels));
         source.lanes[0U] = hibiki::RtLaneInputV1{source.input_block.data(),
                                                  static_cast<std::uint16_t>(
-                                                     decoded.data.channels == 1U
+                                                     source.data.channels == 1U
                                                          ? 2U
-                                                         : decoded.data.channels)};
+                                                         : source.data.channels)};
         source.next_frame = 0U;
         source.sample_rate = output.config.sample_rate;
         source.block_frames = output.block_frames;
@@ -630,6 +638,97 @@ bool render_wav_file_source(WavFileSourceState& source,
         }
     }
     return delivered;
+}
+
+// Device-free end-to-end evidence: decode (and resample when needed), commit
+// the same Studio graph used by the live path, then drive every frame through
+// process_output_group in bounded blocks. No WASAPI handoff is involved, so
+// the result is reproducible on machines without any audio endpoint.
+bool render_wav_offline(const std::filesystem::path& input_path,
+                        const std::filesystem::path& output_path,
+                        OfflineRenderResult& result,
+                        std::string& error_detail) {
+    hibiki::AudioEngineModel engine;
+    hibiki::IrWavDataV1 decoded_data{};
+    std::uint32_t input_file_rate = 0U;
+    bool resampled = false;
+    if (!decode_wav_for_sink_rate(input_path, kOfflineRenderOutputSampleRateV1,
+                                  decoded_data, input_file_rate, resampled)) {
+        error_detail = "decode failed; file must be a bounded Float32 PCM WAV";
+        return false;
+    }
+    try {
+        const auto channels = static_cast<std::uint32_t>(decoded_data.channels);
+        if (channels != 1U && channels != kOfflineRenderOutputChannelsV1) {
+            error_detail = "unsupported channel count for offline render";
+            return false;
+        }
+        const std::uint32_t lane_channels =
+            channels == 1U ? 2U : channels;
+        auto scene = hibiki::make_easy_scene(hibiki::EasySceneKind::Studio, "main");
+        scene.graph.output_channels = kOfflineRenderOutputChannelsV1;
+        engine.set_sample_rate(kOfflineRenderOutputSampleRateV1);
+        if (!engine.prepare_graph(scene.graph, 5U) || !engine.commit_graph()) {
+            engine.rollback_graph();
+            error_detail = "graph prepare/commit failed";
+            return false;
+        }
+        // Bounded output: same cap as the decoder.
+        const auto max_frames = hibiki::kMaxIrWavBytesV1 /
+                                (sizeof(float) * kOfflineRenderOutputChannelsV1);
+        if (decoded_data.frames() > max_frames) {
+            error_detail = "converted buffer exceeds the offline render cap";
+            return false;
+        }
+        std::vector<float> rendered(
+            decoded_data.frames() * kOfflineRenderOutputChannelsV1, 0.0F);
+        const hibiki::RtLaneInputV1 lane{decoded_data.interleaved_samples.data(),
+                                         static_cast<std::uint16_t>(lane_channels)};
+        constexpr std::size_t kBlock = 128U;  // matches kWavSource block cadence
+        std::size_t offset = 0U;
+        while (offset < decoded_data.frames()) {
+            const auto frames = (std::min)(static_cast<std::size_t>(kBlock),
+                                           decoded_data.frames() - offset);
+            float* out_base = rendered.data() +
+                              offset * kOfflineRenderOutputChannelsV1;
+            if (!engine.process_output_group(
+                    "main", std::span<const hibiki::RtLaneInputV1>(&lane, 1U),
+                    out_base, frames)) {
+                error_detail = "process_output_group failed at frame " +
+                               std::to_string(offset);
+                return false;
+            }
+            offset += frames;
+        }
+        const auto wav_bytes = hibiki::export_wav_f32_ir(
+            std::span<const float>(rendered.data(), rendered.size()),
+            kOfflineRenderOutputSampleRateV1,
+            kOfflineRenderOutputChannelsV1);
+        if (wav_bytes.empty()) {
+            error_detail = "wav encode failed";
+            return false;
+        }
+        std::ofstream out(output_path, std::ios::binary | std::ios::trunc);
+        if (!out) {
+            error_detail = "cannot open output path for writing";
+            return false;
+        }
+        out.write(reinterpret_cast<const char*>(wav_bytes.data()),
+                  static_cast<std::streamsize>(wav_bytes.size()));
+        if (!out) {
+            error_detail = "output write failed";
+            return false;
+        }
+        result.frames = decoded_data.frames();
+        result.file_sample_rate = input_file_rate;
+        result.output_sample_rate = kOfflineRenderOutputSampleRateV1;
+        result.file_rate_matches = !resampled;
+        result.resampled = resampled;
+        return true;
+    } catch (...) {
+        error_detail = "unexpected exception during offline render";
+        return false;
+    }
 }
 
 // Rebuild the engine graph from the coordinator's current session-route plan.
@@ -1222,10 +1321,19 @@ int wmain(const int argc, wchar_t* const* argv) {
     std::filesystem::path wav_source_path{};
     bool wav_source_loop_requested = false;
     bool wav_source_path_seen = false;
+    std::filesystem::path offline_render_path{};
+    bool offline_render_requested = false;
     for (int index = 1; index < argc; ++index) {
         const std::wstring_view argument = argv[index] != nullptr
                                                ? std::wstring_view(argv[index])
                                                : std::wstring_view{};
+        if (argument == L"--render-offline" && index + 1 < argc &&
+            argv[index + 1] != nullptr) {
+            offline_render_path = std::filesystem::path(argv[index + 1]);
+            offline_render_requested = true;
+            ++index;
+            continue;
+        }
         if (argument == L"--enable-wav-source") {
             // The shared requested flag below owns the enable decision.
             continue;
@@ -1322,7 +1430,26 @@ int wmain(const int argc, wchar_t* const* argv) {
         (void)SetConsoleCtrlHandler(on_console_control, FALSE);
         return 2;
     }
-    if (wav_source_requested && (!wasapi_output_requested || !wav_source_path_seen)) {
+    if (offline_render_requested &&
+        (wasapi_output_requested || test_tone_requested || session_routing_requested ||
+         process_delivery_requested || tab_bridge_requested || driver_loopback_requested ||
+         system_volume_requested || wav_source_loop_requested)) {
+        // Fail-closed: offline render is device-free evidence; it must not
+        // share state with any live-delivery path or start the control pipe.
+        std::fwprintf(stderr, L"error: --render-offline rejects all live-delivery flags.\n");
+        (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+        return 2;
+    }
+    if (offline_render_requested && (!wav_source_requested || !wav_source_path_seen ||
+                                     offline_render_path.empty())) {
+        // Fail-closed: the offline render needs exactly one bounded WAV input.
+        std::fwprintf(stderr,
+                      L"error: --render-offline requires --enable-wav-source and --wav-source-path.\n");
+        (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+        return 2;
+    }
+    if (wav_source_requested && !offline_render_requested &&
+        (!wasapi_output_requested || !wav_source_path_seen)) {
         // Fail-closed: the source needs a sink and an explicit bounded file.
         (void)SetConsoleCtrlHandler(on_console_control, FALSE);
         return 2;
@@ -1338,6 +1465,27 @@ int wmain(const int argc, wchar_t* const* argv) {
         // Fail-closed: the VST3 lane needs a sink to be meaningful.
         (void)SetConsoleCtrlHandler(on_console_control, FALSE);
         return 2;
+    }
+
+    if (offline_render_requested) {
+        OfflineRenderResult result;
+        std::string error_detail;
+        const bool rendered = render_wav_offline(
+            wav_source_path, offline_render_path, result, error_detail);
+        if (rendered) {
+            std::fwprintf(stdout,
+                          L"offline render complete: frames=%llu; resampled %lu->%lu;"
+                          L" output=%ls\n",
+                          static_cast<unsigned long long>(result.frames),
+                          static_cast<unsigned long>(result.file_sample_rate),
+                          static_cast<unsigned long>(result.output_sample_rate),
+                          offline_render_path.c_str());
+        } else {
+            std::fwprintf(stderr, L"error: offline render failed: %hs\n",
+                          error_detail.c_str());
+        }
+        (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+        return rendered ? 0 : 1;
     }
 
     hibiki::AudioEngineModel engine;

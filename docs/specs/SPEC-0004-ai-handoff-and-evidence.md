@@ -172,7 +172,7 @@ public contract 變更必須在同一 slice 更新相關 Spec/schema、source、
 觸發時執行；live probes 永遠 opt-in。
 
 `docs-check.ps1` 檢查必要入口、
-唯一 ID 與 adapter 存在；`source-policy.ps1` 阻擋 binary、秘密、私人裝置資料與 ISO
+唯一 ID 與 adapter 存在；`source-policy.ps1` 阻擋 binary、秘密、私人裝置資料與 equal-loudness
 授權內容。`handoff-check.ps1` 必須能檢查指定 Issue 或枚舉所有 numeric active handoff，驗證
 Issue/branch、v2 ownership/scope/dependency、Git ancestry、必要 headings 與最多五個 resume commands。
 CI 失敗時不可宣稱該變更可交接。Handoff 檔案已由 issue body handoff block 取代；

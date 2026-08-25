@@ -620,7 +620,7 @@ public static class ControlPayloadsV1
         payload[18] = (byte)nameBytes.Length;
         payload[19] = (byte)outputBytes.Length;
         payload[20] = (byte)irRefBytes.Length;
-        payload[22] = 1;                                                   // ISO derived standard.
+        payload[22] = 1;                                                   // equal-loudness derived standard.
 
         var laneId = StrictUtf8.GetBytes(sceneId + "-lane");
         if (laneId.Length is < 1 or > 31)
