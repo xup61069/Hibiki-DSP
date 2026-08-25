@@ -36,7 +36,7 @@ function reportState() {
     bridgeConnected,
     droppedPackets,
     bridgeReconnectState: bridgeReconnectState(),
-    bridgeRetryInSec: retryInSec,
+    bridgeRetryInSec: bridgeRetryInSec(),
   });
 }
 
