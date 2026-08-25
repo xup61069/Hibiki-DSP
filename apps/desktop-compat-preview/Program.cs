@@ -47,6 +47,7 @@ internal sealed class PreviewForm : Form
     private readonly Button _removeRouteRule = new() { Text = "移除選取預設", AutoSize = true, AccessibleName = "移除選取的 App 路由預設" };
     private readonly Button _clearRouteRules = new() { Text = "清除全部預設", AutoSize = true, AccessibleName = "清除全部 App 路由預設" };
     private readonly Label _effective = new() { AutoSize = true };
+    private readonly Label _listeningDose = new() { AutoSize = true, AccessibleName = "今日聆聽劑量" };
     private readonly ComboBox _scenes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取情境設定檔" };
     private readonly TextBox _customSceneId = new() { Width = 220, PlaceholderText = "Scene ID", AccessibleName = "自訂場景 ID" };
     private readonly TextBox _customSceneName = new() { Width = 220, PlaceholderText = "名稱", AccessibleName = "自訂場景名稱" };
@@ -56,9 +57,14 @@ internal sealed class PreviewForm : Form
     private readonly ComboBox _irModes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取 IR 模式" };
     private readonly TrackBar _irStrength = new() { Minimum = 0, Maximum = 100, TickFrequency = 10, Width = 460, AccessibleName = "IR 強度百分比" };
     private readonly Label _irStatus = new() { AutoSize = false, Width = 550, Height = 58 };
+    private readonly Label _eqStatus = new() { AutoSize = false, Width = 550, Height = 32, AccessibleName = "等化器視覺狀態" };
+    private readonly Label _safetyStatus = new() { AutoSize = true, AccessibleName = "安全上限狀態" };
+    private readonly Label _deviceSwitchStatus = new() { AutoSize = true, AccessibleName = "裝置切換狀態" };
+    private readonly Label _lastSendDiagnostics = new() { AutoSize = false, Width = 550, Height = 32, AccessibleName = "最近命令診斷" };
     private readonly Button _loadIr = new() { Text = "載入 IR WAV 並準備", AutoSize = true, AccessibleName = "載入 IR WAV 並準備" };
     private readonly TrackBar _volume = new() { Minimum = -60, Maximum = 0, TickFrequency = 5, Width = 460, AccessibleName = "主音量分貝" };
     private readonly Button _enhance = new() { Text = "一鍵改善", AutoSize = true, Margin = new Padding(3, 12, 3, 3), AccessibleName = "一鍵改善" };
+    private readonly Button _connect = new() { Text = "連接引擎", AutoSize = true, Margin = new Padding(3, 12, 3, 3), AccessibleName = "連接或重新連接 Hibiki 音訊引擎" };
     private readonly System.Windows.Forms.Timer _statusTimer = new() { Interval = 1000 };
     private bool _updatingScene;
     private bool _updatingSession;
@@ -82,9 +88,21 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(groups);
         panel.Controls.Add(new Label { Text = "本機裝置 catalog（僅 metadata）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
         panel.Controls.Add(_devices);
-        var connect = new Button { Text = "嘗試連接已啟動的 Hibiki 引擎", AutoSize = true, Margin = new Padding(3, 12, 3, 3), AccessibleName = "嘗試連接已啟動的 Hibiki 引擎" };
-        connect.Click += async (_, _) => { await _viewModel.ConnectAsync(TimeSpan.FromSeconds(3)); RefreshView(); };
-        panel.Controls.Add(connect);
+        _connect.Click += async (_, _) =>
+        {
+            _connect.Enabled = false;
+            try
+            {
+                if (_viewModel.IsConnected) await _viewModel.DisconnectAsync();
+                await _viewModel.ConnectAsync(TimeSpan.FromSeconds(3));
+            }
+            finally
+            {
+                _connect.Enabled = true;
+            }
+            RefreshView();
+        };
+        panel.Controls.Add(_connect);
         panel.Controls.Add(_connection);
         panel.Controls.Add(new Label { Text = "場景", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
         SyncSceneList();
@@ -173,6 +191,10 @@ internal sealed class PreviewForm : Form
         _volume.ValueChanged += async (_, _) => { _viewModel.RequestedVolumeDb = _volume.Value; if (_viewModel.IsConnected) await _viewModel.QueueVolumeAsync(); RefreshView(); };
         panel.Controls.Add(_volume);
         panel.Controls.Add(_effective);
+        panel.Controls.Add(_listeningDose);
+        panel.Controls.Add(_safetyStatus);
+        panel.Controls.Add(_deviceSwitchStatus);
+        panel.Controls.Add(_lastSendDiagnostics);
         panel.Controls.Add(_routes);
         panel.Controls.Add(new Label { Text = "Expert App／工作階段（需以 -EnableSessionRouting 啟動）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
         panel.Controls.Add(_sessions);
@@ -326,6 +348,8 @@ internal sealed class PreviewForm : Form
             if (_updatingRouteRules) return;
             RefreshView();
         };
+        panel.Controls.Add(new Label { Text = "等化器", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        panel.Controls.Add(_eqStatus);
         panel.Controls.Add(_status);
         Controls.Add(panel);
         _viewModel.PropertyChanged += OnViewModelChanged;
@@ -387,6 +411,8 @@ internal sealed class PreviewForm : Form
             : $"裝置 catalog：{_viewModel.PhysicalDevices.Count} 筆（render {renderDevices.Length}／capture {captureDevices.Length}）；" +
               $"預設輸出：{defaultRender ?? "未指定"}\r\n只顯示 metadata；physical sink 與實體切換尚未啟用。";
         _enhance.Enabled = _viewModel.IsConnected;
+        _connect.Text = _viewModel.IsConnected ? "重新連接" : "連接引擎";
+        _connect.Enabled = !_viewModel.IsBusy;
         _scenes.Enabled = _viewModel.IsConnected;
         _volume.Enabled = _viewModel.IsConnected;
         var sessions = _viewModel.SessionCatalog.ToArray();
@@ -425,8 +451,15 @@ internal sealed class PreviewForm : Form
         _loadIr.Enabled = _viewModel.IsConnected && _viewModel.IrPhaseMode != IrPhaseMode.Bypass;
         _irStrength.Enabled = _viewModel.IrPhaseMode is IrPhaseMode.MixedPhase or IrPhaseMode.LinearPhase;
         _effective.Text = $"實際有效音量：{_viewModel.EffectiveVolumeDb:0.0} dB；{_viewModel.VolumeOriginText}；{_viewModel.VolumeActuatorText}";
+        _listeningDose.Text = _viewModel.ListeningDose.StateText;
+        _safetyStatus.Text = _viewModel.SafetyStatusText;
+        _deviceSwitchStatus.Text = _viewModel.DeviceSwitchStatusText;
+        _lastSendDiagnostics.Text = string.IsNullOrEmpty(_viewModel.LastSendDiagnostics)
+            ? "最近命令診斷：無異常紀錄"
+            : $"最近命令診斷：{_viewModel.LastSendDiagnostics}";
         _routes.Text = _viewModel.Expert.RouteHealthAccessibleSummary;
         _status.Text = _viewModel.StatusText;
+        _eqStatus.Text = _viewModel.EqSurface.StateText;
         _irStatus.Text = $"{_viewModel.IrPhaseModeText}；實測延遲 {_viewModel.IrAddedDelayMs:0.0} ms。\r\n{_viewModel.IrPrepareStatus}";
         var requested = Math.Clamp((int)Math.Round(_viewModel.RequestedVolumeDb), _volume.Minimum, _volume.Maximum);
         if (_volume.Value != requested) _volume.Value = requested;
