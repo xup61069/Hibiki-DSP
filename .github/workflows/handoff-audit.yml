@@ -25,6 +25,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      # GitHub issue-event mutations (label/assignee) propagate eventually.
+      # Rapid claim-admission sequences fire labeled+assigned back-to-back; the
+      # concurrency group serializes but the surviving run may start before the
+      # final mutation is visible via API. Wait here so the last surviving run
+      # audits settled state instead of producing false positives.
+      - name: Wait for issue-event consistency
+        shell: pwsh
+        run: Start-Sleep -Seconds 20
+
       - name: Audit all active handoffs
         shell: pwsh
         env:
