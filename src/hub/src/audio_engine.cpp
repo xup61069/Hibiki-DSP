@@ -675,6 +675,7 @@ bool AudioEngineModel::has_active_vst3_lane(
 }
 
 void AudioEngineModel::reset_vst3_lane_state() noexcept {
+    vst3_tap_.reset();
     active_vst3_lanes_.reset();
     pending_vst3_lanes_.reset();
     pending_vst3_lane_clear_target_ = {};
@@ -750,6 +751,8 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
     if (!apply_ir(output_group, output_interleaved, frames)) return false;
     if (!apply_loudness_peq(output_group, output_interleaved, frames)) return false;
     if (!apply_program_aware(output_group, output_interleaved, frames)) return false;
+    (void)vst3_tap_.publish(output_group, output_interleaved,
+                            frames, active_graph_.output_channels);
     if (!apply_vst3_lanes(output_group, output_interleaved, frames)) return false;
     if (!apply_group_master(output_group, output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
@@ -1314,6 +1317,25 @@ bool AudioEngineModel::apply_vst3_lanes(
     std::memcpy(output_interleaved, temp.data(),
                 frames * channels * sizeof(float));
     return true;
+}
+
+bool AudioEngineModel::read_vst3_tap(
+    const std::string_view output_group,
+    float* const destination,
+    const std::size_t max_frames,
+    std::uint32_t& channels_out,
+    std::size_t& frames_out,
+    std::uint64_t& sequence_out) const noexcept {
+    return vst3_tap_.read(output_group, destination, max_frames,
+                          channels_out, frames_out, sequence_out);
+}
+
+bool AudioEngineModel::push_vst3_lane(
+    const std::string_view output_group,
+    const float* const interleaved,
+    const std::size_t frames) noexcept {
+    if (!has_active_vst3_lanes_) { return false; }
+    return active_vst3_lanes_.push(output_group, interleaved, frames);
 }
 
 
