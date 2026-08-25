@@ -2,6 +2,8 @@
 
 ## 已完成（有 commit 與 evidence）
 
+第四十三波（wave 43）整合增量已合併十項能力與修正：(1) 瀏覽器擴充功能在橋接斷線期間每秒回報已丟棄封包數，讓使用者確認分頁音訊仍在播放且封包持續被丟棄；橋接重新連線或擷取停止後心跳即停止，不會殘留計時器（Issue #1569 / PR #1582）。(2) Control model 的聆聽劑量指示器改為以 effective volume（含靜音與音量衰減）計算，不再只看 requested level，讓使用者看到的累積劑量更接近實際聽到的音量（Issue #1576 / PR #1584）。(3) Engine 對 VST3 tap 讀取加入 seqlock 驗證並把 tap 發布限制在有 lane 的 graph block，避免讀到半寫入幀或在無 lane 時發出無效 tap 資料；tap consumer 不再收到撕裂或不一致的快照（Issue #1575 / PR #1585）。(4) 正式 WinUI 在音量保護頁面加入聆聽劑量指示器顯示，讓使用者直接看到目前累積聽感負荷而非只能在 status JSON 中查找（Issue #1589 / PR #1590）。(5) Engine Preview 修正四情境並行 soak harness：bounded offline render 不再因情境間共享 state 或逾時假設而誤報，讓 per-App delivery 的長時間壓力驗證可在 CI 穩定執行（Issue #1562 / PR #1587）。(6) DesktopCompat 備用 UI 在自訂場景表單加入「音量連動等響度」核取方塊，對齊 WinUI 殼已有的 opt-in 功能；勾選後建立的自訂場景會帶入 loudness live update 旗標（Issue #1574 / PR #1579）。(7) DesktopCompat 備用 UI 新增主輸出「靜音」與 App 工作階段「App 靜音」兩個核取方塊，主輸出靜音會透過 QueueVolumeAsync 送出 fade-out 並保留音量設定，App 靜音由套用按鈕路徑自動帶入；回寫以 _updatingSession 保護避免重入（Issue #1586 / PR #1593）。(8) Control model 修正聆聽劑量的計費窗口標籤與靜音間隙處理：mute 期間不再被計入累積劑量，窗口標籤誠實反映實際統計範圍，WinUI binding 在資料更新後正確刷新（Issue #1592 / PR #1597）。(9) 瀏覽器擴充功能 popup 新增「複製診斷資訊」按鈕：一鍵把 capturing、bridgeConnected、bridgeReconnectState、droppedPackets 和 UTC 時間戳複製為匿名純文字快照，方便 issue 回報時附上連線狀態而不洩露任何音訊內容、網址或裝置識別碼（Issue #1596 / PR #1601）。(10) 瀏覽器擴充功能在 capture teardown 時正確停止 heartbeat 計時器，避免橋接關閉後仍持續查詢 dropped packet 數造成不必要的 runtime message（Issue #1595 / PR #1598）。以上皆屬 user-space source/UI/engine contract/control/docs evidence；不宣稱 driver/WaveRT/HLK 或簽章。
+
 第四十二波（wave 42）文件收尾註記：大膽現代視覺樣式已透過 PR #1569 還原至 main；正式 WinUI 恢復實色 section card、footer accent 左邊框、隱含按鈕 6px 圓角、InfoBar 12px 圓角與 section 入場轉場。Issue #1555 的原始 UI 目標已由多個已完成整合切片覆蓋，本切片僅補上 baseline 收尾說明，不改 UI、engine、wire contract 或 runtime 行為。
 
 
