@@ -1,6 +1,66 @@
 <!doctype html>
 <html lang="en">
-  <head><meta charset="utf-8"><title>Hibiki tab capture</title></head>
+  <head><meta charset="utf-8"><title>Hibiki tab capture</title>
+  <style>
+    :root {
+      --bg: #1B2028;
+      --surface: #262C38;
+      --surface-hover: #2E3542;
+      --accent: #60CDFF;
+      --accent-hover: #7BD5FF;
+      --text: #FFFFFF;
+      --text-secondary: #9CA3AF;
+      --border: rgba(255, 255, 255, 0.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 260px;
+      padding: 16px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', -apple-system, sans-serif;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    button {
+      width: 100%;
+      min-height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 150ms ease, transform 100ms ease;
+    }
+    button:hover:not(:disabled) { background: var(--surface-hover); }
+    button:active:not(:disabled) { transform: scale(0.98); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    #capture {
+      background: var(--accent);
+      color: #000;
+      border-color: transparent;
+    }
+    #capture:hover:not(:disabled) { background: var(--accent-hover); }
+    #status {
+      text-align: center;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    #status[data-error] {
+      background: rgba(255, 80, 80, 0.15);
+      color: #FF6B6B;
+      border-color: rgba(255, 80, 80, 0.3);
+    }
+  </style></head>
   <body>
   <button id="capture" type="button" aria-label="Capture this tab">Capture this tab</button>
   <button id="stop" type="button" disabled aria-label="Stop capture">Stop capture</button>
