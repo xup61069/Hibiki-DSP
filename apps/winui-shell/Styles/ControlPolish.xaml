@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -10,16 +10,16 @@
             <StaticResource x:Key="SliderTrackFill" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPointerOver" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPressed" ResourceKey="HibikiSliderTrackFill" />
-            <SolidColorBrush x:Key="HibikiSectionCardBrush">#F0F4F9F0</SolidColorBrush>
-            <SolidColorBrush x:Key="HibikiRouteItemBrush">#FFFFFFB8</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiSectionCardBrush">#F6F9FC</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiRouteItemBrush">#FFFFFFD8</SolidColorBrush>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
             <SolidColorBrush x:Key="HibikiSliderTrackFill" Opacity="0.36" Color="{StaticResource SystemAccentColor}" />
             <StaticResource x:Key="SliderTrackFill" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPointerOver" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPressed" ResourceKey="HibikiSliderTrackFill" />
-            <SolidColorBrush x:Key="HibikiSectionCardBrush">#1A202C90</SolidColorBrush>
-            <SolidColorBrush x:Key="HibikiRouteItemBrush">#262D3A80</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiSectionCardBrush">#222A38</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiRouteItemBrush">#2E3848</SolidColorBrush>
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
