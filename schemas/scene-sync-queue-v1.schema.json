@@ -61,7 +61,8 @@
           "properties": {
             "name": {"maxLength": 0},
             "output_group": {"maxLength": 0},
-            "ir_reference": {"maxLength": 0}
+            "ir_reference": {"maxLength": 0},
+            "loudness_live_update": {"const": false}
           }
         }
       }

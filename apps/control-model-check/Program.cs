@@ -1749,8 +1749,15 @@ static async Task RunSceneCatalogCheckServerAsync(
         };
         const string restartId = "restart-scene";
         Check(await writer.AddCustomSceneAsync(new SceneCard(
-                restartId, "重啟同步", "離線重啟保留", "零額外緩衝", true)),
+                restartId, "重啟同步", "離線重啟保留", "零額外緩衝", true,
+                "", true)),
             "Offline restart add fixture failed locally.");
+
+        var persistedCardsJson = File.ReadAllText(restartPath);
+        var persistedQueueJson = File.ReadAllText(restartQueuePath);
+        Check(!persistedCardsJson.Contains("\"loudness_live_update\": false") &&
+              !persistedQueueJson.Contains("\"loudness_live_update\": false"),
+            "Default-off live flag must stay absent from serialized card and queue JSON.");
 
         var reader = new EasyControlViewModel
         {
@@ -1765,8 +1772,9 @@ static async Task RunSceneCatalogCheckServerAsync(
             "A new ViewModel must restore a valid offline scene replay queue.");
         Check(reader.LoadPendingSceneCatalogOps(out _) &&
               reader.PendingSceneCatalogOpsCount == 1 &&
-              reader.Scenes.First(scene => scene.Id == restartId).Name == "重啟同步",
-            "A restored replay operation must preserve its exact add payload.");
+              reader.Scenes.First(scene => scene.Id == restartId).Name == "重啟同步" &&
+              reader.PendingSceneCatalogOpTestsOnly[0].LoudnessLiveUpdate,
+            "A restored replay operation must preserve its exact live-loudness payload.");
 
         File.WriteAllText(restartQueuePath, "{\"schema_version\":1,\"dropped_operations\":-1}");
         Check(!reader.LoadPendingSceneCatalogOps(out var corruptError) &&
