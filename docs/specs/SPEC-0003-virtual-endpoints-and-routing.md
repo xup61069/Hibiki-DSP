@@ -138,6 +138,8 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   `frames=rendered/total` 進度與 `failed` 區塊計數；連續失敗達上限後停止排程並保留
   honest detail。此模式與 test tone、tab bridge、driver loopback 互斥；它是本機檔案播放
   的 user-space graph evidence，不是 endpoint policy、實體 driver 或 WaveRT delivery 驗收。
+  WAV 來源解碼以 64 MiB 位元組上限為界（`kMaxSourceWavFramesV1` 僅防整數溢位）；
+  4096-tap 即時卷積核心上限只約束 IR kernel 載入，不套用於播放來源檔。
 - Engine Preview 另提供 opt-in `--render-offline <output.wav>`（搭配
   `--enable-wav-source` 與 `--wav-source-path`）：在同一行程內完成 decode（必要時以同一
   bounded resampler 轉換到 48 kHz）、commit 同一套 Studio graph，再以 bounded blocks 驅動

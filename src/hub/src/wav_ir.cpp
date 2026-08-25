@@ -54,7 +54,7 @@ IrWavDecodeResultV1 decode_ir_wav_v1(const std::span<const std::uint8_t> bytes,
                                      const std::size_t max_frames) noexcept {
     try {
         if (bytes.size() < 12U || bytes.size() > kMaxIrWavBytesV1 || max_frames == 0U ||
-            max_frames > kMaxRealtimeIrTapsV1 || !tag_is(bytes.data(), "RIFF") ||
+            max_frames > kMaxSourceWavFramesV1 || !tag_is(bytes.data(), "RIFF") ||
             !tag_is(bytes.data() + 8U, "WAVE")) {
             return failure("IR WAV header, size or bound is invalid");
         }
@@ -113,7 +113,7 @@ IrWavDecodeResultV1 decode_ir_wav_v1(const std::span<const std::uint8_t> bytes,
         const auto frames = data_bytes / block_align;
         if (frames == 0U || frames > max_frames ||
             frames > std::numeric_limits<std::size_t>::max() / channels) {
-            return failure("IR WAV exceeds the bounded tap count");
+            return failure("WAV exceeds the bounded frame count for this path");
         }
 
         IrWavDecodeResultV1 result{};

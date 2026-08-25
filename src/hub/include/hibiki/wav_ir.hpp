@@ -15,6 +15,15 @@ namespace hibiki {
 
 constexpr std::size_t kMaxIrWavBytesV1 = 64U * 1024U * 1024U;
 
+// Playback/offline source decoding shares the RIFF parser with IR loading,
+// but a source is not convolver kernel material: callers decoding playback
+// sources pass kMaxSourceWavFramesV1 (byte-bound derived), while IR kernel
+// loading passes kMaxRealtimeIrTapsV1 explicitly. The default keeps legacy
+// one-argument call sites on the wide source bound; prepare_ir_convolver_
+// from_wav_v1 still re-validates the realtime tap limit fail-closed.
+constexpr std::size_t kMaxSourceWavFramesV1 =
+    kMaxIrWavBytesV1 / (sizeof(float) * 1U);
+
 // Control-plane representation of a bounded IR WAV. Samples are interleaved
 // by frame, matching the file, while IrConvolverV1 receives a channel-major
 // copy during prepare. The RT thread never owns this object or reads a file.
@@ -40,7 +49,7 @@ struct IrWavDecodeResultV1 {
 // samples, unsupported layouts and oversized files fail closed.
 [[nodiscard]] IrWavDecodeResultV1 decode_ir_wav_v1(
     std::span<const std::uint8_t> bytes,
-    std::size_t max_frames = kMaxRealtimeIrTapsV1) noexcept;
+    std::size_t max_frames = kMaxSourceWavFramesV1) noexcept;
 
 // Copy decoded interleaved samples into the convolver's bounded channel-major
 // kernel and apply an already validated phase resolution. A mono file may be
