@@ -46,6 +46,12 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   bank（其 ring 為 float32）；需要 plugin 延遲補償時，呼叫端必須先在上游 double domain
   完成後再進入此路徑。此格式僅描述 user-space engine 內部累加精度，不是 WASAPI、
   driver、WaveRT 或 ASIO 的 64-bit delivery 證據。
+- `AudioEngineModel::process_f64` 與 `process_output_group_f64` 是 model 級 bounded
+  double entry points：沿用同一份已 commit 的 immutable graph、Group Master 與 limiter
+  邊界；無 active graph 或 sample format 非 0/1 時 fail-closed。與低階
+  `process_graph_f64` 的差別在於 model 級入口自動套 Group Master ramp 與 limiter，
+  呼叫端不需另外處理。Group Master 的 control state 由既有 volume notification API
+  管理；volume_state() 只回傳目前 reconciled snapshot，不改變音訊狀態。
 - `IrPhasePolicy v1`：minimum/mixed/linear/bypass 模式與 0..1 strength；只描述可驗證的
   額外延遲預算，不攜帶未授權 IR 或 ISO 係數。
 - `AudioSessionDescriptor v1`：endpoint/session-instance identity、lane/output group、gain
