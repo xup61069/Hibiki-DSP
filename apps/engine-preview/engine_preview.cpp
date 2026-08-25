@@ -8,6 +8,7 @@
 #include "hibiki/session_catalog.hpp"
 #include "hibiki/session_command_queue.hpp"
 #include "hibiki/session_route_rules.hpp"
+#include "hibiki/tab_bridge.hpp"
 #include "hibiki/windows_audio_session_route.hpp"
 #include "hibiki/windows_device_catalog.hpp"
 #include "hibiki/windows_process_loopback_lane.hpp"
@@ -73,6 +74,19 @@ struct WasapiOutputState final {
     bool requested{false};
     bool active{false};
     bool test_tone_enabled{false};
+};
+
+constexpr std::uint32_t kTabBridgeMaxFrames = 4096U;
+constexpr std::uint32_t kTabBridgeMaxOutputChannels = 8U;
+
+struct TabBridgeState final {
+    hibiki::TabBridgeServer server{};
+    hibiki::TabCaptureQueueV1 queue{};
+    std::vector<float> input_buffer{};
+    std::vector<float> output_buffer{};
+    std::vector<hibiki::RtLaneInputV1> lane_inputs{};
+    bool requested{false};
+    bool listening{false};
 };
 
 constexpr std::uint32_t kTestToneInputChannels = 2U;
@@ -687,11 +701,14 @@ hibiki::ControlStatusSnapshotV1 make_initial_status(
     const std::string_view system_volume_detail,
     const bool session_routing_enabled,
     const std::string_view session_routing_detail,
-    const std::string_view process_loopback_detail) noexcept {
+    const std::string_view process_loopback_detail,
+    const bool tab_bridge_enabled,
+    const std::string_view tab_bridge_detail) noexcept {
     hibiki::ControlStatusSnapshotV1 snapshot{};
     snapshot.sequence = 1U;
     snapshot.volume = volume;
     snapshot.route_count = 6U;
+    // Route count will be updated below when tab bridge adds route 6.
     set_route(snapshot.routes[0U], "engine-control", "引擎控制面",
               "named pipe 已啟動；目前為本機 user-space preview。",
               hibiki::ControlRouteHealthStateV1::Ready);
@@ -719,6 +736,12 @@ hibiki::ControlStatusSnapshotV1 make_initial_status(
               session_routing_enabled ? hibiki::ControlRouteHealthStateV1::Pending
                                        : hibiki::ControlRouteHealthStateV1::Unavailable,
               session_routing_enabled ? 0U : 1U);
+    set_route(snapshot.routes[6U], "browser-tab", "瀏覽器分頁",
+              tab_bridge_detail,
+              tab_bridge_enabled ? hibiki::ControlRouteHealthStateV1::Pending
+                                  : hibiki::ControlRouteHealthStateV1::Unavailable,
+              tab_bridge_enabled ? 0U : 1U);
+    if (tab_bridge_enabled) snapshot.route_count = 7U;
     return snapshot;
 }
 
@@ -763,10 +786,18 @@ int wmain(const int argc, wchar_t* const* argv) {
         has_command_line_flag(argc, argv, L"--enable-test-tone");
     const bool process_delivery_requested =
         has_command_line_flag(argc, argv, L"--enable-process-delivery");
+    const bool tab_bridge_requested =
+        has_command_line_flag(argc, argv, L"--enable-tab-bridge");
     if (process_delivery_requested && (!wasapi_output_requested || !session_routing_requested)) {
         // Fail-closed: process delivery needs both a WASAPI sink and session
         // routing to be meaningful. Refuse to start rather than silently
         // running with a half-enabled path.
+        (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+        return 2;
+    }
+    if (tab_bridge_requested && !wasapi_output_requested) {
+        // Fail-closed: tab bridge requires a WASAPI sink to be meaningful.
+        // Refuse to start rather than silently running with a half-enabled path.
         (void)SetConsoleCtrlHandler(on_console_control, FALSE);
         return 2;
     }
@@ -787,6 +818,8 @@ int wmain(const int argc, wchar_t* const* argv) {
     wasapi_output.requested = wasapi_output_requested;
     TestToneState test_tone;
     ProcessDeliveryState process_delivery;
+    TabBridgeState tab_bridge;
+    tab_bridge.requested = tab_bridge_requested;
     if (process_delivery_requested) {
         process_delivery.input_buffer.resize(
             static_cast<std::size_t>(kProcessLoopbackMaxFrames) * 2U);
@@ -821,6 +854,26 @@ int wmain(const int argc, wchar_t* const* argv) {
     if (wasapi_started && session_routing_requested && process_delivery_requested) {
         (void)rebuild_delivery_graph(process_delivery, engine, wasapi_output,
                                      session_routing.coordinator);
+    }
+    std::string tab_bridge_detail = tab_bridge_requested
+        ? "tab bridge requested; binding loopback listener..."
+        : "tab bridge disabled; Preview will not accept browser packets.";
+    const bool tab_bridge_started = wasapi_started && tab_bridge.requested;
+    if (tab_bridge_started) {
+        hibiki::TabBridgeServerConfigV1 tab_config{};
+        if (tab_bridge.server.start(tab_config, hibiki::enqueue_tab_capture_packet_v1,
+                                    &tab_bridge.queue)) {
+            tab_bridge.listening = true;
+            tab_bridge_detail = "loopback listener bound; waiting for browser capture.";
+            tab_bridge.input_buffer.resize(
+                static_cast<std::size_t>(kTabBridgeMaxFrames) * 2U);
+            tab_bridge.output_buffer.resize(
+                static_cast<std::size_t>(kTabBridgeMaxFrames) *
+                static_cast<std::size_t>(kTestToneMaxOutputChannels));
+            tab_bridge.lane_inputs.assign(1U, hibiki::RtLaneInputV1{});
+        } else {
+            tab_bridge_detail = "loopback listener bind failed; tab bridge disabled.";
+        }
     }
     const auto initial_wasapi_snapshot = engine.wasapi_output_snapshot();
     const std::string catalog_detail = physical_catalog_ready
@@ -906,7 +959,8 @@ int wmain(const int argc, wchar_t* const* argv) {
     auto status = make_initial_status(engine.volume(), catalog_detail, wasapi_output,
                                       initial_wasapi_snapshot, system_volume_active,
                                       system_volume_detail, session_routing_active,
-                                      session_routing_detail, process_loopback_detail);
+                                      session_routing_detail, process_loopback_detail,
+                                      tab_bridge.listening, tab_bridge_detail);
     if (!status_store.publish(status)) return 4;
     hibiki::ControlPlaneHostV1 host;
     hibiki::IpcNamedPipeConfigV1 pipe_config{kPipeName, 64U * 1024U, 1000U};
@@ -1026,6 +1080,15 @@ int wmain(const int argc, wchar_t* const* argv) {
             (void)render_test_tone(test_tone, engine);
             next_test_tone_render = now + std::chrono::milliseconds{10};
         }
+        if (tab_bridge.listening) {
+            hibiki::TabCaptureBlockV1 block{};
+            (void)hibiki::process_tab_capture_lane_to_wasapi_v1(
+                engine, 0U, tab_bridge.queue,
+                tab_bridge.input_buffer.data(), kTabBridgeMaxFrames,
+                std::span<hibiki::RtLaneInputV1>(tab_bridge.lane_inputs),
+                tab_bridge.output_buffer.data(), kTabBridgeMaxOutputChannels,
+                block);
+        }
         const auto wasapi_snapshot = engine.wasapi_output_snapshot();
         const auto volume = engine.volume();
         bool status_changed = false;
@@ -1100,6 +1163,13 @@ int wmain(const int argc, wchar_t* const* argv) {
             !same_route(previous_process_route, status.routes[5U])) {
             status_changed = true;
         }
+        const auto previous_tab_route = status.routes[6U];
+        const bool tab_active = tab_bridge.listening;
+        set_route(status.routes[6U], "browser-tab", "瀏覽器分頁", tab_bridge_detail,
+                  tab_active ? hibiki::ControlRouteHealthStateV1::Pending
+                              : hibiki::ControlRouteHealthStateV1::Unavailable,
+                  tab_active ? 0U : 1U);
+        if (!same_route(previous_tab_route, status.routes[6U])) status_changed = true;
         if (status_changed) {
             ++status.sequence;
             (void)status_store.publish(status);
@@ -1107,6 +1177,7 @@ int wmain(const int argc, wchar_t* const* argv) {
         std::this_thread::sleep_for(std::chrono::milliseconds{2});
     }
     host.stop();
+    tab_bridge.server.stop();
     engine.stop_wasapi_output();
     physical_catalog.unbind();
     session_routing.coordinator.unbind();
