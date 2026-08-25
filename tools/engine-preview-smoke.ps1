@@ -450,10 +450,9 @@ function Write-WavSourceFixture([string]$Path) {
     $writer.Write([uint16]4)
     $writer.Write([uint16]32)
     $writer.Write([System.Text.Encoding]::ASCII.GetBytes('data'))
-    $writer.Write([uint32]960) # 240 frames x 2 ch x 4 bytes
+    $writer.Write([uint32]960) # 240 frames x 1 ch x 4 bytes
     for ($frame = 0; $frame -lt 240; $frame++) {
       $sample = [single](0.25 * [Math]::Sin(2 * [Math]::PI * 5000 * $frame / 48000))
-      $writer.Write([single]$sample)
       $writer.Write([single]$sample)
     }
     $writer.Flush()
@@ -704,7 +703,8 @@ try {
           if ($detailBytes -gt 0 -and $detailBytes -le 120) {
             $wavDetail = [System.Text.Encoding]::UTF8.GetString(
               $statusReply, $wavRouteOffset + 104, $detailBytes)
-            if ($wavDetail -match 'wav file source rendering') {
+            if ($wavDetail -match 'wav file source rendering' -and
+                $wavDetail -match 'frames=\d+/240') {
               $wavReady = $true
               break
             }

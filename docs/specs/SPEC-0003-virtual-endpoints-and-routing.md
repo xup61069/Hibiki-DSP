@@ -131,9 +131,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   `--enable-wasapi-output` 與 `--wav-source-path`）：preview 會先以既有 v1 WAV decoder
   fail-closed 驗證 Float32 PCM、sample rate 與聲道數，再把 bounded decoded block 接進
   user-space graph 與 WASAPI handoff；可另用 `--enable-wav-loop` 重播。status route
-  `wav-source` 只有在 sink 回報 rendered blocks 後才顯示 Ready。此模式與 test tone、tab
-  bridge、driver loopback 互斥；它是本機檔案播放的 user-space graph evidence，不是
-  endpoint policy、實體 driver 或 WaveRT delivery 驗收。
+  `wav-source` 只有在 sink 回報 rendered blocks 後才顯示 Ready，並回報 bounded
+  `frames=rendered/total` 進度與 `failed` 區塊計數；連續失敗達上限後停止排程並保留
+  honest detail。此模式與 test tone、tab bridge、driver loopback 互斥；它是本機檔案播放
+  的 user-space graph evidence，不是 endpoint policy、實體 driver 或 WaveRT delivery 驗收。
 - `PersistentPolyphaseResampler` 是 clock-drift/SRC baseline：固定容量 8 phase × 16 tap
   polyphase FIR bank 支援最多 8 聲道與 0.25x–4.0x source step，保留跨 block phase 與
   bounded history，ratio 變更不重置 stream，invalid input fail-closed 且 RT path 不配置。

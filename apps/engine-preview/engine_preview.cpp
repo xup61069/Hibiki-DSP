@@ -150,12 +150,17 @@ struct WavFileSourceState final {
     std::uint32_t sample_rate{0U};
     std::uint32_t block_frames{0U};
     std::uint64_t rendered_blocks{0U};
+    std::uint64_t frames_rendered{0U};
+    std::uint64_t failed_blocks{0U};
+    std::uint32_t consecutive_failures{0U};
     bool requested{false};
     bool loop{false};
     bool prepared{false};
     bool active{false};
     bool eof{false};
 };
+
+constexpr std::uint32_t kWavSourceFailureLimit = 100U;
 
 constexpr std::size_t kMaxProcessDeliverySources = 8U;
 constexpr std::uint32_t kProcessLoopbackMaxFrames = 4096U;
@@ -465,6 +470,7 @@ bool render_wav_file_source(WavFileSourceState& source,
     const auto source_channels =
         source.data.channels == 1U ? 2U : static_cast<std::uint32_t>(source.data.channels);
     const auto total_frames = source.data.frames();
+    const auto start_frame = source.next_frame;
     for (std::uint32_t frame = 0U; frame < source.block_frames; ++frame) {
         if (source.next_frame >= total_frames) {
             if (!source.loop) {
@@ -483,6 +489,11 @@ bool render_wav_file_source(WavFileSourceState& source,
             }
             source.next_frame = 0U;
         }
+        else if (frame > 0U && source.next_frame == 0U) {
+            // Loop wrap: the frame position restarted, so the rest of this
+            // block is silence padding and progress reports a full block.
+            break;
+        }
         const auto offset =
             static_cast<std::size_t>(frame) * static_cast<std::size_t>(source_channels);
         if (source.data.channels == 1U) {
@@ -499,10 +510,21 @@ bool render_wav_file_source(WavFileSourceState& source,
         }
         ++source.next_frame;
     }
+    source.frames_rendered += source.next_frame - start_frame;
     const auto delivered = engine.process_output_group_to_wasapi(
         "main", std::span<const hibiki::RtLaneInputV1>(source.lanes),
         source.output_block.data(), source.block_frames);
-    if (delivered) ++source.rendered_blocks;
+    if (delivered) {
+        ++source.rendered_blocks;
+        source.consecutive_failures = 0U;
+    } else {
+        ++source.failed_blocks;
+        ++source.consecutive_failures;
+        if (source.consecutive_failures >= kWavSourceFailureLimit) {
+            source.active = false;
+            source.eof = true;
+        }
+    }
     return delivered;
 }
 
@@ -994,13 +1016,16 @@ hibiki::ControlStatusSnapshotV1 make_initial_status(
     const std::string_view session_routing_detail,
     const std::string_view process_loopback_detail,
     const bool driver_loopback_enabled,
+    const bool driver_loopback_ready,
     const std::string_view driver_loopback_detail,
     const bool wav_source_enabled, const std::string_view wav_source_detail,
     const bool tab_bridge_enabled, const std::string_view tab_bridge_detail) noexcept {
     hibiki::ControlStatusSnapshotV1 snapshot{};
     snapshot.sequence = 1U;
     snapshot.volume = volume;
-    snapshot.route_count = 7U;
+    snapshot.route_count = wav_source_enabled || driver_loopback_enabled || tab_bridge_enabled
+                              ? 7U
+                              : 6U;
     set_route(snapshot.routes[0U], "engine-control", "引擎控制面",
               "named pipe 已啟動；目前為本機 user-space preview。",
               hibiki::ControlRouteHealthStateV1::Ready);
@@ -1028,22 +1053,28 @@ hibiki::ControlStatusSnapshotV1 make_initial_status(
               session_routing_enabled ? hibiki::ControlRouteHealthStateV1::Pending
                                        : hibiki::ControlRouteHealthStateV1::Unavailable,
               session_routing_enabled ? 0U : 1U);
-    set_route(snapshot.routes[6U], "browser-tab", "瀏覽器分頁",
-              tab_bridge_detail,
-              tab_bridge_enabled ? hibiki::ControlRouteHealthStateV1::Pending
-                                  : hibiki::ControlRouteHealthStateV1::Unavailable,
-              tab_bridge_enabled ? 0U : 1U);
-    set_route(snapshot.routes[6U], "driver-loopback", "Driver Stream Loopback",
-              driver_loopback_detail,
-              driver_loopback_enabled
-                  ? hibiki::ControlRouteHealthStateV1::Pending
-                  : hibiki::ControlRouteHealthStateV1::Unavailable,
-              driver_loopback_enabled ? 0U : 1U);
-    set_route(snapshot.routes[6U], "wav-source", "WAV 檔案音源",
-              wav_source_detail,
-              wav_source_enabled ? hibiki::ControlRouteHealthStateV1::Pending
-                                  : hibiki::ControlRouteHealthStateV1::Unavailable,
-              wav_source_enabled ? 0U : 1U);
+    // The last status slot is the explicit audio-source slot: exactly one of
+    // the mutually exclusive sources fills it, so the initial snapshot must
+    // already name the requested mode instead of publishing a wrong route id.
+    if (wav_source_enabled) {
+        set_route(snapshot.routes[6U], "wav-source", "WAV 檔案音源",
+                  wav_source_detail,
+                  hibiki::ControlRouteHealthStateV1::Pending, 0U);
+    } else if (driver_loopback_enabled) {
+        set_route(snapshot.routes[6U], "driver-loopback", "Driver Stream Loopback",
+                  driver_loopback_detail,
+                  driver_loopback_ready
+                      ? hibiki::ControlRouteHealthStateV1::Pending
+                      : hibiki::ControlRouteHealthStateV1::Degraded,
+                  driver_loopback_ready ? 0U : 1U);
+    } else {
+        set_route(snapshot.routes[6U], "browser-tab", "瀏覽器分頁",
+                  tab_bridge_detail,
+                  tab_bridge_enabled
+                      ? hibiki::ControlRouteHealthStateV1::Pending
+                      : hibiki::ControlRouteHealthStateV1::Unavailable,
+                  tab_bridge_enabled ? 0U : 1U);
+    }
     return snapshot;
 }
 
@@ -1406,6 +1437,7 @@ int wmain(const int argc, wchar_t* const* argv) {
                                       system_volume_detail, session_routing_active,
                                       session_routing_detail, process_loopback_detail,
                                       wasapi_output.driver_loopback_enabled,
+                                      driver_loopback_ready,
                                       driver_loopback_detail,
                                       wasapi_output.wav_source_enabled, wav_source_detail,
                                       tab_bridge.listening, tab_bridge_detail);
@@ -1710,8 +1742,14 @@ int wmain(const int argc, wchar_t* const* argv) {
             } else if (wav_ready) {
                 detail = "wav file source rendering; blocks=" +
                          std::to_string(wav_source.rendered_blocks);
+                detail += "; frames=" + std::to_string(wav_source.frames_rendered) +
+                          "/" + std::to_string(wav_source.data.frames());
                 if (wav_source.loop) {
                     detail += "; loop=on";
+                }
+                if (wav_source.failed_blocks != 0U) {
+                    detail += "; failed=" +
+                              std::to_string(wav_source.failed_blocks);
                 }
             } else if (!wav_source.prepared) {
                 detail =
