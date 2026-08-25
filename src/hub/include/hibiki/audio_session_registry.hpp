@@ -50,6 +50,9 @@ public:
     [[nodiscard]] const std::vector<AudioSessionDescriptorV1>& sessions() const noexcept {
         return sessions_;
     }
+    [[nodiscard]] std::vector<AudioSessionDescriptorV1>& mutable_sessions() noexcept {
+        return sessions_;
+    }
 
 private:
     static bool valid(const AudioSessionDescriptorV1& descriptor) noexcept;

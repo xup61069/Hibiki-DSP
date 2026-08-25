@@ -141,26 +141,32 @@ HRESULT WindowsProcessLoopbackSourceV1::start(
     audio_client_ = activation->client;
     activation->client = nullptr;
 
-    WAVEFORMATEX* mix_format = nullptr;
-    result = audio_client_->GetMixFormat(&mix_format);
-    if (FAILED(result) || mix_format == nullptr || !is_float32(*mix_format)) {
-        if (mix_format != nullptr) CoTaskMemFree(mix_format);
-        set_degraded(FAILED(result) ? result : AUDCLNT_E_UNSUPPORTED_FORMAT);
-        stop();
-        return last_error_;
-    }
-    sample_rate_ = mix_format->nSamplesPerSec;
-    channels_ = mix_format->nChannels;
-    if ((config.requested_sample_rate != 0U && config.requested_sample_rate != sample_rate_) ||
-        (config.requested_channels != 0U && config.requested_channels != channels_)) {
-        CoTaskMemFree(mix_format);
+    // The process-loopback virtual device does not expose GetMixFormat()
+    // (it returns E_NOTIMPL). Following the official Microsoft
+    // ApplicationLoopback sample, we supply an explicit Float32 stereo format
+    // and let WASAPI resample/mix all captured process audio into it.
+    constexpr std::uint32_t kCaptureRate = 48000U;
+    constexpr std::uint32_t kCaptureChannels = 2U;
+    WAVEFORMATEX capture_format{};
+    capture_format.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
+    capture_format.nChannels = static_cast<WORD>(kCaptureChannels);
+    capture_format.nSamplesPerSec = kCaptureRate;
+    capture_format.wBitsPerSample = sizeof(float) * 8U;
+    capture_format.nBlockAlign =
+        static_cast<WORD>((capture_format.wBitsPerSample / 8U) * capture_format.nChannels);
+    capture_format.nAvgBytesPerSec =
+        capture_format.nSamplesPerSec * capture_format.nBlockAlign;
+
+    if ((config.requested_sample_rate != 0U && config.requested_sample_rate != kCaptureRate) ||
+        (config.requested_channels != 0U && config.requested_channels != kCaptureChannels)) {
         set_degraded(AUDCLNT_E_UNSUPPORTED_FORMAT);
         stop();
         return last_error_;
     }
+    sample_rate_ = kCaptureRate;
+    channels_ = kCaptureChannels;
     event_handle_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     if (event_handle_ == nullptr) {
-        CoTaskMemFree(mix_format);
         set_degraded(HRESULT_FROM_WIN32(GetLastError()));
         stop();
         return last_error_;
@@ -170,8 +176,7 @@ HRESULT WindowsProcessLoopbackSourceV1::start(
         AUDCLNT_SHAREMODE_SHARED,
         AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK |
             AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
-        kBufferDuration, 0, mix_format, nullptr);
-    CoTaskMemFree(mix_format);
+        kBufferDuration, 0, &capture_format, nullptr);
     if (FAILED(result)) {
         set_degraded(result);
         stop();
