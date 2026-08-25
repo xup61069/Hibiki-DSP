@@ -90,6 +90,7 @@ extern "C" {
 #include <cmath>
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -4783,6 +4784,88 @@ int main() {
               !loudness_engine->has_active_loudness_peq("main"));
         CHECK(std::abs(loudness_scene_worker.active_loudness().reference_phon -
                        80.0) < 1e-12);
+    }
+
+    // Live phon recompute: stored formula points rebuild the attachment at a
+    // new phon, debounced and fail-closed. The proxy mapping is control-plane
+    // only; no ISO table, no BS.1770 conformance claim.
+    {
+        auto live_engine = std::make_unique<AudioEngineModel>();
+        GraphConfigV1 live_graph;
+        live_graph.lanes.push_back(LaneConfigV1{"live-main", "main", 2, 0.0, true});
+        live_graph.lanes.push_back(LaneConfigV1{"live-side", "side", 2, 0.0, true});
+        live_graph.strict_direct = false;
+        CHECK(live_engine->prepare_graph(live_graph, 1U) &&
+              live_engine->commit_graph());
+        live_engine->set_sample_rate(48000U);
+
+        const std::array<Iso226FormulaPointV1, 3> live_points{{
+            {100.0, 0.35, 50.0, 0.0},
+            {1000.0, 0.30, 2.4, 0.0},
+            {8000.0, 0.25, 50.0, 0.0}}};
+        EqualLoudnessPolicyV1 live_policy{};
+        live_policy.reference_phon = 80.0;
+        live_policy.strength = 1.0;
+        live_policy.max_boost_db = 6.0;
+
+        CHECK(live_engine->prepare_loudness_peq(
+            "main", live_points, 70.0, live_policy));
+        CHECK(live_engine->commit_loudness_peq());
+
+        // Before opt-in updates are rejected; the 80 phon request is inside
+        // the low-band domain but must still fail closed while disabled.
+        CHECK(!live_engine->update_loudness_phon("main", 55.0));
+        CHECK(!live_engine->update_loudness_phon("main", 19.5));
+        CHECK(!live_engine->update_loudness_phon("main", 85.0));
+        CHECK(!live_engine->update_loudness_phon("side", 55.0));
+        live_engine->set_loudness_live_update("main", true);
+
+        // A fresh attachment starts disabled; the switch must be set again
+        // after any explicit prepare/commit cycle.
+        CHECK(live_engine->prepare_loudness_peq(
+            "main", live_points, 70.0, live_policy));
+        CHECK(live_engine->commit_loudness_peq());
+        CHECK(!live_engine->update_loudness_phon("main", 55.0));
+        live_engine->set_loudness_live_update("main", true);
+
+        // A >=3 phon step bypasses time debounce immediately (40 stays inside
+        // the high-band normative phon cap used by the 8 kHz point).
+        CHECK(live_engine->update_loudness_phon("main", 40.0));
+        // Small steps inside 250 ms are debounced.
+        CHECK(!live_engine->update_loudness_phon("main", 41.5));
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(260));
+        CHECK(live_engine->update_loudness_phon("main", 42.0));
+
+        // Strict Direct must fail closed even when enabled.
+        live_graph.strict_direct = true;
+        CHECK(live_engine->prepare_graph(live_graph, 2U) &&
+              live_engine->commit_graph());
+        CHECK(!live_engine->update_loudness_phon("main", 30.0));
+        live_graph.strict_direct = false;
+        CHECK(live_engine->prepare_graph(live_graph, 3U) &&
+              live_engine->commit_graph());
+
+        // Volume-notification path: accepted notifications drive a bounded
+        // phon estimate (70 + requested dB), foreign groups stay inert.
+        EngineControlWorkerV1 live_worker(*live_engine);
+        ControlCommandV1 volume_command{};
+        volume_command.type = IpcMessageType::VolumeNotification;
+        volume_command.volume = VolumeNotificationV1{-20.0, false, 1U};
+        CHECK(live_worker.consume(volume_command) ==
+              EngineControlResultV1::Applied);
+        ControlCommandV1 group_volume_command{};
+        group_volume_command.type = IpcMessageType::VolumeNotification;
+        group_volume_command.has_volume_target = true;
+        group_volume_command.volume_target.output_group_bytes = 4U;
+        std::copy_n("side", 4U,
+                    group_volume_command.volume_target.output_group.data());
+        group_volume_command.volume = VolumeNotificationV1{-10.0, false, 2U};
+        CHECK(live_worker.consume(group_volume_command) ==
+              EngineControlResultV1::Applied);
+        CHECK(std::abs(live_engine->volume("side").requested_db + 10.0) < 1e-12);
+        CHECK(live_engine->loudness_peq_transaction_idle() &&
+              live_engine->has_active_loudness_peq("main"));
     }
 
     // Program-aware level is a fixed-capacity output attachment. The Movie
