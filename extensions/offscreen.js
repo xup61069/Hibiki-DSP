@@ -61,7 +61,7 @@ function connectBridge() {
     bridge.onclose = () => {
       bridge = null;
       setBridgeConnected(false);
-      setStateHeartbeat(true);
+      setStateHeartbeat(capturing);
       scheduleBridgeRetry();
     };
     bridge.onerror = () => {};
