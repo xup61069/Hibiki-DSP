@@ -129,7 +129,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   evidence，不是 kernel IPC、WaveRT delivery 或 driver 行為證據。
 - Engine Preview 也提供 opt-in `--enable-wav-source`（搭配
   `--enable-wasapi-output` 與 `--wav-source-path`）：preview 會先以既有 v1 WAV decoder
-  fail-closed 驗證 Float32 PCM、sample rate 與聲道數，再把 bounded decoded block 接進
+  fail-closed 驗證 Float32 PCM 與聲道數；檔案取樣率與 prepared sink 不同時，在控制面以
+  bounded polyphase resampler（0.25x–4.0x）離線轉換整個解碼緩衝區並對齊名目長度，
+  status detail 誠實標示 `resampled <file>-><sink>`；RT render path 維持純拷貝、無配置。
+  轉換後把 bounded decoded block 接進
   user-space graph 與 WASAPI handoff；可另用 `--enable-wav-loop` 重播。status route
   `wav-source` 只有在 sink 回報 rendered blocks 後才顯示 Ready，並回報 bounded
   `frames=rendered/total` 進度與 `failed` 區塊計數；連續失敗達上限後停止排程並保留
