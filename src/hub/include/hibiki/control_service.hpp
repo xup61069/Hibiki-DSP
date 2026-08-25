@@ -24,6 +24,8 @@ using ControlStatusSnapshotReplyV1 = bool (*)(IpcFrameV1& response,
                                               void* context) noexcept;
 using SessionCatalogSnapshotReplyV1 = bool (*)(IpcFrameV1& response,
                                                void* context) noexcept;
+using EqVisualSnapshotReplyV1 = bool (*)(IpcFrameV1& response,
+                                         void* context) noexcept;
 
 struct ControlPlaneHandlerContextV1 {
     ControlCommandSinkV1 sink{nullptr};
@@ -34,6 +36,8 @@ struct ControlPlaneHandlerContextV1 {
     void* status_context{nullptr};
     SessionCatalogSnapshotReplyV1 session_catalog_reply{nullptr};
     void* session_catalog_context{nullptr};
+    EqVisualSnapshotReplyV1 eq_visual_reply{nullptr};
+    void* eq_visual_context{nullptr};
 };
 
 // Single-producer (pipe worker), single-consumer (control worker) queue. The
@@ -82,13 +86,15 @@ public:
         void* sink_context,
         DeviceCatalogSnapshotStoreV1* snapshot_store = nullptr,
         ControlStatusSnapshotStoreV1* status_store = nullptr,
-        SessionCatalogSnapshotStoreV1* session_catalog_store = nullptr) noexcept;
+        SessionCatalogSnapshotStoreV1* session_catalog_store = nullptr,
+        EqVisualSnapshotStoreV1* eq_visual_store = nullptr) noexcept;
 
     [[nodiscard]] bool start_with_queue(
         const IpcNamedPipeConfigV1& config,
         DeviceCatalogSnapshotStoreV1* snapshot_store = nullptr,
         ControlStatusSnapshotStoreV1* status_store = nullptr,
-        SessionCatalogSnapshotStoreV1* session_catalog_store = nullptr) noexcept;
+        SessionCatalogSnapshotStoreV1* session_catalog_store = nullptr,
+        EqVisualSnapshotStoreV1* eq_visual_store = nullptr) noexcept;
 
     void stop() noexcept;
 

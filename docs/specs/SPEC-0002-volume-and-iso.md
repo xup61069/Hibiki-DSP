@@ -185,6 +185,12 @@ opt-in 時，才會在同一 control transaction 掛載單點 1 kHz formula atta
 因此自訂 catalog scene 仍需在 wire 上把 [84] 設為 1 才會啟用；
 內建 Easy scene 則由 factory 預設帶入上述值。
 
+成功且未靜音的 live phon recompute 會發布一次 `EqVisualSnapshotV1`（sequence、
+source、最多 32 組頻率/增益點），存入 bounded control-plane cache；UI 以
+`EqVisualSnapshotRequest` 主動拉取，pipe server 不推送。這是控制面視覺回饋，
+不是音訊內容偵測，也不是 driver／實體音訊 evidence；缺少快照時 request 回 Error，
+UI 必須保留上一個安全畫面。
+
 Scene attachment 的聲道數在 graph transaction 準備時解析。若 transaction 已有 pending
 graph，等響度 PEQ 與 multi-channel IR 必須以該 pending graph 的 output channels 編譯；
 否則才使用 active graph，沒有 graph 時 IR 使用 IR 自身的 channel layout。這讓

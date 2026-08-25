@@ -29,7 +29,9 @@ public enum ControlMessageType : ushort
     SessionRouteCommand = 17,
     SessionRouteRuleCommand = 18,
     IrPrepareCommand = 19,
-    SceneCatalogCommand = 20
+    SceneCatalogCommand = 20,
+    EqVisualSnapshotRequest = 21,
+    EqVisualSnapshot = 22,
 }
 
 public enum IpcDecodeError
@@ -158,7 +160,9 @@ public static class IpcCodecV1
         ControlMessageType.SessionCatalogSnapshot or ControlMessageType.SessionCatalogRequest or
         ControlMessageType.SessionVolumeCommand or ControlMessageType.SessionRouteCommand or
         ControlMessageType.SessionRouteRuleCommand or ControlMessageType.IrPrepareCommand or
-        ControlMessageType.SceneCatalogCommand;
+        ControlMessageType.SceneCatalogCommand or
+        ControlMessageType.EqVisualSnapshotRequest or
+        ControlMessageType.EqVisualSnapshot;
 }
 
 public static class ControlPayloadsV1
@@ -180,6 +184,12 @@ public static class ControlPayloadsV1
     public const int ControlStatusSnapshotMaxBytes = ControlStatusSnapshotHeaderBytes +
                                                      (ControlStatusSnapshotEntryBytes *
                                                       ControlStatusSnapshotCapacity);
+    public const int EqVisualSnapshotHeaderBytes = 10;
+    public const int EqVisualSnapshotPointBytes = 16;
+    public const int EqVisualSnapshotCapacity = 32;
+    public const int EqVisualSnapshotMaxBytes = EqVisualSnapshotHeaderBytes +
+                                                (EqVisualSnapshotPointBytes *
+                                                 EqVisualSnapshotCapacity);
     public const int SessionCatalogSnapshotHeaderBytes = 24;
     public const int SessionCatalogSnapshotEntryBytes = 256;
     public const int SessionCatalogSnapshotCapacity = 32;
@@ -1117,6 +1127,87 @@ public static class ControlPayloadsV1
         return true;
     }
 
+    public static byte[] EncodeEqVisualSnapshot(ulong sequence,
+                                                EqVisualSourceV1 source,
+                                                IReadOnlyList<EqVisualPointV1> points)
+    {
+        if (sequence == 0UL || !Enum.IsDefined(source) ||
+            points is null || points.Count is < 4 or > EqVisualSnapshotCapacity)
+            throw new ArgumentException("EQ visual snapshot is outside the v1 limit.");
+        for (var index = 0; index < points.Count; index++)
+        {
+            var point = points[index];
+            if (!EqVisualPointV1.IsValid(point) ||
+                (index != 0 && point.FrequencyHz <= points[index - 1].FrequencyHz))
+                throw new ArgumentException("EQ visual snapshot is outside the v1 limit.");
+        }
+
+        var payload = new byte[EqVisualSnapshotHeaderBytes +
+                               (points.Count * EqVisualSnapshotPointBytes)];
+        BinaryPrimitives.WriteUInt64LittleEndian(payload, sequence);
+        payload[8] = (byte)source;
+        payload[9] = checked((byte)points.Count);
+        for (var index = 0; index < points.Count; index++)
+        {
+            var offset = EqVisualSnapshotHeaderBytes +
+                         (index * EqVisualSnapshotPointBytes);
+            BinaryPrimitives.WriteDoubleLittleEndian(payload.AsSpan(offset),
+                                                     points[index].FrequencyHz);
+            BinaryPrimitives.WriteDoubleLittleEndian(payload.AsSpan(offset + 8),
+                                                     points[index].GainDb);
+        }
+
+        return payload;
+    }
+
+    public static bool TryDecodeEqVisualSnapshot(
+        ReadOnlySpan<byte> payload,
+        out ulong sequence,
+        out EqVisualSourceV1 source,
+        out IReadOnlyList<EqVisualPointV1> points)
+    {
+        sequence = 0UL;
+        source = EqVisualSourceV1.None;
+        points = Array.Empty<EqVisualPointV1>();
+        if (payload.Length < EqVisualSnapshotHeaderBytes ||
+            payload.Length > EqVisualSnapshotMaxBytes ||
+            (payload.Length - EqVisualSnapshotHeaderBytes) % EqVisualSnapshotPointBytes != 0)
+            return false;
+
+        sequence = BinaryPrimitives.ReadUInt64LittleEndian(payload);
+        source = (EqVisualSourceV1)payload[8];
+        var count = payload[9];
+        if (sequence == 0UL || !Enum.IsDefined(source) ||
+            count is < 4 or > EqVisualSnapshotCapacity ||
+            payload.Length != EqVisualSnapshotHeaderBytes +
+                              (count * EqVisualSnapshotPointBytes))
+        {
+            sequence = 0UL;
+            source = EqVisualSourceV1.None;
+            return false;
+        }
+
+        var list = new List<EqVisualPointV1>(count);
+        double previousFrequency = 0.0;
+        for (var index = 0; index < count; index++)
+        {
+            var offset = EqVisualSnapshotHeaderBytes +
+                         (index * EqVisualSnapshotPointBytes);
+            var frequencyHz = BinaryPrimitives.ReadDoubleLittleEndian(
+                payload.Slice(offset, 8));
+            var gainDb = BinaryPrimitives.ReadDoubleLittleEndian(
+                payload.Slice(offset + 8, 8));
+            if (!EqVisualPointV1.IsValid(new EqVisualPointV1(frequencyHz, gainDb)) ||
+                frequencyHz <= previousFrequency)
+                return false;
+            previousFrequency = frequencyHz;
+            list.Add(new EqVisualPointV1(frequencyHz, gainDb));
+        }
+
+        points = list;
+        return true;
+    }
+
     private static void WriteDbQ16(Span<byte> destination, double db)
     {
         var q16 = checked((int)Math.Round(db * 65536.0, MidpointRounding.AwayFromZero));
@@ -1155,7 +1246,9 @@ public sealed class IpcRequestSession
          request.Type == ControlMessageType.ControlStatusRequest &&
          reply.Type == ControlMessageType.ControlStatusSnapshot ||
          request.Type == ControlMessageType.SessionCatalogRequest &&
-         reply.Type == ControlMessageType.SessionCatalogSnapshot);
+         reply.Type == ControlMessageType.SessionCatalogSnapshot ||
+         request.Type == ControlMessageType.EqVisualSnapshotRequest &&
+         reply.Type == ControlMessageType.EqVisualSnapshot);
 }
 
 public sealed class ControlCommandFactoryV1
@@ -1257,6 +1350,9 @@ public sealed class ControlCommandFactoryV1
 
     public IpcEnvelopeV1 RequestControlStatus() =>
         _requests.Create(ControlMessageType.ControlStatusRequest);
+
+    public IpcEnvelopeV1 RequestEqVisualSnapshot() =>
+        _requests.Create(ControlMessageType.EqVisualSnapshotRequest);
 }
 
 // Thin asynchronous client for the control worker. It owns no UI state and

@@ -8,9 +8,10 @@ bool ControlPlaneHostV1::start(
     const IpcNamedPipeConfigV1& config,
     const ControlCommandSinkV1 sink,
     void* const sink_context,
-    DeviceCatalogSnapshotStoreV1* const snapshot_store,
-    ControlStatusSnapshotStoreV1* const status_store,
-    SessionCatalogSnapshotStoreV1* const session_catalog_store) noexcept {
+        DeviceCatalogSnapshotStoreV1* const snapshot_store,
+        ControlStatusSnapshotStoreV1* const status_store,
+        SessionCatalogSnapshotStoreV1* const session_catalog_store,
+        EqVisualSnapshotStoreV1* const eq_visual_store) noexcept {
     stop();
     if (sink == nullptr) return false;
     context_.sink = sink;
@@ -27,6 +28,10 @@ bool ControlPlaneHostV1::start(
                                          ? nullptr
                                          : session_catalog_snapshot_reply_v1;
     context_.session_catalog_context = session_catalog_store;
+    context_.eq_visual_reply = eq_visual_store == nullptr
+                                   ? nullptr
+                                   : eq_visual_snapshot_reply_v1;
+    context_.eq_visual_context = eq_visual_store;
     if (!pipe_.start(config, handle_control_frame_v1, &context_)) {
         context_ = {};
         return false;
@@ -37,10 +42,11 @@ bool ControlPlaneHostV1::start(
 bool ControlPlaneHostV1::start_with_queue(
     const IpcNamedPipeConfigV1& config,
     DeviceCatalogSnapshotStoreV1* const snapshot_store,
-    ControlStatusSnapshotStoreV1* const status_store,
-    SessionCatalogSnapshotStoreV1* const session_catalog_store) noexcept {
+        ControlStatusSnapshotStoreV1* const status_store,
+        SessionCatalogSnapshotStoreV1* const session_catalog_store,
+        EqVisualSnapshotStoreV1* const eq_visual_store) noexcept {
     return start(config, enqueue_control_command_v1, &queue_, snapshot_store, status_store,
-                 session_catalog_store);
+                 session_catalog_store, eq_visual_store);
 }
 
 void ControlPlaneHostV1::stop() noexcept {
@@ -86,6 +92,17 @@ bool handle_control_frame_v1(const IpcFrameV1& request,
         if (handler->session_catalog_reply == nullptr ||
             !handler->session_catalog_reply(response, handler->session_catalog_context) ||
             response.header.type != IpcMessageType::SessionCatalogSnapshot) {
+            response = make_error_frame_v1(request);
+        } else {
+            response.header.request_id = request.header.request_id;
+        }
+        return true;
+    }
+    if (request.header.type == IpcMessageType::EqVisualSnapshotRequest) {
+        response = {};
+        if (handler->eq_visual_reply == nullptr ||
+            !handler->eq_visual_reply(response, handler->eq_visual_context) ||
+            response.header.type != IpcMessageType::EqVisualSnapshot) {
             response = make_error_frame_v1(request);
         } else {
             response.header.request_id = request.header.request_id;

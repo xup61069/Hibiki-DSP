@@ -1869,6 +1869,49 @@ static async Task RunSceneCatalogCheckServerAsync(
     }
 }
 
+// Case 7a: EQ visual snapshot wire encoding is strict and request/reply
+// correlation only accepts the matching typed snapshot.
+{
+    var eqPoints = new EqVisualPointV1[]
+    {
+        new(31.0, -4.0), new(120.0, 2.0), new(1000.0, 0.0), new(8000.0, 1.5),
+    };
+    var encodedEq = ControlPayloadsV1.EncodeEqVisualSnapshot(
+        7UL, EqVisualSourceV1.EqualLoudness, eqPoints);
+    Check(encodedEq.Length == ControlPayloadsV1.EqVisualSnapshotHeaderBytes +
+          (4 * ControlPayloadsV1.EqVisualSnapshotPointBytes),
+        "A four-point EQ visual snapshot must use the bounded variable length.");
+    Check(ControlPayloadsV1.TryDecodeEqVisualSnapshot(
+              encodedEq, out var eqSequence, out var eqSource, out var eqDecoded) &&
+          eqSequence == 7UL && eqSource == EqVisualSourceV1.EqualLoudness &&
+          eqDecoded.Count == 4 &&
+          Math.Abs(eqDecoded[0].GainDb + 4.0) < 1e-12,
+        "EQ visual round-trip must preserve sequence, source, and points.");
+
+    var badEq = (byte[])encodedEq.Clone();
+    badEq[9] = 3;
+    Check(!ControlPayloadsV1.TryDecodeEqVisualSnapshot(badEq, out _, out _, out _),
+        "An under-populated EQ visual frame must fail closed.");
+    badEq = (byte[])encodedEq.Clone();
+    // Write +30.0 dB directly: an XOR on the low mantissa byte merely makes
+    // a nearby legal value, so it does not exercise range rejection.
+    double invalidGainDb = 30.0;
+    BitConverter.GetBytes(invalidGainDb).CopyTo(badEq,
+        ControlPayloadsV1.EqVisualSnapshotHeaderBytes +
+        (3 * ControlPayloadsV1.EqVisualSnapshotPointBytes) + 8);
+    Check(!ControlPayloadsV1.TryDecodeEqVisualSnapshot(badEq, out _, out _, out _),
+        "An out-of-range gain point must fail closed.");
+
+    var factory = new ControlCommandFactoryV1();
+    var eqRequest = factory.RequestEqVisualSnapshot();
+    Check(IpcRequestSession.IsReplyTo(eqRequest, new IpcEnvelopeV1(
+            ControlMessageType.EqVisualSnapshot, eqRequest.RequestId, encodedEq)),
+        "The matching EQ visual snapshot must satisfy reply correlation.");
+    Check(!IpcRequestSession.IsReplyTo(factory.RequestDeviceCatalog(), new IpcEnvelopeV1(
+            ControlMessageType.EqVisualSnapshot, 2UL, encodedEq)),
+        "Cross-request snapshots must not satisfy reply correlation.");
+}
+
 // Case 7: the live EQ surface only changes after a confirmed visual frame,
 // fails closed on malformed/stale frames, and resets when control disconnects.
 {
@@ -1933,5 +1976,47 @@ static async Task RunSceneCatalogCheckServerAsync(
     testNow = testNow.AddMilliseconds(180);
     Check(surface.TransitionProgress == 1.0,
         "Transition progress must clamp at completion and cannot exceed the target curve.");
+}
+
+// Case 7b: RefreshEqVisualSnapshotAsync applies a valid engine reply and
+// preserves the previous safe surface when the engine has no snapshot.
+{
+    var eqPoints = new EqVisualPointV1[]
+    {
+        new(31.0, -3.0), new(120.0, 2.0), new(1000.0, 0.0), new(8000.0, 1.0),
+    };
+    const string pipeName = "HibikiDSP_eq_snapshot_poll_check";
+    using var serverCts = new CancellationTokenSource();
+    var connectedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var serverTask = RunSceneCatalogCheckServerAsync(pipeName, request =>
+    {
+        if (request.Type != ControlMessageType.EqVisualSnapshotRequest) return null;
+        return new IpcEnvelopeV1(
+            ControlMessageType.EqVisualSnapshot,
+            request.RequestId,
+            ControlPayloadsV1.EncodeEqVisualSnapshot(
+                9UL, EqVisualSourceV1.EqualLoudness, eqPoints));
+    }, connectedSignal, serverCts.Token);
+
+    var eqViewModel = new EasyControlViewModel(pipeName);
+    try
+    {
+        Check(await eqViewModel.ConnectAsync(TimeSpan.FromSeconds(2), serverCts.Token),
+            "The EQ snapshot check must connect to its local mock pipe.");
+        Check(eqViewModel.EqSurface.HasConfirmedFrame &&
+              eqViewModel.EqSurface.LastAppliedSequence == 9UL &&
+              Math.Abs(eqViewModel.EqSurface.TargetPoints[0].GainDb + 3.0) < 1e-12,
+            "A successful snapshot pull must drive the live EQ surface.");
+
+        Check(!await eqViewModel.RefreshEqVisualSnapshotAsync(serverCts.Token) ||
+              eqViewModel.EqSurface.LastAppliedSequence >= 9UL,
+            "Repeated pulls must never rewind the confirmed surface.");
+    }
+    finally
+    {
+        await eqViewModel.DisconnectAsync();
+        serverCts.Cancel();
+        try { await serverTask; } catch (OperationCanceledException) { }
+    }
 }
 Console.WriteLine("Control model checks passed.");
