@@ -75,6 +75,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         Array.Empty<PeqFilterV1>();
     private double[]? _wizardMeasurementFrequencies;
     private double[]? _wizardMeasurementLevels;
+    private IReadOnlyList<WizardPeqRow> _wizardPreviewRows =
+        Array.Empty<WizardPeqRow>();
 
     private const int EqPollIntervalMs = 1000;
 
@@ -519,12 +521,18 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public string WizardExportedPath => _wizardExportedPath;
 
+    public sealed record WizardPeqRow(
+        int Index, string FrequencyText, string GainText, string QText);
+
+    public IReadOnlyList<WizardPeqRow> WizardPreviewFilters => _wizardPreviewRows;
+
     public void ResetWizardState()
     {
         _wizardMeasurementPath = string.Empty;
         _wizardImportedPointCount = 0;
         _wizardHasResult = false;
         _wizardExportedPath = string.Empty;
+        _wizardPreviewRows = Array.Empty<WizardPeqRow>();
         _wizardStatus = "尚未載入量測；請先選擇 CSV 或 REW 文字檔";
         OnPropertyChanged(nameof(WizardMeasurementPath));
         OnPropertyChanged(nameof(WizardImportedPointCount));
@@ -532,6 +540,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(WizardImportedCountText));
         OnPropertyChanged(nameof(WizardHasResult));
         OnPropertyChanged(nameof(WizardExportedPath));
+        OnPropertyChanged(nameof(WizardPreviewFilters));
         OnPropertyChanged(nameof(WizardStatus));
     }
 
@@ -670,6 +679,13 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         }
 
         _wizardCompiledFilters = [.. compile.Filters];
+        _wizardPreviewRows = compile.Filters
+            .Select((filter, index) => new WizardPeqRow(
+                index + 1,
+                $"{filter.FrequencyHz:0.#} Hz",
+                $"{(filter.GainDb >= 0 ? "+" : string.Empty)}{filter.GainDb:0.##} dB",
+                $"Q {filter.Q:0.##}"))
+            .ToArray();
         WizardHasResult = true;
         WizardStatus = $"已編譯 {compile.Filters.Count} 個 PEQ 濾波器" +
                        (compile.Limited ? "；部分修正已受限於安全上限" : "") +

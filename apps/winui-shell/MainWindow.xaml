@@ -530,6 +530,34 @@
                         </Border>
                     </StackPanel>
                     <TextBlock Text="{Binding WizardStatus}" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" AutomationProperties.LiveSetting="Polite" AutomationProperties.Name="校正狀態" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <Border Style="{StaticResource SectionCardStyle}" Visibility="{Binding WizardHasResult, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="PEQ 濾波器預覽" Style="{ThemeResource BodyStrongTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" AutomationProperties.Name="PEQ 濾波器預覽" />
+                            <controls:ItemsRepeater ItemsSource="{Binding WizardPreviewFilters}" MaxWidth="560">
+                                <controls:ItemsRepeater.Layout>
+                                    <controls:StackLayout Spacing="4" />
+                                </controls:ItemsRepeater.Layout>
+                                <controls:ItemsRepeater.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="8" Background="{ThemeResource SubtleFillColorSecondaryBrush}" Padding="12,6">
+                                            <Grid ColumnSpacing="14">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="28" />
+                                                    <ColumnDefinition Width="110" />
+                                                    <ColumnDefinition Width="90" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Index}" Style="{ThemeResource CaptionTextBlockStyle}" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold" />
+                                                <TextBlock Grid.Column="1" Text="{Binding FrequencyText}" Style="{ThemeResource CaptionTextBlockStyle}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                                <TextBlock Grid.Column="2" Text="{Binding GainText}" Style="{ThemeResource CaptionTextBlockStyle}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Grid.Column="3" Text="{Binding QText}" Style="{ThemeResource CaptionTextBlockStyle}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </controls:ItemsRepeater.ItemTemplate>
+                            </controls:ItemsRepeater>
+                        </StackPanel>
+                    </Border>
                     <TextBlock Text="{Binding WizardExportedPath}" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" AutomationProperties.LiveSetting="Polite" AutomationProperties.Name="匯出位置" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
             </Border></Grid>

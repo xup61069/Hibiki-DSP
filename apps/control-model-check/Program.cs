@@ -917,6 +917,13 @@ finally
 Check(wizardVm.CompileWizardCorrection() && wizardVm.WizardHasResult &&
       wizardVm.WizardStatus.Contains("PEQ", StringComparison.Ordinal),
     $"Wizard compile must produce bounded PEQ filters from the imported points. Status={wizardVm.WizardStatus}");
+var wizardPreview = wizardVm.WizardPreviewFilters;
+Check(wizardPreview.Count == 2 &&
+      wizardPreview[0].Index == 1 &&
+      wizardPreview.All(row => row.FrequencyText.EndsWith(" Hz", StringComparison.Ordinal) &&
+                              row.GainText.EndsWith(" dB", StringComparison.Ordinal) &&
+                              row.QText.StartsWith("Q ", StringComparison.Ordinal)),
+    "Wizard preview rows must expose one formatted PEQ filter per compiled band.");
 var wizardExportPath = Path.Combine(Path.GetTempPath(), $"hibiki-wizard-export-{Guid.NewGuid():N}.json");
 try
 {

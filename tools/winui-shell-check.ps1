@@ -325,7 +325,8 @@ foreach ($requiredText in @('x:Name="RootGrid"', 'ItemsSource="{Binding Scenes}"
     'ItemsSource="{Binding WizardCurveOptions}"', 'WizardTargetCurve',
     'OnImportWizardMeasurementClick', 'OnCompileWizardClick',
     'OnExportWizardProfileClick', 'x:Name="ShellCalibrateSection"',
-    'AutomationProperties.Name="校正精靈目標曲線"')) {
+    'AutomationProperties.Name="校正精靈目標曲線"',
+    'ItemsSource="{Binding WizardPreviewFilters}"')) {
   if (-not $xaml.Contains($requiredText)) { throw "WinUI shell binding missing: $requiredText" }
 }
 if (-not $codeBehind.Contains('RootGrid.DataContext = ViewModel') -or
