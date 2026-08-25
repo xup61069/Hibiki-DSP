@@ -52,6 +52,7 @@ internal sealed class PreviewForm : Form
     private readonly TextBox _customSceneId = new() { Width = 220, PlaceholderText = "Scene ID", AccessibleName = "自訂場景 ID" };
     private readonly TextBox _customSceneName = new() { Width = 220, PlaceholderText = "名稱", AccessibleName = "自訂場景名稱" };
     private readonly TextBox _customSceneDescription = new() { Width = 460, PlaceholderText = "說明", AccessibleName = "自訂場景說明" };
+    private readonly CheckBox _customSceneLoudnessLiveUpdate = new() { Text = "音量連動等響度", AutoSize = true, AccessibleName = "音量連動等響度" };
     private readonly Button _addCustomScene = new() { Text = "加入自訂場景", AutoSize = true, AccessibleName = "加入自訂場景" };
     private readonly Button _removeCustomScene = new() { Text = "移除選取的自訂場景", AutoSize = true, AccessibleName = "移除選取的自訂場景" };
     private readonly ComboBox _irModes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取 IR 模式" };
@@ -118,6 +119,7 @@ internal sealed class PreviewForm : Form
         _customSceneId.TextChanged += (_, _) => _viewModel.CustomSceneId = _customSceneId.Text;
         _customSceneName.TextChanged += (_, _) => _viewModel.CustomSceneName = _customSceneName.Text;
         _customSceneDescription.TextChanged += (_, _) => _viewModel.CustomSceneDescription = _customSceneDescription.Text;
+        _customSceneLoudnessLiveUpdate.CheckedChanged += (_, _) => _viewModel.CustomSceneLoudnessLiveUpdate = _customSceneLoudnessLiveUpdate.Checked;
         var customSceneIdentity = new FlowLayoutPanel
         {
             AutoSize = true,
@@ -128,6 +130,7 @@ internal sealed class PreviewForm : Form
         customSceneIdentity.Controls.Add(_customSceneName);
         panel.Controls.Add(customSceneIdentity);
         panel.Controls.Add(_customSceneDescription);
+        panel.Controls.Add(_customSceneLoudnessLiveUpdate);
         _addCustomScene.Click += async (_, _) =>
         {
             await _viewModel.AddCustomSceneAsync();
@@ -474,6 +477,7 @@ internal sealed class PreviewForm : Form
             _customSceneName.Text = _viewModel.CustomSceneName;
         if (!string.Equals(_customSceneDescription.Text, _viewModel.CustomSceneDescription, StringComparison.Ordinal))
             _customSceneDescription.Text = _viewModel.CustomSceneDescription;
+        _customSceneLoudnessLiveUpdate.Checked = _viewModel.CustomSceneLoudnessLiveUpdate;
         _removeCustomScene.Enabled = _scenes.SelectedValue is string removableSceneId &&
                                      _viewModel.CustomSceneCards.Any(item => item.Id == removableSceneId);
         var selectedScene = _viewModel.SelectedScene?.Id;
