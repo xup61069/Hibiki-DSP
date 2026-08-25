@@ -695,7 +695,9 @@ std::size_t WindowsControlRuntimeV1::drain_session_commands() noexcept {
                 WindowsVolumeEventContextsV1::session());
             catalog_dirty = catalog_dirty || SUCCEEDED(result);
         } else if (item.kind == SessionCommandKindV1::Route) {
-            if (item.route.catalog_sequence != expected_sequence) {
+            // Accept past-or-present sequences; handle validation rejects
+            // truly expired entries and future sequences are invalid.
+            if (item.route.catalog_sequence > expected_sequence) {
                 ++processed;
                 continue;
             }
