@@ -4950,6 +4950,104 @@ int main() {
         CHECK(std::abs(live_engine->volume("side").requested_db + 10.0) < 1e-12);
         CHECK(live_engine->loudness_peq_transaction_idle() &&
               live_engine->has_active_loudness_peq("main"));
+
+        // Muted-volume proxy semantics: a mute=true notification keeps the
+        // curve targeting the unmuted listening level (70 + requested dB),
+        // so the estimate must not collapse toward the 20-phon floor. The
+        // accepted mute notification still applies to the volume bank.
+        ControlCommandV1 mute_command{};
+        mute_command.type = IpcMessageType::VolumeNotification;
+        mute_command.volume = VolumeNotificationV1{-20.0, true, 3U};
+        CHECK(live_worker.consume(mute_command) ==
+              EngineControlResultV1::Applied);
+        CHECK(live_engine->volume("main").mute);
+        CHECK(live_engine->loudness_peq_transaction_idle() &&
+              live_engine->has_active_loudness_peq("main"));
+    }
+
+    // Per-group debounce isolation: the debounce window and phon baseline
+    // belong to each output group's attachment, not to the engine. The model
+    // keeps one active loudness attachment at a time, so switching groups
+    // must not inherit the previous group's fresh debounce window, and
+    // updates targeting a non-active group stay fail-closed.
+    {
+        auto group_engine = std::make_unique<AudioEngineModel>();
+        GraphConfigV1 group_graph;
+        group_graph.lanes.push_back(LaneConfigV1{"group-main", "main", 2, 0.0, true});
+        group_graph.lanes.push_back(LaneConfigV1{"group-side", "side", 2, 0.0, true});
+        group_graph.strict_direct = false;
+        CHECK(group_engine->prepare_graph(group_graph, 1U) &&
+              group_engine->commit_graph());
+        group_engine->set_sample_rate(48000U);
+
+        const std::array<Iso226FormulaPointV1, 3> group_points{{
+            {100.0, 0.35, 50.0, 0.0},
+            {1000.0, 0.30, 2.4, 0.0},
+            {8000.0, 0.25, 50.0, 0.0}}};
+        EqualLoudnessPolicyV1 group_policy{};
+        group_policy.reference_phon = 80.0;
+        group_policy.strength = 1.0;
+        group_policy.max_boost_db = 6.0;
+
+        // No attachment exists yet: every live update is fail-closed.
+        CHECK(!group_engine->update_loudness_phon("side", 61.5));
+
+        CHECK(group_engine->prepare_loudness_peq(
+            "main", group_points, 70.0, group_policy));
+        CHECK(group_engine->commit_loudness_peq());
+        group_engine->set_loudness_live_update("main", true);
+        // Only the active group accepts updates; "side" has no attachment.
+        CHECK(!group_engine->update_loudness_phon("side", 61.5));
+
+        // "main" takes a big step (>=3 phon) and lands at 40 phon.
+        CHECK(group_engine->update_loudness_phon("main", 40.0));
+
+        // Switching the single attachment to "side" starts from that
+        // attachment's own prepare-time baseline (60 phon), so its small
+        // +1.5 phon step is accepted immediately instead of waiting out
+        // main's fresh debounce window.
+        CHECK(group_engine->prepare_loudness_peq(
+            "side", group_points, 60.0, group_policy));
+        CHECK(group_engine->commit_loudness_peq());
+        CHECK(!group_engine->has_active_loudness_peq("main"));
+        CHECK(!group_engine->update_loudness_phon("main", 41.0));
+        group_engine->set_loudness_live_update("side", true);
+        CHECK(group_engine->update_loudness_phon("side", 61.5));
+        // Back-to-back small steps are debounced by side's own window.
+        CHECK(!group_engine->update_loudness_phon("side", 62.0));
+
+        // After the window expires the same group's small step succeeds.
+        std::this_thread::sleep_for(std::chrono::milliseconds(260));
+        CHECK(group_engine->update_loudness_phon("side", 62.0));
+
+        // A live phon recompute is an attached-to-attached replace on the
+        // active group, so it must use the bounded equal-power RT crossfade
+        // instead of swapping filters mid-block. Rendering stays finite and
+        // the transaction completes within the fade budget.
+        std::array<float, 1024> live_fade_input{};
+        std::array<float, 2048> live_fade_output{};
+        const RtLaneInputV1 live_fade_view{live_fade_input.data(), 2U};
+        std::array<float, 1024> live_fade_idle{};
+        const RtLaneInputV1 live_fade_idle_view{live_fade_idle.data(), 2U};
+        const std::array<RtLaneInputV1, 2> live_fade_views{
+            {live_fade_idle_view, live_fade_view}};
+        CHECK(group_engine->prepare_loudness_peq(
+            "side", group_points, 62.0, group_policy));
+        CHECK(group_engine->commit_loudness_peq());
+        group_engine->set_loudness_live_update("side", true);
+        CHECK(group_engine->update_loudness_phon("side", 65.0));
+        CHECK(!group_engine->loudness_peq_transition_complete());
+        for (std::size_t fade_block = 0U;
+             fade_block < 6U && !group_engine->loudness_peq_transition_complete();
+             ++fade_block) {
+            CHECK(group_engine->process_output_group(
+                "side", live_fade_views, live_fade_output.data(), 1024U));
+            CHECK(std::all_of(live_fade_output.begin(), live_fade_output.end(),
+                              [](const float value) {
+                                  return std::isfinite(value);
+                              }));
+        }
+        CHECK(group_engine->loudness_peq_transition_complete());
     }
 
     // Program-aware level is a fixed-capacity output attachment. The Movie

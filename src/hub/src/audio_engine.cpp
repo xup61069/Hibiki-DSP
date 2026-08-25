@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <memory>
@@ -348,13 +349,13 @@ bool AudioEngineModel::update_loudness_phon(
         return false;
     }
     const auto now = std::chrono::steady_clock::now();
-    if (last_phon_update_time_.time_since_epoch().count() != 0) {
+    if (active_loudness_peq_.last_phon_update_time_.time_since_epoch().count() != 0) {
         const auto elapsed_ms =
             std::chrono::duration_cast<std::chrono::milliseconds>(
-                now - last_phon_update_time_)
+                now - active_loudness_peq_.last_phon_update_time_)
                 .count();
         const bool big_step =
-            std::abs(new_phon - last_loudness_phon_) >= 3.0;
+            std::abs(new_phon - active_loudness_peq_.last_loudness_phon_) >= 3.0;
         if (!big_step && elapsed_ms < 250) {
             return false;
         }
@@ -373,8 +374,8 @@ bool AudioEngineModel::update_loudness_phon(
         rollback_loudness_peq();
         return false;
     }
-    last_loudness_phon_ = new_phon;
-    last_phon_update_time_ = now;
+    active_loudness_peq_.last_loudness_phon_ = new_phon;
+    active_loudness_peq_.last_phon_update_time_ = now;
     return true;
 }
 
@@ -400,8 +401,6 @@ void AudioEngineModel::reset_loudness_peq_state() noexcept {
     has_pending_loudness_peq_ = false;
     previous_loudness_peq_ = {};
     loudness_crossfade_.reset();
-    last_loudness_phon_ = 80.0;
-    last_phon_update_time_ = std::chrono::steady_clock::time_point{};
 }
 
 void AudioEngineModel::set_loudness_live_update(
@@ -412,7 +411,11 @@ void AudioEngineModel::set_loudness_live_update(
         return;
     }
     active_loudness_peq_.live_update_enabled = enabled;
-    last_loudness_phon_ = active_loudness_peq_.current_phon;
+    // Re-baseline this group's debounce window to the attachment's current
+    // phon so the first live update after opt-in is not compared against a
+    // stale baseline from a previous attachment.
+    active_loudness_peq_.last_loudness_phon_ =
+        active_loudness_peq_.current_phon;
 }
 
 bool AudioEngineModel::prepare_program_aware(

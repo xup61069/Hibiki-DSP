@@ -316,6 +316,12 @@ private:
         double current_phon{80.0};
         EqualLoudnessPolicyV1 policy{};
         bool live_update_enabled{false};
+        // Per-group live-update debounce state (control plane only; never
+        // touched by the audio thread). A recompute runs when at least
+        // 250 ms elapsed since this group's last applied update OR the phon
+        // request moved by 3.0 or more from this group's baseline.
+        double last_loudness_phon_{80.0};
+        std::chrono::steady_clock::time_point last_phon_update_time_{};
     };
 
     LoudnessGraphAttachmentV1 active_loudness_peq_{};
@@ -343,14 +349,7 @@ private:
     LoudnessPeqCrossfadeState loudness_crossfade_{};
 
     bool has_active_loudness_peq_{false};
-
     bool has_pending_loudness_peq_{false};
-
-    // Live-update debounce state (control plane only; never touched by the
-    // audio thread). A recompute runs when at least 250 ms elapsed since the
-    // last applied update OR the phon request moved by 3.0 or more.
-    double last_loudness_phon_{80.0};
-    std::chrono::steady_clock::time_point last_phon_update_time_{};
 
     struct ProgramAwareAttachmentV1 {
         bool attached{false};
