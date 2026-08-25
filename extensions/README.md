@@ -19,9 +19,13 @@ While capturing without a bridge, it distinguishes waiting for the next retry,
 an active retry, and exhaustion of the bounded retry budget. If retries are
 exhausted, the popup offers an explicit manual retry button that resets the
 bounded budget without stopping capture or rebuilding the audio graph. The
-retry only re-attempts the optional loopback bridge: local tab playback remains
-unchanged, packets continue to be dropped until the bridge reconnects, and the
-control is diagnostic only — it does not imply browser or vendor control. Stop
+popup also refreshes the dropped-packet count once per second while capture is
+active and the bridge is disconnected, so a rising number shows that tab audio
+is still flowing and packets are still being dropped; the heartbeat stops as
+soon as the bridge reconnects. The retry only re-attempts the optional loopback
+bridge: local tab playback remains unchanged, packets continue to be dropped
+until the bridge reconnects, and the retry and heartbeat are diagnostic only —
+they do not imply browser or vendor control. Stop
 releases the user-selected stream and capture graph. Closing or navigating away
 from the captured tab also ends the source stream and releases that graph.
 

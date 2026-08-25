@@ -48,10 +48,12 @@ internal sealed class PreviewForm : Form
     private readonly Button _removeRouteRule = new() { Text = "移除選取預設", AutoSize = true, AccessibleName = "移除選取的 App 路由預設" };
     private readonly Button _clearRouteRules = new() { Text = "清除全部預設", AutoSize = true, AccessibleName = "清除全部 App 路由預設" };
     private readonly Label _effective = new() { AutoSize = true };
+    private readonly Label _listeningDose = new() { AutoSize = true, AccessibleName = "今日聆聽劑量" };
     private readonly ComboBox _scenes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取情境設定檔" };
     private readonly TextBox _customSceneId = new() { Width = 220, PlaceholderText = "Scene ID", AccessibleName = "自訂場景 ID" };
     private readonly TextBox _customSceneName = new() { Width = 220, PlaceholderText = "名稱", AccessibleName = "自訂場景名稱" };
     private readonly TextBox _customSceneDescription = new() { Width = 460, PlaceholderText = "說明", AccessibleName = "自訂場景說明" };
+    private readonly CheckBox _customSceneLoudnessLiveUpdate = new() { Text = "音量連動等響度", AutoSize = true, AccessibleName = "音量連動等響度" };
     private readonly Button _addCustomScene = new() { Text = "加入自訂場景", AutoSize = true, AccessibleName = "加入自訂場景" };
     private readonly Button _removeCustomScene = new() { Text = "移除選取的自訂場景", AutoSize = true, AccessibleName = "移除選取的自訂場景" };
     private readonly ComboBox _irModes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取 IR 模式" };
@@ -119,6 +121,7 @@ internal sealed class PreviewForm : Form
         _customSceneId.TextChanged += (_, _) => _viewModel.CustomSceneId = _customSceneId.Text;
         _customSceneName.TextChanged += (_, _) => _viewModel.CustomSceneName = _customSceneName.Text;
         _customSceneDescription.TextChanged += (_, _) => _viewModel.CustomSceneDescription = _customSceneDescription.Text;
+        _customSceneLoudnessLiveUpdate.CheckedChanged += (_, _) => _viewModel.CustomSceneLoudnessLiveUpdate = _customSceneLoudnessLiveUpdate.Checked;
         var customSceneIdentity = new FlowLayoutPanel
         {
             AutoSize = true,
@@ -129,6 +132,7 @@ internal sealed class PreviewForm : Form
         customSceneIdentity.Controls.Add(_customSceneName);
         panel.Controls.Add(customSceneIdentity);
         panel.Controls.Add(_customSceneDescription);
+        panel.Controls.Add(_customSceneLoudnessLiveUpdate);
         _addCustomScene.Click += async (_, _) =>
         {
             await _viewModel.AddCustomSceneAsync();
@@ -199,6 +203,7 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(_volume);
         panel.Controls.Add(_muted);
         panel.Controls.Add(_effective);
+        panel.Controls.Add(_listeningDose);
         panel.Controls.Add(_safetyStatus);
         panel.Controls.Add(_deviceSwitchStatus);
         panel.Controls.Add(_lastSendDiagnostics);
@@ -460,6 +465,7 @@ internal sealed class PreviewForm : Form
         _loadIr.Enabled = _viewModel.IsConnected && _viewModel.IrPhaseMode != IrPhaseMode.Bypass;
         _irStrength.Enabled = _viewModel.IrPhaseMode is IrPhaseMode.MixedPhase or IrPhaseMode.LinearPhase;
         _effective.Text = $"實際有效音量：{_viewModel.EffectiveVolumeDb:0.0} dB；{_viewModel.VolumeOriginText}；{_viewModel.VolumeActuatorText}";
+        _listeningDose.Text = _viewModel.ListeningDose.StateText;
         _safetyStatus.Text = _viewModel.SafetyStatusText;
         _deviceSwitchStatus.Text = _viewModel.DeviceSwitchStatusText;
         _lastSendDiagnostics.Text = string.IsNullOrEmpty(_viewModel.LastSendDiagnostics)
@@ -483,6 +489,7 @@ internal sealed class PreviewForm : Form
             _customSceneName.Text = _viewModel.CustomSceneName;
         if (!string.Equals(_customSceneDescription.Text, _viewModel.CustomSceneDescription, StringComparison.Ordinal))
             _customSceneDescription.Text = _viewModel.CustomSceneDescription;
+        _customSceneLoudnessLiveUpdate.Checked = _viewModel.CustomSceneLoudnessLiveUpdate;
         _removeCustomScene.Enabled = _scenes.SelectedValue is string removableSceneId &&
                                      _viewModel.CustomSceneCards.Any(item => item.Id == removableSceneId);
         var selectedScene = _viewModel.SelectedScene?.Id;
