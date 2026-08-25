@@ -394,6 +394,35 @@ function Get-EnginePreviewSmokeWavSampleStats {
   }
 }
 
+function Assert-EnginePreviewSmokeSignalBounds {
+  param(
+    [Parameter(Mandatory)]$Statistics,
+    [ValidateRange(1, [int64]::MaxValue)][int64]$ExpectedFrameCount = 239,
+    [ValidateRange(0, 1)][double]$MaximumPeak = 0.9,
+    [ValidateRange(0, 1)][double]$MaximumRms = 0.5,
+    [ValidateRange(0, 1)][double]$MaximumAbsoluteDcOffset = 0.05
+  )
+  if ($null -eq $Statistics.Peak -or $null -eq $Statistics.Rms -or
+      $null -eq $Statistics.DcOffset -or $null -eq $Statistics.FrameCount) {
+    throw 'Signal-boundary assertions require peak/RMS/DC/frame statistics.'
+  }
+  if ($Statistics.FrameCount -ne $ExpectedFrameCount) {
+    throw ("Rendered frame count is outside expectation: got {0}, expected {1}." -f $Statistics.FrameCount, $ExpectedFrameCount)
+  }
+  $peak = [double]$Statistics.Peak
+  if (($peak -le [double]0) -or ($peak -ge $MaximumPeak)) {
+    throw ("Rendered peak level is outside the safe signal window (0 exclusive, {0} exclusive): {1}." -f $MaximumPeak, $peak)
+  }
+  $rms = [double]$Statistics.Rms
+  if (($rms -le [double]0) -or ($rms -ge $MaximumRms)) {
+    throw ("Rendered RMS level is outside the safe signal window (0 exclusive, {0} exclusive): {1}." -f $MaximumRms, $rms)
+  }
+  $absoluteDcOffset = [Math]::Abs([double]$Statistics.DcOffset)
+  if ($absoluteDcOffset -ge $MaximumAbsoluteDcOffset) {
+    throw ("Rendered DC offset magnitude exceeds the allowed bound |dc| < {0}: {1}." -f $MaximumAbsoluteDcOffset, $absoluteDcOffset)
+  }
+}
+
 function Read-OfflineRenderWavDataChunk {
   param([Parameter(Mandatory)][string]$Path)
   $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open,
@@ -514,6 +543,50 @@ if ($SelfTest) {
   $unalignedSamplesCaught = $false
   try { Get-EnginePreviewSmokeWavSampleStats -Samples ([float[]]@(0.1, 0.2, 0.3)) -ChannelCount 2 } catch { $unalignedSamplesCaught = $true }
   if (-not $unalignedSamplesCaught) { throw 'WAV sample-statistics self-test expected a channel-alignment rejection.' }
+  $cases++
+
+  $saturatedStatsCaught = $false
+  try {
+    Assert-EnginePreviewSmokeSignalBounds -Statistics ([pscustomobject]@{
+      Peak = [double]0.95; Rms = [double]0.1; DcOffset = [double]0; FrameCount = [int64]239 })
+  } catch { $saturatedStatsCaught = $true }
+  if (-not $saturatedStatsCaught) { throw 'Signal-boundary self-test expected an over-peak rejection.' }
+  $cases++
+
+  $silentStatsCaught = $false
+  try {
+    Assert-EnginePreviewSmokeSignalBounds -Statistics ([pscustomobject]@{
+      Peak = [double]0; Rms = [double]0; DcOffset = [double]0; FrameCount = [int64]239 })
+  } catch { $silentStatsCaught = $true }
+  if (-not $silentStatsCaught) { throw 'Signal-boundary self-test expected a silent-render rejection.' }
+  $cases++
+
+  $hotRmsStatsCaught = $false
+  try {
+    Assert-EnginePreviewSmokeSignalBounds -Statistics ([pscustomobject]@{
+      Peak = [double]0.5; Rms = [double]0.6; DcOffset = [double]0; FrameCount = [int64]239 })
+  } catch { $hotRmsStatsCaught = $true }
+  if (-not $hotRmsStatsCaught) { throw 'Signal-boundary self-test expected an over-RMS rejection.' }
+  $cases++
+
+  $dcDriftStatsCaught = $false
+  try {
+    Assert-EnginePreviewSmokeSignalBounds -Statistics ([pscustomobject]@{
+      Peak = [double]0.5; Rms = [double]0.25; DcOffset = [double]0.08; FrameCount = [int64]239 })
+  } catch { $dcDriftStatsCaught = $true }
+  if (-not $dcDriftStatsCaught) { throw 'Signal-boundary self-test expected a DC-offset rejection.' }
+  $cases++
+
+  $frameMismatchStatsCaught = $false
+  try {
+    Assert-EnginePreviewSmokeSignalBounds -Statistics ([pscustomobject]@{
+      Peak = [double]0.25; Rms = [double]0.15; DcOffset = [double]0; FrameCount = [int64]238 })
+  } catch { $frameMismatchStatsCaught = $true }
+  if (-not $frameMismatchStatsCaught) { throw 'Signal-boundary self-test expected a frame-count rejection.' }
+  $cases++
+
+  Assert-EnginePreviewSmokeSignalBounds -Statistics ([pscustomobject]@{
+    Peak = [double]0.25; Rms = [double]0.15; DcOffset = [double]0.01; FrameCount = [int64]239 })
   $cases++
 
   Write-Output "Engine Preview path and IPC self-test passed ($cases cases; offline/no-process/no-file-write)."
@@ -700,6 +773,7 @@ if ($RenderOffline) {
 
   $offlineSamples = Read-OfflineRenderWavDataChunk -Path $smokePlan.OfflineRenderPath
   $offlineStats = Get-EnginePreviewSmokeWavSampleStats -Samples $offlineSamples -ChannelCount 2
+  Assert-EnginePreviewSmokeSignalBounds -Statistics $offlineStats -ExpectedFrameCount 239
   $statisticsCulture = [System.Globalization.CultureInfo]::InvariantCulture
   $peakText = $offlineStats.Peak.ToString('F6', $statisticsCulture)
   $rmsText = $offlineStats.Rms.ToString('F6', $statisticsCulture)
