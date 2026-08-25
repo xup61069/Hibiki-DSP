@@ -57,10 +57,6 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene_catalog(
         definition.scene.ir_reference.assign(payload.ir_reference.data(),
                                              payload.ir_reference_bytes);
     }
-    for (std::size_t index = 0U; index < payload.timeline_count; ++index) {
-        definition.scene.automation_timeline_ids.emplace_back(
-            payload.timeline_ids[index].data());
-    }
     definition.scene.latency_mode = payload.latency_mode;
     definition.scene.ir_phase.schema_version = 1U;
     definition.scene.ir_phase.mode = payload.ir_phase_mode;

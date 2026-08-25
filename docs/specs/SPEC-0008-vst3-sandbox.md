@@ -58,12 +58,10 @@ protocol/plugin error 都回傳明確結果，並在已驗證的輸出範圍先�
 callback 呼叫，也不會自動重啟 quarantine worker。參數 frame 仍沿用最多 64 點的既有
 protocol limit，SDK worker 才會把它轉成 `IParameterChanges`。
 
-`Vst3WorkerLaneSessionV1` 將這個 exchange 與既有 `Vst3ParameterTimelineV1`、stable
-`lane_token` 及 latency projection 接起來。它要求成功 handshake 後才進入 `Ready`，每次
-成功 block 必須連續銜接 `block_start`，並把區間內事件轉成 bounded sample offsets；worker
-或順序／格式錯誤會把 lane 置為 `Degraded`，不自動重啟或重送未知結果。這是 control/IPC
-session boundary，不是 RT graph plugin callback；Scene scheduler、back-pressure 與跨版本
-plugin state persistence 仍由更上層規格負責。
+`Vst3WorkerLaneSessionV1` 將這個 exchange 與 stable `lane_token` 及 latency projection 接起來。
+它要求成功 handshake 後才進入 `Ready`，每次成功 block 必須連續銜接 `block_start`。worker
+錯誤會把 lane 置為 `Degraded`，不自動重啟或重送未知結果。這是 control/IPC session boundary，
+不是 RT graph plugin callback；跨版本 plugin state persistence 仍由更上層規格負責。
 
 `PluginHostModel` 的 `prepare_worker_session`、`handshake_worker` 與
 `process_worker_block` 是目前 host model 的接線點：只有 trusted/certified、same-channel、
@@ -92,17 +90,6 @@ payload 仍在既有 `kVst3WorkerMaxPayloadBytesV1` 預算內（static_assert �
 這仍是 wire/control-plane 契約：SDK processor 與 worker executable 尚未 dispatch 多 bus
 plugin processing，不能由本契約反推 side-chain/multi-bus 實際 plugin process 已完成。
 
-`Vst3SceneAutomationSchedulerV1` 提供 Scene reference 到 lane 的 control-plane registry：
-最多 16 條 timeline、16 個 scene/lane binding，啟用時先驗證所有 timeline、lane token 與
-lane state，再套用 snapshot；每個 lane 用 `atomic_flag` 保持最多一個 in-flight block，
-重入直接回傳 `busy`，不建立無界 queue。block 仍由 `Vst3WorkerLaneSessionV1` 執行，worker
-錯誤映射為 `worker_failed`／lane degraded。它另提供以 `Vst3TimelineEditorV1` 為基礎的
-slot 編輯交易（`begin_timeline_edit`／`editing_timeline`／`commit_timeline_edit`／
-`cancel_timeline_edit`）與 `timeline_snapshot` 讀回存取，編輯中拒絕重入與 slot 刪除，
-commit 只發布通過驗證之 draft，`clear()` 強制中止進行中編輯。這個 scheduler 不執行 DSP、
-不持有 audio buffer，也不包含 plugin state blob；跨版本 state persistence 必須另用版本化
-schema 與 plugin identity/checksum policy。
-
 `vst3_sdk_catalog.hpp` 提供 optional control-plane bridge，使用 `THIRD_PARTY.yml` 鎖定的
 Steinberg SDK 3.8.1 build 84 與 submodule commits，掃描 module factory class metadata。
 SDK checkout 由開發者在 `.local/` 提供，public monorepo 不 vendor SDK；catalog 不執行 plugin、
@@ -119,56 +106,7 @@ VST3 sandbox worker，不能直接掛進 Hibiki RT graph。此 adapter 沒有參
 SDK adapter 的 control API 另接受最多 16 個 parameter IDs、每個 ID 最多 5 個 sample-accurate
 points，將 normalized `[0,1]` 值轉成官方 `IParameterChanges`；非法 offset、值域或超限事件
 會在交給 plugin 前拒絕。`ProcessBlockWithParameters` 已由 frame codec 與 optional SDK
-worker 解碼並交給 adapter。`Vst3ParameterTimelineV1` 現在提供最多 256 個已排序事件的
-control-plane snapshot、穩定 sample-position block extraction 與 worker point conversion；
-它現在以 bounded canonical JSON 持久化為 `vst3-parameter-timeline-v1.schema.json`：
-writer 只輸出固定鍵組、全部 256 個 event slot 的唯一文件；reader 是嚴格的
-fail-closed tokenizer，僅接受該形式加上無意義空白，未知或重複鍵、缺鍵、非法或越界
-數值、陣列長度與 event_count 不一致、截斷或超過 64 KiB 的輸入都會被拒絕且不改動
-目的地；通過驗證的 snapshot 經 serialize→parse 後逐位元組穩定。檔案寫入先寫暫存再
-取代。這是控制面檔案契約，不是一般 JSON parser。
-`Vst3TimelineFileStoreV1` 在此之上提供 bounded per-timeline 檔案儲存：每個
-timeline 一份 canonical 文件，ID 限縮為檔名安全子集（[A-Za-z0-9._-]，最長 64 位元
-組）並與檔名一一對應，容量固定為 16、列舉確定排序；損壞、未知或越界內容一律
-fail-closed，絕不部分載入。
-`sync_timeline_store_to_scheduler_v1` 則把整個 store 以確定順序載入 Scene
-automation scheduler：任何單一項目失敗只計入 skipped，不中斷同步、也不改變
-scheduler 既有項目。
-`sync_scheduler_to_timeline_store_v1` 提供反方向匯出：排程器內所有 timeline 依
-確定順序原子寫回 store，並把 store 中已不存在於排程器的 ID 回報為 stale 候選；
-stale 僅回報、不刪除，是否清除由呼叫端決定；目的地容量不足時整體失敗並回報
-真實總數。
-排程器另提供唯讀內省：`timeline_ids` 以確定排序列舉已儲存 ID，
-`binding_views` 回傳每個 Scene/lane/timeline 綁定的不可變複本；目的地容量
-不足時整體失敗且計數歸零，絕不部分輸出。`Vst3TimelineEditorV1` 現在提供
-supervisor 端 bounded 編輯交易：draft 變更不影響已發布 snapshot，同一
-(parameter_id, sample_position) 的 upsert 以取代而非重複呈現，commit 只在通過既有
-timeline 驗證後才交換已發布 snapshot，discard 直接還原。editor 另保留最多 8 組
-已發布 snapshot 的 bounded undo/redo 歷史：commit 推入前一個狀態並清空 redo、
-容量滿時淘汰最舊、undo/redo 在編輯 session 進行中一律拒絕、reset 清空雙 stack；
-歷史僅存在於單一 editor 範圍內。這是 headless 控制面契約。
-
-`Vst3TimelineSupervisorSurfaceV1` 在 editor 與 file store 之上提供 selection-aware 的
-supervisor facade：attach/detach 恰一個非擁有的 store handle；select(id) 會從 store
-載入 snapshot 並作為 editor baseline，編輯 session 進行中或 store 失敗時拒絕；
-所有編輯操作在未 attach 或未選取時 fail-closed；save_selected() 只接受已 commit
-狀態並透過 store 的 atomic save path 寫入。dirty 狀態由「已發布 snapshot 是否與最後
-載入/儲存 baseline 相同」推導，不另行手動追蹤。此 surface 不擁有 worker、音訊
-buffer 或檔案 handle，也不在 RT thread 執行。
-
-`Vst3TimelineSurfaceModelV1` 是上述 supervisor surface 的 managed
-control-model mirror：它維持相同的 bounded ID、排序、draft、published、history
-與 dirty semantics，並以 `INotifyPropertyChanged` 在成功的 catalog、selection、
-edit、commit、undo/redo、save transition 後通知 binding。`IsDirtyState` 是唯讀
-projection；拒絕的操作不發通知。這只提供 future WinUI UI 的本地 binding seam，
-不增加 IPC payload、不擁有 native file store、不執行 worker/DSP，也不在 RT thread
-執行；native supervisor surface 仍是 persistence authority。它也 mirror
-`Vst3TimelineSupervisorSurfaceV1::clear_history()`：清除 managed undo/redo stacks
-但保留 published snapshot、dirty baseline 與進行中的 draft，並更新 binding 的
-history projections。
-
-supervisor 的 UI 編輯器、跨版本 plugin state persistence 與完整自動化排程仍未接入，
-因此不能宣稱完整 host automation。
+worker 解碼並交給 adapter。
 
 `LatencyAlignmentPlanV1` 會在 control plane 取所有 active lane 的 reported latency，將每個
 lane 的補償量設為 `maximum_latency - lane_latency`，上限 16,384 samples。
@@ -252,6 +190,6 @@ admission validator、bounded parameter frame、latency alignment primitive、la
 與 optional worker executable 已有 bridge；仍未完成第三方 plugin certification、第三方 plugin
 compatibility review、side-chain/multi-bus 的實際 worker process、
 完整 crash dump capture/redaction pipeline 與 production worker policy。目前
-supervisor、named pipe、passthrough worker、catalog、bounded SDK processor、handshake/process
-exchange、timeline lane 與 Scene automation scheduler 提供可測試的 process
-containment/metadata/automation boundary，不能宣稱已完成第三方 VST3 host。
+supervisor、named pipe、passthrough worker、catalog、bounded SDK processor 與 handshake/process
+exchange 提供可測試的 process containment/metadata/automation boundary，不能宣稱已完成第三方
+VST3 host。
