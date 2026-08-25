@@ -368,7 +368,7 @@
                                     </Border>
                                 </StackPanel>
                                 <TextBlock Text="IR WAV 會在 Engine Preview 的 control-plane prepare/commit；尚無實體 sink。" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <Button Content="選擇並準備 IR WAV 檔" MinHeight="32" AutomationProperties.Name="準備 IR WAV 檔案" Click="OnPrepareIrClick" ToolTipService.ToolTip="選擇 WAV 檔並準備 IR 相位塑形" />
+                                <Button Content="選擇並準備 IR WAV 檔" MinHeight="32" AutomationProperties.Name="準備 IR WAV 檔案" Click="OnPrepareIrClick" AutomationProperties.HelpText="選擇 WAV 檔並準備 IR 相位塑形" ToolTipService.ToolTip="選擇 WAV 檔並準備 IR 相位塑形" />
                                 <TextBlock Text="{Binding IrPrepareStatus}" Style="{ThemeResource CaptionTextBlockStyle}" AutomationProperties.LiveSetting="Polite" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
                         </Border>
@@ -407,7 +407,7 @@
                                 <StackPanel Spacing="10">
                                     <TextBlock Text="App 工作階段（暫時選取清單）" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                     <TextBlock Text="只顯示 bounded metadata；套用 App 音量會寫入 Windows session，實體 per-App 擷取／重新送出仍未驗證（即使路由命令回傳 Ack，仍屬使用者空間控制證據）。" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                                <Button Content="刷新 App 工作階段清單" Click="OnRefreshSessionCatalogClick" MinHeight="32" HorizontalAlignment="Left" AutomationProperties.Name="刷新 App 工作階段清單" ToolTipService.ToolTip="重新掃描目前執行中的 App" />
+                                <Button Content="刷新 App 工作階段清單" Click="OnRefreshSessionCatalogClick" MinHeight="32" HorizontalAlignment="Left" AutomationProperties.Name="刷新 App 工作階段清單" AutomationProperties.HelpText="重新掃描目前執行中的 App" ToolTipService.ToolTip="重新掃描目前執行中的 App" />
                                     <TextBlock Text="{Binding SessionCatalogSequenceDisplayText}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                     <controls:ItemsRepeater ItemsSource="{Binding SessionCatalog}">
                                         <controls:ItemsRepeater.ItemTemplate>
@@ -425,7 +425,7 @@
                                                         <Border Style="{StaticResource StatusPillCompactStyle}">
                                                             <TextBlock Text="{Binding RouteStateLabel}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                         </Border>
-                                <Button Content="選取" Tag="{Binding Handle}" Click="OnSessionSelectClick" MinHeight="32" AutomationProperties.Name="選取 App 工作階段" ToolTipService.ToolTip="選取此工作階段以調整音量和路由" />
+                                <Button Content="選取" Tag="{Binding Handle}" Click="OnSessionSelectClick" MinHeight="32" AutomationProperties.Name="選取 App 工作階段" AutomationProperties.HelpText="選取此工作階段以調整音量和路由" ToolTipService.ToolTip="選取此工作階段以調整音量和路由" />
                                                     </StackPanel>
                                                 </Grid>
                                             </DataTemplate>
@@ -436,10 +436,10 @@
                                     <TextBlock Text="{Binding SelectedRouteRuleSummary}" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.Name="目前 App 路由預設預覽" />
  <Slider Header="App 音量（dB）" Minimum="-60" Maximum="6" StepFrequency="0.5" Value="{Binding SessionVolumeDb, Mode=TwoWay}" Style="{StaticResource HibikiSliderStyle}" AutomationProperties.Name="App 工作階段音量" />
                                     <CheckBox Content="App 靜音" IsChecked="{Binding SessionMuted, Mode=TwoWay}" IsEnabled="{Binding HasSelectedSession}" AutomationProperties.Name="App 工作階段靜音" />
-                                <Button Content="套用選取 App 音量" Click="OnApplySessionVolumeClick" IsEnabled="{Binding HasSelectedSession}" MinHeight="32" HorizontalAlignment="Left" AutomationProperties.Name="套用選取 App 音量" ToolTipService.ToolTip="將音量變更寫入選取的 App 工作階段" />
+                                <Button Content="套用選取 App 音量" Click="OnApplySessionVolumeClick" IsEnabled="{Binding HasSelectedSession}" MinHeight="32" HorizontalAlignment="Left" AutomationProperties.Name="套用選取 App 音量" AutomationProperties.HelpText="將音量變更寫入選取的 App 工作階段" ToolTipService.ToolTip="將音量變更寫入選取的 App 工作階段" />
                                     <TextBox Header="Lane ID" Text="{Binding SessionRouteLaneId, Mode=TwoWay}" AutomationProperties.Name="App Lane ID" />
                                     <TextBox Header="Output Group" Text="{Binding SessionRouteOutputGroup, Mode=TwoWay}" AutomationProperties.Name="App Output Group" />
-                                <Button Content="套用選取 App 路由" Click="OnApplySessionRouteClick" IsEnabled="{Binding HasSelectedSession}" MinHeight="32" HorizontalAlignment="Left" Style="{StaticResource AccentButtonStyle}" AutomationProperties.Name="套用選取 App 路由" ToolTipService.ToolTip="將路由設定套用到選取的 App" />
+                                <Button Content="套用選取 App 路由" Click="OnApplySessionRouteClick" IsEnabled="{Binding HasSelectedSession}" MinHeight="32" HorizontalAlignment="Left" Style="{StaticResource AccentButtonStyle}" AutomationProperties.Name="套用選取 App 路由" AutomationProperties.HelpText="將路由設定套用到選取的 App" ToolTipService.ToolTip="將路由設定套用到選取的 App" />
                         </StackPanel>
                             </Border><Border Style="{StaticResource SectionCardStyle}" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
                                 <StackPanel Spacing="10">
@@ -454,7 +454,7 @@
                                                         <ColumnDefinition Width="Auto" />
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.Name="App 路由預設摘要" />
-                                    <Button Grid.Column="1" Content="移除" Tag="{Binding RuleId}" Click="OnRemoveRouteRuleClick" MinHeight="32" AutomationProperties.Name="移除 App 路由預設" ToolTipService.ToolTip="刪除此路由預設" />
+                                    <Button Grid.Column="1" Content="移除" Tag="{Binding RuleId}" Click="OnRemoveRouteRuleClick" MinHeight="32" AutomationProperties.Name="移除 App 路由預設" AutomationProperties.HelpText="刪除此路由預設" ToolTipService.ToolTip="刪除此路由預設" />
                                                 </Grid>
                                             </DataTemplate>
                                         </controls:ItemsRepeater.ItemTemplate>
@@ -493,8 +493,8 @@
                                         <ComboBox Grid.Column="1" Header="增益控制者" ItemsSource="{Binding RouteRuleGainOwners}" SelectedItem="{Binding RouteRuleGainOwner, Mode=TwoWay}" AutomationProperties.Name="App 路由預設增益控制者" />
                                     </Grid>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button Content="新增／更新預設" Click="OnApplyRouteRuleClick" Style="{StaticResource AccentButtonStyle}" MinHeight="32" AutomationProperties.Name="新增或更新 App 路由預設" ToolTipService.ToolTip="建立或更新此 App 的路由預設" />
-                                <Button Content="清除全部預設" Click="OnClearRouteRulesClick" MinHeight="32" AutomationProperties.Name="清除全部 App 路由預設" ToolTipService.ToolTip="刪除所有已保存的路由預設" />
+                                <Button Content="新增／更新預設" Click="OnApplyRouteRuleClick" Style="{StaticResource AccentButtonStyle}" MinHeight="32" AutomationProperties.Name="新增或更新 App 路由預設" AutomationProperties.HelpText="建立或更新此 App 的路由預設" ToolTipService.ToolTip="建立或更新此 App 的路由預設" />
+                                <Button Content="清除全部預設" Click="OnClearRouteRulesClick" MinHeight="32" AutomationProperties.Name="清除全部 App 路由預設" AutomationProperties.HelpText="刪除所有已保存的路由預設" ToolTipService.ToolTip="刪除所有已保存的路由預設" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border></Grid>
