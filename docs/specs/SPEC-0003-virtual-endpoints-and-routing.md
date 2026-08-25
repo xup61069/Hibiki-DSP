@@ -119,6 +119,14 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   的完整 packet 可直接通過 engine render gate；engine outbound encode 經 ring 往返後
   逐位元組一致且 validate 通過；underrun 或損毀 packet 則 fail-closed。這些都是
   user-space contract evidence；實體 WaveRT delivery 驗收尚未涵蓋。
+- Engine Preview 提供 opt-in `--enable-driver-loopback`（搭配
+  `--enable-wasapi-output`）：bounded stereo sine 先經 `encode_driver_stream_packet_from_lane`
+  編成完整 v1 packet，發布到 in-process `driver_stream_ring_v1`，pop 後由
+  `process_driver_stream_packet_to_wasapi` 再次 validate 並送進既有 WASAPI handoff；
+  status route `driver-loopback` 只有在 sink 回報 rendered blocks 後才顯示 Ready，並誠實列出
+  encode/push/pop/deliver 失敗與 ring overrun/underrun 計數。此模式與 test tone、tab bridge、
+  process delivery 互斥，且 ring 僅存在於 preview 行程內：它是 user-space packet-chain
+  evidence，不是 kernel IPC、WaveRT delivery 或 driver 行為證據。
 - `PersistentPolyphaseResampler` 是 clock-drift/SRC baseline：固定容量 8 phase × 16 tap
   polyphase FIR bank 支援最多 8 聲道與 0.25x–4.0x source step，保留跨 block phase 與
   bounded history，ratio 變更不重置 stream，invalid input fail-closed 且 RT path 不配置。
