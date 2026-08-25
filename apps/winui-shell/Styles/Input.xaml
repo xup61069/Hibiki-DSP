@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -52,4 +52,9 @@
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
     </Style>
-</ResourceDictionary>
+
+    <!-- Subtle button elevation: all buttons get a gentle entrance transition.
+         Primary (accent) buttons already have color feedback; this adds motion. -->
+    <Style TargetType="Button">
+        <Setter Property="CornerRadius" Value="6" />
+    </Style></ResourceDictionary>
