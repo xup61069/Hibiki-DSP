@@ -20,8 +20,10 @@ anonymous plain-text snapshot on the clipboard: the capturing flag, the bridge
 connection flag, the bounded-retry state, the dropped-packet counter and a UTC
 timestamp. It contains no audio samples, tab URLs, tab titles or device
 identifiers, so bug reports can share connection state without private data.
-While capturing without a bridge, it distinguishes waiting for the next retry,
-an active retry, and exhaustion of the bounded retry budget. If retries are
+While capturing without a bridge, the popup shows a per-second countdown to
+the next retry while waiting; when no countdown value is available it falls
+back to the plain waiting wording. It keeps distinguishing an active retry and
+exhaustion of the bounded retry budget. If retries are
 exhausted, the popup offers an explicit manual retry button that resets the
 bounded budget without stopping capture or rebuilding the audio graph. The
 popup also refreshes the dropped-packet count once per second while capture is

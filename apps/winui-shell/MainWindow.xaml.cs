@@ -221,6 +221,7 @@ public sealed partial class MainWindow : Window
         SetSectionVisibility("ShellPresetsSection", tag == "presets");
         SetSectionVisibility("ShellVolumeSection", tag == "volume");
         SetSectionVisibility("ShellRouteSection", tag == "route");
+        SetSectionVisibility("ShellCalibrateSection", tag == "calibrate");
         SetSectionVisibility("ShellExpertSection", tag == "expert");
     }
 
@@ -328,6 +329,41 @@ public sealed partial class MainWindow : Window
             await ViewModel.SwitchPhysicalDeviceAsync(endpointId);
     }
 
+    private async void OnImportWizardMeasurementClick(object sender, RoutedEventArgs e)
+    {
+        var picker = new Windows.Storage.Pickers.FileOpenPicker();
+
+        var handle = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, handle);
+
+        picker.FileTypeFilter.Add(".csv");
+        picker.FileTypeFilter.Add(".txt");
+        var file = await picker.PickSingleFileAsync();
+
+        if (file is not null)
+            ViewModel.ImportWizardMeasurement(file.Path);
+    }
+
+    private void OnCompileWizardClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.CompileWizardCorrection();
+    }
+
+    private async void OnExportWizardProfileClick(object sender, RoutedEventArgs e)
+    {
+        var picker = new Windows.Storage.Pickers.FileSavePicker();
+
+        var handle = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, handle);
+
+        picker.SuggestedFileName = "hibiki-calibration";
+        picker.FileTypeChoices.Add("JSON", [".json"]);
+        var file = await picker.PickSaveFileAsync();
+
+        if (file is not null)
+            ViewModel.ExportWizardProfile(file.Path);
+    }
+
     private async void OnRefreshPhysicalDevicesClick(object sender, RoutedEventArgs e)
     {
         await ViewModel.RefreshPhysicalDevicePickerAsync();
@@ -411,6 +447,47 @@ public sealed partial class MainWindow : Window
         if (sender is Border card)
         {
             card.BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"];
+        }
+    }
+
+    private static double[] ParseWizardNumbers(string? text, out bool parseFailed)
+    {
+        parseFailed = false;
+        var values = new List<double>();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return values.ToArray();
+        }
+
+        foreach (var token in text.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!double.TryParse(token, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value))
+            {
+                parseFailed = true;
+                return values.ToArray();
+            }
+            values.Add(value);
+        }
+        return values.ToArray();
+    }
+
+    private void OnCalibrationWizardBuildClick(object sender, RoutedEventArgs e)
+    {
+        var frequencies = ParseWizardNumbers(CalibrationWizardFrequencyInput.Text, out var freqParseFailed);
+        var levels = ParseWizardNumbers(CalibrationWizardLevelInput.Text, out var levelParseFailed);
+        if (freqParseFailed || levelParseFailed || frequencies.Length != levels.Length)
+        {
+            CalibrationWizardStatusText.Text = "輸入錯誤：頻率與電平都要是有效數值，且數量相同。";
+            return;
+        }
+
+        if (ViewModel.Expert.TryBuildWizardPeq(frequencies, levels, out var error))
+        {
+            CalibrationWizardStatusText.Text = ViewModel.Expert.WizardStatusText;
+        }
+        else
+        {
+            CalibrationWizardStatusText.Text = error;
         }
     }
 }

@@ -47,6 +47,34 @@ public sealed class ListeningDoseModelV1
                 : $"聆聽劑量（自啟動起）：{_accumulatedDosePercent:0}%（安全；未校正參考值）";
 
     /// <summary>
+    /// Shows how long until the accumulated dose reaches 100% at the current
+    /// loudness rate. Returns an honest label when there is no data yet, when
+    /// the rate is zero (safe or muted), or when the budget is already spent.
+    /// </summary>
+    public string RemainingSafeTimeText
+    {
+        get
+        {
+            if (!_hasLastSample)
+                return "尚無資料";
+
+            if (_lastRatePerSecond <= 0.0)
+                return "安全範圍內；無倒數限制";
+
+            if (_accumulatedDosePercent >= 100.0)
+                return "已過量；建議休息";
+
+            var remainingPercent = Math.Max(0.0, 100.0 - _accumulatedDosePercent);
+            var seconds = remainingPercent / _lastRatePerSecond;
+            if (seconds < 60.0)
+                return $"約 {seconds:0} 秒";
+            if (seconds < 3600.0)
+                return $"約 {seconds / 60.0:0} 分鐘";
+            return $"約 {seconds / 3600.0:0.#} 小時";
+        }
+    }
+
+    /// <summary>
     /// Folds one confirmed effective-volume sample taken now. Invalid samples
     /// are rejected fail-closed without touching accumulated state. Muted
     /// samples fold with a zero dose rate so the silent interval is never

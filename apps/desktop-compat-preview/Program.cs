@@ -28,6 +28,7 @@ internal sealed class PreviewForm : Form
     private readonly Label _routes = new() { AutoSize = false, Width = 550, Height = 58 };
     private readonly Label _sessions = new() { AutoSize = false, Width = 550, Height = 72 };
     private readonly ComboBox _sessionSelector = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取 Expert App" };
+    private readonly TextBox _sessionFilter = new() { Width = 460, PlaceholderText = "篩選 App 名稱或 App ID", AccessibleName = "Expert App 清單篩選" };
     private readonly ComboBox _physicalDeviceSelector = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取實體輸出裝置" };
     private readonly Button _switchDevice = new() { Text = "切換實體裝置", AutoSize = true, AccessibleName = "切換實體輸出裝置" };
     private readonly Button _refreshDevices = new() { Text = "重新掃描裝置", AutoSize = true, AccessibleName = "重新掃描實體輸出裝置清單" };
@@ -57,6 +58,7 @@ internal sealed class PreviewForm : Form
     private readonly TextBox _customSceneName = new() { Width = 220, PlaceholderText = "名稱", AccessibleName = "自訂場景名稱" };
     private readonly TextBox _customSceneDescription = new() { Width = 460, PlaceholderText = "說明", AccessibleName = "自訂場景說明" };
     private readonly CheckBox _customSceneLoudnessLiveUpdate = new() { Text = "音量連動等響度", AutoSize = true, AccessibleName = "音量連動等響度" };
+    private readonly Label _customSceneQueueStatus = new() { AutoSize = true, AccessibleName = "離線場景同步佇列狀態" };
     private readonly Button _addCustomScene = new() { Text = "加入自訂場景", AutoSize = true, AccessibleName = "加入自訂場景" };
     private readonly Button _removeCustomScene = new() { Text = "移除選取的自訂場景", AutoSize = true, AccessibleName = "移除選取的自訂場景" };
     private readonly ComboBox _irModes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取 IR 模式" };
@@ -171,6 +173,7 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(customSceneIdentity);
         panel.Controls.Add(_customSceneDescription);
         panel.Controls.Add(_customSceneLoudnessLiveUpdate);
+        panel.Controls.Add(_customSceneQueueStatus);
         _addCustomScene.Click += async (_, _) =>
         {
             await _viewModel.AddCustomSceneAsync();
@@ -248,6 +251,8 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(_routes);
         panel.Controls.Add(new Label { Text = "Expert App／工作階段（需以 -EnableSessionRouting 啟動）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
         panel.Controls.Add(_sessions);
+        _sessionFilter.TextChanged += (_, _) => SyncSessionList();
+        panel.Controls.Add(_sessionFilter);
         _sessionSelector.SelectedIndexChanged += (_, _) =>
         {
             if (_updatingSession || _sessionSelector.SelectedItem is not SessionCatalogEntryV1 entry) return;
@@ -473,32 +478,14 @@ internal sealed class PreviewForm : Form
         _connect.Enabled = !_viewModel.IsBusy;
         _scenes.Enabled = _viewModel.IsConnected;
         _volume.Enabled = _viewModel.IsConnected;
-        var sessions = _viewModel.SessionCatalog.ToArray();
-        _sessions.Text = sessions.Length == 0
+        var sessionCount = _viewModel.SessionCatalog.Count;
+        _sessions.Text = sessionCount == 0
             ? "App catalog：尚未同步；請以 -EnableSessionRouting 啟動引擎，或目前沒有可控制的工作階段。"
-            : $"App catalog：{sessions.Length} 筆；只顯示 bounded metadata。套用 App 音量會寫入 Windows session，" +
-              "實體 per-App 重新送出仍未驗證。";
-        _updatingSession = true;
-        try
-        {
-            var selectedHandle = _viewModel.SelectedSessionHandle;
-            _sessionSelector.DataSource = null;
-            _sessionSelector.DisplayMember = nameof(SessionCatalogEntryV1.DisplayName);
-            _sessionSelector.ValueMember = nameof(SessionCatalogEntryV1.Handle);
-            _sessionSelector.DataSource = sessions;
-            if (selectedHandle != 0UL)
-            {
-                var selectedIndex = Array.FindIndex(sessions, entry => entry.Handle == selectedHandle);
-                if (selectedIndex >= 0) _sessionSelector.SelectedIndex = selectedIndex;
-            }
-            SyncSessionControls();
-        }
-        finally
-        {
-            _updatingSession = false;
-        }
+            : $"App catalog：{sessionCount} 筆；只顯示 bounded metadata。套用 App 音量會寫入 Windows session，" +
+              "實體 per-App 送出已由 process-loopback E2E 覆蓋；仍屬使用者空間控制證據。";
+        SyncSessionList();
         var hasSession = _viewModel.HasSelectedSession;
-        _sessionSelector.Enabled = _viewModel.IsConnected && sessions.Length > 0;
+        _sessionSelector.Enabled = _viewModel.IsConnected && _sessionSelector.Items.Count > 0;
         _sessionVolume.Enabled = _viewModel.IsConnected && hasSession && _viewModel.SelectedSession?.VolumeAvailable == true;
         _applySessionVolume.Enabled = _sessionVolume.Enabled;
         _sessionLane.Enabled = _viewModel.IsConnected && hasSession;
@@ -509,7 +496,7 @@ internal sealed class PreviewForm : Form
         _loadIr.Enabled = _viewModel.IsConnected && _viewModel.IrPhaseMode != IrPhaseMode.Bypass;
         _irStrength.Enabled = _viewModel.IrPhaseMode is IrPhaseMode.MixedPhase or IrPhaseMode.LinearPhase;
         _effective.Text = $"實際有效音量：{_viewModel.EffectiveVolumeDb:0.0} dB；{_viewModel.VolumeOriginText}；{_viewModel.VolumeActuatorText}";
-        _listeningDose.Text = _viewModel.ListeningDose.StateText;
+        _listeningDose.Text = $"{_viewModel.ListeningDose.StateText}｜剩餘安全時間：{_viewModel.ListeningDose.RemainingSafeTimeText}";
         _safetyStatus.Text = _viewModel.SafetyStatusText;
         _deviceSwitchStatus.Text = _viewModel.DeviceSwitchStatusText;
         _lastSendDiagnostics.Text = string.IsNullOrEmpty(_viewModel.LastSendDiagnostics)
@@ -534,6 +521,11 @@ internal sealed class PreviewForm : Form
         if (!string.Equals(_customSceneDescription.Text, _viewModel.CustomSceneDescription, StringComparison.Ordinal))
             _customSceneDescription.Text = _viewModel.CustomSceneDescription;
         _customSceneLoudnessLiveUpdate.Checked = _viewModel.CustomSceneLoudnessLiveUpdate;
+        _customSceneQueueStatus.Text = _viewModel.PendingSceneCatalogOpsCount == 0 &&
+                                       _viewModel.DroppedSceneCatalogOperations == 0
+            ? "離線場景同步佇列：無待同步變更"
+            : $"離線場景同步佇列：{_viewModel.PendingSceneCatalogOpsCount} 筆待同步；" +
+              $"已捨棄 {_viewModel.DroppedSceneCatalogOperations} 筆最舊變更（容量上限 {EasyControlViewModel.MaxPendingSceneCatalogOps}）";
         _removeCustomScene.Enabled = _scenes.SelectedValue is string removableSceneId &&
                                      _viewModel.CustomSceneCards.Any(item => item.Id == removableSceneId);
         var selectedScene = _viewModel.SelectedScene?.Id;
@@ -543,6 +535,37 @@ internal sealed class PreviewForm : Form
             _updatingScene = true;
             _scenes.SelectedValue = selectedScene;
             _updatingScene = false;
+        }
+    }
+
+    private void SyncSessionList()
+    {
+        var selectedHandle = _viewModel.SelectedSessionHandle;
+        var allSessions = _viewModel.SessionCatalog.ToArray();
+        var filter = _sessionFilter.Text.Trim();
+        var sessions = filter.Length == 0
+            ? allSessions
+            : Array.FindAll(
+                allSessions,
+                entry => entry.DisplayName.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+                         entry.AppId.Contains(filter, StringComparison.OrdinalIgnoreCase));
+        _updatingSession = true;
+        try
+        {
+            _sessionSelector.DataSource = null;
+            _sessionSelector.DisplayMember = nameof(SessionCatalogEntryV1.DisplayName);
+            _sessionSelector.ValueMember = nameof(SessionCatalogEntryV1.Handle);
+            _sessionSelector.DataSource = sessions;
+            if (selectedHandle != 0UL)
+            {
+                var selectedIndex = Array.FindIndex(sessions, entry => entry.Handle == selectedHandle);
+                if (selectedIndex >= 0) _sessionSelector.SelectedIndex = selectedIndex;
+            }
+            SyncSessionControls();
+        }
+        finally
+        {
+            _updatingSession = false;
         }
     }
 

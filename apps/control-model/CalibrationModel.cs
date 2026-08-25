@@ -152,6 +152,7 @@ public static class CalibrationCompilerV1
     public const double MinQ = 0.1;
     public const double MaxQ = 100.0;
     private const long MaxFileBytes = 1024 * 1024;
+    public const long MaxMeasurementFileBytes = MaxFileBytes;
 
     private const double MinCurveFrequencyHz = 10.0;
     private const double MaxCurveFrequencyHz = 24000.0;
