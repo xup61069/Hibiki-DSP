@@ -157,7 +157,7 @@
                             <ComboBox Header="實體輸出裝置" AutomationProperties.Name="實體輸出裝置" AutomationProperties.HelpText="只顯示引擎已驗證且目前 Active 的 render 裝置" ItemsSource="{Binding PhysicalDevices}" DisplayMemberPath="DisplayName" SelectedValuePath="EndpointId" SelectedValue="{Binding SelectedPhysicalDeviceId, Mode=TwoWay}" HorizontalAlignment="Stretch" />
                             <StackPanel x:Name="DeviceActionRow" Orientation="Vertical" Spacing="6" AutomationProperties.Name="實體裝置控制">
                                 <TextBlock Text="裝置動作" Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <Border Padding="12,10" CornerRadius="10" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                <Border Padding="16" CornerRadius="12" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                                     <StackPanel Orientation="Horizontal" Spacing="10">
                                         <Button Content="切換實體裝置" Click="OnSwitchDeviceClick" IsEnabled="{Binding IsConnected}" Style="{StaticResource AccentButtonStyle}" MinHeight="40" FontWeight="SemiBold" AutomationProperties.Name="切換實體輸出裝置" AutomationProperties.HelpText="先預熱新裝置，再以 30 ms 交叉淡化；失敗會回復上一個裝置" />
                                         <Button Content="重新掃描裝置" Click="OnRefreshPhysicalDevicesClick" IsEnabled="{Binding IsConnected}" MinHeight="40" AutomationProperties.Name="重新掃描實體輸出裝置" AutomationProperties.HelpText="向引擎要求最新裝置快照；失敗時保留目前清單" />
@@ -323,7 +323,7 @@
                             </Border>
                         </StackPanel>
                         <ToggleSwitch Header="靜音" IsOn="{Binding Muted, Mode=TwoWay}" AutomationProperties.Name="靜音" AutomationProperties.HelpText="淡出目前輸出並保留音量設定" />
-                        <Border Padding="14,12,14,14" CornerRadius="10" Margin="0,4,0,0" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                        <Border Padding="16" CornerRadius="12" Margin="0,4,0,0" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                             <StackPanel Spacing="12">
                                 <TextBlock Text="IR 相位塑形" Style="{ThemeResource BodyStrongTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                 <ComboBox Header="IR 相位模式" ItemsSource="{Binding IrPhaseModeOptions}" DisplayMemberPath="Label" SelectedValuePath="Mode" SelectedValue="{Binding IrPhaseMode, Mode=TwoWay}" AutomationProperties.Name="IR 相位模式" AutomationProperties.HelpText="Game 低延遲、Balanced 混合相位、Movie 線性相位或 Bypass" HorizontalAlignment="Stretch" MaxWidth="360" />
