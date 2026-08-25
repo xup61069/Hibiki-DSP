@@ -12,7 +12,6 @@
                     <ResourceDictionary x:Key="Light">
                         <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#F6F9FC" />
                         <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="{StaticResource SystemAccentColor}" />
-                        <SolidColorBrush x:Key="HibikiSliderTrackFillBrush" Opacity="0.3" Color="{StaticResource SystemAccentColor}" />
                         <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="{StaticResource SystemAccentColor}" />
                         <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="{StaticResource SystemAccentColor}" />
                         <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="{StaticResource SystemAccentColor}" />
@@ -20,16 +19,11 @@
                     <ResourceDictionary x:Key="Dark">
                         <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#1B2028" />
                         <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="{StaticResource SystemAccentColorLight1}" />
-                        <SolidColorBrush x:Key="HibikiSliderTrackFillBrush" Opacity="0.4" Color="{StaticResource SystemAccentColor}" />
                         <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="{StaticResource SystemAccentColorLight1}" />
                         <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="{StaticResource SystemAccentColorLight1}" />
                         <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="{StaticResource SystemAccentColorLight1}" />
                     </ResourceDictionary>
                 </ResourceDictionary.ThemeDictionaries>
-                <Style x:Key="ModernSliderStyle" TargetType="Slider">
-                    <Setter Property="UseSystemFocusVisuals" Value="True" />
-                    <Setter Property="FocusVisualMargin" Value="-7,0,-7,0" />
-                </Style>
             </ResourceDictionary>
         </Grid.Resources>
         <Grid.RowDefinitions>
@@ -171,7 +165,7 @@
                             <ComboBox Header="實體輸出裝置" AutomationProperties.Name="實體輸出裝置" AutomationProperties.HelpText="只顯示引擎已驗證且目前 Active 的 render 裝置" ItemsSource="{Binding PhysicalDevices}" DisplayMemberPath="DisplayName" SelectedValuePath="EndpointId" SelectedValue="{Binding SelectedPhysicalDeviceId, Mode=TwoWay}" HorizontalAlignment="Stretch" />
                             <StackPanel x:Name="DeviceActionRow" Orientation="Vertical" Spacing="6" AutomationProperties.Name="實體裝置控制">
                                 <TextBlock Text="裝置動作" Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <Border Padding="16" CornerRadius="12" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                <Border Style="{StaticResource SectionCardStyle}" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
                                     <StackPanel Orientation="Horizontal" Spacing="10">
                                         <Button Content="切換實體裝置" Click="OnSwitchDeviceClick" IsEnabled="{Binding IsConnected}" Style="{StaticResource AccentButtonStyle}" MinHeight="40" FontWeight="SemiBold" AutomationProperties.Name="切換實體輸出裝置" AutomationProperties.HelpText="先預熱新裝置，再以 30 ms 交叉淡化；失敗會回復上一個裝置" />
                                         <Button Content="重新掃描裝置" Click="OnRefreshPhysicalDevicesClick" IsEnabled="{Binding IsConnected}" MinHeight="40" AutomationProperties.Name="重新掃描實體輸出裝置" AutomationProperties.HelpText="向引擎要求最新裝置快照；失敗時保留目前清單" />
@@ -316,7 +310,7 @@
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1" Header="Expert" IsOn="{Binding IsExpert, Mode=TwoWay}" AutomationProperties.Name="Expert 詳細模式" AutomationProperties.HelpText="顯示 Matrix、DSP Graph、VST3 與校正狀態" />
                         </Grid>
-                        <Slider Header="系統音量（dB）" Minimum="-60" Maximum="0" Value="{Binding RequestedVolumeDb, Mode=TwoWay}" ValueChanged="OnVolumeChanged" Style="{StaticResource ModernSliderStyle}" AutomationProperties.Name="系統音量" AutomationProperties.HelpText="以 dB 調整音量；安全限制會優先套用" />
+                        <Slider Header="系統音量（dB）" Minimum="-60" Maximum="0" Value="{Binding RequestedVolumeDb, Mode=TwoWay}" ValueChanged="OnVolumeChanged" Style="{StaticResource HibikiSliderStyle}" AutomationProperties.Name="系統音量" AutomationProperties.HelpText="以 dB 調整音量；安全限制會優先套用" />
                         <StackPanel Orientation="Horizontal" Spacing="10">
                             <Border CornerRadius="999" Padding="12,5" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                                 <TextBlock Text="{Binding RequestedVolumeDisplayText}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -337,11 +331,11 @@
                             </Border>
                         </StackPanel>
                         <ToggleSwitch Header="靜音" IsOn="{Binding Muted, Mode=TwoWay}" AutomationProperties.Name="靜音" AutomationProperties.HelpText="淡出目前輸出並保留音量設定" />
-                        <Border Padding="16" CornerRadius="12" Margin="0,4,0,0" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                        <Border Style="{StaticResource SectionCardStyle}" Margin="0,4,0,0" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
                             <StackPanel Spacing="12">
                                 <TextBlock Text="IR 相位塑形" Style="{ThemeResource BodyStrongTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                 <ComboBox Header="IR 相位模式" ItemsSource="{Binding IrPhaseModeOptions}" DisplayMemberPath="Label" SelectedValuePath="Mode" SelectedValue="{Binding IrPhaseMode, Mode=TwoWay}" AutomationProperties.Name="IR 相位模式" AutomationProperties.HelpText="Game 低延遲、Balanced 混合相位、Movie 線性相位或 Bypass" HorizontalAlignment="Stretch" MaxWidth="360" />
-                                <Slider Header="IR 相位強度" Minimum="0" Maximum="1" StepFrequency="0.05" Value="{Binding IrPhaseStrength, Mode=TwoWay}" IsEnabled="{Binding IrPhaseUsesFir}" Style="{StaticResource ModernSliderStyle}" AutomationProperties.Name="IR 相位強度" AutomationProperties.HelpText="調整 mixed-phase 或 linear-phase 的延遲與相位折衷" />
+                                <Slider Header="IR 相位強度" Minimum="0" Maximum="1" StepFrequency="0.05" Value="{Binding IrPhaseStrength, Mode=TwoWay}" IsEnabled="{Binding IrPhaseUsesFir}" Style="{StaticResource HibikiSliderStyle}" AutomationProperties.Name="IR 相位強度" AutomationProperties.HelpText="調整 mixed-phase 或 linear-phase 的延遲與相位折衷" />
                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                     <Border CornerRadius="999" Padding="12,5" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                                         <TextBlock Text="{Binding IrPhaseModeText}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -456,7 +450,7 @@
                                         </controls:ItemsRepeater.ItemTemplate>
                                     </controls:ItemsRepeater>
                                 </StackPanel>
-                            </Border><Border Padding="16" CornerRadius="12" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                            </Border><Border Style="{StaticResource SectionCardStyle}" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
                                 <StackPanel Spacing="10">
                                     <TextBlock Text="App 工作階段（暫時選取清單）" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                     <TextBlock Text="只顯示 bounded metadata；套用 App 音量會寫入 Windows session，實體 per-App 擷取／重新送出仍未驗證（即使路由命令回傳 Ack，仍屬使用者空間控制證據）。" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
@@ -487,14 +481,14 @@
                                     <TextBlock Text="{Binding SelectedSessionDisplayText}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     <TextBlock Text="{Binding SessionVolumeDisplayText}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     <TextBlock Text="{Binding SelectedRouteRuleSummary}" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.Name="目前 App 路由預設預覽" />
-                                    <Slider Header="App 音量（dB）" Minimum="-60" Maximum="6" StepFrequency="0.5" Value="{Binding SessionVolumeDb, Mode=TwoWay}" AutomationProperties.Name="App 工作階段音量" />
+ <Slider Header="App 音量（dB）" Minimum="-60" Maximum="6" StepFrequency="0.5" Value="{Binding SessionVolumeDb, Mode=TwoWay}" Style="{StaticResource HibikiSliderStyle}" AutomationProperties.Name="App 工作階段音量" />
                                     <CheckBox Content="App 靜音" IsChecked="{Binding SessionMuted, Mode=TwoWay}" IsEnabled="{Binding HasSelectedSession}" AutomationProperties.Name="App 工作階段靜音" />
                                 <Button Content="套用選取 App 音量" Click="OnApplySessionVolumeClick" IsEnabled="{Binding HasSelectedSession}" MinHeight="32" HorizontalAlignment="Left" AutomationProperties.Name="套用選取 App 音量" />
                                     <TextBox Header="Lane ID" Text="{Binding SessionRouteLaneId, Mode=TwoWay}" AutomationProperties.Name="App Lane ID" />
                                     <TextBox Header="Output Group" Text="{Binding SessionRouteOutputGroup, Mode=TwoWay}" AutomationProperties.Name="App Output Group" />
                                 <Button Content="套用選取 App 路由" Click="OnApplySessionRouteClick" IsEnabled="{Binding HasSelectedSession}" MinHeight="32" HorizontalAlignment="Left" Style="{StaticResource AccentButtonStyle}" AutomationProperties.Name="套用選取 App 路由" />
                         </StackPanel>
-                            </Border><Border Padding="16" CornerRadius="12" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                            </Border><Border Style="{StaticResource SectionCardStyle}" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
                                 <StackPanel Spacing="10">
                                     <TextBlock Text="App 路由預設（Expert）" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                     <TextBlock Text="建立後會保存到本機；只有 App 清單已同步且引擎回覆 Ack，才會顯示為已套用。App ID 或顯示名稱至少填一項。" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -554,7 +548,7 @@
           <Grid x:Name="ShellExpertSection" Visibility="Collapsed">
             <TextBlock Text="Easy 模式已隱藏 Expert 內容；切換「Expert」後就會顯示這一頁。" TextWrapping="Wrap" Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="{Binding IsExpert, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
             <Border x:Name="ExpertPanel" Padding="24" CornerRadius="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="16" /></TransitionCollection></Border.Transitions>
-              <StackPanel x:Name="ShellExpertContent" Spacing="16" Visibility="{Binding IsExpert, Converter={StaticResource BoolToVisibilityConverter}}"><TextBlock Text="{Binding Expert.StatusText}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" /><Border Padding="16" CornerRadius="12" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+              <StackPanel x:Name="ShellExpertContent" Spacing="16" Visibility="{Binding IsExpert, Converter={StaticResource BoolToVisibilityConverter}}"><TextBlock Text="{Binding Expert.StatusText}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" /><Border Style="{StaticResource SectionCardStyle}" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
                                 <StackPanel Spacing="10">
                                     <TextBlock Text="Matrix" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                     <TextBlock Text="{Binding Expert.MatrixSummary}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -578,7 +572,7 @@
                                     </controls:ItemsRepeater>
                                 </StackPanel>
 
-                            </Border><Border Padding="16" CornerRadius="12" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                            </Border><Border Style="{StaticResource SectionCardStyle}" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
                                 <StackPanel Spacing="10">
                                     <TextBlock Text="DSP Graph" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                     <TextBlock Text="{Binding Expert.DspSummary}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -593,7 +587,7 @@
                                         </controls:ItemsRepeater.ItemTemplate>
                                     </controls:ItemsRepeater>
                                 </StackPanel>
-                            </Border><Border Padding="16" CornerRadius="12" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                            </Border><Border Style="{StaticResource SectionCardStyle}" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
                                 <StackPanel Spacing="10">
                                     <TextBlock Text="VST3 隔離 Lane" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                     <TextBlock Text="{Binding Expert.Vst3Summary}" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -614,7 +608,7 @@
                                         </controls:ItemsRepeater.ItemTemplate>
                                     </controls:ItemsRepeater>
                                 </StackPanel>
-                            </Border><Border Padding="16" CornerRadius="12" Background="{ThemeResource SubtleFillColorTertiaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                            </Border><Border Style="{StaticResource SectionCardStyle}" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
                                 <StackPanel Spacing="10">
                                     <TextBlock Text="校正狀態" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                     <Grid ColumnSpacing="10">
