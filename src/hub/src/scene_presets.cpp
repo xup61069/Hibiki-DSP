@@ -13,7 +13,7 @@ EasySceneDefaultsV1 make_easy_scene(const EasySceneKind kind,
     defaults.graph.output_channels = 2;
     defaults.graph.lanes.push_back(LaneConfigV1{"main", output_group, 2, 0.0, true});
     defaults.loudness.reference_phon = 80.0;
-    defaults.loudness.standard = "iso-226-2023-derived";
+    defaults.loudness.standard = "equal-loudness-derived";
     // Built-in Relative-mode scenes ship with live phon recompute enabled:
     // accepted VolumeNotifications then drive the bounded debounced recompute
     // through the normal control plane. Studio overrides this below; Strict
@@ -35,6 +35,8 @@ EasySceneDefaultsV1 make_easy_scene(const EasySceneKind kind,
             defaults.program_aware.enabled = true;
             defaults.program_aware.target_dbfs = -23.0;
             defaults.program_aware.max_cut_db = 12.0;
+            defaults.program_aware.bass_correction_enabled = true;
+            defaults.program_aware.bass_max_cut_db = 4.0;
             break;
         case EasySceneKind::Voice:
             defaults.scene.latency_mode = LatencyMode::Balanced;

@@ -5,7 +5,7 @@
 #include "hibiki/scene_graph.hpp"
 #include "hibiki/asio_transport_consumer.hpp"
 #include "hibiki/driver_stream_bridge.hpp"
-#include "hibiki/iso226.hpp"
+#include "hibiki/equal_loudness.hpp"
 #include "hibiki/peq_dsp.hpp"
 #include "hibiki/wav_ir.hpp"
 #include "hibiki/output_fanout.hpp"
@@ -64,14 +64,14 @@ public:
     [[nodiscard]] bool commit_ir() noexcept;
     void rollback_ir() noexcept;
     // Equal-loudness is an independent fixed-capacity output attachment.
-    // Prepare evaluates caller-supplied ISO formula points on the control
+    // Prepare evaluates caller-supplied equal-loudness formula points on the control
     // worker and compiles them into bounded PEQ coefficients; commit is the
     // only RT-visible swap. The callback never allocates, waits, or reads a
-    // path. This is user-space tone shaping, not ISO conformance evidence.
+    // path. This is user-space tone shaping, not equal-loudness conformance evidence.
 
     [[nodiscard]] bool prepare_loudness_peq(
         std::string_view output_group,
-        std::span<const Iso226FormulaPointV1> points,
+        std::span<const EqualLoudnessFormulaPointV1> points,
         double current_phon,
         const EqualLoudnessPolicyV1& policy) noexcept;
 
@@ -105,7 +105,7 @@ public:
         std::string_view output_group = "main") const noexcept;
 
     // Control-plane projection of the confirmed compensation curve. It is a
-    // bounded visual snapshot, not an audio measurement or ISO conformance.
+    // bounded visual snapshot, not an audio measurement or equal-loudness conformance.
     [[nodiscard]] LoudnessCurveSnapshotV1 loudness_curve_snapshot() const noexcept;
 
     void reset_loudness_peq_state() noexcept;
@@ -134,6 +134,7 @@ public:
         bool silence_gated{true};
         double measured_dbfs{-144.0};
         double applied_gain_db{0.0};
+        double bass_correction_gain_db{0.0};
         std::uint64_t sequence{0U};
     };
     [[nodiscard]] ProgramAwareTelemetrySnapshotV1
@@ -342,7 +343,7 @@ private:
         std::array<char, kMaxOutputGroupBytes> output_group{};
         PeqProcessorV1 peq{};
         // Stored for live phon recompute. Not read by RT path.
-        std::array<Iso226FormulaPointV1, 64U> formula_points{};
+        std::array<EqualLoudnessFormulaPointV1, 64U> formula_points{};
         std::size_t formula_point_count{0U};
         double current_phon{80.0};
         EqualLoudnessPolicyV1 policy{};

@@ -39,5 +39,5 @@ audio callback 直接呼叫 COM、寫 registry 或配置記憶體。
 
 ## 不在本規格
 
-內容感知 loudness（BS.1770/LUFS）、ISO 226 曲線、limiter DSP 與實際
+內容感知 loudness（BS.1770/LUFS）、equal-loudness 曲線、limiter DSP 與實際
 `IAudioEndpointVolume` 寫入各由既有 volume／ISO／Windows adapter 契約負責。

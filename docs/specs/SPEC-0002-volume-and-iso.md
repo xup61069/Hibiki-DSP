@@ -9,7 +9,7 @@ related_adrs: [ADR-0002]
 source_globs: ["src/**", "schemas/output-group-volume-v1.schema.json"]
 ---
 
-# SPEC-0002：Windows volume link 與 ISO 226 boundary
+# SPEC-0002：Windows volume link 與 equal-loudness boundary
 
 ## Windows volume
 
@@ -93,14 +93,14 @@ JSON schema 的 `anchor_id` 欄位要求非空字串或 null，空字串與 C0/C
 只有 speaker／headphone-coupler 才能回報 calibrated phon，`headphone-estimated` 永遠
 標示為估算，不能包裝成 HATS/coupler 測量。
 
-## ISO compensation
+## equal-loudness compensation
 
-對合法取得的兩條 ISO contour 以 1 kHz 正規化：
+對合法取得的兩條 equal-loudness contour 以 1 kHz 正規化：
 
 `G(f)=strength*((current(f)-current(1k))-(reference(f)-reference(1k)))`
 
-`iso226_spl_from_phon` 實作 ISO 226:2023 的公式，但只接受 caller-supplied
-`Iso226FormulaPointV1 {alpha_f, threshold_db, transfer_db}` 與 reference parameters；
+`equal_loudness_spl_from_phon` 實作 equal-loudness 的公式，但只接受 caller-supplied
+`EqualLoudnessFormulaPointV1 {alpha_f, threshold_db, transfer_db}` 與 reference parameters；
 repository 不包含標準的 29 點係數表。公式邊界採用頻率相關的規範範圍：
 20–4000 Hz 只接受 20–90 phon，5000–12500 Hz 只接受 20–80 phon；0、10 phon 與超出上限的
 值屬參考性質並一律回傳 invalid。已知標準缺陷是 1 kHz / 0 phon 公式輸出 0 dB 而非聽閾
@@ -109,14 +109,14 @@ repository 不包含標準的 29 點係數表。公式邊界採用頻率相關�
 的 1 kHz 正規化增益、F3/boost 限制與 `limited` 診斷；缺少 1 kHz anchor 或任何
 current/reference 評估落在頻率相關規範範圍外時整批 fail-closed。需要連續響度補償時，
 呼叫端可在 log-frequency 軸內插相鄰三分之一倍頻程點，或直接以公式即時計算；本模組不提供
-ISO 授權表格或 golden contour。
+equal-loudness 授權表格或 golden contour。
 
 預設 reference=80 phon。未校準時只能使用 Relative Compensation；校準模式必須保存 acoustic
-anchor、測試信號、實測 SPL、gain path 與 uncertainty。ISO 只定 magnitude；phase 是 Hibiki 的
+anchor、測試信號、實測 SPL、gain path 與 uncertainty。equal-loudness 只定 magnitude；phase 是 Hibiki 的
 minimum/mixed/linear implementation choice。
 
 Exporter 只接受 caller-supplied `PeqFilterV1`，目前可輸出 Hibiki JSON profile、Equalizer
-APO、CamillaDSP YAML 與 REW filter list；不內嵌 ISO 授權表格，也不把估算耳機資料標成正式
+APO、CamillaDSP YAML 與 REW filter list；不內嵌 equal-loudness 授權表格，也不把估算耳機資料標成正式
 量測結果。`compile_bounded_peq_correction_v1` 可把 caller-supplied 的 measured/target
 頻響點編成最多 16 段 bounded PEQ，並保留 clipped/unrepresented `limited` 狀態；這是
 校正檔 compiler baseline，不是房間聲學 optimizer。calibration response 的
@@ -130,7 +130,7 @@ IEEE-float WAV IR；它只負責檔案格式，不替任何未授權量測資料
 聲道；係數在 control side 準備，`process_interleaved` 只使用固定 state，不配置、不等待，
 並對非有限輸入 fail-safe。單分頁 adapter 可選擇在 Graph 前套用這組 PEQ；filter 的 sample
 rate／聲道不符時整個 lane block fail-closed。這是 per-lane EQ，不代表已完成 VST3 或正式
-ISO 係數 fit。
+equal-loudness 係數 fit。
 
 `IrConvolverV1` 提供最多 4096 taps、mono 或逐聲道 kernel 的固定容量 direct FIR；它保存
 跨 block history，會檢查 `IrPhaseResolutionV1` 已經 valid、sample rate／聲道一致與所有
@@ -138,7 +138,7 @@ ISO 係數 fit。
 minimum-phase 使用 real-cepstrum reconstruction，mixed/linear-phase 以 source magnitude
 建立 causal integer-sample linear-phase target，再依 strength 做 phase interpolation；它
 不在 RT thread 配置或執行。轉換後的 declared delay 仍須由實際量測驗證，不能把 FFT 轉換
-結果宣稱成 ISO 或聲學 conformance。
+結果宣稱成 equal-loudness 或聲學 conformance。
 
 `decode_ir_wav_v1` 是 control-plane 的 bounded RIFF/WAVE importer：接受 IEEE Float32 與 signed
 PCM16/24/32、最多 8 聲道與 4096 frames，檢查 RIFF container/chunk 邊界、block alignment、
@@ -152,15 +152,15 @@ Group Master → limiter；失敗時保留既有 active attachment。SceneApply 
 的校正鏈意外殘留。此 attachment 仍不代表已連接實體 sink、WaveRT driver 或完成聲學校正，且
 production concurrent RT/control swap 仍需 epoch/RCU 驗證。
 
-`AudioEngineModel::prepare_loudness_peq` 把 caller-supplied ISO formula points、current phon
+`AudioEngineModel::prepare_loudness_peq` 把 caller-supplied equal-loudness formula points、current phon
 與 `EqualLoudnessPolicyV1` 先送入既有 `build_formula_compensation`，再在 control plane 編成最多
 16 段固定容量 PEQ。commit 才會替換指定 output group 的 active attachment；prepare/clear rollback
 保留舊 attachment。RT render 順序為 graph → IR → equal-loudness PEQ → program-aware level →
 Group Master → limiter；
 Strict Direct 時可準備或保留 attachment，但 render 會 fail-open bypass，確保輸出不變。SceneApply 成功路徑會在同一個 control
 transaction 清掉上一個 loudness EQ，避免不相關 Scene 的音色殘留。這是 bounded proxy 與音色控制，
-不是 ISO 226 conformance、正式係數 fit、實體 sink delivery 或 driver/WaveRT evidence；production
-concurrent swap 以 commit-point snapshot 取代 epoch/RCU：同一 output group 的 attached-to-attached prepare/commit 保留上一組 immutable PEQ，用固定容量堆疊緩衝與 sin/cos equal-power gain 做 120 ms crossfade。clear 後重掛、不同 group 首次掛載、rollback 或 Strict Direct 不啟動 fade。單次 render block 超過 23040 frames 時整個呼叫 fail-closed，不做部分淡化。這仍不是 ISO 226 conformance、實體 sink delivery 或 driver/WaveRT evidence；真實裝置上的主觀無感切換尚未驗收。
+不是 equal-loudness conformance、正式係數 fit、實體 sink delivery 或 driver/WaveRT evidence；production
+concurrent swap 以 commit-point snapshot 取代 epoch/RCU：同一 output group 的 attached-to-attached prepare/commit 保留上一組 immutable PEQ，用固定容量堆疊緩衝與 sin/cos equal-power gain 做 120 ms crossfade。clear 後重掛、不同 group 首次掛載、rollback 或 Strict Direct 不啟動 fade。單次 render block 超過 23040 frames 時整個呼叫 fail-closed，不做部分淡化。這仍不是 equal-loudness conformance、實體 sink delivery 或 driver/WaveRT evidence；真實裝置上的主觀無感切換尚未驗收。
 
 Live phon recompute 的 debounce 狀態屬於每個 output group 的 attachment
 （per-group），不是 engine 層級單一狀態：engine 同時只保留一份 active loudness
@@ -171,7 +171,7 @@ VolumeNotification 的 phon proxy（70 + requested_db，clamp 到 20..90）在 m
 時刻意維持以 requested_db 估算：曲線目標是解除靜音後的聆聽音量等響度形狀，
 而不是把靜音解讀成「聽不見」；因此 mute 通知不會觸發、也不會凍結既有的 live
 recompute 排程，unmute 恢復時也不需要額外補償步驟。此 proxy 是 bounded estimate，
-不是音量量測，也不是 ISO 226 conformance。
+不是音量量測，也不是 equal-loudness conformance。
 
 Live phon recompute 預設關閉，但可明確 opt-in：
 `EqualLoudnessPolicyV1` 提供 `live_update_enabled` 旗標（SceneCatalog wire format
@@ -198,7 +198,7 @@ UI 必須保留上一個安全畫面。
 ±24 dB 內），且 sequence 與 equal-loudness 共用同一全域單調空間；無變化或靜音
 閘門開啟時不得重複發布。RT 供給 lock-free telemetry projection，control read
 撕裂或非有限值時 fail-closed。這仍是控制面視覺回饋，不是內容分析、BS.1770
-metering、ISO 226 conformance 或實體音訊 evidence。
+metering、equal-loudness conformance 或實體音訊 evidence。
 
 Scene attachment 的聲道數在 graph transaction 準備時解析。若 transaction 已有 pending
 graph，等響度 PEQ 與 multi-channel IR 必須以該 pending graph 的 output channels 編譯；
@@ -218,7 +218,7 @@ RMS 代理；`KWeightedProxy` 會在固定容量狀態內串接高通與高頻 s
 可選排除呼叫端標示的 LFE channel。兩者都使用 3 秒分析窗、靜音門、增益上限與 dB/s
 速率限制，適合由單一 Lane 明確選用。K-weighted 路徑仍不是正式 BS.1770 meter（沒有
 完整 gated loudness、合法 oracle 與 true-peak conformance），UI／文件必須顯示 proxy；它
-也不會在 `Relative`／`Calibrated` ISO 曲線中偷偷改變音色。正式 BS.1770 analyzer 與 oracle
+也不會在 `Relative`／`Calibrated` equal-loudness 曲線中偷偷改變音色。正式 BS.1770 analyzer 與 oracle
 仍是 release gate。
 
 `ProgramAwareLevelBankV1` 把上述 controller 變成最多 32 個 output group 的固定容量
@@ -231,9 +231,16 @@ max cut 12 dB），SceneApply 成功路徑在同一個 control transaction 清�
 controller；Strict Direct 維持 fail-open bypass。此整合仍是 user-space bounded proxy，
 不宣稱 BS.1770 conformance、實體 sink delivery 或 driver/WaveRT evidence。
 
+選用欄位 `bass_correction_enabled`／`bass_max_cut_db`（0–12 dB）加入內容驅動的低頻校正：
+`BassExcessDetectorV1` 以每聲道一階低通（~120 Hz）量測低頻帶對全頻帶的 RMS 能量比，
+在約兩秒滑動窗內平滑成 dB 差。比值接近 0 dB（低頻明顯偏高）時，RT 路徑以一階 low-shelf
+施加有界衰減（Movie 預設上限 4 dB），增益滑移速率與音量控制相同。遙測新增
+`bass_correction_gain_db`，source=2 自適應幀在低頻點發布實際校正值。這是固定濾波器
+能量比代理，不是 FFT 頻譜分析或 BS.1770 loudness meter，也不宣稱 ISO 226 conformance。
+
 ## IR 相位／延遲滑桿
 
-`IrPhasePolicyV1` 是獨立於 ISO magnitude 的 control-plane contract。`strength` 固定為
+`IrPhasePolicyV1` 是獨立於 equal-loudness magnitude 的 control-plane contract。`strength` 固定為
 0..1，0 代表不增加 buffering；1 代表該模式允許的最高相位校正。模式語意固定如下：
 
 - `minimum-phase`：Game 預設，minimum-phase IIR／FIR 路徑、0 ms 額外 buffering。
@@ -248,7 +255,7 @@ Engine Preview 會在 Ack 前完成 user-space graph attachment commit；graph c
 「0 ms 額外緩衝」「最高 80/160 ms」等可驗證文字，不使用「零延遲完美相位」宣稱。
 Scene 若省略 `ir_phase` 欄位，向後相容地採用 `minimum-phase/strength=0`。
 
-公開 repository 不得包含 ISO 授權文件、掃圖、完整受限表格或未核准 golden data。正式係數加入
+公開 repository 不得包含 equal-loudness 授權文件、掃圖、完整受限表格或未核准 golden data。正式係數加入
 GPL source 前必須由人類 reviewer 完成法務 gate。
 
 ## Safety
@@ -256,4 +263,4 @@ GPL source 前必須由人類 reviewer 完成法務 gate。
 一般 boost 上限 +6 dB，Expert calibrated 上限 +12 dB；低於實測 F3 不 boost；最後一級 −1 dBTP
 limiter。`build_formula_compensation` 已提供 bounded gain cap；目前 engine attachment 以
 control-thread prepare/commit 替換固定容量 PEQ，同組替換使用上述 bounded 120 ms crossfade；
-本切片不宣稱正式 ISO 曲線更新、實機聽感無切換痕跡或 driver/WaveRT 行為。
+本切片不宣稱正式 equal-loudness 曲線更新、實機聽感無切換痕跡或 driver/WaveRT 行為。

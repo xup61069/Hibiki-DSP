@@ -113,7 +113,7 @@ HLK、Microsoft signing、Authenticode 或付費交付通道。
 1. 鎖定 Windows 11 24H2+ target 機器與實體音訊測試環境。
 2. 完成引擎到 WaveRT 虛擬端點的實際 streaming、可聽輸出與長時間 soak。
 3. 在 target 環境複驗正式 WinUI、accessibility、安裝、升級、rollback 與 uninstall。
-4. 完成 ISO 226 相關授權確認。
+4. 完成 equal-loudness 相關授權確認。
 
 因此目前沒有可信的 V1 日期。driver 在隔離 guest 能安裝、PnP start 並穩定重啟，是重要的
 driver 啟動證據，但不是實體播放或可發行產品。
@@ -168,5 +168,5 @@ source 入口。GitHub 只存放 source、依賴鎖定、建置腳本、文字 m
 完整授權與第三方資訊見 [LICENSES/README.md](LICENSES/README.md) 與
 [THIRD_PARTY.yml](THIRD_PARTY.yml)；商標政策見 [TRADEMARKS.md](TRADEMARKS.md)。
 
-禁止提交金鑰、憑證、顧客資料、真實 endpoint／serial identity、私人校正檔、ISO 受限
+禁止提交金鑰、憑證、顧客資料、真實 endpoint／serial identity、私人校正檔、equal-loudness 受限
 內容或任何編譯產物。

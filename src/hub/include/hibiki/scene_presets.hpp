@@ -2,7 +2,7 @@
 
 // SPDX-License-Identifier: GPL-3.0-only
 
-#include "hibiki/iso226.hpp"
+#include "hibiki/equal_loudness.hpp"
 #include "hibiki/contracts.hpp"
 #include "hibiki/program_loudness.hpp"
 #include "hibiki/scene_graph.hpp"

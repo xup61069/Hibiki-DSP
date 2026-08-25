@@ -46,7 +46,7 @@ extern "C" {
 #include "hibiki/wavert_stream_v1.h"
 #include "hibiki/endpoint_topology_v1.h"
 }
-#include "hibiki/iso226.hpp"
+#include "hibiki/equal_loudness.hpp"
 #include "hibiki/ir_phase.hpp"
 #include "hibiki/wav_ir.hpp"
 #include "hibiki/scene_graph.hpp"
@@ -385,6 +385,99 @@ int main() {
     CHECK(!validate_program_aware_policy(ProgramAwareLevelPolicyV1{
         1, false, -23.0, 6.0, 12.0, 3000.0, 6.0, -70.0,
         ProgramAwareMeterModeV1::KWeightedProxy, 8}));
+    CHECK(validate_program_aware_policy(ProgramAwareLevelPolicyV1{
+        1, true, -23.0, 6.0, 12.0, 3000.0, 6.0, -70.0,
+        ProgramAwareMeterModeV1::RmsProxy, -1, true, 4.0}));
+    CHECK(!validate_program_aware_policy(ProgramAwareLevelPolicyV1{
+        1, true, -23.0, 6.0, 12.0, 3000.0, 6.0, -70.0,
+        ProgramAwareMeterModeV1::RmsProxy, -1, true, 13.0}));
+
+    // Bass-excess detector: a pure low-frequency tone must drive the smoothed
+    // ratio toward 0 dB (bass-dominated); silence keeps the detector parked.
+    BassExcessDetectorV1 bass_detector;
+    CHECK(bass_detector.configure(48000U));
+    CHECK(!bass_detector.configure(4000U));
+    std::array<float, 4800> bass_tone{};
+    for (std::size_t frame = 0U; frame < bass_tone.size(); ++frame) {
+        bass_tone[frame] = static_cast<float>(
+            0.3 * std::sin(2.0 * 3.14159265358979323846 * 80.0 *
+                            static_cast<double>(frame) / 48000.0));
+    }
+    CHECK(bass_detector.process(bass_tone.data(), bass_tone.size(), 1U));
+    const double first_pass = bass_detector.smoothed_excess_db();
+    CHECK(first_pass > -12.0);
+    CHECK(bass_detector.process(bass_tone.data(), bass_tone.size(), 1U));
+    CHECK(bass_detector.process(bass_tone.data(), bass_tone.size(), 1U));
+    CHECK(bass_detector.smoothed_excess_db() > -3.0);
+    bass_detector.reset();
+    CHECK(bass_detector.smoothed_excess_db() <= -144.0);
+    std::array<float, 128> silent_bass{};
+    CHECK(bass_detector.process(silent_bass.data(), silent_bass.size(), 1U));
+    CHECK(bass_detector.smoothed_excess_db() <= -144.0);
+    CHECK(!bass_detector.process(nullptr, 64U, 1U));
+
+    // Controller integration: bass correction enabled + loud low-frequency
+    // content produces a bounded negative correction in telemetry and on the
+    // samples; disabled policy leaves it at zero.
+    ProgramAwareLevelControllerV1 bass_controller;
+    CHECK(bass_controller.configure(
+        ProgramAwareLevelPolicyV1{1, true, -40.0, 0.0, 24.0, 3000.0, 60.0,
+                                  -70.0, ProgramAwareMeterModeV1::RmsProxy,
+                                  -1, true, 6.0},
+        48000U));
+    std::array<float, 4800> bass_content{};
+    for (std::size_t repeat = 0U; repeat < 8U; ++repeat) {
+        for (std::size_t frame = 0U; frame < bass_content.size(); ++frame) {
+            bass_content[frame] = static_cast<float>(
+                0.4 * std::sin(2.0 * 3.14159265358979323846 * 70.0 *
+                                static_cast<double>(frame) / 48000.0));
+        }
+        CHECK(bass_controller.process_interleaved(
+            bass_content.data(), bass_content.size(), 1U));
+    }
+    const auto bass_telemetry = bass_controller.read_telemetry();
+    CHECK(bass_telemetry.valid && !bass_telemetry.silence_gated);
+    CHECK(bass_telemetry.bass_correction_gain_db < -1.0 &&
+          bass_telemetry.bass_correction_gain_db >= -6.0);
+    // The correction must be shelf-shaped: a low-frequency probe is cut more
+    // than a high-frequency probe through the same filter state.
+    std::array<float, 4800> bass_probe{};
+    for (std::size_t frame = 0U; frame < bass_probe.size(); ++frame) {
+        bass_probe[frame] = static_cast<float>(
+            0.4 * std::sin(2.0 * 3.14159265358979323846 * 70.0 *
+                            static_cast<double>(frame) / 48000.0));
+    }
+    CHECK(bass_controller.process_interleaved(bass_probe.data(),
+                                               bass_probe.size(), 1U));
+    double shelf_low_probe_energy = 0.0;
+    for (const auto sample : bass_probe) {
+        shelf_low_probe_energy += static_cast<double>(sample) * sample;
+    }
+    std::array<float, 4800> high_probe{};
+    for (std::size_t frame = 0U; frame < high_probe.size(); ++frame) {
+        high_probe[frame] = static_cast<float>(
+            0.4 * std::sin(2.0 * 3.14159265358979323846 * 4000.0 *
+                            static_cast<double>(frame) / 48000.0));
+    }
+    // Reset filter state between probes so the comparison is fair.
+    bass_controller.reset();
+    CHECK(bass_controller.process_interleaved(high_probe.data(),
+                                              high_probe.size(), 1U));
+    double high_energy = 0.0;
+    for (const auto sample : high_probe) high_energy += static_cast<double>(sample) * sample;
+    double shelf_high_probe_energy = 0.0;
+    for (const auto sample : high_probe) {
+        shelf_high_probe_energy += static_cast<double>(sample) * sample;
+    }
+    CHECK(shelf_low_probe_energy < shelf_high_probe_energy);
+
+    ProgramAwareLevelControllerV1 no_bass_controller;
+    CHECK(no_bass_controller.configure(ProgramAwareLevelPolicyV1{}, 48000U));
+    std::array<float, 128> plain_block{};
+    plain_block[0] = 0.5F;
+    CHECK(no_bass_controller.process_interleaved(plain_block.data(),
+                                                  64U, 1U));
+    CHECK(no_bass_controller.status().bass_correction_gain_db == 0.0);
 
     PeqProcessorV1 peq;
     const std::array<PeqFilterV1, 1> peq_filters{{PeqFilterV1{1000.0, 6.0, 1.0}}};
@@ -620,8 +713,8 @@ int main() {
         20.0 * std::log10(static_cast<double>(engage_96k_gain));
     CHECK(std::abs(recovered_48k_db - recovered_96k_db) < 0.01);
 
-    const std::vector<IsoContourPoint> current{{100.0, 60.0}, {1000.0, 40.0}};
-    const std::vector<IsoContourPoint> reference{{100.0, 50.0}, {1000.0, 40.0}};
+    const std::vector<EqualLoudnessContourPoint> current{{100.0, 60.0}, {1000.0, 40.0}};
+    const std::vector<EqualLoudnessContourPoint> reference{{100.0, 50.0}, {1000.0, 40.0}};
     EqualLoudnessPolicyV1 policy;
     policy.max_boost_db = 6.0;
     const auto result = build_compensation(current, reference, policy);
@@ -630,35 +723,35 @@ int main() {
     CHECK(std::abs(result.points[0].gain_db - 6.0) < 1e-12);
     CHECK(result.limited);
     double one_k_spl = 0.0;
-    CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{1000.0, 0.30, 2.4, 0.0},
-                               Iso226FormulaReferenceV1{0.30, 2.4}, 80.0, one_k_spl));
+    CHECK(equal_loudness_spl_from_phon(EqualLoudnessFormulaPointV1{1000.0, 0.30, 2.4, 0.0},
+                               EqualLoudnessFormulaReferenceV1{0.30, 2.4}, 80.0, one_k_spl));
     CHECK(std::abs(one_k_spl - 80.0) < 1e-10);
-    CHECK(!iso226_spl_from_phon(Iso226FormulaPointV1{1000.0, 0.30, 2.4, 0.0},
-                                Iso226FormulaReferenceV1{0.30, 2.4}, 10.0, one_k_spl));
-    CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{1000.0, 0.25, 2.4, 0.0},
-                               Iso226FormulaReferenceV1{0.25, 2.4}, 60.0, one_k_spl));
+    CHECK(!equal_loudness_spl_from_phon(EqualLoudnessFormulaPointV1{1000.0, 0.30, 2.4, 0.0},
+                                EqualLoudnessFormulaReferenceV1{0.30, 2.4}, 10.0, one_k_spl));
+    CHECK(equal_loudness_spl_from_phon(EqualLoudnessFormulaPointV1{1000.0, 0.25, 2.4, 0.0},
+                               EqualLoudnessFormulaReferenceV1{0.25, 2.4}, 60.0, one_k_spl));
     CHECK(std::abs(one_k_spl - 60.0) < 1e-10);
-    CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{4000.0, 0.25, 50.0, 0.0},
-                               Iso226FormulaReferenceV1{0.30, 2.4}, 90.0, one_k_spl));
-    CHECK(!iso226_spl_from_phon(Iso226FormulaPointV1{4000.0, 0.25, 50.0, 0.0},
-                                Iso226FormulaReferenceV1{0.30, 2.4}, 90.5, one_k_spl));
-    CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{5000.0, 0.25, 50.0, 0.0},
-                               Iso226FormulaReferenceV1{0.30, 2.4}, 20.0, one_k_spl));
-    CHECK(!iso226_spl_from_phon(Iso226FormulaPointV1{5000.0, 0.25, 50.0, 0.0},
-                                Iso226FormulaReferenceV1{0.30, 2.4}, 19.5, one_k_spl));
-    CHECK(iso226_spl_from_phon(Iso226FormulaPointV1{12500.0, 0.25, 50.0, 0.0},
-                               Iso226FormulaReferenceV1{0.30, 2.4}, 80.0, one_k_spl));
-    CHECK(!iso226_spl_from_phon(Iso226FormulaPointV1{12500.0, 0.25, 50.0, 0.0},
-                                Iso226FormulaReferenceV1{0.30, 2.4}, 80.5, one_k_spl));
-    CHECK(!iso226_spl_from_phon(Iso226FormulaPointV1{1000.0, 0.30, 2.4, 0.0},
-                                Iso226FormulaReferenceV1{0.30, 2.4}, 0.0, one_k_spl));
-    const std::array<Iso226FormulaPointV1, 2> formula_points{{
+    CHECK(equal_loudness_spl_from_phon(EqualLoudnessFormulaPointV1{4000.0, 0.25, 50.0, 0.0},
+                               EqualLoudnessFormulaReferenceV1{0.30, 2.4}, 90.0, one_k_spl));
+    CHECK(!equal_loudness_spl_from_phon(EqualLoudnessFormulaPointV1{4000.0, 0.25, 50.0, 0.0},
+                                EqualLoudnessFormulaReferenceV1{0.30, 2.4}, 90.5, one_k_spl));
+    CHECK(equal_loudness_spl_from_phon(EqualLoudnessFormulaPointV1{5000.0, 0.25, 50.0, 0.0},
+                               EqualLoudnessFormulaReferenceV1{0.30, 2.4}, 20.0, one_k_spl));
+    CHECK(!equal_loudness_spl_from_phon(EqualLoudnessFormulaPointV1{5000.0, 0.25, 50.0, 0.0},
+                                EqualLoudnessFormulaReferenceV1{0.30, 2.4}, 19.5, one_k_spl));
+    CHECK(equal_loudness_spl_from_phon(EqualLoudnessFormulaPointV1{12500.0, 0.25, 50.0, 0.0},
+                               EqualLoudnessFormulaReferenceV1{0.30, 2.4}, 80.0, one_k_spl));
+    CHECK(!equal_loudness_spl_from_phon(EqualLoudnessFormulaPointV1{12500.0, 0.25, 50.0, 0.0},
+                                EqualLoudnessFormulaReferenceV1{0.30, 2.4}, 80.5, one_k_spl));
+    CHECK(!equal_loudness_spl_from_phon(EqualLoudnessFormulaPointV1{1000.0, 0.30, 2.4, 0.0},
+                                EqualLoudnessFormulaReferenceV1{0.30, 2.4}, 0.0, one_k_spl));
+    const std::array<EqualLoudnessFormulaPointV1, 2> formula_points{{
         {100.0, 0.25, 50.0, 0.0}, {1000.0, 0.30, 2.4, 0.0}}};
     const auto formula_result = build_formula_compensation(formula_points, 60.0, policy);
     CHECK(formula_result.points.size() == 2U &&
           std::abs(formula_result.points[1].gain_db) < 1e-10 &&
           std::isfinite(formula_result.points[0].gain_db));
-    const std::array<Iso226FormulaPointV1, 1> no_anchor{{{100.0, 0.25, 50.0, 0.0}}};
+    const std::array<EqualLoudnessFormulaPointV1, 1> no_anchor{{{100.0, 0.25, 50.0, 0.0}}};
     CHECK(build_formula_compensation(no_anchor, 60.0, policy).points.empty());
     EqualLoudnessPolicyV1 full_range_policy{};
     full_range_policy.measured_f3_hz = 20000.0;
@@ -667,13 +760,13 @@ int main() {
     full_range_policy.measured_f3_hz = 20000.1;
     CHECK(build_formula_compensation(formula_points, 60.0, full_range_policy).points.empty());
     full_range_policy.measured_f3_hz = 0.0;
-    const std::array<Iso226FormulaPointV1, 3> valid_high_band_points{{
+    const std::array<EqualLoudnessFormulaPointV1, 3> valid_high_band_points{{
         {4000.0, 0.25, 50.0, 0.0},
         {5000.0, 0.25, 50.0, 0.0},
         {1000.0, 0.30, 2.4, 0.0}}};
     CHECK(build_formula_compensation(valid_high_band_points, 80.0, full_range_policy)
               .points.size() == 3U);
-    const std::array<Iso226FormulaPointV1, 2> invalid_high_band_points{{
+    const std::array<EqualLoudnessFormulaPointV1, 2> invalid_high_band_points{{
         {1000.0, 0.30, 2.4, 0.0}, {12500.0, 0.25, 50.0, 0.0}}};
     CHECK(build_formula_compensation(invalid_high_band_points, 85.0,
                                      full_range_policy).points.empty());
@@ -758,7 +851,7 @@ int main() {
     CHECK(!validate_calibration_compile_policy_v1(invalid_spacing_policy));
     calibrated.anchor_id = "speaker-anchor";
     CHECK(!validate_policy(calibrated));
-    calibrated.standard = "iso-226-2023-calibrated";
+    calibrated.standard = "equal-loudness-calibrated";
     CHECK(validate_policy(calibrated));
     calibrated.anchor_id = std::string(64, 'a');
     CHECK(validate_policy(calibrated));
@@ -3862,7 +3955,7 @@ int main() {
                                             bypass_resolution));
 
     // Equal-loudness policy is now a fixed-capacity output attachment. The
-    // formula points remain caller-supplied legal test values; no ISO table
+    // formula points remain caller-supplied legal test values; no equal-loudness table
     // is embedded. A low-frequency boost and high-frequency cut must reach
     // the selected group only, after IR and before Group Master.
     {
@@ -3874,7 +3967,7 @@ int main() {
         CHECK(loudness_engine->prepare_graph(loudness_graph, 1U) &&
               loudness_engine->commit_graph());
         loudness_engine->set_sample_rate(48000U);
-        const std::array<Iso226FormulaPointV1, 3> legal_points{{
+        const std::array<EqualLoudnessFormulaPointV1, 3> legal_points{{
             {100.0, 0.35, 50.0, 0.0},
             {1000.0, 0.30, 2.4, 0.0},
             {8000.0, 0.25, 50.0, 0.0}}};
@@ -4091,7 +4184,7 @@ int main() {
 
     // Live phon recompute: stored formula points rebuild the attachment at a
     // new phon, debounced and fail-closed. The proxy mapping is control-plane
-    // only; no ISO table, no BS.1770 conformance claim.
+    // only; no equal-loudness table, no BS.1770 conformance claim.
     {
         auto live_engine = std::make_unique<AudioEngineModel>();
         GraphConfigV1 live_graph;
@@ -4102,7 +4195,7 @@ int main() {
               live_engine->commit_graph());
         live_engine->set_sample_rate(48000U);
 
-        const std::array<Iso226FormulaPointV1, 3> live_points{{
+        const std::array<EqualLoudnessFormulaPointV1, 3> live_points{{
             {100.0, 0.35, 50.0, 0.0},
             {1000.0, 0.30, 2.4, 0.0},
             {8000.0, 0.25, 50.0, 0.0}}};
@@ -4315,7 +4408,7 @@ int main() {
               group_engine->commit_graph());
         group_engine->set_sample_rate(48000U);
 
-        const std::array<Iso226FormulaPointV1, 3> group_points{{
+        const std::array<EqualLoudnessFormulaPointV1, 3> group_points{{
             {100.0, 0.35, 50.0, 0.0},
             {1000.0, 0.30, 2.4, 0.0},
             {8000.0, 0.25, 50.0, 0.0}}};
@@ -4608,6 +4701,8 @@ int main() {
         CHECK(movie_defaults.loudness.live_update_enabled);
         CHECK(std::abs(movie_defaults.program_aware.target_dbfs + 23.0) < 1e-12);
         CHECK(std::abs(movie_defaults.program_aware.max_cut_db - 12.0) < 1e-12);
+        CHECK(movie_defaults.program_aware.bass_correction_enabled);
+        CHECK(std::abs(movie_defaults.program_aware.bass_max_cut_db - 4.0) < 1e-12);
         AudioEngineModel movie_engine;
         GraphConfigV1 movie_graph;
         movie_graph.lanes.push_back(LaneConfigV1{"movie-lane", "main", 2, 0.0, true});

@@ -24,7 +24,7 @@ struct SceneProfileV1 {
     std::vector<std::string> lanes;
     // Stable caller-owned calibration label for a previously prepared IR.
     // It is an opaque comparison token only: it never embeds IR samples,
-    // file paths, or ISO 226 coefficients. An empty value means the scene
+    // file paths, or equal-loudness coefficients. An empty value means the scene
     // does not reference a calibration, and SceneApply keeps its existing
     // fail-closed IR detach behavior for that scene.
     std::string ir_reference;
