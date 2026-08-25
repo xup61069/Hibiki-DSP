@@ -9,6 +9,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
                 <ResourceDictionary Source="ms-appx:///Styles/SceneCard.xaml" />
+                <ResourceDictionary Source="ms-appx:///Styles/Input.xaml" />
                 <ResourceDictionary>
                     <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
                     <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter" />
