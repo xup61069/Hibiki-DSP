@@ -6,7 +6,7 @@
 #include "hibiki/ipc.hpp"
 #include "hibiki/contracts.hpp"
 #include "hibiki/ir_phase.hpp"
-#include "hibiki/iso226.hpp"
+#include "hibiki/equal_loudness.hpp"
 
 #include <array>
 #include <cstddef>
@@ -293,8 +293,10 @@ struct DeviceCatalogSnapshotV1 {
 
 // The live EQ surface consumes a bounded confirmed compensation curve. The
 // fixed Apache control contract carries frequency/gain pairs only; policy and
-// ISO formula inputs stay engine-local. Source 1 is equal loudness and source
-// 2 remains reserved until an adaptive-correction engine source exists.
+// equal-loudness formula inputs stay engine-local. Source 1 is equal loudness. Source 2
+// is the bounded projection of the committed program-aware slow level proxy;
+// it is control-plane visual feedback, not content analysis or a BS.1770/equal-loudness
+// conformance claim.
 constexpr std::size_t kEqVisualSnapshotHeaderBytesV1 = 10U;
 constexpr std::size_t kEqVisualSnapshotPointBytesV1 = 16U;
 constexpr std::size_t kEqVisualSnapshotCapacityV1 = 32U;

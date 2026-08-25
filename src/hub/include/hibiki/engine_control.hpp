@@ -169,6 +169,14 @@ private:
     EqVisualPublishFnV1 eq_visual_publisher_{nullptr};
     void* eq_visual_publisher_context_{nullptr};
     std::uint64_t next_eq_visual_sequence_{1U};
+    // Adaptive frames share the global monotonic EQ visual sequence with
+    // equal-loudness source=1 frames so store/UI stale rejection stays
+    // consistent across sources. The gain gate prevents publishing every
+    // drain tick while the controller is settling; the time gate bounds
+    // slow-control publish frequency.
+    double last_published_adaptive_gain_db_{0.0};
+    bool has_published_adaptive_{false};
+    std::chrono::steady_clock::time_point last_adaptive_publish_time_{};
 };
 
 }  // namespace hibiki

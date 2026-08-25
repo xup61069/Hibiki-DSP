@@ -241,7 +241,7 @@ void AudioEngineModel::rollback_ir() noexcept {
 
 bool AudioEngineModel::prepare_loudness_peq(
     const std::string_view output_group,
-    const std::span<const Iso226FormulaPointV1> points,
+    const std::span<const EqualLoudnessFormulaPointV1> points,
     const double current_phon,
     const EqualLoudnessPolicyV1& policy) noexcept {
     if (points.data() == nullptr && !points.empty()) return false;
@@ -344,7 +344,7 @@ void AudioEngineModel::rollback_loudness_peq() noexcept {
 bool AudioEngineModel::update_loudness_phon(
     const std::string_view output_group,
     const double new_phon) noexcept {
-    // Fail closed outside the bounded phon proxy domain. The ISO formula
+    // Fail closed outside the bounded phon proxy domain. The equal-loudness formula
     // itself is frequency-dependent; 20..90 is the safe superset used by the
     // prepare path and by contract tests.
     if (new_phon < 20.0 || new_phon > 90.0 || !std::isfinite(new_phon)) {
@@ -371,7 +371,7 @@ bool AudioEngineModel::update_loudness_phon(
     }
     if (!prepare_loudness_peq(
             output_group,
-            std::span<const Iso226FormulaPointV1>(
+            std::span<const EqualLoudnessFormulaPointV1>(
                 active_loudness_peq_.formula_points.data(),
                 active_loudness_peq_.formula_point_count),
             new_phon,
@@ -437,7 +437,7 @@ AudioEngineModel::LoudnessCurveSnapshotV1 AudioEngineModel::loudness_curve_snaps
     snapshot.current_phon = active_loudness_peq_.current_phon;
 
     const auto compensation = build_formula_compensation(
-        std::span<const Iso226FormulaPointV1>(
+        std::span<const EqualLoudnessFormulaPointV1>(
             active_loudness_peq_.formula_points.data(),
             active_loudness_peq_.formula_point_count),
         active_loudness_peq_.current_phon,
@@ -552,6 +552,53 @@ bool AudioEngineModel::has_active_program_aware(
            active_program_aware_.output_group_bytes == output_group.size() &&
            std::equal(output_group.begin(), output_group.end(),
                       active_program_aware_.output_group.begin());
+}
+
+AudioEngineModel::ProgramAwareTelemetrySnapshotV1
+AudioEngineModel::program_aware_visual_snapshot() const noexcept {
+    ProgramAwareTelemetrySnapshotV1 snapshot;
+    if (!has_active_program_aware_ || !active_program_aware_.attached ||
+        active_program_aware_.bank == nullptr) {
+        return snapshot;
+    }
+    if (has_active_graph_ && active_graph_.strict_direct) return snapshot;
+
+    const std::string_view group(
+        active_program_aware_.output_group.data(),
+        active_program_aware_.output_group_bytes);
+    auto* controller = active_program_aware_.bank->controller_for_group(group);
+    if (controller == nullptr ||
+        controller->sample_rate() != sample_rate_.load(std::memory_order_relaxed)) {
+        return snapshot;
+    }
+    return program_aware_telemetry_snapshot(group);
+}
+
+AudioEngineModel::ProgramAwareTelemetrySnapshotV1
+AudioEngineModel::program_aware_telemetry_snapshot(
+    const std::string_view output_group) const noexcept {
+    if ((has_active_graph_ && active_graph_.strict_direct) ||
+        !has_active_program_aware(output_group) ||
+        active_program_aware_.bank == nullptr) {
+        return {};
+    }
+    auto* controller =
+        active_program_aware_.bank->controller_for_group(output_group);
+    if (controller == nullptr ||
+        controller->sample_rate() != sample_rate_.load(std::memory_order_relaxed)) {
+        return {};
+    }
+    const auto telemetry = controller->read_telemetry();
+    ProgramAwareTelemetrySnapshotV1 snapshot;
+    snapshot.valid = telemetry.valid && telemetry.enabled &&
+                     !telemetry.silence_gated;
+    if (!snapshot.valid) return snapshot;
+    snapshot.enabled = true;
+    snapshot.silence_gated = false;
+    snapshot.measured_dbfs = telemetry.measured_dbfs;
+    snapshot.applied_gain_db = telemetry.applied_gain_db;
+    snapshot.sequence = telemetry.sequence;
+    return snapshot;
 }
 
 void AudioEngineModel::reset_program_aware_state() noexcept {

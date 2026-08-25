@@ -5,15 +5,18 @@
 #include <cstddef>
 #include <cstdint>
 #include <array>
+#include <atomic>
 #include <string_view>
 
 namespace hibiki {
+
+inline constexpr std::size_t kTelemetryDoubleCountV1 = 2U;
 
 // Slow content-aware level correction. The default remains a bounded RMS proxy
 // for backwards compatibility. KWeightedProxy adds the two fixed K-weighting
 // sections used by the ITU-R BS.1770 family, but this class is still not a
 // conformance meter: it has no gated loudness blocks, true-peak oracle, or
-// channel-layout metadata. It must not be presented as formal BS.1770 or ISO
+// channel-layout metadata. It must not be presented as formal BS.1770 or equal-loudness
 // 226 conformance.
 enum class ProgramAwareMeterModeV1 : std::uint8_t {
     RmsProxy = 0,
@@ -47,6 +50,18 @@ struct ProgramAwareLevelStatusV1 {
     ProgramAwareMeterModeV1 meter_mode{ProgramAwareMeterModeV1::RmsProxy};
 };
 
+// Control-plane projection of RT-owned status. This is bounded visual
+// telemetry only; it is not a BS.1770 meter, equal-loudness curve, or physical-audio
+// evidence.
+struct ProgramAwareTelemetrySnapshotV1 {
+    bool valid{false};
+    bool enabled{false};
+    bool silence_gated{true};
+    double measured_dbfs{-144.0};
+    double applied_gain_db{0.0};
+    std::uint64_t sequence{0U};
+};
+
 [[nodiscard]] bool validate_program_aware_policy(
     const ProgramAwareLevelPolicyV1& policy) noexcept;
 
@@ -54,6 +69,10 @@ struct ProgramAwareLevelStatusV1 {
 // block; process only copies scalar state and never allocates or waits.
 class ProgramAwareLevelControllerV1 final {
 public:
+    ProgramAwareLevelControllerV1() noexcept = default;
+    ProgramAwareLevelControllerV1(const ProgramAwareLevelControllerV1&) = delete;
+    ProgramAwareLevelControllerV1& operator=(
+        const ProgramAwareLevelControllerV1&) = delete;
     [[nodiscard]] bool configure(const ProgramAwareLevelPolicyV1& policy,
                                  std::uint32_t sample_rate) noexcept;
     void reset() noexcept;
@@ -63,6 +82,10 @@ public:
     [[nodiscard]] const ProgramAwareLevelStatusV1& status() const noexcept {
         return status_;
     }
+    // Lock-free projection for the control worker after the audio callback's
+    // current block has completed. Reads are not synchronized with an in-
+    // flight render; every field is independently finite and bounded.
+    [[nodiscard]] ProgramAwareTelemetrySnapshotV1 read_telemetry() const noexcept;
     [[nodiscard]] std::uint32_t sample_rate() const noexcept { return sample_rate_; }
 
 public:
@@ -84,6 +107,8 @@ public:
         double y2{0.0};
     };
 
+    void store_telemetry() noexcept;
+
 private:
     ProgramAwareLevelPolicyV1 policy_{};
     ProgramAwareLevelStatusV1 status_{};
@@ -93,6 +118,13 @@ private:
 
     std::array<Biquad, 2U> k_weighting_{};
     std::array<std::array<BiquadState, 8U>, 2U> k_state_{};
+
+    mutable std::array<std::atomic<double>, kTelemetryDoubleCountV1>
+        telemetry_doubles_{};
+    mutable std::atomic<bool> telemetry_valid_{false};
+    mutable std::atomic<bool> telemetry_enabled_{false};
+    mutable std::atomic<bool> telemetry_silence_gated_{true};
+    mutable std::atomic<std::uint64_t> telemetry_sequence_{0U};
 };
 
 // Fixed-capacity per-output-group program-aware level attachment. The

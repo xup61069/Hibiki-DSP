@@ -14,7 +14,7 @@ namespace hibiki {
 
 // A control-plane frequency-response sample.  measured_db and target_db are
 // caller-supplied values (for example from REW or a legal calibration file);
-// no microphone data or ISO table is embedded here.
+// no microphone data or equal-loudness table is embedded here.
 struct CalibrationResponsePointV1 {
     double frequency_hz{0.0};
     double measured_db{0.0};

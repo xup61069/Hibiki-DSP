@@ -95,7 +95,7 @@ Hello 與裝置 catalog 成功後，ViewModel 會以序列化的 `ControlStatusR
   COM、named pipe 或檔案系統。
 - 視窗關閉時必須釋放 pipe client。未來若加入自動重連，必須另立 ADR，並採
   bounded backoff 與明確使用者狀態提示。
-- Expert 摘要不可宣稱 Matrix/VST3/ISO 校正已提交；沒有對應版本化 IPC command 時，
+- Expert 摘要不可宣稱 Matrix/VST3/equal-loudness 校正已提交；沒有對應版本化 IPC command 時，
   UI 必須維持唯讀並顯示「未認證／未校準」狀態。
 - Shell 不得宣稱 VST3 時間軸已同步到 worker、plugin 或持久儲存；任何未來編輯面都必須
   明確標示本機邊界，且 commit 只能改變 managed published snapshot。

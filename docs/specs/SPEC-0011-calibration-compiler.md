@@ -41,7 +41,7 @@ endpoint ID 邊界一致。多位元組文字即使不超過 260 個字元，也
 
 ## 限制與安全
 
-- 這是 bounded PEQ baseline，不是房間聲學最佳化、耳機 HATS/coupler 推論或 ISO 係數 fit。
+- 這是 bounded PEQ baseline，不是房間聲學最佳化、耳機 HATS/coupler 推論或 equal-loudness 係數 fit。
 - 編譯器不讀取裝置、麥克風或檔案系統；頻響資料與裝置 identity 由上層提供。
 - 最大 512 個輸入點、16 段輸出、boost +24 dB、cut -44 dB、Q 0.1–100 的 policy 上限
   固定在 source；一般模式應使用更低的 +6 dB boost。
