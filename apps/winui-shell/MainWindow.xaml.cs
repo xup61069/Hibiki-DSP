@@ -449,4 +449,45 @@ public sealed partial class MainWindow : Window
             card.BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"];
         }
     }
+
+    private static double[] ParseWizardNumbers(string? text, out bool parseFailed)
+    {
+        parseFailed = false;
+        var values = new List<double>();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return values.ToArray();
+        }
+
+        foreach (var token in text.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!double.TryParse(token, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value))
+            {
+                parseFailed = true;
+                return values.ToArray();
+            }
+            values.Add(value);
+        }
+        return values.ToArray();
+    }
+
+    private void OnCalibrationWizardBuildClick(object sender, RoutedEventArgs e)
+    {
+        var frequencies = ParseWizardNumbers(CalibrationWizardFrequencyInput.Text, out var freqParseFailed);
+        var levels = ParseWizardNumbers(CalibrationWizardLevelInput.Text, out var levelParseFailed);
+        if (freqParseFailed || levelParseFailed || frequencies.Length != levels.Length)
+        {
+            CalibrationWizardStatusText.Text = "輸入錯誤：頻率與電平都要是有效數值，且數量相同。";
+            return;
+        }
+
+        if (ViewModel.Expert.TryBuildWizardPeq(frequencies, levels, out var error))
+        {
+            CalibrationWizardStatusText.Text = ViewModel.Expert.WizardStatusText;
+        }
+        else
+        {
+            CalibrationWizardStatusText.Text = error;
+        }
+    }
 }

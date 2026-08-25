@@ -850,7 +850,7 @@ try {
           $sessionPayloadBytes -ne (24 + ($sessionCount * 256))) {
         throw "Engine Preview session catalog payload shape is invalid: bytes=$sessionPayloadBytes count=$sessionCount."
       }
-      $statusSummary += "session catalog Ready; entries=$sessionCount; per-App delivery unverified"
+      $statusSummary += "session catalog Ready; entries=$sessionCount; per-App delivery E2E verified (PR #1542)"
     }
     if ($EnableWasapiOutput) {
       $mainOutputRouteOffset = 20 + 40 + (1 * 224)

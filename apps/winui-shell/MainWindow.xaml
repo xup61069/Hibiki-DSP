@@ -639,6 +639,37 @@
                                     </Grid>
                                     <TextBlock Text="{Binding Expert.Calibration.Detail}" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource SectionCardStyle}" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="校正精靈（本機預覽）" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" AutomationProperties.Name="校正精靈標題" />
+                                    <TextBlock Text="選擇目標曲線並輸入量測點（頻率 Hz 與電平 dB，用逗點、分號或分行分隔），會在本機產生最多 16 段 PEQ 預覽；這個預覽不送出 engine 也不改變聲音。" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <ComboBox x:Name="CalibrationWizardTargetCurvePicker" SelectedIndex="{Binding Expert.WizardTargetCurveIndex, Mode=TwoWay}" AutomationProperties.Name="校正目標曲線">
+                                        <ComboBoxItem Content="Flat 全平 (flat)" />
+                                        <ComboBoxItem Content="Harman 入耳式 (harman-in-ear)" />
+                                        <ComboBoxItem Content="Harman 罩耳式 (harman-over-ear)" />
+                                    </ComboBox>
+                                    <TextBox x:Name="CalibrationWizardFrequencyInput" Header="量測頻率 (Hz)" PlaceholderText="例如: 100, 500, 1000, 4000" AutomationProperties.Name="校正量測頻率輸入" />
+                                    <TextBox x:Name="CalibrationWizardLevelInput" Header="量測電平 (dB)" PlaceholderText="例如: -3, -1, 0, -2.5" AutomationProperties.Name="校正量測電平輸入" />
+                                    <Button x:Name="CalibrationWizardBuildPeqButton" Click="OnCalibrationWizardBuildClick" AutomationProperties.Name="產生校正 PEQ 預覽" AutomationProperties.HelpText="在本機控制平面編譯 PEQ 預覽，不送出 engine 命令">產生校正 PEQ 預覽</Button>
+                                    <TextBlock x:Name="CalibrationWizardStatusText" Text="{Binding Expert.WizardStatusText}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <controls:ItemsRepeater ItemsSource="{Binding Expert.WizardPeqPreview}">
+                                        <controls:ItemsRepeater.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Style="{StaticResource RouteItemCardGridStyle}" ColumnSpacing="10" AutomationProperties.Name="{Binding AccessibleText}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding AccessibleText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                    <Border Grid.Column="1" Style="{StaticResource StatusPillCompactStyle}">
+                                                        <TextBlock Text="{Binding Index}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                    </Border>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </controls:ItemsRepeater.ItemTemplate>
+                                    </controls:ItemsRepeater>
+                                </StackPanel>
                             </Border></StackPanel>
             </Border>
           </Grid>
