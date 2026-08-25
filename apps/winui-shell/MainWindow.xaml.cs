@@ -15,6 +15,8 @@ public sealed partial class MainWindow : Window
 {
     public EasyControlViewModel ViewModel { get; } = new();
 
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _eqVisualTransitionTimer;
+
     public MainWindow()
     {
         ViewModel.LoadCustomScenes(out _);
@@ -35,9 +37,13 @@ public sealed partial class MainWindow : Window
         if (e.PropertyName is nameof(EasyControlViewModel.EqSurface) or
             nameof(EasyControlViewModel.IsConnected))
         {
-            #if !HIBIKI_COMPATIBILITY_PREVIEW
-            DispatcherQueue.TryEnqueue(RefreshEqVisualCanvas);
-            #endif
+#if !HIBIKI_COMPATIBILITY_PREVIEW
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                RefreshEqVisualCanvas();
+                StartEqVisualTransitionTimer();
+            });
+#endif
         }
 
 #if !HIBIKI_COMPATIBILITY_PREVIEW
@@ -168,6 +174,39 @@ public sealed partial class MainWindow : Window
             ShowNavigationSection(tag);
     }
 #endif
+
+    private void OnEqVisualTransitionTick(object? sender, object e)
+    {
+        var timer = sender as Microsoft.UI.Dispatching.DispatcherQueueTimer ?? _eqVisualTransitionTimer;
+        if (ViewModel.EqSurface.TransitionProgress >= 1.0)
+        {
+            if (timer is not null)
+            {
+                timer.Stop();
+                timer.Tick -= OnEqVisualTransitionTick;
+            }
+            _eqVisualTransitionTimer = null;
+        }
+
+#if !HIBIKI_COMPATIBILITY_PREVIEW
+        RefreshEqVisualCanvas();
+#endif
+    }
+
+    private void StartEqVisualTransitionTimer()
+    {
+        if (ViewModel.EqSurface.TransitionProgress < 1.0)
+        {
+            _eqVisualTransitionTimer ??= Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().CreateTimer();
+            if (_eqVisualTransitionTimer is not null)
+            {
+                _eqVisualTransitionTimer.Interval = TimeSpan.FromMilliseconds(16);
+                _eqVisualTransitionTimer.IsRepeating = true;
+                _eqVisualTransitionTimer.Tick += OnEqVisualTransitionTick;
+                _eqVisualTransitionTimer.Start();
+            }
+        }
+    }
 
     private async void OnConnectClick(object sender, RoutedEventArgs e)
     {
