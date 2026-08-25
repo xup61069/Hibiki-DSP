@@ -65,4 +65,29 @@
         <Setter Property="BorderThickness" Value="1" />
     </Style>
 
+    <!-- Status footer: accent-colored left edge with a subtle top divider.
+         Keep all border values here so local attributes cannot override
+         the intended accent treatment. -->
+    <Style x:Key="FooterAccentBorderStyle" TargetType="Border">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Padding" Value="36,12,36,16" />
+        <Setter Property="BorderBrush">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Offset="0.0">
+                        <GradientStop.Color>
+                            <StaticResource ResourceKey="SystemAccentColor" />
+                        </GradientStop.Color>
+                    </GradientStop>
+                    <GradientStop Offset="0.28">
+                        <GradientStop.Color>
+                            <StaticResource ResourceKey="SystemAccentColor" />
+                        </GradientStop.Color>
+                    </GradientStop>
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="BorderThickness" Value="4,1,0,0" />
+    </Style>
+
 </ResourceDictionary>
