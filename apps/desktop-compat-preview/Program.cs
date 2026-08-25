@@ -57,6 +57,7 @@ internal sealed class PreviewForm : Form
     private readonly TextBox _customSceneName = new() { Width = 220, PlaceholderText = "名稱", AccessibleName = "自訂場景名稱" };
     private readonly TextBox _customSceneDescription = new() { Width = 460, PlaceholderText = "說明", AccessibleName = "自訂場景說明" };
     private readonly CheckBox _customSceneLoudnessLiveUpdate = new() { Text = "音量連動等響度", AutoSize = true, AccessibleName = "音量連動等響度" };
+    private readonly Label _customSceneQueueStatus = new() { AutoSize = true, AccessibleName = "離線場景同步佇列狀態" };
     private readonly Button _addCustomScene = new() { Text = "加入自訂場景", AutoSize = true, AccessibleName = "加入自訂場景" };
     private readonly Button _removeCustomScene = new() { Text = "移除選取的自訂場景", AutoSize = true, AccessibleName = "移除選取的自訂場景" };
     private readonly ComboBox _irModes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取 IR 模式" };
@@ -171,6 +172,7 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(customSceneIdentity);
         panel.Controls.Add(_customSceneDescription);
         panel.Controls.Add(_customSceneLoudnessLiveUpdate);
+        panel.Controls.Add(_customSceneQueueStatus);
         _addCustomScene.Click += async (_, _) =>
         {
             await _viewModel.AddCustomSceneAsync();
@@ -534,6 +536,11 @@ internal sealed class PreviewForm : Form
         if (!string.Equals(_customSceneDescription.Text, _viewModel.CustomSceneDescription, StringComparison.Ordinal))
             _customSceneDescription.Text = _viewModel.CustomSceneDescription;
         _customSceneLoudnessLiveUpdate.Checked = _viewModel.CustomSceneLoudnessLiveUpdate;
+        _customSceneQueueStatus.Text = _viewModel.PendingSceneCatalogOpsCount == 0 &&
+                                       _viewModel.DroppedSceneCatalogOperations == 0
+            ? "離線場景同步佇列：無待同步變更"
+            : $"離線場景同步佇列：{_viewModel.PendingSceneCatalogOpsCount} 筆待同步；" +
+              $"已捨棄 {_viewModel.DroppedSceneCatalogOperations} 筆最舊變更（容量上限 {EasyControlViewModel.MaxPendingSceneCatalogOps}）";
         _removeCustomScene.Enabled = _scenes.SelectedValue is string removableSceneId &&
                                      _viewModel.CustomSceneCards.Any(item => item.Id == removableSceneId);
         var selectedScene = _viewModel.SelectedScene?.Id;
