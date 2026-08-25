@@ -76,9 +76,12 @@ lane 經 immutable graph 處理後送入 WASAPI handoff。`--enable-tab-bridge` 
 receiver 實際狀態（disabled、listening 或 waiting），沒有使用者 capture 時不得顯示 Ready。
 
 Engine Preview 另提供 opt-in 的 `--enable-tab-noise-suppressor` 旗標：啟用時對 tab bridge
-lane 套用 `BasicNoiseSuppressorV1`（固定 high-pass + downward-gate）。此功能是基本降噪，
-不是 ML/spectral denoising；不得宣稱 AI denoising 或 RNNoise。未加此旗標時，預設行為
-與先前完全相同。
+lane 套用 `BasicNoiseSuppressorV1`（固定 high-pass + downward-gate）。此旗標必須與
+`--enable-tab-bridge` 併用；單獨出現時 host fail-closed 拒絕啟動。抑制器以實際 sink
+sample rate、stereo（2 聲道）初始化；非 stereo 區塊會被 fail-closed 丟棄，route-health
+仍只代表 listener 狀態，不因此宣稱降噪品質或 AI/ML denoising。設定失敗時不得把
+未設定的 effect 接到 lane。此功能是基本降噪，不是 ML/spectral denoising；不得宣稱
+AI denoising 或 RNNoise。未加此旗標時，預設行為與先前完全相同。
 
 ## Extension security and CSP policy
 
