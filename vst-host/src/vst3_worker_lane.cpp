@@ -33,7 +33,6 @@ bool Vst3WorkerLaneSessionV1::prepare(
     }
     sandbox_ = &sandbox;
     config_ = config;
-    timeline_.clear();
     next_block_start_ = 0U;
     has_processed_block_ = false;
     state_ = Vst3WorkerLaneStateV1::Prepared;
@@ -55,42 +54,9 @@ Vst3WorkerExchangeResultV1 Vst3WorkerLaneSessionV1::handshake(
 void Vst3WorkerLaneSessionV1::detach() noexcept {
     sandbox_ = nullptr;
     config_ = {};
-    timeline_.clear();
     state_ = Vst3WorkerLaneStateV1::Detached;
     next_block_start_ = 0U;
     has_processed_block_ = false;
-}
-
-bool Vst3WorkerLaneSessionV1::append_parameter_event(
-    const Vst3ParameterTimelineEventV1& event) noexcept {
-    if (state_ == Vst3WorkerLaneStateV1::Degraded ||
-        state_ == Vst3WorkerLaneStateV1::Detached) {
-        return false;
-    }
-    return timeline_.append(event);
-}
-
-bool Vst3WorkerLaneSessionV1::erase_parameter_event(const std::size_t index) noexcept {
-    if (state_ == Vst3WorkerLaneStateV1::Degraded ||
-        state_ == Vst3WorkerLaneStateV1::Detached) {
-        return false;
-    }
-    return timeline_.erase(index);
-}
-
-bool Vst3WorkerLaneSessionV1::set_parameter_timeline(
-    const Vst3ParameterTimelineSnapshotV1& snapshot) noexcept {
-    if (state_ == Vst3WorkerLaneStateV1::Degraded ||
-        state_ == Vst3WorkerLaneStateV1::Detached ||
-        !validate_vst3_parameter_timeline_v1(snapshot)) {
-        return false;
-    }
-    Vst3ParameterTimelineV1 candidate;
-    for (std::size_t index = 0U; index < snapshot.event_count; ++index) {
-        if (!candidate.append(snapshot.events[index])) return false;
-    }
-    timeline_ = candidate;
-    return true;
 }
 
 Vst3WorkerExchangeResultV1 Vst3WorkerLaneSessionV1::process_block(
@@ -107,15 +73,9 @@ Vst3WorkerExchangeResultV1 Vst3WorkerLaneSessionV1::process_block(
         state_ = Vst3WorkerLaneStateV1::Degraded;
         return Vst3WorkerExchangeResultV1::invalid_argument;
     }
-    std::array<Vst3WorkerParameterPointV1, kVst3WorkerMaxParameterPointsV1> points{};
-    std::size_t point_count = 0U;
-    if (!timeline_.collect_block(block_start, frames, points, point_count)) {
-        state_ = Vst3WorkerLaneStateV1::Degraded;
-        return Vst3WorkerExchangeResultV1::invalid_argument;
-    }
     const auto result = sandbox_->process_worker_block(
         request_id, config_.channels, frames, input, output,
-        std::span<const Vst3WorkerParameterPointV1>(points.data(), point_count));
+        std::span<const Vst3WorkerParameterPointV1>());
     if (result != Vst3WorkerExchangeResultV1::ok) {
         state_ = Vst3WorkerLaneStateV1::Degraded;
         return result;

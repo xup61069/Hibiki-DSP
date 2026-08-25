@@ -8,7 +8,6 @@
 #include <span>
 
 #include "hibiki/latency_graph_commit.hpp"
-#include "hibiki/vst3_parameter_timeline.hpp"
 #include "hibiki/vst3_sandbox.hpp"
 
 namespace hibiki {
@@ -31,7 +30,7 @@ enum class Vst3WorkerLaneStateV1 : std::uint8_t {
     Degraded,
 };
 
-// Control/IPC-side session bridge. It owns timeline ordering and maps each
+// Control/IPC-side session bridge. It maps each
 // successful block to the bounded worker exchange. The RT graph must consume
 // only the resulting caller-owned block; it must never call this class.
 class Vst3WorkerLaneSessionV1 final {
@@ -44,14 +43,6 @@ public:
         std::uint64_t request_id = 1U);
     void detach() noexcept;
 
-    [[nodiscard]] bool append_parameter_event(
-        const Vst3ParameterTimelineEventV1& event) noexcept;
-    [[nodiscard]] bool erase_parameter_event(std::size_t index) noexcept;
-    [[nodiscard]] bool set_parameter_timeline(
-        const Vst3ParameterTimelineSnapshotV1& snapshot) noexcept;
-    [[nodiscard]] const Vst3ParameterTimelineSnapshotV1& parameter_timeline() const noexcept {
-        return timeline_.snapshot();
-    }
 
     [[nodiscard]] Vst3WorkerExchangeResultV1 process_block(
         std::uint64_t request_id,
@@ -67,7 +58,6 @@ public:
 private:
     Vst3SandboxProcess* sandbox_{nullptr};
     Vst3WorkerLaneConfigV1 config_{};
-    Vst3ParameterTimelineV1 timeline_{};
     Vst3WorkerLaneStateV1 state_{Vst3WorkerLaneStateV1::Detached};
     std::uint64_t next_block_start_{0U};
     bool has_processed_block_{false};

@@ -35,11 +35,8 @@ policy, crash-dump redaction and real plugin certification remain separate gates
 
 Bounded parameter automation itself is present: up to 16 parameter IDs and five
 sample-accurate points per ID are accepted by the processor API and optional
-SDK worker. The bounded timeline and Scene scheduler are also part of this
-source baseline, including persistence, editing transactions, undo/redo history
-and the C# Compatibility Preview editing surfaces; full end-to-end device
-validation, crash-dump redaction and third-party certification remain separate
-gates.
+SDK worker. Full end-to-end device validation, crash-dump redaction and
+third-party certification remain separate gates.
 
 The processor API and optional SDK worker accept up to 16 parameter IDs, five
 sample-accurate points per ID and normalized values in `[0,1]`; the bounded
@@ -54,11 +51,8 @@ must never be called from the RT graph; a failed worker is reported to the
 existing quarantine policy rather than silently restarted.
 
 `Vst3WorkerLaneSessionV1` is the next control-plane layer: it binds a stable lane
-token and reported latency, requires a successful handshake, extracts events
-from `Vst3ParameterTimelineV1`, and rejects non-contiguous blocks. A worker or
-ordering failure moves that lane to `Degraded`; Scene scheduling and
-back-pressure are bounded source contracts, while third-party certification
-remains a follow-up gate.
+token and reported latency and requires a successful handshake. A worker failure
+moves that lane to `Degraded`.
 
 `PluginHostModel` now exposes the host-model entry points for preparing,
 handshaking and processing that lane. Only the existing trusted/certified,
@@ -66,13 +60,9 @@ same-layout descriptor can enter the session; a failed exchange detaches the
 lane and moves the host to `Quarantined`. This is still a source-level contract,
 not evidence of a signed driver or a certified third-party plug-in.
 
-`Vst3SceneAutomationSchedulerV1` stores up to 16 stable timeline IDs and
-scene/lane bindings, validates the complete scene before activation, and
-rejects concurrent blocks per lane with an explicit `busy` result. It applies
-timeline snapshots to worker lanes but deliberately does not serialize opaque
-plugin state. `Vst3SceneStateCoordinatorV1` separately binds up to 16 Scene
-state references, checks private metadata and approved migration rules, and
-restores only into caller-owned buffers.
+`Vst3SceneStateCoordinatorV1` binds up to 16 Scene state references, checks
+private metadata and approved migration rules, and restores only into
+caller-owned buffers.
 
 `preflight_scene_vst3_state_v1` adapts that coordinator to
 `EngineControlWorkerV1::set_scene_preflight`: a Scene with no state bindings

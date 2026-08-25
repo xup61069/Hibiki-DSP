@@ -5,13 +5,7 @@ add_library(hibiki_vst_host STATIC
   src/vst3_worker_pipe.cpp
   src/latency_compensation.cpp
   src/latency_graph_commit.cpp
-  src/vst3_parameter_timeline.cpp
-  src/vst3_timeline_editor.cpp
-  src/vst3_timeline_persistence.cpp
-  src/vst3_timeline_file_store.cpp
-  src/vst3_supervisor_surface.cpp
   src/vst3_worker_lane.cpp
-  src/vst3_scene_automation.cpp
   src/vst3_plugin_state.cpp
   src/vst3_scene_state.cpp
   src/vst3_scene_state_preflight.cpp
