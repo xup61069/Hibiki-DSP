@@ -109,7 +109,13 @@ bool validate_program_aware_policy(const ProgramAwareLevelPolicyV1& policy) noex
            std::isfinite(policy.silence_gate_dbfs) && policy.silence_gate_dbfs >= -144.0 &&
            policy.silence_gate_dbfs < 0.0 &&
            std::isfinite(policy.bass_max_cut_db) && policy.bass_max_cut_db >= 0.0 &&
-           policy.bass_max_cut_db <= 12.0;
+           policy.bass_max_cut_db <= 12.0 &&
+           std::isfinite(policy.night_compression_max_reduction_db) &&
+           policy.night_compression_max_reduction_db >= 0.0 &&
+           policy.night_compression_max_reduction_db <= 24.0 &&
+           std::isfinite(policy.night_compression_knee_db) &&
+           policy.night_compression_knee_db >= 6.0 &&
+           policy.night_compression_knee_db <= 30.0;
 }
 
 bool BassExcessDetectorV1::configure(const std::uint32_t sample_rate) noexcept {
@@ -190,6 +196,8 @@ void ProgramAwareLevelControllerV1::store_telemetry() noexcept {
                                 std::memory_order_relaxed);
     telemetry_doubles_[2].store(status_.bass_correction_gain_db,
                                 std::memory_order_relaxed);
+    telemetry_doubles_[3].store(status_.night_compression_gain_db,
+                                std::memory_order_relaxed);
     telemetry_enabled_.store(status_.enabled, std::memory_order_relaxed);
     telemetry_silence_gated_.store(status_.silence_gated,
                                    std::memory_order_relaxed);
@@ -222,6 +230,10 @@ ProgramAwareLevelControllerV1::read_telemetry() const noexcept {
     snapshot.measured_dbfs = measured;
     snapshot.applied_gain_db = applied_gain;
     snapshot.bass_correction_gain_db = bass_gain;
+    const double night_gain =
+        telemetry_doubles_[3].load(std::memory_order_acquire);
+    if (!std::isfinite(night_gain)) return ProgramAwareTelemetrySnapshotV1{};
+    snapshot.night_compression_gain_db = night_gain;
     snapshot.sequence = after;
     return snapshot;
 }
@@ -239,6 +251,8 @@ bool ProgramAwareLevelControllerV1::configure(const ProgramAwareLevelPolicyV1& p
     if (policy_.bass_correction_enabled) {
         (void)bass_detector_.configure(sample_rate);
     }
+    // Night compression needs no coefficient setup: the peak envelope runs on
+    // per-block time constants derived from sample_rate_ and block length.
     configured_ = true;
     reset();
     status_.enabled = policy_.enabled;
@@ -248,6 +262,9 @@ bool ProgramAwareLevelControllerV1::configure(const ProgramAwareLevelPolicyV1& p
 void ProgramAwareLevelControllerV1::reset() noexcept {
     smoothed_energy_ = 0.0;
     bass_cut_db_ = 0.0;
+    night_peak_env_ = 0.0;
+    night_reduction_db_ = 0.0;
+    night_envelope_started_ = false;
     bass_detector_.reset();
     bass_shelf_state_ = {};
     status_ = {};
@@ -339,9 +356,57 @@ bool ProgramAwareLevelControllerV1::process_interleaved(float* const interleaved
                                   0.0, policy_.bass_max_cut_db);
         status_.bass_correction_gain_db = -bass_cut_db_;
     }
+    // Night-mode dynamics compression: track a fast-attack / slow-release
+    // peak envelope over the block, compare it against the smoothed RMS and
+    // apply a bounded reduction when the crest factor exceeds the knee. The
+    // reduction slews at the shared dB/s rate so transitions stay click-free.
+    status_.night_compression_gain_db = 0.0;
+    if (policy_.night_compression_enabled && !status_.silence_gated) {
+        constexpr double kAttackSeconds = 0.005;   // 5 ms: catch transients.
+        constexpr double kReleaseSeconds = 0.600;  // 600 ms: musical decay.
+        const double attack_alpha =
+            std::clamp(1.0 - std::exp(-block_seconds / kAttackSeconds), 0.0, 1.0);
+        const double release_alpha =
+            std::clamp(1.0 - std::exp(-block_seconds / kReleaseSeconds), 0.0, 1.0);
+
+        double block_peak = 0.0;
+        for (std::size_t index = 0U; index < samples; ++index) {
+            const double magnitude = std::abs(static_cast<double>(interleaved[index]));
+            if (magnitude > block_peak) block_peak = magnitude;
+        }
+        if (!night_envelope_started_) {
+            night_peak_env_ = block_peak;
+            night_envelope_started_ = true;
+        } else if (block_peak > night_peak_env_) {
+            night_peak_env_ += attack_alpha * (block_peak - night_peak_env_);
+        } else {
+            night_peak_env_ += release_alpha * (block_peak - night_peak_env_);
+        }
+
+        const double peak_db = db_from_energy(night_peak_env_ * night_peak_env_);
+        const double crest_db = peak_db - status_.measured_dbfs;  // >= 0 typically
+        const double knee = policy_.night_compression_knee_db;
+        double target_reduction = 0.0;
+        if (crest_db > knee) {
+            // Linear-in-dB slope of 2:1 above the knee, capped by the policy.
+            const double overshoot_db = crest_db - knee;
+            target_reduction = std::clamp(overshoot_db * 0.5, 0.0,
+                                          policy_.night_compression_max_reduction_db);
+        }
+        const double reduction_delta = std::clamp(target_reduction - night_reduction_db_,
+                                                  -max_step, max_step);
+        night_reduction_db_ = std::clamp(night_reduction_db_ + reduction_delta,
+                                         0.0, policy_.night_compression_max_reduction_db);
+        status_.night_compression_gain_db = -night_reduction_db_;
+    }
     store_telemetry();
     const auto linear_gain = static_cast<float>(
         std::pow(10.0, std::clamp(status_.applied_gain_db, -144.0, 12.0) / 20.0));
+    const auto night_gain =
+        policy_.night_compression_enabled && night_reduction_db_ > 0.0
+            ? static_cast<float>(
+                  std::pow(10.0, status_.night_compression_gain_db / 20.0))
+            : 1.0F;
     if (policy_.bass_correction_enabled && status_.bass_correction_gain_db < 0.0) {
         // Rebuild the shelf coefficients only when the slewing cut moved by a
         // meaningful amount; this stays bounded and allocation-free.
@@ -353,13 +418,14 @@ bool ProgramAwareLevelControllerV1::process_interleaved(float* const interleaved
                 auto& sample_ref = interleaved[frame * channels + channel];
                 sample_ref = static_cast<float>(process_biquad(
                     bass_shelf_, bass_shelf_state_[channel],
-                    static_cast<double>(sample_ref * linear_gain)));
+                    static_cast<double>(sample_ref * linear_gain *
+                                        night_gain)));
                 if (!std::isfinite(sample_ref)) sample_ref = 0.0F;
             }
         }
     } else {
         for (std::size_t index = 0U; index < samples; ++index) {
-            interleaved[index] *= linear_gain;
+            interleaved[index] *= linear_gain * night_gain;
         }
     }
     return true;

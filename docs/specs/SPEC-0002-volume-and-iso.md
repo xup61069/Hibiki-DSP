@@ -227,7 +227,8 @@ RT thread 只以 group label 查找既有 slot，過程不配置、不鎖定、�
 `AudioEngineModel::prepare_program_aware`／`prepare_program_aware_clear`／
 `commit_program_aware`／`rollback_program_aware` 提供與 loudness PEQ 相同的交易式邊界；
 commit 是唯一 RT-visible 替換點。Movie Easy Scene 預設啟用 RmsProxy（target −23 dBFS、
-max cut 12 dB），SceneApply 成功路徑在同一個 control transaction 清掉上一個 Scene 的
+max cut 12 dB；bass 校正上限 4 dB；night-mode 壓縮上限 9 dB、knee 12 dB），
+SceneApply 成功路徑在同一個 control transaction 清掉上一個 Scene 的
 controller；Strict Direct 維持 fail-open bypass。此整合仍是 user-space bounded proxy，
 不宣稱 BS.1770 conformance、實體 sink delivery 或 driver/WaveRT evidence。
 
@@ -237,6 +238,15 @@ controller；Strict Direct 維持 fail-open bypass。此整合仍是 user-space 
 施加有界衰減（Movie 預設上限 4 dB），增益滑移速率與音量控制相同。遙測新增
 `bass_correction_gain_db`，source=2 自適應幀在低頻點發布實際校正值。這是固定濾波器
 能量比代理，不是 FFT 頻譜分析或 BS.1770 loudness meter，也不宣稱 ISO 226 conformance。
+
+選用欄位 night_compression_enabled／night_compression_max_reduction_db（0–24 dB）與
+night_compression_knee_db（6–30 dB）加入有界動態範圍壓縮：RT 路徑以 5 ms attack／
+600 ms release 的 peak envelope 比較 peak 與平滑 RMS 的 crest factor；超過 knee 時用
+2:1 斜率計算衰減，clamp 到政策上限，並使用與音量控制相同的 dB/s slew rate 避免爆音。
+遙測新增 night_compression_gain_db。這是對白可聽性的 proxy，不是 Dolby 夜間模式複刻、
+正式 BS.1770 loudness meter 或 true-peak limiter。Movie Easy Scene 預設 opt-in，其他場景
+維持關閉；壓縮增益會與 level gain 及 bass shelf 在同一個 RT pass 內串接，不引入額外
+buffering 或配置。
 
 ## IR 相位／延遲滑桿
 
