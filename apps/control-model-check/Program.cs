@@ -1,5 +1,6 @@
 using Hibiki.ControlModel;
 using System.Buffers.Binary;
+using System.Globalization;
 using System.IO.Pipes;
 using System.Text;
 
@@ -891,6 +892,46 @@ finally
 {
     if (File.Exists(presetPath)) File.Delete(presetPath);
 }
+
+// ---- #1615 calibration wizard view-model --------------------------------
+var wizardVm = new EasyControlViewModel("wizard-pipe");
+Check(wizardVm.WizardCurveOptions.Length == 3 &&
+      wizardVm.WizardCurveOptions.All(option => option.Mode == (IrPhaseMode)(int)option.Mode) &&
+      wizardVm.WizardTargetCurve == CalibrationTargetCurveIdV1.Flat &&
+      !wizardVm.WizardHasResult && wizardVm.WizardImportedPointCount == 0,
+    "Wizard must start with three target curves and no compiled result.");
+var wizardPath = Path.Combine(Path.GetTempPath(), $"hibiki-wizard-measure-{Guid.NewGuid():N}.csv");
+File.WriteAllText(wizardPath, string.Create(CultureInfo.InvariantCulture,
+    $"* REW export\n20, -2.5\n1000, 0.25\n8000, -1.75\n"));
+try
+{
+    Check(wizardVm.ImportWizardMeasurement(wizardPath) &&
+          wizardVm.WizardMeasurementPath == Path.GetFullPath(wizardPath) &&
+          wizardVm.WizardImportedPointCount == 3,
+        "Wizard import must parse comment-free frequency/level CSV rows.");
+}
+finally
+{
+    if (File.Exists(wizardPath)) File.Delete(wizardPath);
+}
+Check(wizardVm.CompileWizardCorrection() && wizardVm.WizardHasResult &&
+      wizardVm.WizardStatus.Contains("PEQ", StringComparison.Ordinal),
+    $"Wizard compile must produce bounded PEQ filters from the imported points. Status={wizardVm.WizardStatus}");
+var wizardExportPath = Path.Combine(Path.GetTempPath(), $"hibiki-wizard-export-{Guid.NewGuid():N}.json");
+try
+{
+    Check(wizardVm.ExportWizardProfile(wizardExportPath) &&
+          wizardVm.WizardExportedPath == Path.GetFullPath(wizardExportPath),
+        "Wizard export must save the compiled PEQ preset.");
+}
+finally
+{
+    if (File.Exists(wizardExportPath)) File.Delete(wizardExportPath);
+}
+wizardVm.ResetWizardState();
+Check(!wizardVm.CompileWizardCorrection() && !wizardVm.WizardHasResult &&
+      wizardVm.WizardStatus.Contains("尚未載入量測", StringComparison.Ordinal),
+    "Wizard reset must clear the compiled result and block re-compilation.");
 
 
 // ---- #823 honest custom-scene sync -------------------------------------
