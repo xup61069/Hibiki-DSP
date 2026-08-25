@@ -10,6 +10,7 @@ param(
   [switch]$EnableTabNoiseSuppressor,
   [switch]$EnableDriverLoopback,
   [switch]$EnableWavSource,
+  [switch]$RenderOffline,
   [switch]$StatusOnly,
   [switch]$SelfTest
 )
@@ -34,6 +35,7 @@ function Get-EnginePreviewSmokePlan {
     IrDirectory = $localRoot
     IrPath = Join-Path $localRoot 'engine-preview-smoke-ir.wav'
     WavSourcePath = Join-Path $localRoot 'engine-preview-smoke-source.wav'
+    OfflineRenderPath = Join-Path $localRoot 'engine-preview-smoke-render.wav'
   }
 }
 
@@ -432,6 +434,31 @@ function Write-TestIrWav([string]$Path) {
   }
 }
 
+function Assert-OfflineRenderWavHeader([string]$Path) {
+  $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open,
+                                   [System.IO.FileAccess]::Read,
+                                   [System.IO.FileShare]::Read)
+  try {
+    $reader = [System.IO.BinaryReader]::new($stream)
+    if ([System.Text.Encoding]::ASCII.GetString($reader.ReadBytes(4)) -ne 'RIFF') {
+      throw "Offline render WAV has an invalid RIFF header: $Path."
+    }
+    [void]$reader.ReadUInt32()
+    if ([System.Text.Encoding]::ASCII.GetString($reader.ReadBytes(4)) -ne 'WAVE') {
+      throw "Offline render WAV is not a WAVE file: $Path."
+    }
+    if ([System.Text.Encoding]::ASCII.GetString($reader.ReadBytes(4)) -ne 'fmt ') {
+      throw "Offline render WAV has no fmt chunk: $Path."
+    }
+    [void]$reader.ReadUInt32()
+    if ($reader.ReadUInt16() -ne 3 -or $reader.ReadUInt16() -ne 2 -or
+        $reader.ReadUInt32() -ne 48000) {
+      throw "Offline render WAV is not float32 stereo at 48000 Hz: $Path."
+    }
+  } finally {
+    $reader.Dispose()
+  }
+}
 function Write-WavSourceFixture([string]$Path) {
   $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Create,
                                    [System.IO.FileAccess]::Write,
@@ -503,10 +530,51 @@ if ($EnableWavSource) {
   $engineArguments += '--wav-source-path'
   $engineArguments += $wavSourcePath
 }
-$engineProcess = Start-Process -FilePath $engine -ArgumentList $engineArguments `
-  -WorkingDirectory $smokePlan.EngineWorkingDirectory -WindowStyle Hidden -PassThru
+$engineProcess = $null
+$offlineExitCode = $null
+if ($RenderOffline) {
+  if ($EnableWasapiOutput -or $EnableTestTone -or $EnableSessionRouting -or
+      $EnableProcessDelivery -or $EnableTabBridge -or $EnableDriverLoopback -or
+      $EnableSystemVolume) {
+    throw 'RenderOffline is exclusive with live-delivery switches.'
+  }
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $smokePlan.WavSourcePath) | Out-Null
+  Write-WavSourceFixture $smokePlan.WavSourcePath
+  $engineArguments += '--render-offline'
+  $engineArguments += $smokePlan.OfflineRenderPath
+  $engineArguments += '--enable-wav-source'
+  $engineArguments += '--wav-source-path'
+  $engineArguments += $smokePlan.WavSourcePath
+  Push-Location $smokePlan.EngineWorkingDirectory
+  try {
+    $offlineOutput = & $engine @engineArguments 2>&1
+    $offlineExitCode = $LASTEXITCODE
+  } finally {
+    Pop-Location
+  }
+} else {
+  $engineProcess = Start-Process -FilePath $engine -ArgumentList $engineArguments `
+    -WorkingDirectory $smokePlan.EngineWorkingDirectory -WindowStyle Hidden -PassThru
+}
 $irPath = $smokePlan.IrPath
 $irDirectory = $smokePlan.IrDirectory
+if ($RenderOffline) {
+  if ($offlineExitCode -ne 0) {
+    throw "Engine Preview offline render failed: exit=$offlineExitCode output=$offlineOutput"
+  }
+  if (-not (Test-Path -LiteralPath $smokePlan.OfflineRenderPath)) {
+    throw "Engine Preview offline render did not create a WAV file: $($smokePlan.OfflineRenderPath)."
+  }
+  Assert-OfflineRenderWavHeader $smokePlan.OfflineRenderPath
+  $offlineText = ($offlineOutput | Out-String)
+  if ($offlineText -notmatch 'frames=(\d+)') { throw 'Offline render summary omitted frames.' }
+  if ([int]$Matches[1] -ne 239) { throw "Offline render frame count mismatch: $($Matches[1])." }
+  if ($offlineText -notmatch 'resampled 44100->48000') {
+    throw 'Offline render summary omitted the resample conversion.'
+  }
+  Write-Output ("Engine Preview offline WAV render smoke passed ({0})." -f ($offlineText.Trim() -join '; '))
+  exit 0
+}
 New-Item -ItemType Directory -Force -Path $irDirectory | Out-Null
 Write-TestIrWav $irPath
 $client = $null
@@ -808,9 +876,14 @@ try {
   Write-Output 'Engine Preview bounded IR WAV prepare and phase-policy ACK smoke passed.'
 } finally {
   if ($null -ne $client) { $client.Dispose() }
-  if (-not $engineProcess.HasExited) { Stop-Process -Id $engineProcess.Id; $engineProcess.WaitForExit() }
-    if (Test-Path -LiteralPath $irPath) { Remove-Item -LiteralPath $irPath -Force -ErrorAction SilentlyContinue }
-    if ($EnableWavSource -and (Test-Path -LiteralPath $smokePlan.WavSourcePath)) {
-      Remove-Item -LiteralPath $smokePlan.WavSourcePath -Force -ErrorAction SilentlyContinue
-    }
+  if ($null -ne $engineProcess -and -not $engineProcess.HasExited) {
+    Stop-Process -Id $engineProcess.Id; $engineProcess.WaitForExit()
+  }
+  if (Test-Path -LiteralPath $irPath) { Remove-Item -LiteralPath $irPath -Force -ErrorAction SilentlyContinue }
+  if (($EnableWavSource -or $RenderOffline) -and (Test-Path -LiteralPath $smokePlan.WavSourcePath)) {
+    Remove-Item -LiteralPath $smokePlan.WavSourcePath -Force -ErrorAction SilentlyContinue
+  }
+  if ($RenderOffline -and (Test-Path -LiteralPath $smokePlan.OfflineRenderPath)) {
+    Remove-Item -LiteralPath $smokePlan.OfflineRenderPath -Force -ErrorAction SilentlyContinue
+  }
 }
