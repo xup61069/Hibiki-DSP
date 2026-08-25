@@ -1823,4 +1823,69 @@ static async Task RunSceneCatalogCheckServerAsync(
     }
 }
 
+// Case 7: the live EQ surface only changes after a confirmed visual frame,
+// fails closed on malformed/stale frames, and resets when control disconnects.
+{
+    var points = new EqVisualPointV1[]
+    {
+        new(31.0, 4.0), new(120.0, 3.0), new(1000.0, 0.0), new(8000.0, 2.0),
+    };
+    var confirmed = new EqVisualFrameV1(11UL, EqVisualSourceV1.EqualLoudness, points);
+    Check(confirmed.IsValid, "A bounded increasing-frequency EQ frame must be valid.");
+
+    var eqViewModel = new EasyControlViewModel("HibikiDSP_eq_visual_check");
+    Check(!eqViewModel.EqSurface.HasConfirmedFrame &&
+          eqViewModel.EqSurface.StateText.Contains("離線；等待引擎確認", StringComparison.Ordinal),
+        "The EQ surface must not animate before an engine confirmation.");
+    Check(!await eqViewModel.QueueVolumeAsync(TimeSpan.FromMilliseconds(40)),
+          "Offline volume push must fail without changing the visual frame.");
+    Check(!eqViewModel.EqSurface.HasConfirmedFrame &&
+          eqViewModel.EqSurface.LastAppliedSequence == 0UL,
+        "A queued/local-only volume change must not drive the live EQ animation.");
+
+    Check(eqViewModel.ApplyEqVisualFrame(confirmed, out var appliedError), appliedError);
+    Check(eqViewModel.EqSurface.HasConfirmedFrame &&
+          eqViewModel.EqSurface.LastAppliedSequence == 11UL &&
+          eqViewModel.EqSurface.StateText.Contains("等響度", StringComparison.Ordinal),
+        "A confirmed equal-loudness frame must update the visible surface.");
+
+    Check(!eqViewModel.ApplyEqVisualFrame(new EqVisualFrameV1(
+            12UL, EqVisualSourceV1.EqualLoudness,
+            [new EqVisualPointV1(31.0, 31.0), new EqVisualPointV1(60.0, 0.0),
+             new EqVisualPointV1(1000.0, 0.0), new EqVisualPointV1(8000.0, 0.0)]),
+        out var boundsError) && boundsError.Contains("invalid"),
+        "An out-of-range gain frame must fail closed.");
+    Check(!eqViewModel.ApplyEqVisualFrame(new EqVisualFrameV1(
+            10UL, EqVisualSourceV1.AdaptiveCorrection,
+            [new EqVisualPointV1(31.0, -4.0), new EqVisualPointV1(120.0, -1.0),
+             new EqVisualPointV1(1000.0, 0.0), new EqVisualPointV1(8000.0, 0.0)]),
+        out var staleError) && staleError.Contains("stale"),
+        "An older sequence must fail closed instead of rewinding the curve.");
+    Check(eqViewModel.EqSurface.Source == EqVisualSourceV1.EqualLoudness &&
+          Math.Abs(eqViewModel.EqSurface.TargetPoints[0].GainDb - 4.0) < 1e-12,
+        "Rejected frames must preserve the previous safe surface.");
+
+    await eqViewModel.DisconnectAsync();
+    Check(!eqViewModel.EqSurface.HasConfirmedFrame &&
+          eqViewModel.EqSurface.Source == EqVisualSourceV1.None &&
+          eqViewModel.EqSurface.TargetPoints.All(point => point.GainDb == 0.0),
+        "Disconnect must reset the live EQ surface to its safe baseline.");
+
+    var surface = eqViewModel.EqSurface;
+    DateTimeOffset testNow = EqVisualSurfaceModelV1.EpochUtc;
+    surface.SetTransitionClockForTesting(() => testNow);
+    Check(surface.TransitionProgress == 1.0,
+        "A reset surface must not expose an in-flight transition.");
+    Check(surface.ApplyFrame(confirmed), "A deterministic transition fixture must apply.");
+    Check(surface.Points[0].GainDb == 0.0 &&
+          Math.Abs(surface.TargetPoints[0].GainDb - 4.0) < 1e-12 &&
+          surface.TransitionProgress == 0.0,
+        "An accepted frame must start its bounded transition from the safe baseline.");
+    testNow = testNow.AddMilliseconds(90);
+    Check(Math.Abs(surface.TransitionProgress - 0.5) < 1e-12,
+        "Transition progress must advance deterministically halfway through 180 ms.");
+    testNow = testNow.AddMilliseconds(180);
+    Check(surface.TransitionProgress == 1.0,
+        "Transition progress must clamp at completion and cannot exceed the target curve.");
+}
 Console.WriteLine("Control model checks passed.");

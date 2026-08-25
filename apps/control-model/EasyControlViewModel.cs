@@ -64,6 +64,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public ExpertSurfaceModel Expert { get; } = new();
 
+    public EqVisualSurfaceModelV1 EqSurface { get; } = new();
+
     public Vst3TimelineEditorViewModelV1 Vst3TimelineEditor { get; } = new();
 
     public IReadOnlyList<IrPhaseModeOption> IrPhaseModeOptions { get; } =
@@ -1043,6 +1045,30 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         return true;
     }
 
+    // Applies a confirmed engine visual frame. Invalid or out-of-order frames
+    // fail closed and preserve the previous surface exactly.
+    public bool ApplyEqVisualFrame(EqVisualFrameV1 frame, out string error)
+    {
+        error = string.Empty;
+        if (frame is null || !frame.IsValid)
+        {
+            error = "EQ visual frame invalid";
+            return false;
+        }
+        if (frame.Sequence <= EqSurface.LastAppliedSequence && EqSurface.HasConfirmedFrame)
+        {
+            error = "EQ visual frame stale";
+            return false;
+        }
+        if (!EqSurface.ApplyFrame(frame))
+        {
+            error = "EQ visual transition rejected";
+            return false;
+        }
+        OnPropertyChanged(nameof(EqSurface));
+        return true;
+    }
+
     public bool ApplyRouteHealth(IReadOnlyList<RouteHealthCardV1> cards, out string error)
     {
         if (!Expert.TryApplyRouteHealth(cards, out error)) return false;
@@ -1561,6 +1587,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             _controlClient = null;
         }
         SetConnectionState(ControlConnectionState.Disconnected);
+        _ = EqSurface.Reset();
+        OnPropertyChanged(nameof(EqSurface));
     }
 
     public async Task<bool> OneTapEnhanceAsync(CancellationToken cancellationToken = default)
