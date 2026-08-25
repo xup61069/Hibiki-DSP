@@ -52,9 +52,9 @@ Chrome 單分頁捕捉或 vendor ASIO 攔截。
 `SessionCatalogSnapshot` 並啟用 App 音量／lane-output／route-rule command queue。預設 Engine
 Preview 不枚舉或操作 Windows session；`-EnableSessionRouting` 與系統音量 opt-in 可獨立或同時
 使用。所有命令先檢查 catalog sequence、generation-scoped handle 與 payload，再由 worker 交易套用；
-失敗時保留上一份 catalog／rule graph。這個切片驗證選取、命令與 Windows session volume 控制面，
-不宣稱已完成實體 per-App capture/re-send、process-loopback 或 DSP lane delivery；預覽 UI 必須顯示
-`per-App delivery unverified`。
+失敗時保留上一份 catalog／rule graph。這個切片驗證選取、命令與 Windows session volume 控制面。
+實體 per-App capture/re-send 已由 PR #1542 的 process-loopback Float32 source E2E 驗證覆蓋，
+屬 user-space 控制證據；預覽 UI 應說明此已驗證範圍與邊界，不再宣稱未驗證。
 
 ## 驗收
 

@@ -409,7 +409,7 @@
                             </Border><Border Style="{StaticResource SectionCardStyle}" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
                                 <StackPanel Spacing="10">
                                     <TextBlock Text="App 工作階段（暫時選取清單）" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-                                    <TextBlock Text="只顯示 bounded metadata；套用 App 音量會寫入 Windows session，實體 per-App 擷取／重新送出仍未驗證（即使路由命令回傳 Ack，仍屬使用者空間控制證據）。" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+<TextBlock Text="只顯示 bounded metadata；套用 App 音量會寫入 Windows session。實體 per-App 擷取／重新送出已由 process-loopback Float32 source 的 E2E 驗證覆蓋（PR #1542；user-space 控制證據）。" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                 <Button Content="刷新 App 工作階段清單" Click="OnRefreshSessionCatalogClick" MinHeight="32" HorizontalAlignment="Left" AutomationProperties.Name="刷新 App 工作階段清單" AutomationProperties.HelpText="重新掃描目前執行中的 App" ToolTipService.ToolTip="重新掃描目前執行中的 App" />
                                     <TextBlock Text="{Binding SessionCatalogSequenceDisplayText}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                     <controls:ItemsRepeater ItemsSource="{Binding SessionCatalog}">

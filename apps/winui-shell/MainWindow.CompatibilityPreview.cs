@@ -150,7 +150,7 @@ public sealed partial class MainWindow
         });
         content.Children.Add(new TextBlock
         {
-            Text = "只顯示 bounded metadata；套用 App 音量會寫入 Windows session，實體 per-App 重新送出仍未驗證。",
+            Text = "只顯示 bounded metadata；套用 App 音量會寫入 Windows session。實體 per-App 重新送出已由 process-loopback Float32 source 的 E2E 驗證覆蓋（PR #1542；user-space 控制證據）。",
             TextWrapping = TextWrapping.Wrap,
             Foreground = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush"),
         });
