@@ -141,7 +141,8 @@ public sealed class CustomSceneCatalogV1
                 var scene = new SceneCard(item.Id ?? string.Empty, item.Name ?? string.Empty,
                                           item.Description ?? string.Empty,
                                           item.LatencyLabel ?? string.Empty, item.SafetyEnabled,
-                                          item.IrReference ?? string.Empty);
+                                          item.IrReference ?? string.Empty,
+                                          item.LoudnessLiveUpdate);
                 if (!IsValid(scene) || candidate.Any(existing => existing.Id == scene.Id))
                 {
                     error = "Preset 含有無效或重複場景";
@@ -168,7 +169,8 @@ public sealed class CustomSceneCatalogV1
         Description = scene.Description,
         LatencyLabel = scene.LatencyLabel,
         SafetyEnabled = scene.SafetyEnabled,
-        IrReference = scene.IrReference
+        IrReference = scene.IrReference,
+        LoudnessLiveUpdate = scene.LoudnessLiveUpdate
     };
 
     private static bool IsValid(SceneCard scene)
@@ -226,5 +228,8 @@ public sealed class CustomSceneCatalogV1
 
         [JsonPropertyName("ir_reference")]
         public string? IrReference { get; set; }
+
+        [JsonPropertyName("loudness_live_update")]
+        public bool LoudnessLiveUpdate { get; set; }
     }
 }

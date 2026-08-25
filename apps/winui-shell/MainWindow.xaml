@@ -275,6 +275,7 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <VisualStateManager.VisualStateGroups>
                                 <VisualStateGroup>
@@ -301,6 +302,7 @@
                             <TextBox Header="Scene ID（英文小寫）" Text="{Binding CustomSceneId, Mode=TwoWay}" AutomationProperties.Name="自訂場景 ID" AutomationProperties.HelpText="使用小寫英數、點、底線或連字號，最多 31 字元" />
                             <TextBox x:Name="CustomFormNameBox" Grid.Column="1" Header="名稱" Text="{Binding CustomSceneName, Mode=TwoWay}" AutomationProperties.Name="自訂場景名稱" />
                             <TextBox x:Name="CustomFormDescriptionBox" Grid.Row="2" Header="說明" Text="{Binding CustomSceneDescription, Mode=TwoWay}" AutomationProperties.Name="自訂場景說明" />
+                            <ToggleSwitch Grid.Row="3" Header="音量連動等響度" IsOn="{Binding CustomSceneLoudnessLiveUpdate, Mode=TwoWay}" AutomationProperties.Name="音量連動等響度" AutomationProperties.HelpText="開啟後此場景的等響度補償會隨輸出音量自動重新計算；關閉時維持固定曲線" ToolTipService.ToolTip="隨音量自動更新等響度補償（選用）" />
                         </Grid>
                         <Button Content="加入自訂預設" Click="OnAddCustomSceneClick" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" MinHeight="40" FontWeight="SemiBold" AutomationProperties.Name="加入自訂預設" AutomationProperties.HelpText="加入後會保存到本機 user-space preset 檔案" ToolTipService.ToolTip="保存到本機 user-space preset 檔案" />
                     </StackPanel>

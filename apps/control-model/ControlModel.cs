@@ -226,7 +226,8 @@ public sealed record SceneCard(
     string Description,
     string LatencyLabel,
     bool SafetyEnabled,
-    string IrReference = "");
+    string IrReference = "",
+    bool LoudnessLiveUpdate = false);
 
 public static class ScenePresetCatalog
 {
