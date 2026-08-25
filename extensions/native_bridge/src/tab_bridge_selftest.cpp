@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "hibiki/tab_bridge.hpp"
+#include "hibiki/ws_transport.hpp"
 
 #include <array>
 #include <cmath>
@@ -9,6 +10,7 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <span>
 #include <vector>
 
 namespace {
@@ -250,13 +252,328 @@ bool test_server_config_boundaries() {
     return true;
 }
 
+std::size_t read_cursor_bytes(std::span<const std::uint8_t> source,
+                              std::size_t& offset,
+                              std::span<std::uint8_t> destination) {
+    if (destination.size() > source.size() - offset) return 0U;
+    std::copy_n(source.begin() + static_cast<std::ptrdiff_t>(offset),
+                static_cast<std::ptrdiff_t>(destination.size()), destination.begin());
+    offset += destination.size();
+    return destination.size();
+}
+
+void append_client_frame(std::vector<std::uint8_t>& stream,
+                         const std::uint8_t opcode,
+                         const std::span<const std::uint8_t> payload,
+                         const bool masked = true,
+                         const bool reserved_bits = false,
+                         const bool fin_bit = true,
+                         const bool force_127_length = false) {
+    std::uint8_t first = static_cast<std::uint8_t>((fin_bit ? 0x80U : 0x00U) | opcode);
+    if (reserved_bits) first = static_cast<std::uint8_t>(first | 0x70U);
+    stream.push_back(first);
+    const auto size = payload.size();
+    if (force_127_length) {
+        stream.push_back(static_cast<std::uint8_t>((masked ? 0x80U : 0x00U) | 127U));
+        for (int shift = 7; shift >= 0; --shift) {
+            stream.push_back(static_cast<std::uint8_t>(
+                (static_cast<std::uint64_t>(size) >> (shift * 8U)) & 0xffU));
+        }
+    } else if (size <= 125U) {
+        stream.push_back(static_cast<std::uint8_t>((masked ? 0x80U : 0x00U) | size));
+    } else {
+        stream.push_back(static_cast<std::uint8_t>((masked ? 0x80U : 0x00U) | 126U));
+        stream.push_back(static_cast<std::uint8_t>((size >> 8U) & 0xffU));
+        stream.push_back(static_cast<std::uint8_t>(size & 0xffU));
+    }
+    const std::array<std::uint8_t, 4> mask{0x11U, 0x22U, 0x33U, 0x44U};
+    if (masked) stream.insert(stream.end(), mask.begin(), mask.end());
+    for (std::size_t index = 0U; index < size; ++index) {
+        stream.push_back(masked ? static_cast<std::uint8_t>(payload[index] ^ mask[index % 4U])
+                                : payload[index]);
+    }
+}
+
+bool test_websocket_handshake() {
+    constexpr std::string_view kValidRequest =
+        "GET /v1/tab HTTP/1.1\r\n"
+        "Host: 127.0.0.1:17842\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
+        "\r\n";
+    std::string accept;
+    if (!expect(hibiki::websocket_compute_accept("dGhlIHNhbXBsZSBub25jZQ==", accept),
+                "websocket accept computes") ||
+        !expect(accept == "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=",
+                "websocket accept matches the known vector")) {
+        return false;
+    }
+
+    std::string response;
+    if (!expect(hibiki::parse_websocket_handshake(kValidRequest, response),
+                "valid handshake parses") ||
+        !expect(response.rfind("HTTP/1.1 101 Switching Protocols\r\n", 0U) == 0U,
+                "handshake responds with 101") ||
+        !expect(response.find("Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=") !=
+                    std::string::npos,
+                "handshake carries the computed accept")) {
+        return false;
+    }
+
+    if (!expect(!hibiki::parse_websocket_handshake("GET / HTTP/1.1\r\nHost: x\r\n", response),
+                "truncated handshake is rejected") ||
+        !expect(!hibiki::parse_websocket_handshake(
+                    "GET / HTTP/1.1\r\nUpgrade: websocket\r\n\r\n", response),
+                "missing key header is rejected") ||
+        !expect(!hibiki::parse_websocket_handshake(
+                    "GET / HTTP/1.1\r\nSec-WebSocket-Key:   \t \r\n\r\n", response),
+                "blank key is rejected")) {
+        return false;
+    }
+    return true;
+}
+
+bool expect_frame_failure(const std::vector<std::uint8_t>& stream,
+                          const std::size_t max_payload,
+                          const hibiki::WsFrameError expected_error,
+                          const char* label) {
+    hibiki::WsDecodedFrameV1 frame{};
+    hibiki::WsFrameError error{hibiki::WsFrameError::None};
+    std::size_t offset = 0U;
+    const auto reader = [&](std::span<std::uint8_t> destination) {
+        return read_cursor_bytes(stream, offset, destination) == destination.size();
+    };
+    return expect(!hibiki::read_ws_client_frame(reader, max_payload, frame, error) &&
+                      error == expected_error,
+                  label);
+}
+
+bool expect_frame_success(const std::vector<std::uint8_t>& stream,
+                          const std::uint8_t expected_opcode,
+                          const std::span<const std::uint8_t> expected_payload,
+                          const char* label) {
+    hibiki::WsDecodedFrameV1 frame{};
+    hibiki::WsFrameError error{hibiki::WsFrameError::None};
+    std::size_t offset = 0U;
+    const auto reader = [&](std::span<std::uint8_t> destination) {
+        return read_cursor_bytes(stream, offset, destination) == destination.size();
+    };
+    if (!expect(hibiki::read_ws_client_frame(reader, 1024U * 1024U, frame, error), label)) {
+        return false;
+    }
+    if (!expect(frame.opcode == expected_opcode && frame.payload.size() == expected_payload.size(),
+                "decoded frame metadata matches")) {
+        return false;
+    }
+    for (std::size_t index = 0U; index < expected_payload.size(); ++index) {
+        if (!expect(frame.payload[index] == expected_payload[index], "unmasked payload matches")) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool test_websocket_frames() {
+    const std::array<std::uint8_t, 3> small{0xABU, 0xCDU, 0xEFU};
+    std::vector<std::uint8_t> small_stream;
+    append_client_frame(small_stream, 0x2U, small);
+    if (!expect_frame_success(small_stream, 0x2U, small, "small masked frame decodes")) return false;
+
+    std::vector<std::uint8_t> large_payload(300U);
+    for (std::size_t index = 0U; index < large_payload.size(); ++index) {
+        large_payload[index] = static_cast<std::uint8_t>(index & 0xffU);
+    }
+    std::vector<std::uint8_t> extended_stream;
+    append_client_frame(extended_stream, 0x2U, large_payload);
+    if (!expect_frame_success(extended_stream, 0x2U, large_payload,
+                              "extended 126-bit length decodes")) {
+        return false;
+    }
+
+    std::vector<std::uint8_t> long_form_stream;
+    append_client_frame(long_form_stream, 0x2U, small, true, false, true, true);
+    if (!expect_frame_success(long_form_stream, 0x2U, small,
+                              "127-bit length form decodes")) {
+        return false;
+    }
+
+    if (!expect_frame_failure(small_stream, 2U, hibiki::WsFrameError::PayloadTooLarge,
+                              "oversized payload fails closed")) {
+        return false;
+    }
+
+    std::vector<std::uint8_t> unmasked;
+    append_client_frame(unmasked, 0x2U, small, false);
+    if (!expect_frame_failure(unmasked, 1024U, hibiki::WsFrameError::UnmaskedClientFrame,
+                              "unmasked client frames are rejected")) {
+        return false;
+    }
+
+    std::vector<std::uint8_t> reserved;
+    append_client_frame(reserved, 0x2U, small, true, true);
+    if (!expect_frame_failure(reserved, 1024U, hibiki::WsFrameError::ReservedBitsSet,
+                              "reserved bits are rejected")) {
+        return false;
+    }
+
+    std::vector<std::uint8_t> missing_fin;
+    append_client_frame(missing_fin, 0x2U, small, true, false, false);
+    if (!expect_frame_failure(missing_fin, 1024U, hibiki::WsFrameError::ReservedBitsSet,
+                              "clear FIN bit is rejected")) {
+        return false;
+    }
+
+    std::vector<std::uint8_t> truncated_payload = small_stream;
+    truncated_payload.pop_back();
+    if (!expect_frame_failure(truncated_payload, 1024U, hibiki::WsFrameError::TruncatedPayload,
+                              "truncated payload fails closed")) {
+        return false;
+    }
+
+    std::vector<std::uint8_t> truncated_length;
+    truncated_length.push_back(0x82U);
+    truncated_length.push_back(0xFEU);
+    truncated_length.push_back(0x01U);
+    if (!expect_frame_failure(truncated_length, 1024U, hibiki::WsFrameError::TruncatedPayload,
+                              "truncated extended length fails closed")) {
+        return false;
+    }
+
+    hibiki::WsDecodedFrameV1 frame{};
+    hibiki::WsFrameError error{hibiki::WsFrameError::None};
+    const auto failing_reader = [](std::span<std::uint8_t>) { return false; };
+    if (!expect(!hibiki::read_ws_client_frame(failing_reader, 1024U, frame, error) &&
+                    error == hibiki::WsFrameError::IncompleteFrame,
+                "stream failure before the header fails closed")) {
+        return false;
+    }
+
+    std::vector<std::uint8_t> control_output;
+    const auto collecting_writer = [&control_output](std::span<const std::uint8_t> bytes) {
+        control_output.insert(control_output.end(), bytes.begin(), bytes.end());
+        return true;
+    };
+    const auto rejecting_writer = [](std::span<const std::uint8_t>) { return false; };
+    if (!expect(hibiki::send_ws_control_frame(collecting_writer, 0x9U, small) &&
+                    control_output.size() == 5U && control_output[0] == 0x89U &&
+                    control_output[1] == 0x03U,
+                "ping control frame encodes") ||
+        !expect(!hibiki::send_ws_control_frame(rejecting_writer, 0xAU,
+                                               std::vector<std::uint8_t>(126U, 0U)),
+                "control payloads above 125 bytes are rejected") ||
+        !expect(hibiki::send_ws_control_frame(collecting_writer, 0x8U, {}),
+                "empty close frame encodes")) {
+        return false;
+    }
+    return true;
+}
+
+bool test_serve_loop_semantics() {
+    const auto tab_packet = make_packet();
+    const std::array<std::uint8_t, 2> ping_payload{'h', 'i'};
+
+    std::vector<std::uint8_t> client_stream;
+    append_client_frame(client_stream, 0x9U, ping_payload);
+    append_client_frame(client_stream, 0x2U,
+                        std::span<const std::uint8_t>{tab_packet.data(), tab_packet.size()});
+    append_client_frame(client_stream, 0x8U, {});
+
+    std::size_t offset = 0U;
+    std::vector<std::uint8_t> server_output;
+    std::size_t callback_count = 0U;
+    float first_sample = 0.0F;
+    struct CallbackContext {
+        std::size_t* count;
+        float* sample;
+    } callback_context{&callback_count, &first_sample};
+    const auto lambda_callback = [](const TabCapturePacketViewV1& view, void* raw_context) noexcept {
+        auto* context = static_cast<CallbackContext*>(raw_context);
+        ++(*context->count);
+        *context->sample = view.sample(0U);
+    };
+    const hibiki::TabCapturePacketCallbackV1 typed_callback = lambda_callback;
+    const auto reader = [&](std::span<std::uint8_t> destination) {
+        return read_cursor_bytes(client_stream, offset, destination) == destination.size();
+    };
+    const auto writer = [&](std::span<const std::uint8_t> bytes) {
+        server_output.insert(server_output.end(), bytes.begin(), bytes.end());
+        return true;
+    };
+
+    bool closed = false;
+    while (!closed) {
+        hibiki::WsMessageKind kind{hibiki::WsMessageKind::Close};
+        std::vector<std::uint8_t> payload;
+        if (!expect(hibiki::next_ws_binary_message(reader, writer, 64U * 1024U, kind, payload),
+                    "serve step succeeds inside the loop")) {
+            return false;
+        }
+        if (kind == hibiki::WsMessageKind::Close) {
+            closed = true;
+        } else if (kind == hibiki::WsMessageKind::Ping) {
+            if (!expect(payload.empty(), "ping payload is consumed by the pong reply")) return false;
+            if (!expect(server_output.size() >= 4U && server_output[0] == 0x8AU &&
+                            server_output[1] == 0x02U && server_output[2] == 'h' &&
+                            server_output[3] == 'i',
+                        "pong echoes the ping payload")) {
+                return false;
+            }
+        } else {
+            TabCapturePacketViewV1 view{};
+            TabPacketError error{TabPacketError::None};
+            if (!expect(decode_tab_capture_packet_v1(payload, view, error),
+                        "binary frame reaches callback path")) return false;
+            typed_callback(view, &callback_context);
+        }
+    }
+
+    if (!expect(callback_count == 1U && std::abs(first_sample - 0.25F) < 1e-6F,
+                "exactly one valid packet reached the callback with its sample") ||
+        !expect(offset == client_stream.size(), "close frame terminates the loop at the end") ||
+        !expect(server_output.size() >= 6U && server_output[0] == 0x8AU &&
+                    server_output[1] == 0x02U && server_output[2] == 'h' &&
+                    server_output[server_output.size() - 2U] == 0x88U &&
+                    server_output[server_output.size() - 1U] == 0x00U,
+                "pong then close are written back")) {
+        return false;
+    }
+
+    std::vector<std::uint8_t> text_stream;
+    const std::array<std::uint8_t, 1> text{'x'};
+    append_client_frame(text_stream, 0x1U, text);
+    client_stream.swap(text_stream);
+    offset = 0U;
+    hibiki::WsMessageKind kind{hibiki::WsMessageKind::Close};
+    std::vector<std::uint8_t> payload;
+    if (!expect(!hibiki::next_ws_binary_message(reader, writer, 64U * 1024U, kind, payload),
+                "non-binary non-control opcode fails closed")) {
+        return false;
+    }
+
+    std::vector<std::uint8_t> empty_binary_stream;
+    append_client_frame(empty_binary_stream, 0x2U, {});
+    client_stream.swap(empty_binary_stream);
+    offset = 0U;
+    server_output.clear();
+    if (!expect(hibiki::next_ws_binary_message(reader, writer, 64U * 1024U, kind, payload) &&
+                    kind == hibiki::WsMessageKind::Binary && payload.empty(),
+                "empty binary frame stays distinct from close")) {
+        return false;
+    }
+    return true;
+}
+
 }  // namespace
 
 int main() {
     if (!test_packet_boundaries() || !test_queue_boundaries() ||
-        !test_queue_input_output_guards() || !test_server_config_boundaries()) {
+        !test_queue_input_output_guards() || !test_server_config_boundaries() ||
+        !test_websocket_handshake() || !test_websocket_frames() ||
+        !test_serve_loop_semantics()) {
         return 1;
     }
-    std::cout << "hibiki_tab_bridge_selftest passed (packet boundaries, FIFO queue, input/output guards, drops and server guards).\n";
+    std::cout << "hibiki_tab_bridge_selftest passed (packet boundaries, FIFO queue, guards, server config, websocket handshake, framing and serve-loop semantics).\n";
     return 0;
 }
