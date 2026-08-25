@@ -28,6 +28,7 @@ internal sealed class PreviewForm : Form
     private readonly Label _routes = new() { AutoSize = false, Width = 550, Height = 58 };
     private readonly Label _sessions = new() { AutoSize = false, Width = 550, Height = 72 };
     private readonly ComboBox _sessionSelector = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取 Expert App" };
+    private readonly TextBox _sessionFilter = new() { Width = 460, PlaceholderText = "篩選 App 名稱或 App ID", AccessibleName = "Expert App 清單篩選" };
     private readonly ComboBox _physicalDeviceSelector = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取實體輸出裝置" };
     private readonly Button _switchDevice = new() { Text = "切換實體裝置", AutoSize = true, AccessibleName = "切換實體輸出裝置" };
     private readonly Button _refreshDevices = new() { Text = "重新掃描裝置", AutoSize = true, AccessibleName = "重新掃描實體輸出裝置清單" };
@@ -250,6 +251,8 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(_routes);
         panel.Controls.Add(new Label { Text = "Expert App／工作階段（需以 -EnableSessionRouting 啟動）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
         panel.Controls.Add(_sessions);
+        _sessionFilter.TextChanged += (_, _) => SyncSessionList();
+        panel.Controls.Add(_sessionFilter);
         _sessionSelector.SelectedIndexChanged += (_, _) =>
         {
             if (_updatingSession || _sessionSelector.SelectedItem is not SessionCatalogEntryV1 entry) return;
@@ -475,32 +478,14 @@ internal sealed class PreviewForm : Form
         _connect.Enabled = !_viewModel.IsBusy;
         _scenes.Enabled = _viewModel.IsConnected;
         _volume.Enabled = _viewModel.IsConnected;
-        var sessions = _viewModel.SessionCatalog.ToArray();
-        _sessions.Text = sessions.Length == 0
+        var sessionCount = _viewModel.SessionCatalog.Count;
+        _sessions.Text = sessionCount == 0
             ? "App catalog：尚未同步；請以 -EnableSessionRouting 啟動引擎，或目前沒有可控制的工作階段。"
-            : $"App catalog：{sessions.Length} 筆；只顯示 bounded metadata。套用 App 音量會寫入 Windows session，" +
+            : $"App catalog：{sessionCount} 筆；只顯示 bounded metadata。套用 App 音量會寫入 Windows session，" +
               "實體 per-App 送出已由 process-loopback E2E 覆蓋；仍屬使用者空間控制證據。";
-        _updatingSession = true;
-        try
-        {
-            var selectedHandle = _viewModel.SelectedSessionHandle;
-            _sessionSelector.DataSource = null;
-            _sessionSelector.DisplayMember = nameof(SessionCatalogEntryV1.DisplayName);
-            _sessionSelector.ValueMember = nameof(SessionCatalogEntryV1.Handle);
-            _sessionSelector.DataSource = sessions;
-            if (selectedHandle != 0UL)
-            {
-                var selectedIndex = Array.FindIndex(sessions, entry => entry.Handle == selectedHandle);
-                if (selectedIndex >= 0) _sessionSelector.SelectedIndex = selectedIndex;
-            }
-            SyncSessionControls();
-        }
-        finally
-        {
-            _updatingSession = false;
-        }
+        SyncSessionList();
         var hasSession = _viewModel.HasSelectedSession;
-        _sessionSelector.Enabled = _viewModel.IsConnected && sessions.Length > 0;
+        _sessionSelector.Enabled = _viewModel.IsConnected && _sessionSelector.Items.Count > 0;
         _sessionVolume.Enabled = _viewModel.IsConnected && hasSession && _viewModel.SelectedSession?.VolumeAvailable == true;
         _applySessionVolume.Enabled = _sessionVolume.Enabled;
         _sessionLane.Enabled = _viewModel.IsConnected && hasSession;
@@ -550,6 +535,37 @@ internal sealed class PreviewForm : Form
             _updatingScene = true;
             _scenes.SelectedValue = selectedScene;
             _updatingScene = false;
+        }
+    }
+
+    private void SyncSessionList()
+    {
+        var selectedHandle = _viewModel.SelectedSessionHandle;
+        var allSessions = _viewModel.SessionCatalog.ToArray();
+        var filter = _sessionFilter.Text.Trim();
+        var sessions = filter.Length == 0
+            ? allSessions
+            : Array.FindAll(
+                allSessions,
+                entry => entry.DisplayName.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+                         entry.AppId.Contains(filter, StringComparison.OrdinalIgnoreCase));
+        _updatingSession = true;
+        try
+        {
+            _sessionSelector.DataSource = null;
+            _sessionSelector.DisplayMember = nameof(SessionCatalogEntryV1.DisplayName);
+            _sessionSelector.ValueMember = nameof(SessionCatalogEntryV1.Handle);
+            _sessionSelector.DataSource = sessions;
+            if (selectedHandle != 0UL)
+            {
+                var selectedIndex = Array.FindIndex(sessions, entry => entry.Handle == selectedHandle);
+                if (selectedIndex >= 0) _sessionSelector.SelectedIndex = selectedIndex;
+            }
+            SyncSessionControls();
+        }
+        finally
+        {
+            _updatingSession = false;
         }
     }
 
