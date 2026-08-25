@@ -6495,8 +6495,6 @@ int main() {
     // RT no-allocation contract (Issue #1553): the exercised audio entry
     // points must complete without any global allocation while processing.
     {
-        using rt_noalloc_probe::allocations_during;
-
         // Detector: several blocks through the configured detector.
         BassExcessDetectorV1 no_alloc_detector;
         CHECK(no_alloc_detector.configure(48000U));
@@ -6507,7 +6505,7 @@ int main() {
                                 static_cast<double>(frame) / 48000.0));
         }
         bool detector_ok = true;
-        const auto detector_allocations = allocations_during([&] {
+        const auto detector_allocations = rt_noalloc_probe::allocations_during([&] {
             for (unsigned repeat = 0U; repeat < 8U; ++repeat) {
                 if (!no_alloc_detector.process(detector_block.data(),
                                                 detector_block.size(), 1U)) {
@@ -6528,7 +6526,7 @@ int main() {
                                       -1, true, 6.0},
             48000U));
         bool controller_ok = true;
-        const auto controller_allocations = allocations_during([&] {
+        const auto controller_allocations = rt_noalloc_probe::allocations_during([&] {
             for (unsigned repeat = 0U; repeat < 4U; ++repeat) {
                 if (!no_alloc_controller.process_interleaved(
                         detector_block.data(), detector_block.size(), 1U)) {
@@ -6561,7 +6559,7 @@ int main() {
             "main", std::span<const RtLaneInputV1>(&probe_lane, 1U),
             rendered_block.data(), 256U));
         bool graph_ok = true;
-        const auto graph_allocations = allocations_during([&] {
+        const auto graph_allocations = rt_noalloc_probe::allocations_during([&] {
             for (unsigned repeat = 0U; repeat < 8U; ++repeat) {
                 if (!no_alloc_engine.process_output_group(
                         "main", std::span<const RtLaneInputV1>(&probe_lane, 1U),
