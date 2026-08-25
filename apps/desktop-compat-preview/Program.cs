@@ -81,6 +81,7 @@ internal sealed class PreviewForm : Form
     private bool _updatingSession;
     private bool _updatingRouteRules;
     private bool _statusRefreshActive;
+    private bool _restoredPersistedState;
     internal PreviewForm(EasyControlViewModel viewModel)
     {
         _viewModel = viewModel;
@@ -102,6 +103,7 @@ internal sealed class PreviewForm : Form
         {
             if (_updatingPhysicalDevices || _physicalDeviceSelector.SelectedValue is not string endpointId) return;
             _viewModel.SelectedPhysicalDeviceId = endpointId;
+            PersistUiState();
         };
         _switchDevice.Click += async (_, _) =>
         {
@@ -156,6 +158,7 @@ internal sealed class PreviewForm : Form
             if (_updatingScene || _scenes.SelectedValue is not string id || !_viewModel.IsConnected)
                 return;
             await _viewModel.SelectSceneAsync(id);
+            PersistUiState();
             RefreshView();
         };
         panel.Controls.Add(_scenes);
@@ -442,6 +445,7 @@ internal sealed class PreviewForm : Form
             // double-click experience when the local Engine Preview is already
             // running, while still remaining safe when no engine is present.
             await _viewModel.ConnectAsync(TimeSpan.FromSeconds(1));
+            RestorePersistedSelections();
             RefreshView();
         };
         RefreshView();
@@ -457,6 +461,43 @@ internal sealed class PreviewForm : Form
         }
         BeginInvoke(RefreshView);
     }
+
+    private void RestorePersistedSelections()
+    {
+        if (_restoredPersistedState || IsDisposed) return;
+        _restoredPersistedState = true;
+        var state = PreviewUiState.Load();
+        if (state.SelectedPhysicalDeviceEndpointId is string endpointId)
+        {
+            var devices = _viewModel.PhysicalDevices
+                .Where(device => device.Flow == PhysicalDeviceFlowV1.Render && device.IsSelectable)
+                .ToArray();
+            if (Array.Exists(devices, device => device.EndpointId == endpointId))
+                _viewModel.SelectedPhysicalDeviceId = endpointId;
+        }
+        if (_viewModel.IsConnected && state.SelectedSceneId is string sceneId &&
+            _viewModel.Scenes.Any(scene => scene.Id == sceneId))
+        {
+            _ = ApplyRestoredSceneAsync(sceneId);
+        }
+    }
+
+    private async Task ApplyRestoredSceneAsync(string sceneId)
+    {
+        try
+        {
+            await _viewModel.SelectSceneAsync(sceneId);
+            RefreshView();
+        }
+        catch (Exception)
+        {
+            // Restoring a persisted scene is best-effort and never blocks use.
+        }
+    }
+
+    private void PersistUiState() =>
+        PreviewUiState.Save(_viewModel.SelectedPhysicalDeviceId,
+            _scenes.SelectedValue as string ?? _viewModel.SelectedScene?.Id);
 
     private void RefreshView()
     {
