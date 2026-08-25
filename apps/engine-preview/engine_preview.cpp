@@ -87,6 +87,7 @@ struct TabBridgeState final {
     std::vector<hibiki::RtLaneInputV1> lane_inputs{};
     bool requested{false};
     bool listening{false};
+    std::uint64_t received_blocks{0U};
 };
 
 constexpr std::uint32_t kTestToneInputChannels = 2U;
@@ -801,6 +802,18 @@ int wmain(const int argc, wchar_t* const* argv) {
         (void)SetConsoleCtrlHandler(on_console_control, FALSE);
         return 2;
     }
+    if (tab_bridge_requested && test_tone_requested) {
+        // Fail-closed: one explicit audio source per preview run. A test tone
+        // would fight the tab lane for the same output-group graph.
+        (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+        return 2;
+    }
+    if (tab_bridge_requested && session_routing_requested) {
+        // Fail-closed: process-loopback delivery owns its own lane set and
+        // graph rebuilds; this slice does not mix browser capture into it.
+        (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+        return 2;
+    }
 
     hibiki::AudioEngineModel engine;
     hibiki::EngineControlWorkerV1 control_worker{engine};
@@ -858,6 +871,29 @@ int wmain(const int argc, wchar_t* const* argv) {
     std::string tab_bridge_detail = tab_bridge_requested
         ? "tab bridge requested; binding loopback listener..."
         : "tab bridge disabled; Preview will not accept browser packets.";
+    if (wasapi_started && tab_bridge_requested) {
+        // Dedicated tab-capture lane routed to the main output group. This is
+        // the graph the merged host was missing: without it the adapter
+        // rejects every block and no tab audio can ever reach the sink.
+        //
+        // The graph transaction is the only mutable engine state this mode
+        // owns; prepare/commit is atomic, so a failed rebuild leaves the
+        // previously committed graph untouched and the host exits fail-closed.
+        hibiki::GraphConfigV1 tab_graph{};
+        hibiki::LaneConfigV1 tab_lane{};
+        tab_lane.id = "tab-capture";
+        tab_lane.output_group = "main";
+        tab_lane.channel_count = 2U;
+        tab_graph.lanes.push_back(tab_lane);
+        tab_graph.output_channels = wasapi_output.config.channels;
+        engine.set_sample_rate(wasapi_output.config.sample_rate);
+        const bool graph_ready = engine.prepare_graph(tab_graph, 3U) && engine.commit_graph();
+        if (!graph_ready) {
+            engine.rollback_graph();
+            (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+            return 2;
+        }
+    }
     const bool tab_bridge_started = wasapi_started && tab_bridge.requested;
     if (tab_bridge_started) {
         hibiki::TabBridgeServerConfigV1 tab_config{};
@@ -1082,12 +1118,15 @@ int wmain(const int argc, wchar_t* const* argv) {
         }
         if (tab_bridge.listening) {
             hibiki::TabCaptureBlockV1 block{};
-            (void)hibiki::process_tab_capture_lane_to_wasapi_v1(
+            const bool delivered = hibiki::process_tab_capture_lane_to_wasapi_v1(
                 engine, 0U, tab_bridge.queue,
                 tab_bridge.input_buffer.data(), kTabBridgeMaxFrames,
                 std::span<hibiki::RtLaneInputV1>(tab_bridge.lane_inputs),
                 tab_bridge.output_buffer.data(), kTabBridgeMaxOutputChannels,
                 block);
+            if (delivered) {
+                ++tab_bridge.received_blocks;
+            }
         }
         const auto wasapi_snapshot = engine.wasapi_output_snapshot();
         const auto volume = engine.volume();
@@ -1164,11 +1203,19 @@ int wmain(const int argc, wchar_t* const* argv) {
             status_changed = true;
         }
         const auto previous_tab_route = status.routes[6U];
-        const bool tab_active = tab_bridge.listening;
-        set_route(status.routes[6U], "browser-tab", "瀏覽器分頁", tab_bridge_detail,
-                  tab_active ? hibiki::ControlRouteHealthStateV1::Pending
-                              : hibiki::ControlRouteHealthStateV1::Unavailable,
-                  tab_active ? 0U : 1U);
+        const auto wasapi_snapshot_now = engine.wasapi_output_snapshot();
+        if (!tab_bridge.listening) {
+            set_route(status.routes[6U], "browser-tab", "瀏覽器分頁", tab_bridge_detail,
+                      hibiki::ControlRouteHealthStateV1::Unavailable, 1U);
+        } else if (tab_bridge.received_blocks > 0U &&
+                   has_rendered_blocks(wasapi_snapshot_now)) {
+            set_route(status.routes[6U], "browser-tab", "瀏覽器分頁",
+                      "receiving user-gesture tab capture; rendered through WASAPI sink.",
+                      hibiki::ControlRouteHealthStateV1::Ready, 0U);
+        } else {
+            set_route(status.routes[6U], "browser-tab", "瀏覽器分頁", tab_bridge_detail,
+                      hibiki::ControlRouteHealthStateV1::Pending, 0U);
+        }
         if (!same_route(previous_tab_route, status.routes[6U])) status_changed = true;
         if (status_changed) {
             ++status.sequence;
