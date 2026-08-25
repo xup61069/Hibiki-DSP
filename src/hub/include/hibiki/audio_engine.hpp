@@ -150,10 +150,11 @@ public:
                                              float* output_interleaved,
                                              std::size_t frames) noexcept;
     // Bounded double-precision model entry points. These use the same
-    // committed immutable graph and Group Master boundary as the float32
-    // path, but intentionally exclude the plugin-latency bank and all
-    // float-only attachments. Callers owning double samples must resolve
-    // plugin latency upstream before entering this v1 boundary.
+    // committed immutable graph as the float32 path and apply Group Master,
+    // but intentionally exclude the final TruePeakLimiter, the plugin-latency
+    // bank, and all float-only attachments in this v1 boundary. Callers
+    // owning double samples must ensure peak safety and resolve plugin
+    // latency upstream before entering this entry point.
     [[nodiscard]] bool process_f64(std::span<const RtLaneInputF64V1> inputs,
                                    double* output_interleaved,
                                    std::size_t frames) noexcept;
