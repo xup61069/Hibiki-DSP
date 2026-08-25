@@ -6,6 +6,7 @@
 #include "hibiki/driver_stream_ring_v1.h"
 #include "hibiki/engine_control.hpp"
 #include "hibiki/noise_suppressor.hpp"
+#include "hibiki/output_sink.hpp"
 #include "hibiki/scene_presets.hpp"
 #include "hibiki/session_catalog.hpp"
 #include "hibiki/session_command_queue.hpp"
@@ -137,6 +138,7 @@ struct DriverLoopbackState final {
 
 constexpr std::uint32_t kWavSourceMaxFrames = 4096U;
 constexpr std::uint32_t kWavSourceMaxOutputChannels = kTestToneMaxOutputChannels;
+constexpr std::size_t kWavSourceResampleFlushInputFramesV1 = 64U;
 
 // Bounded WAV file playback source. The file is decoded once on the control
 // plane before streaming starts; the render loop only copies already decoded
@@ -148,6 +150,7 @@ struct WavFileSourceState final {
     std::array<hibiki::RtLaneInputV1, 1U> lanes{};
     std::size_t next_frame{0U};
     std::uint32_t sample_rate{0U};
+    std::uint32_t file_sample_rate{0U};
     std::uint32_t block_frames{0U};
     std::uint64_t rendered_blocks{0U};
     std::uint64_t frames_rendered{0U};
@@ -410,10 +413,8 @@ bool prepare_wav_file_source(WavFileSourceState& source,
             return false;
         }
 
-        // Reuse the bounded IR WAV decoder; resampling is explicitly out of
-        // scope, so the file rate must already match the prepared sink.
         const auto decoded = hibiki::decode_ir_wav_v1(bytes);
-        if (!decoded.valid || decoded.data.sample_rate != output.config.sample_rate) {
+        if (!decoded.valid) {
             return false;
         }
         if (decoded.data.channels == 0U || decoded.data.frames() == 0U) return false;
@@ -435,7 +436,87 @@ bool prepare_wav_file_source(WavFileSourceState& source,
             return false;
         }
 
-        source.data = decoded.data;
+        source.file_sample_rate = decoded.data.sample_rate;
+        if (decoded.data.sample_rate == output.config.sample_rate) {
+            source.data = decoded.data;
+        } else {
+            std::size_t produced = 0U;
+            // Offline control-plane conversion: the whole file is already in
+            // memory, so the RT path stays a plain copy. The resampler is the
+            // same bounded polyphase bank used by the output sink.
+            const double step = static_cast<double>(decoded.data.sample_rate) /
+                                static_cast<double>(output.config.sample_rate);
+            const auto nominal = static_cast<std::size_t>(std::llround(
+                static_cast<double>(decoded.data.frames()) *
+                static_cast<double>(output.config.sample_rate) /
+                static_cast<double>(decoded.data.sample_rate)));
+            if (nominal == 0U) return false;
+
+            hibiki::PersistentPolyphaseResampler resampler;
+            if (!resampler.prepare(decoded.data.channels, step)) return false;
+            const auto channel_count =
+                static_cast<std::size_t>(decoded.data.channels);
+            // process() only emits centers fully covered by real input, so
+            // reserve bounded tail room and drive the FIR history out with
+            // silence instead of assuming one flush reaches nominal length.
+            // One flush chunk emits floor((input + history - 2)/step) + 1
+            // frames (see required_output_frames); reserve exactly that so
+            // every flush call has enough bounded output room.
+            const auto flush_output_frames = static_cast<std::size_t>(
+                (static_cast<double>(kWavSourceResampleFlushInputFramesV1 + 13U) /
+                 step)) + 1U;
+            std::vector<float> converted(
+                (nominal + flush_output_frames) * channel_count, 0.0F);
+            constexpr std::size_t kChunkFrames = 4096U;
+            const auto total_input = decoded.data.frames();
+            for (std::size_t offset = 0U; offset < total_input; offset += kChunkFrames) {
+                const auto chunk = (std::min)(kChunkFrames, total_input - offset);
+                float* out_base =
+                    converted.data() + produced * static_cast<std::size_t>(decoded.data.channels);
+                const auto capacity = converted.size() /
+                                          static_cast<std::size_t>(decoded.data.channels) -
+                                      produced;
+                std::size_t got = 0U;
+                if (!resampler.process(
+                    decoded.data.interleaved_samples.data() +
+                        offset * static_cast<std::size_t>(decoded.data.channels),
+                    chunk, out_base, capacity, got)) {
+                    engine.rollback_graph();
+                    return false;
+                }
+                produced += got;
+            }
+            {
+                const std::vector<float> zeros(
+                    kWavSourceResampleFlushInputFramesV1 * channel_count, 0.0F);
+                while (produced < nominal) {
+                    float* out_base = converted.data() + produced * channel_count;
+                    const auto capacity =
+                        converted.size() / channel_count - produced;
+                    std::size_t got = 0U;
+                    if (!resampler.process(zeros.data(),
+                                           kWavSourceResampleFlushInputFramesV1,
+                                           out_base, capacity, got)) {
+                        engine.rollback_graph();
+                        return false;
+                    }
+                    if (got == 0U) break;
+                    produced += got;
+                }
+            }
+            if (produced < nominal) {
+                engine.rollback_graph();
+                return false;
+            }
+            produced = nominal;
+            source.data.sample_rate = output.config.sample_rate;
+            source.data.channels = decoded.data.channels;
+            source.data.interleaved_samples.resize(
+                nominal * static_cast<std::size_t>(decoded.data.channels));
+            std::copy_n(converted.begin(),
+                        produced * static_cast<std::size_t>(decoded.data.channels),
+                        source.data.interleaved_samples.begin());
+        }
         source.input_block.resize(
             static_cast<std::size_t>(kWavSourceMaxFrames) *
             static_cast<std::size_t>(
@@ -1755,6 +1836,11 @@ int wmain(const int argc, wchar_t* const* argv) {
                           "/" + std::to_string(wav_source.data.frames());
                 if (wav_source.loop) {
                     detail += "; loop=on";
+                }
+                if (wav_source.file_sample_rate != 0U &&
+                    wav_source.file_sample_rate != wasapi_output.config.sample_rate) {
+                    detail += "; resampled " + std::to_string(wav_source.file_sample_rate) +
+                              "->" + std::to_string(wasapi_output.config.sample_rate);
                 }
                 if (wav_source.failed_blocks != 0U) {
                     detail += "; failed=" +
