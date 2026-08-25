@@ -46,7 +46,7 @@
             </Grid.ColumnDefinitions>
             <StackPanel x:Name="TitleBarDragRegion" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                 <Border Width="18" Height="18" CornerRadius="5" Background="{ThemeResource AccentFillColorDefaultBrush}">
-                    <FontIcon Glyph="" FontSize="11" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+                    <FontIcon FontSize="10" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" Glyph="&#xE767;" />
                 </Border>
                 <TextBlock Text="Hibiki DSP" VerticalAlignment="Center" Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" />
             </StackPanel>
@@ -205,7 +205,7 @@
                             <FontIcon Glyph="" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
                             <TextBlock Text="場景" Style="{ThemeResource SubtitleTextBlockStyle}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                         </StackPanel>
-                        <controls:ItemsRepeater ItemsSource="{Binding Scenes}">
+                        <controls:ItemsRepeater x:Name="SceneCardRepeater" ItemsSource="{Binding Scenes}" ElementPrepared="OnSceneCardPrepared">
                             <controls:ItemsRepeater.Layout>
                                 <controls:UniformGridLayout MaximumRowsOrColumns="2" MinItemWidth="260" MinItemHeight="84" />
                             </controls:ItemsRepeater.Layout>
@@ -369,17 +369,17 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <ComboBox x:Name="Vst3TimelineSelector" MinWidth="200" Header="時間軸" ItemsSource="{Binding Vst3TimelineEditor.TimelineIds}" SelectedItem="{Binding Vst3TimelineEditor.SelectedTimelineId, Mode=TwoWay}" SelectionChanged="OnVst3TimelineSelect" AutomationProperties.Name="選取 VST3 時間軸" />
-                                        <Button Grid.Column="2" Content="開始草稿" Click="OnVst3BeginEditClick" AutomationProperties.Name="開始時間軸草稿" />
-                                        <Button Grid.Column="3" Content="刪除時間軸" Click="OnVst3RemoveTimelineClick" AutomationProperties.Name="刪除目前時間軸" />
+                                        <Button Grid.Column="2" Content="開始草稿" Click="OnVst3BeginEditClick" MinHeight="32" AutomationProperties.Name="開始時間軸草稿" />
+                                        <Button Grid.Column="3" Content="刪除時間軸" Click="OnVst3RemoveTimelineClick" MinHeight="32" AutomationProperties.Name="刪除目前時間軸" />
                                     </Grid>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Button Content="提交草稿" Click="OnVst3CommitClick" Style="{StaticResource AccentButtonStyle}" AutomationProperties.Name="提交時間軸草稿" />
-                                        <Button Content="捨棄草稿" Click="OnVst3DiscardClick" AutomationProperties.Name="捨棄時間軸草稿" />
+                                        <Button Content="提交草稿" Click="OnVst3CommitClick" Style="{StaticResource AccentButtonStyle}" MinHeight="32" AutomationProperties.Name="提交時間軸草稿" />
+                                        <Button Content="捨棄草稿" Click="OnVst3DiscardClick" MinHeight="32" AutomationProperties.Name="捨棄時間軸草稿" />
                                         <Border Width="1" Margin="4,0" Background="{ThemeResource CardStrokeColorDefaultBrush}" />
-                                        <Button Content="復原" Click="OnVst3UndoClick" AutomationProperties.Name="復原時間軸操作" />
-                                        <Button Content="重做" Click="OnVst3RedoClick" AutomationProperties.Name="重做時間軸操作" />
-                                        <Button Content="清除歷史" Click="OnVst3ClearHistoryClick" AutomationProperties.Name="清除時間軸編輯歷史" AutomationProperties.HelpText="只清除復原與重做紀錄；保留目前內容、修改狀態與開啟中的草稿" />
-                                        <Button Content="保存基準" Click="OnVst3SaveBaselineClick" AutomationProperties.Name="保存時間軸基準" AutomationProperties.HelpText="將目前內容存為新的未修改基準；需要先選取時間軸且沒有開啟中的草稿" />
+                                        <Button Content="復原" Click="OnVst3UndoClick" MinHeight="32" AutomationProperties.Name="復原時間軸操作" />
+                                        <Button Content="重做" Click="OnVst3RedoClick" MinHeight="32" AutomationProperties.Name="重做時間軸操作" />
+                                        <Button Content="清除歷史" Click="OnVst3ClearHistoryClick" MinHeight="32" AutomationProperties.Name="清除時間軸編輯歷史" AutomationProperties.HelpText="只清除復原與重做紀錄；保留目前內容、修改狀態與開啟中的草稿" />
+                                        <Button Content="保存基準" Click="OnVst3SaveBaselineClick" MinHeight="32" AutomationProperties.Name="保存時間軸基準" AutomationProperties.HelpText="將目前內容存為新的未修改基準；需要先選取時間軸且沒有開啟中的草稿" />
                                     </StackPanel>
                                     <controls:ItemsRepeater ItemsSource="{Binding Vst3TimelineEditor.Rows}">
                                         <controls:ItemsRepeater.Layout>
@@ -415,11 +415,11 @@
                                         <TextBox Grid.Column="2" Header="正規化值 0–1" PlaceholderText="0.0" Text="{Binding Vst3TimelineEditor.NewValueText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="新事件正規化值" />
                                     </Grid>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Button Content="加入事件" Click="OnVst3UpsertClick" Style="{StaticResource AccentButtonStyle}" AutomationProperties.Name="加入時間軸事件" />
+                                        <Button Content="加入事件" Click="OnVst3UpsertClick" Style="{StaticResource AccentButtonStyle}" MinHeight="32" AutomationProperties.Name="加入時間軸事件" />
                                         <TextBox Header="更新值" Width="120" Text="{Binding Vst3TimelineEditor.SelectedRowValueText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="修改選取列的值" />
-                                        <Button Content="更新選取列" Click="OnVst3SetRowValueClick" AutomationProperties.Name="更新選取列數值" />
-                                        <Button Content="刪除選取列" Click="OnVst3RemoveRowClick" AutomationProperties.Name="刪除選取列" />
-                                        <Button Content="註冊新時間軸" Click="OnVst3RegisterClick" AutomationProperties.Name="註冊新時間軸" />
+                                        <Button Content="更新選取列" Click="OnVst3SetRowValueClick" MinHeight="32" AutomationProperties.Name="更新選取列數值" />
+                                        <Button Content="刪除選取列" Click="OnVst3RemoveRowClick" MinHeight="32" AutomationProperties.Name="刪除選取列" />
+                                        <Button Content="註冊新時間軸" Click="OnVst3RegisterClick" MinHeight="32" AutomationProperties.Name="註冊新時間軸" />
                                     </StackPanel>
                                     <TextBox Header="新時間軸 ID" PlaceholderText="例如 game-bgm" Text="{Binding Vst3TimelineEditor.NewTimelineIdText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="新時間軸 ID" />
                                     <Border CornerRadius="999" Padding="12,5" HorizontalAlignment="Left" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
