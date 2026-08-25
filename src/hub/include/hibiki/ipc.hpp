@@ -35,6 +35,8 @@ enum class IpcMessageType : std::uint16_t {
     SessionRouteRuleCommand = 18,
     IrPrepareCommand = 19,
     SceneCatalogCommand = 20,
+    EqVisualSnapshotRequest = 21,
+    EqVisualSnapshot = 22,
 };
 
 struct IpcHeaderV1 {

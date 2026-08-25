@@ -427,6 +427,66 @@ void AudioEngineModel::set_loudness_live_update(
         active_loudness_peq_.current_phon;
 }
 
+AudioEngineModel::LoudnessCurveSnapshotV1 AudioEngineModel::loudness_curve_snapshot()
+    const noexcept {
+    LoudnessCurveSnapshotV1 snapshot;
+    if (!has_active_loudness_peq_ || !active_loudness_peq_.attached) return snapshot;
+    snapshot.attached = true;
+    snapshot.output_group = active_loudness_peq_.output_group;
+    snapshot.output_group_bytes = active_loudness_peq_.output_group_bytes;
+    snapshot.current_phon = active_loudness_peq_.current_phon;
+
+    const auto compensation = build_formula_compensation(
+        std::span<const Iso226FormulaPointV1>(
+            active_loudness_peq_.formula_points.data(),
+            active_loudness_peq_.formula_point_count),
+        active_loudness_peq_.current_phon,
+        active_loudness_peq_.policy);
+
+    // Keep every finite compensation anchor. Zero-gain anchors are legal:
+    // they describe a flat segment of the applied control curve.
+    std::size_t point_count = 0U;
+    for (const auto& point : compensation.points) {
+        if (point_count >= snapshot.points.size()) break;
+        if (!std::isfinite(point.frequency_hz) || !std::isfinite(point.gain_db)) continue;
+        snapshot.points[point_count++] =
+            EqVisualSnapshotPointV1{point.frequency_hz, point.gain_db};
+    }
+
+    // The bounded visual frame requires at least four samples. Densify the
+    // SAME piecewise-linear control curve by repeatedly splitting its widest
+    // log-frequency gap; this changes drawing resolution, never the applied
+    // EQ response. Fewer than two anchors stays fail-closed.
+    while (point_count < 4U && point_count < snapshot.points.size()) {
+        std::size_t gap_index = point_count;
+        double best_ratio = 1.0;
+        for (std::size_t index = 0U; index + 1U < point_count; ++index) {
+            const auto low = snapshot.points[index].frequency_hz;
+            const auto high = snapshot.points[index + 1U].frequency_hz;
+            if (!(low > 0.0) || !(high > low)) return snapshot;
+            const auto ratio = high / low;
+            if (ratio > best_ratio) {
+                best_ratio = ratio;
+                gap_index = index;
+            }
+        }
+        if (gap_index >= point_count) break;
+        const auto low = snapshot.points[gap_index].frequency_hz;
+        const auto high = snapshot.points[gap_index + 1U].frequency_hz;
+        const EqVisualSnapshotPointV1 midpoint{
+            std::sqrt(low * high),
+            0.5 * (snapshot.points[gap_index].gain_db +
+                   snapshot.points[gap_index + 1U].gain_db)};
+        for (std::size_t index = point_count; index > gap_index + 1U; --index) {
+            snapshot.points[index] = snapshot.points[index - 1U];
+        }
+        snapshot.points[gap_index + 1U] = midpoint;
+        ++point_count;
+    }
+    snapshot.point_count = point_count;
+    return snapshot;
+}
+
 bool AudioEngineModel::prepare_program_aware(
     const std::string_view output_group,
     const ProgramAwareLevelPolicyV1& policy) noexcept {

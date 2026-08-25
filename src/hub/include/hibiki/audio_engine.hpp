@@ -15,6 +15,7 @@
 #include "hibiki/windows_wasapi_fanout.hpp"
 #include "hibiki/program_loudness.hpp"
 #include "hibiki/vst3_lane_bridge.hpp"
+#include "hibiki/control_payloads.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -35,6 +36,15 @@ enum class EngineTransactionState : std::uint8_t {
 
 class AudioEngineModel final {
 public:
+    struct LoudnessCurveSnapshotV1 {
+        bool attached{false};
+        std::array<char, kMaxOutputGroupBytes> output_group{};
+        std::uint8_t output_group_bytes{0U};
+        double current_phon{80.0};
+        std::array<EqVisualSnapshotPointV1, kEqVisualSnapshotCapacityV1> points{};
+        std::size_t point_count{0U};
+    };
+
     AudioEngineModel();
     ~AudioEngineModel();
     AudioEngineModel(const AudioEngineModel&) = delete;
@@ -93,6 +103,10 @@ public:
     [[nodiscard]] bool has_active_loudness_peq(
 
         std::string_view output_group = "main") const noexcept;
+
+    // Control-plane projection of the confirmed compensation curve. It is a
+    // bounded visual snapshot, not an audio measurement or ISO conformance.
+    [[nodiscard]] LoudnessCurveSnapshotV1 loudness_curve_snapshot() const noexcept;
 
     void reset_loudness_peq_state() noexcept;
 
