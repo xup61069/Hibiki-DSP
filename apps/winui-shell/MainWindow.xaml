@@ -252,7 +252,7 @@
                             </controls:ItemsRepeater.Layout>
                             <controls:ItemsRepeater.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid ColumnSpacing="8">
+                                    <Grid Style="{StaticResource RouteItemCardGridStyle}" ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
