@@ -373,7 +373,7 @@
                                         </controls:ItemsRepeater.Layout>
                                         <controls:ItemsRepeater.ItemTemplate>
                                             <DataTemplate>
-                                                <Grid Padding="10" ColumnSpacing="10" CornerRadius="8" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                                <Grid Padding="12" ColumnSpacing="10" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto" />
                                                         <ColumnDefinition Width="*" />
