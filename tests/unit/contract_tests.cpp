@@ -84,9 +84,11 @@ extern "C" {
 #include <cmath>
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -108,6 +110,52 @@ extern "C" {
             return 1;                                                                       \
         }                                                                                   \
     } while (false)
+
+// RT no-allocation contract probe (Issue #1553): the AGENTS.md hard rule says
+// the RT audio path never allocates. These probes count global new/delete
+// during a scoped window and fail on any allocation. They cover only the
+// exercised entry points under test conditions; this is not process-wide
+// proof and makes no claim about other threads or paths.
+namespace rt_noalloc_probe {
+
+std::atomic<std::size_t> allocation_count{0U};
+thread_local bool counting_active = false;
+
+void* counted_new(std::size_t size) {
+    if (counting_active) ++allocation_count;
+    void* ptr = std::malloc(size == 0U ? 1U : size);
+    if (ptr == nullptr) throw std::bad_alloc();
+    return ptr;
+}
+
+void counted_delete(void* ptr) noexcept { std::free(ptr); }
+
+template <typename Function>
+std::size_t allocations_during(Function&& function) {
+    const auto before = allocation_count.load(std::memory_order_relaxed);
+    counting_active = true;
+    function();
+    counting_active = false;
+    return allocation_count.load(std::memory_order_relaxed) - before;
+}
+
+}  // namespace rt_noalloc_probe
+
+void* operator new(std::size_t size) { return rt_noalloc_probe::counted_new(size); }
+
+void* operator new[](std::size_t size) { return rt_noalloc_probe::counted_new(size); }
+
+void operator delete(void* ptr) noexcept { rt_noalloc_probe::counted_delete(ptr); }
+
+void operator delete[](void* ptr) noexcept { rt_noalloc_probe::counted_delete(ptr); }
+
+void operator delete(void* ptr, std::size_t) noexcept {
+    rt_noalloc_probe::counted_delete(ptr);
+}
+
+void operator delete[](void* ptr, std::size_t) noexcept {
+    rt_noalloc_probe::counted_delete(ptr);
+}
 
 #if defined(_WIN32)
 bool acknowledge_ipc_request(const hibiki::IpcFrameV1& request,
@@ -6502,6 +6550,87 @@ int main() {
         engine.reset_vst3_lane_state();
         CHECK(!engine.read_vst3_tap("main", tap_out.data(), 128U,
                                      tap_channels, tap_frames, tap_sequence));
+    }
+
+    // RT no-allocation contract (Issue #1553): the exercised audio entry
+    // points must complete without any global allocation while processing.
+    {
+        // Detector: several blocks through the configured detector.
+        BassExcessDetectorV1 no_alloc_detector;
+        CHECK(no_alloc_detector.configure(48000U));
+        std::array<float, 256U> detector_block{};
+        for (std::size_t frame = 0U; frame < detector_block.size(); ++frame) {
+            detector_block[frame] = static_cast<float>(
+                0.4 * std::sin(2.0 * 3.14159265358979323846 * 70.0 *
+                                static_cast<double>(frame) / 48000.0));
+        }
+        bool detector_ok = true;
+        const auto detector_allocations = rt_noalloc_probe::allocations_during([&] {
+            for (unsigned repeat = 0U; repeat < 8U; ++repeat) {
+                if (!no_alloc_detector.process(detector_block.data(),
+                                                detector_block.size(), 1U)) {
+                    detector_ok = false;
+                    break;
+                }
+            }
+        });
+        CHECK(detector_ok);
+        CHECK(detector_allocations == 0U);
+
+        // Controller: the bass-correction shelf path must also avoid hidden
+        // vector/string growth inside process_interleaved.
+        ProgramAwareLevelControllerV1 no_alloc_controller;
+        CHECK(no_alloc_controller.configure(
+            ProgramAwareLevelPolicyV1{1, true, -40.0, 0.0, 24.0, 3000.0, 60.0,
+                                      -70.0, ProgramAwareMeterModeV1::RmsProxy,
+                                      -1, true, 6.0},
+            48000U));
+        bool controller_ok = true;
+        const auto controller_allocations = rt_noalloc_probe::allocations_during([&] {
+            for (unsigned repeat = 0U; repeat < 4U; ++repeat) {
+                if (!no_alloc_controller.process_interleaved(
+                        detector_block.data(), detector_block.size(), 1U)) {
+                    controller_ok = false;
+                    break;
+                }
+            }
+        });
+        CHECK(controller_ok);
+        CHECK(controller_allocations == 0U);
+
+        // Committed graph: process_output_group on a prepared Studio graph.
+        AudioEngineModel no_alloc_engine;
+        GraphConfigV1 no_alloc_graph;
+        no_alloc_graph.lanes.push_back(LaneConfigV1{"main", "main", 2, 0.0, true});
+        CHECK(no_alloc_engine.prepare_graph(no_alloc_graph, 1U));
+        CHECK(no_alloc_engine.commit_graph());
+        std::array<float, 512U> lane_block{};
+        for (std::size_t frame = 0U; frame < lane_block.size() / 2U; ++frame) {
+            lane_block[frame * 2U] = static_cast<float>(
+                0.3 * std::sin(2.0 * 3.14159265358979323846 * 220.0 *
+                                static_cast<double>(frame) / 48000.0));
+            lane_block[frame * 2U + 1U] = lane_block[frame * 2U];
+        }
+        std::array<float, 512U> rendered_block{};
+        const hibiki::RtLaneInputV1 probe_lane{lane_block.data(), 2U};
+        // Warm-up block outside the counting window: first-call lazy setup is
+        // control-plane behavior and stays out of the steady-state contract.
+        CHECK(no_alloc_engine.process_output_group(
+            "main", std::span<const RtLaneInputV1>(&probe_lane, 1U),
+            rendered_block.data(), 256U));
+        bool graph_ok = true;
+        const auto graph_allocations = rt_noalloc_probe::allocations_during([&] {
+            for (unsigned repeat = 0U; repeat < 8U; ++repeat) {
+                if (!no_alloc_engine.process_output_group(
+                        "main", std::span<const RtLaneInputV1>(&probe_lane, 1U),
+                        rendered_block.data(), 256U)) {
+                    graph_ok = false;
+                    break;
+                }
+            }
+        });
+        CHECK(graph_ok);
+        CHECK(graph_allocations == 0U);
     }
 
     return 0;
