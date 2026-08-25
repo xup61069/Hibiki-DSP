@@ -1537,4 +1537,57 @@ static async Task RunSceneCatalogCheckServerAsync(
         try { await serverTask; } catch (OperationCanceledException) { }
     }
 }
+// Listening-dose model: fail-closed sample rejection, trapezoid
+// accumulation, silent-gap interruption and daily reset.
+var dose = new ListeningDoseModelV1();
+Check(dose.AccumulatedDosePercent == 0.0 && !dose.IsAccumulating,
+    "Dose must start at zero.");
+Check(!dose.AddSample(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero), -150.0, false),
+    "Below-floor volume samples must be rejected fail-closed.");
+Check(dose.AccumulatedDosePercent == 0.0 && !dose.IsAccumulating,
+    "Rejected samples must not touch accumulated state.");
+Check(!dose.AddSample(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero), -12.0, true),
+    "Muted samples must be rejected.");
+Check(dose.AddSample(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero), -6.0, false),
+    "-6 dB (88 dBA) is above the criterion and must accumulate.");
+// Fold one sample per minute for a full hour (inside the 5-minute bound).
+for (var minute = 1; minute <= 60; ++minute)
+{
+    var at = new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero)
+        .AddMinutes(minute);
+    dose.AddSample(at, -6.0, false);
+}
+Check(dose.AccumulatedDosePercent > 20.0 && dose.AccumulatedDosePercent < 30.0,
+    "One hour at +3 dB over criterion should be about a quarter of the budget.");
+Check(dose.IsAccumulating, "Active loud listening must report accumulating.");
+
+var afterLongGap = new DateTimeOffset(2026, 8, 26, 12, 0, 0, TimeSpan.Zero);
+dose.AddSample(afterLongGap, -30.0, false);
+Check(dose.LastSampleGap > ListeningDoseModelV1.MaxSampleInterval,
+    "The long silence must be observable as a sample gap.");
+Check(dose.AccumulatedDosePercent >= 20.0 && dose.AccumulatedDosePercent < 30.0,
+    "A silent gap longer than the bound must not add dose.");
+Check(!dose.IsAccumulating,
+    "A long silent gap must end the accumulating state.");
+
+dose.ResetDaily();
+Check(dose.AccumulatedDosePercent == 0.0 && !dose.IsAccumulating,
+    "Daily reset must clear the accumulator.");
+
+// ViewModel integration: every confirmed volume-state update folds exactly
+// one dose sample; invalid states are rejected before the fold.
+var doseVm = new EasyControlViewModel("dose-pipe");
+Check(doseVm.ListeningDose.AccumulatedDosePercent == 0.0,
+    "A fresh view model starts with zero dose.");
+var badState = VolumeSafetyStateV1.Initial() with { EffectiveDb = double.NaN, Generation = 2 };
+Check(!doseVm.ApplyVolumeSafetyState(badState, out _),
+    "NaN effective volume must fail closed.");
+Check(doseVm.ListeningDose.AccumulatedDosePercent == 0.0,
+    "Rejected volume states must not fold into the dose.");
+var loudState = VolumeSafetyStateV1.Initial(-6.0) with { Generation = 3 };
+Check(doseVm.ApplyVolumeSafetyState(loudState, out _),
+    "Valid loud volume state must apply.");
+Check(doseVm.ListeningDose.IsAccumulating,
+    "Applying a confirmed loud state must start dose accumulation.");
+
 Console.WriteLine("Control model checks passed.");

@@ -272,6 +272,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public VolumeSafetyStateV1 VolumeState => _volumeState;
     public double EffectiveVolumeDb => _volumeState.EffectiveDb;
+    public ListeningDoseModelV1 ListeningDose { get; } = new();
     public string EffectiveVolumeDisplayText => $"實際有效音量：{EffectiveVolumeDb:0.0} dB";
     public double SafetyCeilingDb => _volumeState.SafetyCeilingDb;
     public string SafetyStatusText => _volumeState.SafetyStatusText;
@@ -1044,6 +1045,10 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         _requestedVolumeDb = state.RequestedDb;
         _muted = state.Muted;
         _generation = state.Generation;
+        // The dose indicator is a pure observer of confirmed volume state:
+        // rejection or failure above never reaches this line.
+        ListeningDose.AddSample(DateTimeOffset.UtcNow, state.EffectiveDb,
+                                state.Muted);
         OnPropertyChanged(nameof(RequestedVolumeDb));
         OnPropertyChanged(nameof(RequestedVolumeDisplayText));
         OnPropertyChanged(nameof(Muted));
