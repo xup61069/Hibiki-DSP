@@ -24,8 +24,9 @@ add_subdirectory(extensions/native_bridge)
 
 if(WIN32 AND HIBIKI_BUILD_ENGINE_PREVIEW)
 add_executable(hibiki_engine_preview apps/engine-preview/engine_preview.cpp)
-target_link_libraries(hibiki_engine_preview PRIVATE hibiki_hub hibiki_tab_bridge_contract)
+target_link_libraries(hibiki_engine_preview PRIVATE hibiki_hub hibiki_vst_host hibiki_tab_bridge_contract)
   target_compile_features(hibiki_engine_preview PRIVATE cxx_std_20)
+  target_link_libraries(hibiki_engine_preview PRIVATE mmdevapi)
   # The preview main loop drains IR prepare/scene transactions inline; keep the
   # Windows default 1 MiB stack from overflowing on heavy kernels the same way
   # the contract-test harness already does.

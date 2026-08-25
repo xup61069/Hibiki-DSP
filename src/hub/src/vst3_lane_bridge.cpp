@@ -156,5 +156,98 @@ void Vst3LaneRingBridgeV1::reset() noexcept {
     clear_all();
 }
 
-}  // namespace hibiki
+// --- Vst3TapBufferV1 implementation ---
 
+bool Vst3TapBufferV1::publish(
+    const std::string_view output_group,
+    const float* interleaved,
+    const std::size_t frames,
+    const std::uint32_t channels) noexcept {
+    if (output_group.empty() ||
+        output_group.size() > kMaxOutputGroupBytesV1 ||
+        interleaved == nullptr || frames == 0U ||
+        frames > kMaxVst3TapFramesV1 ||
+        channels == 0U || channels > kMaxVst3TapChannelsV1) {
+        return false;
+    }
+
+    // Reject NaN/Inf — the worker must never receive garbage.
+    const std::size_t sample_count = frames * static_cast<std::size_t>(channels);
+    for (std::size_t i = 0U; i < sample_count; ++i) {
+        if (!std::isfinite(interleaved[i])) { return false; }
+    }
+
+    // Acquire sequence: even = stable, odd = mid-write. We increment to
+    // odd, write data, then increment to even (seqlock-style).
+    const std::uint64_t seq =
+        write_seq_.fetch_add(1U, std::memory_order_relaxed) + 1U;
+
+    std::memcpy(buffer_.data(), interleaved,
+                sample_count * sizeof(float));
+    std::memcpy(group_.data(), output_group.data(), output_group.size());
+    group_bytes_ = static_cast<std::uint8_t>(output_group.size());
+    channels_ = channels;
+    frames_ = frames;
+    sequence_ = seq;
+
+    // Release: publish with release ordering so readers see complete data.
+    valid_.store(true, std::memory_order_release);
+    write_seq_.fetch_add(1U, std::memory_order_release);
+    return true;
+}
+
+bool Vst3TapBufferV1::read(
+    const std::string_view output_group,
+    float* destination,
+    const std::size_t max_frames,
+    std::uint32_t& channels_out,
+    std::size_t& frames_out,
+    std::uint64_t& sequence_out) const noexcept {
+    if (destination == nullptr || max_frames == 0U) { return false; }
+
+    // Acquire fence: see a consistent snapshot or reject.
+    const bool is_valid = valid_.load(std::memory_order_acquire);
+    if (!is_valid) { return false; }
+
+    // Read all scalar fields first.
+    const auto group_bytes = group_bytes_;
+    const auto channels = channels_;
+    const auto frames = frames_;
+    const auto seq = sequence_;
+
+    // Verify group matches.
+    if (group_bytes != output_group.size() ||
+        std::memcmp(group_.data(), output_group.data(), group_bytes) != 0) {
+        return false;
+    }
+
+    // Check capacity and shape.
+    if (channels == 0U || channels > kMaxVst3TapChannelsV1 ||
+        frames == 0U || frames > kMaxVst3TapFramesV1) {
+        return false;
+    }
+
+    const std::size_t sample_count =
+        static_cast<std::size_t>(frames) * channels;
+    if (sample_count > max_frames * channels) { return false; }
+
+    std::memcpy(destination, buffer_.data(), sample_count * sizeof(float));
+
+    // Post-read validation: ensure we didn't read during a concurrent
+    // write. If the sequence changed between our acquire and now, the
+    // data may be torn. Fail-closed rather than returning partial audio.
+    const std::uint64_t post_seq =
+        write_seq_.load(std::memory_order_acquire);
+    if ((post_seq & 1U) != 0U) { return false; }
+
+    channels_out = channels;
+    frames_out = frames;
+    sequence_out = seq;
+    return true;
+}
+
+void Vst3TapBufferV1::reset() noexcept {
+    valid_.store(false, std::memory_order_release);
+}
+
+}  // namespace hibiki
