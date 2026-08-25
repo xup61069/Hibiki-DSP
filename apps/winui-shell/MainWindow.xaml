@@ -192,9 +192,9 @@
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <ProgressRing Width="26" Height="26" IsActive="{Binding IsBusy}" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" VerticalAlignment="Center" />
-                                <Button x:Name="ConnectButton" Content="連接引擎" Click="OnConnectClick" MinHeight="40" FontWeight="SemiBold" Style="{StaticResource AccentButtonStyle}" AutomationProperties.Name="連接 Hibiki 音訊引擎" AutomationProperties.HelpText="連接後才能套用場景與音量控制" ToolTipService.ToolTip="連接 Hibiki 音訊引擎" VerticalAlignment="Center" />
+                                <Button x:Name="ConnectButton" Content="連接引擎" Click="OnConnectClick" MinHeight="40" FontWeight="SemiBold" Style="{StaticResource AccentButtonStyle}" AutomationProperties.Name="連接 Hibiki 音訊引擎" AutomationProperties.HelpText="連接後才能套用場景與音量控制；處理中按鈕會停用" ToolTipService.ToolTip="連接 Hibiki 音訊引擎" IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}" VerticalAlignment="Center" />
                             </StackPanel>
-                            <Button Content="一鍵改善" Click="OnEnhanceClick" IsEnabled="{Binding IsConnected}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" MinHeight="40" FontWeight="SemiBold" AutomationProperties.Name="一鍵改善聲音" AutomationProperties.HelpText="套用遊戲場景、校正與音量保護" ToolTipService.ToolTip="套用遊戲場景、校正與音量保護" />
+                            <Button x:Name="EnhanceButton" Content="一鍵改善" Click="OnEnhanceClick" IsEnabled="{Binding IsConnected}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" MinHeight="40" FontWeight="SemiBold" AutomationProperties.Name="一鍵改善聲音" AutomationProperties.HelpText="套用遊戲場景、校正與音量保護" ToolTipService.ToolTip="套用遊戲場景、校正與音量保護" />
                             <Border Style="{StaticResource StatusPillStyle}">
                                 <TextBlock Text="{Binding StatusText}" Style="{ThemeResource CaptionTextBlockStyle}" TextWrapping="Wrap" MaxWidth="340" Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.LiveSetting="Polite" />
                             </Border>
