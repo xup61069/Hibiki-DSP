@@ -63,14 +63,13 @@ public sealed partial class MainWindow : Window
         var points = frame.TransitionProgress >= 1.0 ? frame.TargetPoints : InterpolatePoints(frame.Points, frame.TargetPoints, frame.TransitionProgress);
         var width = double.IsNaN(EqVisualCanvas.ActualWidth) || EqVisualCanvas.ActualWidth < 120.0 ? 480.0 : EqVisualCanvas.ActualWidth;
         var height = double.IsNaN(EqVisualCanvas.ActualHeight) || EqVisualCanvas.ActualHeight < 60.0 ? 140.0 : EqVisualCanvas.ActualHeight;
-
-        var geometry = string.Create(System.Globalization.CultureInfo.InvariantCulture,
-            $"M {width * 0.02:F1} {height * 0.5 + points[0].GainDb * -2.2:F1}");
+        var pointCollection = new Microsoft.UI.Xaml.Media.PointCollection();
         foreach (var point in points)
         {
+            var gainDb = Math.Clamp(point.GainDb, -24.0, 24.0);
             var x = width * (0.02 + (Math.Log10(point.FrequencyHz / 20.0) / Math.Log10(1000.0)) * 0.96);
-            var y = Math.Clamp(height * 0.5 - point.GainDb * 2.2, height * 0.08, height * 0.92);
-            geometry += $" L {x:F1} {y:F1}";
+            var y = Math.Clamp(height * 0.5 - gainDb * 2.2, height * 0.08, height * 0.92);
+            pointCollection.Append(new Windows.Foundation.Point(x, y));
         }
 
         var strokeColor = frame.Source switch
@@ -85,21 +84,8 @@ public sealed partial class MainWindow : Window
             Stroke = new SolidColorBrush(strokeColor),
             StrokeThickness = 3.0,
             StrokeLineJoin = PenLineJoin.Round,
-            Points = ParsePolylinePoints(geometry.Substring(2)),
+            Points = pointCollection,
         });
-    }
-
-    private static Windows.Foundation.PointCollection ParsePolylinePoints(string geometry)
-    {
-        var collection = new Windows.Foundation.PointCollection();
-        var tokens = geometry.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        for (var index = 0; index + 1 < tokens.Length; index += 2)
-        {
-            collection.Append(new Windows.Foundation.Point(
-                double.Parse(tokens[index], System.Globalization.CultureInfo.InvariantCulture),
-                double.Parse(tokens[index + 1], System.Globalization.CultureInfo.InvariantCulture)));
-        }
-        return collection;
     }
 
     private static IReadOnlyList<EqVisualPointV1> InterpolatePoints(
