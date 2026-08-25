@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 
 namespace Hibiki.ControlModel;
@@ -64,6 +65,18 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private int _droppedSceneCatalogOperations;
     private CancellationTokenSource? _eqPollCts;
     private Task? _eqPollLoop;
+    private CalibrationTargetCurveIdV1 _wizardTargetCurve = CalibrationTargetCurveIdV1.Flat;
+    private string _wizardMeasurementPath = string.Empty;
+    private string _wizardStatus = "尚未載入量測；請先選擇 CSV 或 REW 文字檔";
+    private int _wizardImportedPointCount;
+    private bool _wizardHasResult;
+    private string _wizardExportedPath = string.Empty;
+    private IReadOnlyList<PeqFilterV1> _wizardCompiledFilters =
+        Array.Empty<PeqFilterV1>();
+    private double[]? _wizardMeasurementFrequencies;
+    private double[]? _wizardMeasurementLevels;
+    private IReadOnlyList<WizardPeqRow> _wizardPreviewRows =
+        Array.Empty<WizardPeqRow>();
 
     private const int EqPollIntervalMs = 1000;
 
@@ -442,6 +455,265 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         _irPrepareStatus = "Scene 已切換；IR 已清除，需重新載入";
         OnPropertyChanged(nameof(IrPrepareStatus));
         OnPropertyChanged(nameof(HasPreparedIr));
+    }
+
+    // ---- #1615 calibration wizard -------------------------------------
+
+    public IrPhaseModeOption[] WizardCurveOptions { get; } =
+        Enum.GetValues<CalibrationTargetCurveIdV1>()
+            .Where(Enum.IsDefined)
+            .Select(id => new IrPhaseModeOption(
+                (IrPhaseMode)(int)id,
+                id switch
+                {
+                    CalibrationTargetCurveIdV1.Flat => "Flat／平直",
+                    CalibrationTargetCurveIdV1.HarmanInEar => "Harman 入耳",
+                    CalibrationTargetCurveIdV1.HarmanOverEar => "Harman 耳罩",
+                    _ => "未知目標曲線"
+                },
+                id switch
+                {
+                    CalibrationTargetCurveIdV1.Flat => "不做音色修飾，只校正量測誤差",
+                    CalibrationTargetCurveIdV1.HarmanInEar => "套用 Harman 入耳目標曲線",
+                    CalibrationTargetCurveIdV1.HarmanOverEar => "套用 Harman 耳罩目標曲線",
+                    _ => ""
+                }))
+            .ToArray();
+
+    public CalibrationTargetCurveIdV1 WizardTargetCurve
+    {
+        get => _wizardTargetCurve;
+        set
+        {
+            if (!Enum.IsDefined(value) || value == _wizardTargetCurve) return;
+            _wizardTargetCurve = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string WizardMeasurementPath => _wizardMeasurementPath;
+
+    public string WizardStatus
+    {
+        get => _wizardStatus;
+        private set
+        {
+            if (_wizardStatus == value) return;
+            _wizardStatus = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public int WizardImportedPointCount => _wizardImportedPointCount;
+    public bool WizardHasMeasurement => _wizardMeasurementPath.Length > 0;
+    public string WizardImportedCountText => $"量測點數：{_wizardImportedPointCount}";
+
+    public bool WizardHasResult
+    {
+        get => _wizardHasResult;
+        private set
+        {
+            if (_wizardHasResult == value) return;
+            _wizardHasResult = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string WizardExportedPath => _wizardExportedPath;
+
+    public sealed record WizardPeqRow(
+        int Index, string FrequencyText, string GainText, string QText);
+
+    public IReadOnlyList<WizardPeqRow> WizardPreviewFilters => _wizardPreviewRows;
+
+    public void ResetWizardState()
+    {
+        _wizardMeasurementPath = string.Empty;
+        _wizardImportedPointCount = 0;
+        _wizardHasResult = false;
+        _wizardExportedPath = string.Empty;
+        _wizardPreviewRows = Array.Empty<WizardPeqRow>();
+        _wizardStatus = "尚未載入量測；請先選擇 CSV 或 REW 文字檔";
+        OnPropertyChanged(nameof(WizardMeasurementPath));
+        OnPropertyChanged(nameof(WizardImportedPointCount));
+        OnPropertyChanged(nameof(WizardHasMeasurement));
+        OnPropertyChanged(nameof(WizardImportedCountText));
+        OnPropertyChanged(nameof(WizardHasResult));
+        OnPropertyChanged(nameof(WizardExportedPath));
+        OnPropertyChanged(nameof(WizardPreviewFilters));
+        OnPropertyChanged(nameof(WizardStatus));
+    }
+
+    private static List<double>[] ReadMeasurementFile(string fullPath)
+    {
+        List<double> frequencies = [];
+        List<double> levels = [];
+        foreach (var rawLine in File.ReadLines(fullPath))
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0 ||
+                line.StartsWith('*') || line.StartsWith('#') || line.StartsWith(';'))
+            {
+                continue;
+            }
+            var parts = line.Split([' ', '\t', ',', ';'],
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (parts.Length < 2 ||
+                !TryParseInvariantDouble(parts[0], out var frequencyHz) ||
+                !TryParseInvariantDouble(parts[1], out var levelDb))
+            {
+                continue;
+            }
+            frequencies.Add(frequencyHz);
+            levels.Add(levelDb);
+            if (frequencies.Count >= CalibrationResponseV1.MaxPoints) break;
+        }
+
+        return [frequencies, levels];
+    }
+
+    private static bool TryParseInvariantDouble(string token, out double value) =>
+        double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+
+    public bool ImportWizardMeasurement(string filePath)
+    {
+        WizardHasResult = false;
+        string fullPath;
+        try
+        {
+            fullPath = Path.GetFullPath(filePath ?? string.Empty);
+            var info = new FileInfo(fullPath);
+            if (!info.Exists || info.Length is < 1 ||
+                info.Length > CalibrationCompilerV1.MaxMeasurementFileBytes)
+                throw new InvalidDataException("量測檔不存在或超過大小上限");
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or
+                                          UnauthorizedAccessException or InvalidDataException or
+                                          NotSupportedException)
+        {
+            _wizardMeasurementPath = string.Empty;
+            _wizardImportedPointCount = 0;
+            WizardStatus = $"量測檔無法讀取：{exception.Message}";
+            OnPropertyChanged(nameof(WizardMeasurementPath));
+            OnPropertyChanged(nameof(WizardImportedPointCount));
+            OnPropertyChanged(nameof(WizardHasMeasurement));
+            OnPropertyChanged(nameof(WizardImportedCountText));
+            return false;
+        }
+
+        List<double>[] parsed;
+        try
+        {
+            parsed = ReadMeasurementFile(fullPath);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _wizardMeasurementPath = string.Empty;
+            _wizardImportedPointCount = 0;
+            WizardStatus = $"量測檔讀取失敗：{exception.Message}";
+            OnPropertyChanged(nameof(WizardMeasurementPath));
+            OnPropertyChanged(nameof(WizardImportedPointCount));
+            OnPropertyChanged(nameof(WizardHasMeasurement));
+            OnPropertyChanged(nameof(WizardImportedCountText));
+            return false;
+        }
+
+        if (parsed[0].Count == 0)
+        {
+            _wizardMeasurementPath = string.Empty;
+            _wizardImportedPointCount = 0;
+            WizardStatus = "沒有可解析的「頻率 量級」資料列；請使用 CSV 或 REW 匯出格式";
+            OnPropertyChanged(nameof(WizardMeasurementPath));
+            OnPropertyChanged(nameof(WizardImportedPointCount));
+            OnPropertyChanged(nameof(WizardHasMeasurement));
+            OnPropertyChanged(nameof(WizardImportedCountText));
+            return false;
+        }
+
+        _wizardMeasurementPath = fullPath;
+        _wizardMeasurementFrequencies = [.. parsed[0]];
+        _wizardMeasurementLevels = [.. parsed[1]];
+        _wizardImportedPointCount = Math.Min(parsed[0].Count, CalibrationResponseV1.MaxPoints);
+        WizardStatus = $"已解析 {_wizardImportedPointCount} 個頻率點；尚未編譯校正";
+        OnPropertyChanged(nameof(WizardMeasurementPath));
+        OnPropertyChanged(nameof(WizardImportedPointCount));
+        OnPropertyChanged(nameof(WizardHasMeasurement));
+        OnPropertyChanged(nameof(WizardImportedCountText));
+        return true;
+    }
+
+    public bool CompileWizardCorrection()
+    {
+        if (_wizardMeasurementPath.Length == 0)
+        {
+            WizardHasResult = false;
+            WizardStatus = "尚未載入量測；請先選擇 CSV 或 REW 文字檔";
+            return false;
+        }
+
+        var frequencies = _wizardMeasurementFrequencies;
+        var levels = _wizardMeasurementLevels;
+        if (frequencies is null || levels is null)
+        {
+            ResetWizardState();
+            WizardStatus = "量測資料遺失；請重新選擇量測檔";
+            return false;
+        }
+
+        var response = CalibrationCompilerV1.BuildTargetedResponse(
+            null, 48000.0, frequencies, levels, _wizardTargetCurve);
+        if (response is null)
+        {
+            WizardHasResult = false;
+            WizardStatus = "量測點超出有效範圍或排序錯誤（頻率需遞增、20 Hz–24 kHz）";
+            return false;
+        }
+
+        var compile = CalibrationCompilerV1.CompileBoundedPeqCorrection(response.Points);
+        if (compile.Filters.Count == 0 &&
+            compile.Diagnostic.Contains("invalid", StringComparison.Ordinal))
+        {
+            WizardHasResult = false;
+            WizardStatus = "校正編譯失敗：量測資料無效";
+            return false;
+        }
+
+        _wizardCompiledFilters = [.. compile.Filters];
+        _wizardPreviewRows = compile.Filters
+            .Select((filter, index) => new WizardPeqRow(
+                index + 1,
+                $"{filter.FrequencyHz:0.#} Hz",
+                $"{(filter.GainDb >= 0 ? "+" : string.Empty)}{filter.GainDb:0.##} dB",
+                $"Q {filter.Q:0.##}"))
+            .ToArray();
+        WizardHasResult = true;
+        WizardStatus = $"已編譯 {compile.Filters.Count} 個 PEQ 濾波器" +
+                       (compile.Limited ? "；部分修正已受限於安全上限" : "") +
+                       $"。{compile.Diagnostic}";
+        return true;
+    }
+
+    public bool ExportWizardProfile(string filePath)
+    {
+        if (!_wizardHasResult)
+        {
+            WizardStatus = "尚無校正結果可匯出；請先載入量測並編譯";
+            return false;
+        }
+
+        if (!CalibrationCompilerV1.TrySavePreset(
+                filePath, new PeqPresetV1(1U, _wizardCompiledFilters), out var error))
+        {
+            _wizardExportedPath = string.Empty;
+            OnPropertyChanged(nameof(WizardExportedPath));
+            WizardStatus = $"匯出失敗：{error}";
+            return false;
+        }
+
+        _wizardExportedPath = Path.GetFullPath(filePath);
+        WizardStatus = $"校正設定已匯出：{_wizardExportedPath}";
+        OnPropertyChanged(nameof(WizardExportedPath));
+        return true;
     }
 
     public async Task<bool> PrepareIrAsync(string filePath,

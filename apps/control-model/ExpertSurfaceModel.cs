@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Linq;
 
@@ -33,6 +34,25 @@ public sealed record ExpertCalibrationSummary(
     string Status,
     string Detail);
 
+public sealed record ExpertWizardPeqFilterSummary(
+    int Index,
+    double FrequencyHz,
+    double GainDb,
+    double Q)
+{
+    public string AccessibleText =>
+        string.Create(CultureInfo.InvariantCulture,
+            $"Filter {Index}: {FrequencyHz:0.#} Hz, {GainDb:+0.##;-0.##;0} dB, Q {Q:0.00}");
+}
+
+public sealed record ExpertCalibrationWizardState(
+    string TargetCurveName,
+    int PointCount,
+    int FilterCount,
+    bool Limited,
+    string Diagnostic,
+    IReadOnlyList<ExpertWizardPeqFilterSummary> Filters);
+
 // Read-only Expert surface for the first WinUI shell. It deliberately exposes
 // the graph's current shape and safety limits without inventing an IPC edit
 // payload. Mutating Matrix/DSP/VST state remains a future versioned command;
@@ -41,6 +61,8 @@ public sealed class ExpertSurfaceModel : INotifyPropertyChanged
 {
     private bool _isVisible;
     private IReadOnlyList<RouteHealthCardV1> _routeHealth = RouteHealthCatalogV1.Defaults;
+    private CalibrationTargetCurveIdV1 _wizardTargetCurve = CalibrationTargetCurveIdV1.Flat;
+    private ExpertCalibrationWizardState? _wizardState;
 
     public ExpertSurfaceModel()
     {
@@ -106,10 +128,120 @@ public sealed class ExpertSurfaceModel : INotifyPropertyChanged
     public string DspSummary => "Graph 順序：Group Master → calibration → limiter";
     public string Vst3Summary => "VST3 只允許隔離程序與認證清單；未認證 lane fail-closed";
 
+    public CalibrationTargetCurveIdV1 WizardTargetCurveId => _wizardTargetCurve;
+
+    public string WizardTargetCurveName =>
+        CalibrationCompilerV1.TargetCurveName(_wizardTargetCurve);
+
+    public string WizardCurveDisplayName => _wizardTargetCurve switch
+    {
+        CalibrationTargetCurveIdV1.Flat => "Flat 全平",
+        CalibrationTargetCurveIdV1.HarmanInEar => "Harman 入耳式",
+        CalibrationTargetCurveIdV1.HarmanOverEar => "Harman 罩耳式",
+        _ => "未知目標曲線",
+    };
+
+    public int WizardTargetCurveIndex
+    {
+        get => (int)_wizardTargetCurve;
+        set => SetWizardTargetCurve((CalibrationTargetCurveIdV1)value);
+    }
+
+    public bool HasWizardResult => _wizardState is not null;
+
+    public ExpertCalibrationWizardState? WizardState => _wizardState;
+
+    public IReadOnlyList<ExpertWizardPeqFilterSummary> WizardPeqPreview =>
+        _wizardState?.Filters ?? Array.Empty<ExpertWizardPeqFilterSummary>();
+
+    public string WizardStatusText
+    {
+        get
+        {
+            var boundary = "此預覽只在控制平面編譯，不送出 engine 命令。";
+            if (_wizardState is null)
+            {
+                return $"尚未建立 PEQ 預覽；輸入量測點後按下「產生校正 PEQ 預覽」。目前目標曲線：{WizardCurveDisplayName}。{boundary}";
+            }
+
+            var limitedNotice = _wizardState.Limited ? "結果受限於 boost/cut 或 filter 上限。" : string.Empty;
+            return $"{WizardCurveDisplayName}：已產生 {_wizardState.FilterCount} 段 PEQ 預覽（{_wizardState.PointCount} 點）。{limitedNotice}{boundary}";
+        }
+    }
+
     public void SetVisible(bool value)
     {
         IsVisible = value;
         OnPropertyChanged(nameof(StatusText));
+    }
+
+    public void SetWizardTargetCurve(CalibrationTargetCurveIdV1 curveId)
+    {
+        if (!Enum.IsDefined(curveId) || curveId == _wizardTargetCurve)
+        {
+            return;
+        }
+
+        _wizardTargetCurve = curveId;
+        OnPropertyChanged(nameof(WizardTargetCurveId));
+        OnPropertyChanged(nameof(WizardTargetCurveName));
+        OnPropertyChanged(nameof(WizardCurveDisplayName));
+        OnPropertyChanged(nameof(WizardTargetCurveIndex));
+        OnPropertyChanged(nameof(WizardStatusText));
+    }
+
+    public bool TryBuildWizardPeq(
+        IReadOnlyList<double>? measuredFrequenciesHz,
+        IReadOnlyList<double>? measuredLevelsDb,
+        out string error)
+    {
+        error = string.Empty;
+        var response = CalibrationCompilerV1.BuildTargetedResponse(
+            deviceId: null,
+            sampleRate: 48000.0,
+            measuredFrequenciesHz,
+            measuredLevelsDb,
+            _wizardTargetCurve);
+        if (response is null)
+        {
+            _wizardState = null;
+            NotifyWizardChanged();
+            error = "量測資料無效：頻率必須嚴格遞增、兩組數量相同、介於 10 Hz–24 kHz 且電平在 −144…+12 dB。";
+            return false;
+        }
+
+        var compiled = CalibrationCompilerV1.CompileBoundedPeqCorrection(
+            response.Points, new CalibrationCompilePolicyV1());
+        if (!compiled.Filters.Any() &&
+            compiled.Diagnostic.Contains("invalid", StringComparison.Ordinal))
+        {
+            _wizardState = null;
+            NotifyWizardChanged();
+            error = "PEQ 編譯失敗：" + compiled.Diagnostic;
+            return false;
+        }
+
+        var filters = compiled.Filters
+            .Select((filter, index) => new ExpertWizardPeqFilterSummary(
+                index + 1, filter.FrequencyHz, filter.GainDb, filter.Q))
+            .ToArray();
+        _wizardState = new ExpertCalibrationWizardState(
+            WizardTargetCurveName,
+            response.Points.Count,
+            filters.Length,
+            compiled.Limited,
+            compiled.Diagnostic,
+            filters);
+        NotifyWizardChanged();
+        return true;
+    }
+
+    private void NotifyWizardChanged()
+    {
+        OnPropertyChanged(nameof(HasWizardResult));
+        OnPropertyChanged(nameof(WizardState));
+        OnPropertyChanged(nameof(WizardPeqPreview));
+        OnPropertyChanged(nameof(WizardStatusText));
     }
 
     public bool TryApplyRouteHealth(IReadOnlyList<RouteHealthCardV1> cards,

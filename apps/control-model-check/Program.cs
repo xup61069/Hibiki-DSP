@@ -1,5 +1,6 @@
 using Hibiki.ControlModel;
 using System.Buffers.Binary;
+using System.Globalization;
 using System.IO.Pipes;
 using System.Text;
 
@@ -823,6 +824,29 @@ Check(targetedResponse is not null && targetedResponse.IsValid &&
 Check(CalibrationCompilerV1.BuildTargetedResponse(
         null, 48000.0, [100.0, 50.0], [-2.0, -1.0]) is null,
     "Unsorted frequencies must fail closed in BuildTargetedResponse.");
+var wizardSurface = new ExpertSurfaceModel();
+Check(wizardSurface.WizardTargetCurveId == CalibrationTargetCurveIdV1.Flat &&
+      wizardSurface.WizardTargetCurveName == "flat" &&
+      !wizardSurface.HasWizardResult &&
+      wizardSurface.WizardPeqPreview.Count == 0,
+    "Wizard surface must start with the flat curve and no preview.");
+wizardSurface.SetWizardTargetCurve(CalibrationTargetCurveIdV1.HarmanInEar);
+Check(wizardSurface.WizardTargetCurveIndex == 1 &&
+      wizardSurface.WizardTargetCurveName == "harman-in-ear" &&
+      wizardSurface.WizardCurveDisplayName.Contains("Harman"),
+    "Wizard curve switching must update the read-only surface.");
+var validWizardPoints = new[] { 100.0, 500.0, 1000.0, 4000.0 };
+Check(wizardSurface.TryBuildWizardPeq(validWizardPoints, [-8.0, -1.0, 0.0, -3.5], out _) &&
+      wizardSurface.HasWizardResult && wizardSurface.WizardState is not null &&
+      wizardSurface.WizardState.PointCount == 4 &&
+      wizardSurface.WizardPeqPreview.Count > 0 &&
+      wizardSurface.WizardStatusText.Contains("Harman"),
+    "Wizard PEQ build must produce a bounded local preview.");
+Check(!wizardSurface.TryBuildWizardPeq([500.0, 100.0], [0.0, 0.0], out var invalidWizard) &&
+      !wizardSurface.HasWizardResult &&
+      invalidWizard.Contains("無效") &&
+      wizardSurface.WizardStatusText.Contains("尚未建立"),
+    "Wizard must reject unsorted input and clear the stale preview.");
 var batchOk = CalibrationCompilerV1.CompileMultiChannelBatch(
     2,
     [
@@ -891,6 +915,53 @@ finally
 {
     if (File.Exists(presetPath)) File.Delete(presetPath);
 }
+
+// ---- #1615 calibration wizard view-model --------------------------------
+var wizardVm = new EasyControlViewModel("wizard-pipe");
+Check(wizardVm.WizardCurveOptions.Length == 3 &&
+      wizardVm.WizardCurveOptions.All(option => option.Mode == (IrPhaseMode)(int)option.Mode) &&
+      wizardVm.WizardTargetCurve == CalibrationTargetCurveIdV1.Flat &&
+      !wizardVm.WizardHasResult && wizardVm.WizardImportedPointCount == 0,
+    "Wizard must start with three target curves and no compiled result.");
+var wizardPath = Path.Combine(Path.GetTempPath(), $"hibiki-wizard-measure-{Guid.NewGuid():N}.csv");
+File.WriteAllText(wizardPath, string.Create(CultureInfo.InvariantCulture,
+    $"* REW export\n20, -2.5\n1000, 0.25\n8000, -1.75\n"));
+try
+{
+    Check(wizardVm.ImportWizardMeasurement(wizardPath) &&
+          wizardVm.WizardMeasurementPath == Path.GetFullPath(wizardPath) &&
+          wizardVm.WizardImportedPointCount == 3,
+        "Wizard import must parse comment-free frequency/level CSV rows.");
+}
+finally
+{
+    if (File.Exists(wizardPath)) File.Delete(wizardPath);
+}
+Check(wizardVm.CompileWizardCorrection() && wizardVm.WizardHasResult &&
+      wizardVm.WizardStatus.Contains("PEQ", StringComparison.Ordinal),
+    $"Wizard compile must produce bounded PEQ filters from the imported points. Status={wizardVm.WizardStatus}");
+var wizardPreview = wizardVm.WizardPreviewFilters;
+Check(wizardPreview.Count == 2 &&
+      wizardPreview[0].Index == 1 &&
+      wizardPreview.All(row => row.FrequencyText.EndsWith(" Hz", StringComparison.Ordinal) &&
+                              row.GainText.EndsWith(" dB", StringComparison.Ordinal) &&
+                              row.QText.StartsWith("Q ", StringComparison.Ordinal)),
+    "Wizard preview rows must expose one formatted PEQ filter per compiled band.");
+var wizardExportPath = Path.Combine(Path.GetTempPath(), $"hibiki-wizard-export-{Guid.NewGuid():N}.json");
+try
+{
+    Check(wizardVm.ExportWizardProfile(wizardExportPath) &&
+          wizardVm.WizardExportedPath == Path.GetFullPath(wizardExportPath),
+        "Wizard export must save the compiled PEQ preset.");
+}
+finally
+{
+    if (File.Exists(wizardExportPath)) File.Delete(wizardExportPath);
+}
+wizardVm.ResetWizardState();
+Check(!wizardVm.CompileWizardCorrection() && !wizardVm.WizardHasResult &&
+      wizardVm.WizardStatus.Contains("尚未載入量測", StringComparison.Ordinal),
+    "Wizard reset must clear the compiled result and block re-compilation.");
 
 
 // ---- #823 honest custom-scene sync -------------------------------------
@@ -1656,5 +1727,8 @@ Check(doseVm.ApplyVolumeSafetyState(mutedState, out _),
     "A muted volume state must still apply.");
 Check(!doseVm.ListeningDose.IsAccumulating,
     "A confirmed muted state must not accumulate new dose.");
+
+// Remaining safe-time countdown self-test.
+DoseRemainingCheck.Run(Check);
 
 Console.WriteLine("Control model checks passed.");

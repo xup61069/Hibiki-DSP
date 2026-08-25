@@ -43,7 +43,8 @@ engine Ack；失敗保留本機預設並顯示未套用狀態，下一次可重�
 Expert 面板提供可讀的規則摘要、欄位提示、啟用與 gain owner 選擇；移除與清除都經由同一
 control model。WinUI code-behind 只呼叫 ViewModel，不在 UI thread 直接接觸 COM、RT graph 或
 Windows session identity。這個 catalog 是控制面便利層，不宣稱已完成實體 per-App reroute、
-Chrome 單分頁捕捉或 vendor ASIO 攔截。
+Chrome 單分頁捕捉或 vendor ASIO 攔截。實體 per-App 送出已由 process-loopback Float32 source
+E2E 驗證（PR #1542）；此處仍屬使用者空間控制證據，不宣稱 driver/WaveRT 能力。
 
 ## Engine Preview opt-in 邊界
 
@@ -52,9 +53,9 @@ Chrome 單分頁捕捉或 vendor ASIO 攔截。
 `SessionCatalogSnapshot` 並啟用 App 音量／lane-output／route-rule command queue。預設 Engine
 Preview 不枚舉或操作 Windows session；`-EnableSessionRouting` 與系統音量 opt-in 可獨立或同時
 使用。所有命令先檢查 catalog sequence、generation-scoped handle 與 payload，再由 worker 交易套用；
-失敗時保留上一份 catalog／rule graph。這個切片驗證選取、命令與 Windows session volume 控制面，
-不宣稱已完成實體 per-App capture/re-send、process-loopback 或 DSP lane delivery；預覽 UI 必須顯示
-`per-App delivery unverified`。
+失敗時保留上一份 catalog／rule graph。這個切片驗證選取、命令與 Windows session volume 控制面；
+實體 per-App capture/re-send 與 process-loopback Float32 source 已由 PR #1542 E2E 驗證，
+預覽 UI 應誠實標示已覆蓋範圍與仍屬 user-space 控制證據的邊界。
 
 ## 驗收
 
