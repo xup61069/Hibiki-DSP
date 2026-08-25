@@ -173,13 +173,17 @@ VolumeNotification 的 phon proxy（70 + requested_db，clamp 到 20..90）在 m
 recompute 排程，unmute 恢復時也不需要額外補償步驟。此 proxy 是 bounded estimate，
 不是音量量測，也不是 ISO 226 conformance。
 
-Live phon recompute 的啟用是明確 opt-in：
-`EqualLoudnessPolicyV1` 新增 `live_update_enabled` 旗標（SceneCatalog wire format
+Live phon recompute 預設關閉，但可明確 opt-in：
+`EqualLoudnessPolicyV1` 提供 `live_update_enabled` 旗標（SceneCatalog wire format
 使用 `SceneCatalogCommandV1` 保留位元組 [84]，預設 0，decode 拒絕大於 1 的值）。
+內建 Game／Movie／Voice（Relative 模式）Easy scene 預設開啟此旗標；
+Studio 屬 Strict Direct 且 strength 為 0，維持 fail-closed 關閉。
 Scene apply 只有在 policy 為 Relative 模式、strength 大於 0、policy 驗證通過且
 opt-in 時，才會在同一 control transaction 掛載單點 1 kHz formula attachment，
 並在 commit 成功後對該 output group 呼叫 `set_loudness_live_update`；
 未 opt-in 的場景維持既有行為（只清除上一個 loudness EQ，不掛載、不啟用）。
+因此自訂 catalog scene 仍需在 wire 上把 [84] 設為 1 才會啟用；
+內建 Easy scene 則由 factory 預設帶入上述值。
 
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
 schema 要求 `anchor_id` 在非 null 時為 non-empty printable UTF-8 且最長 64 字，拒絕 C0/C1
