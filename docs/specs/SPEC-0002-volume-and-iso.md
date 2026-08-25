@@ -162,6 +162,17 @@ transaction 清掉上一個 loudness EQ，避免不相關 Scene 的音色殘留�
 不是 ISO 226 conformance、正式係數 fit、實體 sink delivery 或 driver/WaveRT evidence；production
 concurrent swap 以 commit-point snapshot 取代 epoch/RCU：同一 output group 的 attached-to-attached prepare/commit 保留上一組 immutable PEQ，用固定容量堆疊緩衝與 sin/cos equal-power gain 做 120 ms crossfade。clear 後重掛、不同 group 首次掛載、rollback 或 Strict Direct 不啟動 fade。單次 render block 超過 23040 frames 時整個呼叫 fail-closed，不做部分淡化。這仍不是 ISO 226 conformance、實體 sink delivery 或 driver/WaveRT evidence；真實裝置上的主觀無感切換尚未驗收。
 
+Live phon recompute 的 debounce 狀態屬於每個 output group 的 attachment
+（per-group），不是 engine 層級單一狀態：engine 同時只保留一份 active loudness
+attachment，切換到另一個 group 時不會繼承前一個 group 的 250 ms 等待窗口或
+phon 基準線；對非 active group 的即時更新一律 fail-closed。≥3 phon 的大幅
+變更仍然立即放行。
+VolumeNotification 的 phon proxy（70 + requested_db，clamp 到 20..90）在 mute=true
+時刻意維持以 requested_db 估算：曲線目標是解除靜音後的聆聽音量等響度形狀，
+而不是把靜音解讀成「聽不見」；因此 mute 通知不會觸發、也不會凍結既有的 live
+recompute 排程，unmute 恢復時也不需要額外補償步驟。此 proxy 是 bounded estimate，
+不是音量量測，也不是 ISO 226 conformance。
+
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
 schema 要求 `anchor_id` 在非 null 時為 non-empty printable UTF-8 且最長 64 字，拒絕 C0/C1
 控制字元與 DEL；runtime validator 維持既有非空與 64 字邊界檢查，

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <memory>
@@ -348,13 +349,13 @@ bool AudioEngineModel::update_loudness_phon(
         return false;
     }
     const auto now = std::chrono::steady_clock::now();
-    if (last_phon_update_time_.time_since_epoch().count() != 0) {
+    if (active_loudness_peq_.last_phon_update_time_.time_since_epoch().count() != 0) {
         const auto elapsed_ms =
             std::chrono::duration_cast<std::chrono::milliseconds>(
-                now - last_phon_update_time_)
+                now - active_loudness_peq_.last_phon_update_time_)
                 .count();
         const bool big_step =
-            std::abs(new_phon - last_loudness_phon_) >= 3.0;
+            std::abs(new_phon - active_loudness_peq_.last_loudness_phon_) >= 3.0;
         if (!big_step && elapsed_ms < 250) {
             return false;
         }
@@ -373,8 +374,8 @@ bool AudioEngineModel::update_loudness_phon(
         rollback_loudness_peq();
         return false;
     }
-    last_loudness_phon_ = new_phon;
-    last_phon_update_time_ = now;
+    active_loudness_peq_.last_loudness_phon_ = new_phon;
+    active_loudness_peq_.last_phon_update_time_ = now;
     return true;
 }
 
@@ -400,8 +401,6 @@ void AudioEngineModel::reset_loudness_peq_state() noexcept {
     has_pending_loudness_peq_ = false;
     previous_loudness_peq_ = {};
     loudness_crossfade_.reset();
-    last_loudness_phon_ = 80.0;
-    last_phon_update_time_ = std::chrono::steady_clock::time_point{};
 }
 
 void AudioEngineModel::set_loudness_live_update(
@@ -412,7 +411,11 @@ void AudioEngineModel::set_loudness_live_update(
         return;
     }
     active_loudness_peq_.live_update_enabled = enabled;
-    last_loudness_phon_ = active_loudness_peq_.current_phon;
+    // Re-baseline this group's debounce window to the attachment's current
+    // phon so the first live update after opt-in is not compared against a
+    // stale baseline from a previous attachment.
+    active_loudness_peq_.last_loudness_phon_ =
+        active_loudness_peq_.current_phon;
 }
 
 bool AudioEngineModel::prepare_program_aware(
@@ -587,6 +590,12 @@ VolumeNotificationResult AudioEngineModel::apply_windows_volume(
                : VolumeNotificationResult::Invalid;
 }
 
+OutputGroupVolumeStateV1 AudioEngineModel::volume_state(
+    const std::string_view output_group) const noexcept {
+    return volume_bank_ != nullptr ? volume_bank_->state(output_group)
+                                   : OutputGroupVolumeStateV1{};
+}
+
 bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
                                float* const output_interleaved,
                                const std::size_t frames) noexcept {
@@ -637,6 +646,37 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
                          -1.0, sample_rate_.load(std::memory_order_relaxed))
                    : 1.0F);
     }
+    return true;
+}
+
+bool AudioEngineModel::process_f64(const std::span<const RtLaneInputF64V1> inputs,
+                                   double* const output_interleaved,
+                                   const std::size_t frames) noexcept {
+    if (frames == 0U || output_interleaved == nullptr) return false;
+    if (!has_active_graph_ ||
+        (active_graph_.sample_format != kGraphSampleFormatFloat32V1 &&
+         active_graph_.sample_format != kGraphSampleFormatFloat64V1) ||
+        !process_graph_f64(active_graph_, inputs, output_interleaved, frames)) {
+        return false;
+    }
+    if (!apply_group_master_f64("main", output_interleaved, frames)) return false;
+    return true;
+}
+
+bool AudioEngineModel::process_output_group_f64(
+    const std::string_view output_group,
+    const std::span<const RtLaneInputF64V1> inputs,
+    double* const output_interleaved,
+    const std::size_t frames) noexcept {
+    if (output_group.empty() || frames == 0U || output_interleaved == nullptr) return false;
+    if (!has_active_graph_ ||
+        (active_graph_.sample_format != kGraphSampleFormatFloat32V1 &&
+         active_graph_.sample_format != kGraphSampleFormatFloat64V1) ||
+        !process_graph_for_output_group_f64(active_graph_, output_group, inputs,
+                                            output_interleaved, frames)) {
+        return false;
+    }
+    if (!apply_group_master_f64(output_group, output_interleaved, frames)) return false;
     return true;
 }
 
@@ -969,6 +1009,33 @@ bool AudioEngineModel::apply_group_master(const std::string_view output_group,
     return volume_bank_ != nullptr && volume_bank_->apply_to_interleaved(
         output_group, output_interleaved, frames, active_graph_.output_channels,
         sample_rate_.load(std::memory_order_relaxed));
+}
+
+bool AudioEngineModel::apply_group_master_f64(
+    const std::string_view output_group,
+    double* const output_interleaved,
+    const std::size_t frames) noexcept {
+    if (active_graph_.strict_direct) return true;
+    if (volume_bank_ == nullptr) return false;
+    const auto channel_count = active_graph_.output_channels;
+    if (channel_count == 0U || channel_count > 8U) return false;
+    for (std::size_t frame = 0U; frame < frames; ++frame) {
+        auto* const output_frame =
+            output_interleaved + frame * static_cast<std::size_t>(channel_count);
+        std::array<float, 8> float_frame{};
+        for (std::uint32_t channel = 0U; channel < channel_count; ++channel) {
+            float_frame[channel] = static_cast<float>(output_frame[channel]);
+        }
+        if (!volume_bank_->apply_to_interleaved(
+                output_group, float_frame.data(), 1U, channel_count,
+                sample_rate_.load(std::memory_order_relaxed))) {
+            return false;
+        }
+        for (std::uint32_t channel = 0U; channel < channel_count; ++channel) {
+            output_frame[channel] = static_cast<double>(float_frame[channel]);
+        }
+    }
+    return true;
 }
 
 bool AudioEngineModel::apply_ir(const std::string_view output_group,

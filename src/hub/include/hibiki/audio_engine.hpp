@@ -140,6 +140,8 @@ public:
     [[nodiscard]] VolumeNotificationResult apply_windows_volume(
         std::string_view output_group,
         const VolumeNotificationV1& notification) noexcept;
+    [[nodiscard]] OutputGroupVolumeStateV1 volume_state(
+        std::string_view output_group) const noexcept;
     [[nodiscard]] bool process(std::span<const RtLaneInputV1> inputs,
                                float* output_interleaved,
                                std::size_t frames) noexcept;
@@ -147,6 +149,19 @@ public:
                                              std::span<const RtLaneInputV1> inputs,
                                              float* output_interleaved,
                                              std::size_t frames) noexcept;
+    // Bounded double-precision model entry points. These use the same
+    // committed immutable graph and Group Master boundary as the float32
+    // path, but intentionally exclude the plugin-latency bank and all
+    // float-only attachments. Callers owning double samples must resolve
+    // plugin latency upstream before entering this v1 boundary.
+    [[nodiscard]] bool process_f64(std::span<const RtLaneInputF64V1> inputs,
+                                   double* output_interleaved,
+                                   std::size_t frames) noexcept;
+    [[nodiscard]] bool process_output_group_f64(
+        std::string_view output_group,
+        std::span<const RtLaneInputF64V1> inputs,
+        double* output_interleaved,
+        std::size_t frames) noexcept;
     [[nodiscard]] bool prepare_output_fanout(const OutputFanoutPlanV1& plan,
                                               double source_step = 1.0) noexcept;
     [[nodiscard]] bool observe_output_fanout_clock(std::size_t sink_index,
@@ -301,6 +316,12 @@ private:
         double current_phon{80.0};
         EqualLoudnessPolicyV1 policy{};
         bool live_update_enabled{false};
+        // Per-group live-update debounce state (control plane only; never
+        // touched by the audio thread). A recompute runs when at least
+        // 250 ms elapsed since this group's last applied update OR the phon
+        // request moved by 3.0 or more from this group's baseline.
+        double last_loudness_phon_{80.0};
+        std::chrono::steady_clock::time_point last_phon_update_time_{};
     };
 
     LoudnessGraphAttachmentV1 active_loudness_peq_{};
@@ -328,14 +349,7 @@ private:
     LoudnessPeqCrossfadeState loudness_crossfade_{};
 
     bool has_active_loudness_peq_{false};
-
     bool has_pending_loudness_peq_{false};
-
-    // Live-update debounce state (control plane only; never touched by the
-    // audio thread). A recompute runs when at least 250 ms elapsed since the
-    // last applied update OR the phon request moved by 3.0 or more.
-    double last_loudness_phon_{80.0};
-    std::chrono::steady_clock::time_point last_phon_update_time_{};
 
     struct ProgramAwareAttachmentV1 {
         bool attached{false};
@@ -364,6 +378,10 @@ private:
     [[nodiscard]] bool apply_group_master(std::string_view output_group,
                                           float* output_interleaved,
                                std::size_t frames) noexcept;
+    [[nodiscard]] bool apply_group_master_f64(
+        std::string_view output_group,
+        double* output_interleaved,
+        std::size_t frames) noexcept;
     [[nodiscard]] bool apply_ir(std::string_view output_group,
                                 float* output_interleaved,
                                              std::size_t frames) noexcept;

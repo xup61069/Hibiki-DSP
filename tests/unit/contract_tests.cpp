@@ -1393,6 +1393,90 @@ int main() {
     RtGraphSnapshotV1 f64_bad_snapshot;
     CHECK(!compile_rt_snapshot(f64_graph, 13U, f64_bad_snapshot));
 
+    AudioEngineModel f64_engine;
+    const double model_f64_input[] = {0.1, -0.2, 1.0, 0.25};
+    const RtLaneInputF64V1 model_f64_view{model_f64_input, 2U};
+    double model_f64_output[4]{};
+    CHECK(!f64_engine.process_f64(
+        std::span<const RtLaneInputF64V1>(&model_f64_view, 1),
+        model_f64_output, 2U));
+
+    GraphConfigV1 f64_default_graph;
+    f64_default_graph.output_channels = 2U;
+    f64_default_graph.lanes.push_back(LaneConfigV1{"model-f64", "main", 2U,
+                                                   -6.0205999, true});
+    CHECK(f64_engine.prepare_graph(f64_default_graph, 14U));
+    CHECK(f64_engine.commit_graph());
+    f64_engine.set_sample_rate(48000U);
+    CHECK(f64_engine.apply_windows_volume(
+        "main", VolumeNotificationV1{0.0, false, 1U}) ==
+        VolumeNotificationResult::Accepted);
+
+    {
+        std::array<double, 1024> warmup{};
+        const RtLaneInputF64V1 warmup_view{warmup.data(), 2U};
+        std::array<double, 2048> warmup_out{};
+        for (int wi = 0; wi < 4; ++wi) {
+            CHECK(f64_engine.process_f64(
+                std::span<const RtLaneInputF64V1>(&warmup_view, 1),
+                warmup_out.data(), 512U));
+        }
+    }
+    std::fill_n(model_f64_output, std::size(model_f64_output),
+                std::numeric_limits<double>::quiet_NaN());
+    CHECK(f64_engine.process_f64(
+        std::span<const RtLaneInputF64V1>(&model_f64_view, 1),
+        model_f64_output, 2U));
+    // The default float32 graph remains valid for the model-level f64 path;
+    // lane mixing is already accumulated in double before Group Master.
+    const double default_gain = static_cast<double>(
+        static_cast<float>(std::pow(10.0f, -6.0205999f / 20.0f)));
+    const double expected_default = default_gain;
+    CHECK(std::abs(model_f64_output[0] -
+                   model_f64_input[0] * expected_default) < 1e-6);
+    CHECK(std::abs(model_f64_output[1] -
+                   model_f64_input[1] * expected_default) < 1e-6);
+
+    f64_default_graph.sample_format = kGraphSampleFormatFloat64V1;
+    CHECK(f64_engine.prepare_graph(f64_default_graph, 15U));
+    CHECK(f64_engine.commit_graph());
+    f64_engine.set_sample_rate(48000U);
+    CHECK(f64_engine.volume_state("main").effective_db == 0.0);
+    CHECK(f64_engine.apply_windows_volume(
+        "main", VolumeNotificationV1{0.0, false, 1U}) ==
+        VolumeNotificationResult::Accepted);
+
+    {
+        std::array<double, 1024> warmup{};
+        const RtLaneInputF64V1 warmup_view{warmup.data(), 2U};
+        std::array<double, 2048> warmup_out{};
+        for (int wi = 0; wi < 4; ++wi) {
+            CHECK(f64_engine.process_f64(
+                std::span<const RtLaneInputF64V1>(&warmup_view, 1),
+                warmup_out.data(), 512U));
+        }
+    }
+    CHECK(f64_engine.process_f64(
+        std::span<const RtLaneInputF64V1>(&model_f64_view, 1),
+        model_f64_output, 2U));
+    CHECK(std::abs(model_f64_output[0] /
+                       (model_f64_input[0] * default_gain) - 1.0) < 1e-6);
+    CHECK(std::abs(model_f64_output[3] /
+                       (model_f64_input[3] * default_gain) - 1.0) < 1e-6);
+    CHECK(!f64_engine.process_output_group_f64(
+        "missing",
+        std::span<const RtLaneInputF64V1>(&model_f64_view, 1),
+        model_f64_output, 2U));
+    std::fill_n(model_f64_output, std::size(model_f64_output),
+                std::numeric_limits<double>::quiet_NaN());
+    CHECK(f64_engine.process_output_group_f64(
+        "main",
+        std::span<const RtLaneInputF64V1>(&model_f64_view, 1),
+        model_f64_output, 2U));
+    CHECK(std::abs(model_f64_output[1] /
+                       (model_f64_input[1] * default_gain) - 1.0) < 1e-6);
+    CHECK(std::isfinite(model_f64_output[3]));
+
     DeviceSwitchTransaction transaction;
     CHECK(transaction.begin(DeviceTargetV1{"endpoint-a", 2, 48000, 128}));
     CHECK(transaction.prepare_complete());
@@ -4866,6 +4950,104 @@ int main() {
         CHECK(std::abs(live_engine->volume("side").requested_db + 10.0) < 1e-12);
         CHECK(live_engine->loudness_peq_transaction_idle() &&
               live_engine->has_active_loudness_peq("main"));
+
+        // Muted-volume proxy semantics: a mute=true notification keeps the
+        // curve targeting the unmuted listening level (70 + requested dB),
+        // so the estimate must not collapse toward the 20-phon floor. The
+        // accepted mute notification still applies to the volume bank.
+        ControlCommandV1 mute_command{};
+        mute_command.type = IpcMessageType::VolumeNotification;
+        mute_command.volume = VolumeNotificationV1{-20.0, true, 3U};
+        CHECK(live_worker.consume(mute_command) ==
+              EngineControlResultV1::Applied);
+        CHECK(live_engine->volume("main").mute);
+        CHECK(live_engine->loudness_peq_transaction_idle() &&
+              live_engine->has_active_loudness_peq("main"));
+    }
+
+    // Per-group debounce isolation: the debounce window and phon baseline
+    // belong to each output group's attachment, not to the engine. The model
+    // keeps one active loudness attachment at a time, so switching groups
+    // must not inherit the previous group's fresh debounce window, and
+    // updates targeting a non-active group stay fail-closed.
+    {
+        auto group_engine = std::make_unique<AudioEngineModel>();
+        GraphConfigV1 group_graph;
+        group_graph.lanes.push_back(LaneConfigV1{"group-main", "main", 2, 0.0, true});
+        group_graph.lanes.push_back(LaneConfigV1{"group-side", "side", 2, 0.0, true});
+        group_graph.strict_direct = false;
+        CHECK(group_engine->prepare_graph(group_graph, 1U) &&
+              group_engine->commit_graph());
+        group_engine->set_sample_rate(48000U);
+
+        const std::array<Iso226FormulaPointV1, 3> group_points{{
+            {100.0, 0.35, 50.0, 0.0},
+            {1000.0, 0.30, 2.4, 0.0},
+            {8000.0, 0.25, 50.0, 0.0}}};
+        EqualLoudnessPolicyV1 group_policy{};
+        group_policy.reference_phon = 80.0;
+        group_policy.strength = 1.0;
+        group_policy.max_boost_db = 6.0;
+
+        // No attachment exists yet: every live update is fail-closed.
+        CHECK(!group_engine->update_loudness_phon("side", 61.5));
+
+        CHECK(group_engine->prepare_loudness_peq(
+            "main", group_points, 70.0, group_policy));
+        CHECK(group_engine->commit_loudness_peq());
+        group_engine->set_loudness_live_update("main", true);
+        // Only the active group accepts updates; "side" has no attachment.
+        CHECK(!group_engine->update_loudness_phon("side", 61.5));
+
+        // "main" takes a big step (>=3 phon) and lands at 40 phon.
+        CHECK(group_engine->update_loudness_phon("main", 40.0));
+
+        // Switching the single attachment to "side" starts from that
+        // attachment's own prepare-time baseline (60 phon), so its small
+        // +1.5 phon step is accepted immediately instead of waiting out
+        // main's fresh debounce window.
+        CHECK(group_engine->prepare_loudness_peq(
+            "side", group_points, 60.0, group_policy));
+        CHECK(group_engine->commit_loudness_peq());
+        CHECK(!group_engine->has_active_loudness_peq("main"));
+        CHECK(!group_engine->update_loudness_phon("main", 41.0));
+        group_engine->set_loudness_live_update("side", true);
+        CHECK(group_engine->update_loudness_phon("side", 61.5));
+        // Back-to-back small steps are debounced by side's own window.
+        CHECK(!group_engine->update_loudness_phon("side", 62.0));
+
+        // After the window expires the same group's small step succeeds.
+        std::this_thread::sleep_for(std::chrono::milliseconds(260));
+        CHECK(group_engine->update_loudness_phon("side", 62.0));
+
+        // A live phon recompute is an attached-to-attached replace on the
+        // active group, so it must use the bounded equal-power RT crossfade
+        // instead of swapping filters mid-block. Rendering stays finite and
+        // the transaction completes within the fade budget.
+        std::array<float, 1024> live_fade_input{};
+        std::array<float, 2048> live_fade_output{};
+        const RtLaneInputV1 live_fade_view{live_fade_input.data(), 2U};
+        std::array<float, 1024> live_fade_idle{};
+        const RtLaneInputV1 live_fade_idle_view{live_fade_idle.data(), 2U};
+        const std::array<RtLaneInputV1, 2> live_fade_views{
+            {live_fade_idle_view, live_fade_view}};
+        CHECK(group_engine->prepare_loudness_peq(
+            "side", group_points, 62.0, group_policy));
+        CHECK(group_engine->commit_loudness_peq());
+        group_engine->set_loudness_live_update("side", true);
+        CHECK(group_engine->update_loudness_phon("side", 65.0));
+        CHECK(!group_engine->loudness_peq_transition_complete());
+        for (std::size_t fade_block = 0U;
+             fade_block < 6U && !group_engine->loudness_peq_transition_complete();
+             ++fade_block) {
+            CHECK(group_engine->process_output_group(
+                "side", live_fade_views, live_fade_output.data(), 1024U));
+            CHECK(std::all_of(live_fade_output.begin(), live_fade_output.end(),
+                              [](const float value) {
+                                  return std::isfinite(value);
+                              }));
+        }
+        CHECK(group_engine->loudness_peq_transition_complete());
     }
 
     // Program-aware level is a fixed-capacity output attachment. The Movie
