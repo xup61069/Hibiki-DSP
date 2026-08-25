@@ -72,6 +72,7 @@ function Get-ExtensionInteractiveControlOpenings([string]$popupHtml) {
 
 function Assert-ExtensionPopupControlNames([string]$popupHtml, [string]$sourceName) {
   $controls = @(Get-ExtensionInteractiveControlOpenings $popupHtml)
+  $seenControlIds = @{}
   $labelTargets = @{}
   foreach ($labelMatch in [regex]::Matches(
       $popupHtml,
@@ -81,6 +82,17 @@ function Assert-ExtensionPopupControlNames([string]$popupHtml, [string]$sourceNa
       $labelMatch.Groups['attributes'].Value,
       '(?<![A-Za-z-])id\s*=\s*["''](?<value>[^"'']+)["'']')
     if (!$targetIdMatch.Success) { continue }
+    foreach ($control in $controls) {
+      $controlIdMatch = [regex]::Match(
+        $control.Attributes,
+        '(?<![A-Za-z-])id\s*=\s*["''](?<value>[^"'']+)["'']')
+      if ($controlIdMatch.Success -and $controlIdMatch.Groups['value'].Value -eq $targetIdMatch.Groups['value'].Value) {
+        if ($seenControlIds.ContainsKey($targetIdMatch.Groups['value'].Value)) {
+          throw "Duplicate interactive control id '$($targetIdMatch.Groups['value'].Value)' at $($sourceName):$($control.Line); ids must be unique so getElementById resolves the intended element."
+        }
+        $seenControlIds[$targetIdMatch.Groups['value'].Value] = $true
+      }
+    }
     $targetId = $targetIdMatch.Groups['value'].Value
     $targetText = $labelMatch.Groups['text'].Value -replace '<[^>]+>', ' '
     if (!$labelTargets.ContainsKey($targetId)) {
@@ -591,7 +603,7 @@ connect-src   ws://127.0.0.1:17842
   $popupValidLines = @(
     '<button type="button" aria-label="Capture this tab">Capture</button>',
     "<input type='text' aria-label='Tab title' />",
-    '<button id="capture" aria-labelledby="capture">Capture</button><p id="capture">Capture</p>'
+    '<button id="capture-btn" aria-labelledby="capture">Capture</button><p id="capture">Capture</p>'
   )
   $popupValid = $popupValidLines -join [Environment]::NewLine
   if ((Assert-ExtensionPopupControlNames $popupValid 'selftest-popup-valid.html') -ne 3) {
@@ -630,7 +642,18 @@ connect-src   ws://127.0.0.1:17842
   }
   if (-not $popupEmptyLabelTargetCaught) { throw 'Extension accessibility self-test expected an empty labelledby target failure.' }
 
-  Write-Output 'Browser extension policy self-test passed (50 cases).'
+  $popupDuplicateId = @'
+  <button id="capture" type="button" aria-label="Capture">Capture</button>
+  <button id="capture" type="button" aria-label="Capture again">Capture again</button>
+'@
+  $popupDuplicateIdCaught = $false
+  try { [void](Assert-ExtensionPopupControlNames $popupDuplicateId 'selftest-popup-duplicate-id.html') } catch {
+    $popupDuplicateIdCaught = $true
+    if ($_.Exception.Message -notmatch "Duplicate interactive control id 'capture' at selftest-popup-duplicate-id.html:2") { throw }
+  }
+  if (-not $popupDuplicateIdCaught) { throw 'Extension accessibility self-test expected a duplicate control id failure.' }
+
+  Write-Output 'Browser extension policy self-test passed (52 cases).'
   exit 0
 }
 
