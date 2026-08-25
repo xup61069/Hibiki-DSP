@@ -1392,6 +1392,90 @@ int main() {
     RtGraphSnapshotV1 f64_bad_snapshot;
     CHECK(!compile_rt_snapshot(f64_graph, 13U, f64_bad_snapshot));
 
+    AudioEngineModel f64_engine;
+    const double model_f64_input[] = {0.1, -0.2, 1.0, 0.25};
+    const RtLaneInputF64V1 model_f64_view{model_f64_input, 2U};
+    double model_f64_output[4]{};
+    CHECK(!f64_engine.process_f64(
+        std::span<const RtLaneInputF64V1>(&model_f64_view, 1),
+        model_f64_output, 2U));
+
+    GraphConfigV1 f64_default_graph;
+    f64_default_graph.output_channels = 2U;
+    f64_default_graph.lanes.push_back(LaneConfigV1{"model-f64", "main", 2U,
+                                                   -6.0205999, true});
+    CHECK(f64_engine.prepare_graph(f64_default_graph, 14U));
+    CHECK(f64_engine.commit_graph());
+    f64_engine.set_sample_rate(48000U);
+    CHECK(f64_engine.apply_windows_volume(
+        "main", VolumeNotificationV1{0.0, false, 1U}) ==
+        VolumeNotificationResult::Accepted);
+
+    {
+        std::array<double, 1024> warmup{};
+        const RtLaneInputF64V1 warmup_view{warmup.data(), 2U};
+        std::array<double, 2048> warmup_out{};
+        for (int wi = 0; wi < 4; ++wi) {
+            CHECK(f64_engine.process_f64(
+                std::span<const RtLaneInputF64V1>(&warmup_view, 1),
+                warmup_out.data(), 512U));
+        }
+    }
+    std::fill_n(model_f64_output, std::size(model_f64_output),
+                std::numeric_limits<double>::quiet_NaN());
+    CHECK(f64_engine.process_f64(
+        std::span<const RtLaneInputF64V1>(&model_f64_view, 1),
+        model_f64_output, 2U));
+    // The default float32 graph remains valid for the model-level f64 path;
+    // lane mixing is already accumulated in double before Group Master.
+    const double default_gain = static_cast<double>(
+        static_cast<float>(std::pow(10.0f, -6.0205999f / 20.0f)));
+    const double expected_default = default_gain;
+    CHECK(std::abs(model_f64_output[0] -
+                   model_f64_input[0] * expected_default) < 1e-6);
+    CHECK(std::abs(model_f64_output[1] -
+                   model_f64_input[1] * expected_default) < 1e-6);
+
+    f64_default_graph.sample_format = kGraphSampleFormatFloat64V1;
+    CHECK(f64_engine.prepare_graph(f64_default_graph, 15U));
+    CHECK(f64_engine.commit_graph());
+    f64_engine.set_sample_rate(48000U);
+    CHECK(f64_engine.volume_state("main").effective_db == 0.0);
+    CHECK(f64_engine.apply_windows_volume(
+        "main", VolumeNotificationV1{0.0, false, 1U}) ==
+        VolumeNotificationResult::Accepted);
+
+    {
+        std::array<double, 1024> warmup{};
+        const RtLaneInputF64V1 warmup_view{warmup.data(), 2U};
+        std::array<double, 2048> warmup_out{};
+        for (int wi = 0; wi < 4; ++wi) {
+            CHECK(f64_engine.process_f64(
+                std::span<const RtLaneInputF64V1>(&warmup_view, 1),
+                warmup_out.data(), 512U));
+        }
+    }
+    CHECK(f64_engine.process_f64(
+        std::span<const RtLaneInputF64V1>(&model_f64_view, 1),
+        model_f64_output, 2U));
+    CHECK(std::abs(model_f64_output[0] /
+                       (model_f64_input[0] * default_gain) - 1.0) < 1e-6);
+    CHECK(std::abs(model_f64_output[3] /
+                       (model_f64_input[3] * default_gain) - 1.0) < 1e-6);
+    CHECK(!f64_engine.process_output_group_f64(
+        "missing",
+        std::span<const RtLaneInputF64V1>(&model_f64_view, 1),
+        model_f64_output, 2U));
+    std::fill_n(model_f64_output, std::size(model_f64_output),
+                std::numeric_limits<double>::quiet_NaN());
+    CHECK(f64_engine.process_output_group_f64(
+        "main",
+        std::span<const RtLaneInputF64V1>(&model_f64_view, 1),
+        model_f64_output, 2U));
+    CHECK(std::abs(model_f64_output[1] /
+                       (model_f64_input[1] * default_gain) - 1.0) < 1e-6);
+    CHECK(std::isfinite(model_f64_output[3]));
+
     DeviceSwitchTransaction transaction;
     CHECK(transaction.begin(DeviceTargetV1{"endpoint-a", 2, 48000, 128}));
     CHECK(transaction.prepare_complete());
