@@ -129,6 +129,10 @@ public:
 
     [[nodiscard]] const SceneProfileV1& active_scene() const noexcept { return active_scene_; }
     [[nodiscard]] const EqualLoudnessPolicyV1& active_loudness() const noexcept { return active_loudness_; }
+    [[nodiscard]] bool update_loudness_phon(std::string_view output_group,
+                                            double new_phon) noexcept {
+        return engine_.update_loudness_phon(output_group, new_phon);
+    }
     [[nodiscard]] bool has_active_scene() const noexcept { return has_active_scene_; }
     [[nodiscard]] std::uint64_t revision() const noexcept { return revision_; }
 

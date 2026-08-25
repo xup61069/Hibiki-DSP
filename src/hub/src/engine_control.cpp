@@ -193,6 +193,9 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             candidate_loudness.strength > 0.0 &&
             candidate_loudness.live_update_enabled &&
             validate_policy(candidate_loudness);
+        // Capture before the swaps below: after std::swap(candidate_loudness,
+        // active_loudness_) the variable holds the previous scene's policy.
+        const bool enable_live_after_commit = mount_loudness_peq;
         if (mount_loudness_peq) {
             const Iso226FormulaPointV1 live_points{
                 1000.0, 0.30, 2.4, 0.0};
@@ -234,12 +237,6 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
         }
         std::swap(active_scene_, candidate_scene);
         std::swap(active_loudness_, candidate_loudness);
-        // The live-update switch belongs to the attachment; opt in after the
-        // commit when the scene's policy requests it. Failure is non-fatal:
-        // the attachment stays mounted but live recompute remains disabled.
-        if (mount_loudness_peq && candidate_loudness.live_update_enabled) {
-            engine_.set_loudness_live_update(output_group, true);
-        }
         if (!engine_.commit_graph()) {
             std::swap(active_scene_, candidate_scene);
             std::swap(active_loudness_, candidate_loudness);
@@ -277,6 +274,14 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             engine_.rollback_loudness_peq();
             engine_.rollback_program_aware();
             return EngineControlResultV1::Failed;
+        }
+        // Every prepare_loudness_peq resets the new attachment's live-update
+        // switch to opt-in, so the captured enable decision must run after
+        // all commits have succeeded. Failure is non-fatal: the attachment
+        // stays mounted but live phon recompute remains disabled until an
+        // explicit opt-in.
+        if (enable_live_after_commit) {
+            engine_.set_loudness_live_update(output_group, true);
         }
         revision_ = next_revision;
         has_active_scene_ = true;

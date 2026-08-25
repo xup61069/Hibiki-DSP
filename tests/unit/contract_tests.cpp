@@ -4877,6 +4877,12 @@ int main() {
               EngineControlResultV1::Applied);
         CHECK(loudness_engine->loudness_peq_transaction_idle() &&
               loudness_engine->has_active_loudness_peq("main"));
+        // The committed attachment must actually accept live phon updates:
+        // prepare_loudness_peq resets the switch to opt-in, so a scene apply
+        // that only mounts the attachment without enabling it after commit
+        // would leave this update rejected (regression guard for the commit
+        // ordering of the scene-driven opt-in).
+        CHECK(loudness_scene_worker.update_loudness_phon("main", 76.0));
         CHECK(std::abs(loudness_scene_worker.active_loudness().reference_phon -
                        80.0) < 1e-12);
     }
