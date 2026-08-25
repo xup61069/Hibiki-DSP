@@ -5340,6 +5340,12 @@ int main() {
         CHECK(movie_engine.has_active_program_aware("main") &&
               movie_engine.program_aware_transaction_idle());
 
+        // The committed attachment must carry the live opt-in: a direct
+        // recompute request succeeds only when the flag survives the
+        // pending-to-active promotion during SceneApply commit.
+        // 80 -> 66 phon is a >=3 phon step, so debounce cannot mask it.
+        CHECK(movie_engine.update_loudness_phon("main", 66.0));
+
         // The built-in Movie attachment is live-enabled, so an accepted large
         // volume step immediately recomputes its bounded phon curve.
         movie_engine.set_sample_rate(48000U);
