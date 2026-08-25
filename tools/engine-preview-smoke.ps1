@@ -7,6 +7,7 @@ param(
   [switch]$EnableWasapiOutput,
   [switch]$EnableTestTone,
   [switch]$EnableTabBridge,
+  [switch]$EnableTabNoiseSuppressor,
   [switch]$StatusOnly,
   [switch]$SelfTest
 )
@@ -440,6 +441,10 @@ if ($EnableTestTone) {
 if ($EnableTabBridge) {
   if (-not $EnableWasapiOutput) { throw 'EnableTabBridge requires EnableWasapiOutput.' }
   $engineArguments += '--enable-tab-bridge'
+}
+if ($EnableTabNoiseSuppressor) {
+  if (-not $EnableTabBridge) { throw 'EnableTabNoiseSuppressor requires EnableTabBridge.' }
+  $engineArguments += '--enable-tab-noise-suppressor'
 }
 $engineProcess = Start-Process -FilePath $engine -ArgumentList $engineArguments `
   -WorkingDirectory $smokePlan.EngineWorkingDirectory -WindowStyle Hidden -PassThru
