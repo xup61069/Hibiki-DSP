@@ -45,6 +45,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: ./tools/handoff-check.ps1 -Issue ${{ steps.handoff.outputs.issue }}
 
+      - name: Commit message integrity gate
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: ./tools/run-commit-message-gate.ps1
+
       - name: Configure and test unsigned source
         shell: pwsh
         run: ./tools/verify.ps1
