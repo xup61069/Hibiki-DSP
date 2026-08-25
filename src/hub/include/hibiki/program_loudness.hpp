@@ -10,7 +10,7 @@
 
 namespace hibiki {
 
-inline constexpr std::size_t kTelemetryDoubleCountV1 = 2U;
+inline constexpr std::size_t kTelemetryDoubleCountV1 = 3U;
 
 // Slow content-aware level correction. The default remains a bounded RMS proxy
 // for backwards compatibility. KWeightedProxy adds the two fixed K-weighting
@@ -37,6 +37,12 @@ struct ProgramAwareLevelPolicyV1 {
     // below zero keeps every channel; callers may set 3 for the usual LPCM
     // L/R/C/LFE/… order. This is a hint, not a channel-layout assertion.
     std::int32_t excluded_channel{-1};
+    // Opt-in content-driven bass correction. When enabled, a fixed one-pole
+    // low-pass (~120 Hz) measures the bass-to-broadband energy ratio over a
+    // sliding two-second window and applies a bounded low-shelf attenuation
+    // on the RT thread when bass clearly dominates.
+    bool bass_correction_enabled{false};
+    double bass_max_cut_db{6.0};
 };
 
 struct ProgramAwareLevelStatusV1 {
@@ -48,6 +54,7 @@ struct ProgramAwareLevelStatusV1 {
     double desired_gain_db{0.0};
     double applied_gain_db{0.0};
     ProgramAwareMeterModeV1 meter_mode{ProgramAwareMeterModeV1::RmsProxy};
+    double bass_correction_gain_db{0.0};
 };
 
 // Control-plane projection of RT-owned status. This is bounded visual
@@ -59,11 +66,41 @@ struct ProgramAwareTelemetrySnapshotV1 {
     bool silence_gated{true};
     double measured_dbfs{-144.0};
     double applied_gain_db{0.0};
+    double bass_correction_gain_db{0.0};
     std::uint64_t sequence{0U};
 };
 
 [[nodiscard]] bool validate_program_aware_policy(
     const ProgramAwareLevelPolicyV1& policy) noexcept;
+
+// RT-safe bass-excess detector. One-pole low-pass per channel (~120 Hz),
+// exponentially smoothed bass/broadband energy ratio over a ~2 s window.
+// No allocation, lock, wait, or platform call.
+class BassExcessDetectorV1 final {
+public:
+    BassExcessDetectorV1() noexcept = default;
+    BassExcessDetectorV1(const BassExcessDetectorV1&) = delete;
+    BassExcessDetectorV1& operator=(const BassExcessDetectorV1&) = delete;
+    [[nodiscard]] bool configure(std::uint32_t sample_rate) noexcept;
+    void reset() noexcept;
+    // Processes one interleaved block read-only and updates the smoothed
+    // bass-excess estimate. Returns false on invalid input.
+    [[nodiscard]] bool process(const float* interleaved, std::size_t frames,
+                               std::uint32_t channels) noexcept;
+    // Smoothed dB difference 20*log10(band_rms / total_rms); <= 0. Near 0
+    // means bass-dominated content. Returns -144 before enough data.
+    [[nodiscard]] double smoothed_excess_db() const noexcept { return smoothed_excess_db_; }
+
+private:
+    static constexpr double kBassCutoffHz = 120.0;
+    static constexpr double kWindowSeconds = 2.0;
+    std::uint32_t sample_rate_{0U};
+    std::array<double, 8U> lp_state_{};
+    double smoothed_band_energy_{0.0};
+    double smoothed_total_energy_{0.0};
+    double smoothed_excess_db_{-144.0};
+    bool window_started_{false};
+};
 
 // RT-owned, allocation-free level controller. The caller supplies the audio
 // block; process only copies scalar state and never allocates or waits.
@@ -115,6 +152,8 @@ private:
     std::uint32_t sample_rate_{0U};
     bool configured_{false};
     double smoothed_energy_{0.0};
+    double bass_cut_db_{0.0};
+    BassExcessDetectorV1 bass_detector_{};
 
     std::array<Biquad, 2U> k_weighting_{};
     std::array<std::array<BiquadState, 8U>, 2U> k_state_{};

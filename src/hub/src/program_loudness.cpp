@@ -83,13 +83,88 @@ bool validate_program_aware_policy(const ProgramAwareLevelPolicyV1& policy) noex
            std::isfinite(policy.max_rate_db_per_second) &&
            policy.max_rate_db_per_second > 0.0 && policy.max_rate_db_per_second <= 60.0 &&
            std::isfinite(policy.silence_gate_dbfs) && policy.silence_gate_dbfs >= -144.0 &&
-           policy.silence_gate_dbfs < 0.0;
+           policy.silence_gate_dbfs < 0.0 &&
+           std::isfinite(policy.bass_max_cut_db) && policy.bass_max_cut_db >= 0.0 &&
+           policy.bass_max_cut_db <= 12.0;
+}
+
+bool BassExcessDetectorV1::configure(const std::uint32_t sample_rate) noexcept {
+    if (sample_rate < 8000U || sample_rate > 192000U) return false;
+    sample_rate_ = sample_rate;
+    reset();
+    return true;
+}
+
+void BassExcessDetectorV1::reset() noexcept {
+    lp_state_.fill(0.0);
+    smoothed_band_energy_ = 0.0;
+    smoothed_total_energy_ = 0.0;
+    smoothed_excess_db_ = -144.0;
+    window_started_ = false;
+}
+
+bool BassExcessDetectorV1::process(const float* const interleaved,
+                                   const std::size_t frames,
+                                   const std::uint32_t channels) noexcept {
+    if (sample_rate_ == 0U || interleaved == nullptr || frames == 0U ||
+        channels == 0U || channels > lp_state_.size()) {
+        return false;
+    }
+    // One-pole coefficient from the fixed ~120 Hz cutoff; recomputed only on
+    // configure via sample_rate_, so this stays allocation-free per block.
+    const double rc = 1.0 / (2.0 * 3.14159265358979323846 * kBassCutoffHz);
+    const double dt = 1.0 / static_cast<double>(sample_rate_);
+    const double alpha = std::clamp(dt / (rc + dt), 0.0, 1.0);
+
+    double band_energy = 0.0;
+    double total_energy = 0.0;
+    std::size_t finite_count = 0U;
+    for (std::size_t frame = 0U; frame < frames; ++frame) {
+        for (std::uint32_t channel = 0U; channel < channels; ++channel) {
+            const double input =
+                std::isfinite(interleaved[frame * channels + channel])
+                    ? static_cast<double>(interleaved[frame * channels + channel])
+                    : 0.0;
+            auto& state = lp_state_[channel];
+            state += alpha * (input - state);
+            band_energy += state * state;
+            total_energy += input * input;
+            ++finite_count;
+        }
+    }
+    if (finite_count == 0U) return true;
+    band_energy /= static_cast<double>(finite_count);
+    total_energy /= static_cast<double>(finite_count);
+
+    const double block_seconds =
+        static_cast<double>(frames) / static_cast<double>(sample_rate_);
+    const double window_alpha =
+        std::clamp(1.0 - std::exp(-block_seconds / kWindowSeconds), 0.0, 1.0);
+    if (!window_started_) {
+        smoothed_band_energy_ = band_energy;
+        smoothed_total_energy_ = total_energy;
+        window_started_ = true;
+    } else {
+        smoothed_band_energy_ += window_alpha * (band_energy - smoothed_band_energy_);
+        smoothed_total_energy_ += window_alpha * (total_energy - smoothed_total_energy_);
+    }
+    if (smoothed_total_energy_ > 0.0 && smoothed_band_energy_ > 0.0) {
+        smoothed_excess_db_ =
+            std::clamp(10.0 * std::log10(smoothed_band_energy_ /
+                                          smoothed_total_energy_),
+                       -144.0, 0.0);
+    } else {
+        smoothed_excess_db_ = -144.0;
+    }
+    return true;
 }
 
 void ProgramAwareLevelControllerV1::store_telemetry() noexcept {
     telemetry_doubles_[0].store(status_.measured_dbfs,
                                 std::memory_order_relaxed);
     telemetry_doubles_[1].store(status_.applied_gain_db,
+                                std::memory_order_relaxed);
+    telemetry_doubles_[2].store(status_.bass_correction_gain_db,
                                 std::memory_order_relaxed);
     telemetry_enabled_.store(status_.enabled, std::memory_order_relaxed);
     telemetry_silence_gated_.store(status_.silence_gated,
@@ -111,15 +186,18 @@ ProgramAwareLevelControllerV1::read_telemetry() const noexcept {
         telemetry_doubles_[0].load(std::memory_order_acquire);
     const double applied_gain =
         telemetry_doubles_[1].load(std::memory_order_acquire);
+    const double bass_gain =
+        telemetry_doubles_[2].load(std::memory_order_acquire);
     const auto after = telemetry_sequence_.load(std::memory_order_acquire);
     // A torn read is fail-closed: the caller keeps the previous safe visual
     // frame instead of publishing a mixed-generation projection.
     if (before != after || !std::isfinite(measured) ||
-        !std::isfinite(applied_gain)) {
+        !std::isfinite(applied_gain) || !std::isfinite(bass_gain)) {
         return ProgramAwareTelemetrySnapshotV1{};
     }
     snapshot.measured_dbfs = measured;
     snapshot.applied_gain_db = applied_gain;
+    snapshot.bass_correction_gain_db = bass_gain;
     snapshot.sequence = after;
     return snapshot;
 }
@@ -133,6 +211,9 @@ bool ProgramAwareLevelControllerV1::configure(const ProgramAwareLevelPolicyV1& p
     sample_rate_ = sample_rate;
     k_weighting_[0] = make_high_pass(sample_rate);
     k_weighting_[1] = make_high_shelf(sample_rate);
+    if (policy_.bass_correction_enabled) {
+        (void)bass_detector_.configure(sample_rate);
+    }
     configured_ = true;
     reset();
     status_.enabled = policy_.enabled;
@@ -141,6 +222,8 @@ bool ProgramAwareLevelControllerV1::configure(const ProgramAwareLevelPolicyV1& p
 
 void ProgramAwareLevelControllerV1::reset() noexcept {
     smoothed_energy_ = 0.0;
+    bass_cut_db_ = 0.0;
+    bass_detector_.reset();
     status_ = {};
     status_.schema_version = 1U;
     status_.enabled = policy_.enabled;
@@ -210,11 +293,34 @@ bool ProgramAwareLevelControllerV1::process_interleaved(float* const interleaved
                                   -max_step, max_step);
     status_.applied_gain_db = std::clamp(status_.applied_gain_db + delta,
                                          -policy_.max_cut_db, policy_.max_boost_db);
+    // Content-driven bass correction: when enabled and the signal is live,
+    // a clear bass excess (smoothed band/total ratio near 0 dB) drives a
+    // bounded low-shelf cut. The gain slews at the same bounded rate as the
+    // level gain so the RT path stays click-free.
+    status_.bass_correction_gain_db = 0.0;
+    if (policy_.bass_correction_enabled && !status_.silence_gated) {
+        (void)bass_detector_.process(interleaved, frames, channels);
+        constexpr double kFullCutExcessDb = -1.0;   // near 0 dB: bass dominates
+        constexpr double kNoCutExcessDb = -10.0;    // balanced spectrum
+        const double excess = bass_detector_.smoothed_excess_db();
+        const double target_cut =
+            std::clamp((kNoCutExcessDb - excess) /
+                           (kNoCutExcessDb - kFullCutExcessDb),
+                       0.0, 1.0) * policy_.bass_max_cut_db;
+        const double cut_delta = std::clamp(target_cut - bass_cut_db_,
+                                             -max_step, max_step);
+        bass_cut_db_ = std::clamp(bass_cut_db_ + cut_delta,
+                                  0.0, policy_.bass_max_cut_db);
+        status_.bass_correction_gain_db = -bass_cut_db_;
+    }
     store_telemetry();
     const auto linear_gain = static_cast<float>(
         std::pow(10.0, std::clamp(status_.applied_gain_db, -144.0, 12.0) / 20.0));
+    const auto bass_linear = static_cast<float>(
+        std::pow(10.0, status_.bass_correction_gain_db / 20.0));
     for (std::size_t index = 0U; index < samples; ++index) {
         interleaved[index] *= linear_gain;
+        interleaved[index] *= bass_linear;
     }
     return true;
 }
