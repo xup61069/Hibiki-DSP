@@ -191,6 +191,15 @@ source、最多 32 組頻率/增益點），存入 bounded control-plane cache�
 不是音訊內容偵測，也不是 driver／實體音訊 evidence；缺少快照時 request 回 Error，
 UI 必須保留上一個安全畫面。
 
+已提交且 enabled、未靜音、非 Strict Direct 的 program-aware level attachment，
+會在 applied gain 相對上一個已發布值有 >=0.25 dB 的量化變化且距離上次發布
+>=1 秒時，發布一次 source=2 的 `EqVisualSnapshotV1`。此自適應校正視覺幀使用
+與 equal-loudness 幀相同的 bounded wire format（至少四點、頻率遞增、增益
+±24 dB 內），且 sequence 與 equal-loudness 共用同一全域單調空間；無變化或靜音
+閘門開啟時不得重複發布。RT 供給 lock-free telemetry projection，control read
+撕裂或非有限值時 fail-closed。這仍是控制面視覺回饋，不是內容分析、BS.1770
+metering、ISO 226 conformance 或實體音訊 evidence。
+
 Scene attachment 的聲道數在 graph transaction 準備時解析。若 transaction 已有 pending
 graph，等響度 PEQ 與 multi-channel IR 必須以該 pending graph 的 output channels 編譯；
 否則才使用 active graph，沒有 graph 時 IR 使用 IR 自身的 channel layout。這讓

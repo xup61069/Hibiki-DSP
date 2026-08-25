@@ -1,6 +1,9 @@
 #include "hibiki/engine_control.hpp"
 
+#include <array>
 #include <algorithm>
+#include <cmath>
+#include <chrono>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -402,6 +405,51 @@ std::size_t EngineControlWorkerV1::drain(ControlCommandQueueV1& queue,
         (void)consume(command);
         ++processed;
     }
+
+    // After the command drain, publish an adaptive visual frame only when the
+    // engine confirms committed, enabled, non-silence-gated telemetry and the
+    // applied gain moved by at least 0.25 dB after the one-second rate limit.
+    // Silence/disabled/invalid states do not clear the previous safe frame.
+    const auto pa = engine_.program_aware_visual_snapshot();
+    const auto now = std::chrono::steady_clock::now();
+    const bool gain_changed = !has_published_adaptive_ ||
+        std::abs(pa.applied_gain_db - last_published_adaptive_gain_db_) >= 0.25;
+    const bool rate_limit_elapsed = !has_published_adaptive_ ||
+        now - last_adaptive_publish_time_ >= std::chrono::milliseconds(1000);
+    if (pa.valid && !pa.silence_gated && std::isfinite(pa.applied_gain_db) &&
+        gain_changed && rate_limit_elapsed) {
+        EqVisualSnapshotV1 visual{};
+        visual.sequence = next_eq_visual_sequence_;
+        visual.source = 2U;  // AdaptiveCorrection
+
+        // Bounded low-shelf proxy: represent the applied gain as a simple
+        // four-point curve that decays toward unity above the correction
+        // band. This shows what the level controller changed, not a formal
+        // BS.1770 or ISO 226 response.
+        const double gain = pa.applied_gain_db;
+        constexpr std::array<double, 4> frequencies{31.0, 120.0, 1000.0, 8000.0};
+        constexpr double shelf_ratios[4] = {1.0, 0.7, 0.3, 0.0};
+        for (std::size_t index = 0U; index < frequencies.size(); ++index) {
+            visual.points[index].frequency_hz = frequencies[index];
+            visual.points[index].gain_db = gain * shelf_ratios[index];
+        }
+
+        std::array<std::uint8_t, kEqVisualSnapshotPayloadBytesV1> encoded{};
+        std::size_t encoded_bytes = 0U;
+        EqVisualSnapshotV1 decoded{};
+        if (eq_visual_publisher_ != nullptr &&
+            encode_eq_visual_snapshot_v1(visual, encoded, encoded_bytes) &&
+            decode_eq_visual_snapshot_v1(
+                std::span<const std::uint8_t>(encoded.data(), encoded_bytes),
+                decoded)) {
+            ++next_eq_visual_sequence_;
+            last_published_adaptive_gain_db_ = pa.applied_gain_db;
+            has_published_adaptive_ = true;
+            last_adaptive_publish_time_ = now;
+            eq_visual_publisher_(decoded, eq_visual_publisher_context_);
+        }
+    }
+
     return processed;
 }
 
