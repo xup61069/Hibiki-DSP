@@ -3,7 +3,7 @@ id: SPEC-0019
 status: accepted
 owner: hibiki-maintainers
 authority: control-plane
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-25
 review_after_days: 30
 related_adrs: [ADR-0002, ADR-0004]
 source_globs: ["src/hub/include/hibiki/session_catalog.hpp", "src/hub/src/session_catalog.cpp", "src/hub/include/hibiki/windows_audio_session_route.hpp", "src/hub/src/windows_audio_session_route.cpp", "src/hub/include/hibiki/windows_device_catalog.hpp", "src/hub/src/windows_device_catalog.cpp", "src/hub/include/hibiki/control_service.hpp", "src/hub/src/control_service.cpp", "apps/control-model/SessionCatalogModel.cs", "apps/control-model/IpcProtocol.cs", "apps/control-model/EasyControlViewModel.cs", "tests/unit/contract_tests.cpp", "apps/control-model-check/Program.cs"]

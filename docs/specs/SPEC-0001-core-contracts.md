@@ -3,7 +3,7 @@ id: SPEC-0001
 status: accepted
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-24
+last_reviewed: 2026-08-25
 review_after_days: 30
 related_adrs: [ADR-0001, ADR-0002]
 source_globs: ["src/**", "schemas/**", "config/distribution-profile.yml"]

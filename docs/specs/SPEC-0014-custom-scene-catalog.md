@@ -3,7 +3,7 @@ id: SPEC-0014
 status: accepted
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-24
+last_reviewed: 2026-08-25
 review_after_days: 30
 related_adrs: [ADR-0002]
 source_globs: ["src/hub/**scene_catalog*", "src/hub/**engine_control*", "apps/control-model/**Scene*", "apps/winui-shell/**", "schemas/scene-definition-v1.schema.json", "schemas/custom-scene-cards-v1.schema.json", "schemas/scene-profile-v1.schema.json", "schemas/scene-sync-queue-v1.schema.json", "tests/**"]

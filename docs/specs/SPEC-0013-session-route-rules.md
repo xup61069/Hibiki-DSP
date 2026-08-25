@@ -3,7 +3,7 @@ id: SPEC-0013
 status: accepted
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-25
 review_after_days: 30
 related_adrs: [ADR-0002]
 source_globs: ["src/hub/include/hibiki/session_route_rules.hpp", "src/hub/src/session_route_rules.cpp", "src/hub/include/hibiki/windows_audio_session_route.hpp", "src/hub/src/windows_audio_session_route.cpp", "schemas/session-route-rule-v1.schema.json", "tests/**"]
