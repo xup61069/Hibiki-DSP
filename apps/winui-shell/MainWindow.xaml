@@ -586,8 +586,7 @@
     </Grid>
   </controls:NavigationView.Content>
 </controls:NavigationView>
-    <Border Grid.Row="2" Style="{StaticResource FooterAccentBorderStyle}" Padding="36,12,36,16"
-            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+    <Border Grid.Row="2" Style="{StaticResource FooterAccentBorderStyle}">
         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
             <FontIcon FontSize="12" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" Glyph="&#xE946;" />
             <TextBlock Text="Easy 模式只顯示安全操作；切換 Expert 才會顯示 Matrix、DSP Graph、IR 與 VST3。"
