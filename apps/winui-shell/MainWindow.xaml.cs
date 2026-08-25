@@ -201,6 +201,7 @@ public sealed partial class MainWindow : Window
             _eqVisualTransitionTimer ??= Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().CreateTimer();
             if (_eqVisualTransitionTimer is not null)
             {
+                _eqVisualTransitionTimer.Tick -= OnEqVisualTransitionTick;
                 _eqVisualTransitionTimer.Interval = TimeSpan.FromMilliseconds(16);
                 _eqVisualTransitionTimer.IsRepeating = true;
                 _eqVisualTransitionTimer.Tick += OnEqVisualTransitionTick;
