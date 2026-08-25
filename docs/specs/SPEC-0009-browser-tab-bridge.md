@@ -57,7 +57,11 @@ capture-state / get-capture-state path 回報 bounded reconnect state：connecte
 retrying、exhausted 或 idle；popup 在 capture 中顯示等待重試、正在重試或已停止重試，
 而不是只顯示靜態未連線。重試用完時 tab playback 繼續且 packet 繼續丟棄；手動 Stop
 或串流自然結束仍會完整 teardown graph 並取消重試。receiver 已限制 localhost、WebSocket frame 大小、mask、ping/close
-與 decoder 驗證。`TabCaptureQueueV1` 將 validated packet 複製到四格固定 SPSC ring，
+與 decoder 驗證。offscreen 追蹤累計送出的 packet 總數 `totalPackets`（每次 Start capture
+歸零）與既有 `droppedPackets`；兩個匿名計數器都會放進 capture-state / get-capture-state
+path，popup 的「複製診斷資訊」快照也會包含這兩行，讓使用者貼進 issue 的快照能直接顯示
+packet 是否有在送出或全部被丟棄。此計數是 user-space 匿名健康資訊，不宣稱 engine 接收率
+或音訊品質。`TabCaptureQueueV1` 將 validated packet 複製到四格固定 SPSC ring，
 控制執行緒可用 `enqueue_tab_capture_packet_v1` 作 callback，RT lane 再以 caller-owned
 buffer pop；滿載會回報 dropped blocks，不阻塞 WebSocket。`process_tab_capture_lane_v1`
 會把一個 queue block 送入 `AudioEngineModel::process_lane_block`，因此沿用同一份
