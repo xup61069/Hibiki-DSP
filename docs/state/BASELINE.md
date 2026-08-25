@@ -2,6 +2,8 @@
 
 ## 已完成（有 commit 與 evidence）
 
+第四十二波（wave 42）文件收尾註記：大膽現代視覺樣式已透過 PR #1569 還原至 main；正式 WinUI 恢復實色 section card、footer accent 左邊框、隱含按鈕 6px 圓角、InfoBar 12px 圓角與 section 入場轉場。Issue #1555 的原始 UI 目標已由多個已完成整合切片覆蓋，本切片僅補上 baseline 收尾說明，不改 UI、engine、wire contract 或 runtime 行為。
+
 
 第四十一波（wave 41）整合增量已合併兩項能力：(1) Engine Preview 的 WAV file source 新增控制面離線 polyphase resample：當檔案取樣率與 prepared sink 不同時，先驗證比值在 0.25x–4.0x 內，再用 bounded PersistentPolyphaseResampler 對整個解碼緩衝區做一次性轉換，讓 44.1 kHz 音樂檔在 48 kHz shared-mode endpoint 上直接播放而不再 fail-closed 拒收；rate-matched 路徑行為不變，status detail 誠實標示 resampled 資訊，超範圍或解碼失敗仍 fail-closed。此為控制面離線 evidence，RT path 維持無配置純拷貝（Issue #1517 / PR #1519）。(2) Control model 為 program-aware level controller 建立 bounded、fail-closed 的 adaptive correction EQ visual frame 發布契約：committed 且 enabled 的非 Strict Direct attachment 在 applied gain 相對上一個已發布值有 >=0.25 dB 變化且距離上次發布超過 rate limit 時，把確認幀存入既有 EqVisualSnapshotV1 cache；disabled、silence-gated、未掛載或 Strict Direct 時不發布新幀且 UI 保留上一個安全畫面，讓現代等化器能呈現內容音量校正正在作用的視覺回饋。此為 control-plane visual projection，不是 ISO 226 或實體音訊 evidence（Issue #1515 / PR #1522）。以上皆屬 user-space source/engine contract/control/docs evidence；不宣稱 driver/WaveRT/HLK 或簽章。
 
