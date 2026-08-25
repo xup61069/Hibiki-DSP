@@ -516,6 +516,17 @@
                     </StackPanel>
                     <TextBlock Text="載入耳機或喇叭的量測文字檔，選擇目標曲線，編譯成有安全上限的 PEQ 校正設定。" TextWrapping="Wrap" Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     <ComboBox Header="目標曲線" ItemsSource="{Binding WizardCurveOptions}" DisplayMemberPath="Label" SelectedValuePath="Mode" SelectedValue="{Binding WizardTargetCurve, Mode=TwoWay}" AutomationProperties.Name="校正精靈目標曲線" AutomationProperties.HelpText="Flat 只校正量測誤差；Harman 曲線套用對應耳機目標" HorizontalAlignment="Stretch" MaxWidth="360" />
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <ToggleSwitch Header="多聲道模式" IsOn="{Binding WizardMultiChannel, Mode=TwoWay}" MinWidth="160"
+                                     AutomationProperties.Name="多聲道模式"
+                                     AutomationProperties.HelpText="啟用後同一份量測會批次套用到所有聲道"
+                                     ToolTipService.ToolTip="把一份量測複製到每個聲道後批次產生 PEQ" />
+                        <controls:NumberBox Header="聲道數（1／2／6／8）" Value="{Binding WizardChannelCount, Mode=TwoWay}"
+                                            SpinButtonPlacementMode="Compact" SmallChange="1" MinWidth="140"
+                                            AutomationProperties.Name="聲道數"
+                                            AutomationProperties.HelpText="只接受 1、2、6 或 8"
+                                            ToolTipService.ToolTip="支援 1／2／6／8 聲道" />
+                    </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Button Content="選擇量測檔（CSV／REW）" Click="OnImportWizardMeasurementClick" Style="{StaticResource AccentButtonStyle}" MinHeight="32" AutomationProperties.Name="選擇校正量測檔案" AutomationProperties.HelpText="選擇 CSV 或 REW 匯出的頻率量級文字檔" ToolTipService.ToolTip="選擇 CSV 或 REW 匯出的頻率量級文字檔" />
                         <Button Content="編譯校正" Click="OnCompileWizardClick" MinHeight="32" IsEnabled="{Binding WizardHasResult, Converter={StaticResource InverseBoolConverter}}" AutomationProperties.Name="編譯校正設定" AutomationProperties.HelpText="以目前量測與目標曲線編譯 PEQ 濾波器" ToolTipService.ToolTip="以目前量測與目標曲線編譯 PEQ 濾波器" />
