@@ -439,6 +439,31 @@ int main() {
     CHECK(bass_telemetry.valid && !bass_telemetry.silence_gated);
     CHECK(bass_telemetry.bass_correction_gain_db < -1.0 &&
           bass_telemetry.bass_correction_gain_db >= -6.0);
+    // The correction must be shelf-shaped: a low-frequency probe is cut more
+    // than a high-frequency probe through the same filter state.
+    std::array<float, 4800> bass_probe{};
+    for (std::size_t frame = 0U; frame < bass_probe.size(); ++frame) {
+        bass_probe[frame] = static_cast<float>(
+            0.4 * std::sin(2.0 * 3.14159265358979323846 * 70.0 *
+                            static_cast<double>(frame) / 48000.0));
+    }
+    CHECK(bass_controller.process_interleaved(bass_probe.data(),
+                                               bass_probe.size(), 1U));
+    double low_energy = 0.0;
+    for (const auto sample : bass_probe) low_energy += static_cast<double>(sample) * sample;
+    std::array<float, 4800> high_probe{};
+    for (std::size_t frame = 0U; frame < high_probe.size(); ++frame) {
+        high_probe[frame] = static_cast<float>(
+            0.4 * std::sin(2.0 * 3.14159265358979323846 * 4000.0 *
+                            static_cast<double>(frame) / 48000.0));
+    }
+    // Reset filter state between probes so the comparison is fair.
+    bass_controller.reset();
+    CHECK(bass_controller.process_interleaved(high_probe.data(),
+                                              high_probe.size(), 1U));
+    double high_energy = 0.0;
+    for (const auto sample : high_probe) high_energy += static_cast<double>(sample) * sample;
+    CHECK(low_energy < high_energy);
 
     ProgramAwareLevelControllerV1 no_bass_controller;
     CHECK(no_bass_controller.configure(ProgramAwareLevelPolicyV1{}, 48000U));
@@ -4670,6 +4695,8 @@ int main() {
         CHECK(movie_defaults.loudness.live_update_enabled);
         CHECK(std::abs(movie_defaults.program_aware.target_dbfs + 23.0) < 1e-12);
         CHECK(std::abs(movie_defaults.program_aware.max_cut_db - 12.0) < 1e-12);
+        CHECK(movie_defaults.program_aware.bass_correction_enabled);
+        CHECK(std::abs(movie_defaults.program_aware.bass_max_cut_db - 4.0) < 1e-12);
         AudioEngineModel movie_engine;
         GraphConfigV1 movie_graph;
         movie_graph.lanes.push_back(LaneConfigV1{"movie-lane", "main", 2, 0.0, true});

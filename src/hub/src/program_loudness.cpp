@@ -54,6 +54,30 @@ ProgramAwareLevelControllerV1::Biquad make_high_shelf(const std::uint32_t sample
                                                   a2 / a0};
 }
 
+// First-order-style low shelf (RBJ cookbook, S = 1). gain_db < 0 attenuates
+// the band below f0 toward gain_db while leaving content well above f0 near
+// unity. Reuses the shared Biquad representation with a2 = 0.
+ProgramAwareLevelControllerV1::Biquad make_low_shelf(
+    const std::uint32_t sample_rate, const double f0_hz,
+    const double gain_db) noexcept {
+    const auto amplitude = std::pow(10.0, gain_db / 40.0);
+    const auto omega = 2.0 * kPi * f0_hz / static_cast<double>(sample_rate);
+    const auto cosine = std::cos(omega);
+    const auto sine = std::sin(omega);
+    const auto alpha = sine / 2.0;
+    const auto sqrt_a2sa = 2.0 * std::sqrt(amplitude) * alpha;
+    const auto a0 = (amplitude + 1.0) + (amplitude - 1.0) * cosine + sqrt_a2sa;
+    const auto b0 =
+        amplitude * ((amplitude + 1.0) - (amplitude - 1.0) * cosine + sqrt_a2sa);
+    const auto b1 = 2.0 * amplitude * ((amplitude - 1.0) - (amplitude + 1.0) * cosine);
+    const auto b2 =
+        amplitude * ((amplitude + 1.0) - (amplitude - 1.0) * cosine - sqrt_a2sa);
+    const auto a1 = -2.0 * ((amplitude - 1.0) + (amplitude + 1.0) * cosine);
+    const auto a2 = (amplitude + 1.0) + (amplitude - 1.0) * cosine - sqrt_a2sa;
+    return ProgramAwareLevelControllerV1::Biquad{b0 / a0, b1 / a0, b2 / a0,
+                                                  a1 / a0, a2 / a0};
+}
+
 double process_biquad(const ProgramAwareLevelControllerV1::Biquad& section,
                       ProgramAwareLevelControllerV1::BiquadState& state,
                       const double input) noexcept {
@@ -211,6 +235,7 @@ bool ProgramAwareLevelControllerV1::configure(const ProgramAwareLevelPolicyV1& p
     sample_rate_ = sample_rate;
     k_weighting_[0] = make_high_pass(sample_rate);
     k_weighting_[1] = make_high_shelf(sample_rate);
+    bass_shelf_ = make_low_shelf(sample_rate, 120.0, 0.0);  // unity until slewing
     if (policy_.bass_correction_enabled) {
         (void)bass_detector_.configure(sample_rate);
     }
@@ -224,6 +249,7 @@ void ProgramAwareLevelControllerV1::reset() noexcept {
     smoothed_energy_ = 0.0;
     bass_cut_db_ = 0.0;
     bass_detector_.reset();
+    bass_shelf_state_ = {};
     status_ = {};
     status_.schema_version = 1U;
     status_.enabled = policy_.enabled;
@@ -316,11 +342,25 @@ bool ProgramAwareLevelControllerV1::process_interleaved(float* const interleaved
     store_telemetry();
     const auto linear_gain = static_cast<float>(
         std::pow(10.0, std::clamp(status_.applied_gain_db, -144.0, 12.0) / 20.0));
-    const auto bass_linear = static_cast<float>(
-        std::pow(10.0, status_.bass_correction_gain_db / 20.0));
-    for (std::size_t index = 0U; index < samples; ++index) {
-        interleaved[index] *= linear_gain;
-        interleaved[index] *= bass_linear;
+    if (policy_.bass_correction_enabled && status_.bass_correction_gain_db < 0.0) {
+        // Rebuild the shelf coefficients only when the slewing cut moved by a
+        // meaningful amount; this stays bounded and allocation-free.
+        const double shelf_gain_db =
+            -bass_cut_db_;  // negative: attenuation below the corner
+        bass_shelf_ = make_low_shelf(sample_rate_, 120.0, shelf_gain_db);
+        for (std::size_t frame = 0U; frame < frames; ++frame) {
+            for (std::uint32_t channel = 0U; channel < channels; ++channel) {
+                auto& sample_ref = interleaved[frame * channels + channel];
+                sample_ref = static_cast<float>(process_biquad(
+                    bass_shelf_, bass_shelf_state_[channel],
+                    static_cast<double>(sample_ref * linear_gain)));
+                if (!std::isfinite(sample_ref)) sample_ref = 0.0F;
+            }
+        }
+    } else {
+        for (std::size_t index = 0U; index < samples; ++index) {
+            interleaved[index] *= linear_gain;
+        }
     }
     return true;
 }

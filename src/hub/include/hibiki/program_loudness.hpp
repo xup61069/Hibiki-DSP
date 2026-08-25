@@ -157,6 +157,8 @@ private:
 
     std::array<Biquad, 2U> k_weighting_{};
     std::array<std::array<BiquadState, 8U>, 2U> k_state_{};
+    Biquad bass_shelf_{};
+    std::array<BiquadState, 8U> bass_shelf_state_{};
 
     mutable std::array<std::atomic<double>, kTelemetryDoubleCountV1>
         telemetry_doubles_{};
