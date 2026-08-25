@@ -17,7 +17,11 @@ float one_pole_coeff(const double milliseconds, const std::uint32_t sample_rate)
 }  // namespace
 
 bool validate_noise_suppressor_policy(const BasicNoiseSuppressorPolicyV1& policy) noexcept {
-    return policy.schema_version == 1U && std::isfinite(policy.threshold_dbfs) &&
+    // enabled is authoritative: only an explicitly enabled policy is a valid
+    // configuration. A disabled policy must be rejected fail-closed instead of
+    // silently behaving as a bypass.
+    return policy.enabled && policy.schema_version == 1U &&
+           std::isfinite(policy.threshold_dbfs) &&
            policy.threshold_dbfs >= -96.0 && policy.threshold_dbfs < 0.0 &&
            std::isfinite(policy.floor_db) && policy.floor_db >= -96.0 && policy.floor_db <= 0.0 &&
            std::isfinite(policy.attack_ms) && policy.attack_ms >= 0.1 &&
@@ -30,7 +34,10 @@ bool validate_noise_suppressor_policy(const BasicNoiseSuppressorPolicyV1& policy
 bool BasicNoiseSuppressorV1::configure(const BasicNoiseSuppressorPolicyV1& policy,
                                        const std::uint32_t sample_rate,
                                        const std::uint32_t channels) noexcept {
-    if (!validate_noise_suppressor_policy(policy) || sample_rate < 8000U ||
+    // enabled is authoritative and fail-closed: a disabled policy is a
+    // rejected configuration, never an accepted bypass mode.
+    if (!validate_noise_suppressor_policy(policy) || !policy.enabled ||
+        sample_rate < 8000U ||
         sample_rate > 192000U || channels == 0U || channels > 8U ||
         policy.highpass_hz >= static_cast<double>(sample_rate) / 2.0) {
         return false;
