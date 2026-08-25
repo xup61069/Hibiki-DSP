@@ -63,6 +63,7 @@ internal sealed class PreviewForm : Form
     private readonly Button _loadIr = new() { Text = "載入 IR WAV 並準備", AutoSize = true, AccessibleName = "載入 IR WAV 並準備" };
     private readonly TrackBar _volume = new() { Minimum = -60, Maximum = 0, TickFrequency = 5, Width = 460, AccessibleName = "主音量分貝" };
     private readonly Button _enhance = new() { Text = "一鍵改善", AutoSize = true, Margin = new Padding(3, 12, 3, 3), AccessibleName = "一鍵改善" };
+    private readonly Button _connect = new() { Text = "連接引擎", AutoSize = true, Margin = new Padding(3, 12, 3, 3), AccessibleName = "連接或重新連接 Hibiki 音訊引擎" };
     private readonly System.Windows.Forms.Timer _statusTimer = new() { Interval = 1000 };
     private bool _updatingScene;
     private bool _updatingSession;
@@ -86,9 +87,21 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(groups);
         panel.Controls.Add(new Label { Text = "本機裝置 catalog（僅 metadata）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
         panel.Controls.Add(_devices);
-        var connect = new Button { Text = "嘗試連接已啟動的 Hibiki 引擎", AutoSize = true, Margin = new Padding(3, 12, 3, 3), AccessibleName = "嘗試連接已啟動的 Hibiki 引擎" };
-        connect.Click += async (_, _) => { await _viewModel.ConnectAsync(TimeSpan.FromSeconds(3)); RefreshView(); };
-        panel.Controls.Add(connect);
+        _connect.Click += async (_, _) =>
+        {
+            _connect.Enabled = false;
+            try
+            {
+                if (_viewModel.IsConnected) await _viewModel.DisconnectAsync();
+                await _viewModel.ConnectAsync(TimeSpan.FromSeconds(3));
+            }
+            finally
+            {
+                _connect.Enabled = true;
+            }
+            RefreshView();
+        };
+        panel.Controls.Add(_connect);
         panel.Controls.Add(_connection);
         panel.Controls.Add(new Label { Text = "場景", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
         SyncSceneList();
@@ -396,6 +409,8 @@ internal sealed class PreviewForm : Form
             : $"裝置 catalog：{_viewModel.PhysicalDevices.Count} 筆（render {renderDevices.Length}／capture {captureDevices.Length}）；" +
               $"預設輸出：{defaultRender ?? "未指定"}\r\n只顯示 metadata；physical sink 與實體切換尚未啟用。";
         _enhance.Enabled = _viewModel.IsConnected;
+        _connect.Text = _viewModel.IsConnected ? "重新連接" : "連接引擎";
+        _connect.Enabled = !_viewModel.IsBusy;
         _scenes.Enabled = _viewModel.IsConnected;
         _volume.Enabled = _viewModel.IsConnected;
         var sessions = _viewModel.SessionCatalog.ToArray();
