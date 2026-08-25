@@ -663,8 +663,6 @@ bool render_wav_offline(const std::filesystem::path& input_path,
             error_detail = "unsupported channel count for offline render";
             return false;
         }
-        const std::uint32_t lane_channels =
-            channels == 1U ? 2U : channels;
         auto scene = hibiki::make_easy_scene(hibiki::EasySceneKind::Studio, "main");
         scene.graph.output_channels = kOfflineRenderOutputChannelsV1;
         engine.set_sample_rate(kOfflineRenderOutputSampleRateV1);
@@ -682,8 +680,26 @@ bool render_wav_offline(const std::filesystem::path& input_path,
         }
         std::vector<float> rendered(
             decoded_data.frames() * kOfflineRenderOutputChannelsV1, 0.0F);
-        const hibiki::RtLaneInputV1 lane{decoded_data.interleaved_samples.data(),
-                                         static_cast<std::uint16_t>(lane_channels)};
+        // Mono sources must be expanded to a bounded stereo copy before the
+        // render loop: the lane contract reads channel_count floats per frame,
+        // so pointing a 2-channel lane at a 1-float-per-frame buffer would
+        // over-read the heap and misinterpret adjacent samples as L/R.
+        std::vector<float> lane_block{};
+        if (channels == 1U) {
+            lane_block.resize(decoded_data.frames() * 2U);
+            for (std::size_t frame = 0U; frame < decoded_data.frames(); ++frame) {
+                lane_block[frame * 2U] =
+                    decoded_data.interleaved_samples[frame];
+                lane_block[frame * 2U + 1U] =
+                    decoded_data.interleaved_samples[frame];
+            }
+        }
+        const float* lane_data =
+            channels == 1U
+                ? lane_block.data()
+                : decoded_data.interleaved_samples.data();
+        const hibiki::RtLaneInputV1 lane{
+            lane_data, static_cast<std::uint16_t>(kOfflineRenderOutputChannelsV1)};
         constexpr std::size_t kBlock = 128U;  // matches kWavSource block cadence
         std::size_t offset = 0U;
         while (offset < decoded_data.frames()) {
