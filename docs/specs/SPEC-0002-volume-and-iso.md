@@ -3,7 +3,7 @@ id: SPEC-0002
 status: accepted
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-25
 review_after_days: 30
 related_adrs: [ADR-0002]
 source_globs: ["src/**", "schemas/output-group-volume-v1.schema.json"]
@@ -20,7 +20,7 @@ fade、device crossfade 與 safety clamp 必須保留 last-known-safe gain。
 `AudioEngineModel` 的 RT Group Master 已實際使用 dB-domain ramp：一般變更 8 ms、mute
 5 ms、unmute 15 ms；control worker 只發布 Q16.16 target，audio thread 自己推進固定狀態，
 因此不會在音量鍵或 Scene 結束時產生 block-level hard step。實體 device crossfade 仍由
-`OutputCrossfade` 的 30 ms sink handoff 負責。
+`OutputCrossfade` 的 30 ms sink handoff 負責。等響補償 PEQ 的同組替換另在 engine commit 點保留上一組濾波器，RT 端以固定 120 ms equal-power crossfade 過渡；這是 bounded user-space DSP transition，不是實體 sink handoff。
 
 每個已註冊的 output group 都有自己的 canonical `requested_db`／mute／generation、safety
 reconcile 與 RT ramp；`OutputGroupVolumeBankV1` 固定最多 32 組，群組在 graph commit 前
@@ -160,7 +160,7 @@ Group Master → limiter；
 Strict Direct 時可準備或保留 attachment，但 render 會 fail-open bypass，確保輸出不變。SceneApply 成功路徑會在同一個 control
 transaction 清掉上一個 loudness EQ，避免不相關 Scene 的音色殘留。這是 bounded proxy 與音色控制，
 不是 ISO 226 conformance、正式係數 fit、實體 sink delivery 或 driver/WaveRT evidence；production
-concurrent swap 仍需 epoch/RCU 驗證，100–200 ms crossfade 仍未實作。
+concurrent swap 以 commit-point snapshot 取代 epoch/RCU：同一 output group 的 attached-to-attached prepare/commit 保留上一組 immutable PEQ，用固定容量堆疊緩衝與 sin/cos equal-power gain 做 120 ms crossfade。clear 後重掛、不同 group 首次掛載、rollback 或 Strict Direct 不啟動 fade。單次 render block 超過 23040 frames 時整個呼叫 fail-closed，不做部分淡化。這仍不是 ISO 226 conformance、實體 sink delivery 或 driver/WaveRT evidence；真實裝置上的主觀無感切換尚未驗收。
 
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
 schema 要求 `anchor_id` 在非 null 時為 non-empty printable UTF-8 且最長 64 字，拒絕 C0/C1
@@ -211,5 +211,5 @@ GPL source 前必須由人類 reviewer 完成法務 gate。
 
 一般 boost 上限 +6 dB，Expert calibrated 上限 +12 dB；低於實測 F3 不 boost；最後一級 −1 dBTP
 limiter。`build_formula_compensation` 已提供 bounded gain cap；目前 engine attachment 以
-control-thread prepare/commit 替換固定容量 PEQ，尚未提供 immutable bank 的 100–200 ms crossfade，
-因此不得宣稱無感切換或正式 ISO 曲線更新。
+control-thread prepare/commit 替換固定容量 PEQ，同組替換使用上述 bounded 120 ms crossfade；
+本切片不宣稱正式 ISO 曲線更新、實機聽感無切換痕跡或 driver/WaveRT 行為。

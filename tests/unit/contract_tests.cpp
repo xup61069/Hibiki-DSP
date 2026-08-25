@@ -4634,6 +4634,47 @@ int main() {
             "main", legal_points, 60.0, loudness_policy));
         CHECK(loudness_engine->commit_loudness_peq());
 
+        // Replacing an attachment on the same output group must use a
+        // bounded equal-power RT crossfade instead of swapping filters
+        // mid-block. A fresh attach on another group, and re-attaching
+        // after a transactional clear, remain immediate swaps.
+        EqualLoudnessPolicyV1 changed_loudness_policy = loudness_policy;
+        changed_loudness_policy.strength = 0.55;
+        CHECK(loudness_engine->loudness_peq_transition_complete());
+        CHECK(loudness_engine->prepare_loudness_peq(
+            "main", legal_points, 60.0, changed_loudness_policy));
+        CHECK(loudness_engine->commit_loudness_peq());
+        CHECK(!loudness_engine->loudness_peq_transition_complete());
+        for (std::size_t fade_block = 0U;
+             fade_block < 6U && !loudness_engine->loudness_peq_transition_complete();
+             ++fade_block) {
+            CHECK(loudness_engine->process_output_group(
+                "main", loudness_main_views,
+                loudness_output.data(), 1024U));
+            CHECK(std::all_of(loudness_output.begin(), loudness_output.end(),
+                              [](const float value) {
+                                  return std::isfinite(value);
+                              }));
+        }
+        CHECK(loudness_engine->loudness_peq_transition_complete());
+
+        CHECK(loudness_engine->prepare_loudness_peq(
+            "side", legal_points, 60.0, changed_loudness_policy));
+        CHECK(loudness_engine->commit_loudness_peq());
+        CHECK(loudness_engine->has_active_loudness_peq("side"));
+        CHECK(loudness_engine->loudness_peq_transition_complete());
+
+        CHECK(loudness_engine->prepare_loudness_peq_clear());
+        CHECK(loudness_engine->commit_loudness_peq());
+        CHECK(!loudness_engine->has_active_loudness_peq("main"));
+        CHECK(!loudness_engine->has_active_loudness_peq("side"));
+        CHECK(loudness_engine->prepare_loudness_peq(
+            "main", legal_points, 60.0, loudness_policy));
+        CHECK(loudness_engine->commit_loudness_peq());
+        CHECK(loudness_engine->has_active_loudness_peq("main"));
+        CHECK(!loudness_engine->has_active_loudness_peq("side"));
+        CHECK(loudness_engine->loudness_peq_transition_complete());
+
         // A committed attachment survives a graph switch, but Strict Direct
         // render bypasses it.
         loudness_graph.strict_direct = true;
