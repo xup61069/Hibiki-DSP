@@ -109,6 +109,7 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene_catalog(
                                              payload.anchor_id_bytes);
     }
     definition.loudness.calibrated = payload.calibrated_flag != 0U;
+    definition.loudness.live_update_enabled = payload.loudness_live_update != 0U;
 
     auto* const catalog = mutable_scene_catalog();
     if (catalog == nullptr ||
@@ -181,9 +182,37 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
                 return EngineControlResultV1::Failed;
             }
         }
-        if (!engine_.prepare_loudness_peq_clear()) {
+        // A scene whose equal-loudness policy is meaningful (Relative mode,
+        // positive strength) and explicitly opts in to live phon recompute
+        // mounts its bounded formula attachment inside this same
+        // transaction; the single-point 1 kHz proxy is the same caller-owned
+        // formula shape used by tests and the live recompute path. Scenes
+        // without the opt-in keep the legacy clear-only behavior.
+        const bool mount_loudness_peq =
+            candidate_loudness.mode == EqualLoudnessMode::Relative &&
+            candidate_loudness.strength > 0.0 &&
+            candidate_loudness.live_update_enabled &&
+            validate_policy(candidate_loudness);
+        if (mount_loudness_peq) {
+            const Iso226FormulaPointV1 live_points{
+                1000.0, 0.30, 2.4, 0.0};
+            if (!engine_.prepare_loudness_peq(
+                    output_group,
+                    std::span<const Iso226FormulaPointV1>(&live_points, 1U),
+                    candidate_loudness.reference_phon,
+                    candidate_loudness)) {
+                engine_.rollback_graph();
+                if (!keep_referenced_ir) engine_.rollback_ir();
+                engine_.rollback_loudness_peq();
+                engine_.rollback_program_aware();
+                return EngineControlResultV1::Failed;
+            }
+        }
+        // A freshly mounted scene attachment replaces the previous one in
+        // this transaction; without a mount, keep the legacy clear-only path.
+        if (!mount_loudness_peq && !engine_.prepare_loudness_peq_clear()) {
             engine_.rollback_graph();
-            engine_.rollback_ir();
+            if (!keep_referenced_ir) engine_.rollback_ir();
             engine_.rollback_loudness_peq();
             engine_.rollback_program_aware();
             return EngineControlResultV1::Failed;
@@ -205,6 +234,12 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
         }
         std::swap(active_scene_, candidate_scene);
         std::swap(active_loudness_, candidate_loudness);
+        // The live-update switch belongs to the attachment; opt in after the
+        // commit when the scene's policy requests it. Failure is non-fatal:
+        // the attachment stays mounted but live recompute remains disabled.
+        if (mount_loudness_peq && candidate_loudness.live_update_enabled) {
+            engine_.set_loudness_live_update(output_group, true);
+        }
         if (!engine_.commit_graph()) {
             std::swap(active_scene_, candidate_scene);
             std::swap(active_loudness_, candidate_loudness);

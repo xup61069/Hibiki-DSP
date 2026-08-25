@@ -274,7 +274,8 @@ namespace {
 //   [15..23]    lane count, timeline count and bounded-text lengths
 //   [24..79]    finite f64 scene/loudness policies
 //   [80..83]    loudness mode
-//   [84..95]    reserved zero
+//   [84]        loudness live update flag
+//   [85..95]    reserved zero
 //   [96..127]   scene ID
 //   [128..247]  scene name
 //   [248..311]  output group
@@ -359,6 +360,7 @@ bool encode_scene_catalog_command_v1(
                 command.graph_output_channels != 8U ||
             command.auto_attenuate > 1U || command.strict_direct > 1U ||
             command.standard_id > 2U || command.calibrated_flag > 1U ||
+            command.loudness_live_update > 1U ||
             command.timeline_count > kSceneCatalogTimelineCapacityV1 ||
             command.ir_reference_bytes > command.ir_reference.size() ||
             (command.ir_reference_bytes > 0U && command.ir_reference_bytes < 8U) ||
@@ -429,6 +431,7 @@ bool encode_scene_catalog_command_v1(
             write_f64_bits(p + 56U, command.max_boost_db);
             write_f64_bits(p + 64U, command.measured_f3_hz);
             write_f64_bits(p + 72U, command.ir_phase_strength);
+            p[84] = command.loudness_live_update;
             auto* timeline_base = p + kSceneCatalogTimelineBaseV1;
             for (std::size_t item = 0U; item < command.timeline_count; ++item) {
                 const auto& source = command.timeline_ids[item];
@@ -539,7 +542,8 @@ bool decode_scene_catalog_command_v1(
     }
 
     // Upsert.
-    for (std::size_t index = 84U; index < 96U; ++index) {
+    if (payload[84] > 1U) return false;
+    for (std::size_t index = 85U; index < 96U; ++index) {
         if (payload[index] != 0U) return false;
     }
     const auto latency_raw = read_u32(payload.data() + 4U);
@@ -570,6 +574,7 @@ bool decode_scene_catalog_command_v1(
     command.anchor_id_bytes = payload[21];
     command.standard_id = payload[22];
     command.calibrated_flag = payload[23];
+    command.loudness_live_update = payload[84];
 
     if (command.lane_count == 0U ||
         command.lane_count > kSceneCatalogLaneCountV1 ||
@@ -579,6 +584,7 @@ bool decode_scene_catalog_command_v1(
             command.graph_output_channels != 8U ||
         command.auto_attenuate > 1U || command.strict_direct > 1U ||
         command.standard_id > 2U || command.calibrated_flag > 1U ||
+        command.loudness_live_update > 1U ||
         command.ir_reference_bytes > command.ir_reference.size() ||
         (command.ir_reference_bytes > 0U && command.ir_reference_bytes < 8U) ||
         command.anchor_id_bytes > command.anchor_id.size() ||

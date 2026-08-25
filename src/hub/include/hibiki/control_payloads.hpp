@@ -98,6 +98,7 @@ struct SceneCatalogCommandV1 {
     std::uint8_t anchor_id_bytes{0U};
     std::uint8_t standard_id{0U};
     std::uint8_t calibrated_flag{0U};
+    std::uint8_t loudness_live_update{0U};
     std::uint8_t reserved_b{0U};
     std::array<char, kSceneCatalogIdMaxBytesV1> id{};
     std::array<char, kSceneCatalogNameMaxBytesV1> name{};

@@ -2222,6 +2222,7 @@ int main() {
 
     AudioEngineModel control_engine;
     EngineControlWorkerV1 control_worker(control_engine);
+    control_engine.set_sample_rate(8000U);
     ControlCommandQueueV1 control_queue;
     ControlCommandV1 scene_command{};
     scene_command.type = IpcMessageType::SceneApply;
@@ -2271,7 +2272,6 @@ int main() {
           session_route_rule_accepted);
     session_route_rule_control.session_route_rule.catalog_sequence = 13U;
     CHECK(control_worker.consume(session_route_rule_control) == EngineControlResultV1::Failed);
-    control_engine.set_sample_rate(8000U);
     ControlCommandV1 control_volume{};
     control_volume.type = IpcMessageType::VolumeNotification;
     control_volume.volume = VolumeNotificationV1{0.0, false, 1U};
@@ -4963,6 +4963,105 @@ int main() {
         CHECK(live_engine->volume("main").mute);
         CHECK(live_engine->loudness_peq_transaction_idle() &&
               live_engine->has_active_loudness_peq("main"));
+    }
+
+    // Scene-driven live loudness enable: a catalog scene whose policy opts
+    // in mounts the bounded 1 kHz formula attachment and enables live
+    // recompute, so accepted volume notifications drive debounced phon
+    // updates end-to-end through the normal control plane.
+    {
+        auto enable_engine = std::make_unique<AudioEngineModel>();
+        GraphConfigV1 enable_graph;
+        enable_graph.lanes.push_back(LaneConfigV1{"live-enable-main", "main", 2, 0.0, true});
+        enable_graph.lanes.push_back(LaneConfigV1{"live-enable-side", "side", 2, 0.0, true});
+        enable_graph.strict_direct = false;
+        CHECK(enable_engine->prepare_graph(enable_graph, 1U) &&
+              enable_engine->commit_graph());
+        enable_engine->set_sample_rate(48000U);
+
+        EngineControlWorkerV1 enable_worker(*enable_engine);
+        SceneCatalogCommandV1 enable_catalog{};
+        enable_catalog.operation = SessionRouteRuleOperationV1::Upsert;
+        enable_catalog.standard_id = 1U;
+        enable_catalog.loudness_mode = EqualLoudnessMode::Relative;
+        enable_catalog.reference_phon = 70.0;
+        enable_catalog.strength = 0.30;
+        enable_catalog.max_boost_db = 6.0;
+        enable_catalog.loudness_live_update = 1U;
+        enable_catalog.lane_count = 1U;
+        enable_catalog.graph_output_channels = 2U;
+        enable_catalog.id_bytes = 9;
+        std::copy_n("loud-live", 9, enable_catalog.id.data());
+        enable_catalog.name_bytes = 9;
+        std::copy_n("Loud Live", 9, enable_catalog.name.data());
+        enable_catalog.output_group_bytes = 4;
+        std::copy_n("main", 4, enable_catalog.output_group.data());
+        enable_catalog.lanes[0].id_bytes = 14;
+        std::copy_n("loud-live-lane", 14, enable_catalog.lanes[0].id.data());
+        enable_catalog.lanes[0].output_group_bytes = 4;
+        std::copy_n("main", 4, enable_catalog.lanes[0].output_group.data());
+
+        // The bounded wire form round-trips the opt-in flag.
+        std::vector<std::uint8_t> enable_wire;
+        CHECK(encode_scene_catalog_command_v1(enable_catalog, enable_wire));
+        IpcFrameV1 enable_frame;
+        enable_frame.header.type = IpcMessageType::SceneCatalogCommand;
+        enable_frame.payload = enable_wire;
+        ControlCommandV1 enable_round_trip{};
+        CHECK(decode_control_command_v1(enable_frame, enable_round_trip));
+        CHECK(enable_round_trip.scene_catalog.loudness_live_update == 1U &&
+              enable_round_trip.scene_catalog.loudness_mode ==
+                  EqualLoudnessMode::Relative);
+        CHECK(enable_worker.consume(enable_round_trip) == EngineControlResultV1::Applied);
+
+        // Scenes without the opt-in keep the legacy clear-only behavior.
+        ControlCommandV1 disable_apply{};
+        disable_apply.type = IpcMessageType::SceneApply;
+        std::array<std::uint8_t, kSceneApplyPayloadBytesV1> enable_payload{};
+        CHECK(encode_scene_apply_payload_v1("game", "main", enable_payload));
+        CHECK(decode_scene_apply_payload_v1(enable_payload, disable_apply.scene));
+        CHECK(enable_worker.consume(disable_apply) == EngineControlResultV1::Applied);
+        CHECK(!enable_engine->has_active_loudness_peq("main"));
+
+        // Re-applying the opted-in scene mounts the attachment and enables
+        // live recompute.
+        ControlCommandV1 enable_apply{};
+        enable_apply.type = IpcMessageType::SceneApply;
+        CHECK(encode_scene_apply_payload_v1("loud-live", "main", enable_payload));
+        CHECK(decode_scene_apply_payload_v1(enable_payload, enable_apply.scene));
+        CHECK(enable_worker.consume(enable_apply) == EngineControlResultV1::Applied);
+        CHECK(enable_engine->has_active_loudness_peq("main") &&
+              enable_engine->loudness_peq_transaction_idle());
+
+        // An accepted volume notification now recomputes the curve live:
+        // 50 phon is a >=3 phon step from the 70 phon mount baseline.
+        ControlCommandV1 live_volume{};
+        live_volume.type = IpcMessageType::VolumeNotification;
+        live_volume.volume = VolumeNotificationV1{-20.0, false, 1U};
+        CHECK(enable_worker.consume(live_volume) == EngineControlResultV1::Applied);
+        CHECK(std::abs(enable_engine->volume("main").requested_db + 20.0) < 1e-12);
+        CHECK(enable_engine->loudness_peq_transaction_idle() &&
+              enable_engine->has_active_loudness_peq("main"));
+
+        // A small step inside the debounce window still updates the volume
+        // bank while the recompute is debounced.
+        ControlCommandV1 small_step{};
+        small_step.type = IpcMessageType::VolumeNotification;
+        small_step.volume = VolumeNotificationV1{-19.0, false, 2U};
+        CHECK(enable_worker.consume(small_step) == EngineControlResultV1::Applied);
+        CHECK(std::abs(enable_engine->volume("main").requested_db + 19.0) < 1e-12);
+        CHECK(enable_engine->loudness_peq_transaction_idle());
+
+        // A foreign group without an attachment stays fail-closed.
+        ControlCommandV1 side_volume{};
+        side_volume.type = IpcMessageType::VolumeNotification;
+        side_volume.has_volume_target = true;
+        side_volume.volume_target.output_group_bytes = 4U;
+        std::copy_n("side", 4U, side_volume.volume_target.output_group.data());
+        side_volume.volume = VolumeNotificationV1{-10.0, false, 3U};
+        CHECK(enable_worker.consume(side_volume) == EngineControlResultV1::Applied);
+        CHECK(std::abs(enable_engine->volume("side").requested_db + 10.0) < 1e-12);
+        CHECK(!enable_engine->has_active_loudness_peq("side"));
     }
 
     // Per-group debounce isolation: the debounce window and phon baseline

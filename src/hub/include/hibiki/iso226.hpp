@@ -42,6 +42,10 @@ struct EqualLoudnessPolicyV1 {
     double max_boost_db{6.0};
     double measured_f3_hz{0.0};
     std::string anchor_id;
+    // Opt-in live phon recompute for the scene's equal-loudness attachment.
+    // Disabled is the safe default; every explicit attachment prepare resets
+    // to disabled (existing behavior, unchanged).
+    bool live_update_enabled{false};
     // Kept as a source-compatible convenience for early callers. New code
     // should use mode == EqualLoudnessMode::Calibrated.
     bool calibrated{false};
