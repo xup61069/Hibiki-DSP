@@ -17,6 +17,18 @@ internal sealed record PreviewUiStateV1
     [JsonPropertyName("selected_scene_id")]
     public string? SelectedSceneId { get; init; }
 
+    [JsonPropertyName("window_x")]
+    public int? WindowX { get; init; }
+
+    [JsonPropertyName("window_y")]
+    public int? WindowY { get; init; }
+
+    [JsonPropertyName("window_width")]
+    public int? WindowWidth { get; init; }
+
+    [JsonPropertyName("window_height")]
+    public int? WindowHeight { get; init; }
+
     [JsonPropertyName("updated_at")]
     public string? UpdatedAtUtc { get; init; }
 }
@@ -51,7 +63,8 @@ internal static class PreviewUiState
         }
     }
 
-    public static void Save(string? selectedPhysicalDeviceEndpointId, string? selectedSceneId)
+    public static void Save(string? selectedPhysicalDeviceEndpointId, string? selectedSceneId,
+        Rectangle? windowBounds)
     {
         try
         {
@@ -61,6 +74,10 @@ internal static class PreviewUiState
                 SelectedPhysicalDeviceEndpointId =
                     NormalizeId(selectedPhysicalDeviceEndpointId),
                 SelectedSceneId = NormalizeId(selectedSceneId),
+                WindowX = windowBounds?.X,
+                WindowY = windowBounds?.Y,
+                WindowWidth = windowBounds?.Width,
+                WindowHeight = windowBounds?.Height,
                 UpdatedAtUtc = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture)
             };
             var json = JsonSerializer.Serialize(state,
