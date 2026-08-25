@@ -6,6 +6,18 @@
     </Window.SystemBackdrop>
 
     <Grid x:Name="RootGrid" Padding="0" AutomationProperties.Name="Hibiki DSP 音訊場景控制">
+        <Grid.Resources>
+            <ResourceDictionary>
+                <ResourceDictionary.ThemeDictionaries>
+                    <ResourceDictionary x:Key="Light">
+                        <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#F6F9FC" />
+                    </ResourceDictionary>
+                    <ResourceDictionary x:Key="Dark">
+                        <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#1B2028" />
+                    </ResourceDictionary>
+                </ResourceDictionary.ThemeDictionaries>
+            </ResourceDictionary>
+        </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="48" />
             <RowDefinition Height="*" />
