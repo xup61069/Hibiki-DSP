@@ -56,6 +56,7 @@ internal sealed class PreviewForm : Form
     private readonly ComboBox _irModes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取 IR 模式" };
     private readonly TrackBar _irStrength = new() { Minimum = 0, Maximum = 100, TickFrequency = 10, Width = 460, AccessibleName = "IR 強度百分比" };
     private readonly Label _irStatus = new() { AutoSize = false, Width = 550, Height = 58 };
+    private readonly Label _eqStatus = new() { AutoSize = false, Width = 550, Height = 32, AccessibleName = "等化器視覺狀態" };
     private readonly Button _loadIr = new() { Text = "載入 IR WAV 並準備", AutoSize = true, AccessibleName = "載入 IR WAV 並準備" };
     private readonly TrackBar _volume = new() { Minimum = -60, Maximum = 0, TickFrequency = 5, Width = 460, AccessibleName = "主音量分貝" };
     private readonly Button _enhance = new() { Text = "一鍵改善", AutoSize = true, Margin = new Padding(3, 12, 3, 3), AccessibleName = "一鍵改善" };
@@ -326,6 +327,8 @@ internal sealed class PreviewForm : Form
             if (_updatingRouteRules) return;
             RefreshView();
         };
+        panel.Controls.Add(new Label { Text = "等化器", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        panel.Controls.Add(_eqStatus);
         panel.Controls.Add(_status);
         Controls.Add(panel);
         _viewModel.PropertyChanged += OnViewModelChanged;
@@ -427,6 +430,7 @@ internal sealed class PreviewForm : Form
         _effective.Text = $"實際有效音量：{_viewModel.EffectiveVolumeDb:0.0} dB；{_viewModel.VolumeOriginText}；{_viewModel.VolumeActuatorText}";
         _routes.Text = _viewModel.Expert.RouteHealthAccessibleSummary;
         _status.Text = _viewModel.StatusText;
+        _eqStatus.Text = _viewModel.EqSurface.StateText;
         _irStatus.Text = $"{_viewModel.IrPhaseModeText}；實測延遲 {_viewModel.IrAddedDelayMs:0.0} ms。\r\n{_viewModel.IrPrepareStatus}";
         var requested = Math.Clamp((int)Math.Round(_viewModel.RequestedVolumeDb), _volume.Minimum, _volume.Maximum);
         if (_volume.Value != requested) _volume.Value = requested;
