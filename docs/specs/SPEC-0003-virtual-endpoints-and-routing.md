@@ -165,7 +165,9 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   `KWeightedProxy` 內容音量，速率與 boost/cut 都受 policy 限制。K-weighted 路徑仍是
   bounded proxy，不是靜默擷取、完整 gated LUFS meter、降噪或 BS.1770 conformance。
 - 同一個 tab effects contract 可選套用 `BasicNoiseSuppressorV1`：固定高通＋downward gate，
-  只接受 1–8 聲道且要求 sample rate/channel 完全相符。gate 採 upper-only 2 dB hysteresis：
+  只接受 1–8 聲道且要求 sample rate/channel 完全相符。policy 的 `enabled` 欄位是權威
+  開關：只有 `enabled=true` 是有效設定，`enabled=false` 一律 fail-closed 拒絕，不得
+  被解讀為 bypass。gate 採 upper-only 2 dB hysteresis：
   envelope 在設定的 threshold 關閉，必須回升到 threshold +2 dB 才重新開啟，兩個邊界之間
   維持原狀態，因此訊號在臨界附近徘徊時不會反覆開關（chatter）。它是可測試的基本抑噪，
   不宣稱 RNNoise、頻譜 AI、AEC 或麥克風權限處理；效果順序為 PEQ → IR → basic suppressor → level。

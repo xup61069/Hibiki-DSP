@@ -99,6 +99,7 @@ extern "C" {
 #include <limits>
 #include <memory>
 #include <new>
+#include <numeric>
 #include <span>
 #include <string>
 #include <thread>
@@ -403,7 +404,7 @@ int main() {
                       IrPhaseResolutionV1{1, IrPhaseMode::Bypass, 0.0, 0.0, false, false}));
 
     BasicNoiseSuppressorV1 noise_suppressor;
-    CHECK(validate_noise_suppressor_policy(BasicNoiseSuppressorPolicyV1{}));
+    CHECK(!validate_noise_suppressor_policy(BasicNoiseSuppressorPolicyV1{}));
     CHECK(noise_suppressor.configure(
         BasicNoiseSuppressorPolicyV1{1, true, -40.0, -30.0, 1.0, 10.0, 0.0}, 48000U, 1U));
     std::array<float, 480> noise_block{};
@@ -5160,6 +5161,67 @@ int main() {
                               }));
         }
         CHECK(group_engine->loudness_peq_transition_complete());
+    }
+
+    // Cross-channel-count scene switching must prepare attachments for the
+    // graph that is about to commit, not the previous active layout. A
+    // stereo -> surround -> stereo cycle would otherwise report Applied and
+    // then fail every render block until another same-layout scene switch.
+    {
+        auto switch_engine = std::make_unique<AudioEngineModel>();
+        GraphConfigV1 stereo_graph;
+        stereo_graph.output_channels = 2U;
+        stereo_graph.lanes.push_back(
+            LaneConfigV1{"stereo-main", "main", 2, 0.0, true});
+        stereo_graph.strict_direct = false;
+        CHECK(switch_engine->prepare_graph(stereo_graph, 1U) &&
+              switch_engine->commit_graph());
+        switch_engine->set_sample_rate(48000U);
+
+        EngineControlWorkerV1 switch_worker(*switch_engine);
+        ControlCommandV1 game_apply{};
+        game_apply.type = IpcMessageType::SceneApply;
+        std::array<std::uint8_t, kSceneApplyPayloadBytesV1> scene_payload{};
+        CHECK(encode_scene_apply_payload_v1("game", "main", scene_payload));
+        CHECK(decode_scene_apply_payload_v1(scene_payload, game_apply.scene));
+
+        CHECK(switch_worker.consume(game_apply) ==
+              EngineControlResultV1::Applied);
+        CHECK(switch_engine->has_active_loudness_peq("main") &&
+              switch_engine->loudness_peq_transaction_idle());
+        std::vector<float> stereo_audio(64U * 2U);
+        std::iota(stereo_audio.begin(), stereo_audio.end(), -32.0F);
+        const RtLaneInputV1 stereo_view{stereo_audio.data(), 2U};
+        CHECK(switch_engine->process_output_group(
+            "main", std::span<const RtLaneInputV1>(&stereo_view, 1U),
+            stereo_audio.data(), 64U));
+
+        GraphConfigV1 surround_graph;
+        surround_graph.output_channels = 8U;
+        LaneConfigV1 surround_lane{"surround-main", "main", 2, 0.0, true};
+        surround_lane.channel_map = {0, 1, -1, -1, -1, -1, -1, -1};
+        surround_graph.lanes.push_back(std::move(surround_lane));
+        surround_graph.strict_direct = false;
+        CHECK(switch_engine->prepare_graph(surround_graph, 2U));
+        CHECK(switch_worker.consume(game_apply) ==
+              EngineControlResultV1::Applied);
+        CHECK(switch_engine->loudness_peq_transaction_idle() &&
+              switch_engine->has_active_loudness_peq("main"));
+        std::vector<float> surround_audio(64U * 8U);
+        const RtLaneInputV1 surround_view{surround_audio.data(), 2U};
+        CHECK(switch_engine->process_output_group(
+            "main", std::span<const RtLaneInputV1>(&surround_view, 1U),
+            surround_audio.data(), 64U));
+
+        GraphConfigV1 back_to_stereo_graph = stereo_graph;
+        CHECK(switch_engine->prepare_graph(back_to_stereo_graph, 4U));
+        CHECK(switch_worker.consume(game_apply) ==
+              EngineControlResultV1::Applied);
+        const RtLaneInputV1 stereo_view_back{stereo_audio.data(), 2U};
+        std::fill(stereo_audio.begin(), stereo_audio.end(), 0.0F);
+        CHECK(switch_engine->process_output_group(
+            "main", std::span<const RtLaneInputV1>(&stereo_view_back, 1U),
+            stereo_audio.data(), 64U));
     }
 
     // Program-aware level is a fixed-capacity output attachment. The Movie

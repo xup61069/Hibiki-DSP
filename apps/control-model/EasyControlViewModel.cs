@@ -53,6 +53,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private string _customSceneId = string.Empty;
     private string _customSceneName = string.Empty;
     private string _customSceneDescription = string.Empty;
+    private bool _customSceneLoudnessLiveUpdate;
     private string _customSceneCatalogPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Hibiki DSP", "scene-cards-v1.json");
@@ -320,6 +321,12 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         set { if (value != _customSceneDescription) { _customSceneDescription = value; OnPropertyChanged(); } }
     }
 
+    public bool CustomSceneLoudnessLiveUpdate
+    {
+        get => _customSceneLoudnessLiveUpdate;
+        set { if (value != _customSceneLoudnessLiveUpdate) { _customSceneLoudnessLiveUpdate = value; OnPropertyChanged(); } }
+    }
+
     public bool IsExpert
     {
         get => _isExpert;
@@ -511,7 +518,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     internal sealed record PendingSceneCatalogOp(
         bool IsUpsert, string SceneId, string Name, string OutputGroup,
-        string IrReference = "");
+        string IrReference = "",
+        bool LoudnessLiveUpdate = false);
 
     public string CustomSceneQueuePath
     {
@@ -549,7 +557,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     {
         return await AddCustomSceneCoreAsync(
             new SceneCard(CustomSceneId.Trim(), CustomSceneName.Trim(),
-                          CustomSceneDescription.Trim(), "平衡", true),
+                          CustomSceneDescription.Trim(), "平衡", true,
+                          LoudnessLiveUpdate: CustomSceneLoudnessLiveUpdate),
             cancellationToken).ConfigureAwait(true);
     }
 
@@ -581,7 +590,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         if (!IsConnected &&
             !TryPersistOfflineSceneOp(new PendingSceneCatalogOp(
                 true, scene.Id, scene.Name, _session.ActiveOutputGroup ?? "main",
-                scene.IrReference)))
+                scene.IrReference, scene.LoudnessLiveUpdate)))
         {
             _session.CustomScenes.Remove(scene.Id);
             if (previous is not null) _session.CustomScenes.Upsert(previous);
@@ -592,18 +601,20 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         CustomSceneId = string.Empty;
         CustomSceneName = string.Empty;
         CustomSceneDescription = string.Empty;
+        CustomSceneLoudnessLiveUpdate = false;
 
         if (IsConnected)
         {
             var sent = await SendSceneCatalogCommandAsync(
                 _commands.UpsertSceneCatalog(scene.Id, scene.Name,
-                    _session.ActiveOutputGroup ?? "main", scene.IrReference),
+                    _session.ActiveOutputGroup ?? "main", scene.IrReference,
+                    scene.LoudnessLiveUpdate),
                 cancellationToken).ConfigureAwait(true);
             if (!sent)
             {
                 EnqueueSceneCatalogOp(new PendingSceneCatalogOp(
                     true, scene.Id, scene.Name, _session.ActiveOutputGroup ?? "main",
-                    scene.IrReference));
+                    scene.IrReference, scene.LoudnessLiveUpdate));
                 StatusText = $"已加入自訂場景：{scene.Name}；同步未完成，連線恢復後自動重試";
                 return false;
             }
@@ -1327,7 +1338,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         {
             if (!queue.Enqueue(new SceneCatalogQueueCard(
                     operation.IsUpsert, operation.SceneId, operation.Name,
-                    operation.OutputGroup, operation.IrReference)))
+                    operation.OutputGroup, operation.IrReference,
+                    operation.LoudnessLiveUpdate)))
             {
                 return false;
             }
@@ -1369,7 +1381,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         {
             _pendingSceneCatalogOps.Enqueue(new PendingSceneCatalogOp(
                 operation.IsUpsert, operation.SceneId, operation.Name,
-                operation.OutputGroup, operation.IrReference));
+                operation.OutputGroup, operation.IrReference,
+                operation.LoudnessLiveUpdate));
         }
         _droppedSceneCatalogOperations = droppedCount;
         return true;
@@ -1500,7 +1513,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             {
                 command = operation.IsUpsert
                     ? _commands.UpsertSceneCatalog(operation.SceneId, operation.Name,
-                          operation.OutputGroup, operation.IrReference)
+                          operation.OutputGroup, operation.IrReference,
+                          operation.LoudnessLiveUpdate)
                     : _commands.RemoveSceneCatalog(operation.SceneId);
             }
             catch (ArgumentException)

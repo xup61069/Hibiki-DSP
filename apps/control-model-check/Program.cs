@@ -1446,6 +1446,20 @@ static bool TryReadSceneCatalogIrReference(byte[] payload, out string irReferenc
     return true;
 }
 
+static bool TryReadSceneCatalogLiveUpdate(byte[] payload, out bool liveUpdate)
+{
+    liveUpdate = false;
+    if (!TryReadSceneCatalogOp(payload, out var operation, out _) ||
+        operation != nameof(SessionRouteRuleOperationV1.Upsert) ||
+        payload.Length < 85)
+    {
+        return false;
+    }
+
+    liveUpdate = payload[84] == 1;
+    return payload[84] is 0 or 1;
+}
+
 static async Task ReadExactBytesAsync(Stream stream, byte[] buffer, CancellationToken token)
 {
     var offset = 0;
@@ -1564,12 +1578,36 @@ static async Task RunSceneCatalogCheckServerAsync(
               TryReadSceneCatalogIrReference(flushedPayload, out var flushedIrReference) &&
               flushedIrReference == "sync-calibration-a",
             "Flushed Scene catalog upsert must encode the card IR reference at the v1 wire offset.");
+        Check(syncViewModel.LastCommand?.Payload.ToArray() is { } flushedLivePayload &&
+              TryReadSceneCatalogLiveUpdate(flushedLivePayload, out var flushedLiveUpdate) &&
+              !flushedLiveUpdate,
+            "Flushed Scene catalog upsert must default live loudness opt-in to off at wire byte 84.");
         Check(ackingCatalogIds.Contains(sceneSyncBaseId),
             "Engine-side check catalog must contain the flushed custom scene.");
         var flushedQueue = new CustomSceneSyncQueueV1();
         Check(flushedQueue.TryLoad(syncQueuePath, out _, out _) &&
               flushedQueue.Operations.Count == 0,
             "A successful flush must clear the persisted replay queue.");
+
+        // Case 1b: a live-opt-in card must persist the flag in both the card
+        // mirror and the offline replay queue, then encode byte 84 = 1 on the
+        // flushed engine command.
+        const string liveSceneId = "live-check-scene";
+        Check(await syncViewModel.AddCustomSceneAsync(new SceneCard(
+                liveSceneId, "同步檢查 Live", "離線新增後補送", "零額外緩衝", true,
+                LoudnessLiveUpdate: true)) &&
+              syncViewModel.IsConnected &&
+              syncViewModel.PendingSceneCatalogOpsCount == 0,
+            "Connected live-opt-in add must send immediately.");
+        Check(syncViewModel.LastCommand?.Payload.ToArray() is { } livePayload &&
+              TryReadSceneCatalogOp(livePayload, out var liveOperation, out var liveSceneIdSent) &&
+              liveOperation == nameof(SessionRouteRuleOperationV1.Upsert) &&
+              liveSceneIdSent == liveSceneId &&
+              TryReadSceneCatalogLiveUpdate(livePayload, out var liveFlag) &&
+              liveFlag,
+            "Connected live-opt-in upsert must encode byte 84 = 1.");
+        Check(ackingCatalogIds.Contains(liveSceneId),
+            "Engine-side check catalog must contain the live-opt-in custom scene.");
     }
     finally
     {
@@ -1711,8 +1749,15 @@ static async Task RunSceneCatalogCheckServerAsync(
         };
         const string restartId = "restart-scene";
         Check(await writer.AddCustomSceneAsync(new SceneCard(
-                restartId, "重啟同步", "離線重啟保留", "零額外緩衝", true)),
+                restartId, "重啟同步", "離線重啟保留", "零額外緩衝", true,
+                "", true)),
             "Offline restart add fixture failed locally.");
+
+        var persistedCardsJson = File.ReadAllText(restartPath);
+        var persistedQueueJson = File.ReadAllText(restartQueuePath);
+        Check(!persistedCardsJson.Contains("\"loudness_live_update\": false") &&
+              !persistedQueueJson.Contains("\"loudness_live_update\": false"),
+            "Default-off live flag must stay absent from serialized card and queue JSON.");
 
         var reader = new EasyControlViewModel
         {
@@ -1727,8 +1772,9 @@ static async Task RunSceneCatalogCheckServerAsync(
             "A new ViewModel must restore a valid offline scene replay queue.");
         Check(reader.LoadPendingSceneCatalogOps(out _) &&
               reader.PendingSceneCatalogOpsCount == 1 &&
-              reader.Scenes.First(scene => scene.Id == restartId).Name == "重啟同步",
-            "A restored replay operation must preserve its exact add payload.");
+              reader.Scenes.First(scene => scene.Id == restartId).Name == "重啟同步" &&
+              reader.PendingSceneCatalogOpTestsOnly[0].LoudnessLiveUpdate,
+            "A restored replay operation must preserve its exact live-loudness payload.");
 
         File.WriteAllText(restartQueuePath, "{\"schema_version\":1,\"dropped_operations\":-1}");
         Check(!reader.LoadPendingSceneCatalogOps(out var corruptError) &&

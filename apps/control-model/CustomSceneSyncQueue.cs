@@ -9,7 +9,8 @@ namespace Hibiki.ControlModel;
 // One bounded, replayable offline scene catalog operation.
 public sealed record SceneCatalogQueueCard(
     bool IsUpsert, string SceneId, string Name, string OutputGroup,
-    string IrReference = "");
+    string IrReference = "",
+    bool LoudnessLiveUpdate = false);
 
 // Persisted companion to the custom scene card mirror. It keeps only the
 // bounded replay operations needed to resume engine synchronization after a
@@ -148,7 +149,8 @@ public sealed class CustomSceneSyncQueueV1
                 var operation = new SceneCatalogQueueCard(
                     item.IsUpsert, item.SceneId ?? string.Empty, item.Name ?? string.Empty,
                     item.OutputGroup ?? string.Empty,
-                    item.IrReference ?? string.Empty);
+                    item.IrReference ?? string.Empty,
+                    item.LoudnessLiveUpdate);
                 if (!IsValid(operation))
                 {
                     error = "場景同步佇列含有無效操作";
@@ -176,7 +178,8 @@ public sealed class CustomSceneSyncQueueV1
         SceneId = operation.SceneId,
         Name = operation.Name,
         OutputGroup = operation.OutputGroup,
-        IrReference = operation.IrReference
+        IrReference = operation.IrReference,
+        LoudnessLiveUpdate = operation.LoudnessLiveUpdate
     };
 
     private static bool IsValid(SceneCatalogQueueCard operation)
@@ -240,5 +243,9 @@ public sealed class CustomSceneSyncQueueV1
 
         [JsonPropertyName("ir_reference")]
         public string? IrReference { get; set; }
+
+        [JsonPropertyName("loudness_live_update")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public bool LoudnessLiveUpdate { get; set; }
     }
 }

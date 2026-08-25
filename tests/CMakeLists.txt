@@ -32,6 +32,20 @@ endif()
 
 add_test(NAME hibiki_driver_stream_tests COMMAND hibiki_driver_stream_tests)
 
+add_executable(hibiki_noise_suppressor_tests
+  unit/noise_suppressor_tests.cpp
+)
+
+target_link_libraries(hibiki_noise_suppressor_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_noise_suppressor_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_noise_suppressor_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_noise_suppressor_tests COMMAND hibiki_noise_suppressor_tests)
+
 if(HIBIKI_BUILD_LIVE_PROBES AND WIN32)
   add_executable(hibiki_live_device_catalog_probe
     live_device_catalog_probe.cpp

@@ -7,7 +7,7 @@
   "required": ["schema_version", "enabled", "threshold_dbfs", "floor_db", "attack_ms", "release_ms", "highpass_hz"],
   "properties": {
     "schema_version": {"const": 1},
-    "enabled": {"type": "boolean"},
+    "enabled": {"const": true},
     "threshold_dbfs": {"type": "number", "minimum": -96, "exclusiveMaximum": 0},
     "floor_db": {"type": "number", "minimum": -96, "maximum": 0},
     "attack_ms": {"type": "number", "minimum": 0.1, "maximum": 2000},
