@@ -1531,10 +1531,12 @@ static async Task RunSceneCatalogCheckServerAsync(
     };
     const string pipeName = "HibikiDSP_eq_snapshot_poll_check";
     using var serverCts = new CancellationTokenSource();
+    long eqPollRequestCount = 0L;
     var connectedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     var serverTask = RunSceneCatalogCheckServerAsync(pipeName, request =>
     {
         if (request.Type != ControlMessageType.EqVisualSnapshotRequest) return null;
+        Interlocked.Increment(ref eqPollRequestCount);
         return new IpcEnvelopeV1(
             ControlMessageType.EqVisualSnapshot,
             request.RequestId,
@@ -1555,6 +1557,28 @@ static async Task RunSceneCatalogCheckServerAsync(
         Check(!await eqViewModel.RefreshEqVisualSnapshotAsync(serverCts.Token) ||
               eqViewModel.EqSurface.LastAppliedSequence >= 9UL,
             "Repeated pulls must never rewind the confirmed surface.");
+
+        // Periodic EQ visual polling: after connect, the background loop must
+        // issue additional EqVisualSnapshotRequest frames without any caller
+        // action. Two observed requests beyond the initial pull prove the
+        // loop runs; a disconnect must stop further polling growth.
+        var pollRequestsBefore = Interlocked.Read(ref eqPollRequestCount);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(4);
+        while (Interlocked.Read(ref eqPollRequestCount) < pollRequestsBefore + 2 &&
+               DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(50, serverCts.Token).ConfigureAwait(true);
+        }
+        Check(Interlocked.Read(ref eqPollRequestCount) >= pollRequestsBefore + 2,
+            "The periodic EQ visual poll must issue repeated snapshot requests after connect.");
+
+        await eqViewModel.DisconnectAsync();
+        serverCts.Cancel();
+        try { await serverTask; } catch (OperationCanceledException) { }
+        var pollRequestsAtStop = Interlocked.Read(ref eqPollRequestCount);
+        await Task.Delay(1400).ConfigureAwait(true);
+        Check(Interlocked.Read(ref eqPollRequestCount) == pollRequestsAtStop,
+            "Disconnect must stop the periodic EQ visual poll.");
     }
     finally
     {
@@ -1563,4 +1587,74 @@ static async Task RunSceneCatalogCheckServerAsync(
         try { await serverTask; } catch (OperationCanceledException) { }
     }
 }
+// Listening-dose model: fail-closed sample rejection, trapezoid
+// accumulation, silent-gap interruption and daily reset.
+var dose = new ListeningDoseModelV1();
+Check(dose.AccumulatedDosePercent == 0.0 && !dose.IsAccumulating,
+    "Dose must start at zero.");
+Check(!dose.AddSample(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero), -150.0, false),
+    "Below-floor volume samples must be rejected fail-closed.");
+Check(dose.AccumulatedDosePercent == 0.0 && !dose.IsAccumulating,
+    "Rejected samples must not touch accumulated state.");
+// A muted sample folds with a zero rate (the accumulator advances its time
+// anchor) so the silent interval is never retroactively billed.
+Check(dose.AddSample(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero), -12.0, true),
+    "Muted samples must still advance the time anchor.");
+Check(dose.AddSample(new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero), -6.0, false),
+    "-6 dB (88 dBA) is above the criterion and must accumulate.");
+// Fold one sample per minute for a full hour (inside the 5-minute bound).
+for (var minute = 1; minute <= 60; ++minute)
+{
+    var at = new DateTimeOffset(2026, 8, 26, 10, 0, 0, TimeSpan.Zero)
+        .AddMinutes(minute);
+    dose.AddSample(at, -6.0, false);
+}
+Check(dose.AccumulatedDosePercent > 20.0 && dose.AccumulatedDosePercent < 30.0,
+    "One hour at +3 dB over criterion should be about a quarter of the budget.");
+Check(dose.IsAccumulating, "Active loud listening must report accumulating.");
+
+var doseBeforeMute = dose.AccumulatedDosePercent;
+
+var afterLongGap = new DateTimeOffset(2026, 8, 26, 12, 0, 0, TimeSpan.Zero);
+dose.AddSample(afterLongGap, -30.0, false);
+Check(dose.LastSampleGap > ListeningDoseModelV1.MaxSampleInterval,
+    "The long silence must be observable as a sample gap.");
+Check(dose.AccumulatedDosePercent >= 20.0 && dose.AccumulatedDosePercent < 30.0,
+    "A silent gap longer than the bound must not add dose.");
+Check(!dose.IsAccumulating,
+    "A long silent gap must end the accumulating state.");
+
+var afterMute = new DateTimeOffset(2026, 8, 26, 13, 0, 0, TimeSpan.Zero);
+dose.AddSample(afterMute, -30.0, true);   // mute for two minutes
+var unmute = new DateTimeOffset(2026, 8, 26, 13, 2, 0, TimeSpan.Zero);
+dose.AddSample(unmute, -6.0, false);      // unmute at the same loud level
+Check(dose.AccumulatedDosePercent < doseBeforeMute + 2.0,
+    "Two muted minutes must not be retroactively billed at the loud rate.");
+
+dose.ResetDaily();
+Check(dose.AccumulatedDosePercent == 0.0 && !dose.IsAccumulating,
+    "Daily reset must clear the accumulator.");
+
+// ViewModel integration: every confirmed volume-state update folds exactly
+// one dose sample; invalid states are rejected before the fold.
+var doseVm = new EasyControlViewModel("dose-pipe");
+Check(doseVm.ListeningDose.AccumulatedDosePercent == 0.0,
+    "A fresh view model starts with zero dose.");
+var badState = VolumeSafetyStateV1.Initial() with { EffectiveDb = double.NaN, Generation = 2 };
+Check(!doseVm.ApplyVolumeSafetyState(badState, out _),
+    "NaN effective volume must fail closed.");
+Check(doseVm.ListeningDose.AccumulatedDosePercent == 0.0,
+    "Rejected volume states must not fold into the dose.");
+var loudState = VolumeSafetyStateV1.Initial(-6.0) with { Generation = 3 };
+Check(doseVm.ApplyVolumeSafetyState(loudState, out _),
+    "Valid loud volume state must apply.");
+Check(doseVm.ListeningDose.IsAccumulating,
+    "Applying a confirmed loud state must start dose accumulation.");
+
+var mutedState = VolumeSafetyStateV1.Initial(-6.0) with { Muted = true, Generation = 4 };
+Check(doseVm.ApplyVolumeSafetyState(mutedState, out _),
+    "A muted volume state must still apply.");
+Check(!doseVm.ListeningDose.IsAccumulating,
+    "A confirmed muted state must not accumulate new dose.");
+
 Console.WriteLine("Control model checks passed.");

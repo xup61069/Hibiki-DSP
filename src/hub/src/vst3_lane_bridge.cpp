@@ -209,6 +209,12 @@ bool Vst3TapBufferV1::read(
     const bool is_valid = valid_.load(std::memory_order_acquire);
     if (!is_valid) { return false; }
 
+    // Pre-read sequence: paired with the post-read load below so a writer
+    // that completes a full publish while we copy is detected (the classic
+    // seqlock retry check; this reader is fail-closed instead of retrying).
+    const std::uint64_t pre_seq =
+        write_seq_.load(std::memory_order_acquire);
+
     // Read all scalar fields first.
     const auto group_bytes = group_bytes_;
     const auto channels = channels_;
@@ -233,12 +239,14 @@ bool Vst3TapBufferV1::read(
 
     std::memcpy(destination, buffer_.data(), sample_count * sizeof(float));
 
-    // Post-read validation: ensure we didn't read during a concurrent
-    // write. If the sequence changed between our acquire and now, the
-    // data may be torn. Fail-closed rather than returning partial audio.
+    // Post-read validation: require the sequence to be unchanged and even.
+    // An odd sequence means we raced an in-flight publish; a changed even
+    // value means the writer completed a whole publish round during our
+    // memcpy. Either way the samples may be torn: fail-closed rather than
+    // returning partial audio.
     const std::uint64_t post_seq =
         write_seq_.load(std::memory_order_acquire);
-    if ((post_seq & 1U) != 0U) { return false; }
+    if (pre_seq != post_seq || (post_seq & 1U) != 0U) { return false; }
 
     channels_out = channels;
     frames_out = frames;
@@ -248,6 +256,13 @@ bool Vst3TapBufferV1::read(
 
 void Vst3TapBufferV1::reset() noexcept {
     valid_.store(false, std::memory_order_release);
+}
+
+void Vst3TapBufferV1::force_sequence_odd_for_tests() noexcept {
+    // Simulate a reader that sampled pre_seq even and then observed an
+    // in-flight publish (odd) at the post-read check.
+    write_seq_.store(write_seq_.load(std::memory_order_acquire) + 1U,
+                     std::memory_order_release);
 }
 
 }  // namespace hibiki

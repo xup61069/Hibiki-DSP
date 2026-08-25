@@ -751,8 +751,13 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
     if (!apply_ir(output_group, output_interleaved, frames)) return false;
     if (!apply_loudness_peq(output_group, output_interleaved, frames)) return false;
     if (!apply_program_aware(output_group, output_interleaved, frames)) return false;
-    (void)vst3_tap_.publish(output_group, output_interleaved,
-                            frames, active_graph_.output_channels);
+    // The tap is control-plane telemetry for VST3 lane workers. When no
+    // lane is active the sandbox never reads it, so skip the isfinite scan
+    // and copies entirely instead of paying the cost every RT block.
+    if (has_active_vst3_lanes_) {
+        (void)vst3_tap_.publish(output_group, output_interleaved,
+                                frames, active_graph_.output_channels);
+    }
     if (!apply_vst3_lanes(output_group, output_interleaved, frames)) return false;
     if (!apply_group_master(output_group, output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
