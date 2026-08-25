@@ -40,4 +40,22 @@
         <Setter Property="BorderThickness" Value="1" />
     </Style>
 
+    <!-- Shared card surface for route-health rows, App session rows, matrix
+         routes and VST3 lanes. Extracted from duplicated inline attributes so
+         all inner list items share the same corner radius and padding. -->
+    <Style x:Key="RouteItemCardGridStyle" TargetType="Grid">
+        <Setter Property="Padding" Value="12" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style x:Key="RouteItemCardStackStyle" TargetType="StackPanel">
+        <Setter Property="Padding" Value="12" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
 </ResourceDictionary>

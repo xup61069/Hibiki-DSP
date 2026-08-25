@@ -381,7 +381,7 @@
                                     <controls:ItemsRepeater ItemsSource="{Binding Expert.RouteHealth}">
                                         <controls:ItemsRepeater.ItemTemplate>
                                             <DataTemplate>
-                                                <StackPanel Padding="12" Spacing="4" CornerRadius="10" AutomationProperties.Name="{Binding AccessibleSummary}" AutomationProperties.HelpText="{Binding Detail}" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                                <StackPanel Style="{StaticResource RouteItemCardStackStyle}" Spacing="4" AutomationProperties.Name="{Binding AccessibleSummary}" AutomationProperties.HelpText="{Binding Detail}">
                                                      <StackPanel.Transitions>
                                                          <TransitionCollection>
                                                              <EntranceThemeTransition FromVerticalOffset="16" />
@@ -412,7 +412,7 @@
                                     <controls:ItemsRepeater ItemsSource="{Binding SessionCatalog}">
                                         <controls:ItemsRepeater.ItemTemplate>
                                             <DataTemplate>
-                                                <Grid Padding="12" ColumnSpacing="10" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                                <Grid Style="{StaticResource RouteItemCardGridStyle}" ColumnSpacing="10">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="Auto" />
@@ -448,7 +448,7 @@
                                     <controls:ItemsRepeater ItemsSource="{Binding RouteRules}">
                                         <controls:ItemsRepeater.ItemTemplate>
                                             <DataTemplate>
-                                                <Grid Padding="12" ColumnSpacing="10" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                                <Grid Style="{StaticResource RouteItemCardGridStyle}" ColumnSpacing="10">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="Auto" />
@@ -508,7 +508,7 @@
                                     <controls:ItemsRepeater ItemsSource="{Binding Expert.MatrixRoutes}">
                                         <controls:ItemsRepeater.ItemTemplate>
                                             <DataTemplate>
-                                                <Grid Padding="12" ColumnSpacing="10" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                                <Grid Style="{StaticResource RouteItemCardGridStyle}" ColumnSpacing="10">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="*" />
@@ -547,7 +547,7 @@
                                     <controls:ItemsRepeater ItemsSource="{Binding Expert.Vst3Lanes}">
                                         <controls:ItemsRepeater.ItemTemplate>
                                             <DataTemplate>
-                                                <Grid Padding="12" ColumnSpacing="10" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                                <Grid Style="{StaticResource RouteItemCardGridStyle}" ColumnSpacing="10">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="Auto" />
