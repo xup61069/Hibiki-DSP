@@ -3,7 +3,7 @@ id: SPEC-0024
 status: accepted
 owner: hibiki-maintainers
 authority: control-model
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-25
 review_after_days: 30
 related_adrs: [ADR-0001, ADR-0004]
 source_globs: ["apps/control-model/SessionRouteRuleCatalog.cs", "apps/control-model/ControlModel.cs", "apps/control-model/EasyControlViewModel.cs", "apps/winui-shell/MainWindow.xaml", "apps/winui-shell/MainWindow.xaml.cs", "schemas/session-route-rules-v1.schema.json", "apps/control-model-check/Program.cs", "apps/engine-preview/engine_preview.cpp", "tools/engine-preview-smoke.ps1"]
