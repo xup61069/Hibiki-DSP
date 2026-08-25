@@ -99,6 +99,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch((error) => sendResponse({ok: false, error: String(error)}));
     return true;
   }
+  if (message?.type === 'retry-tab-bridge') {
+    if (!capturing || bridgeConnected) {
+      sendResponse({ok: false, error: 'bridge-retry-unavailable'});
+      return false;
+    }
+    cancelBridgeRetry();
+    connectBridge();
+    sendResponse({ok: true});
+    return false;
+  }
   if (message?.type !== 'start-tab-stream' || typeof message.streamId !== 'string') return false;
   startCapture(message)
     .then(() => sendResponse({ok: true}))
