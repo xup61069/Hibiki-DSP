@@ -138,7 +138,7 @@
 
                         <StackPanel Spacing="12">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon Glyph="" FontSize=" 20 " Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                                <FontIcon Glyph="" FontSize="20" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
                                 <TextBlock Text="先選輸出，再一鍵變好聽" Style="{ThemeResource TitleTextBlockStyle}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             </StackPanel>
                             <ComboBox Header="輸出群組" AutomationProperties.Name="輸出群組" AutomationProperties.HelpText="選擇 Main、Low Latency 或 Surround 輸出" ItemsSource="{Binding OutputGroups}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding SelectedOutputGroup, Mode=TwoWay}" HorizontalAlignment="Stretch" />
