@@ -14,6 +14,99 @@ constexpr std::size_t kMaxFilters = 16U;
 constexpr double kMinQ = 0.1;
 constexpr double kMaxQ = 100.0;
 
+// Built-in target curve anchor points (frequency_hz, target_db). Each curve
+// is a bounded log-frequency interpolation table; the caller supplies the
+// measured response and the compiler computes the residual. These are
+// normalised to 0 dB at 1 kHz and do not represent an absolute SPL target.
+struct TargetCurveAnchorV1 {
+    double frequency_hz;
+    double target_db;
+};
+
+constexpr TargetCurveAnchorV1 kTargetCurveFlat[] = {
+    {20.0, 0.0}, {20000.0, 0.0},
+};
+
+constexpr TargetCurveAnchorV1 kTargetCurveHarmanInEar[] = {
+    {20.0,   6.5}, {32.0,   6.0}, {63.0,   4.5},
+    {125.0,  3.0}, {250.0,  1.5}, {500.0,  0.5},
+    {1000.0, 0.0}, {2000.0, -1.0}, {3000.0, 3.5},
+    {4000.0, 4.0}, {6000.0, 2.0}, {8000.0, -1.0},
+    {10000.0, -3.0}, {16000.0, -8.0}, {20000.0, -12.0},
+};
+
+constexpr TargetCurveAnchorV1 kTargetCurveHarmanOverEar[] = {
+    {20.0,   7.0}, {32.0,   6.5}, {63.0,   5.5},
+    {125.0,  4.0}, {250.0,  2.0}, {500.0,  0.5},
+    {1000.0, 0.0}, {1500.0, -0.5}, {2000.0, -1.5},
+    {3000.0, 3.0}, {4000.0, 3.5}, {5000.0, 1.0},
+    {8000.0, -2.0}, {10000.0, -4.0}, {16000.0, -9.0}, {20000.0, -13.0},
+};
+
+}  // namespace
+
+const char* calibration_target_curve_name_v1(
+    const CalibrationTargetCurveIdV1 id) noexcept {
+    switch (id) {
+        case CalibrationTargetCurveIdV1::Flat: return "flat";
+        case CalibrationTargetCurveIdV1::HarmanInEar: return "harman-in-ear";
+        case CalibrationTargetCurveIdV1::HarmanOverEar: return "harman-over-ear";
+        default: return "";
+    }
+}
+
+bool sample_calibration_target_curve_v1(
+    const CalibrationTargetCurveIdV1 id,
+    const double frequency_hz,
+    double& target_db) noexcept {
+    const TargetCurveAnchorV1* anchors = nullptr;
+    std::size_t count = 0U;
+    switch (id) {
+        case CalibrationTargetCurveIdV1::Flat:
+            anchors = kTargetCurveFlat;
+            count = std::size(kTargetCurveFlat);
+            break;
+        case CalibrationTargetCurveIdV1::HarmanInEar:
+            anchors = kTargetCurveHarmanInEar;
+            count = std::size(kTargetCurveHarmanInEar);
+            break;
+        case CalibrationTargetCurveIdV1::HarmanOverEar:
+            anchors = kTargetCurveHarmanOverEar;
+            count = std::size(kTargetCurveHarmanOverEar);
+            break;
+        default:
+            return false;
+    }
+    if (!std::isfinite(frequency_hz) || frequency_hz < 10.0 || frequency_hz > 24000.0) {
+        return false;
+    }
+    if (count == 1U) {
+        target_db = anchors[0].target_db;
+        return true;
+    }
+    if (frequency_hz <= anchors[0].frequency_hz) {
+        target_db = anchors[0].target_db;
+        return true;
+    }
+    if (frequency_hz >= anchors[count - 1U].frequency_hz) {
+        target_db = anchors[count - 1U].target_db;
+        return true;
+    }
+    for (std::size_t i = 1U; i < count; ++i) {
+        if (frequency_hz <= anchors[i].frequency_hz) {
+            const auto lo = anchors[i - 1U];
+            const auto hi = anchors[i];
+            const auto t = (std::log2(frequency_hz) - std::log2(lo.frequency_hz)) /
+                           (std::log2(hi.frequency_hz) - std::log2(lo.frequency_hz));
+            target_db = lo.target_db + t * (hi.target_db - lo.target_db);
+            return true;
+        }
+    }
+    return false;
+}
+
+namespace {
+
 double correction_db(const CalibrationResponsePointV1& point) noexcept {
     return point.target_db - point.measured_db;
 }
