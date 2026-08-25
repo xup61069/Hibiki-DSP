@@ -27,12 +27,11 @@ process loopback、瀏覽器單分頁與 direct bypass 的路由健康卡片、A
 只送出最新的控制值。
 正式殼層使用單一 NavigationView 導覽，固定六頁依序為「快速開始」（Ctrl+1）、
 「場景」（Ctrl+2）、「自訂預設」（Ctrl+3）、「音量保護」（Ctrl+4）、「路由健康」（Ctrl+5）
-與「Expert Panel」（Ctrl+6）；VST3 時間軸仍是本機草稿面，不列入主要導覽。
+與「Expert Panel」（Ctrl+6）；正式 shell 不提供 VST3 時間軸編輯面。
 這些頁面是同一 shell 內的面板切換，不新增 IPC 命令，也不改變 Easy/Expert 的
 顯示邊界：Expert Panel 頁面只收納既有 Expert 唯讀摘要與本機編輯面。
-Expert 另提供 Vst3TimelineEditorViewModelV1 的本機時間軸編輯面：註冊／選取、草稿
-新增／修改／刪除列、commit／discard、undo／redo、保存基準與繁中狀態回饋。正式 shell 的清除歷史與保存基準動作只呼叫既有 surface-level
-ViewModel seams：清除歷史會將復原／重做堆疊歸零，已發布內容、dirty 基準與開啟中的草稿不得改變；保存基準會在無草稿且已選取時間軸時，把目前內容存為新的未修改基準並清 dirty 狀態。兩者皆不觸碰引擎或 timeline 持久化格式。
+正式 shell 不再暴露 VST3 時間軸編輯卡片；VST3 host 能力仍由 SPEC-0008 的 bounded
+model seams 管理，不得由 shell 宣稱已同步到 worker、plugin 或持久儲存。
 
 Out：WaveRT/PortCls 驅動、實體裝置枚舉、音訊處理、VST3 host UI、校正量測與
 任何編譯後的 EXE／DLL。這些能力仍由各自 Spec 與 worker 負責。
@@ -44,13 +43,9 @@ Out：WaveRT/PortCls 驅動、實體裝置枚舉、音訊處理、VST3 host UI�
 非同步命令；ViewModel 透過 `NamedPipeControlClientV1` 建立 local-only
 versioned IPC，Hello 成功後才可送出 SceneApply 或 VolumeNotification。
 
-`EasyControlViewModel.Vst3TimelineEditor` 暴露 `Vst3TimelineEditorViewModelV1` 作為 VST3
-自動化時間軸的本機 binding seam。它沿用 bounded model 的容量、排序、draft、published、
-dirty 與 undo/redo 語意，解析欄位使用 invariant culture 且失敗時不改變狀態。
-`NewTimelineIdText` 與 `SelectedRowValueText` 是可雙向綁定的輸入欄位；
-`SelectedTimelineId` setter 走同一個 fail-closed Select 流程，拒絕時清除過期選取並顯示狀態。
-目前只提供本地檢視與草稿編輯；不送 IPC payload、不寫 native file store，也不代表 engine
-已載入、plugin 已套用或 timeline 已持久化。
+`EasyControlViewModel` 不再向 WinUI shell 暴露 VST3 時間軸編輯 binding seam。若未來需要
+重新引入，必須另立 Spec 切片並保持 fail-closed 邊界：不送 IPC payload、不寫 native file
+store，也不代表 engine 已載入、plugin 已套用或 timeline 已持久化。
 
 固定輸出群組 ID 為 `main`、`low-latency`、`surround`；它們是 UI 選擇值，
 不是實體 Endpoint ID。場景 ID 延用 `game`、`movie`、`voice`、`studio`。
@@ -85,6 +80,10 @@ Bypass、過期／不存在檔案、格式或 tap 上限錯誤都 fail-closed；
 Hello 與裝置 catalog 成功後，ViewModel 會以序列化的 `ControlStatusRequest` 取得一次完整
 狀態；status store 未掛載時顯示控制狀態暫不可用，但不把整個音訊連線誤判為失敗。
 
+
+視窗大小與位置會在正常關閉時保存到 `%LOCALAPPDATA%\Hibiki DSP\window-placement-v1.json`，
+下次啟動前先還原；讀取或寫入失敗時使用內建預設 1080x720 佈局，不影響引擎連線。
+位置與尺寸都經 bounded clamp，避免還原到螢幕外或小於最小可用尺寸。
 ## 失敗與安全
 
 - 沒有輸出群組時 One-Tap Enhance fail-closed，不產生 SceneApply。
@@ -98,8 +97,8 @@ Hello 與裝置 catalog 成功後，ViewModel 會以序列化的 `ControlStatusR
   bounded backoff 與明確使用者狀態提示。
 - Expert 摘要不可宣稱 Matrix/VST3/ISO 校正已提交；沒有對應版本化 IPC command 時，
   UI 必須維持唯讀並顯示「未認證／未校準」狀態。
-- VST3 時間軸卡片必須明確以本機編輯面呈現；commit 只改變 managed published snapshot，
-  不得宣稱已同步到 worker、plugin 或持久儲存。
+- Shell 不得宣稱 VST3 時間軸已同步到 worker、plugin 或持久儲存；任何未來編輯面都必須
+  明確標示本機邊界，且 commit 只能改變 managed published snapshot。
 - 路由健康卡片不得以顏色作為唯一狀態訊息；每張卡片都要有可讀的狀態標籤與邊界說明。
 - 音量安全投影不得把 `requestedDb` 當成實際輸出；`effectiveDb` 必須不高於要求值與
   safety ceiling，並拒絕過期 generation。
