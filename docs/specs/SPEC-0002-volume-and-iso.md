@@ -231,6 +231,13 @@ max cut 12 dB），SceneApply 成功路徑在同一個 control transaction 清�
 controller；Strict Direct 維持 fail-open bypass。此整合仍是 user-space bounded proxy，
 不宣稱 BS.1770 conformance、實體 sink delivery 或 driver/WaveRT evidence。
 
+選用欄位 `bass_correction_enabled`／`bass_max_cut_db`（0–12 dB）加入內容驅動的低頻校正：
+`BassExcessDetectorV1` 以每聲道一階低通（~120 Hz）量測低頻帶對全頻帶的 RMS 能量比，
+在約兩秒滑動窗內平滑成 dB 差。比值接近 0 dB（低頻明顯偏高）時，RT 路徑以一階 low-shelf
+施加有界衰減（Movie 預設上限 4 dB），增益滑移速率與音量控制相同。遙測新增
+`bass_correction_gain_db`，source=2 自適應幀在低頻點發布實際校正值。這是固定濾波器
+能量比代理，不是 FFT 頻譜分析或 BS.1770 loudness meter，也不宣稱 ISO 226 conformance。
+
 ## IR 相位／延遲滑桿
 
 `IrPhasePolicyV1` 是獨立於 equal-loudness magnitude 的 control-plane contract。`strength` 固定為

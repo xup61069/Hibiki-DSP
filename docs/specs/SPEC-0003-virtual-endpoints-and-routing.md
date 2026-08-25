@@ -138,6 +138,13 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   `frames=rendered/total` 進度與 `failed` 區塊計數；連續失敗達上限後停止排程並保留
   honest detail。此模式與 test tone、tab bridge、driver loopback 互斥；它是本機檔案播放
   的 user-space graph evidence，不是 endpoint policy、實體 driver 或 WaveRT delivery 驗收。
+- Engine Preview 另提供 opt-in `--render-offline <output.wav>`（搭配
+  `--enable-wav-source` 與 `--wav-source-path`）：在同一行程內完成 decode（必要時以同一
+  bounded resampler 轉換到 48 kHz）、commit 同一套 Studio graph，再以 bounded blocks 驅動
+  `process_output_group` 渲染整段訊號，最後匯出 Float32 立體聲 WAV。此模式完全不觸碰
+  WASAPI、driver loopback 或任何音訊端點，因此可在沒有喇叭或音效裝置的機器重現；
+  它是裝置無關的 user-space graph evidence，不是 driver、WaveRT delivery 或實機播放
+  驗收。離線渲染與所有即時播放模式互斥。
 - `PersistentPolyphaseResampler` 是 clock-drift/SRC baseline：固定容量 8 phase × 16 tap
   polyphase FIR bank 支援最多 8 聲道與 0.25x–4.0x source step，保留跨 block phase 與
   bounded history，ratio 變更不重置 stream，invalid input fail-closed 且 RT path 不配置。
