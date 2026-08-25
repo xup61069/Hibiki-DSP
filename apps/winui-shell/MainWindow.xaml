@@ -117,6 +117,14 @@
         <KeyboardAccelerator Modifiers="Control" Key="Number6" />
       </controls:NavigationViewItem.KeyboardAccelerators>
     </controls:NavigationViewItem>
+    <controls:NavigationViewItem Content="校正精靈" Tag="calibrate" AutomationProperties.Name="校正精靈頁面">
+      <controls:NavigationViewItem.Icon>
+        <FontIcon Glyph="" />
+      </controls:NavigationViewItem.Icon>
+      <controls:NavigationViewItem.KeyboardAccelerators>
+        <KeyboardAccelerator Modifiers="Control" Key="Number7" />
+      </controls:NavigationViewItem.KeyboardAccelerators>
+    </controls:NavigationViewItem>
   </controls:NavigationView.MenuItems>
   <controls:NavigationView.PaneHeader>
     <StackPanel Orientation="Horizontal" Spacing="10" Margin="12,0,12,4">
@@ -501,6 +509,58 @@
                                     </StackPanel>
                                 </StackPanel>
                             </Border></Grid>
+          <Grid x:Name="ShellCalibrateSection" Visibility="Collapsed"><Grid.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" IsStaggeringEnabled="True" /></TransitionCollection></Grid.Transitions><Border Style="{StaticResource SectionCardStyle}" Padding="28"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="16" /></TransitionCollection></Border.Transitions>
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="校正精靈" Style="{ThemeResource TitleTextBlockStyle}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                    </StackPanel>
+                    <TextBlock Text="載入耳機或喇叭的量測文字檔，選擇目標曲線，編譯成有安全上限的 PEQ 校正設定。" TextWrapping="Wrap" Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <ComboBox Header="目標曲線" ItemsSource="{Binding WizardCurveOptions}" DisplayMemberPath="Label" SelectedValuePath="Mode" SelectedValue="{Binding WizardTargetCurve, Mode=TwoWay}" AutomationProperties.Name="校正精靈目標曲線" AutomationProperties.HelpText="Flat 只校正量測誤差；Harman 曲線套用對應耳機目標" HorizontalAlignment="Stretch" MaxWidth="360" />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Content="選擇量測檔（CSV／REW）" Click="OnImportWizardMeasurementClick" Style="{StaticResource AccentButtonStyle}" MinHeight="32" AutomationProperties.Name="選擇校正量測檔案" AutomationProperties.HelpText="選擇 CSV 或 REW 匯出的頻率量級文字檔" ToolTipService.ToolTip="選擇 CSV 或 REW 匯出的頻率量級文字檔" />
+                        <Button Content="編譯校正" Click="OnCompileWizardClick" MinHeight="32" IsEnabled="{Binding WizardHasResult, Converter={StaticResource InverseBoolConverter}}" AutomationProperties.Name="編譯校正設定" AutomationProperties.HelpText="以目前量測與目標曲線編譯 PEQ 濾波器" ToolTipService.ToolTip="以目前量測與目標曲線編譯 PEQ 濾波器" />
+                        <Button Content="匯出校正設定" Click="OnExportWizardProfileClick" MinHeight="32" IsEnabled="{Binding WizardHasResult}" AutomationProperties.Name="匯出校正 PEQ 設定檔" AutomationProperties.HelpText="將已編譯的 PEQ 濾波器存成 JSON 檔" ToolTipService.ToolTip="將已編譯的 PEQ 濾波器存成 JSON 檔" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Style="{StaticResource StatusPillStyle}">
+                            <TextBlock Text="{Binding WizardMeasurementPath}" Style="{ThemeResource CaptionTextBlockStyle}" AutomationProperties.Name="量測檔路徑" Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxWidth="420" TextTrimming="CharacterEllipsis" />
+                        </Border>
+                        <Border Style="{StaticResource StatusPillStyle}" Visibility="{Binding WizardHasMeasurement, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="{Binding WizardImportedCountText}" Style="{ThemeResource CaptionTextBlockStyle}" AutomationProperties.Name="量測點數" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="{Binding WizardStatus}" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" AutomationProperties.LiveSetting="Polite" AutomationProperties.Name="校正狀態" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <Border Style="{StaticResource SectionCardStyle}" Visibility="{Binding WizardHasResult, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="PEQ 濾波器預覽" Style="{ThemeResource BodyStrongTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" AutomationProperties.Name="PEQ 濾波器預覽" />
+                            <controls:ItemsRepeater ItemsSource="{Binding WizardPreviewFilters}" MaxWidth="560">
+                                <controls:ItemsRepeater.Layout>
+                                    <controls:StackLayout Spacing="4" />
+                                </controls:ItemsRepeater.Layout>
+                                <controls:ItemsRepeater.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="8" Background="{ThemeResource SubtleFillColorSecondaryBrush}" Padding="12,6">
+                                            <Grid ColumnSpacing="14">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="28" />
+                                                    <ColumnDefinition Width="110" />
+                                                    <ColumnDefinition Width="90" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Index}" Style="{ThemeResource CaptionTextBlockStyle}" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold" />
+                                                <TextBlock Grid.Column="1" Text="{Binding FrequencyText}" Style="{ThemeResource CaptionTextBlockStyle}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                                <TextBlock Grid.Column="2" Text="{Binding GainText}" Style="{ThemeResource CaptionTextBlockStyle}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Grid.Column="3" Text="{Binding QText}" Style="{ThemeResource CaptionTextBlockStyle}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </controls:ItemsRepeater.ItemTemplate>
+                            </controls:ItemsRepeater>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="{Binding WizardExportedPath}" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" AutomationProperties.LiveSetting="Polite" AutomationProperties.Name="匯出位置" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+            </Border></Grid>
           <Grid x:Name="ShellExpertSection" Visibility="Collapsed">
             <TextBlock Text="Easy 模式已隱藏 Expert 內容；切換「Expert」後就會顯示這一頁。" TextWrapping="Wrap" Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="{Binding IsExpert, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
             <Border x:Name="ExpertPanel" Style="{StaticResource SectionCardStyle}" Padding="28"><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="16" /></TransitionCollection></Border.Transitions>
