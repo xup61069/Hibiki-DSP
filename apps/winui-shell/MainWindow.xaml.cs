@@ -5,6 +5,9 @@ using Hibiki.ControlModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
+using Windows.UI;
 
 namespace Hibiki.WinUI;
 
@@ -29,6 +32,15 @@ public sealed partial class MainWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName is nameof(EasyControlViewModel.EqSurface) or
+            nameof(EasyControlViewModel.IsConnected))
+        {
+            #if !HIBIKI_COMPATIBILITY_PREVIEW
+            DispatcherQueue.TryEnqueue(RefreshEqVisualCanvas);
+            #endif
+        }
+
+#if !HIBIKI_COMPATIBILITY_PREVIEW
         if (e.PropertyName == nameof(EasyControlViewModel.IsConnected))
         {
             DispatcherQueue.TryEnqueue(() =>
@@ -38,9 +50,70 @@ public sealed partial class MainWindow : Window
                     DisconnectedBanner.IsOpen = !ViewModel.IsConnected;
             });
         }
+#endif
     }
 
 #if !HIBIKI_COMPATIBILITY_PREVIEW
+    private void RefreshEqVisualCanvas()
+    {
+        if (EqVisualCanvas is null) return;
+        EqVisualCanvas.Children.Clear();
+
+        var frame = ViewModel.EqSurface;
+        var points = frame.TransitionProgress >= 1.0 ? frame.TargetPoints : InterpolatePoints(frame.Points, frame.TargetPoints, frame.TransitionProgress);
+        var width = double.IsNaN(EqVisualCanvas.ActualWidth) || EqVisualCanvas.ActualWidth < 120.0 ? 480.0 : EqVisualCanvas.ActualWidth;
+        var height = double.IsNaN(EqVisualCanvas.ActualHeight) || EqVisualCanvas.ActualHeight < 60.0 ? 140.0 : EqVisualCanvas.ActualHeight;
+
+        var geometry = string.Create(System.Globalization.CultureInfo.InvariantCulture,
+            $"M {width * 0.02:F1} {height * 0.5 + points[0].GainDb * -2.2:F1}");
+        foreach (var point in points)
+        {
+            var x = width * (0.02 + (Math.Log10(point.FrequencyHz / 20.0) / Math.Log10(1000.0)) * 0.96);
+            var y = Math.Clamp(height * 0.5 - point.GainDb * 2.2, height * 0.08, height * 0.92);
+            geometry += $" L {x:F1} {y:F1}";
+        }
+
+        var strokeColor = frame.Source switch
+        {
+            EqVisualSourceV1.EqualLoudness => Color.FromArgb(255, 0, 120, 212),
+            EqVisualSourceV1.AdaptiveCorrection => Color.FromArgb(255, 0, 153, 188),
+            _ => (Color)Application.Current.Resources["SystemAccentColor"],
+        };
+
+        EqVisualCanvas.Children.Add(new Polyline
+        {
+            Stroke = new SolidColorBrush(strokeColor),
+            StrokeThickness = 3.0,
+            StrokeLineJoin = PenLineJoin.Round,
+            Points = ParsePolylinePoints(geometry.Substring(2)),
+        });
+    }
+
+    private static Windows.Foundation.PointCollection ParsePolylinePoints(string geometry)
+    {
+        var collection = new Windows.Foundation.PointCollection();
+        var tokens = geometry.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        for (var index = 0; index + 1 < tokens.Length; index += 2)
+        {
+            collection.Append(new Windows.Foundation.Point(
+                double.Parse(tokens[index], System.Globalization.CultureInfo.InvariantCulture),
+                double.Parse(tokens[index + 1], System.Globalization.CultureInfo.InvariantCulture)));
+        }
+        return collection;
+    }
+
+    private static IReadOnlyList<EqVisualPointV1> InterpolatePoints(
+        IReadOnlyList<EqVisualPointV1> from,
+        IReadOnlyList<EqVisualPointV1> to,
+        double progress)
+    {
+        if (from.Count != to.Count || progress <= 0.0) return from;
+        if (progress >= 1.0) return to;
+        return from.Select((point, index) => new EqVisualPointV1(
+            point.FrequencyHz,
+            point.GainDb + ((to[index].GainDb - point.GainDb) * progress))).ToArray();
+    }
+
     private void ConfigureTitleBar()
     {
         ExtendsContentIntoTitleBar = true;
