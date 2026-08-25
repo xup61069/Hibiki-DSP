@@ -599,6 +599,7 @@ function Assert-ExtendedPrintableContractSchemas {
         schema_version = 1
         output_channels = 8
         strict_direct = $false
+        sample_format = 0
         lanes = @([ordered]@{
           id = 'lane-音訊'
           output_group = 'group-音訊'

@@ -25,6 +25,10 @@ bool validate_graph(const GraphConfigV1& graph) noexcept {
         (graph.output_channels != 2 && graph.output_channels != 6 && graph.output_channels != 8)) {
         return false;
     }
+    if (graph.sample_format != kGraphSampleFormatFloat32V1 &&
+        graph.sample_format != kGraphSampleFormatFloat64V1) {
+        return false;
+    }
 
     for (std::size_t lane_index = 0; lane_index < graph.lanes.size(); ++lane_index) {
         const auto& lane = graph.lanes[lane_index];
@@ -79,6 +83,7 @@ bool compile_rt_snapshot(const GraphConfigV1& graph,
     compiled.lane_count = static_cast<std::uint32_t>(graph.lanes.size());
     compiled.revision = revision;
     compiled.strict_direct = graph.strict_direct;
+    compiled.sample_format = graph.sample_format;
     std::array<std::uint32_t, kMaxRtLanes> group_max_latency{};
     for (std::size_t index = 0U; index < graph.lanes.size(); ++index) {
         const auto& source = graph.lanes[index];
@@ -201,6 +206,74 @@ bool process_graph_filtered(const RtGraphSnapshotV1& snapshot,
 
 }  // namespace
 
+namespace {
+
+bool process_graph_filtered_f64(const RtGraphSnapshotV1& snapshot,
+                                const std::string_view output_group,
+                                const std::span<const RtLaneInputF64V1> inputs,
+                                double* const output_interleaved,
+                                const std::size_t frames) noexcept {
+    if (snapshot.schema_version != 1 || snapshot.lane_count > kMaxRtLanes ||
+        snapshot.output_channels == 0 || snapshot.output_channels > 8 ||
+        (snapshot.sample_format != kGraphSampleFormatFloat32V1 &&
+         snapshot.sample_format != kGraphSampleFormatFloat64V1)) {
+        return false;
+    }
+    if (output_interleaved == nullptr || inputs.size() < snapshot.lane_count) {
+        return false;
+    }
+
+    const auto output_samples = frames * static_cast<std::size_t>(snapshot.output_channels);
+    std::fill_n(output_interleaved, output_samples, 0.0);
+    bool matched_output_group = output_group.empty();
+
+    for (std::size_t lane_index = 0; lane_index < snapshot.lane_count; ++lane_index) {
+        const auto& lane = snapshot.lanes[lane_index];
+        const bool is_target_group = output_group.empty() ||
+            (lane.output_group_bytes == output_group.size() &&
+             std::equal(output_group.begin(), output_group.end(),
+                        lane.output_group.begin()));
+        if (!is_target_group) {
+            continue;
+        }
+        matched_output_group = true;
+        const auto& input = inputs[lane_index];
+        if (!lane.enabled || input.interleaved == nullptr ||
+            input.channel_count != lane.input_channels || input.channel_count > 8 ||
+            input.channel_count == 0) {
+            continue;
+        }
+        const auto makeup_gain_linear =
+            static_cast<double>(lane.makeup_gain_linear);
+        for (std::size_t frame = 0; frame < frames; ++frame) {
+            const auto* input_frame = input.interleaved +
+                                      frame * static_cast<std::size_t>(input.channel_count);
+            auto* output_frame = output_interleaved +
+                                 frame * static_cast<std::size_t>(snapshot.output_channels);
+            for (std::uint32_t source_channel = 0; source_channel < input.channel_count;
+                 ++source_channel) {
+                if (lane.matrix_enabled) {
+                    for (std::uint32_t destination = 0U; destination < snapshot.output_channels;
+                         ++destination) {
+                        output_frame[destination] += input_frame[source_channel] *
+                            static_cast<double>(lane.channel_matrix[source_channel][destination]) *
+                            makeup_gain_linear;
+                    }
+                } else {
+                    const auto destination = lane.channel_map[source_channel];
+                    if (destination >= 0) {
+                        output_frame[static_cast<std::size_t>(destination)] +=
+                            input_frame[source_channel] * makeup_gain_linear;
+                    }
+                }
+            }
+        }
+    }
+    return matched_output_group;
+}
+
+}  // namespace
+
 bool process_graph(const RtGraphSnapshotV1& snapshot,
                    const std::span<const RtLaneInputV1> inputs,
                    float* const output_interleaved,
@@ -221,6 +294,26 @@ bool process_graph_for_output_group(const RtGraphSnapshotV1& snapshot,
     }
     return process_graph_filtered(snapshot, output_group, inputs, output_interleaved, frames,
                                   latency_bank);
+}
+
+bool process_graph_f64(const RtGraphSnapshotV1& snapshot,
+                       const std::span<const RtLaneInputF64V1> inputs,
+                       double* const output_interleaved,
+                       const std::size_t frames) noexcept {
+    return process_graph_filtered_f64(snapshot, {}, inputs, output_interleaved, frames);
+}
+
+bool process_graph_for_output_group_f64(const RtGraphSnapshotV1& snapshot,
+                                        const std::string_view output_group,
+                                        const std::span<const RtLaneInputF64V1> inputs,
+                                        double* const output_interleaved,
+                                        const std::size_t frames) noexcept {
+    if (output_group.empty() || output_group.size() > kMaxOutputGroupBytes ||
+        output_group.find('\0') != std::string_view::npos) {
+        return false;
+    }
+    return process_graph_filtered_f64(snapshot, output_group, inputs, output_interleaved,
+                                      frames);
 }
 
 }  // namespace hibiki

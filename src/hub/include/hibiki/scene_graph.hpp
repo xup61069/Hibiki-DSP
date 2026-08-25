@@ -37,11 +37,20 @@ struct GraphConfigV1 {
     std::vector<LaneConfigV1> lanes;
     std::uint32_t output_channels{2};
     bool strict_direct{false};
+    // Versioned render sample format: 0 = float32 (legacy default),
+    // 1 = float64. Unknown values fail closed in validate_graph.
+    std::uint32_t sample_format{0U};
 };
 
 constexpr std::size_t kMaxRtLanes = 32;
 constexpr std::size_t kMaxOutputGroupBytes = 64;
 constexpr std::size_t kMaxLaneIdBytes = 64;
+
+// Versioned graph sample formats for GraphConfigV1::sample_format and
+// RtGraphSnapshotV1::sample_format. Unknown values must fail closed before
+// any RT thread observes them.
+inline constexpr std::uint32_t kGraphSampleFormatFloat32V1 = 0U;
+inline constexpr std::uint32_t kGraphSampleFormatFloat64V1 = 1U;
 
 struct RtLaneSnapshotV1 {
     std::uint32_t input_channels{2};
@@ -62,11 +71,17 @@ struct RtGraphSnapshotV1 {
     std::uint32_t lane_count{0};
     std::uint64_t revision{0};
     bool strict_direct{false};
+    std::uint32_t sample_format{kGraphSampleFormatFloat32V1};
     std::array<RtLaneSnapshotV1, kMaxRtLanes> lanes{};
 };
 
 struct RtLaneInputV1 {
     const float* interleaved{nullptr};
+    std::uint32_t channel_count{0};
+};
+
+struct RtLaneInputF64V1 {
+    const double* interleaved{nullptr};
     std::uint32_t channel_count{0};
 };
 
@@ -88,5 +103,19 @@ struct RtLaneInputV1 {
     float* output_interleaved,
     std::size_t frames,
     LaneLatencyBankV1* latency_bank = nullptr) noexcept;
+// Bounded double-precision render path. Inputs and output are interleaved
+// double samples; lane accumulation happens in double. The float32 lane
+// latency bank is intentionally outside this v1 boundary: callers needing
+// plugin-latency compensation must resolve it upstream in the double domain.
+[[nodiscard]] bool process_graph_f64(const RtGraphSnapshotV1& snapshot,
+                                     std::span<const RtLaneInputF64V1> inputs,
+                                     double* output_interleaved,
+                                     std::size_t frames) noexcept;
+[[nodiscard]] bool process_graph_for_output_group_f64(
+    const RtGraphSnapshotV1& snapshot,
+    std::string_view output_group,
+    std::span<const RtLaneInputF64V1> inputs,
+    double* output_interleaved,
+    std::size_t frames) noexcept;
 
 }  // namespace hibiki
