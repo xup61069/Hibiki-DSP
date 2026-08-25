@@ -33,6 +33,8 @@ using SessionRouteHandlerFnV1 = bool (*)(const SessionRouteCommandV1& request,
 using SessionRouteRuleHandlerFnV1 = bool (*)(const SessionRouteRuleCommandV1& request,
                                              void* context) noexcept;
 using IrPrepareHandlerFnV1 = bool (*)(const IrPrepareCommandV1& request,
+                                      void* context) noexcept;
+using EqVisualPublishFnV1 = void (*)(const EqVisualSnapshotV1& snapshot,
                                      void* context) noexcept;
 
 // Control-worker adapter for the fixed queue. It is intentionally not called
@@ -123,6 +125,13 @@ public:
         ir_prepare_context_ = context;
     }
 
+    // Called on the control worker only after update_loudness_phon reports a
+    // confirmed recompute. The callback must not throw, wait, or touch RT.
+    void set_eq_visual_publisher(EqVisualPublishFnV1 publisher, void* context) noexcept {
+        eq_visual_publisher_ = publisher;
+        eq_visual_publisher_context_ = context;
+    }
+
     [[nodiscard]] EngineControlResultV1 consume(const ControlCommandV1& command) noexcept;
     [[nodiscard]] std::size_t drain(ControlCommandQueueV1& queue,
                                      std::size_t max_commands = ControlCommandQueueV1::kCapacity) noexcept;
@@ -157,6 +166,9 @@ private:
     void* session_route_rule_context_{nullptr};
     IrPrepareHandlerFnV1 ir_prepare_handler_{nullptr};
     void* ir_prepare_context_{nullptr};
+    EqVisualPublishFnV1 eq_visual_publisher_{nullptr};
+    void* eq_visual_publisher_context_{nullptr};
+    std::uint64_t next_eq_visual_sequence_{1U};
 };
 
 }  // namespace hibiki

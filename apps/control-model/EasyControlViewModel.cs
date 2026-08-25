@@ -1163,6 +1163,58 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         }
     }
 
+    // Pulls the latest engine-published EQ visual frame after a control-plane
+    // change. A missing or malformed frame is intentionally quiet: the EQ is
+    // optional UI evidence and must not overwrite the previous safe surface.
+    public async Task<bool> RefreshEqVisualSnapshotAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_controlClient is null || !_controlClient.IsConnected) return false;
+        var gateHeld = false;
+        try
+        {
+            await _commandGate.WaitAsync(cancellationToken).ConfigureAwait(true);
+            gateHeld = true;
+            SetBusy(true);
+            var reply = await _controlClient.RoundTripAsync(
+                _commands.RequestEqVisualSnapshot(), cancellationToken)
+                .ConfigureAwait(true);
+            return ApplyEqVisualSnapshot(reply, out _);
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+        finally
+        {
+            SetBusy(false);
+            if (gateHeld) _commandGate.Release();
+        }
+    }
+
+    private bool ApplyEqVisualSnapshot(IpcEnvelopeV1 reply, out string error)
+    {
+        error = string.Empty;
+        if (reply.Type != ControlMessageType.EqVisualSnapshot ||
+            !ControlPayloadsV1.TryDecodeEqVisualSnapshot(reply.Payload.Span,
+                                                          out var sequence,
+                                                          out var source,
+                                                          out var points))
+        {
+            error = "EQ visual snapshot format invalid";
+            return false;
+        }
+
+        var frame = new EqVisualFrameV1(sequence, source, points);
+        if (!ApplyEqVisualFrame(frame, out error)) return false;
+        OnPropertyChanged(nameof(EqSurface));
+        return true;
+    }
+
     public async Task<bool> RefreshPhysicalDevicesAsync(
         CancellationToken cancellationToken = default)
     {
@@ -1562,6 +1614,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
                 StatusText = "引擎已連線；裝置清單暫不可用，音訊保持安全狀態";
             if (IsConnected && !await RefreshControlStatusAsync(cancellationToken).ConfigureAwait(true))
                 StatusText = "引擎已連線；控制狀態暫不可用，音訊保持安全狀態";
+            if (IsConnected)
+                _ = await RefreshEqVisualSnapshotAsync(cancellationToken).ConfigureAwait(true);
             if (IsConnected && !await RefreshSessionCatalogAsync(cancellationToken).ConfigureAwait(true))
                 StatusText = "引擎已連線；App 清單暫不可用，音訊保持安全狀態";
             if (IsConnected && _pendingSceneCatalogOps.Count > 0)
@@ -1612,6 +1666,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         if (sent) MarkIrClearedByScene();
         if (sent && IsConnected)
             _ = await RefreshControlStatusAsync(cancellationToken).ConfigureAwait(true);
+        if (sent && IsConnected)
+            _ = await RefreshEqVisualSnapshotAsync(cancellationToken).ConfigureAwait(true);
         return sent;
     }
 
@@ -1623,6 +1679,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         if (sent) MarkIrClearedByScene();
         if (sent && IsConnected)
             _ = await RefreshControlStatusAsync(cancellationToken).ConfigureAwait(true);
+        if (sent && IsConnected)
+            _ = await RefreshEqVisualSnapshotAsync(cancellationToken).ConfigureAwait(true);
         return sent;
     }
 
@@ -1631,6 +1689,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         var sent = await SendCommandAsync(BuildVolumeCommand, cancellationToken).ConfigureAwait(true);
         if (sent && IsConnected)
             _ = await RefreshControlStatusAsync(cancellationToken).ConfigureAwait(true);
+        if (sent && IsConnected)
+            _ = await RefreshEqVisualSnapshotAsync(cancellationToken).ConfigureAwait(true);
         return sent;
     }
 

@@ -1005,6 +1005,12 @@ void set_route(hibiki::ControlRouteHealthEntryV1& route,
     std::copy(detail.begin(), detail.end(), route.detail.begin());
 }
 
+void publish_eq_visual_snapshot(const hibiki::EqVisualSnapshotV1& snapshot,
+                                void* const context) noexcept {
+    auto* store = static_cast<hibiki::EqVisualSnapshotStoreV1*>(context);
+    if (store != nullptr) (void)store->publish(snapshot);
+}
+
 hibiki::ControlStatusSnapshotV1 make_initial_status(
     const hibiki::OutputGroupVolumeStateV1 volume,
     const std::string_view physical_catalog_detail,
@@ -1431,6 +1437,8 @@ int wmain(const int argc, wchar_t* const* argv) {
     control_worker.set_session_route_handler(enqueue_session_route_command, &session_routing);
     control_worker.set_session_route_rule_handler(enqueue_session_route_rule_command,
                                                   &session_routing);
+    hibiki::EqVisualSnapshotStoreV1 eq_visual_store;
+    control_worker.set_eq_visual_publisher(publish_eq_visual_snapshot, &eq_visual_store);
     hibiki::ControlStatusSnapshotStoreV1 status_store;
     auto status = make_initial_status(engine.volume(), catalog_detail, wasapi_output,
                                       initial_wasapi_snapshot, system_volume_active,
@@ -1449,7 +1457,8 @@ int wmain(const int argc, wchar_t* const* argv) {
                                physical_catalog_ready ? physical_catalog.snapshot_store() : nullptr,
                                &status_store,
                                session_routing_requested ? &session_routing.catalog_store
-                                                         : nullptr)) {
+                                                         : nullptr,
+                               &eq_visual_store)) {
         engine.stop_wasapi_output();
         physical_catalog.unbind();
         session_routing.coordinator.unbind();

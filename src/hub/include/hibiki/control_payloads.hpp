@@ -11,6 +11,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <vector>
 #include <span>
 #include <string_view>
@@ -289,6 +290,60 @@ struct DeviceCatalogSnapshotV1 {
 [[nodiscard]] bool decode_device_catalog_snapshot_v1(
     std::span<const std::uint8_t> payload,
     DeviceCatalogSnapshotV1& snapshot) noexcept;
+
+// The live EQ surface consumes a bounded confirmed compensation curve. The
+// fixed Apache control contract carries frequency/gain pairs only; policy and
+// ISO formula inputs stay engine-local. Source 1 is equal loudness and source
+// 2 remains reserved until an adaptive-correction engine source exists.
+constexpr std::size_t kEqVisualSnapshotHeaderBytesV1 = 10U;
+constexpr std::size_t kEqVisualSnapshotPointBytesV1 = 16U;
+constexpr std::size_t kEqVisualSnapshotCapacityV1 = 32U;
+constexpr std::size_t kEqVisualSnapshotPayloadBytesV1 =
+    kEqVisualSnapshotHeaderBytesV1 +
+    (kEqVisualSnapshotPointBytesV1 * kEqVisualSnapshotCapacityV1);
+
+struct EqVisualSnapshotPointV1 {
+    double frequency_hz{0.0};
+    double gain_db{0.0};
+};
+
+struct EqVisualSnapshotV1 {
+    std::uint64_t sequence{0U};
+    std::uint8_t source{0U};
+    std::array<EqVisualSnapshotPointV1, kEqVisualSnapshotCapacityV1> points{};
+};
+
+[[nodiscard]] bool encode_eq_visual_snapshot_v1(
+    const EqVisualSnapshotV1& snapshot,
+    std::array<std::uint8_t, kEqVisualSnapshotPayloadBytesV1>& payload,
+    std::size_t& payload_bytes) noexcept;
+
+[[nodiscard]] bool decode_eq_visual_snapshot_v1(
+    std::span<const std::uint8_t> payload,
+    EqVisualSnapshotV1& snapshot) noexcept;
+
+// Bounded control-plane cache for the latest confirmed EQ visual frame.
+// Publication is serialized, replies copy a whole validated frame, and no RT
+// code touches this object. A missing snapshot intentionally makes an
+// EqVisualSnapshotRequest return Error instead of an empty curve.
+class EqVisualSnapshotStoreV1 final {
+public:
+    EqVisualSnapshotStoreV1() noexcept = default;
+
+    [[nodiscard]] bool publish(const EqVisualSnapshotV1& snapshot) noexcept;
+    [[nodiscard]] bool reply(IpcFrameV1& response) const noexcept;
+    [[nodiscard]] bool has_snapshot() const noexcept;
+    [[nodiscard]] std::uint64_t sequence() const noexcept;
+
+private:
+    mutable std::mutex mutex_{};
+    std::array<std::uint8_t, kEqVisualSnapshotPayloadBytesV1> payload_{};
+    std::size_t payload_bytes_{0U};
+    std::uint64_t sequence_{0U};
+};
+
+[[nodiscard]] bool eq_visual_snapshot_reply_v1(IpcFrameV1& response,
+                                               void* context) noexcept;
 
 struct ControlCommandV1 {
     IpcMessageType type{IpcMessageType::Error};

@@ -38,6 +38,9 @@ void write_u64(std::uint8_t* bytes, const std::uint64_t value) noexcept {
     }
 }
 
+void write_f64_bits(std::uint8_t* bytes, double value) noexcept;
+double read_f64_bits(const std::uint8_t* bytes) noexcept;
+
 std::uint64_t read_u64(const std::uint8_t* bytes) noexcept {
     std::uint64_t value = 0U;
     for (std::uint32_t index = 0U; index < 8U; ++index) {
@@ -102,6 +105,145 @@ bool is_printable_utf8(const std::string_view value) noexcept {
 }
 
 }  // namespace
+
+bool encode_eq_visual_snapshot_v1(
+    const EqVisualSnapshotV1& snapshot,
+    std::array<std::uint8_t, kEqVisualSnapshotPayloadBytesV1>& payload,
+    std::size_t& payload_bytes) noexcept {
+    payload.fill(0U);
+    payload_bytes = 0U;
+    if (snapshot.sequence == 0U || snapshot.source == 0U || snapshot.source > 2U) {
+        return false;
+    }
+
+    const auto is_zero_tail = [&snapshot](const std::size_t index) noexcept {
+        for (std::size_t next = index; next < snapshot.points.size(); ++next) {
+            if (snapshot.points[next].frequency_hz != 0.0 ||
+                snapshot.points[next].gain_db != 0.0) {
+                return false;
+            }
+        }
+        return true;
+    };
+    for (std::size_t index = 0U; index < snapshot.points.size(); ++index) {
+        const auto& point = snapshot.points[index];
+        if (!std::isfinite(point.frequency_hz) || !std::isfinite(point.gain_db)) return false;
+        // Zero padding must be contiguous from the first all-zero pair to the
+        // end; real points must be strictly increasing in frequency.
+        if (point.frequency_hz == 0.0 && point.gain_db == 0.0 &&
+            is_zero_tail(index + 1U)) {
+            break;
+        }
+        if (index != 0U &&
+            !(snapshot.points[index - 1U].frequency_hz < point.frequency_hz)) {
+            return false;
+        }
+        if (point.frequency_hz >= 20.0 && point.frequency_hz <= 20000.0 &&
+            point.gain_db >= -24.0 && point.gain_db <= 24.0) {
+            continue;
+        }
+        if (!(point.frequency_hz == 0.0 && point.gain_db == 0.0 &&
+              is_zero_tail(index + 1U))) {
+            return false;
+        }
+    }
+
+    std::size_t point_count = 0U;
+    while (point_count < snapshot.points.size() &&
+           !(snapshot.points[point_count].frequency_hz == 0.0 &&
+             snapshot.points[point_count].gain_db == 0.0)) {
+        ++point_count;
+    }
+    if (point_count < 4U) return false;
+    write_u64(payload.data(), snapshot.sequence);
+    payload[8U] = snapshot.source;
+    payload[9U] = static_cast<std::uint8_t>(point_count);
+    for (std::size_t index = 0U; index < point_count; ++index) {
+        auto* bytes = payload.data() + kEqVisualSnapshotHeaderBytesV1 +
+                      (index * kEqVisualSnapshotPointBytesV1);
+        write_f64_bits(bytes, snapshot.points[index].frequency_hz);
+        write_f64_bits(bytes + 8U, snapshot.points[index].gain_db);
+    }
+    payload_bytes = kEqVisualSnapshotHeaderBytesV1 +
+                    (point_count * kEqVisualSnapshotPointBytesV1);
+    return true;
+}
+
+bool decode_eq_visual_snapshot_v1(std::span<const std::uint8_t> payload,
+                                  EqVisualSnapshotV1& snapshot) noexcept {
+    snapshot = {};
+    if (payload.size() < kEqVisualSnapshotHeaderBytesV1 ||
+        payload.size() > kEqVisualSnapshotPayloadBytesV1 ||
+        (payload.size() - kEqVisualSnapshotHeaderBytesV1) %
+            kEqVisualSnapshotPointBytesV1 != 0U) {
+        return false;
+    }
+    const auto sequence = read_u64(payload.data());
+    const auto source = static_cast<std::uint8_t>(payload[8U]);
+    const auto point_count = static_cast<std::size_t>(payload[9U]);
+    const auto expected_bytes = kEqVisualSnapshotHeaderBytesV1 +
+                                (point_count * kEqVisualSnapshotPointBytesV1);
+    if (sequence == 0U || source == 0U || source > 2U || point_count < 4U ||
+        payload.size() != expected_bytes) {
+        return false;
+    }
+    double previous_frequency = 0.0;
+    for (std::size_t index = 0U; index < point_count; ++index) {
+        const auto* bytes = payload.data() + kEqVisualSnapshotHeaderBytesV1 +
+                            (index * kEqVisualSnapshotPointBytesV1);
+        const double frequency_hz = read_f64_bits(bytes);
+        const double gain_db = read_f64_bits(bytes + 8U);
+        if (!std::isfinite(frequency_hz) || !std::isfinite(gain_db) ||
+            frequency_hz < 20.0 || frequency_hz > 20000.0 ||
+            gain_db < -24.0 || gain_db > 24.0 ||
+            frequency_hz <= previous_frequency) {
+            return false;
+        }
+        previous_frequency = frequency_hz;
+        snapshot.points[index] = EqVisualSnapshotPointV1{frequency_hz, gain_db};
+    }
+    snapshot.sequence = sequence;
+    snapshot.source = source;
+    return true;
+}
+
+bool EqVisualSnapshotStoreV1::publish(const EqVisualSnapshotV1& snapshot) noexcept {
+    std::array<std::uint8_t, kEqVisualSnapshotPayloadBytesV1> candidate{};
+    std::size_t candidate_bytes = 0U;
+    if (!encode_eq_visual_snapshot_v1(snapshot, candidate, candidate_bytes)) return false;
+    std::scoped_lock lock(mutex_);
+    if (payload_bytes_ != 0U && snapshot.sequence <= sequence_) return false;
+    payload_ = candidate;
+    payload_bytes_ = candidate_bytes;
+    sequence_ = snapshot.sequence;
+    return true;
+}
+
+bool EqVisualSnapshotStoreV1::reply(IpcFrameV1& response) const noexcept {
+    std::scoped_lock lock(mutex_);
+    if (payload_bytes_ == 0U) return false;
+    response = {};
+    response.header.type = IpcMessageType::EqVisualSnapshot;
+    response.header.payload_bytes = static_cast<std::uint32_t>(payload_bytes_);
+    response.payload.assign(payload_.begin(), payload_.begin() +
+                                           static_cast<std::ptrdiff_t>(payload_bytes_));
+    return true;
+}
+
+bool EqVisualSnapshotStoreV1::has_snapshot() const noexcept {
+    std::scoped_lock lock(mutex_);
+    return payload_bytes_ != 0U;
+}
+
+std::uint64_t EqVisualSnapshotStoreV1::sequence() const noexcept {
+    std::scoped_lock lock(mutex_);
+    return sequence_;
+}
+
+bool eq_visual_snapshot_reply_v1(IpcFrameV1& response, void* const context) noexcept {
+    auto* store = static_cast<EqVisualSnapshotStoreV1*>(context);
+    return store != nullptr && store->reply(response);
+}
 
 bool is_printable_utf8_v1(const std::string_view value) noexcept {
     return is_printable_utf8(value);
@@ -1146,6 +1288,7 @@ bool decode_control_command_v1(const IpcFrameV1& frame,
         case IpcMessageType::DeviceCatalogRequest:
         case IpcMessageType::ControlStatusRequest:
         case IpcMessageType::SessionCatalogRequest:
+        case IpcMessageType::EqVisualSnapshotRequest:
             return frame.payload.empty();
         case IpcMessageType::VolumeNotification:
             if (frame.payload.size() == kVolumeNotificationPayloadBytesV1) {
@@ -1173,6 +1316,7 @@ bool decode_control_command_v1(const IpcFrameV1& frame,
         case IpcMessageType::Error:
         case IpcMessageType::ControlStatusSnapshot:
         case IpcMessageType::SessionCatalogSnapshot:
+        case IpcMessageType::EqVisualSnapshot:
             return false;
     }
     return false;

@@ -343,7 +343,31 @@ EngineControlResultV1 EngineControlWorkerV1::consume(
                             ? std::string_view(command.volume_target.output_group.data(),
                                                command.volume_target.output_group_bytes)
                             : std::string_view{"main"});
-                    (void)engine_.update_loudness_phon(target_group, estimated_phon);
+                    if (engine_.update_loudness_phon(target_group, estimated_phon)) {
+                        const auto curve = engine_.loudness_curve_snapshot();
+                        EqVisualSnapshotV1 visual{};
+                        visual.sequence = next_eq_visual_sequence_;
+                        visual.source = 1U;
+                        for (std::size_t index = 0U; index < curve.point_count &&
+                             index < visual.points.size(); ++index) {
+                            visual.points[index] = curve.points[index];
+                        }
+                        std::array<std::uint8_t,
+                                   kEqVisualSnapshotPayloadBytesV1> encoded_snapshot{};
+                        std::size_t encoded_bytes = 0U;
+                        EqVisualSnapshotV1 decoded_snapshot{};
+                        if (eq_visual_publisher_ != nullptr &&
+                            encode_eq_visual_snapshot_v1(visual, encoded_snapshot,
+                                                         encoded_bytes) &&
+                            decode_eq_visual_snapshot_v1(
+                                std::span<const std::uint8_t>(encoded_snapshot.data(),
+                                                              encoded_bytes),
+                                decoded_snapshot)) {
+                            ++next_eq_visual_sequence_;
+                            eq_visual_publisher_(decoded_snapshot,
+                                                 eq_visual_publisher_context_);
+                        }
+                    }
                 }
                 return result == VolumeNotificationResult::Accepted
                            ? EngineControlResultV1::Applied

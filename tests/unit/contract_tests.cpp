@@ -1721,6 +1721,82 @@ int main() {
     CHECK(!snapshot_store.publish(
               std::span<const std::uint8_t>(published_payload.data(), published_bytes), 32U) &&
           snapshot_store.sequence() == 32U);
+
+    // EQ visual snapshot: bounded variable-length wire, strict validation,
+    // stale-store rejection, and response-only routing.
+    EqVisualSnapshotV1 eq_visual{};
+    eq_visual.sequence = 7U;
+    eq_visual.source = 1U;
+    eq_visual.points[0] = {31.0, -4.0};
+    eq_visual.points[1] = {120.0, 2.0};
+    eq_visual.points[2] = {1000.0, 0.0};
+    eq_visual.points[3] = {8000.0, 1.5};
+    std::array<std::uint8_t, kEqVisualSnapshotPayloadBytesV1> eq_payload{};
+    std::size_t eq_bytes = 0U;
+    CHECK(encode_eq_visual_snapshot_v1(eq_visual, eq_payload, eq_bytes) &&
+          eq_bytes == kEqVisualSnapshotHeaderBytesV1 +
+                          (4U * kEqVisualSnapshotPointBytesV1));
+    EqVisualSnapshotV1 decoded_eq{};
+    CHECK(decode_eq_visual_snapshot_v1(
+              std::span<const std::uint8_t>(eq_payload.data(), eq_bytes), decoded_eq) &&
+          decoded_eq.sequence == 7U && decoded_eq.source == 1U &&
+          decoded_eq.points[0].frequency_hz == 31.0 &&
+          decoded_eq.points[3].gain_db == 1.5);
+    auto malformed_eq = eq_payload;
+    malformed_eq[9U] = 0U;
+    CHECK(!decode_eq_visual_snapshot_v1(
+        std::span<const std::uint8_t>(malformed_eq.data(), eq_bytes), decoded_eq));
+    malformed_eq = eq_payload;
+    // Duplicate the first point's frequency so decoding must reject a
+    // non-increasing curve instead of merely producing another valid one.
+    for (std::size_t index = 0U; index < 8U; ++index) {
+        malformed_eq[kEqVisualSnapshotHeaderBytesV1 +
+                     kEqVisualSnapshotPointBytesV1 + index] =
+            eq_payload[kEqVisualSnapshotHeaderBytesV1 + index];
+    }
+    CHECK(!decode_eq_visual_snapshot_v1(
+        std::span<const std::uint8_t>(malformed_eq.data(), eq_bytes), decoded_eq));
+    malformed_eq = eq_payload;
+    // Write +30.0 dB directly: the prior XOR only produced a tiny negative
+    // value that remained inside the legal gain range.
+    double invalid_gain = 30.0;
+    std::memcpy(malformed_eq.data() + kEqVisualSnapshotHeaderBytesV1 +
+                    kEqVisualSnapshotPointBytesV1 * 3U + 8U,
+                &invalid_gain, sizeof(invalid_gain));
+    CHECK(!decode_eq_visual_snapshot_v1(
+        std::span<const std::uint8_t>(malformed_eq.data(), eq_bytes), decoded_eq));
+    CHECK(!decode_eq_visual_snapshot_v1(
+        std::span<const std::uint8_t>(eq_payload.data(), eq_bytes - 1U), decoded_eq));
+    CHECK(!decode_eq_visual_snapshot_v1(
+        std::span<const std::uint8_t>(eq_payload.data(), eq_bytes + 1U), decoded_eq));
+    IpcFrameV1 eq_frame;
+    eq_frame.header.type = IpcMessageType::EqVisualSnapshotRequest;
+    CHECK(decode_control_command_v1(eq_frame, decoded_command) &&
+          decoded_command.type == IpcMessageType::EqVisualSnapshotRequest);
+    eq_frame.header.type = IpcMessageType::EqVisualSnapshot;
+    CHECK(!decode_control_command_v1(eq_frame, decoded_command));
+
+    EqVisualSnapshotStoreV1 eq_store;
+    IpcFrameV1 eq_response;
+    CHECK(is_valid_message_type(IpcMessageType::EqVisualSnapshotRequest) &&
+          is_valid_message_type(IpcMessageType::EqVisualSnapshot) &&
+          !eq_store.has_snapshot() && eq_store.sequence() == 0U &&
+          !eq_store.reply(eq_response));
+    CHECK(eq_store.publish(eq_visual) && eq_store.has_snapshot() &&
+          eq_store.sequence() == 7U && eq_store.reply(eq_response) &&
+          eq_response.header.type == IpcMessageType::EqVisualSnapshot &&
+          eq_response.header.payload_bytes == eq_bytes &&
+          eq_response.payload.size() == eq_bytes);
+    eq_visual.sequence = 6U;
+    CHECK(!eq_store.publish(eq_visual) && eq_store.sequence() == 7U);
+    eq_visual.sequence = 8U;
+    eq_visual.points[0].gain_db = -5.0;
+    CHECK(eq_store.publish(eq_visual) && eq_store.sequence() == 8U);
+    IpcFrameV1 eq_callback_response;
+    CHECK(eq_visual_snapshot_reply_v1(eq_callback_response, &eq_store) &&
+          eq_callback_response.header.type == IpcMessageType::EqVisualSnapshot);
+    CHECK(!eq_visual_snapshot_reply_v1(eq_callback_response, nullptr));
+
     ControlStatusSnapshotV1 status_snapshot{};
     status_snapshot.sequence = 3U;
     status_snapshot.volume.requested_db = -6.0;
@@ -4945,11 +5021,24 @@ int main() {
         // Volume-notification path: accepted notifications drive a bounded
         // phon estimate (70 + requested dB), foreign groups stay inert.
         EngineControlWorkerV1 live_worker(*live_engine);
+        struct EqVisualPublishCounter final {
+            unsigned count{0U};
+            std::uint64_t last_sequence{0U};
+        };
+        EqVisualPublishCounter eq_publish;
+        const auto eq_publish_fn = +[](const EqVisualSnapshotV1& snapshot,
+                                       void* context) noexcept {
+            auto* counter = static_cast<EqVisualPublishCounter*>(context);
+            ++counter->count;
+            counter->last_sequence = snapshot.sequence;
+        };
+        live_worker.set_eq_visual_publisher(eq_publish_fn, &eq_publish);
         ControlCommandV1 volume_command{};
         volume_command.type = IpcMessageType::VolumeNotification;
         volume_command.volume = VolumeNotificationV1{-20.0, false, 1U};
         CHECK(live_worker.consume(volume_command) ==
               EngineControlResultV1::Applied);
+        CHECK(eq_publish.count == 1U && eq_publish.last_sequence == 1U);
         ControlCommandV1 group_volume_command{};
         group_volume_command.type = IpcMessageType::VolumeNotification;
         group_volume_command.has_volume_target = true;
@@ -4959,6 +5048,8 @@ int main() {
         group_volume_command.volume = VolumeNotificationV1{-10.0, false, 2U};
         CHECK(live_worker.consume(group_volume_command) ==
               EngineControlResultV1::Applied);
+        CHECK(eq_publish.count == 1U &&
+              "a foreign-group volume notification must not publish EQ visual");
         CHECK(std::abs(live_engine->volume("side").requested_db + 10.0) < 1e-12);
         CHECK(live_engine->loudness_peq_transaction_idle() &&
               live_engine->has_active_loudness_peq("main"));
