@@ -10,6 +10,7 @@ let droppedPackets = 0;
 let bridgeRetryTimer = null;
 let bridgeRetryAttempt = 0;
 let bridgeRetryExhausted = false;
+let bridgeRetryDeadlineMs = 0;
 let stateHeartbeatTimer = null;
 
 const BRIDGE_RETRY_MAX_ATTEMPTS = 10;
@@ -23,12 +24,16 @@ const BRIDGE_RECONNECT_CONNECTED_V1 = 'connected';
 const BRIDGE_RECONNECT_EXHAUSTED_V1 = 'exhausted';
 
 function reportState() {
+  const retryInSec = bridgeReconnectState() === BRIDGE_RECONNECT_WAITING_V1
+    ? Math.max(0, Math.ceil((bridgeRetryDeadlineMs - Date.now()) / 1000))
+    : 0;
   chrome.runtime.sendMessage({
     type: 'capture-state',
     capturing: context !== null,
     bridgeConnected,
     droppedPackets,
     bridgeReconnectState: bridgeReconnectState(),
+    bridgeRetryInSec: retryInSec,
   });
 }
 
@@ -81,6 +86,7 @@ function scheduleBridgeRetry() {
   bridgeRetryExhausted = false;
   const delay = Math.min(BRIDGE_RETRY_BASE_MS * Math.pow(2, bridgeRetryAttempt), BRIDGE_RETRY_CAP_MS);
   bridgeRetryAttempt++;
+  bridgeRetryDeadlineMs = Date.now() + delay;
   bridgeRetryTimer = setTimeout(() => {
     bridgeRetryTimer = null;
     connectBridge();
@@ -92,6 +98,7 @@ function cancelBridgeRetry() {
     clearTimeout(bridgeRetryTimer);
     bridgeRetryTimer = null;
   }
+  bridgeRetryDeadlineMs = 0;
   bridgeRetryAttempt = 0;
   bridgeRetryExhausted = false;
 }
