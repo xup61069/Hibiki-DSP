@@ -104,7 +104,7 @@
         <RowDefinition Height="Auto" />
         <RowDefinition Height="*" />
       </Grid.RowDefinitions>
-      <controls:InfoBar x:Name="DisconnectedBanner" IsOpen="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}" Severity="Warning" Title="尚未連接引擎" Message="連接後才能套用場景、音量與路由控制。點擊「連接引擎」開始。" IsClosable="False" Margin="32,12,28,0" AutomationProperties.Name="引擎連線狀態提醒" Grid.Row="0" /><ScrollViewer Grid.Row="1" Padding="32,0,28,32">
+      <controls:InfoBar x:Name="DisconnectedBanner" IsOpen="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}" Severity="Warning" Title="尚未連接引擎" Message="連接後才能套用場景、音量與路由控制。點擊「連接引擎」開始。" IsClosable="False" Margin="32,12,32,0" AutomationProperties.Name="引擎連線狀態提醒" Grid.Row="0" /><ScrollViewer Grid.Row="1" Padding="32,0,32,32">
         <StackPanel MaxWidth="1080" Spacing="20">
         <Grid x:Name="ShellHomeSection"><Border Padding="24" CornerRadius="16" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#080866CC" Offset="0.0" /><GradientStop Color="#040866CC" Offset="0.5" /><GradientStop Color="Transparent" Offset="1.0" /></LinearGradientBrush></Border.Background><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
                     <Grid x:Name="HeroLayout" ColumnSpacing="32" RowSpacing="16">
@@ -610,7 +610,7 @@
       </ScrollViewer>
     </Grid>
   </controls:NavigationView.Content>
-</controls:NavigationView><Border Grid.Row="2" Padding="14,6" Margin="4,10,0,16" HorizontalAlignment="Left" CornerRadius="999" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+</controls:NavigationView><Border Grid.Row="2" Padding="14,6" Margin="32,10,32,16" HorizontalAlignment="Left" CornerRadius="999" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <FontIcon FontSize="12" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
                 <TextBlock Text="Easy 模式只顯示安全操作；切換 Expert 才會顯示 Matrix、DSP Graph、IR 與 VST3。" Style="{ThemeResource CaptionTextBlockStyle}" TextWrapping="Wrap" MaxWidth="640" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
