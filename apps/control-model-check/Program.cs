@@ -792,6 +792,56 @@ var ignoreCompile = CalibrationCompilerV1.CompileBoundedPeqCorrection(
 Check(ignoreCompile.Filters.Count == 0 && !ignoreCompile.Limited &&
       ignoreCompile.Diagnostic.Contains("ignore threshold"),
     "Compiler must ignore errors within threshold.");
+// Guided calibration target curves (#1564): names, bounded sampling and
+// multi-channel batch compilation.
+Check(CalibrationCompilerV1.TargetCurveName(CalibrationTargetCurveIdV1.Flat) == "flat" &&
+      CalibrationCompilerV1.TargetCurveName(CalibrationTargetCurveIdV1.HarmanInEar) == "harman-in-ear" &&
+      CalibrationCompilerV1.TargetCurveName(CalibrationTargetCurveIdV1.HarmanOverEar) == "harman-over-ear" &&
+      CalibrationCompilerV1.TargetCurveName((CalibrationTargetCurveIdV1)99) == string.Empty,
+    "Target curve name mapping must be exhaustive and fail closed.");
+Check(CalibrationCompilerV1.TrySampleTargetCurve(CalibrationTargetCurveIdV1.Flat, 1000.0, out var flatDb) &&
+      Math.Abs(flatDb) < 1e-12,
+    "Flat target curve must normalise to 0 dB at 1 kHz.");
+Check(CalibrationCompilerV1.TrySampleTargetCurve(CalibrationTargetCurveIdV1.HarmanInEar, 3000.0, out var ieDb) &&
+      ieDb > 3.0 && ieDb < 4.0 &&
+      CalibrationCompilerV1.TrySampleTargetCurve(CalibrationTargetCurveIdV1.HarmanOverEar, 1000.0, out var oeDb) &&
+      Math.Abs(oeDb) < 1e-12,
+    "Harman curves must interpolate smoothly around their anchor points.");
+Check(!CalibrationCompilerV1.TrySampleTargetCurve(CalibrationTargetCurveIdV1.HarmanInEar, 5.0, out _) &&
+      !CalibrationCompilerV1.TrySampleTargetCurve(CalibrationTargetCurveIdV1.HarmanInEar, 25000.0, out _) &&
+      !CalibrationCompilerV1.TrySampleTargetCurve((CalibrationTargetCurveIdV1)42, 1000.0, out _),
+    "Out-of-range frequency or unknown curve ID must fail closed.");
+var targetedResponse = CalibrationCompilerV1.BuildTargetedResponse(
+    "wizard-endpoint", 48000.0,
+    [100.0, 500.0, 1000.0, 4000.0], [-2.0, -1.0, 0.0, -3.0],
+    CalibrationTargetCurveIdV1.HarmanOverEar);
+Check(targetedResponse is not null && targetedResponse.IsValid &&
+      targetedResponse.Points.Count == 4 &&
+      Math.Abs(targetedResponse.Points[3].TargetDb - 3.5) < 1e-12 &&
+      Math.Abs(targetedResponse.Points[0].TargetDb - 4.489) < 0.01,
+    "BuildTargetedResponse must pair measured levels with the selected curve.");
+Check(CalibrationCompilerV1.BuildTargetedResponse(
+        null, 48000.0, [100.0, 50.0], [-2.0, -1.0]) is null,
+    "Unsorted frequencies must fail closed in BuildTargetedResponse.");
+var batchOk = CalibrationCompilerV1.CompileMultiChannelBatch(
+    2,
+    [
+        [new(100.0, -8.0, 0.0), new(1000.0, -1.0, 0.0)],
+        [new(100.0, -7.0, 0.0), new(1000.0, -1.0, 0.0)],
+    ],
+    calibPolicy);
+Check(batchOk.Success && batchOk.ChannelFilters.Count == 2 &&
+      batchOk.ChannelFilters[0].Count == 2 &&
+      Math.Abs(batchOk.ChannelFilters[0][0].GainDb - 6.0) < 1e-6 &&
+      Math.Abs(batchOk.ChannelFilters[0][1].GainDb - 1.0) < 1e-6 &&
+      batchOk.ChannelLimited[1] && batchOk.Diagnostic.Contains("clipped"),
+    "Multi-channel batch must compile each channel independently.");
+var batchMismatch = CalibrationCompilerV1.CompileMultiChannelBatch(
+    2,
+    [[new(100.0, -3.0, 0.0)]],
+    calibPolicy);
+Check(!batchMismatch.Success && batchMismatch.ChannelFilters.Count == 0,
+    "Channel-count mismatch must fail closed without partial output.");
 var apoExport = CalibrationCompilerV1.ExportEqualizerApo(compileResult.Filters);
 Check(apoExport.Contains("Preamp: -1 dB") && apoExport.Contains("Filter 1: ON PK Fc 100.000 Hz"),
     "Equalizer APO export format failed.");

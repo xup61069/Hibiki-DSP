@@ -21,6 +21,26 @@ struct CalibrationResponsePointV1 {
     double target_db{0.0};
 };
 
+// Caller-selected target response curve for guided calibration workflows.
+// The library provides three bounded presets; the caller interpolates the
+// target level per frequency point before invoking the compiler. No ISO 226
+// table or microphone data is embedded here.
+enum class CalibrationTargetCurveIdV1 : std::uint8_t {
+    Flat = 0,
+    HarmanInEar = 1,
+    HarmanOverEar = 2,
+};
+
+[[nodiscard]] const char* calibration_target_curve_name_v1(
+    CalibrationTargetCurveIdV1 id) noexcept;
+
+// Interpolate the built-in target curve at the given frequency (Hz) and
+// return the target level in dB. Returns false when the curve ID or the
+// frequency is out of range.
+[[nodiscard]] bool sample_calibration_target_curve_v1(
+    CalibrationTargetCurveIdV1 id, double frequency_hz,
+    double& target_db) noexcept;
+
 struct CalibrationCompilePolicyV1 {
     std::uint32_t schema_version{1};
     std::uint32_t max_filters{16};
