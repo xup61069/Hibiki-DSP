@@ -6495,6 +6495,17 @@ int main() {
         CHECK(!tap.publish("main", pub_data.data(), 2U, 0U));   // zero channels
         CHECK(!tap.publish("main", pub_data.data(), 2U, 9U));   // over channel cap
 
+        // Torn-read rejection: an odd (mid-write) sequence at the post-read
+        // check must fail closed even though valid_ is still true.
+        const std::array<float, 4U> torn_data{0.25F, -0.5F, 0.75F, -1.0F};
+        CHECK(tap.publish("main", torn_data.data(), 2U, 2U));
+        tap.force_sequence_odd_for_tests();
+        std::uint32_t torn_ch = 0U;
+        std::size_t torn_frames = 0U;
+        std::uint64_t torn_seq = 0U;
+        CHECK(!tap.read("main", read_buf.data(), 32U,
+                        torn_ch, torn_frames, torn_seq));
+
         // Max capacity round-trip (512 frames × 8 channels).
         Vst3TapBufferV1 max_tap;
         std::vector<float> max_data(kMaxVst3TapFramesV1 * kMaxVst3TapChannelsV1);
@@ -6519,8 +6530,8 @@ int main() {
         }
         CHECK(max_match);
 
-        // Engine-level integration: publish via process_output_group,
-        // then read back via the public accessor.
+        // Engine-level integration: with no active VST3 lane the RT path
+        // must not publish tap data at all (P1-2), so reads stay empty.
         AudioEngineModel engine;
         GraphConfigV1 tap_graph;
         tap_graph.lanes.push_back(LaneConfigV1{"tap-lane", "main", 2, 0.0, true});
@@ -6540,6 +6551,19 @@ int main() {
         std::uint32_t tap_channels = 0U;
         std::size_t tap_frames = 0U;
         std::uint64_t tap_sequence = 0U;
+        CHECK(!engine.read_vst3_tap("main", tap_out.data(), 128U,
+                                     tap_channels, tap_frames, tap_sequence));
+
+        // Once a lane becomes active, the same process call publishes the
+        // pre-VST3 block and read_vst3_tap returns it.
+        std::vector<float> lane_ring(512U * 2U);
+        CHECK(engine.prepare_vst3_lane("main", 2U, std::span<float>(lane_ring)));
+        CHECK(engine.commit_vst3_lane());
+        CHECK(engine.has_active_vst3_lane("main"));
+        for (auto& s : render_buf) { s = 0.0F; }
+        CHECK(engine.process_output_group("main",
+                                           std::span<const RtLaneInputV1>(lane_inputs),
+                                           render_buf.data(), 16U));
         CHECK(engine.read_vst3_tap("main", tap_out.data(), 128U,
                                     tap_channels, tap_frames, tap_sequence));
         CHECK(tap_channels == 2U);
