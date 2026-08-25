@@ -542,21 +542,46 @@ try {
     }
     if ($EnableTabBridge) {
       $tabRouteOffset = 20 + 40 + (6 * 224)
-      if ($statusReply[$tabRouteOffset + 1] -gt 4) {
-        throw "Browser tab route state is invalid: $($statusReply[$tabRouteOffset + 1])."
+      $tabState = $null
+      $tabDetail = ''
+      for ($attempt = 0; $attempt -lt 50; $attempt++) {
+        if ($statusReply.Length -ge (20 + 40 + (7 * 224))) {
+          if ($statusReply[$tabRouteOffset + 1] -le 4) {
+            $tabDetailBytes = [BitConverter]::ToUInt16($statusReply, $tabRouteOffset + 6)
+            if ($tabDetailBytes -gt 0 -and $tabDetailBytes -le 120) {
+              $candidate = [System.Text.Encoding]::UTF8.GetString(
+                $statusReply, $tabRouteOffset + 104, $tabDetailBytes)
+              # The host must prove the loopback listener actually bound before it
+              # reports Pending; a generic "requested" or empty detail means the
+              # graph/listener setup did not complete as designed.
+              if ($candidate -match 'loopback listener bound') {
+                $tabState = $statusReply[$tabRouteOffset + 1]
+                $tabDetail = $candidate
+                break
+              }
+            }
+          }
+        }
+        Start-Sleep -Milliseconds 20
+        $statusFrame = New-IpcFrame 13 ([uint64](60 + $attempt)) @()
+        Send-IpcFrame $client $statusFrame
+        $statusReply = Receive-IpcFrame $client
+        Assert-IpcFrameShape -Frame $statusReply -ExpectedType 12 -ExpectedRequestId ([uint64](60 + $attempt)) -MinimumPayloadLength (40 + (7 * 224))
       }
-      $tabState = $statusReply[$tabRouteOffset + 1]
-      $tabDetailBytes = [BitConverter]::ToUInt16($statusReply, $tabRouteOffset + 6)
-      if ($tabDetailBytes -eq 0 -or $tabDetailBytes -gt 120) {
-        throw "Browser tab route detail length is invalid: $tabDetailBytes."
+      if ($null -eq $tabState) {
+        $debugBytes = [BitConverter]::ToUInt16($statusReply, $tabRouteOffset + 6)
+        $debugDetail = ''
+        if ($debugBytes -gt 0 -and $debugBytes -le 200) {
+          $debugDetail = [System.Text.Encoding]::UTF8.GetString(
+            $statusReply, $tabRouteOffset + 104, $debugBytes)
+        }
+        throw 'Browser tab route never confirmed the loopback listener within the bounded wait.'
       }
-      $tabDetail = [System.Text.Encoding]::UTF8.GetString(
-        $statusReply, $tabRouteOffset + 104, $tabDetailBytes)
-      # The host must prove the loopback listener actually bound before it
-      # reports Pending; a generic "requested" or empty detail means the
-      # graph/listener setup did not complete as designed.
-      if ($tabDetail -notmatch 'loopback listener bound') {
-        throw "Browser tab route detail does not confirm the listener: '$tabDetail'."
+      if ($EnableTabNoiseSuppressor) {
+        if ($tabDetail -notmatch 'suppressor active') {
+          throw "Tab noise suppressor was requested but route detail does not confirm it: '$tabDetail'."
+        }
+        $statusSummary += "; tab noise suppressor active (opt-in)"
       }
       $statusSummary += "browser tab route state=$tabState; listener is loopback-only and opt-in"
     }
