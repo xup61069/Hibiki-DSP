@@ -1042,7 +1042,7 @@ NTSTATUS 0xC000000D，含 disable/enable 重試），明確不主張實體音訊
 或 Microsoft signing，evidence driver-vm-load-test-v1.json（Issue #462 / PR #614）。皆為
 docs/evidence 增量。
 
-目前驗證摘要：`verify.ps1` 的 5 個 CTest（hibiki_contract_tests、hibiki_driver_stream_tests、hibiki_noise_suppressor_tests、hibiki_asio_transport_selftest、hibiki_tab_bridge_selftest）通過（含 #1474 新增的 suppressor fail-closed 測試）；`docs-check.ps1` 的 86 個必要入口與
+目前驗證摘要：`verify.ps1` 的 6 個 CTest（hibiki_contract_tests、hibiki_driver_stream_tests、hibiki_lane_latency_tests、hibiki_noise_suppressor_tests、hibiki_asio_transport_selftest、hibiki_tab_bridge_selftest）通過（含 #1474 新增的 suppressor fail-closed 測試與 #1647 新增的 lane latency 行為測試）；`docs-check.ps1` 的 86 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與
