@@ -13,10 +13,6 @@
       "type": "array", "maxItems": 32,
       "items": {"type": "string", "minLength": 1, "maxLength": 64, "$ref": "printable-string-v1.schema.json#/$defs/printableString"}
     },
-    "automation_timeline_ids": {
-      "type": "array", "maxItems": 16,
-      "items": {"type": "string", "minLength": 1, "maxLength": 64, "$ref": "printable-string-v1.schema.json#/$defs/printableString"}
-    },
     "ir_reference": {
       "type": "string", "minLength": 8, "maxLength": 64,
       "$ref": "printable-string-v1.schema.json#/$defs/printableString",
