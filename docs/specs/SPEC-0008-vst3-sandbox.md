@@ -237,11 +237,13 @@ evidence 契約：不擷取 minidump、不解 symbol、不連接 production work
 
 `Vst3SandboxProcessV1`（vst3_sandbox.hpp）把 sandbox 生命週期事件橋接進該 store：
 worker 以非零碼退出、watchdog timeout、pipe 收送失敗與 handshake/exchange protocol
-error 各記錄一筆去敏化 entry；capture instant 使用系統 UTC 時鐘，uptime 只使用注入的
+error 各記錄一筆去敏化 entry；stop()/quarantine() 內的強制終止失敗也記錄一筆
+job_object_failure entry。單一生命週期事件最多產生一筆 entry：第一個被記錄的原因佔用
+事件槽位，後續同事件原因不得重複或覆蓋。capture instant 使用系統 UTC 時鐘，uptime 只使用注入的
 單調時鐘，兩個時鐘不得混用。module digest 在 launch 時由 plugin path 位元組一次性算出，
 path 本身不留存。setup 失敗（worker 執行檔不存在等）在 process 存在前即結束，不產生任何
 entry。bridge 屬 user-space control-plane 觀測契約，不代表 minidump capture 或 production
-crash policy。
+crash policy；強制終止失敗的可觀測性不宣稱提升 kernel containment 強度。
 
 ## 尚未完成的邊界
 

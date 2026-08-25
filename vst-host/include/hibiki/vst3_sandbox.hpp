@@ -111,10 +111,21 @@ public:
                                        worker_pipe_.server_ready(), worker_pipe_.connected()};
     }
     // Bounded de-identified crash report ring fed by sandbox lifecycle
-    // events (worker exit, watchdog timeout, exchange failure). The store
-    // never holds raw paths, PIDs, handles, or command lines.
+    // events (worker exit, watchdog timeout, exchange failure, forced
+    // termination failure). The store never holds raw paths, PIDs,
+    // handles, or command lines.
     [[nodiscard]] const Vst3CrashReportStoreV1& crash_report_store() const noexcept {
         return crash_reports_;
+    }
+
+    // Test-only injection point: forces the next TerminateJobObject call
+    // inside stop()/quarantine() to be treated as failed so the control
+    // plane can observe a de-identified job_object_failure entry without
+    // needing a real kernel containment breakdown. Never set this in
+    // production code paths; the flag is cleared after one use.
+    void force_job_terminate_failure_for_test() noexcept {
+        job_terminate_failure_for_test_ = true;
+        crash_entry_slot_taken_ = false;
     }
 
 private:
@@ -135,6 +146,14 @@ private:
     Vst3CrashReportStoreV1 crash_reports_{};
     Vst3Sha256DigestV1 module_digest_{};
     std::uint64_t launched_at_ms_{0};
+    bool job_terminate_failure_for_test_{false};
+    // Issue 1335: single-event/single-entry semantics. record_crash_entry
+    // claims this slot when it appends; later attempts to record another
+    // reason for the same lifecycle event are dropped. quarantine() runs
+    // before its caller's own recording, so a job_object_failure entry
+    // wins the slot. stop() is an independent terminal event and resets
+    // the slot first.
+    bool crash_entry_slot_taken_{false};
 };
 
 }  // namespace hibiki

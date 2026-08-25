@@ -539,6 +539,9 @@ bool decode_scene_catalog_command_v1(
     }
 
     // Upsert.
+    for (std::size_t index = 84U; index < 96U; ++index) {
+        if (payload[index] != 0U) return false;
+    }
     const auto latency_raw = read_u32(payload.data() + 4U);
     const auto ir_phase_raw = read_u32(payload.data() + 8U);
     const auto loudness_raw = read_u32(payload.data() + 80U);
