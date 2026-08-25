@@ -39,6 +39,22 @@ schema 層的 `device_id` 上限為 260 字元（`maxLength: 260`）且拒絕 C0
 endpoint ID 邊界一致。多位元組文字即使不超過 260 個字元，也會在進入控制平面或
 校正檔前被拒絕。
 
+## 引導式校正與目標曲線（#1564）
+
+引導式校正工作流在既有 bounded PEQ compiler 上加入三條內建目標曲線：
+`flat`（0 dB 全頻段）、`harman-in-ear` 與 `harman-over-ear`。曲線以 bounded anchor table 定義，
+在 log-frequency 空間做線性內插，全部以 1 kHz = 0 dB 為基準；這些是產品化目標偏好，不是量測
+麥克風或 ISO 226 等響度資料。
+
+`sample_calibration_target_curve_v1`（C++）與 `CalibrationCompilerV1.TrySampleTargetCurve`（C#）
+對 10 Hz–24 kHz 以外的頻率或未知 curve ID 一律 fail-closed。`BuildTargetedResponse` 讓上層
+wizard 把 caller-supplied 的量測電平配對到所選曲線後直接取得合法的 `CalibrationResponseV1`；
+未排序頻率或超出 schema dB 範圍會被拒絕。
+
+`CompileMultiChannelBatch` 接受固定 1／2／6／8 聲道陣列並逐聲道呼叫同一個 bounded compiler：
+任一聲道驗證失敗時整批 fail-closed 且不回傳部分結果；任一聲道被 boost/cut cap 或 filter 數量
+限制時，批次結果標示 limited。多聲道輸出仍受每聲道最多 16 段 PEQ 上限。
+
 ## 限制與安全
 
 - 這是 bounded PEQ baseline，不是房間聲學最佳化、耳機 HATS/coupler 推論或 equal-loudness 係數 fit。

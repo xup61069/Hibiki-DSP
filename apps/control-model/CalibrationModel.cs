@@ -138,6 +138,13 @@ public sealed record CalibrationCompileResultV1(
     double MaximumRequestedCorrectionDb,
     string Diagnostic);
 
+public enum CalibrationTargetCurveIdV1
+{
+    Flat = 0,
+    HarmanInEar = 1,
+    HarmanOverEar = 2,
+}
+
 public static class CalibrationCompilerV1
 {
     public const int MaxResponsePoints = 512;
@@ -145,6 +152,9 @@ public static class CalibrationCompilerV1
     public const double MinQ = 0.1;
     public const double MaxQ = 100.0;
     private const long MaxFileBytes = 1024 * 1024;
+
+    private const double MinCurveFrequencyHz = 10.0;
+    private const double MaxCurveFrequencyHz = 24000.0;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -154,6 +164,167 @@ public static class CalibrationCompilerV1
 
     public static bool ValidatePolicy(CalibrationCompilePolicyV1? policy) =>
         policy is not null && policy.IsValid;
+
+    public static string TargetCurveName(CalibrationTargetCurveIdV1 id) => id switch
+    {
+        CalibrationTargetCurveIdV1.Flat => "flat",
+        CalibrationTargetCurveIdV1.HarmanInEar => "harman-in-ear",
+        CalibrationTargetCurveIdV1.HarmanOverEar => "harman-over-ear",
+        _ => string.Empty,
+    };
+
+    public static bool TrySampleTargetCurve(
+        CalibrationTargetCurveIdV1 id, double frequencyHz, out double targetDb)
+    {
+        targetDb = 0.0;
+        if (!double.IsFinite(frequencyHz) ||
+            frequencyHz < MinCurveFrequencyHz || frequencyHz > MaxCurveFrequencyHz)
+        {
+            return false;
+        }
+
+        // Bounded anchor tables normalised to 0 dB at 1 kHz; no ISO 226 data.
+        ReadOnlySpan<(double FrequencyHz, double TargetDb)> anchors = id switch
+        {
+            CalibrationTargetCurveIdV1.Flat =>
+                [(20.0, 0.0), (20000.0, 0.0)],
+            CalibrationTargetCurveIdV1.HarmanInEar =>
+                [(20.0, 6.5), (32.0, 6.0), (63.0, 4.5), (125.0, 3.0),
+                 (250.0, 1.5), (500.0, 0.5), (1000.0, 0.0), (2000.0, -1.0),
+                 (3000.0, 3.5), (4000.0, 4.0), (6000.0, 2.0), (8000.0, -1.0),
+                 (10000.0, -3.0), (16000.0, -8.0), (20000.0, -12.0)],
+            CalibrationTargetCurveIdV1.HarmanOverEar =>
+                [(20.0, 7.0), (32.0, 6.5), (63.0, 5.5), (125.0, 4.0),
+                 (250.0, 2.0), (500.0, 0.5), (1000.0, 0.0), (1500.0, -0.5),
+                 (2000.0, -1.5), (3000.0, 3.0), (4000.0, 3.5), (5000.0, 1.0),
+                 (8000.0, -2.0), (10000.0, -4.0), (16000.0, -9.0),
+                 (20000.0, -13.0)],
+            _ => default,
+        };
+
+        if (anchors.IsEmpty) return false;
+        if (frequencyHz <= anchors[0].FrequencyHz)
+        {
+            targetDb = anchors[0].TargetDb;
+            return true;
+        }
+        if (frequencyHz >= anchors[^1].FrequencyHz)
+        {
+            targetDb = anchors[^1].TargetDb;
+            return true;
+        }
+
+        var lo = anchors.SearchIndex(frequencyHz);
+        var hi = lo + 1;
+        if (hi >= anchors.Length)
+        {
+            targetDb = anchors[^1].TargetDb;
+            return true;
+        }
+
+        var t = (Math.Log2(frequencyHz) - Math.Log2(anchors[lo].FrequencyHz)) /
+                (Math.Log2(anchors[hi].FrequencyHz) - Math.Log2(anchors[lo].FrequencyHz));
+        targetDb = double.IsFinite(t)
+            ? anchors[lo].TargetDb + t * (anchors[hi].TargetDb - anchors[lo].TargetDb)
+            : anchors[lo].TargetDb;
+        return true;
+    }
+
+    private static int SearchIndex(
+        this ReadOnlySpan<(double FrequencyHz, double TargetDb)> anchors,
+        double frequencyHz)
+    {
+        for (var i = 1; i < anchors.Length; ++i)
+        {
+            if (frequencyHz <= anchors[i].FrequencyHz) return i - 1;
+        }
+        return anchors.Length - 1;
+    }
+
+    public static CalibrationResponseV1? BuildTargetedResponse(
+        string? deviceId,
+        double sampleRate,
+        IReadOnlyList<double>? measuredFrequenciesHz,
+        IReadOnlyList<double>? measuredLevelsDb,
+        CalibrationTargetCurveIdV1 targetCurve = CalibrationTargetCurveIdV1.Flat)
+    {
+        if (measuredFrequenciesHz is null || measuredLevelsDb is null ||
+            measuredFrequenciesHz.Count != measuredLevelsDb.Count ||
+            measuredFrequenciesHz.Count is < 1 or > MaxResponsePoints)
+        {
+            return null;
+        }
+
+        var points = new List<CalibrationPointV1>(measuredFrequenciesHz.Count);
+        for (var i = 0; i < measuredFrequenciesHz.Count; ++i)
+        {
+            var frequency = measuredFrequenciesHz[i];
+            if (!TrySampleTargetCurve(targetCurve, frequency, out var target))
+            {
+                return null;
+            }
+            points.Add(new CalibrationPointV1(frequency, measuredLevelsDb[i], target));
+        }
+
+        // The wizard's single-device import path reports stereo by default;
+        // multi-channel batch compilation uses CompileMultiChannelBatch.
+        const int wizardChannels = 2;
+        var response = new CalibrationResponseV1(1U, sampleRate, wizardChannels, deviceId, points);
+        return response.IsValid ? response : null;
+    }
+
+    public sealed record MultiChannelCompileResultV1(
+        bool Success,
+        IReadOnlyList<IReadOnlyList<PeqFilterV1>> ChannelFilters,
+        IReadOnlyList<bool> ChannelLimited,
+        string Diagnostic);
+
+    public static MultiChannelCompileResultV1 CompileMultiChannelBatch(
+        int channelCount,
+        IReadOnlyList<CalibrationPointV1[]>? perChannelPoints,
+        CalibrationCompilePolicyV1? policy = null)
+    {
+        const string failurePrefix = "multi-channel batch compile rejected:";
+        if (perChannelPoints is null ||
+            channelCount is not (1 or 2 or 6 or 8) ||
+            perChannelPoints.Count != channelCount)
+        {
+            return new MultiChannelCompileResultV1(
+                false, Array.Empty<IReadOnlyList<PeqFilterV1>>(),
+                Array.Empty<bool>(),
+                failurePrefix + " channel count or response set mismatch");
+        }
+
+        var effectivePolicy = policy ?? new CalibrationCompilePolicyV1();
+        var results = new List<IReadOnlyList<PeqFilterV1>>(channelCount);
+        var limits = new List<bool>(channelCount);
+        for (var ch = 0; ch < channelCount; ++ch)
+        {
+            if (perChannelPoints[ch] is null)
+            {
+                return new MultiChannelCompileResultV1(
+                    false, Array.Empty<IReadOnlyList<PeqFilterV1>>(),
+                    Array.Empty<bool>(),
+                    failurePrefix + " channel " + ch.ToString(CultureInfo.InvariantCulture) + " has no points");
+            }
+            var result = CompileBoundedPeqCorrection(perChannelPoints[ch], effectivePolicy);
+            if (!result.Filters.Any() && result.Diagnostic.Contains("invalid", StringComparison.Ordinal))
+            {
+                return new MultiChannelCompileResultV1(
+                    false, Array.Empty<IReadOnlyList<PeqFilterV1>>(),
+                    Array.Empty<bool>(),
+                    failurePrefix + " channel " + ch.ToString(CultureInfo.InvariantCulture) + " failed validation");
+            }
+            results.Add(result.Filters);
+            limits.Add(result.Limited);
+        }
+
+        var anyLimited = limits.Any(l => l);
+        var diagnostic = anyLimited
+            ? "bounded multi-channel PEQ compiled with clipped or unrepresented residuals"
+            : "bounded multi-channel PEQ compiled; verify with a second measurement";
+        return new MultiChannelCompileResultV1(true, results, limits, diagnostic);
+    }
 
     public static bool ValidateResponse(
         IReadOnlyList<CalibrationPointV1>? response,
