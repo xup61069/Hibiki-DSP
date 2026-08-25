@@ -1,0 +1,47 @@
+{
+  "evidence_format": 2,
+  "issue": 1354,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "docs/specs/SPEC-0002-volume-and-iso.md",
+      "src/hub/include/hibiki/audio_engine.hpp",
+      "src/hub/src/audio_engine.cpp",
+      "tests/unit/contract_tests.cpp"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "c250d4b2ebf4d1315ee6a8d59ec447cbaa81518b83d7682e44bbdf84c3e60a10"
+  },
+  "metadata": {
+    "scope": "loudness-peq-bounded-rt-crossfade",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-msbuild-18.9.1-cmake-4.4.0",
+    "commands": [
+      "pwsh -NoProfile -File tools/verify.ps1",
+      "ctest --test-dir .local/build -C RelWithDebInfo --output-on-failure",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange"
+    ],
+    "results": [
+      {
+        "command": "contract tests",
+        "status": "pass",
+        "detail": "All four CTest executables passed, including hibiki_contract_tests fixtures for same-group attached-to-attached loudness PEQ replacement: the transition starts active, bounded render blocks remain finite until completion, and clear/re-attach or a different output group remains an immediate swap."
+      },
+      {
+        "command": "implementation boundary",
+        "status": "pass",
+        "detail": "commit_loudness_peq snapshots the previous immutable PEQ only for same-output-group replacement and starts a fixed-capacity 120 ms equal-power crossfade; render uses stack-only buffers, fails closed for blocks above 23040 frames, and clears transition state after retirement."
+      }
+    ],
+    "limitations": [
+      "This is deterministic user-space DSP evidence; it does not prove physical sink delivery, subjective click-free listening, ISO 226 conformance, WaveRT behavior, driver installation, HLK validation, or signing.",
+      "The provenance digest binds this manifest to the staged source set; it does not independently attest that declared commands ran.",
+      "The first verify invocation completed its build/tests before an unrelated retry hit a transient object-file lock in the shared .local/build directory; the recorded CTest result is from that completed build tree."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4"
+    },
+    "started_at": "2026-08-25T09:20:00+08:00",
+    "finished_at": "2026-08-25T09:55:00+08:00"
+  }
+}
