@@ -449,8 +449,10 @@ int main() {
     }
     CHECK(bass_controller.process_interleaved(bass_probe.data(),
                                                bass_probe.size(), 1U));
-    double low_energy = 0.0;
-    for (const auto sample : bass_probe) low_energy += static_cast<double>(sample) * sample;
+    double shelf_low_probe_energy = 0.0;
+    for (const auto sample : bass_probe) {
+        shelf_low_probe_energy += static_cast<double>(sample) * sample;
+    }
     std::array<float, 4800> high_probe{};
     for (std::size_t frame = 0U; frame < high_probe.size(); ++frame) {
         high_probe[frame] = static_cast<float>(
@@ -463,7 +465,11 @@ int main() {
                                               high_probe.size(), 1U));
     double high_energy = 0.0;
     for (const auto sample : high_probe) high_energy += static_cast<double>(sample) * sample;
-    CHECK(low_energy < high_energy);
+    double shelf_high_probe_energy = 0.0;
+    for (const auto sample : high_probe) {
+        shelf_high_probe_energy += static_cast<double>(sample) * sample;
+    }
+    CHECK(shelf_low_probe_energy < shelf_high_probe_energy);
 
     ProgramAwareLevelControllerV1 no_bass_controller;
     CHECK(no_bass_controller.configure(ProgramAwareLevelPolicyV1{}, 48000U));
