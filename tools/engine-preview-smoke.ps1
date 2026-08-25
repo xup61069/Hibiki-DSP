@@ -9,6 +9,7 @@ param(
   [switch]$EnableTabBridge,
   [switch]$EnableTabNoiseSuppressor,
   [switch]$EnableDriverLoopback,
+  [switch]$EnableWavSource,
   [switch]$StatusOnly,
   [switch]$SelfTest
 )
@@ -32,6 +33,7 @@ function Get-EnginePreviewSmokePlan {
     EnginePath = Join-Path $engineWorkingDirectory 'Release/hibiki_engine_preview.exe'
     IrDirectory = $localRoot
     IrPath = Join-Path $localRoot 'engine-preview-smoke-ir.wav'
+    WavSourcePath = Join-Path $localRoot 'engine-preview-smoke-source.wav'
   }
 }
 
@@ -125,6 +127,7 @@ function Invoke-EnginePreviewSmokePathSelfTest {
   $workingDirectory = [IO.Path]::GetFullPath($fixture.EngineWorkingDirectory).TrimEnd('\', '/')
   $enginePath = [IO.Path]::GetFullPath($fixture.EnginePath).TrimEnd('\', '/')
   $irPath = [IO.Path]::GetFullPath($fixture.IrPath).TrimEnd('\', '/')
+  $wavSourcePath = [IO.Path]::GetFullPath($fixture.WavSourcePath).TrimEnd('\', '/')
   $directory = [System.IO.FileAttributes]::Directory
   $file = [System.IO.FileAttributes]::Archive
   $cases = 0
@@ -143,6 +146,8 @@ function Invoke-EnginePreviewSmokePathSelfTest {
   Assert-EnginePreviewSmokePath -Path $fixture.IrDirectory -Root $fixture.RepositoryRoot -Kind Directory -AllowMissingLeaf -SyntheticAttributes @{}
   $cases++
   Assert-EnginePreviewSmokePath -Path $fixture.IrPath -Root $fixture.RepositoryRoot -Kind File -AllowMissingLeaf -SyntheticAttributes @{}
+  $cases++
+  Assert-EnginePreviewSmokePath -Path $fixture.WavSourcePath -Root $fixture.RepositoryRoot -Kind File -AllowMissingLeaf -SyntheticAttributes @{}
   $cases++
 
   $outsideCaught = $false
@@ -393,6 +398,7 @@ Assert-EnginePreviewSmokePath -Path $smokePlan.EnginePath -Root $smokePlan.Local
 Assert-EnginePreviewSmokePath -Path $smokePlan.EngineWorkingDirectory -Root $smokePlan.LocalRoot -Kind Directory
 Assert-EnginePreviewSmokePath -Path $smokePlan.IrDirectory -Root $smokePlan.RepositoryRoot -Kind Directory -AllowMissingLeaf
 Assert-EnginePreviewSmokePath -Path $smokePlan.IrPath -Root $smokePlan.RepositoryRoot -Kind File -AllowMissingLeaf
+Assert-EnginePreviewSmokePath -Path $smokePlan.WavSourcePath -Root $smokePlan.RepositoryRoot -Kind File -AllowMissingLeaf
 $engine = $smokePlan.EnginePath
 if (@(Get-Process -Name hibiki_engine_preview -ErrorAction SilentlyContinue).Count -gt 0) {
   throw 'Another Engine Preview process is already running; stop it before running this smoke.'
@@ -419,6 +425,37 @@ function Write-TestIrWav([string]$Path) {
     $writer.Write([uint32]8)
     $writer.Write([single]1.0)
     $writer.Write([single]0.0)
+    $writer.Flush()
+    $writer.Dispose()
+  } finally {
+    $stream.Dispose()
+  }
+}
+
+function Write-WavSourceFixture([string]$Path) {
+  $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Create,
+                                   [System.IO.FileAccess]::Write,
+                                   [System.IO.FileShare]::None)
+  try {
+    $writer = [System.IO.BinaryWriter]::new($stream, [System.Text.Encoding]::ASCII, $false)
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('RIFF'))
+    $writer.Write([uint32](36 + 960))
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('WAVE'))
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('fmt '))
+    $writer.Write([uint32]16)
+    $writer.Write([uint16]3) # IEEE Float32
+    $writer.Write([uint16]1) # mono; broadcast to stereo by the source
+    $writer.Write([uint32]48000)
+    $writer.Write([uint32]192000)
+    $writer.Write([uint16]4)
+    $writer.Write([uint16]32)
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('data'))
+    $writer.Write([uint32]960) # 240 frames x 2 ch x 4 bytes
+    for ($frame = 0; $frame -lt 240; $frame++) {
+      $sample = [single](0.25 * [Math]::Sin(2 * [Math]::PI * 5000 * $frame / 48000))
+      $writer.Write([single]$sample)
+      $writer.Write([single]$sample)
+    }
     $writer.Flush()
     $writer.Dispose()
   } finally {
@@ -453,6 +490,19 @@ if ($EnableDriverLoopback) {
     throw 'EnableDriverLoopback is exclusive with the other explicit audio sources.'
   }
   $engineArguments += '--enable-driver-loopback'
+}
+if ($EnableWavSource) {
+  if (-not $EnableWasapiOutput) { throw 'EnableWavSource requires EnableWasapiOutput.' }
+  if ($EnableTestTone -or $EnableTabBridge -or $EnableDriverLoopback -or ($EnableProcessDelivery -and $EnableSessionRouting)) {
+    throw 'EnableWavSource is exclusive with the other explicit audio sources.'
+  }
+  $wavSourcePath = $smokePlan.WavSourcePath
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $wavSourcePath) | Out-Null
+  Write-WavSourceFixture $wavSourcePath
+  $engineArguments += '--enable-wav-source'
+  $engineArguments += '--enable-wav-loop'
+  $engineArguments += '--wav-source-path'
+  $engineArguments += $wavSourcePath
 }
 $engineProcess = Start-Process -FilePath $engine -ArgumentList $engineArguments `
   -WorkingDirectory $smokePlan.EngineWorkingDirectory -WindowStyle Hidden -PassThru
@@ -498,6 +548,7 @@ try {
     $expectedRouteCount = 6
     if ($EnableTabBridge) { $expectedRouteCount = 7 }
     if ($EnableDriverLoopback) { $expectedRouteCount = 7 }
+    if ($EnableWavSource) { $expectedRouteCount = 7 }
     if ($statusPayloadBytes -ne ($statusReply.Length - 20) -or
         $statusPayloadBytes -lt (40 + ($expectedRouteCount * 224))) {
       throw "Engine Preview status payload shape is invalid: bytes=$statusPayloadBytes."
@@ -643,6 +694,33 @@ try {
       }
       $statusSummary += "driver-stream loopback rendered through encode/ring/decode and WASAPI sink ($loopbackDetail)"
     }
+    if ($EnableWavSource) {
+      $wavRouteOffset = 20 + 40 + (6 * 224)
+      $wavDetail = ''
+      $wavReady = $false
+      for ($attempt = 0; $attempt -lt 50; $attempt++) {
+        if ($statusReply.Length -ge (20 + 40 + (7 * 224))) {
+          $detailBytes = [BitConverter]::ToUInt16($statusReply, $wavRouteOffset + 6)
+          if ($detailBytes -gt 0 -and $detailBytes -le 120) {
+            $wavDetail = [System.Text.Encoding]::UTF8.GetString(
+              $statusReply, $wavRouteOffset + 104, $detailBytes)
+            if ($wavDetail -match 'wav file source rendering') {
+              $wavReady = $true
+              break
+            }
+          }
+        }
+        Start-Sleep -Milliseconds 20
+        $statusFrame = New-IpcFrame 13 ([uint64](100 + $attempt)) @()
+        Send-IpcFrame $client $statusFrame
+        $statusReply = Receive-IpcFrame $client
+        Assert-IpcFrameShape -Frame $statusReply -ExpectedType 12 -ExpectedRequestId ([uint64](100 + $attempt)) -MinimumPayloadLength (40 + (7 * 224))
+      }
+      if (-not $wavReady) {
+        throw "WAV file source did not report rendered WASAPI blocks. Detail: '$wavDetail'."
+      }
+      $statusSummary += "WAV file source rendered through the user-space graph and WASAPI sink ($wavDetail)"
+    }
     Write-Output "Engine Preview status-only smoke passed ($($statusSummary -join '; '))."
     return
   }
@@ -730,5 +808,8 @@ try {
 } finally {
   if ($null -ne $client) { $client.Dispose() }
   if (-not $engineProcess.HasExited) { Stop-Process -Id $engineProcess.Id; $engineProcess.WaitForExit() }
-  if (Test-Path -LiteralPath $irPath) { Remove-Item -LiteralPath $irPath -Force -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $irPath) { Remove-Item -LiteralPath $irPath -Force -ErrorAction SilentlyContinue }
+    if ($EnableWavSource -and (Test-Path -LiteralPath $smokePlan.WavSourcePath)) {
+      Remove-Item -LiteralPath $smokePlan.WavSourcePath -Force -ErrorAction SilentlyContinue
+    }
 }
