@@ -89,6 +89,11 @@ public:
 
     void reset() noexcept;
 
+    // Test-only hook: forces the internal sequence into an odd (mid-write)
+    // state so contract tests can exercise the torn-read rejection path
+    // without spawning a racing writer thread. Not used by production code.
+    void force_sequence_odd_for_tests() noexcept;
+
 private:
     static constexpr std::size_t kCapacitySamples =
         kMaxVst3TapFramesV1 * kMaxVst3TapChannelsV1;
