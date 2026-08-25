@@ -10,7 +10,7 @@
       "vst-host/src/vst3_sandbox.cpp"
     ],
     "digest_algorithm": "sha256-git-source-set-v1",
-    "digest": "c039986bd09d6c30a173c72408226bbd24b8075ce1df4af999ffc71fd4e2db59"
+    "digest": "d2e3739f98ba2efe3e74468b0a1bf10be2a2de4fe0900600493e371ac4b2ab83"
   },
   "metadata": {
     "scope": "vst3-sandbox-job-object-failure-capture",
