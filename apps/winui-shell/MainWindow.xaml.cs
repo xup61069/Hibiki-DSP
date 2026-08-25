@@ -77,29 +77,111 @@ public sealed partial class MainWindow : Window
         var points = frame.TransitionProgress >= 1.0 ? frame.TargetPoints : InterpolatePoints(frame.Points, frame.TargetPoints, frame.TransitionProgress);
         var width = double.IsNaN(EqVisualCanvas.ActualWidth) || EqVisualCanvas.ActualWidth < 120.0 ? 480.0 : EqVisualCanvas.ActualWidth;
         var height = double.IsNaN(EqVisualCanvas.ActualHeight) || EqVisualCanvas.ActualHeight < 60.0 ? 140.0 : EqVisualCanvas.ActualHeight;
+
+        DrawZeroDbReferenceLine(width, height);
+        DrawFrequencyTickLabels(width, height);
+
         var pointCollection = new Microsoft.UI.Xaml.Media.PointCollection();
         foreach (var point in points)
         {
             var gainDb = Math.Clamp(point.GainDb, -24.0, 24.0);
-            var x = width * (0.02 + (Math.Log10(point.FrequencyHz / 20.0) / Math.Log10(1000.0)) * 0.96);
+            var x = FrequencyToX(point.FrequencyHz, width);
             var y = Math.Clamp(height * 0.5 - gainDb * 2.2, height * 0.08, height * 0.92);
             pointCollection.Append(new Windows.Foundation.Point(x, y));
         }
 
-        var strokeColor = frame.Source switch
+        var curve = new Polyline
         {
-            EqVisualSourceV1.EqualLoudness => Color.FromArgb(255, 0, 120, 212),
-            EqVisualSourceV1.AdaptiveCorrection => Color.FromArgb(255, 0, 153, 188),
-            _ => (Color)Application.Current.Resources["SystemAccentColor"],
-        };
-
-        EqVisualCanvas.Children.Add(new Polyline
-        {
-            Stroke = new SolidColorBrush(strokeColor),
             StrokeThickness = 3.0,
             StrokeLineJoin = PenLineJoin.Round,
             Points = pointCollection,
-        });
+        };
+        switch (frame.Source)
+        {
+            case EqVisualSourceV1.EqualLoudness:
+                curve.Stroke = new SolidColorBrush(Color.FromArgb(255, 0, 120, 212));
+                break;
+            case EqVisualSourceV1.AdaptiveCorrection:
+                // Dash pattern keeps the two sources distinguishable by shape,
+                // not only by hue, for color-vision-deficient users.
+                curve.Stroke = new SolidColorBrush(Color.FromArgb(255, 0, 153, 188));
+                curve.StrokeDashArray = new Microsoft.UI.Xaml.Media.DoubleCollection { 4.0, 2.5 };
+                break;
+            default:
+                curve.Stroke = new SolidColorBrush((Color)Application.Current.Resources["SystemAccentColor"]);
+                break;
+        }
+
+        EqVisualCanvas.Children.Add(curve);
+        UpdateEqCanvasAccessibilityDescription(frame, points);
+    }
+
+    private static double FrequencyToX(double frequencyHz, double width)
+    {
+        return width * (0.02 + (Math.Log10(frequencyHz / 20.0) / Math.Log10(1000.0)) * 0.96);
+    }
+
+    private void DrawZeroDbReferenceLine(double width, double height)
+    {
+        var zeroY = height * 0.5;
+        var zeroLine = new Microsoft.UI.Xaml.Shapes.Line
+        {
+            X1 = 0,
+            Y1 = zeroY,
+            X2 = width,
+            Y2 = zeroY,
+            Stroke = new SolidColorBrush(Color.FromArgb(255, 160, 160, 160)),
+            StrokeThickness = 1.0,
+            IsHitTestVisible = false,
+        };
+        EqVisualCanvas!.Children.Add(zeroLine);
+    }
+
+    private void DrawFrequencyTickLabels(double width, double height)
+    {
+        var ticks = new (double FrequencyHz, string Label)[]
+        {
+            (31.0, "31"), (250.0, "250"), (1000.0, "1k"), (8000.0, "8k"),
+        };
+        foreach (var (frequencyHz, label) in ticks)
+        {
+            var x = FrequencyToX(frequencyHz, width);
+            var tickLabel = new TextBlock
+            {
+                Text = label,
+                FontSize = 10,
+                Foreground = new SolidColorBrush(Color.FromArgb(255, 130, 130, 130)),
+                IsHitTestVisible = false,
+            };
+            EqVisualCanvas!.Children.Add(tickLabel);
+            Microsoft.UI.Xaml.Controls.Canvas.SetLeft(tickLabel, Math.Clamp(x - 8, 0, Math.Max(width - 20, 0)));
+            Microsoft.UI.Xaml.Controls.Canvas.SetTop(tickLabel, height - 16);
+        }
+    }
+
+    private void UpdateEqCanvasAccessibilityDescription(
+        EqVisualSurfaceModelV1 frame,
+        IReadOnlyList<EqVisualPointV1> renderedPoints)
+    {
+        if (EqVisualCanvas is null) return;
+        var sourceName = frame.Source switch
+        {
+            EqVisualSourceV1.EqualLoudness => "等響度補償（實線）",
+            EqVisualSourceV1.AdaptiveCorrection => "自適應低頻校正（虛線）",
+            _ => "尚未確認來源",
+        };
+        double minDb = double.MaxValue;
+        double maxDb = double.MinValue;
+        foreach (var point in renderedPoints)
+        {
+            minDb = Math.Min(minDb, point.GainDb);
+            maxDb = Math.Max(maxDb, point.GainDb);
+        }
+        var rangeText = minDb <= maxDb
+            ? $"，增益範圍 {minDb:F1} 至 {maxDb:F1} dB"
+            : string.Empty;
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(
+            EqVisualCanvas, $"即時等化器曲線：{sourceName}{rangeText}");
     }
 
     private static IReadOnlyList<EqVisualPointV1> InterpolatePoints(
