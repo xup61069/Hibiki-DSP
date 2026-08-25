@@ -439,20 +439,20 @@ function Write-WavSourceFixture([string]$Path) {
   try {
     $writer = [System.IO.BinaryWriter]::new($stream, [System.Text.Encoding]::ASCII, $false)
     $writer.Write([System.Text.Encoding]::ASCII.GetBytes('RIFF'))
-    $writer.Write([uint32](36 + 960))
+    $writer.Write([uint32](36 + 880))
     $writer.Write([System.Text.Encoding]::ASCII.GetBytes('WAVE'))
     $writer.Write([System.Text.Encoding]::ASCII.GetBytes('fmt '))
     $writer.Write([uint32]16)
     $writer.Write([uint16]3) # IEEE Float32
     $writer.Write([uint16]1) # mono; broadcast to stereo by the source
-    $writer.Write([uint32]48000)
-    $writer.Write([uint32]192000)
+    $writer.Write([uint32]44100) # exercise the offline resample path
+    $writer.Write([uint32]176400) # 44100 Hz x 4-byte mono frames
     $writer.Write([uint16]4)
     $writer.Write([uint16]32)
     $writer.Write([System.Text.Encoding]::ASCII.GetBytes('data'))
-    $writer.Write([uint32]960) # 240 frames x 1 ch x 4 bytes
-    for ($frame = 0; $frame -lt 240; $frame++) {
-      $sample = [single](0.25 * [Math]::Sin(2 * [Math]::PI * 5000 * $frame / 48000))
+    $writer.Write([uint32]880) # 220 frames x 1ch x 4B -> 239 frames at 48000 Hz
+    for ($frame = 0; $frame -lt 220; $frame++) {
+      $sample = [single](0.25 * [Math]::Sin(2 * [Math]::PI * 5000 * $frame / 44100))
       $writer.Write([single]$sample)
     }
     $writer.Flush()
@@ -704,8 +704,9 @@ try {
             $wavDetail = [System.Text.Encoding]::UTF8.GetString(
               $statusReply, $wavRouteOffset + 104, $detailBytes)
             if ($wavDetail -match 'wav file source rendering' -and
-                $wavDetail -match 'frames=\d+/240') {
-              $wavReady = $true
+                $wavDetail -match 'frames=\d+/239' -and
+                $wavDetail -match 'resampled 44100->48000') {
+                $wavReady = $true
               break
             }
           }
