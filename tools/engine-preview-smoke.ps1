@@ -8,6 +8,7 @@ param(
   [switch]$EnableTestTone,
   [switch]$EnableTabBridge,
   [switch]$EnableTabNoiseSuppressor,
+  [switch]$EnableDriverLoopback,
   [switch]$StatusOnly,
   [switch]$SelfTest
 )
@@ -446,6 +447,13 @@ if ($EnableTabNoiseSuppressor) {
   if (-not $EnableTabBridge) { throw 'EnableTabNoiseSuppressor requires EnableTabBridge.' }
   $engineArguments += '--enable-tab-noise-suppressor'
 }
+if ($EnableDriverLoopback) {
+  if (-not $EnableWasapiOutput) { throw 'EnableDriverLoopback requires EnableWasapiOutput.' }
+  if ($EnableTestTone -or $EnableTabBridge -or ($EnableProcessDelivery -and $EnableSessionRouting)) {
+    throw 'EnableDriverLoopback is exclusive with the other explicit audio sources.'
+  }
+  $engineArguments += '--enable-driver-loopback'
+}
 $engineProcess = Start-Process -FilePath $engine -ArgumentList $engineArguments `
   -WorkingDirectory $smokePlan.EngineWorkingDirectory -WindowStyle Hidden -PassThru
 $irPath = $smokePlan.IrPath
@@ -489,6 +497,7 @@ try {
     $statusPayloadBytes = [BitConverter]::ToUInt32($statusReply, 8)
     $expectedRouteCount = 6
     if ($EnableTabBridge) { $expectedRouteCount = 7 }
+    if ($EnableDriverLoopback) { $expectedRouteCount = 7 }
     if ($statusPayloadBytes -ne ($statusReply.Length - 20) -or
         $statusPayloadBytes -lt (40 + ($expectedRouteCount * 224))) {
       throw "Engine Preview status payload shape is invalid: bytes=$statusPayloadBytes."
@@ -605,6 +614,34 @@ try {
         throw 'Engine Preview test tone did not report rendered WASAPI blocks in the status snapshot.'
       }
       $statusSummary += 'test tone rendered through the user-space graph and WASAPI sink'
+    }
+    if ($EnableDriverLoopback) {
+      $loopbackRouteOffset = 20 + 40 + (6 * 224)
+      $loopbackReady = $false
+      $loopbackDetail = ''
+      for ($attempt = 0; $attempt -lt 50; $attempt++) {
+        if ($statusReply.Length -ge (20 + 40 + (7 * 224))) {
+          $loopbackState = $statusReply[$loopbackRouteOffset + 1]
+          $detailBytes = [BitConverter]::ToUInt16($statusReply, $loopbackRouteOffset + 6)
+          if ($detailBytes -gt 0 -and $detailBytes -le 120) {
+            $loopbackDetail = [System.Text.Encoding]::UTF8.GetString(
+              $statusReply, $loopbackRouteOffset + 104, $detailBytes)
+          }
+          if ($loopbackState -eq 0 -and $loopbackDetail -match 'driver-stream loopback rendering') {
+            $loopbackReady = $true
+            break
+          }
+        }
+        Start-Sleep -Milliseconds 20
+        $statusFrame = New-IpcFrame 13 ([uint64](80 + $attempt)) @()
+        Send-IpcFrame $client $statusFrame
+        $statusReply = Receive-IpcFrame $client
+        Assert-IpcFrameShape -Frame $statusReply -ExpectedType 12 -ExpectedRequestId ([uint64](80 + $attempt)) -MinimumPayloadLength (40 + (7 * 224))
+      }
+      if (-not $loopbackReady) {
+        throw "Driver-stream loopback did not report rendered WASAPI blocks. Detail: '$loopbackDetail'."
+      }
+      $statusSummary += "driver-stream loopback rendered through encode/ring/decode and WASAPI sink ($loopbackDetail)"
     }
     Write-Output "Engine Preview status-only smoke passed ($($statusSummary -join '; '))."
     return
