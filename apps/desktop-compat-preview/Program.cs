@@ -525,9 +525,10 @@ internal sealed class PreviewForm : Form
         _scenes.Enabled = _viewModel.IsConnected;
         _volume.Enabled = _viewModel.IsConnected;
         var sessionCount = _viewModel.SessionCatalog.Count;
+        var seqText = _viewModel.SessionCatalogSequenceDisplayText;
         _sessions.Text = sessionCount == 0
-            ? "App catalog：尚未同步；請以 -EnableSessionRouting 啟動引擎，或目前沒有可控制的工作階段。"
-            : $"App catalog：{sessionCount} 筆；只顯示 bounded metadata。套用 App 音量會寫入 Windows session，" +
+            ? $"App catalog：尚未同步（{seqText}）；請以 -EnableSessionRouting 啟動引擎，或目前沒有可控制的工作階段。"
+            : $"App catalog：{sessionCount} 筆；{seqText} 只顯示 bounded metadata。套用 App 音量會寫入 Windows session，" +
               "實體 per-App 送出已由 process-loopback E2E 覆蓋；仍屬使用者空間控制證據。";
         SyncSessionList();
         var hasSession = _viewModel.HasSelectedSession;
