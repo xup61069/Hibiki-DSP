@@ -5,6 +5,8 @@ using Hibiki.ControlModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Input;
 
 namespace Hibiki.WinUI;
 
@@ -282,5 +284,21 @@ public sealed partial class MainWindow : Window
     private async void OnClosed(object sender, WindowEventArgs e)
     {
         await ViewModel.DisconnectAsync();
+    }
+
+    private void OnSectionCardPointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is Border card)
+        {
+            card.BorderBrush = (Brush)Application.Current.Resources["AccentFillColorSecondaryBrush"];
+        }
+    }
+
+    private void OnSectionCardPointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is Border card)
+        {
+            card.BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"];
+        }
     }
 }
