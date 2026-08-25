@@ -37,7 +37,8 @@ plugin state 或完整 graph；卡片可另帶 8–64 bytes 的可列印 UTF-8 `
 卡片另可帶 optional boolean `loudness_live_update`（預設 false）：true 時控制模型在 Upsert
 的 `SceneCatalogCommandV1` wire byte 84 寫入 1，讓引擎端 `EqualLoudnessPolicyV1`
 以 volume-driven phon recompute opt-in 建立該自訂 Scene；false 或省略時 byte 84 為 0。
-此旗標只改變 engine-side loudness attachment 的 live-update 語意，不擴大 UI mirror 對完整
+序列化時，預設 false 不寫出 `loudness_live_update` 欄位；只有 true 會出現在卡片檔。此旗標只改變
+engine-side loudness attachment 的 live-update 語意，不擴大 UI mirror 對完整
 graph/loudness 參數的所有權。
 
 ## 引擎同步管線
@@ -97,7 +98,8 @@ payload 時解碼即拒收，同樣不觸碰既有 catalog。
 成功後，ViewModel 依原順序把佇列中的 Upsert／Remove 補送到引擎。持久化格式由
 `schemas/scene-sync-queue-v1.schema.json` 描述：頂層必須是 `schema_version`（固定 1）、
 `dropped_operations` 與最多 64 筆 `operations`；每筆操作只允許 `is_upsert`、`scene_id`、
-`name`、`output_group` 與 optional `ir_reference` 欄位。schema 以條件式規則直接強制：
+`name`、`output_group`、optional `ir_reference` 與 optional `loudness_live_update`
+欄位。schema 以條件式規則直接強制：
 Upsert 操作必須有
 非空 `name` 與非空 `output_group`；「非空」在 schema 與執行期皆代表至少含一個非空白字元。
 `ir_reference` 必須為空或 8–64 bytes 可列印 UTF-8；Remove 操作時必須為空字串。
@@ -108,7 +110,8 @@ Upsert 操作必須有
 invisible-control exclusion pattern（anchored）拒收 U+0000-U+001F 與 U+007F-U+009F，不會等到送出
 同步指令或外部驗證才失敗。Remove 操作三個附帶文字欄位都必須為空字串，且欄位限制必須與控制模型
 執行期驗證一致。離線重播的 Upsert 必須保留原卡片的 `loudness_live_update`
-選擇並寫入相同的 wire byte 84；Remove 不攜帶此旗標。
+選擇並寫入相同的 wire byte 84；Remove 不攜帶此旗標。序列化只在 true 寫出該欄位，
+false 或預設值保持欄位省略，讓檔案內容與「缺少即 false」的載入契約一致。
 全部成功才回報「引擎已同步」，
 同時保留先前捨棄數量並清空持久化佇列；中途失敗則保留剩餘操作與其持久化狀態，誠實顯示降級
 狀態，待下一次連線再補送。此重播只使用既有 `SceneCatalogCommandV1` wire format 與 Ack 語意，
