@@ -587,6 +587,12 @@ VolumeNotificationResult AudioEngineModel::apply_windows_volume(
                : VolumeNotificationResult::Invalid;
 }
 
+OutputGroupVolumeStateV1 AudioEngineModel::volume_state(
+    const std::string_view output_group) const noexcept {
+    return volume_bank_ != nullptr ? volume_bank_->state(output_group)
+                                   : OutputGroupVolumeStateV1{};
+}
+
 bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
                                float* const output_interleaved,
                                const std::size_t frames) noexcept {
@@ -637,6 +643,37 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
                          -1.0, sample_rate_.load(std::memory_order_relaxed))
                    : 1.0F);
     }
+    return true;
+}
+
+bool AudioEngineModel::process_f64(const std::span<const RtLaneInputF64V1> inputs,
+                                   double* const output_interleaved,
+                                   const std::size_t frames) noexcept {
+    if (frames == 0U || output_interleaved == nullptr) return false;
+    if (!has_active_graph_ ||
+        (active_graph_.sample_format != kGraphSampleFormatFloat32V1 &&
+         active_graph_.sample_format != kGraphSampleFormatFloat64V1) ||
+        !process_graph_f64(active_graph_, inputs, output_interleaved, frames)) {
+        return false;
+    }
+    if (!apply_group_master_f64("main", output_interleaved, frames)) return false;
+    return true;
+}
+
+bool AudioEngineModel::process_output_group_f64(
+    const std::string_view output_group,
+    const std::span<const RtLaneInputF64V1> inputs,
+    double* const output_interleaved,
+    const std::size_t frames) noexcept {
+    if (output_group.empty() || frames == 0U || output_interleaved == nullptr) return false;
+    if (!has_active_graph_ ||
+        (active_graph_.sample_format != kGraphSampleFormatFloat32V1 &&
+         active_graph_.sample_format != kGraphSampleFormatFloat64V1) ||
+        !process_graph_for_output_group_f64(active_graph_, output_group, inputs,
+                                            output_interleaved, frames)) {
+        return false;
+    }
+    if (!apply_group_master_f64(output_group, output_interleaved, frames)) return false;
     return true;
 }
 
@@ -969,6 +1006,33 @@ bool AudioEngineModel::apply_group_master(const std::string_view output_group,
     return volume_bank_ != nullptr && volume_bank_->apply_to_interleaved(
         output_group, output_interleaved, frames, active_graph_.output_channels,
         sample_rate_.load(std::memory_order_relaxed));
+}
+
+bool AudioEngineModel::apply_group_master_f64(
+    const std::string_view output_group,
+    double* const output_interleaved,
+    const std::size_t frames) noexcept {
+    if (active_graph_.strict_direct) return true;
+    if (volume_bank_ == nullptr) return false;
+    const auto channel_count = active_graph_.output_channels;
+    if (channel_count == 0U || channel_count > 8U) return false;
+    for (std::size_t frame = 0U; frame < frames; ++frame) {
+        auto* const output_frame =
+            output_interleaved + frame * static_cast<std::size_t>(channel_count);
+        std::array<float, 8> float_frame{};
+        for (std::uint32_t channel = 0U; channel < channel_count; ++channel) {
+            float_frame[channel] = static_cast<float>(output_frame[channel]);
+        }
+        if (!volume_bank_->apply_to_interleaved(
+                output_group, float_frame.data(), 1U, channel_count,
+                sample_rate_.load(std::memory_order_relaxed))) {
+            return false;
+        }
+        for (std::uint32_t channel = 0U; channel < channel_count; ++channel) {
+            output_frame[channel] = static_cast<double>(float_frame[channel]);
+        }
+    }
+    return true;
 }
 
 bool AudioEngineModel::apply_ir(const std::string_view output_group,
