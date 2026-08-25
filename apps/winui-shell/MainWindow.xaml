@@ -341,6 +341,7 @@
                             </Border>
                         </StackPanel>
                         <ToggleSwitch Header="靜音" IsOn="{Binding Muted, Mode=TwoWay}" AutomationProperties.Name="靜音" AutomationProperties.HelpText="淡出目前輸出並保留音量設定" />
+                        <TextBlock Text="{Binding ListeningDose.StateText}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.Name="今日聆聽劑量" AutomationProperties.LiveSetting="Polite" />
                         <Border Style="{StaticResource SectionCardStyle}" Margin="0,4,0,0" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
                             <StackPanel Spacing="12">
                                 <Grid ColumnSpacing="10">
