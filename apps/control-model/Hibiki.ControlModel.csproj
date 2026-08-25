@@ -6,4 +6,7 @@
     <AssemblyName>Hibiki.ControlModel</AssemblyName>
     <RootNamespace>Hibiki.ControlModel</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Hibiki.ControlModel.Check" />
+  </ItemGroup>
 </Project>

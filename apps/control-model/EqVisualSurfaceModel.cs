@@ -45,12 +45,14 @@ public sealed class EqVisualSurfaceModelV1 : INotifyPropertyChanged
     public const int MinPoints = 4;
     public const int MaxPoints = 32;
     private const double TransitionSeconds = 0.18;
+    internal static readonly DateTimeOffset EpochUtc = new(2020, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     private IReadOnlyList<EqVisualPointV1> _points =
         new EqVisualPointV1[] { new(31, 0), new(250, 0), new(1000, 0), new(8000, 0) };
     private IReadOnlyList<EqVisualPointV1> _targetPoints = _initialPoints();
     private EqVisualSourceV1 _source = EqVisualSourceV1.None;
     private DateTimeOffset _transitionStartUtc = DateTimeOffset.MinValue;
+    private Func<DateTimeOffset> _utcNowProvider = static () => DateTimeOffset.UtcNow;
     private bool _hasConfirmedFrame;
     private ulong _lastAppliedSequence;
 
@@ -77,7 +79,7 @@ public sealed class EqVisualSurfaceModelV1 : INotifyPropertyChanged
                 {
                     EqVisualSourceV1.EqualLoudness => "等響度：尚未確認；不顯示變化",
                     EqVisualSourceV1.AdaptiveCorrection => "自適應校正：尚未確認；不顯示變化",
-                    _ => "等化器：等待引擎確認",
+                    _ => "等化器：離線；等待引擎確認",
                 };
             }
             return Source switch
@@ -94,9 +96,14 @@ public sealed class EqVisualSurfaceModelV1 : INotifyPropertyChanged
         get
         {
             if (_transitionStartUtc == DateTimeOffset.MinValue) return 1.0;
-            var seconds = (DateTimeOffset.UtcNow - _transitionStartUtc).TotalSeconds;
+            var seconds = (_utcNowProvider() - _transitionStartUtc).TotalSeconds;
             return Math.Clamp(seconds / TransitionSeconds, 0.0, 1.0);
         }
+    }
+
+    public void SetTransitionClockForTesting(Func<DateTimeOffset>? utcNowProvider)
+    {
+        _utcNowProvider = utcNowProvider ?? (static () => DateTimeOffset.UtcNow);
     }
 
     public bool ApplyFrame(EqVisualFrameV1 frame)
@@ -112,7 +119,7 @@ public sealed class EqVisualSurfaceModelV1 : INotifyPropertyChanged
         _points = start;
         _targetPoints = target;
         _source = source;
-        _transitionStartUtc = DateTimeOffset.UtcNow;
+        _transitionStartUtc = _utcNowProvider();
         _hasConfirmedFrame = true;
         _lastAppliedSequence = frame.Sequence;
         OnPropertyChanged(nameof(Points));

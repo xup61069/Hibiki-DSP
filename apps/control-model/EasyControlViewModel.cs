@@ -1588,6 +1588,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         }
         SetConnectionState(ControlConnectionState.Disconnected);
         _ = EqSurface.Reset();
+        OnPropertyChanged(nameof(EqSurface));
     }
 
     public async Task<bool> OneTapEnhanceAsync(CancellationToken cancellationToken = default)
