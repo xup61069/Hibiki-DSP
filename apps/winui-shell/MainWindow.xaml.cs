@@ -28,6 +28,7 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         RootGrid.DataContext = ViewModel;
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        EqVisualCanvas.SizeChanged += OnEqVisualCanvasSizeChanged;
         ConfigureTitleBar();
 #endif
         Closed += OnClosed;
@@ -61,6 +62,12 @@ public sealed partial class MainWindow : Window
     }
 
 #if !HIBIKI_COMPATIBILITY_PREVIEW
+    private void OnEqVisualCanvasSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        RefreshEqVisualCanvas();
+        StartEqVisualTransitionTimer();
+    }
+
     private void RefreshEqVisualCanvas()
     {
         if (EqVisualCanvas is null) return;
