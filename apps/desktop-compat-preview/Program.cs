@@ -57,6 +57,9 @@ internal sealed class PreviewForm : Form
     private readonly TrackBar _irStrength = new() { Minimum = 0, Maximum = 100, TickFrequency = 10, Width = 460, AccessibleName = "IR 強度百分比" };
     private readonly Label _irStatus = new() { AutoSize = false, Width = 550, Height = 58 };
     private readonly Label _eqStatus = new() { AutoSize = false, Width = 550, Height = 32, AccessibleName = "等化器視覺狀態" };
+    private readonly Label _safetyStatus = new() { AutoSize = true, AccessibleName = "安全上限狀態" };
+    private readonly Label _deviceSwitchStatus = new() { AutoSize = true, AccessibleName = "裝置切換狀態" };
+    private readonly Label _lastSendDiagnostics = new() { AutoSize = false, Width = 550, Height = 32, AccessibleName = "最近命令診斷" };
     private readonly Button _loadIr = new() { Text = "載入 IR WAV 並準備", AutoSize = true, AccessibleName = "載入 IR WAV 並準備" };
     private readonly TrackBar _volume = new() { Minimum = -60, Maximum = 0, TickFrequency = 5, Width = 460, AccessibleName = "主音量分貝" };
     private readonly Button _enhance = new() { Text = "一鍵改善", AutoSize = true, Margin = new Padding(3, 12, 3, 3), AccessibleName = "一鍵改善" };
@@ -174,6 +177,9 @@ internal sealed class PreviewForm : Form
         _volume.ValueChanged += async (_, _) => { _viewModel.RequestedVolumeDb = _volume.Value; if (_viewModel.IsConnected) await _viewModel.QueueVolumeAsync(); RefreshView(); };
         panel.Controls.Add(_volume);
         panel.Controls.Add(_effective);
+        panel.Controls.Add(_safetyStatus);
+        panel.Controls.Add(_deviceSwitchStatus);
+        panel.Controls.Add(_lastSendDiagnostics);
         panel.Controls.Add(_routes);
         panel.Controls.Add(new Label { Text = "Expert App／工作階段（需以 -EnableSessionRouting 啟動）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
         panel.Controls.Add(_sessions);
@@ -428,6 +434,11 @@ internal sealed class PreviewForm : Form
         _loadIr.Enabled = _viewModel.IsConnected && _viewModel.IrPhaseMode != IrPhaseMode.Bypass;
         _irStrength.Enabled = _viewModel.IrPhaseMode is IrPhaseMode.MixedPhase or IrPhaseMode.LinearPhase;
         _effective.Text = $"實際有效音量：{_viewModel.EffectiveVolumeDb:0.0} dB；{_viewModel.VolumeOriginText}；{_viewModel.VolumeActuatorText}";
+        _safetyStatus.Text = _viewModel.SafetyStatusText;
+        _deviceSwitchStatus.Text = _viewModel.DeviceSwitchStatusText;
+        _lastSendDiagnostics.Text = string.IsNullOrEmpty(_viewModel.LastSendDiagnostics)
+            ? "最近命令診斷：無異常紀錄"
+            : $"最近命令診斷：{_viewModel.LastSendDiagnostics}";
         _routes.Text = _viewModel.Expert.RouteHealthAccessibleSummary;
         _status.Text = _viewModel.StatusText;
         _eqStatus.Text = _viewModel.EqSurface.StateText;
