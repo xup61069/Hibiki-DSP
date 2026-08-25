@@ -527,6 +527,66 @@ int main() {
                                                   64U, 1U));
     CHECK(no_bass_controller.status().bass_correction_gain_db == 0.0);
 
+    // Night-mode compressor policy bounds and behaviour: invalid knee or
+    // reduction limits fail closed; high crest-factor content is attenuated,
+    // steady tones are not, telemetry remains finite, and reset parks the
+    // reduction at zero.
+    ProgramAwareLevelPolicyV1 night_policy{};
+    night_policy.enabled = true;
+    night_policy.night_compression_enabled = true;
+    night_policy.night_compression_max_reduction_db = 9.0;
+    night_policy.night_compression_knee_db = 12.0;
+    CHECK(validate_program_aware_policy(night_policy));
+    auto invalid_night = night_policy;
+    invalid_night.night_compression_knee_db = 5.9;
+    CHECK(!validate_program_aware_policy(invalid_night));
+    invalid_night.night_compression_knee_db = 30.1;
+    CHECK(!validate_program_aware_policy(invalid_night));
+    invalid_night.night_compression_knee_db = 12.0;
+    invalid_night.night_compression_max_reduction_db = 24.1;
+    CHECK(!validate_program_aware_policy(invalid_night));
+    invalid_night.night_compression_max_reduction_db =
+        std::numeric_limits<double>::quiet_NaN();
+    CHECK(!validate_program_aware_policy(invalid_night));
+
+    ProgramAwareLevelControllerV1 night_controller;
+    CHECK(night_controller.configure(night_policy, 48000U));
+    constexpr std::size_t kNightBlockFrames = 480U;
+    for (std::size_t repeat = 0U; repeat < 20U; ++repeat) {
+        std::array<float, 2 * kNightBlockFrames> dynamic_block{};
+        for (std::size_t frame = 0U; frame < kNightBlockFrames; ++frame) {
+            const double phase = static_cast<double>(repeat * kNightBlockFrames + frame);
+            const double quiet_rms = 0.03 *
+                std::sin(2.0 * 3.14159265358979323846 * 500.0 * phase / 48000.0);
+            double sample_value = quiet_rms;
+            if (frame >= kNightBlockFrames - 4U) {
+                sample_value = (frame % 2U) == 0U ? 0.95 : -0.95;
+            }
+            dynamic_block[frame] = static_cast<float>(sample_value);
+        }
+        CHECK(night_controller.process_interleaved(dynamic_block.data(),
+                                                   kNightBlockFrames, 1U));
+        CHECK(std::isfinite(night_controller.status().night_compression_gain_db));
+        const auto night_telemetry = night_controller.read_telemetry();
+        CHECK(night_telemetry.valid &&
+              std::isfinite(night_telemetry.night_compression_gain_db));
+    }
+    CHECK(night_controller.status().night_compression_gain_db < -0.5 &&
+          night_controller.status().night_compression_gain_db >= -9.0);
+
+    night_controller.reset();
+    CHECK(night_controller.status().night_compression_gain_db == 0.0);
+    std::array<float, 4800> steady_night_tone{};
+    for (std::size_t frame = 0U; frame < steady_night_tone.size(); ++frame) {
+        steady_night_tone[frame] = static_cast<float>(
+            0.25 * std::sin(2.0 * 3.14159265358979323846 * 1000.0 *
+                            static_cast<double>(frame) / 48000.0));
+    }
+    CHECK(night_controller.process_interleaved(steady_night_tone.data(),
+                                               steady_night_tone.size(), 1U));
+    CHECK(night_controller.status().night_compression_gain_db > -0.1 &&
+          night_controller.status().night_compression_gain_db <= 0.0);
+
     PeqProcessorV1 peq;
     const std::array<PeqFilterV1, 1> peq_filters{{PeqFilterV1{1000.0, 6.0, 1.0}}};
     CHECK(peq.prepare(peq_filters, 48000U, 2U));
