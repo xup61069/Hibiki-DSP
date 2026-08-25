@@ -10,6 +10,50 @@ $ErrorActionPreference = 'Stop'
 
 $interactiveControlPattern = '(?ms)<(?<type>Button|ComboBox|Slider|ToggleSwitch|CheckBox|TextBox|NumberBox)\b(?<attributes>[^>]*?)(?:/?>)'
 
+# WinUI/XamlControlsResources built-in keys that are resolved by the framework at
+# runtime and therefore do not need a local x:Key definition. Keep this list
+# explicit: an unknown framework resource must fail closed so typos stay caught.
+$script:builtInStaticResourceKeys = @(
+  'AccentButtonStyle',
+  'SystemAccentColor',
+  'SystemAccentColorLight1'
+)
+
+function Get-XamlResourceDefinitions([string]$xaml) {
+  $keys = @{}
+  foreach ($match in [regex]::Matches($xaml, '(?i)x:Key\s*=\s*"(?<key>[^"]*)"')) {
+    $keys[$match.Groups['key'].Value] = $true
+  }
+  return @($keys.Keys)
+}
+
+function Get-XamlStaticResourceReferences([string]$xaml) {
+  $refs = @()
+  foreach ($match in [regex]::Matches($xaml, '\{\s*StaticResource\s+(?<key>[^}]+?)\s*\}')) {
+    $refs += $match.Groups['key'].Value
+  }
+  return @($refs)
+}
+
+function Assert-StaticResourcesDefined {
+  param(
+    [Parameter(Mandatory)][string]$Xaml,
+    [Parameter(Mandatory)][string]$SourceName,
+    [AllowEmptyCollection()][string[]]$KnownKeys = @()
+  )
+  $known = @{}
+  foreach ($key in (Get-XamlResourceDefinitions $Xaml)) { $known[$key] = $true }
+  foreach ($key in $KnownKeys) { $known[$key] = $true }
+  $missing = @(Get-XamlStaticResourceReferences $Xaml |
+    Where-Object { -not $known.ContainsKey($_) } |
+    Select-Object -Unique)
+  if ($missing.Count -gt 0) {
+    throw ("Undefined StaticResource reference(s) in " + $SourceName + ": " + ($missing -join ', ') +
+      ". Add the x:Key definition or extend the framework allowlist only for real WinUI built-ins.")
+  }
+  return $missing.Count
+}
+
 function Get-InteractiveControlOpenings([string]$xaml) {
   foreach ($match in [regex]::Matches($xaml, $script:interactiveControlPattern)) {
     $line = 1 + @($xaml.Substring(0, $match.Index) -split "`n").Count - 1
@@ -178,7 +222,34 @@ if ($SelfTest) {
   }
   if (-not $desktopEmptyCaught) { throw 'DesktopCompat accessibility self-test expected an empty-name failure.' }
 
-  Write-Output 'WinUI interactive-control accessibility self-test passed (10 cases).'
+  $resourceValid = @'
+<StackPanel>
+  <StackPanel.Resources>
+    <SolidColorBrush x:Key="LocalBrush" Color="Red" />
+  </StackPanel.Resources>
+  <Border Background="{StaticResource LocalBrush}" />
+  <Button Style="{StaticResource AccentButtonStyle}" AutomationProperties.Name="OK" />
+</StackPanel>
+'@
+  if ((Assert-StaticResourcesDefined $resourceValid 'selftest-resource-valid.xaml' $script:builtInStaticResourceKeys) -ne 0) {
+    throw 'WinUI StaticResource self-test expected the valid XAML to pass.'
+  }
+
+  $resourceMissing = '<TextBlock Text="{StaticResource MissingBrush}" />'
+  $resourceMissingCaught = $false
+  try {
+    [void](Assert-StaticResourcesDefined $resourceMissing 'selftest-resource-missing.xaml' @())
+  } catch {
+    $resourceMissingCaught = $true
+    if ($_.Exception.Message -notmatch 'Undefined StaticResource reference\(s\) in selftest-resource-missing\.xaml: MissingBrush') { throw }
+  }
+  if (-not $resourceMissingCaught) { throw 'WinUI StaticResource self-test expected an undefined-reference failure.' }
+
+  if ((Assert-StaticResourcesDefined '<Border Background="{StaticResource SystemAccentColor}" />' 'selftest-resource-allowlist.xaml' @('SystemAccentColor')) -ne 0) {
+    throw 'WinUI StaticResource self-test expected the allowlisted framework key to pass.'
+  }
+
+  Write-Output 'WinUI interactive-control accessibility and StaticResource self-test passed (13 cases).'
   exit 0
 }
 
@@ -203,6 +274,24 @@ $lockVersion = [regex]::Match($lock, 'app_sdk:\s*"([^"]+)"').Groups[1].Value
 if ([string]::IsNullOrWhiteSpace($projectVersion) -or $projectVersion -ne $lockVersion) {
   throw "WinUI App SDK version $projectVersion does not match toolchain lock $lockVersion."
 }
+
+$xamlFiles = @(Get-ChildItem (Join-Path $repo 'apps') -Recurse -Filter '*.xaml' -File)
+if ($xamlFiles.Count -eq 0) { throw 'WinUI StaticResource scan found no XAML files.' }
+$allDefinitions = @{}
+foreach ($xamlFile in $xamlFiles) {
+  $fileXamlForDefs = Get-Content -LiteralPath $xamlFile.FullName -Raw
+  foreach ($definedKey in (Get-XamlResourceDefinitions $fileXamlForDefs)) {
+    $allDefinitions[$definedKey] = $true
+  }
+}
+$undefinedResourceCount = 0
+foreach ($xamlFile in $xamlFiles) {
+  $fileXaml = Get-Content -LiteralPath $xamlFile.FullName -Raw
+  $sourceLabel = [System.IO.Path]::GetRelativePath($repo, $xamlFile.FullName) -replace '\\', '/'
+  $knownKeys = @($script:builtInStaticResourceKeys) + @($allDefinitions.Keys)
+  $undefinedResourceCount += Assert-StaticResourcesDefined $fileXaml $sourceLabel $knownKeys
+}
+Write-Output "WinUI StaticResource scan: $($xamlFiles.Count) files checked; undefined references fail closed."
 
 $xaml = Get-Content (Join-Path $shell 'MainWindow.xaml') -Raw
 $codeBehind = Get-Content (Join-Path $shell 'MainWindow.xaml.cs') -Raw
