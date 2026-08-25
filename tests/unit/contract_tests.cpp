@@ -4671,6 +4671,183 @@ int main() {
         CHECK(std::abs(loudness_scene_worker.active_loudness().reference_phon -
                        80.0) < 1e-12);
     }
+
+    // Program-aware level is a fixed-capacity output attachment. The Movie
+    // scene enables a bounded -23 dBFS proxy; per-group isolation,
+    // fail-closed validation, Strict Direct bypass and transactional clear
+    // mirror the loudness PEQ contract. The proxy is rate-limited user-space
+    // evidence, never BS.1770 conformance.
+    {
+        auto pa_engine = std::make_unique<AudioEngineModel>();
+        GraphConfigV1 pa_graph;
+        pa_graph.lanes.push_back(LaneConfigV1{"pa-main", "main", 2, 0.0, true});
+        pa_graph.lanes.push_back(LaneConfigV1{"pa-side", "side", 2, 0.0, true});
+        pa_graph.strict_direct = false;
+        CHECK(pa_engine->prepare_graph(pa_graph, 1U) && pa_engine->commit_graph());
+        pa_engine->set_sample_rate(48000U);
+
+        ProgramAwareLevelPolicyV1 pa_policy{};
+        pa_policy.enabled = true;
+        pa_policy.target_dbfs = -23.0;
+        pa_policy.max_boost_db = 6.0;
+        pa_policy.max_cut_db = 12.0;
+        // Minimum legal window plus maximum legal slew keep the bounded
+        // proxy responsive inside one deterministic test block.
+        pa_policy.analysis_window_ms = 100.0;
+        pa_policy.max_rate_db_per_second = 60.0;
+        CHECK(pa_engine->program_aware_transaction_idle());
+        CHECK(!pa_engine->prepare_program_aware("missing", pa_policy));
+        ProgramAwareLevelPolicyV1 invalid_pa = pa_policy;
+        invalid_pa.schema_version = 2U;
+        CHECK(!pa_engine->prepare_program_aware("main", invalid_pa));
+        ProgramAwareLevelPolicyV1 bad_slew = pa_policy;
+        bad_slew.max_rate_db_per_second = 0.0;
+        CHECK(!pa_engine->prepare_program_aware("main", bad_slew));
+        CHECK(!pa_engine->has_active_program_aware("main"));
+        CHECK(pa_engine->program_aware_transaction_idle());
+
+        std::array<float, 2048> pa_input{};
+        std::array<float, 2048> pa_output{};
+        for (std::size_t frame_index = 0U; frame_index < 1024U; ++frame_index) {
+            const float sample = (frame_index % 64U) < 32U ? 0.5F : -0.5F;
+            pa_input[frame_index * 2U] = sample;
+            pa_input[frame_index * 2U + 1U] = -sample;
+        }
+        const RtLaneInputV1 pa_view{pa_input.data(), 2U};
+        std::array<float, 2048> pa_side_input{};
+        const std::array<RtLaneInputV1, 2> pa_main_views{{
+            pa_view, {pa_side_input.data(), 2U}}};
+
+        // Rollback keeps the attachment inactive; commit attaches only the
+        // selected group.
+        CHECK(pa_engine->prepare_program_aware("main", pa_policy));
+        pa_engine->rollback_program_aware();
+        CHECK(!pa_engine->has_active_program_aware("main"));
+        CHECK(pa_engine->prepare_program_aware("main", pa_policy));
+        CHECK(pa_engine->commit_program_aware() &&
+              pa_engine->has_active_program_aware("main") &&
+              !pa_engine->has_active_program_aware("side"));
+
+        // An identically configured unattached control engine isolates the
+        // shared Group Master ramp so only the program-aware gain differs.
+        auto pa_control_engine = std::make_unique<AudioEngineModel>();
+        GraphConfigV1 pa_control_graph;
+        pa_control_graph.lanes.push_back(LaneConfigV1{"pa-main", "main", 2, 0.0, true});
+        pa_control_graph.lanes.push_back(LaneConfigV1{"pa-side", "side", 2, 0.0, true});
+        CHECK(pa_control_engine->prepare_graph(pa_control_graph, 1U) &&
+              pa_control_engine->commit_graph());
+        pa_control_engine->set_sample_rate(48000U);
+        std::array<float, 2048> pa_reference{};
+        CHECK(pa_control_engine->process_output_group(
+            "main", pa_main_views, pa_reference.data(), 1024U));
+        CHECK(pa_engine->process_output_group(
+            "main", pa_main_views, pa_output.data(), 1024U));
+        CHECK(std::all_of(pa_output.begin(), pa_output.end(),
+                          [](const float value) { return std::isfinite(value); }));
+        const auto block_energy = [](const std::array<float, 2048>& samples) {
+            double sum = 0.0;
+            for (const float value : samples) {
+                sum += static_cast<double>(value) * static_cast<double>(value);
+            }
+            return sum;
+        };
+        // The loud program must be attenuated toward the target while the
+        // bounded limiter stays out of engagement.
+        const double pa_reference_energy = block_energy(pa_reference);
+        const double pa_shaped_energy = block_energy(pa_output);
+        CHECK(pa_reference_energy > 0.0);
+        CHECK(pa_shaped_energy < pa_reference_energy);
+        CHECK(*std::max_element(pa_output.begin(), pa_output.end()) <=
+              *std::max_element(pa_reference.begin(), pa_reference.end()) + 1e-4F);
+
+        // A second group must remain untouched by the main attachment.
+        std::array<float, 512> pa_side_source{};
+        std::array<float, 512> pa_side_output{};
+        for (std::size_t side_frame = 0U; side_frame < 256U; ++side_frame) {
+            const float sample = (side_frame % 32U) < 16U ? 0.125F : -0.125F;
+            pa_side_source[side_frame * 2U] = sample;
+            pa_side_source[side_frame * 2U + 1U] = -sample;
+        }
+        const RtLaneInputV1 pa_side_view{pa_side_source.data(), 2U};
+        const std::array<RtLaneInputV1, 2> pa_side_views{{
+            {pa_side_input.data(), 2U}, pa_side_view}};
+        std::array<float, 512> pa_side_control{};
+        CHECK(pa_control_engine->process_output_group(
+            "side", pa_side_views, pa_side_control.data(), 256U));
+        CHECK(pa_engine->process_output_group(
+            "side", pa_side_views, pa_side_output.data(), 256U));
+        CHECK(pa_side_output == pa_side_control);
+
+        // A committed attachment survives a graph switch, but Strict Direct
+        // render bypasses it.
+        pa_graph.strict_direct = true;
+        CHECK(pa_engine->prepare_graph(pa_graph, 2U) && pa_engine->commit_graph());
+        CHECK(pa_engine->has_active_program_aware("main"));
+        std::array<float, 512> pa_strict_reference{};
+        std::array<float, 512> pa_strict_output{};
+        for (std::size_t strict_frame = 0U; strict_frame < 256U; ++strict_frame) {
+            const float sample = (strict_frame % 32U) < 16U ? 0.125F : -0.125F;
+            pa_strict_reference[strict_frame * 2U] = sample;
+            pa_strict_reference[strict_frame * 2U + 1U] = -sample;
+        }
+        const RtLaneInputV1 pa_strict_main{pa_strict_reference.data(), 2U};
+        const RtLaneInputV1 pa_strict_side{pa_side_input.data(), 2U};
+        const std::array<RtLaneInputV1, 2> pa_strict_views{
+            {pa_strict_main, pa_strict_side}};
+        CHECK(pa_engine->process_output_group(
+            "main", pa_strict_views, pa_strict_output.data(), 256U));
+        CHECK(pa_strict_output == pa_strict_reference);
+
+        // Clear is transactional: rollback keeps the active attachment and
+        // commit detaches the selected output group.
+        pa_graph.strict_direct = false;
+        CHECK(pa_engine->prepare_graph(pa_graph, 3U) && pa_engine->commit_graph());
+        CHECK(pa_engine->prepare_program_aware_clear());
+        pa_engine->rollback_program_aware();
+        CHECK(pa_engine->has_active_program_aware("main"));
+        CHECK(pa_engine->prepare_program_aware_clear());
+        CHECK(pa_engine->commit_program_aware() &&
+              !pa_engine->has_active_program_aware("main"));
+        pa_engine->reset_program_aware_state();
+        CHECK(pa_engine->program_aware_transaction_idle());
+
+        // SceneApply clears any prior attachment in the same control
+        // transaction.
+        CHECK(pa_engine->prepare_program_aware("main", pa_policy));
+        CHECK(pa_engine->commit_program_aware() &&
+              pa_engine->has_active_program_aware("main"));
+        EngineControlWorkerV1 pa_scene_worker(*pa_engine);
+        ControlCommandV1 pa_scene_command{};
+        pa_scene_command.type = IpcMessageType::SceneApply;
+        std::array<std::uint8_t, kSceneApplyPayloadBytesV1> pa_scene_payload{};
+        CHECK(encode_scene_apply_payload_v1("game", "main", pa_scene_payload) &&
+              decode_scene_apply_payload_v1(pa_scene_payload, pa_scene_command.scene));
+        CHECK(pa_scene_worker.consume(pa_scene_command) ==
+              EngineControlResultV1::Applied);
+        CHECK(pa_engine->program_aware_transaction_idle() &&
+              !pa_engine->has_active_program_aware("main"));
+
+        // The Movie factory preset enables the night-mode compressor with
+        // its documented bounded policy.
+        const auto movie_defaults = make_easy_scene(EasySceneKind::Movie, "main");
+        CHECK(movie_defaults.program_aware.enabled);
+        CHECK(std::abs(movie_defaults.program_aware.target_dbfs + 23.0) < 1e-12);
+        CHECK(std::abs(movie_defaults.program_aware.max_cut_db - 12.0) < 1e-12);
+        AudioEngineModel movie_engine;
+        GraphConfigV1 movie_graph;
+        movie_graph.lanes.push_back(LaneConfigV1{"movie-lane", "main", 2, 0.0, true});
+        CHECK(movie_engine.prepare_graph(movie_graph, 1U) &&
+              movie_engine.commit_graph());
+        EngineControlWorkerV1 movie_worker(movie_engine);
+        ControlCommandV1 movie_command{};
+        movie_command.type = IpcMessageType::SceneApply;
+        std::array<std::uint8_t, kSceneApplyPayloadBytesV1> movie_payload{};
+        CHECK(encode_scene_apply_payload_v1("movie", "main", movie_payload) &&
+              decode_scene_apply_payload_v1(movie_payload, movie_command.scene));
+        CHECK(movie_worker.consume(movie_command) == EngineControlResultV1::Applied);
+        CHECK(movie_engine.has_active_program_aware("main") &&
+              movie_engine.program_aware_transaction_idle());
+    }
     AudioEngineModel ir_graph_engine;
     GraphConfigV1 ir_graph;
     ir_graph.lanes.push_back(LaneConfigV1{"ir-lane", "main", 2, 0.0, true});

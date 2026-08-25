@@ -13,6 +13,7 @@
 #include "hibiki/true_peak_limiter.hpp"
 #include "hibiki/windows_wasapi_handoff.hpp"
 #include "hibiki/windows_wasapi_fanout.hpp"
+#include "hibiki/program_loudness.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -81,6 +82,22 @@ public:
         std::string_view output_group = "main") const noexcept;
 
     void reset_loudness_peq_state() noexcept;
+
+    // Program-aware level is an independent fixed-capacity output
+    // attachment. Prepare validates the caller policy on the control worker;
+    // commit is the only RT-visible swap. The callback never allocates,
+    // waits, or reads a path. This is a bounded loudness proxy, not BS.1770
+    // conformance.
+    [[nodiscard]] bool prepare_program_aware(
+        std::string_view output_group,
+        const ProgramAwareLevelPolicyV1& policy) noexcept;
+    [[nodiscard]] bool prepare_program_aware_clear() noexcept;
+    [[nodiscard]] bool commit_program_aware() noexcept;
+    void rollback_program_aware() noexcept;
+    [[nodiscard]] bool program_aware_transaction_idle() const noexcept;
+    [[nodiscard]] bool has_active_program_aware(
+        std::string_view output_group = "main") const noexcept;
+    void reset_program_aware_state() noexcept;
     // True when no IR prepare/clear transaction is pending. SceneApply uses
     // this to decide whether an unchanged calibration reference can keep the
     // current attachment untouched instead of running a clear transaction.
@@ -257,6 +274,18 @@ private:
     bool has_active_loudness_peq_{false};
 
     bool has_pending_loudness_peq_{false};
+
+    struct ProgramAwareAttachmentV1 {
+        bool attached{false};
+        std::uint8_t output_group_bytes{0U};
+        std::array<char, kMaxOutputGroupBytes> output_group{};
+        mutable std::unique_ptr<ProgramAwareLevelBankV1> bank{};
+    };
+
+    ProgramAwareAttachmentV1 active_program_aware_{};
+    ProgramAwareAttachmentV1 pending_program_aware_{};
+    bool has_active_program_aware_{false};
+    bool has_pending_program_aware_{false};
     EngineTransactionState state_{EngineTransactionState::Ready};
     bool has_active_graph_{false};
     bool has_pending_graph_{false};
@@ -274,6 +303,9 @@ private:
     [[nodiscard]] bool apply_loudness_peq(std::string_view output_group,
                                           float* output_interleaved,
                                           std::size_t frames) noexcept;
+    [[nodiscard]] bool apply_program_aware(std::string_view output_group,
+                                            float* output_interleaved,
+                                            std::size_t frames) noexcept;
 };
 
 }  // namespace hibiki

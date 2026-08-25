@@ -10,6 +10,7 @@
 #include "hibiki/session_route_rules.hpp"
 #include "hibiki/windows_audio_session_route.hpp"
 #include "hibiki/windows_device_catalog.hpp"
+#include "hibiki/windows_process_loopback_lane.hpp"
 #include "hibiki/windows_volume_broker.hpp"
 #include "hibiki/windows_volume_link.hpp"
 #include "hibiki/wav_ir.hpp"
@@ -85,6 +86,30 @@ struct TestToneState final {
     double phase{0.0};
     std::uint32_t sample_rate{0U};
     std::uint32_t block_frames{0U};
+};
+
+constexpr std::size_t kMaxProcessDeliverySources = 8U;
+constexpr std::uint32_t kProcessLoopbackMaxFrames = 4096U;
+constexpr std::uint32_t kProcessDeliveryFailureLimit = 100U;
+
+struct ProcessDeliveryLane final {
+    hibiki::WindowsProcessLoopbackSourceV1 source{};
+    std::string lane_id{};
+    std::uint32_t process_id{0U};
+    bool active{false};
+    std::uint32_t consecutive_failures{0U};
+};
+
+struct ProcessDeliveryState final {
+    std::array<ProcessDeliveryLane, kMaxProcessDeliverySources> lanes{};
+    std::vector<float> input_buffer{};
+    std::vector<float> output_buffer{};
+    std::vector<hibiki::RtLaneInputV1> lane_inputs{};
+    hibiki::GraphConfigV1 graph{};
+    hibiki::WindowsProcessLoopbackBlockV1 last_block{};
+    std::uint64_t rendered_blocks{0U};
+    std::uint64_t dropped_blocks{0U};
+    bool graph_ready{false};
 };
 
 bool supported_wasapi_layout(const std::uint32_t channels) noexcept {
@@ -174,6 +199,154 @@ bool render_test_tone(TestToneState& tone,
     return engine.process_output_group_to_wasapi(
         "main", std::span<const hibiki::RtLaneInputV1>(tone.lanes), tone.output.data(),
         tone.block_frames);
+}
+
+// Rebuild the engine graph from the coordinator's current session-route plan.
+// Called only from the control loop (never the RT callback); prepare/commit
+// is transactional so a failed rebuild keeps the previous graph intact.
+bool rebuild_delivery_graph(ProcessDeliveryState& delivery,
+                            hibiki::AudioEngineModel& engine,
+                            const WasapiOutputState& output,
+                            const hibiki::WindowsAudioSessionRouteCoordinatorV1& coordinator) noexcept {
+    if (!output.active || !coordinator.bound()) {
+        delivery.graph_ready = false;
+        return false;
+    }
+    hibiki::GraphConfigV1 candidate{};
+    if (!coordinator.copy_graph(candidate)) return false;
+    if (candidate.lanes.empty()) {
+        // No routed sessions: keep the previous graph (which may be the
+        // test-tone graph or a prior delivery graph) so the sink stays valid.
+        delivery.graph_ready = false;
+        return true;  // No routed sessions yet; not an error.
+    }
+    for (const auto& lane : candidate.lanes) {
+        if (!supported_wasapi_layout(lane.channel_count)) return false;
+    }
+    candidate.output_channels = output.config.channels;
+    engine.set_sample_rate(output.config.sample_rate);
+    // Revision 2: revision 1 was used by prepare_test_tone for its own graph;
+    // delivery uses a separate monotonic value so both transactions stay valid.
+    if (!engine.prepare_graph(candidate, 2U)) {
+        engine.rollback_graph();
+        return false;
+    }
+    if (!engine.commit_graph()) {
+        engine.rollback_graph();
+        return false;
+    }
+    try {
+        delivery.graph = std::move(candidate);
+    } catch (...) {
+        return false;
+    }
+    delivery.lane_inputs.assign(delivery.graph.lanes.size(), hibiki::RtLaneInputV1{});
+    delivery.graph_ready = true;
+    return true;
+}
+
+// Synchronise process-loopback capture sources with the coordinator's plan.
+// Stops sources whose PID/lane pair disappeared, then starts new ones in free
+// slots. Sources are worker-owned COM objects; this runs on the control thread.
+void sync_delivery_sources(ProcessDeliveryState& delivery,
+                           const hibiki::WindowsAudioSessionRouteCoordinatorV1& coordinator) noexcept {
+    hibiki::ProcessLoopbackPlanV1 plan{};
+    const auto result = coordinator.copy_process_loopback_plan(plan);
+    if (result != hibiki::ProcessLoopbackPlanResultV1::Applied &&
+        result != hibiki::ProcessLoopbackPlanResultV1::NoRoutes) {
+        return;  // Ambiguous/capacity failures keep existing sources unchanged.
+    }
+
+    // Deactivate sources no longer present in the current plan.
+    for (auto& entry : delivery.lanes) {
+        if (!entry.active) continue;
+        bool found = false;
+        for (std::size_t i = 0U; i < plan.size; ++i) {
+            if (plan.entries[i].process_id == entry.process_id &&
+                plan.entries[i].lane_id == entry.lane_id) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            entry.source.stop();
+            entry.active = false;
+            entry.process_id = 0U;
+            entry.consecutive_failures = 0U;
+        }
+    }
+
+    // Start new sources for requests that do not already have an active slot.
+    std::size_t next_slot = 0U;
+    for (std::size_t i = 0U; i < plan.size && next_slot < kMaxProcessDeliverySources; ++i) {
+        const auto& request = plan.entries[i];
+        bool already_active = false;
+        for (auto& entry : delivery.lanes) {
+            if (entry.active && entry.process_id == request.process_id &&
+                entry.lane_id == request.lane_id) {
+                already_active = true;
+                break;
+            }
+        }
+        if (already_active) continue;
+        while (next_slot < kMaxProcessDeliverySources && delivery.lanes[next_slot].active) {
+            ++next_slot;
+        }
+        if (next_slot >= kMaxProcessDeliverySources) break;
+        auto& slot = delivery.lanes[next_slot];
+        hibiki::WindowsProcessLoopbackConfigV1 config{};
+        config.process_id = request.process_id;
+        config.include_process_tree = request.include_process_tree;
+        if (SUCCEEDED(slot.source.start(config))) {
+            slot.lane_id = request.lane_id;
+            slot.process_id = request.process_id;
+            slot.active = true;
+            slot.consecutive_failures = 0U;
+        }
+        ++next_slot;
+    }
+}
+
+// Poll each active source once per control-loop iteration. Each successful
+// read feeds one block through the lane graph into the WASAPI sink handoff.
+// This never blocks: source.read() is non-blocking by contract.
+void poll_and_deliver(ProcessDeliveryState& delivery,
+                      hibiki::AudioEngineModel& engine,
+                      const SessionRoutingState& routing) noexcept {
+    if (!delivery.graph_ready || !routing.requested || !routing.bound) return;
+    for (auto& entry : delivery.lanes) {
+        if (!entry.active) continue;
+        std::size_t lane_index = SIZE_MAX;
+        for (std::size_t li = 0U; li < delivery.graph.lanes.size(); ++li) {
+            if (delivery.graph.lanes[li].id == entry.lane_id) {
+                lane_index = li;
+                break;
+            }
+        }
+        if (lane_index == SIZE_MAX) continue;
+        const auto snapshot_before = entry.source.snapshot();
+        if (snapshot_before.state != hibiki::WindowsProcessLoopbackStateV1::Running) {
+            ++entry.consecutive_failures;
+            if (entry.consecutive_failures > kProcessDeliveryFailureLimit) {
+                entry.source.stop();
+                entry.active = false;
+                entry.process_id = 0U;
+            }
+            continue;
+        }
+        const bool ok = hibiki::process_windows_process_loopback_lane_v1(
+            engine, entry.source, lane_index,
+            delivery.input_buffer.data(), kProcessLoopbackMaxFrames,
+            std::span<hibiki::RtLaneInputV1>(delivery.lane_inputs),
+            delivery.output_buffer.data(), kProcessLoopbackMaxFrames,
+            delivery.last_block, /*to_wasapi=*/true);
+        if (ok) {
+            ++delivery.rendered_blocks;
+            entry.consecutive_failures = 0U;
+        } else {
+            ++delivery.dropped_blocks;
+        }
+    }
 }
 
 bool has_rendered_blocks(const hibiki::WasapiSinkHandoffSnapshotV1& snapshot) noexcept {
@@ -588,6 +761,15 @@ int wmain(const int argc, wchar_t* const* argv) {
         has_command_line_flag(argc, argv, L"--enable-wasapi-output");
     const bool test_tone_requested =
         has_command_line_flag(argc, argv, L"--enable-test-tone");
+    const bool process_delivery_requested =
+        has_command_line_flag(argc, argv, L"--enable-process-delivery");
+    if (process_delivery_requested && (!wasapi_output_requested || !session_routing_requested)) {
+        // Fail-closed: process delivery needs both a WASAPI sink and session
+        // routing to be meaningful. Refuse to start rather than silently
+        // running with a half-enabled path.
+        (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+        return 2;
+    }
 
     hibiki::AudioEngineModel engine;
     hibiki::EngineControlWorkerV1 control_worker{engine};
@@ -604,6 +786,14 @@ int wmain(const int argc, wchar_t* const* argv) {
     wasapi_output.engine = &engine;
     wasapi_output.requested = wasapi_output_requested;
     TestToneState test_tone;
+    ProcessDeliveryState process_delivery;
+    if (process_delivery_requested) {
+        process_delivery.input_buffer.resize(
+            static_cast<std::size_t>(kProcessLoopbackMaxFrames) * 2U);
+        process_delivery.output_buffer.resize(
+            static_cast<std::size_t>(kProcessLoopbackMaxFrames) *
+            static_cast<std::size_t>(kTestToneMaxOutputChannels));
+    }
     const HRESULT com_result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     const bool com_initialized = SUCCEEDED(com_result) || com_result == RPC_E_CHANGED_MODE;
     IMMDeviceEnumerator* device_enumerator = nullptr;
@@ -627,6 +817,10 @@ int wmain(const int argc, wchar_t* const* argv) {
                                     : false;
     if (wasapi_started && test_tone_requested) {
         (void)prepare_test_tone(test_tone, wasapi_output, engine);
+    }
+    if (wasapi_started && session_routing_requested && process_delivery_requested) {
+        (void)rebuild_delivery_graph(process_delivery, engine, wasapi_output,
+                                     session_routing.coordinator);
     }
     const auto initial_wasapi_snapshot = engine.wasapi_output_snapshot();
     const std::string catalog_detail = physical_catalog_ready
@@ -766,6 +960,11 @@ int wmain(const int argc, wchar_t* const* argv) {
             }
             next_session_poll = now + std::chrono::milliseconds{250};
         }
+        if (process_delivery_requested && now >= next_session_poll) {
+            (void)rebuild_delivery_graph(process_delivery, engine, wasapi_output,
+                                         session_routing.coordinator);
+            sync_delivery_sources(process_delivery, session_routing.coordinator);
+        }
         if (system_volume_requested && device_enumerator != nullptr && now >= next_volume_poll) {
             const auto bind_result = rebind_default_volume_if_changed(
                 device_enumerator, system_volume.broker, system_volume.bound);
@@ -797,6 +996,9 @@ int wmain(const int argc, wchar_t* const* argv) {
         }
         (void)control_worker.drain(host.command_queue());
         (void)drain_session_commands(session_routing);
+        if (process_delivery_requested) {
+            poll_and_deliver(process_delivery, engine, session_routing);
+        }
         if (system_volume_requested && system_volume.bound &&
             system_volume.have_last_engine_state && now >= next_volume_write) {
             const auto current_engine_state = engine.volume();
@@ -880,7 +1082,14 @@ int wmain(const int argc, wchar_t* const* argv) {
                     : std::string_view("session catalog linked; per-App controls enabled; delivery unverified.");
         const auto process_detail = !session_routing_requested
             ? std::string_view("session routing disabled; process source is not bound.")
-            : std::string_view("process-tree source remains worker-owned; physical delivery unverified.");
+            : !process_delivery_requested
+                ? std::string_view(
+                      "process-tree source remains worker-owned; physical delivery unverified.")
+                : (process_delivery.rendered_blocks > 0U
+                       ? std::string_view(
+                             "per-App process delivery active; blocks rendered through WASAPI sink.")
+                       : std::string_view(
+                             "per-App process delivery enabled; waiting for captured audio."));
         const auto previous_session_route = status.routes[4U];
         const auto previous_process_route = status.routes[5U];
         set_route(status.routes[4U], "windows-session", "Windows App／Session", session_detail,

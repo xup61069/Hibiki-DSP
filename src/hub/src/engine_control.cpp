@@ -131,11 +131,13 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
         SceneProfileV1 candidate_scene{};
         GraphConfigV1 candidate_graph{};
         EqualLoudnessPolicyV1 candidate_loudness{};
+        ProgramAwareLevelPolicyV1 candidate_program_aware{};
         if (scene_kind_from_id(scene_id, kind)) {
             auto candidate = make_easy_scene(kind, std::string(output_group));
             candidate_scene = std::move(candidate.scene);
             candidate_graph = std::move(candidate.graph);
             candidate_loudness = candidate.loudness;
+            candidate_program_aware = candidate.program_aware;
         } else {
             if (active_scene_catalog() == nullptr) return EngineControlResultV1::Invalid;
             const auto* const definition = active_scene_catalog()->find(scene_id);
@@ -145,6 +147,8 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             candidate_scene = definition->scene;
             candidate_graph = definition->graph;
             candidate_loudness = definition->loudness;
+            // Custom catalog scenes do not yet carry a program-aware policy;
+            // the attachment stays cleared for them.
         }
         if (scene_preflight_ != nullptr &&
             !scene_preflight_(candidate_scene, scene_preflight_context_)) {
@@ -172,6 +176,7 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
                 engine_.rollback_graph();
                 engine_.rollback_ir();
                 engine_.rollback_loudness_peq();
+                engine_.rollback_program_aware();
                 return EngineControlResultV1::Failed;
             }
         }
@@ -179,6 +184,22 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             engine_.rollback_graph();
             engine_.rollback_ir();
             engine_.rollback_loudness_peq();
+            engine_.rollback_program_aware();
+            return EngineControlResultV1::Failed;
+        }
+        if (!engine_.prepare_program_aware_clear()) {
+            engine_.rollback_graph();
+            engine_.rollback_ir();
+            engine_.rollback_loudness_peq();
+            engine_.rollback_program_aware();
+            return EngineControlResultV1::Failed;
+        }
+        if (candidate_program_aware.enabled &&
+            !engine_.prepare_program_aware(output_group, candidate_program_aware)) {
+            engine_.rollback_graph();
+            engine_.rollback_ir();
+            engine_.rollback_loudness_peq();
+            engine_.rollback_program_aware();
             return EngineControlResultV1::Failed;
         }
         std::swap(active_scene_, candidate_scene);
@@ -189,6 +210,7 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             engine_.rollback_graph();
             engine_.rollback_ir();
             engine_.rollback_loudness_peq();
+            engine_.rollback_program_aware();
             return EngineControlResultV1::Failed;
         }
         if (!keep_referenced_ir && !engine_.commit_ir()) {
@@ -197,6 +219,7 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             engine_.rollback_graph();
             engine_.rollback_ir();
             engine_.rollback_loudness_peq();
+            engine_.rollback_program_aware();
             return EngineControlResultV1::Failed;
         }
         if (!engine_.commit_loudness_peq()) {
@@ -205,6 +228,18 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             engine_.rollback_graph();
             engine_.rollback_ir();
             engine_.rollback_loudness_peq();
+            engine_.rollback_program_aware();
+            return EngineControlResultV1::Failed;
+        }
+        // Program-aware is the final commit in the scene transaction; a
+        // failure here still rolls back every earlier swap above.
+        if (!engine_.commit_program_aware()) {
+            std::swap(active_scene_, candidate_scene);
+            std::swap(active_loudness_, candidate_loudness);
+            engine_.rollback_graph();
+            engine_.rollback_ir();
+            engine_.rollback_loudness_peq();
+            engine_.rollback_program_aware();
             return EngineControlResultV1::Failed;
         }
         revision_ = next_revision;
@@ -214,6 +249,7 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
         engine_.rollback_graph();
         engine_.rollback_ir();
         engine_.rollback_loudness_peq();
+        engine_.rollback_program_aware();
         return EngineControlResultV1::Failed;
     }
 }

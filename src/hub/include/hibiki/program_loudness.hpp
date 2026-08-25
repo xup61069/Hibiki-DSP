@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <array>
+#include <string_view>
 
 namespace hibiki {
 
@@ -92,6 +93,52 @@ private:
 
     std::array<Biquad, 2U> k_weighting_{};
     std::array<std::array<BiquadState, 8U>, 2U> k_state_{};
+};
+
+// Fixed-capacity per-output-group program-aware level attachment. The
+// control plane registers and configures slots before commit; the RT thread
+// looks up a slot by group label without allocation, lock or platform call.
+// This mirrors the OutputGroupVolumeBankV1 ownership pattern.
+constexpr std::size_t kMaxProgramAwareGroupsV1 = 32U;
+constexpr std::size_t kMaxProgramAwareGroupBytesV1 = 64U;
+
+class ProgramAwareLevelBankV1 final {
+public:
+    ProgramAwareLevelBankV1() noexcept = default;
+    ProgramAwareLevelBankV1(const ProgramAwareLevelBankV1&) = delete;
+    ProgramAwareLevelBankV1& operator=(const ProgramAwareLevelBankV1&) = delete;
+
+    // Control-plane operation. Registration never allocates and is
+    // idempotent for an existing label. Fails closed at capacity.
+    [[nodiscard]] bool register_group(std::string_view output_group) noexcept;
+    // RT-only lookup. Returns nullptr when the group is not registered.
+    [[nodiscard]] ProgramAwareLevelControllerV1* controller_for_group(
+        std::string_view output_group) const noexcept;
+    // Control-plane operation. Configures (or replaces) the policy of one
+    // registered group; the RT state is reset so no stale gain survives.
+    [[nodiscard]] bool configure_group(
+        std::string_view output_group,
+        const ProgramAwareLevelPolicyV1& policy,
+        std::uint32_t sample_rate) noexcept;
+    // Resets every configured controller to unity gain and clears policies.
+    void reset_all() noexcept;
+    [[nodiscard]] bool has_group(std::string_view output_group) const noexcept;
+    [[nodiscard]] std::size_t group_count() const noexcept { return group_count_; }
+
+private:
+    struct Slot {
+        bool used{false};
+        std::array<char, kMaxProgramAwareGroupBytesV1> group{};
+        ProgramAwareLevelPolicyV1 policy{};
+        mutable ProgramAwareLevelControllerV1 controller{};
+    };
+
+    [[nodiscard]] Slot* find_slot(std::string_view output_group) noexcept;
+    [[nodiscard]] const Slot* find_slot(std::string_view output_group) const noexcept;
+    static bool valid_group(std::string_view output_group) noexcept;
+
+    std::array<Slot, kMaxProgramAwareGroupsV1> slots_{};
+    std::size_t group_count_{0U};
 };
 
 }  // namespace hibiki
