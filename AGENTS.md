@@ -31,10 +31,6 @@ AI memory 與 IDE 規則都不是專案真值。
 - 對 maintainer 的進度與完成回報必須先用白話說明：現在讓產品多了／修好了什麼、使用者會
   感覺到什麼、如何確認，以及還缺什麼。不要用 push、commit、branch、PR、merge 或 CI 當標題
   或主要敘事；這些只在影響風險、阻擋、驗證可信度，或 maintainer 明確詢問時，放在末尾的短版
-  開發紀錄。
-- 對 maintainer 的進度與完成回報必須先用白話說明：現在讓產品多了／修好了什麼、使用者會
-  感覺到什麼、如何確認，以及還缺什麼。不要用 push、commit、branch、PR、merge 或 CI 當標題
-  或主要敘事；這些只在影響風險、阻擋、驗證可信度，或 maintainer 明確詢問時，放在末尾的短版
   開發紀錄。省略對話中的 Git 細節不會取消下列內部協作與交接規則。可貼用的視窗分工與 `/goal`
   啟動詞見 `docs/ai/CODEX_GOALS.md`。
 - 唯讀偵察不需要認領。寫入需要 maintainer／orchestrator 明確指派、GitHub Issue、非 `main`
