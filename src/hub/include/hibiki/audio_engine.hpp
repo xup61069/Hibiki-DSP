@@ -303,6 +303,22 @@ public:
                                                     std::size_t frames,
                                                     std::span<RtLaneInputV1> lane_inputs,
                                                     float* output_interleaved) noexcept;
+    // Control-plane accessor for the pre-VST3 tap snapshot. The RT callback
+    // publishes after program-aware level but before apply_vst3_lanes; the
+    // control thread reads it to feed the sandbox worker. Never blocks.
+    [[nodiscard]] bool read_vst3_tap(
+        std::string_view output_group,
+        float* destination,
+        std::size_t max_frames,
+        std::uint32_t& channels_out,
+        std::size_t& frames_out,
+        std::uint64_t& sequence_out) const noexcept;
+    // Control-plane push into an already-committed VST3 lane ring. The caller
+    // must have called prepare_vst3_lane + commit_vst3_lane first.
+    [[nodiscard]] bool push_vst3_lane(
+        std::string_view output_group,
+        const float* interleaved,
+        std::size_t frames) noexcept;
     [[nodiscard]] EngineTransactionState transaction_state() const noexcept { return state_; }
     [[nodiscard]] const RtGraphSnapshotV1& active_graph() const noexcept { return active_graph_; }
     // Control-plane snapshot.  The RT process path reads the two atomics
@@ -395,6 +411,7 @@ private:
     bool has_pending_program_aware_{false};
     Vst3LaneRingBridgeV1 active_vst3_lanes_{};
     Vst3LaneRingBridgeV1 pending_vst3_lanes_{};
+    mutable Vst3TapBufferV1 vst3_tap_{};
     bool has_active_vst3_lanes_{false};
     bool has_pending_vst3_lanes_{false};
     std::string_view pending_vst3_lane_clear_target_{};

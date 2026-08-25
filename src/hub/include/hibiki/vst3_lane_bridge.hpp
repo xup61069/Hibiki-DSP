@@ -2,6 +2,7 @@
 
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include <atomic>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -13,6 +14,8 @@ namespace hibiki {
 constexpr std::size_t kMaxVst3LaneGroupsV1 = 32U;
 constexpr std::size_t kMaxOutputGroupBytesV1 = 64U;
 constexpr std::size_t kMaxVst3RingFramesV1 = 4096U;
+constexpr std::size_t kMaxVst3TapFramesV1 = 512U;
+constexpr std::size_t kMaxVst3TapChannelsV1 = 8U;
 
 // Fixed-capacity lock-free bridge that carries VST3 sandbox worker output
 // into the RT render chain. Control thread pushes validated worker blocks;
@@ -65,5 +68,39 @@ private:
     std::array<LaneSlot, kMaxVst3LaneGroupsV1> lanes_{};
 };
 
-}  // namespace hibiki
+// Lock-free single-slot snapshot of the pre-VST3 audio block. The RT
+// callback writes the latest block and bumps the sequence; the control
+// thread reads it for worker processing. Torn reads are fail-closed (the
+// caller keeps the previous safe state). This is bounded processing
+// telemetry, not content analysis or physical audio evidence.
+class Vst3TapBufferV1 final {
+public:
+    [[nodiscard]] bool publish(const std::string_view output_group,
+                               const float* interleaved,
+                               std::size_t frames,
+                               std::uint32_t channels) noexcept;
 
+    [[nodiscard]] bool read(std::string_view output_group,
+                            float* destination,
+                            std::size_t max_frames,
+                            std::uint32_t& channels_out,
+                            std::size_t& frames_out,
+                            std::uint64_t& sequence_out) const noexcept;
+
+    void reset() noexcept;
+
+private:
+    static constexpr std::size_t kCapacitySamples =
+        kMaxVst3TapFramesV1 * kMaxVst3TapChannelsV1;
+
+    mutable std::array<float, kCapacitySamples> buffer_{};
+    mutable std::array<char, kMaxOutputGroupBytesV1> group_{};
+    mutable std::uint8_t group_bytes_{0U};
+    mutable std::uint32_t channels_{0U};
+    mutable std::size_t frames_{0U};
+    mutable std::uint64_t sequence_{0U};
+    mutable std::atomic<std::uint64_t> write_seq_{0U};
+    mutable std::atomic<bool> valid_{false};
+};
+
+}  // namespace hibiki

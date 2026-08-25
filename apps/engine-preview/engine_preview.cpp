@@ -18,6 +18,8 @@
 #include "hibiki/windows_volume_broker.hpp"
 #include "hibiki/windows_volume_link.hpp"
 #include "hibiki/wav_ir.hpp"
+#include "hibiki/plugin_host.hpp"
+#include "hibiki/vst3_sandbox.hpp"
 
 #include <Windows.h>
 #include <mmdeviceapi.h>
@@ -187,6 +189,27 @@ struct ProcessDeliveryState final {
     std::uint64_t rendered_blocks{0U};
     std::uint64_t dropped_blocks{0U};
     bool graph_ready{false};
+};
+
+constexpr std::size_t kVst3LaneRingCapacityFrames = 4096U;
+
+struct Vst3LaneState final {
+    hibiki::PluginHostModel host{};
+    hibiki::Vst3SandboxProcess sandbox{};
+    std::vector<float> ring_storage{};
+    std::vector<float> tap_buffer{};
+    std::vector<float> worker_output{};
+    std::wstring worker_executable{};
+    std::wstring plugin_path{};
+    std::uint64_t request_id{1U};
+    std::uint64_t block_start{0U};
+    std::uint64_t processed_blocks{0U};
+    std::uint64_t failed_blocks{0U};
+    std::uint32_t channels{0U};
+    std::size_t block_frames{0U};
+    double sample_rate{0.0};
+    bool requested{false};
+    bool launched{false};
 };
 
 bool supported_wasapi_layout(const std::uint32_t channels) noexcept {
@@ -1237,6 +1260,19 @@ int wmain(const int argc, wchar_t* const* argv) {
         has_command_line_flag(argc, argv, L"--enable-driver-loopback");
     const bool wav_source_requested =
         has_command_line_flag(argc, argv, L"--enable-wav-source");
+    const bool vst3_lane_requested =
+        has_command_line_flag(argc, argv, L"--enable-vst3-lane");
+    std::wstring vst3_module_path{};
+    for (int index = 1; index < argc; ++index) {
+        const std::wstring_view argument = argv[index] != nullptr
+                                               ? std::wstring_view(argv[index])
+                                               : std::wstring_view{};
+        if (argument == L"--vst3-module-path" && index + 1 < argc &&
+            argv[index + 1] != nullptr) {
+            vst3_module_path = argv[index + 1];
+            ++index;
+        }
+    }
     if (tab_noise_suppressor_requested && !tab_bridge_requested) {
         // Fail-closed: the basic suppressor only has meaning on the tab lane;
         // refuse to start rather than silently running an unused effect.
@@ -1298,6 +1334,11 @@ int wmain(const int argc, wchar_t* const* argv) {
         (void)SetConsoleCtrlHandler(on_console_control, FALSE);
         return 2;
     }
+    if (vst3_lane_requested && !wasapi_output_requested) {
+        // Fail-closed: the VST3 lane needs a sink to be meaningful.
+        (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+        return 2;
+    }
 
     hibiki::AudioEngineModel engine;
     hibiki::EngineControlWorkerV1 control_worker{engine};
@@ -1320,7 +1361,9 @@ int wmain(const int argc, wchar_t* const* argv) {
     wav_source.loop = wav_source_loop_requested;
     ProcessDeliveryState process_delivery;
     TabBridgeState tab_bridge;
+    Vst3LaneState vst3_lane;
     tab_bridge.requested = tab_bridge_requested;
+    vst3_lane.requested = vst3_lane_requested;
     if (process_delivery_requested) {
         process_delivery.input_buffer.resize(
             static_cast<std::size_t>(kProcessLoopbackMaxFrames) * 2U);
@@ -1360,6 +1403,18 @@ int wmain(const int argc, wchar_t* const* argv) {
     if (wasapi_started && wav_source_requested) {
         wav_source_ready = prepare_wav_file_source(wav_source, wav_source_path,
                                                    wasapi_output, engine);
+    }
+    if (wasapi_started && vst3_lane_requested) {
+        vst3_lane.channels = wasapi_output.config.channels;
+        vst3_lane.block_frames =
+            static_cast<std::size_t>((std::min)(512U, wasapi_output.config.channels * 64U));
+        vst3_lane.sample_rate = static_cast<double>(wasapi_output.config.sample_rate);
+        vst3_lane.ring_storage.resize(kVst3LaneRingCapacityFrames *
+                                       static_cast<std::size_t>(vst3_lane.channels));
+        vst3_lane.tap_buffer.resize(
+            kVst3LaneRingCapacityFrames * static_cast<std::size_t>(vst3_lane.channels));
+        vst3_lane.worker_output.resize(
+            kVst3LaneRingCapacityFrames * static_cast<std::size_t>(vst3_lane.channels));
     }
     if (wasapi_started && session_routing_requested && process_delivery_requested) {
         (void)rebuild_delivery_graph(process_delivery, engine, wasapi_output,
@@ -1674,6 +1729,66 @@ int wmain(const int argc, wchar_t* const* argv) {
                 ++tab_bridge.received_blocks;
             }
         }
+        if (vst3_lane.requested && wasapi_started) {
+            // Launch the sandbox worker on the first iteration.
+            if (!vst3_lane.launched) {
+                vst3_lane.worker_executable =
+                    L".local\\vst3-build\\vst-host\\Release\\hibiki_vst3_sdk_worker.exe";
+                vst3_lane.plugin_path = vst3_module_path;
+                hibiki::Vst3SandboxLaunchV1 launch{};
+                launch.worker_executable = vst3_lane.worker_executable;
+                launch.plugin_path = vst3_lane.plugin_path;
+                launch.watchdog_timeout_ms = 250U;
+                launch.start_time_ms = 1U;
+                launch.vst3_sample_rate = vst3_lane.sample_rate;
+                launch.vst3_channels = vst3_lane.channels;
+                if (hibiki::validate_vst3_sandbox_launch_v1(launch) &&
+                    vst3_lane.sandbox.launch(launch)) {
+                    (void)vst3_lane.host.start(hibiki::PluginDescriptorV1{
+                        "preview-lane", vst3_lane.channels,
+                        vst3_lane.channels, 0U, true, 250U, true, 1U});
+                    if (vst3_lane.host.prepare_worker_session(
+                            vst3_lane.sandbox, vst3_lane.sample_rate,
+                            static_cast<std::uint32_t>(vst3_lane.block_frames))) {
+                        (void)vst3_lane.host.handshake_worker(vst3_lane.request_id++);
+                        vst3_lane.launched = true;
+                        // Prepare the lane ring so apply_vst3_lanes can pop.
+                        (void)engine.prepare_vst3_lane("main", vst3_lane.channels,
+                                                       std::span<float>(vst3_lane.ring_storage));
+                        (void)engine.commit_vst3_lane();
+                    }
+                } else {
+                    ++vst3_lane.failed_blocks;
+                    vst3_lane.requested = false;  // Don't retry indefinitely.
+                }
+            }
+            // Read tap -> process in worker -> push into ring.
+            if (vst3_lane.launched && vst3_lane.host.can_process()) {
+                std::uint32_t tap_channels = 0U;
+                std::size_t tap_frames = 0U;
+                std::uint64_t tap_sequence = 0U;
+                if (engine.read_vst3_tap("main", vst3_lane.tap_buffer.data(),
+                                         kVst3LaneRingCapacityFrames,
+                                         tap_channels, tap_frames, tap_sequence)) {
+                    const std::size_t sample_count =
+                        tap_frames * static_cast<std::size_t>(tap_channels);
+                    auto result = vst3_lane.host.process_worker_block(
+                        vst3_lane.request_id++, vst3_lane.block_start,
+                        static_cast<std::uint32_t>(tap_frames),
+                        std::span<const float>(vst3_lane.tap_buffer.data(), sample_count),
+                        std::span<float>(vst3_lane.worker_output.data(), sample_count));
+                    if (result == hibiki::Vst3WorkerExchangeResultV1::ok) {
+                        vst3_lane.block_start += tap_frames;
+                        // Push processed audio into the ring for RT consumption.
+                        (void)engine.push_vst3_lane("main", vst3_lane.worker_output.data(),
+                                                    tap_frames);
+                        ++vst3_lane.processed_blocks;
+                    } else {
+                        ++vst3_lane.failed_blocks;
+                    }
+                }
+            }
+        }
         const auto wasapi_snapshot = engine.wasapi_output_snapshot();
         const auto volume = engine.volume();
         bool status_changed = false;
@@ -1897,4 +2012,3 @@ int wmain(const int argc, wchar_t* const* argv) {
     if (com_initialized && com_result != RPC_E_CHANGED_MODE) CoUninitialize();
     return 0;
 }
-
