@@ -28,6 +28,9 @@ internal sealed class PreviewForm : Form
     private readonly Label _routes = new() { AutoSize = false, Width = 550, Height = 58 };
     private readonly Label _sessions = new() { AutoSize = false, Width = 550, Height = 72 };
     private readonly ComboBox _sessionSelector = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取 Expert App" };
+    private readonly ComboBox _physicalDeviceSelector = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取實體輸出裝置" };
+    private readonly Button _switchDevice = new() { Text = "切換實體裝置", AutoSize = true, AccessibleName = "切換實體輸出裝置" };
+    private readonly Button _refreshDevices = new() { Text = "重新掃描裝置", AutoSize = true, AccessibleName = "重新掃描實體輸出裝置清單" };
     private readonly TrackBar _sessionVolume = new() { Minimum = -60, Maximum = 0, TickFrequency = 5, Width = 460, AccessibleName = "選取 App 音量分貝" };
     private readonly CheckBox _sessionMuted = new() { Text = "App 靜音", AutoSize = true, AccessibleName = "App 工作階段靜音" };
     private readonly Button _applySessionVolume = new() { Text = "套用選取 App 音量", AutoSize = true, AccessibleName = "套用選取 App 音量" };
@@ -70,6 +73,7 @@ internal sealed class PreviewForm : Form
     private readonly Button _connect = new() { Text = "連接引擎", AutoSize = true, Margin = new Padding(3, 12, 3, 3), AccessibleName = "連接或重新連接 Hibiki 音訊引擎" };
     private readonly System.Windows.Forms.Timer _statusTimer = new() { Interval = 1000 };
     private bool _updatingScene;
+    private bool _updatingPhysicalDevices;
     private bool _updatingSession;
     private bool _updatingRouteRules;
     private bool _statusRefreshActive;
@@ -89,8 +93,42 @@ internal sealed class PreviewForm : Form
         var groups = new ComboBox { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取輸出群組", DataSource = _viewModel.OutputGroups.ToList(), DisplayMember = "Name", ValueMember = "Id" };
         groups.SelectedIndexChanged += (_, _) => { if (groups.SelectedValue is string id) _viewModel.SelectedOutputGroup = id; };
         panel.Controls.Add(groups);
-        panel.Controls.Add(new Label { Text = "本機裝置 catalog（僅 metadata）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
         panel.Controls.Add(_devices);
+        _physicalDeviceSelector.SelectedIndexChanged += (_, _) =>
+        {
+            if (_updatingPhysicalDevices || _physicalDeviceSelector.SelectedValue is not string endpointId) return;
+            _viewModel.SelectedPhysicalDeviceId = endpointId;
+        };
+        _switchDevice.Click += async (_, _) =>
+        {
+            if (_physicalDeviceSelector.SelectedValue is not string switchId) return;
+            _switchDevice.Enabled = false;
+            try
+            {
+                await _viewModel.SwitchPhysicalDeviceAsync(switchId);
+            }
+            finally
+            {
+                _switchDevice.Enabled = true;
+            }
+            RefreshView();
+        };
+        _refreshDevices.Click += async (_, _) =>
+        {
+            await _viewModel.RefreshPhysicalDevicePickerAsync();
+            RefreshView();
+        };
+        panel.Controls.Add(new Label { Text = "實體輸出裝置", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        panel.Controls.Add(_physicalDeviceSelector);
+        var physicalDeviceActions = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false
+        };
+        physicalDeviceActions.Controls.Add(_switchDevice);
+        physicalDeviceActions.Controls.Add(_refreshDevices);
+        panel.Controls.Add(physicalDeviceActions);
         _connect.Click += async (_, _) =>
         {
             _connect.Enabled = false;
@@ -423,7 +461,13 @@ internal sealed class PreviewForm : Form
         _devices.Text = _viewModel.PhysicalDevices.Count == 0
             ? "裝置 catalog：尚未收到引擎快照；不會自行枚舉或建立裝置。"
             : $"裝置 catalog：{_viewModel.PhysicalDevices.Count} 筆（render {renderDevices.Length}／capture {captureDevices.Length}）；" +
-              $"預設輸出：{defaultRender ?? "未指定"}\r\n只顯示 metadata；physical sink 與實體切換尚未啟用。";
+              $"預設輸出：{defaultRender ?? "未指定"}\r\n切換會先預熱新裝置再以 30 ms 交叉淡化；失敗自動回復上一個裝置。";
+        SyncPhysicalDeviceList();
+        var selectableRenderCount = renderDevices.Count(device => device.IsSelectable);
+        _physicalDeviceSelector.Enabled = _viewModel.IsConnected && selectableRenderCount > 0;
+        _switchDevice.Enabled = _viewModel.IsConnected && !_viewModel.IsBusy &&
+                                _physicalDeviceSelector.SelectedValue is string;
+        _refreshDevices.Enabled = _viewModel.IsConnected && !_viewModel.IsBusy;
         _enhance.Enabled = _viewModel.IsConnected;
         _connect.Text = _viewModel.IsConnected ? "重新連接" : "連接引擎";
         _connect.Enabled = !_viewModel.IsBusy;
@@ -520,6 +564,29 @@ internal sealed class PreviewForm : Form
         finally
         {
             _updatingScene = false;
+        }
+    }
+
+    private void SyncPhysicalDeviceList()
+    {
+        var selectedId = _physicalDeviceSelector.SelectedValue as string ?? _viewModel.SelectedPhysicalDeviceId;
+        var renderDevices = _viewModel.PhysicalDevices
+            .Where(device => device.Flow == PhysicalDeviceFlowV1.Render && device.IsSelectable)
+            .ToArray();
+        _updatingPhysicalDevices = true;
+        try
+        {
+            _physicalDeviceSelector.DataSource = null;
+            _physicalDeviceSelector.DisplayMember = nameof(PhysicalDeviceCard.DisplayName);
+            _physicalDeviceSelector.ValueMember = nameof(PhysicalDeviceCard.EndpointId);
+            _physicalDeviceSelector.DataSource = renderDevices;
+            if (selectedId is null) return;
+            var selectedIndex = Array.FindIndex(renderDevices, device => device.EndpointId == selectedId);
+            if (selectedIndex >= 0) _physicalDeviceSelector.SelectedIndex = selectedIndex;
+        }
+        finally
+        {
+            _updatingPhysicalDevices = false;
         }
     }
 
