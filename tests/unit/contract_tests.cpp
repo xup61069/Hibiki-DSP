@@ -4029,6 +4029,31 @@ int main() {
     auto malformed_wav = wav;
     malformed_wav[34U] = 16U;
     CHECK(!decode_ir_wav_v1(malformed_wav).valid);
+    // Playback/offline source decoding is byte-bound, not kernel-tap-bound:
+    // a >4096-frame source must decode, while the same data must still be
+    // rejected when it is prepared as an IR convolver kernel.
+    {
+      constexpr std::size_t kLongSourceFrames = 8192U;
+      std::vector<float> long_source(kLongSourceFrames * 2U);
+      for (std::size_t frame = 0U; frame < kLongSourceFrames; ++frame) {
+        const float value = static_cast<float>((frame % 64U) - 32U) / 64.0F;
+        long_source[frame * 2U] = value;
+        long_source[frame * 2U + 1U] = value;
+      }
+      const auto long_wav = export_wav_f32_ir(
+          long_source, 48000U, 2U);
+      CHECK(long_wav.size() == 44U + long_source.size() * sizeof(float));
+      const auto decoded_long = decode_ir_wav_v1(
+          long_wav, hibiki::kMaxSourceWavFramesV1);
+      CHECK(decoded_long.valid && decoded_long.data.frames() == kLongSourceFrames &&
+            std::abs(decoded_long.data.interleaved_samples[64U]) < 1e-6F);
+      IrConvolverV1 long_convolver;
+      CHECK(!prepare_ir_convolver_from_wav_v1(long_convolver, decoded_long.data,
+                                              ir_phase_resolution));
+      const auto realtime_bound = decode_ir_wav_v1(
+          long_wav, hibiki::kMaxRealtimeIrTapsV1);
+      CHECK(!realtime_bound.valid);
+    }
 
     const std::vector<float> phase_source = {
         0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F,

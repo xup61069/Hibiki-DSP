@@ -442,7 +442,8 @@ bool decode_wav_for_sink_rate(const std::filesystem::path& path,
                        static_cast<std::streamsize>(size))) {
             return false;
         }
-        auto decoded = hibiki::decode_ir_wav_v1(bytes);
+        auto decoded = hibiki::decode_ir_wav_v1(
+            bytes, hibiki::kMaxSourceWavFramesV1);
         if (!decoded.valid) return false;
         if (decoded.data.channels == 0U || decoded.data.frames() == 0U) return false;
         decoded_out = std::move(decoded.data);
@@ -1181,7 +1182,8 @@ bool prepare_ir_file(const hibiki::IrPrepareCommandV1& request, void* const cont
         if (!file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(size))) {
             return false;
         }
-        const auto decoded = hibiki::decode_ir_wav_v1(bytes);
+        const auto decoded = hibiki::decode_ir_wav_v1(
+            bytes, hibiki::kMaxRealtimeIrTapsV1);
         if (!decoded.valid ||
             (request.expected_sample_rate != 0U &&
              decoded.data.sample_rate != request.expected_sample_rate) ||
