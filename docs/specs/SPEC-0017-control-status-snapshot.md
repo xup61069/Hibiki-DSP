@@ -77,3 +77,13 @@ handoff 送出。sink snapshot 的 `rendered_blocks` 大於零後，`main-output
    `--enable-wasapi-output --enable-test-tone` 則只在 sink 回報 rendered block 後顯示
    `test tone rendering.`；此結果限於 user-space WASAPI path。
 6. public repository 不包含編譯後 payload、driver、endpoint identity 或私人 calibration。
+6. public repository 不包含編譯後 payload、driver、endpoint identity 或私人 calibration。
+
+## 聆聽劑量指示器（UI 層附註）
+
+ViewModel 在每次確認音量安全狀態後，把 EffectiveVolumeDb 樣本交給 UI 層的
+`ListeningDoseModelV1` 累積。模型以「0 dBFS 滿刻度 ≈ 94 dBA」的保守換算推估耳側
+音量，並以 85 dBA 基準與 3 dB 交換率折算當日劑量百分比；樣本間隔超過五分鐘時，
+靜默區間不計入任何劑量（睡眠或暫停不會被算成持續暴露）。此指示器是未經校正的
+本機參考值：不是音訊測量、耳機 SPL 校準、ISO 226 或聽力醫學證據；它不修改 IPC
+schema、狀態快照格式或音訊路徑，且只存在於 UI 層記憶體。
