@@ -1,5 +1,6 @@
 add_library(hibiki_tab_bridge_contract STATIC
   src/tab_bridge.cpp
+  src/ws_transport.cpp
 )
 
 target_include_directories(hibiki_tab_bridge_contract
