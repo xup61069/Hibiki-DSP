@@ -1469,7 +1469,7 @@ static async Task RunSceneCatalogCheckServerAsync(
     Check(!adaptiveViewModel.ApplyEqVisualFrame(new EqVisualFrameV1(
             20UL, EqVisualSourceV1.AdaptiveCorrection, adaptivePoints),
         out var staleError) && staleError.Contains("stale"),
-        "Adaptive frames must reject a lower sequence in their own source domain.");
+        "Adaptive frames must reject a lower sequence in the global source domain.");
 }
 
 // Case 7b: RefreshEqVisualSnapshotAsync applies a valid engine reply and
