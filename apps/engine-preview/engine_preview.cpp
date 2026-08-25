@@ -18,6 +18,8 @@
 #include "hibiki/windows_volume_broker.hpp"
 #include "hibiki/windows_volume_link.hpp"
 #include "hibiki/wav_ir.hpp"
+#include "hibiki/plugin_host.hpp"
+#include "hibiki/vst3_sandbox.hpp"
 
 #include <Windows.h>
 #include <mmdeviceapi.h>
@@ -197,6 +199,27 @@ struct ProcessDeliveryState final {
     std::uint64_t rendered_blocks{0U};
     std::uint64_t dropped_blocks{0U};
     bool graph_ready{false};
+};
+
+constexpr std::size_t kVst3LaneRingCapacityFrames = 4096U;
+
+struct Vst3LaneState final {
+    hibiki::PluginHostModel host{};
+    hibiki::Vst3SandboxProcess sandbox{};
+    std::vector<float> ring_storage{};
+    std::vector<float> tap_buffer{};
+    std::vector<float> worker_output{};
+    std::wstring worker_executable{};
+    std::wstring plugin_path{};
+    std::uint64_t request_id{1U};
+    std::uint64_t block_start{0U};
+    std::uint64_t processed_blocks{0U};
+    std::uint64_t failed_blocks{0U};
+    std::uint32_t channels{0U};
+    std::size_t block_frames{0U};
+    double sample_rate{0.0};
+    bool requested{false};
+    bool launched{false};
 };
 
 bool supported_wasapi_layout(const std::uint32_t channels) noexcept {
@@ -640,8 +663,6 @@ bool render_wav_offline(const std::filesystem::path& input_path,
             error_detail = "unsupported channel count for offline render";
             return false;
         }
-        const std::uint32_t lane_channels =
-            channels == 1U ? 2U : channels;
         auto scene = hibiki::make_easy_scene(hibiki::EasySceneKind::Studio, "main");
         scene.graph.output_channels = kOfflineRenderOutputChannelsV1;
         engine.set_sample_rate(kOfflineRenderOutputSampleRateV1);
@@ -659,8 +680,26 @@ bool render_wav_offline(const std::filesystem::path& input_path,
         }
         std::vector<float> rendered(
             decoded_data.frames() * kOfflineRenderOutputChannelsV1, 0.0F);
-        const hibiki::RtLaneInputV1 lane{decoded_data.interleaved_samples.data(),
-                                         static_cast<std::uint16_t>(lane_channels)};
+        // Mono sources must be expanded to a bounded stereo copy before the
+        // render loop: the lane contract reads channel_count floats per frame,
+        // so pointing a 2-channel lane at a 1-float-per-frame buffer would
+        // over-read the heap and misinterpret adjacent samples as L/R.
+        std::vector<float> lane_block{};
+        if (channels == 1U) {
+            lane_block.resize(decoded_data.frames() * 2U);
+            for (std::size_t frame = 0U; frame < decoded_data.frames(); ++frame) {
+                lane_block[frame * 2U] =
+                    decoded_data.interleaved_samples[frame];
+                lane_block[frame * 2U + 1U] =
+                    decoded_data.interleaved_samples[frame];
+            }
+        }
+        const float* lane_data =
+            channels == 1U
+                ? lane_block.data()
+                : decoded_data.interleaved_samples.data();
+        const hibiki::RtLaneInputV1 lane{
+            lane_data, static_cast<std::uint16_t>(kOfflineRenderOutputChannelsV1)};
         constexpr std::size_t kBlock = 128U;  // matches kWavSource block cadence
         std::size_t offset = 0U;
         while (offset < decoded_data.frames()) {
@@ -1345,6 +1384,19 @@ int wmain(const int argc, wchar_t* const* argv) {
         has_command_line_flag(argc, argv, L"--enable-driver-loopback");
     const bool wav_source_requested =
         has_command_line_flag(argc, argv, L"--enable-wav-source");
+    const bool vst3_lane_requested =
+        has_command_line_flag(argc, argv, L"--enable-vst3-lane");
+    std::wstring vst3_module_path{};
+    for (int index = 1; index < argc; ++index) {
+        const std::wstring_view argument = argv[index] != nullptr
+                                               ? std::wstring_view(argv[index])
+                                               : std::wstring_view{};
+        if (argument == L"--vst3-module-path" && index + 1 < argc &&
+            argv[index + 1] != nullptr) {
+            vst3_module_path = argv[index + 1];
+            ++index;
+        }
+    }
     if (tab_noise_suppressor_requested && !tab_bridge_requested) {
         // Fail-closed: the basic suppressor only has meaning on the tab lane;
         // refuse to start rather than silently running an unused effect.
@@ -1425,6 +1477,11 @@ int wmain(const int argc, wchar_t* const* argv) {
         (void)SetConsoleCtrlHandler(on_console_control, FALSE);
         return 2;
     }
+    if (vst3_lane_requested && !wasapi_output_requested) {
+        // Fail-closed: the VST3 lane needs a sink to be meaningful.
+        (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+        return 2;
+    }
 
     if (offline_render_requested) {
         OfflineRenderResult result;
@@ -1468,7 +1525,9 @@ int wmain(const int argc, wchar_t* const* argv) {
     wav_source.loop = wav_source_loop_requested;
     ProcessDeliveryState process_delivery;
     TabBridgeState tab_bridge;
+    Vst3LaneState vst3_lane;
     tab_bridge.requested = tab_bridge_requested;
+    vst3_lane.requested = vst3_lane_requested;
     if (process_delivery_requested) {
         process_delivery.input_buffer.resize(
             static_cast<std::size_t>(kProcessLoopbackMaxFrames) * 2U);
@@ -1508,6 +1567,18 @@ int wmain(const int argc, wchar_t* const* argv) {
     if (wasapi_started && wav_source_requested) {
         wav_source_ready = prepare_wav_file_source(wav_source, wav_source_path,
                                                    wasapi_output, engine);
+    }
+    if (wasapi_started && vst3_lane_requested) {
+        vst3_lane.channels = wasapi_output.config.channels;
+        vst3_lane.block_frames =
+            static_cast<std::size_t>((std::min)(512U, wasapi_output.config.channels * 64U));
+        vst3_lane.sample_rate = static_cast<double>(wasapi_output.config.sample_rate);
+        vst3_lane.ring_storage.resize(kVst3LaneRingCapacityFrames *
+                                       static_cast<std::size_t>(vst3_lane.channels));
+        vst3_lane.tap_buffer.resize(
+            kVst3LaneRingCapacityFrames * static_cast<std::size_t>(vst3_lane.channels));
+        vst3_lane.worker_output.resize(
+            kVst3LaneRingCapacityFrames * static_cast<std::size_t>(vst3_lane.channels));
     }
     if (wasapi_started && session_routing_requested && process_delivery_requested) {
         (void)rebuild_delivery_graph(process_delivery, engine, wasapi_output,
@@ -1699,6 +1770,7 @@ int wmain(const int argc, wchar_t* const* argv) {
 
     auto next_catalog_poll = std::chrono::steady_clock::now() + std::chrono::milliseconds{250};
     auto next_session_poll = std::chrono::steady_clock::now() + std::chrono::milliseconds{250};
+    auto next_delivery_sync = std::chrono::steady_clock::now() + std::chrono::milliseconds{50};
     auto next_volume_poll = std::chrono::steady_clock::now() + std::chrono::milliseconds{50};
     auto next_volume_write = std::chrono::steady_clock::now();
     auto next_driver_loopback_render = std::chrono::steady_clock::now();
@@ -1734,10 +1806,11 @@ int wmain(const int argc, wchar_t* const* argv) {
             }
             next_session_poll = now + std::chrono::milliseconds{250};
         }
-        if (process_delivery_requested && now >= next_session_poll) {
+        if (process_delivery_requested && now >= next_delivery_sync) {
             (void)rebuild_delivery_graph(process_delivery, engine, wasapi_output,
                                          session_routing.coordinator);
             sync_delivery_sources(process_delivery, session_routing.coordinator);
+            next_delivery_sync = now + std::chrono::milliseconds{100};
         }
         if (system_volume_requested && device_enumerator != nullptr && now >= next_volume_poll) {
             const auto bind_result = rebind_default_volume_if_changed(
@@ -1820,6 +1893,66 @@ int wmain(const int argc, wchar_t* const* argv) {
                 ++tab_bridge.received_blocks;
             }
         }
+        if (vst3_lane.requested && wasapi_started) {
+            // Launch the sandbox worker on the first iteration.
+            if (!vst3_lane.launched) {
+                vst3_lane.worker_executable =
+                    L".local\\vst3-build\\vst-host\\Release\\hibiki_vst3_sdk_worker.exe";
+                vst3_lane.plugin_path = vst3_module_path;
+                hibiki::Vst3SandboxLaunchV1 launch{};
+                launch.worker_executable = vst3_lane.worker_executable;
+                launch.plugin_path = vst3_lane.plugin_path;
+                launch.watchdog_timeout_ms = 250U;
+                launch.start_time_ms = 1U;
+                launch.vst3_sample_rate = vst3_lane.sample_rate;
+                launch.vst3_channels = vst3_lane.channels;
+                if (hibiki::validate_vst3_sandbox_launch_v1(launch) &&
+                    vst3_lane.sandbox.launch(launch)) {
+                    (void)vst3_lane.host.start(hibiki::PluginDescriptorV1{
+                        "preview-lane", vst3_lane.channels,
+                        vst3_lane.channels, 0U, true, 250U, true, 1U});
+                    if (vst3_lane.host.prepare_worker_session(
+                            vst3_lane.sandbox, vst3_lane.sample_rate,
+                            static_cast<std::uint32_t>(vst3_lane.block_frames))) {
+                        (void)vst3_lane.host.handshake_worker(vst3_lane.request_id++);
+                        vst3_lane.launched = true;
+                        // Prepare the lane ring so apply_vst3_lanes can pop.
+                        (void)engine.prepare_vst3_lane("main", vst3_lane.channels,
+                                                       std::span<float>(vst3_lane.ring_storage));
+                        (void)engine.commit_vst3_lane();
+                    }
+                } else {
+                    ++vst3_lane.failed_blocks;
+                    vst3_lane.requested = false;  // Don't retry indefinitely.
+                }
+            }
+            // Read tap -> process in worker -> push into ring.
+            if (vst3_lane.launched && vst3_lane.host.can_process()) {
+                std::uint32_t tap_channels = 0U;
+                std::size_t tap_frames = 0U;
+                std::uint64_t tap_sequence = 0U;
+                if (engine.read_vst3_tap("main", vst3_lane.tap_buffer.data(),
+                                         kVst3LaneRingCapacityFrames,
+                                         tap_channels, tap_frames, tap_sequence)) {
+                    const std::size_t sample_count =
+                        tap_frames * static_cast<std::size_t>(tap_channels);
+                    auto result = vst3_lane.host.process_worker_block(
+                        vst3_lane.request_id++, vst3_lane.block_start,
+                        static_cast<std::uint32_t>(tap_frames),
+                        std::span<const float>(vst3_lane.tap_buffer.data(), sample_count),
+                        std::span<float>(vst3_lane.worker_output.data(), sample_count));
+                    if (result == hibiki::Vst3WorkerExchangeResultV1::ok) {
+                        vst3_lane.block_start += tap_frames;
+                        // Push processed audio into the ring for RT consumption.
+                        (void)engine.push_vst3_lane("main", vst3_lane.worker_output.data(),
+                                                    tap_frames);
+                        ++vst3_lane.processed_blocks;
+                    } else {
+                        ++vst3_lane.failed_blocks;
+                    }
+                }
+            }
+        }
         const auto wasapi_snapshot = engine.wasapi_output_snapshot();
         const auto volume = engine.volume();
         bool status_changed = false;
@@ -1896,11 +2029,16 @@ int wmain(const int argc, wchar_t* const* argv) {
                 : session_route_ready && session_snapshot.session_count > 0U
                     ? hibiki::ControlRouteHealthStateV1::Pending
                     : hibiki::ControlRouteHealthStateV1::Unavailable;
+        const auto wasapi_snapshot_now = engine.wasapi_output_snapshot();
+        const bool wasapi_actually_rendering = has_rendered_blocks(wasapi_snapshot_now);
         const auto process_route_state = session_snapshot.degraded
             ? hibiki::ControlRouteHealthStateV1::Degraded
-            : session_route_ready && session_snapshot.routed_count > 0U
-                ? hibiki::ControlRouteHealthStateV1::Pending
-                : hibiki::ControlRouteHealthStateV1::Unavailable;
+            : session_route_ready && session_snapshot.routed_count > 0U &&
+                  process_delivery.rendered_blocks > 0U && wasapi_actually_rendering
+                ? hibiki::ControlRouteHealthStateV1::Ready
+                : session_route_ready && session_snapshot.routed_count > 0U
+                    ? hibiki::ControlRouteHealthStateV1::Pending
+                    : hibiki::ControlRouteHealthStateV1::Unavailable;
         const auto session_detail = !session_routing_requested
             ? std::string_view("session routing disabled; Preview will not enumerate Apps.")
             : !session_routing.bound
@@ -1908,21 +2046,34 @@ int wmain(const int argc, wchar_t* const* argv) {
                 : session_snapshot.degraded
                     ? std::string_view("session enumeration degraded; controls fail closed.")
                     : std::string_view("session catalog linked; per-App controls enabled; delivery unverified.");
-        const auto process_detail = !session_routing_requested
-            ? std::string_view("session routing disabled; process source is not bound.")
-            : !process_delivery_requested
-                ? std::string_view(
-                      "process-tree source remains worker-owned; physical delivery unverified.")
-                : (process_delivery.rendered_blocks > 0U
-                       ? std::string_view(
-                             "per-App process delivery active; blocks rendered through WASAPI sink.")
-                       : std::string_view(
-                             "per-App process delivery enabled; waiting for captured audio."));
+        static thread_local std::string process_detail_buffer;
+        if (!session_routing_requested) {
+            process_detail_buffer =
+                "session routing disabled; process source is not bound.";
+        } else if (!process_delivery_requested) {
+            process_detail_buffer =
+                "process-tree source remains worker-owned; physical delivery unverified.";
+        } else if (process_route_state == hibiki::ControlRouteHealthStateV1::Ready) {
+            process_detail_buffer =
+                "per-App delivery active: " +
+                std::to_string(process_delivery.rendered_blocks) + " block(s) rendered, " +
+                std::to_string(wasapi_snapshot_now.primary.rendered_blocks +
+                               wasapi_snapshot_now.secondary.rendered_blocks) +
+                " WASAPI sink block(s).";
+        } else if (process_delivery.rendered_blocks > 0U) {
+            process_detail_buffer =
+                "per-App capture running (" +
+                std::to_string(process_delivery.rendered_blocks) +
+                " block(s)) but WASAPI sink has not rendered.";
+        } else {
+            process_detail_buffer =
+                "per-App process delivery enabled; waiting for captured audio.";
+        }
         const auto previous_session_route = status.routes[4U];
         const auto previous_process_route = status.routes[5U];
         set_route(status.routes[4U], "windows-session", "Windows App／Session", session_detail,
                   session_route_state, session_routing_requested && session_routing.bound ? 0U : 1U);
-        set_route(status.routes[5U], "process-loopback", "Process Loopback", process_detail,
+        set_route(status.routes[5U], "process-loopback", "Process Loopback", process_detail_buffer,
                   process_route_state, session_routing_requested && session_routing.bound ? 0U : 1U);
         if (!same_route(previous_session_route, status.routes[4U]) ||
             !same_route(previous_process_route, status.routes[5U])) {
