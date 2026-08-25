@@ -1331,6 +1331,32 @@ static async Task RunSceneCatalogCheckServerAsync(
           Math.Abs(eqDecoded[0].GainDb + 4.0) < 1e-12,
         "EQ visual round-trip must preserve sequence, source, and points.");
 
+    var adaptiveEq = ControlPayloadsV1.EncodeEqVisualSnapshot(
+        8UL, EqVisualSourceV1.AdaptiveCorrection,
+        [new EqVisualPointV1(31.0, -4.0), new EqVisualPointV1(120.0, -2.8),
+         new EqVisualPointV1(1000.0, -1.2), new EqVisualPointV1(8000.0, 0.0)]);
+    Check(ControlPayloadsV1.TryDecodeEqVisualSnapshot(
+              adaptiveEq, out _, out var adaptiveSource, out var adaptiveDecoded) &&
+          adaptiveSource == EqVisualSourceV1.AdaptiveCorrection &&
+          adaptiveDecoded.Count == 4 &&
+          Math.Abs(adaptiveDecoded[0].GainDb + 4.0) < 1e-12 &&
+          Math.Abs(adaptiveDecoded[3].GainDb) < 1e-12,
+        "Adaptive source 2 must decode into the existing bounded EQ visual contract.");
+
+    var adaptivePoints = new EqVisualPointV1[]
+    {
+        new(31.0, -3.0), new(120.0, -2.1), new(1000.0, -0.9), new(8000.0, 0.0),
+    };
+    var adaptiveRoundTrip = ControlPayloadsV1.EncodeEqVisualSnapshot(
+        21UL, EqVisualSourceV1.AdaptiveCorrection, adaptivePoints);
+    Check(ControlPayloadsV1.TryDecodeEqVisualSnapshot(
+              adaptiveRoundTrip, out var roundTripSequence, out var roundTripSource,
+              out var roundTripDecoded) &&
+          roundTripSequence == 21UL &&
+          roundTripSource == EqVisualSourceV1.AdaptiveCorrection &&
+          roundTripDecoded.Count == 4,
+        "An adaptive-correction EQ visual frame must round-trip with source=2.");
+
     var badEq = (byte[])encodedEq.Clone();
     badEq[9] = 3;
     Check(!ControlPayloadsV1.TryDecodeEqVisualSnapshot(badEq, out _, out _, out _),
@@ -1388,7 +1414,7 @@ static async Task RunSceneCatalogCheckServerAsync(
         out var boundsError) && boundsError.Contains("invalid"),
         "An out-of-range gain frame must fail closed.");
     Check(!eqViewModel.ApplyEqVisualFrame(new EqVisualFrameV1(
-            10UL, EqVisualSourceV1.AdaptiveCorrection,
+            10UL, EqVisualSourceV1.EqualLoudness,
             [new EqVisualPointV1(31.0, -4.0), new EqVisualPointV1(120.0, -1.0),
              new EqVisualPointV1(1000.0, 0.0), new EqVisualPointV1(8000.0, 0.0)]),
         out var staleError) && staleError.Contains("stale"),
@@ -1419,6 +1445,31 @@ static async Task RunSceneCatalogCheckServerAsync(
     testNow = testNow.AddMilliseconds(180);
     Check(surface.TransitionProgress == 1.0,
         "Transition progress must clamp at completion and cannot exceed the target curve.");
+}
+
+// Case 7c: adaptive correction uses the same stale-safe surface contract and
+// reports its distinct source state.
+{
+    const double adaptiveGain = -4.0;
+    IReadOnlyList<EqVisualPointV1> adaptivePoints = new EqVisualPointV1[]
+    {
+        new(31.0, adaptiveGain), new(120.0, -2.8),
+        new(1000.0, -1.2), new(8000.0, 0.0),
+    };
+    var adaptiveViewModel = new EasyControlViewModel("HibikiDSP_adaptive_visual_check");
+    var adaptiveFrame = new EqVisualFrameV1(
+        21UL, EqVisualSourceV1.AdaptiveCorrection, adaptivePoints);
+    Check(adaptiveFrame.IsValid, "A bounded source-2 frame must be valid.");
+    Check(adaptiveViewModel.ApplyEqVisualFrame(adaptiveFrame, out var error), error);
+    Check(adaptiveViewModel.EqSurface.HasConfirmedFrame &&
+          adaptiveViewModel.EqSurface.Source == EqVisualSourceV1.AdaptiveCorrection &&
+          adaptiveViewModel.EqSurface.LastAppliedSequence == 21UL &&
+          adaptiveViewModel.EqSurface.StateText.Contains("自適應", StringComparison.Ordinal),
+        "A confirmed adaptive frame must use the adaptive visual state.");
+    Check(!adaptiveViewModel.ApplyEqVisualFrame(new EqVisualFrameV1(
+            20UL, EqVisualSourceV1.AdaptiveCorrection, adaptivePoints),
+        out var staleError) && staleError.Contains("stale"),
+        "Adaptive frames must reject a lower sequence in the global source domain.");
 }
 
 // Case 7b: RefreshEqVisualSnapshotAsync applies a valid engine reply and

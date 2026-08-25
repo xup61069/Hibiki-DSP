@@ -3,6 +3,7 @@
 #include "hibiki/program_loudness.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 
 namespace hibiki {
@@ -85,6 +86,44 @@ bool validate_program_aware_policy(const ProgramAwareLevelPolicyV1& policy) noex
            policy.silence_gate_dbfs < 0.0;
 }
 
+void ProgramAwareLevelControllerV1::store_telemetry() noexcept {
+    telemetry_doubles_[0].store(status_.measured_dbfs,
+                                std::memory_order_relaxed);
+    telemetry_doubles_[1].store(status_.applied_gain_db,
+                                std::memory_order_relaxed);
+    telemetry_enabled_.store(status_.enabled, std::memory_order_relaxed);
+    telemetry_silence_gated_.store(status_.silence_gated,
+                                   std::memory_order_relaxed);
+    telemetry_valid_.store(true, std::memory_order_release);
+    telemetry_sequence_.fetch_add(1U, std::memory_order_acq_rel);
+}
+
+ProgramAwareTelemetrySnapshotV1
+ProgramAwareLevelControllerV1::read_telemetry() const noexcept {
+    ProgramAwareTelemetrySnapshotV1 snapshot;
+    const auto before = telemetry_sequence_.load(std::memory_order_acquire);
+    snapshot.valid = telemetry_valid_.load(std::memory_order_acquire);
+    if (!snapshot.valid) return snapshot;
+    snapshot.enabled = telemetry_enabled_.load(std::memory_order_acquire);
+    snapshot.silence_gated =
+        telemetry_silence_gated_.load(std::memory_order_acquire);
+    const double measured =
+        telemetry_doubles_[0].load(std::memory_order_acquire);
+    const double applied_gain =
+        telemetry_doubles_[1].load(std::memory_order_acquire);
+    const auto after = telemetry_sequence_.load(std::memory_order_acquire);
+    // A torn read is fail-closed: the caller keeps the previous safe visual
+    // frame instead of publishing a mixed-generation projection.
+    if (before != after || !std::isfinite(measured) ||
+        !std::isfinite(applied_gain)) {
+        return ProgramAwareTelemetrySnapshotV1{};
+    }
+    snapshot.measured_dbfs = measured;
+    snapshot.applied_gain_db = applied_gain;
+    snapshot.sequence = after;
+    return snapshot;
+}
+
 bool ProgramAwareLevelControllerV1::configure(const ProgramAwareLevelPolicyV1& policy,
                                               const std::uint32_t sample_rate) noexcept {
     if (!validate_program_aware_policy(policy) || sample_rate < 8000U || sample_rate > 192000U) {
@@ -107,6 +146,7 @@ void ProgramAwareLevelControllerV1::reset() noexcept {
     status_.enabled = policy_.enabled;
     status_.silence_gated = true;
     status_.meter_mode = policy_.meter_mode;
+    telemetry_valid_.store(false, std::memory_order_release);
     for (auto& bank : k_state_) {
         for (auto& state : bank) state = {};
     }
@@ -170,6 +210,7 @@ bool ProgramAwareLevelControllerV1::process_interleaved(float* const interleaved
                                   -max_step, max_step);
     status_.applied_gain_db = std::clamp(status_.applied_gain_db + delta,
                                          -policy_.max_cut_db, policy_.max_boost_db);
+    store_telemetry();
     const auto linear_gain = static_cast<float>(
         std::pow(10.0, std::clamp(status_.applied_gain_db, -144.0, 12.0) / 20.0));
     for (std::size_t index = 0U; index < samples; ++index) {
@@ -231,7 +272,7 @@ bool ProgramAwareLevelBankV1::register_group(const std::string_view output_group
         slot.group[0] = static_cast<char>(output_group.size());
         std::copy(output_group.begin(), output_group.end(), slot.group.begin() + 1);
         slot.policy = {};
-        slot.controller = {};
+        new (&slot.controller) ProgramAwareLevelControllerV1{};
         ++group_count_;
         return true;
     }
@@ -262,7 +303,8 @@ void ProgramAwareLevelBankV1::reset_all() noexcept {
     for (auto& slot : slots_) {
         if (!slot.used) continue;
         slot.policy = {};
-        slot.controller = {};
+        slot.controller.~ProgramAwareLevelControllerV1();
+        new (&slot.controller) ProgramAwareLevelControllerV1{};
     }
     group_count_ = 0U;
 }

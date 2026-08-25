@@ -554,6 +554,53 @@ bool AudioEngineModel::has_active_program_aware(
                       active_program_aware_.output_group.begin());
 }
 
+AudioEngineModel::ProgramAwareTelemetrySnapshotV1
+AudioEngineModel::program_aware_visual_snapshot() const noexcept {
+    ProgramAwareTelemetrySnapshotV1 snapshot;
+    if (!has_active_program_aware_ || !active_program_aware_.attached ||
+        active_program_aware_.bank == nullptr) {
+        return snapshot;
+    }
+    if (has_active_graph_ && active_graph_.strict_direct) return snapshot;
+
+    const std::string_view group(
+        active_program_aware_.output_group.data(),
+        active_program_aware_.output_group_bytes);
+    auto* controller = active_program_aware_.bank->controller_for_group(group);
+    if (controller == nullptr ||
+        controller->sample_rate() != sample_rate_.load(std::memory_order_relaxed)) {
+        return snapshot;
+    }
+    return program_aware_telemetry_snapshot(group);
+}
+
+AudioEngineModel::ProgramAwareTelemetrySnapshotV1
+AudioEngineModel::program_aware_telemetry_snapshot(
+    const std::string_view output_group) const noexcept {
+    if ((has_active_graph_ && active_graph_.strict_direct) ||
+        !has_active_program_aware(output_group) ||
+        active_program_aware_.bank == nullptr) {
+        return {};
+    }
+    auto* controller =
+        active_program_aware_.bank->controller_for_group(output_group);
+    if (controller == nullptr ||
+        controller->sample_rate() != sample_rate_.load(std::memory_order_relaxed)) {
+        return {};
+    }
+    const auto telemetry = controller->read_telemetry();
+    ProgramAwareTelemetrySnapshotV1 snapshot;
+    snapshot.valid = telemetry.valid && telemetry.enabled &&
+                     !telemetry.silence_gated;
+    if (!snapshot.valid) return snapshot;
+    snapshot.enabled = true;
+    snapshot.silence_gated = false;
+    snapshot.measured_dbfs = telemetry.measured_dbfs;
+    snapshot.applied_gain_db = telemetry.applied_gain_db;
+    snapshot.sequence = telemetry.sequence;
+    return snapshot;
+}
+
 void AudioEngineModel::reset_program_aware_state() noexcept {
     active_program_aware_ = {};
     pending_program_aware_ = {};

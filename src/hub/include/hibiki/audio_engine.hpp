@@ -124,6 +124,22 @@ public:
     [[nodiscard]] bool program_aware_transaction_idle() const noexcept;
     [[nodiscard]] bool has_active_program_aware(
         std::string_view output_group = "main") const noexcept;
+    // Control-plane projection of the committed, enabled, non-Strict-Direct
+    // program-aware attachment. Invalid when detached, foreign, bypassed,
+    // disabled, silence-gated, or before the first rendered block. This is
+    // bounded visual telemetry, not content analysis or physical audio.
+    struct ProgramAwareTelemetrySnapshotV1 {
+        bool valid{false};
+        bool enabled{false};
+        bool silence_gated{true};
+        double measured_dbfs{-144.0};
+        double applied_gain_db{0.0};
+        std::uint64_t sequence{0U};
+    };
+    [[nodiscard]] ProgramAwareTelemetrySnapshotV1
+    program_aware_telemetry_snapshot(std::string_view output_group) const noexcept;
+    [[nodiscard]] ProgramAwareTelemetrySnapshotV1
+    program_aware_visual_snapshot() const noexcept;
     void reset_program_aware_state() noexcept;
 
     // VST3 lane bridge is an independent fixed-capacity output attachment.
