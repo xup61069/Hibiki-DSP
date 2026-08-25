@@ -1,14 +1,15 @@
 const button = document.getElementById('capture');
 const stopButton = document.getElementById('stop');
 const retryButton = document.getElementById('retry-bridge');
-const status = document.getElementById('status');
 const diagnosticsButton = document.getElementById('copy-diagnostics');
+const status = document.getElementById('status');
 
 let capturing = false;
 let bridgeConnected = false;
 let bridgeReconnectState = 'idle';
 let droppedPackets = 0;
 let retryBusy = false;
+let diagnosticsBusy = false;
 let diagnosticsTimer = 0;
 
 function render() {
@@ -44,29 +45,32 @@ function reconnectText() {
 
 function buildDiagnosticsSnapshot() {
   return [
-    'Hibiki tab capture diagnostics',
-    'capturing=' + (capturing ? 'true' : 'false'),
-    'bridgeConnected=' + (bridgeConnected ? 'true' : 'false'),
-    'bridgeReconnectState=' + bridgeReconnectState,
-    'droppedPackets=' + (Number.isFinite(droppedPackets) && droppedPackets >= 0 ? Math.floor(droppedPackets) : 0),
-    'timestampUtc=' + new Date().toISOString(),
+    'Hibiki extension diagnostic snapshot',
+    `capturing: ${capturing}`,
+    `bridgeConnected: ${bridgeConnected}`,
+    `bridgeReconnectState: ${bridgeReconnectState}`,
+    `droppedPackets: ${Number.isFinite(droppedPackets) && droppedPackets >= 0 ? Math.floor(droppedPackets) : 0}`,
+    `timestampUtc: ${new Date().toISOString()}`,
   ].join('\n');
 }
 
-async function copyDiagnosticsSnapshot(text) {
-  try {
+async function writeClipboard(text) {
+  if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text);
     return true;
-  } catch (_) {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-    try { document.execCommand('copy'); } catch (_) {}
-    document.body.removeChild(textarea);
-    return false;
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    if (!document.execCommand('copy')) throw new Error('copy-failed');
+    return true;
+  } finally {
+    textarea.remove();
   }
 }
 
@@ -178,18 +182,29 @@ retryButton.addEventListener('click', async () => {
   await refreshState();
 });
 
-refreshState();
-
 diagnosticsButton.addEventListener('click', async () => {
+  if (diagnosticsBusy) return;
   delete status.dataset.error;
   clearTimeout(diagnosticsTimer);
-  const snapshot = buildDiagnosticsSnapshot();
-  const usedFallback = !(await copyDiagnosticsSnapshot(snapshot));
-  status.textContent = usedFallback ? '已複製（備援模式）' : '診斷資訊已複製';
+  diagnosticsBusy = true;
+  diagnosticsButton.disabled = true;
+  try {
+    await refreshState();
+    await writeClipboard(buildDiagnosticsSnapshot());
+    status.textContent = '已複製匿名診斷快照';
+  } catch (error) {
+    status.textContent = error instanceof Error ? error.message : String(error);
+    status.dataset.error = 'true';
+  } finally {
+    diagnosticsBusy = false;
+    diagnosticsButton.disabled = false;
+  }
   diagnosticsTimer = setTimeout(() => {
     if (!status.dataset.error) render();
   }, 2000);
 });
+
+refreshState();
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
