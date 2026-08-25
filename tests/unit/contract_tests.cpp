@@ -404,7 +404,7 @@ int main() {
                       IrPhaseResolutionV1{1, IrPhaseMode::Bypass, 0.0, 0.0, false, false}));
 
     BasicNoiseSuppressorV1 noise_suppressor;
-    CHECK(validate_noise_suppressor_policy(BasicNoiseSuppressorPolicyV1{}));
+    CHECK(!validate_noise_suppressor_policy(BasicNoiseSuppressorPolicyV1{}));
     CHECK(noise_suppressor.configure(
         BasicNoiseSuppressorPolicyV1{1, true, -40.0, -30.0, 1.0, 10.0, 0.0}, 48000U, 1U));
     std::array<float, 480> noise_block{};

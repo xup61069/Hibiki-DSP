@@ -557,7 +557,8 @@ public static class ControlPayloadsV1
         string sceneId,
         string name = "",
         string outputGroup = "",
-        string irReference = "")
+        string irReference = "",
+        bool loudnessLiveUpdate = false)
     {
         var id = StrictUtf8.GetBytes(sceneId ?? string.Empty);
         var payload = new byte[SceneCatalogPayloadBytes];
@@ -605,6 +606,7 @@ public static class ControlPayloadsV1
         payload[13] = 0;                                                   // Strict Direct off.
         payload[14] = 2;                                                   // Stereo graph.
         payload[15] = 1;                                                   // One lane.
+        payload[84] = loudnessLiveUpdate ? (byte)1 : (byte)0;              // Live loudness opt-in.
         payload[18] = (byte)nameBytes.Length;
         payload[19] = (byte)outputBytes.Length;
         payload[20] = (byte)irRefBytes.Length;
@@ -1180,11 +1182,12 @@ public sealed class ControlCommandFactoryV1
 
     public IpcEnvelopeV1 UpsertSceneCatalog(string sceneId, string name,
                                              string outputGroup,
-                                             string irReference = "") =>
+                                             string irReference = "",
+                                             bool loudnessLiveUpdate = false) =>
         _requests.Create(ControlMessageType.SceneCatalogCommand,
             ControlPayloadsV1.EncodeSceneCatalogCommand(
                 SessionRouteRuleOperationV1.Upsert, sceneId, name, outputGroup,
-                irReference));
+                irReference, loudnessLiveUpdate));
 
     public IpcEnvelopeV1 RemoveSceneCatalog(string sceneId) =>
         _requests.Create(ControlMessageType.SceneCatalogCommand,
