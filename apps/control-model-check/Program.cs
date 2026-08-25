@@ -823,6 +823,29 @@ Check(targetedResponse is not null && targetedResponse.IsValid &&
 Check(CalibrationCompilerV1.BuildTargetedResponse(
         null, 48000.0, [100.0, 50.0], [-2.0, -1.0]) is null,
     "Unsorted frequencies must fail closed in BuildTargetedResponse.");
+var wizardSurface = new ExpertSurfaceModel();
+Check(wizardSurface.WizardTargetCurveId == CalibrationTargetCurveIdV1.Flat &&
+      wizardSurface.WizardTargetCurveName == "flat" &&
+      !wizardSurface.HasWizardResult &&
+      wizardSurface.WizardPeqPreview.Count == 0,
+    "Wizard surface must start with the flat curve and no preview.");
+wizardSurface.SetWizardTargetCurve(CalibrationTargetCurveIdV1.HarmanInEar);
+Check(wizardSurface.WizardTargetCurveIndex == 1 &&
+      wizardSurface.WizardTargetCurveName == "harman-in-ear" &&
+      wizardSurface.WizardCurveDisplayName.Contains("Harman"),
+    "Wizard curve switching must update the read-only surface.");
+var validWizardPoints = new[] { 100.0, 500.0, 1000.0, 4000.0 };
+Check(wizardSurface.TryBuildWizardPeq(validWizardPoints, [-8.0, -1.0, 0.0, -3.5], out _) &&
+      wizardSurface.HasWizardResult && wizardSurface.WizardState is not null &&
+      wizardSurface.WizardState.PointCount == 4 &&
+      wizardSurface.WizardPeqPreview.Count > 0 &&
+      wizardSurface.WizardStatusText.Contains("Harman"),
+    "Wizard PEQ build must produce a bounded local preview.");
+Check(!wizardSurface.TryBuildWizardPeq([500.0, 100.0], [0.0, 0.0], out var invalidWizard) &&
+      !wizardSurface.HasWizardResult &&
+      invalidWizard.Contains("無效") &&
+      wizardSurface.WizardStatusText.Contains("尚未建立"),
+    "Wizard must reject unsorted input and clear the stale preview.");
 var batchOk = CalibrationCompilerV1.CompileMultiChannelBatch(
     2,
     [
@@ -1656,5 +1679,8 @@ Check(doseVm.ApplyVolumeSafetyState(mutedState, out _),
     "A muted volume state must still apply.");
 Check(!doseVm.ListeningDose.IsAccumulating,
     "A confirmed muted state must not accumulate new dose.");
+
+// Remaining safe-time countdown self-test.
+DoseRemainingCheck.Run(Check);
 
 Console.WriteLine("Control model checks passed.");
