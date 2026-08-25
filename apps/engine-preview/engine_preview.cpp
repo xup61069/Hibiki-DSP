@@ -912,7 +912,8 @@ int wmain(const int argc, wchar_t* const* argv) {
         hibiki::TabBridgeServerConfigV1 tab_config{};
         if (tab_noise_suppressor_requested) {
             // Basic high-pass + downward-gate; explicitly not ML denoising.
-            const hibiki::BasicNoiseSuppressorPolicyV1 kTabNoisePolicy{};
+            const hibiki::BasicNoiseSuppressorPolicyV1 kTabNoisePolicy{
+                1U, true, -55.0, -24.0, 8.0, 120.0, 80.0};
             if (tab_bridge.noise_suppressor.configure(
                     kTabNoisePolicy, wasapi_output.config.sample_rate, 2U)) {
                 tab_bridge.effects = {nullptr, nullptr,
