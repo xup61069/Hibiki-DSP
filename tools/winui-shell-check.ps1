@@ -228,7 +228,7 @@ foreach ($requiredText in @('x:Name="RootGrid"', 'ItemsSource="{Binding Scenes}"
     'AutomationProperties.Name="系統音量"',
     'AutomationProperties.Name="Expert 詳細模式"',
     'AutomationProperties.LiveSetting="Polite"', 'CustomSceneId', 'CustomSceneName',
-    'CustomSceneDescription', 'OnAddCustomSceneClick',
+    'CustomSceneDescription', 'CustomSceneLoudnessLiveUpdate', 'OnAddCustomSceneClick',
     'ItemsSource="{Binding CustomSceneCards}"', 'OnRemoveCustomSceneClick',
     'AutomationProperties.Name="準備 IR WAV 檔案"', 'OnPrepareIrClick',
     'OnRefreshSessionCatalogClick',
