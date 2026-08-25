@@ -6103,6 +6103,95 @@ int main() {
         Vst3SandboxProcess idle_sandbox;
         CHECK(!idle_sandbox.poll_watchdog(1000000ULL));
         CHECK(idle_sandbox.crash_report_store().size() == 0U);
+
+        // Issue 1335: a forced-termination failure during quarantine must
+        // land exactly one job_object_failure entry and suppress the
+        // caller's duplicate reason for the same lifecycle event.
+        Vst3SandboxProcess job_failure_sandbox;
+        const wchar_t* job_worker_candidates[] = {
+            L".local/build/vst-host/RelWithDebInfo/hibiki_vst_worker.exe",
+            L"vst-host/RelWithDebInfo/hibiki_vst_worker.exe"};
+        bool job_worker_launched = false;
+        for (const auto* candidate : job_worker_candidates) {
+            if (GetFileAttributesW(candidate) != INVALID_FILE_ATTRIBUTES) {
+                job_worker_launched = job_failure_sandbox.launch(
+                    make_sandbox_launch(candidate,
+                                        L"C:/plugins/vendor-a/secret-plugin.vst3"));
+                break;
+            }
+        }
+        if (job_worker_launched) {
+            job_failure_sandbox.force_job_terminate_failure_for_test();
+            CHECK(job_failure_sandbox.poll_watchdog(1000000ULL));
+            CHECK(job_failure_sandbox.state() == Vst3SandboxState::Quarantined);
+            const auto& job_store = job_failure_sandbox.crash_report_store();
+            // Exactly one entry for the event; the forced-termination
+            // failure wins the slot over the watchdog timeout.
+            CHECK(job_store.size() == 1U);
+            const auto& job_entry = job_store.entry_at(0U);
+            CHECK(job_entry.reason ==
+                      Vst3CrashReportReasonV1::job_object_failure &&
+                  job_entry.exit_code == 0U && job_entry.captured_utc > 0);
+            // A second terminal stop() is an independent event: the slot
+            // opens fresh but no further forced failure is pending, so the
+            // store still holds exactly one entry.
+            job_failure_sandbox.stop();
+            CHECK(job_store.size() == 1U);
+
+            // Redaction: serialize the store and confirm the raw plugin
+            // path bytes never appear in the document.
+            std::array<char, 4096> job_document{};
+            std::size_t job_written = 0U;
+            CHECK(serialize_vst3_crash_report_store_v1(
+                      job_store, job_document, job_written) ==
+                  Vst3CrashReportResultV1::ok);
+            const std::string_view job_leak("secret-plugin");
+            bool job_leak_found = false;
+            for (std::size_t offset = 0U;
+                 offset + job_leak.size() <= job_written; ++offset) {
+                if (std::equal(job_leak.begin(), job_leak.end(),
+                               job_document.begin() +
+                                   static_cast<std::ptrdiff_t>(offset))) {
+                    job_leak_found = true;
+                }
+            }
+            CHECK(!job_leak_found);
+        } else {
+            CHECK(true);  // Worker binary not built in this configuration.
+        }
+
+        // Issue 1335 normal path: without an injected failure, quarantine
+        // records the original reason only and no job_object_failure entry.
+        Vst3SandboxProcess normal_quarantine_sandbox;
+        const wchar_t* normal_candidates[] = {
+            L".local/build/vst-host/RelWithDebInfo/hibiki_vst_worker.exe",
+            L"vst-host/RelWithDebInfo/hibiki_vst_worker.exe"};
+        bool normal_launched = false;
+        for (const auto* candidate : normal_candidates) {
+            if (GetFileAttributesW(candidate) != INVALID_FILE_ATTRIBUTES) {
+                normal_launched = normal_quarantine_sandbox.launch(
+                    make_sandbox_launch(candidate,
+                                        L"C:/plugins/vendor-a/secret-plugin.vst3"));
+                break;
+            }
+        }
+        if (normal_launched) {
+            CHECK(normal_quarantine_sandbox.poll_watchdog(1000000ULL));
+            CHECK(normal_quarantine_sandbox.state() == Vst3SandboxState::Quarantined);
+            const auto& normal_store =
+                normal_quarantine_sandbox.crash_report_store();
+            CHECK(normal_store.size() == 1U);
+            bool has_job_failure = false;
+            for (std::size_t index = 0U; index < normal_store.size(); ++index) {
+                if (normal_store.entry_at(index).reason ==
+                    Vst3CrashReportReasonV1::job_object_failure) {
+                    has_job_failure = true;
+                }
+            }
+            CHECK(!has_job_failure);
+        } else {
+            CHECK(true);  // Worker binary not built in this configuration.
+        }
 #endif
     }
 
