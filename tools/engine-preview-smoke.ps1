@@ -6,6 +6,7 @@ param(
   [switch]$EnableProcessDelivery,
   [switch]$EnableWasapiOutput,
   [switch]$EnableTestTone,
+  [switch]$EnableTabBridge,
   [switch]$StatusOnly,
   [switch]$SelfTest
 )
@@ -436,6 +437,10 @@ if ($EnableTestTone) {
   if (-not $EnableWasapiOutput) { throw 'EnableTestTone requires EnableWasapiOutput.' }
   $engineArguments += '--enable-test-tone'
 }
+if ($EnableTabBridge) {
+  if (-not $EnableWasapiOutput) { throw 'EnableTabBridge requires EnableWasapiOutput.' }
+  $engineArguments += '--enable-tab-bridge'
+}
 $engineProcess = Start-Process -FilePath $engine -ArgumentList $engineArguments `
   -WorkingDirectory $smokePlan.EngineWorkingDirectory -WindowStyle Hidden -PassThru
 $irPath = $smokePlan.IrPath
@@ -477,8 +482,10 @@ try {
     $statusReply = Receive-IpcFrame $client
     Assert-IpcFrameShape -Frame $statusReply -ExpectedType 12 -ExpectedRequestId 43 -MinimumPayloadLength (40 + (6 * 224))
     $statusPayloadBytes = [BitConverter]::ToUInt32($statusReply, 8)
+    $expectedRouteCount = 6
+    if ($EnableTabBridge) { $expectedRouteCount = 7 }
     if ($statusPayloadBytes -ne ($statusReply.Length - 20) -or
-        $statusPayloadBytes -lt (40 + (6 * 224))) {
+        $statusPayloadBytes -lt (40 + ($expectedRouteCount * 224))) {
       throw "Engine Preview status payload shape is invalid: bytes=$statusPayloadBytes."
     }
     $statusSummary = @()
@@ -527,6 +534,14 @@ try {
         throw "Process delivery route detail is unexpected: '$processDetail'."
       }
       $statusSummary += "process delivery enabled; route detail='$processDetail'"
+    }
+    if ($EnableTabBridge) {
+      $tabRouteOffset = 20 + 40 + (6 * 224)
+      if ($statusReply[$tabRouteOffset + 1] -gt 4) {
+        throw "Browser tab route state is invalid: $($statusReply[$tabRouteOffset + 1])."
+      }
+      $tabState = $statusReply[$tabRouteOffset + 1]
+      $statusSummary += "browser tab route state=$tabState; listener is loopback-only and opt-in"
     }
     if ($EnableTestTone) {
       $toneRendering = $false
