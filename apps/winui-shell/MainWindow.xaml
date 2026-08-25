@@ -5,7 +5,7 @@
         <MicaBackdrop Kind="BaseAlt" />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="RootGrid" Padding="0" AutomationProperties.Name="Hibiki DSP 音訊場景控制">
+    <Grid x:Name="RootGrid" RequestedTheme="Light" Padding="0" AutomationProperties.Name="Hibiki DSP 音訊場景控制">
         <Grid.Resources>
             <ResourceDictionary>
                 <ResourceDictionary.ThemeDictionaries>
