@@ -7,7 +7,7 @@
   "required": ["schema_version", "standard", "mode", "reference_phon", "strength", "max_boost_db"],
   "properties": {
     "schema_version": {"const": 1},
-    "standard": {"enum": ["iso-226-2023-derived", "iso-226-2023-calibrated"]},
+    "standard": {"enum": ["equal-loudness-derived", "equal-loudness-calibrated"]},
     "mode": {"enum": ["calibrated", "relative", "program-aware"]},
     "reference_phon": {"type": "number", "minimum": 20, "maximum": 90},
     "strength": {"type": "number", "minimum": 0, "maximum": 1},

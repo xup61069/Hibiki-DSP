@@ -52,7 +52,7 @@ reference 字串分別佔用固定區間，timeline ID 表與最多 4 條 lane r
 編碼與解碼必須對稱且嚴格：schema 版本、operation 範圍、zero-padding、bounded-string
 可列印 UTF-8、enum 邊界、finite double、lane/timeline 容量任一驗證失敗即拒收，
 不得部分套用。make-up gain 以 Q16.16 定點數傳輸；channel matrix 以 f32 bit-level 序列化。
-引擎收到 Upsert 後重建完整 `SceneDefinitionV1`，通過既有 Scene/Graph/ISO policy 驗證後
+引擎收到 Upsert 後重建完整 `SceneDefinitionV1`，通過既有 Scene/Graph/equal-loudness policy 驗證後
 才進入 catalog；Remove/Clear 同樣走原子替換。
 
 ## 交易與容量
@@ -60,7 +60,7 @@ reference 字串分別佔用固定區間，timeline ID 表與最多 4 條 lane r
 - `SceneCatalogV1::upsert` 先建立完整 replacement，再以 slot swap 原子替換；配置失敗
   不得留下半份 Scene。
 - Scene ID 適合現有 bounded IPC payload，限制為 1–31 bytes；名稱最多 120 bytes。
-- definition 必須通過 Scene、Graph、ISO policy 驗證；Strict Direct latency mode 與 graph
+- definition 必須通過 Scene、Graph、equal-loudness policy 驗證；Strict Direct latency mode 與 graph
   的 `strict_direct` 必須一致。
 - `EngineControlWorkerV1` 只在 control worker 呼叫 resolver、執行 preflight 與
   Validate → Prepare → Commit；RT thread、pipe callback 不讀 catalog。

@@ -16,7 +16,7 @@ inline constexpr std::size_t kTelemetryDoubleCountV1 = 2U;
 // for backwards compatibility. KWeightedProxy adds the two fixed K-weighting
 // sections used by the ITU-R BS.1770 family, but this class is still not a
 // conformance meter: it has no gated loudness blocks, true-peak oracle, or
-// channel-layout metadata. It must not be presented as formal BS.1770 or ISO
+// channel-layout metadata. It must not be presented as formal BS.1770 or equal-loudness
 // 226 conformance.
 enum class ProgramAwareMeterModeV1 : std::uint8_t {
     RmsProxy = 0,
@@ -51,7 +51,7 @@ struct ProgramAwareLevelStatusV1 {
 };
 
 // Control-plane projection of RT-owned status. This is bounded visual
-// telemetry only; it is not a BS.1770 meter, ISO 226 curve, or physical-audio
+// telemetry only; it is not a BS.1770 meter, equal-loudness curve, or physical-audio
 // evidence.
 struct ProgramAwareTelemetrySnapshotV1 {
     bool valid{false};
