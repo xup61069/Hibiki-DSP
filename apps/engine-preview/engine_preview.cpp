@@ -1551,6 +1551,7 @@ int wmain(const int argc, wchar_t* const* argv) {
 
     auto next_catalog_poll = std::chrono::steady_clock::now() + std::chrono::milliseconds{250};
     auto next_session_poll = std::chrono::steady_clock::now() + std::chrono::milliseconds{250};
+    auto next_delivery_sync = std::chrono::steady_clock::now() + std::chrono::milliseconds{50};
     auto next_volume_poll = std::chrono::steady_clock::now() + std::chrono::milliseconds{50};
     auto next_volume_write = std::chrono::steady_clock::now();
     auto next_driver_loopback_render = std::chrono::steady_clock::now();
@@ -1586,10 +1587,11 @@ int wmain(const int argc, wchar_t* const* argv) {
             }
             next_session_poll = now + std::chrono::milliseconds{250};
         }
-        if (process_delivery_requested && now >= next_session_poll) {
+        if (process_delivery_requested && now >= next_delivery_sync) {
             (void)rebuild_delivery_graph(process_delivery, engine, wasapi_output,
                                          session_routing.coordinator);
             sync_delivery_sources(process_delivery, session_routing.coordinator);
+            next_delivery_sync = now + std::chrono::milliseconds{100};
         }
         if (system_volume_requested && device_enumerator != nullptr && now >= next_volume_poll) {
             const auto bind_result = rebind_default_volume_if_changed(
@@ -1748,11 +1750,16 @@ int wmain(const int argc, wchar_t* const* argv) {
                 : session_route_ready && session_snapshot.session_count > 0U
                     ? hibiki::ControlRouteHealthStateV1::Pending
                     : hibiki::ControlRouteHealthStateV1::Unavailable;
+        const auto wasapi_snapshot_now = engine.wasapi_output_snapshot();
+        const bool wasapi_actually_rendering = has_rendered_blocks(wasapi_snapshot_now);
         const auto process_route_state = session_snapshot.degraded
             ? hibiki::ControlRouteHealthStateV1::Degraded
-            : session_route_ready && session_snapshot.routed_count > 0U
-                ? hibiki::ControlRouteHealthStateV1::Pending
-                : hibiki::ControlRouteHealthStateV1::Unavailable;
+            : session_route_ready && session_snapshot.routed_count > 0U &&
+                  process_delivery.rendered_blocks > 0U && wasapi_actually_rendering
+                ? hibiki::ControlRouteHealthStateV1::Ready
+                : session_route_ready && session_snapshot.routed_count > 0U
+                    ? hibiki::ControlRouteHealthStateV1::Pending
+                    : hibiki::ControlRouteHealthStateV1::Unavailable;
         const auto session_detail = !session_routing_requested
             ? std::string_view("session routing disabled; Preview will not enumerate Apps.")
             : !session_routing.bound
@@ -1760,21 +1767,34 @@ int wmain(const int argc, wchar_t* const* argv) {
                 : session_snapshot.degraded
                     ? std::string_view("session enumeration degraded; controls fail closed.")
                     : std::string_view("session catalog linked; per-App controls enabled; delivery unverified.");
-        const auto process_detail = !session_routing_requested
-            ? std::string_view("session routing disabled; process source is not bound.")
-            : !process_delivery_requested
-                ? std::string_view(
-                      "process-tree source remains worker-owned; physical delivery unverified.")
-                : (process_delivery.rendered_blocks > 0U
-                       ? std::string_view(
-                             "per-App process delivery active; blocks rendered through WASAPI sink.")
-                       : std::string_view(
-                             "per-App process delivery enabled; waiting for captured audio."));
+        static thread_local std::string process_detail_buffer;
+        if (!session_routing_requested) {
+            process_detail_buffer =
+                "session routing disabled; process source is not bound.";
+        } else if (!process_delivery_requested) {
+            process_detail_buffer =
+                "process-tree source remains worker-owned; physical delivery unverified.";
+        } else if (process_route_state == hibiki::ControlRouteHealthStateV1::Ready) {
+            process_detail_buffer =
+                "per-App delivery active: " +
+                std::to_string(process_delivery.rendered_blocks) + " block(s) rendered, " +
+                std::to_string(wasapi_snapshot_now.primary.rendered_blocks +
+                               wasapi_snapshot_now.secondary.rendered_blocks) +
+                " WASAPI sink block(s).";
+        } else if (process_delivery.rendered_blocks > 0U) {
+            process_detail_buffer =
+                "per-App capture running (" +
+                std::to_string(process_delivery.rendered_blocks) +
+                " block(s)) but WASAPI sink has not rendered.";
+        } else {
+            process_detail_buffer =
+                "per-App process delivery enabled; waiting for captured audio.";
+        }
         const auto previous_session_route = status.routes[4U];
         const auto previous_process_route = status.routes[5U];
         set_route(status.routes[4U], "windows-session", "Windows App／Session", session_detail,
                   session_route_state, session_routing_requested && session_routing.bound ? 0U : 1U);
-        set_route(status.routes[5U], "process-loopback", "Process Loopback", process_detail,
+        set_route(status.routes[5U], "process-loopback", "Process Loopback", process_detail_buffer,
                   process_route_state, session_routing_requested && session_routing.bound ? 0U : 1U);
         if (!same_route(previous_session_route, status.routes[4U]) ||
             !same_route(previous_process_route, status.routes[5U])) {
@@ -1877,3 +1897,4 @@ int wmain(const int argc, wchar_t* const* argv) {
     if (com_initialized && com_result != RPC_E_CHANGED_MODE) CoUninitialize();
     return 0;
 }
+

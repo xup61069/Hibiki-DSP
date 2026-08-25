@@ -235,6 +235,19 @@ WindowsAudioSessionRouteRefreshResultV1 WindowsAudioSessionRouteCoordinatorV1::r
         degraded_ = true;
         return WindowsAudioSessionRouteRefreshResultV1::Degraded;
     }
+    // Manual route bindings live in the coordinator-owned registry. A refresh
+    // re-enumerates sessions, but it must not erase a binding just because the
+    // same session was upserted from a fresh Windows snapshot.
+    for (AudioSessionDescriptorV1& session : candidate_registry.mutable_sessions()) {
+        if (!session.active) continue;
+        const auto* const previous = registry_.find(session.identity);
+        if (previous == nullptr || previous->lane_id.empty() ||
+            previous->output_group.empty()) {
+            continue;
+        }
+        session.lane_id = previous->lane_id;
+        session.output_group = previous->output_group;
+    }
 
     std::size_t active_count = 0U;
     std::size_t routed_count = 0U;
