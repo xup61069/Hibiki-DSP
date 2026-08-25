@@ -35,22 +35,28 @@ public sealed class ListeningDoseModelV1
     public TimeSpan LastSampleGap => _lastGap;
     public DateTimeOffset WindowStartUtc => _windowStartUtc;
 
+    // There is no automatic local-date rollover yet, so the visible label stays
+    // honest about the accumulation window instead of claiming a day that has
+    // not actually been reset.
+
     public string StateText =>
         _accumulatedDosePercent >= 100.0
-            ? $"今日聆聽劑量：{_accumulatedDosePercent:0}%（過量；建議讓耳朵休息）"
+            ? $"聆聽劑量（自啟動起）：{_accumulatedDosePercent:0}%（過量；建議讓耳朵休息）"
             : _accumulatedDosePercent >= 50.0
-                ? $"今日聆聽劑量：{_accumulatedDosePercent:0}%（注意；接近每日上限）"
-                : $"今日聆聽劑量：{_accumulatedDosePercent:0}%（安全；未校正參考值）";
+                ? $"聆聽劑量（自啟動起）：{_accumulatedDosePercent:0}%（注意；接近每日上限）"
+                : $"聆聽劑量（自啟動起）：{_accumulatedDosePercent:0}%（安全；未校正參考值）";
 
     /// <summary>
     /// Folds one confirmed effective-volume sample taken now. Invalid samples
-    /// are rejected fail-closed without touching accumulated state. Returns
-    /// true when the sample was folded into the accumulator.
+    /// are rejected fail-closed without touching accumulated state. Muted
+    /// samples fold with a zero dose rate so the silent interval is never
+    /// retroactively billed at the previous loud rate; the accumulator still
+    /// advances its time anchor so the next unmuted sample starts fresh.
     /// </summary>
     public bool AddSample(DateTimeOffset atUtc, double effectiveVolumeDb,
                           bool muted)
     {
-        if (muted || !double.IsFinite(effectiveVolumeDb) ||
+        if (!double.IsFinite(effectiveVolumeDb) ||
             effectiveVolumeDb <= MinValidDb)
         {
             return false;
@@ -63,7 +69,7 @@ public sealed class ListeningDoseModelV1
         var doseRatePerHour = excessDb <= 0.0
             ? 0.0
             : 100.0 * Math.Pow(2.0, excessDb / ExchangeDb) / 8.0;
-        var ratePerSecond = doseRatePerHour / 3600.0;
+        var ratePerSecond = muted ? 0.0 : doseRatePerHour / 3600.0;
 
         if (_hasLastSample)
         {

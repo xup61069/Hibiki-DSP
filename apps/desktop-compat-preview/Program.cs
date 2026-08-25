@@ -47,7 +47,7 @@ internal sealed class PreviewForm : Form
     private readonly Button _removeRouteRule = new() { Text = "移除選取預設", AutoSize = true, AccessibleName = "移除選取的 App 路由預設" };
     private readonly Button _clearRouteRules = new() { Text = "清除全部預設", AutoSize = true, AccessibleName = "清除全部 App 路由預設" };
     private readonly Label _effective = new() { AutoSize = true };
-    private readonly Label _listeningDose = new() { AutoSize = true, AccessibleName = "今日聆聽劑量" };
+    private readonly Label _listeningDose = new() { AutoSize = true, AccessibleName = "聆聽劑量（自啟動起）" };
     private readonly ComboBox _scenes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取情境設定檔" };
     private readonly TextBox _customSceneId = new() { Width = 220, PlaceholderText = "Scene ID", AccessibleName = "自訂場景 ID" };
     private readonly TextBox _customSceneName = new() { Width = 220, PlaceholderText = "名稱", AccessibleName = "自訂場景名稱" };
