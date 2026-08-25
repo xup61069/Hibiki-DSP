@@ -67,7 +67,7 @@
 
 
 
-        <controls:NavigationView x:Name="ShellNav" IsBackButtonVisible="Collapsed" IsSettingsVisible="False" OpenPaneLength="244" SelectionChanged="OnShellNavSelectionChanged" AutomationProperties.Name="主要導覽">
+        <controls:NavigationView Grid.Row="1" x:Name="ShellNav" IsBackButtonVisible="Collapsed" IsSettingsVisible="False" OpenPaneLength="244" SelectionChanged="OnShellNavSelectionChanged" AutomationProperties.Name="主要導覽">
   <controls:NavigationView.MenuItems>
     <controls:NavigationViewItem Content="快速開始" Tag="home" IsSelected="True" AutomationProperties.Name="快速開始頁面">
       <controls:NavigationViewItem.Icon>
