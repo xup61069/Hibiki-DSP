@@ -1049,6 +1049,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         // rejection or failure above never reaches this line.
         ListeningDose.AddSample(DateTimeOffset.UtcNow, state.EffectiveDb,
                                 state.Muted);
+        OnPropertyChanged(nameof(ListeningDose));
         OnPropertyChanged(nameof(RequestedVolumeDb));
         OnPropertyChanged(nameof(RequestedVolumeDisplayText));
         OnPropertyChanged(nameof(Muted));
