@@ -895,18 +895,20 @@ int wmain(const int argc, wchar_t* const* argv) {
         }
     }
     const bool tab_bridge_started = wasapi_started && tab_bridge.requested;
+    std::string tab_bridge_route_detail{};
     if (tab_bridge_started) {
         hibiki::TabBridgeServerConfigV1 tab_config{};
         if (tab_bridge.server.start(tab_config, hibiki::enqueue_tab_capture_packet_v1,
                                     &tab_bridge.queue)) {
             tab_bridge.listening = true;
-            tab_bridge_detail = "loopback listener bound; waiting for browser capture.";
             tab_bridge.input_buffer.resize(
                 static_cast<std::size_t>(kTabBridgeMaxFrames) * 2U);
             tab_bridge.output_buffer.resize(
                 static_cast<std::size_t>(kTabBridgeMaxFrames) *
                 static_cast<std::size_t>(kTestToneMaxOutputChannels));
             tab_bridge.lane_inputs.assign(1U, hibiki::RtLaneInputV1{});
+            tab_bridge_route_detail =
+                "loopback listener bound; waiting for browser capture.";
         } else {
             tab_bridge_detail = "loopback listener bind failed; tab bridge disabled.";
         }
@@ -1204,13 +1206,24 @@ int wmain(const int argc, wchar_t* const* argv) {
         }
         const auto previous_tab_route = status.routes[6U];
         const auto wasapi_snapshot_now = engine.wasapi_output_snapshot();
+        if (!tab_bridge_route_detail.empty()) {
+            const auto dropped = tab_bridge.queue.dropped_blocks();
+            if (dropped > 0U) {
+                tab_bridge_route_detail =
+                    "receiving; dropped " + std::to_string(dropped) +
+                    " block(s) while the 4-slot capture queue was full.";
+            }
+        }
         if (!tab_bridge.listening) {
             set_route(status.routes[6U], "browser-tab", "瀏覽器分頁", tab_bridge_detail,
                       hibiki::ControlRouteHealthStateV1::Unavailable, 1U);
         } else if (tab_bridge.received_blocks > 0U &&
                    has_rendered_blocks(wasapi_snapshot_now)) {
             set_route(status.routes[6U], "browser-tab", "瀏覽器分頁",
-                      "receiving user-gesture tab capture; rendered through WASAPI sink.",
+                      !tab_bridge_route_detail.empty()
+                          ? std::string_view(tab_bridge_route_detail)
+                          : std::string_view(
+                                "receiving user-gesture tab capture; rendered through WASAPI sink."),
                       hibiki::ControlRouteHealthStateV1::Ready, 0U);
         } else {
             set_route(status.routes[6U], "browser-tab", "瀏覽器分頁", tab_bridge_detail,
