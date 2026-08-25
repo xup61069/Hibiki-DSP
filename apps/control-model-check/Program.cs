@@ -1481,10 +1481,12 @@ static async Task RunSceneCatalogCheckServerAsync(
     };
     const string pipeName = "HibikiDSP_eq_snapshot_poll_check";
     using var serverCts = new CancellationTokenSource();
+    long eqPollRequestCount = 0L;
     var connectedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     var serverTask = RunSceneCatalogCheckServerAsync(pipeName, request =>
     {
         if (request.Type != ControlMessageType.EqVisualSnapshotRequest) return null;
+        Interlocked.Increment(ref eqPollRequestCount);
         return new IpcEnvelopeV1(
             ControlMessageType.EqVisualSnapshot,
             request.RequestId,
@@ -1505,6 +1507,28 @@ static async Task RunSceneCatalogCheckServerAsync(
         Check(!await eqViewModel.RefreshEqVisualSnapshotAsync(serverCts.Token) ||
               eqViewModel.EqSurface.LastAppliedSequence >= 9UL,
             "Repeated pulls must never rewind the confirmed surface.");
+
+        // Periodic EQ visual polling: after connect, the background loop must
+        // issue additional EqVisualSnapshotRequest frames without any caller
+        // action. Two observed requests beyond the initial pull prove the
+        // loop runs; a disconnect must stop further polling growth.
+        var pollRequestsBefore = Interlocked.Read(ref eqPollRequestCount);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(4);
+        while (Interlocked.Read(ref eqPollRequestCount) < pollRequestsBefore + 2 &&
+               DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(50, serverCts.Token).ConfigureAwait(true);
+        }
+        Check(Interlocked.Read(ref eqPollRequestCount) >= pollRequestsBefore + 2,
+            "The periodic EQ visual poll must issue repeated snapshot requests after connect.");
+
+        await eqViewModel.DisconnectAsync();
+        serverCts.Cancel();
+        try { await serverTask; } catch (OperationCanceledException) { }
+        var pollRequestsAtStop = Interlocked.Read(ref eqPollRequestCount);
+        await Task.Delay(1400).ConfigureAwait(true);
+        Check(Interlocked.Read(ref eqPollRequestCount) == pollRequestsAtStop,
+            "Disconnect must stop the periodic EQ visual poll.");
     }
     finally
     {
