@@ -5019,6 +5019,35 @@ int main() {
         // After the window expires the same group's small step succeeds.
         std::this_thread::sleep_for(std::chrono::milliseconds(260));
         CHECK(group_engine->update_loudness_phon("side", 62.0));
+
+        // A live phon recompute is an attached-to-attached replace on the
+        // active group, so it must use the bounded equal-power RT crossfade
+        // instead of swapping filters mid-block. Rendering stays finite and
+        // the transaction completes within the fade budget.
+        std::array<float, 1024> live_fade_input{};
+        std::array<float, 2048> live_fade_output{};
+        const RtLaneInputV1 live_fade_view{live_fade_input.data(), 2U};
+        std::array<float, 1024> live_fade_idle{};
+        const RtLaneInputV1 live_fade_idle_view{live_fade_idle.data(), 2U};
+        const std::array<RtLaneInputV1, 2> live_fade_views{
+            {live_fade_idle_view, live_fade_view}};
+        CHECK(group_engine->prepare_loudness_peq(
+            "side", group_points, 62.0, group_policy));
+        CHECK(group_engine->commit_loudness_peq());
+        group_engine->set_loudness_live_update("side", true);
+        CHECK(group_engine->update_loudness_phon("side", 65.0));
+        CHECK(!group_engine->loudness_peq_transition_complete());
+        for (std::size_t fade_block = 0U;
+             fade_block < 6U && !group_engine->loudness_peq_transition_complete();
+             ++fade_block) {
+            CHECK(group_engine->process_output_group(
+                "side", live_fade_views, live_fade_output.data(), 1024U));
+            CHECK(std::all_of(live_fade_output.begin(), live_fade_output.end(),
+                              [](const float value) {
+                                  return std::isfinite(value);
+                              }));
+        }
+        CHECK(group_engine->loudness_peq_transition_complete());
     }
 
     // Program-aware level is a fixed-capacity output attachment. The Movie
