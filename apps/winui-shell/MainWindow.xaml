@@ -13,11 +13,17 @@
                         <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#F6F9FC" />
                         <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="{StaticResource SystemAccentColor}" />
                         <SolidColorBrush x:Key="HibikiSliderTrackFillBrush" Opacity="0.3" Color="{StaticResource SystemAccentColor}" />
+                        <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="{StaticResource SystemAccentColor}" />
+                        <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="{StaticResource SystemAccentColor}" />
+                        <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="{StaticResource SystemAccentColor}" />
                     </ResourceDictionary>
                     <ResourceDictionary x:Key="Dark">
                         <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="#1B2028" />
                         <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="{StaticResource SystemAccentColorLight1}" />
                         <SolidColorBrush x:Key="HibikiSliderTrackFillBrush" Opacity="0.4" Color="{StaticResource SystemAccentColor}" />
+                        <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="{StaticResource SystemAccentColorLight1}" />
+                        <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="{StaticResource SystemAccentColorLight1}" />
+                        <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="{StaticResource SystemAccentColorLight1}" />
                     </ResourceDictionary>
                 </ResourceDictionary.ThemeDictionaries>
                 <Style x:Key="ModernSliderStyle" TargetType="Slider">
@@ -630,11 +636,16 @@
       </ScrollViewer>
     </Grid>
   </controls:NavigationView.Content>
-</controls:NavigationView><Border Grid.Row="2" Padding="14,6" Margin="32,10,32,16" HorizontalAlignment="Left" CornerRadius="999" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <FontIcon FontSize="12" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
-                <TextBlock Text="Easy 模式只顯示安全操作；切換 Expert 才會顯示 Matrix、DSP Graph、IR 與 VST3。" Style="{ThemeResource CaptionTextBlockStyle}" TextWrapping="Wrap" MaxWidth="640" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-            </StackPanel>
-        </Border>
+</controls:NavigationView>
+    <Border Grid.Row="2" Padding="32,10,32,14" Background="Transparent"
+            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <FontIcon FontSize="12" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" Glyph="&#xE946;" />
+            <TextBlock Text="Easy 模式只顯示安全操作；切換 Expert 才會顯示 Matrix、DSP Graph、IR 與 VST3。"
+                       Style="{ThemeResource CaptionTextBlockStyle}"
+                       TextTrimming="CharacterEllipsis" MaxLines="1"
+                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
+        </StackPanel>
+    </Border>
     </Grid>
 </Window>
