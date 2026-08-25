@@ -3,6 +3,7 @@
 #include "hibiki/audio_engine.hpp"
 #include "hibiki/control_status.hpp"
 #include "hibiki/control_service.hpp"
+#include "hibiki/driver_stream_ring_v1.h"
 #include "hibiki/engine_control.hpp"
 #include "hibiki/noise_suppressor.hpp"
 #include "hibiki/scene_presets.hpp"
@@ -75,6 +76,7 @@ struct WasapiOutputState final {
     bool requested{false};
     bool active{false};
     bool test_tone_enabled{false};
+    bool driver_loopback_enabled{false};
 };
 
 constexpr std::uint32_t kTabBridgeMaxFrames = 4096U;
@@ -104,6 +106,32 @@ struct TestToneState final {
     double phase{0.0};
     std::uint32_t sample_rate{0U};
     std::uint32_t block_frames{0U};
+};
+
+constexpr std::uint32_t kDriverLoopbackInputChannels = 2U;
+constexpr std::uint32_t kDriverLoopbackMaxFrames = 4096U;
+// Bounded ASCII identifier below the 40-byte wire GUID capacity; it never
+// leaves this process except inside validated v1 packets.
+constexpr char kDriverLoopbackEndpointGuid[] = "hibiki-driver-loopback-v1";
+
+struct DriverLoopbackState final {
+    std::array<float, kDriverLoopbackMaxFrames * kDriverLoopbackInputChannels> input{};
+    std::array<float, kTestToneMaxFrames * kTestToneMaxOutputChannels> processed{};
+    std::array<float, kTestToneMaxFrames * kTestToneMaxOutputChannels> decode_samples{};
+    std::array<float, kTestToneMaxFrames * kTestToneMaxOutputChannels> output{};
+    std::array<std::uint8_t, HIBIKI_DRIVER_STREAM_RING_SLOT_CAPACITY_BYTES_V1> packet{};
+    std::array<std::uint8_t, HIBIKI_DRIVER_STREAM_RING_SLOT_CAPACITY_BYTES_V1> popped{};
+    std::array<hibiki::RtLaneInputV1, 1U> lanes{};
+    hibiki_driver_stream_ring_v1 ring{};
+    double phase{0.0};
+    std::uint64_t sequence{0U};
+    std::uint64_t rendered_blocks{0U};
+    std::uint32_t sample_rate{0U};
+    std::uint32_t block_frames{0U};
+    std::uint32_t encode_failures{0U};
+    std::uint32_t push_failures{0U};
+    std::uint32_t pop_failures{0U};
+    std::uint32_t deliver_failures{0U};
 };
 
 constexpr std::size_t kMaxProcessDeliverySources = 8U;
@@ -217,6 +245,113 @@ bool render_test_tone(TestToneState& tone,
     return engine.process_output_group_to_wasapi(
         "main", std::span<const hibiki::RtLaneInputV1>(tone.lanes), tone.output.data(),
         tone.block_frames);
+}
+
+bool prepare_driver_loopback(DriverLoopbackState& loopback,
+                             WasapiOutputState& output,
+                             hibiki::AudioEngineModel& engine) noexcept {
+    if (!output.active || output.config.sample_rate == 0U || output.block_frames == 0U ||
+        output.block_frames > kDriverLoopbackMaxFrames ||
+        output.config.channels > kTestToneMaxOutputChannels) {
+        return false;
+    }
+
+    auto scene = hibiki::make_easy_scene(hibiki::EasySceneKind::Studio, "main");
+    scene.graph.output_channels = output.config.channels;
+    engine.set_sample_rate(output.config.sample_rate);
+    if (!engine.prepare_graph(scene.graph, 4U) || !engine.commit_graph()) {
+        engine.rollback_graph();
+        return false;
+    }
+
+    if (hibiki_driver_stream_ring_init_v1(
+            &loopback.ring,
+            sizeof(loopback.ring),
+            output.config.channels,
+            output.config.sample_rate) != HIBIKI_DRIVER_STREAM_RING_OK_V1) {
+        engine.rollback_graph();
+        return false;
+    }
+    loopback.lanes[0U] =
+        hibiki::RtLaneInputV1{loopback.input.data(), kDriverLoopbackInputChannels};
+    loopback.sample_rate = output.config.sample_rate;
+    loopback.block_frames = output.block_frames;
+    output.driver_loopback_enabled = true;
+    return true;
+}
+
+bool render_driver_loopback(DriverLoopbackState& loopback,
+                            hibiki::AudioEngineModel& engine) noexcept {
+    constexpr double kFrequencyHz = 440.0;
+    constexpr float kAmplitude = 0.1F;  // approximately -20 dBFS
+    constexpr double kTwoPi = 6.28318530717958647692;
+    if (loopback.sample_rate == 0U || loopback.block_frames == 0U ||
+        loopback.block_frames > kDriverLoopbackMaxFrames) {
+        ++loopback.encode_failures;
+        return false;
+    }
+
+    // Source block: bounded stereo sine, same level as the existing test tone.
+    const auto phase_increment = kTwoPi * kFrequencyHz /
+                                 static_cast<double>(loopback.sample_rate);
+    for (std::uint32_t frame = 0U; frame < loopback.block_frames; ++frame) {
+        const auto sample = kAmplitude * static_cast<float>(std::sin(loopback.phase));
+        if (!std::isfinite(sample)) {
+            ++loopback.encode_failures;
+            return false;
+        }
+        const auto offset =
+            static_cast<std::size_t>(frame) * kDriverLoopbackInputChannels;
+        loopback.input[offset] = sample;
+        loopback.input[offset + 1U] = sample;
+        loopback.phase += phase_increment;
+        if (loopback.phase >= kTwoPi) loopback.phase -= kTwoPi;
+    }
+
+    // Engine path: graph, Group Master and limiter run exactly once per
+    // packet, then the processed block is encoded as a complete v1 packet.
+    std::size_t written_bytes = 0U;
+    if (!engine.encode_driver_stream_packet_from_lane(
+            0U, kDriverLoopbackEndpointGuid, loopback.sequence + 1U,
+            /*generation=*/1ULL,
+            /*flags=*/0U, loopback.input.data(), kDriverLoopbackInputChannels,
+            loopback.block_frames, std::span<hibiki::RtLaneInputV1>(loopback.lanes),
+            loopback.processed.data(), std::span<std::uint8_t>(loopback.packet),
+            written_bytes)) {
+        ++loopback.encode_failures;
+        return false;
+    }
+    ++loopback.sequence;
+
+    const auto push_result = hibiki_driver_stream_ring_push_v1(
+        &loopback.ring, sizeof(loopback.ring), loopback.packet.data(), written_bytes);
+    if (push_result != HIBIKI_DRIVER_STREAM_RING_OK_V1) {
+        ++loopback.push_failures;
+        return false;
+    }
+
+    std::size_t popped_bytes = 0U;
+    std::uint32_t silence = 0U;
+    const auto pop_result = hibiki_driver_stream_ring_pop_v1(
+        &loopback.ring, sizeof(loopback.ring), loopback.popped.data(),
+        loopback.popped.size(), &popped_bytes, &silence);
+    if (pop_result != HIBIKI_DRIVER_STREAM_RING_OK_V1) {
+        ++loopback.pop_failures;
+        return false;
+    }
+
+    // Delivery: decode validates the whole packet again before it may enter
+    // the lane graph a second time on the way to the WASAPI handoff.
+    if (!engine.process_driver_stream_packet_to_wasapi(
+            0U, kDriverLoopbackEndpointGuid,
+            std::span<const std::uint8_t>(loopback.popped.data(), popped_bytes),
+            std::span<float>(loopback.decode_samples),
+            std::span<hibiki::RtLaneInputV1>(loopback.lanes), loopback.output.data())) {
+        ++loopback.deliver_failures;
+        return false;
+    }
+    ++loopback.rendered_blocks;
+    return true;
 }
 
 // Rebuild the engine graph from the coordinator's current session-route plan.
@@ -706,6 +841,8 @@ hibiki::ControlStatusSnapshotV1 make_initial_status(
     const bool session_routing_enabled,
     const std::string_view session_routing_detail,
     const std::string_view process_loopback_detail,
+    const bool driver_loopback_enabled,
+    const std::string_view driver_loopback_detail,
     const bool tab_bridge_enabled,
     const std::string_view tab_bridge_detail) noexcept {
     hibiki::ControlStatusSnapshotV1 snapshot{};
@@ -745,7 +882,13 @@ hibiki::ControlStatusSnapshotV1 make_initial_status(
               tab_bridge_enabled ? hibiki::ControlRouteHealthStateV1::Pending
                                   : hibiki::ControlRouteHealthStateV1::Unavailable,
               tab_bridge_enabled ? 0U : 1U);
-    if (tab_bridge_enabled) snapshot.route_count = 7U;
+    set_route(snapshot.routes[6U], "driver-loopback", "Driver Stream Loopback",
+              driver_loopback_detail,
+              driver_loopback_enabled
+                  ? hibiki::ControlRouteHealthStateV1::Pending
+                  : hibiki::ControlRouteHealthStateV1::Unavailable,
+              driver_loopback_enabled ? 0U : 1U);
+    if (tab_bridge_enabled || driver_loopback_enabled) snapshot.route_count = 7U;
     return snapshot;
 }
 
@@ -794,6 +937,8 @@ int wmain(const int argc, wchar_t* const* argv) {
         has_command_line_flag(argc, argv, L"--enable-tab-bridge");
     const bool tab_noise_suppressor_requested =
         has_command_line_flag(argc, argv, L"--enable-tab-noise-suppressor");
+    const bool driver_loopback_requested =
+        has_command_line_flag(argc, argv, L"--enable-driver-loopback");
     if (tab_noise_suppressor_requested && !tab_bridge_requested) {
         // Fail-closed: the basic suppressor only has meaning on the tab lane;
         // refuse to start rather than silently running an unused effect.
@@ -813,9 +958,22 @@ int wmain(const int argc, wchar_t* const* argv) {
         (void)SetConsoleCtrlHandler(on_console_control, FALSE);
         return 2;
     }
+    if (driver_loopback_requested && !wasapi_output_requested) {
+        // Fail-closed: the loopback source exists to prove the packet chain
+        // reaches a sink; without a sink it has no meaningful behavior.
+        (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+        return 2;
+    }
     if (tab_bridge_requested && test_tone_requested) {
         // Fail-closed: one explicit audio source per preview run. A test tone
         // would fight the tab lane for the same output-group graph.
+        (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+        return 2;
+    }
+    if (driver_loopback_requested &&
+        (test_tone_requested || tab_bridge_requested || process_delivery_requested)) {
+        // Fail-closed: one explicit audio source per preview run. The loopback
+        // owns lane 0 and must not fight another source for the same graph.
         (void)SetConsoleCtrlHandler(on_console_control, FALSE);
         return 2;
     }
@@ -841,6 +999,7 @@ int wmain(const int argc, wchar_t* const* argv) {
     wasapi_output.engine = &engine;
     wasapi_output.requested = wasapi_output_requested;
     TestToneState test_tone;
+    DriverLoopbackState driver_loopback;
     ProcessDeliveryState process_delivery;
     TabBridgeState tab_bridge;
     tab_bridge.requested = tab_bridge_requested;
@@ -874,6 +1033,10 @@ int wmain(const int argc, wchar_t* const* argv) {
                                     : false;
     if (wasapi_started && test_tone_requested) {
         (void)prepare_test_tone(test_tone, wasapi_output, engine);
+    }
+    bool driver_loopback_ready = false;
+    if (wasapi_started && driver_loopback_requested) {
+        driver_loopback_ready = prepare_driver_loopback(driver_loopback, wasapi_output, engine);
     }
     if (wasapi_started && session_routing_requested && process_delivery_requested) {
         (void)rebuild_delivery_graph(process_delivery, engine, wasapi_output,
@@ -943,6 +1106,11 @@ int wmain(const int argc, wchar_t* const* argv) {
         }
     }
     const auto initial_wasapi_snapshot = engine.wasapi_output_snapshot();
+    std::string driver_loopback_detail = driver_loopback_requested
+        ? (driver_loopback_ready
+               ? "driver-stream loopback armed; waiting for first rendered packet."
+               : "driver-stream loopback unavailable; sink or graph setup failed.")
+        : "driver-stream loopback disabled; no in-process packets are published.";
     const std::string catalog_detail = physical_catalog_ready
         ? "physical catalog ready; Preview sink disabled unless WASAPI opt-in is requested."
         : "physical catalog unavailable; safe Preview retained.";
@@ -1027,6 +1195,8 @@ int wmain(const int argc, wchar_t* const* argv) {
                                       initial_wasapi_snapshot, system_volume_active,
                                       system_volume_detail, session_routing_active,
                                       session_routing_detail, process_loopback_detail,
+                                      wasapi_output.driver_loopback_enabled,
+                                      driver_loopback_detail,
                                       tab_bridge.listening, tab_bridge_detail);
     if (!status_store.publish(status)) return 4;
     hibiki::ControlPlaneHostV1 host;
@@ -1050,6 +1220,7 @@ int wmain(const int argc, wchar_t* const* argv) {
     auto next_session_poll = std::chrono::steady_clock::now() + std::chrono::milliseconds{250};
     auto next_volume_poll = std::chrono::steady_clock::now() + std::chrono::milliseconds{50};
     auto next_volume_write = std::chrono::steady_clock::now();
+    auto next_driver_loopback_render = std::chrono::steady_clock::now();
     auto next_test_tone_render = std::chrono::steady_clock::now();
     while (!g_stop.load(std::memory_order_acquire)) {
         const auto now = std::chrono::steady_clock::now();
@@ -1147,6 +1318,10 @@ int wmain(const int argc, wchar_t* const* argv) {
             (void)render_test_tone(test_tone, engine);
             next_test_tone_render = now + std::chrono::milliseconds{10};
         }
+        if (wasapi_output.driver_loopback_enabled && now >= next_driver_loopback_render) {
+            (void)render_driver_loopback(driver_loopback, engine);
+            next_driver_loopback_render = now + std::chrono::milliseconds{10};
+        }
         if (tab_bridge.listening) {
             hibiki::TabCaptureBlockV1 block{};
             const bool delivered = hibiki::process_tab_capture_lane_to_wasapi_v1(
@@ -1179,6 +1354,40 @@ int wmain(const int argc, wchar_t* const* argv) {
                       : hibiki::ControlRouteHealthStateV1::Unavailable,
                   wasapi_output.requested ? 0U : 1U);
         if (!same_route(previous_main_output_route, status.routes[1U])) status_changed = true;
+        if (wasapi_output.driver_loopback_enabled) {
+            const bool loopback_ready = driver_loopback.rendered_blocks > 0U &&
+                                        has_rendered_blocks(wasapi_snapshot);
+            const auto failures = driver_loopback.encode_failures +
+                                  driver_loopback.push_failures +
+                                  driver_loopback.pop_failures +
+                                  driver_loopback.deliver_failures;
+            std::string detail;
+            if (loopback_ready) {
+                detail = "driver-stream loopback rendering; packets=" +
+                         std::to_string(driver_loopback.rendered_blocks);
+                detail += "; sink=" +
+                          std::to_string(wasapi_snapshot.primary.submitted_blocks) +
+                          "/" + std::to_string(wasapi_snapshot.primary.rendered_blocks);
+                if (failures > 0U) {
+                    detail += "; failed=" + std::to_string(failures);
+                }
+                if (driver_loopback.ring.overrun_count != 0U ||
+                    driver_loopback.ring.underrun_count != 0U) {
+                    detail += "; ring_overrun=" +
+                              std::to_string(driver_loopback.ring.overrun_count) +
+                              "; ring_underrun=" +
+                              std::to_string(driver_loopback.ring.underrun_count);
+                }
+                detail += "; user-space only.";
+            } else if (failures > 0U) {
+                detail = "driver-stream loopback degraded; packets=" +
+                         std::to_string(driver_loopback.rendered_blocks) +
+                         "; failures=" + std::to_string(failures);
+            } else {
+                detail = "driver-stream loopback armed; waiting for first rendered packet.";
+            }
+            driver_loopback_detail = std::move(detail);
+        }
         const bool volume_route_ready = system_volume_requested && system_volume.bound;
         const auto volume_detail = volume_route_ready
             ? std::string_view("system endpoint volume linked; write-through explicitly enabled.")
@@ -1234,7 +1443,21 @@ int wmain(const int argc, wchar_t* const* argv) {
             status_changed = true;
         }
         const auto previous_tab_route = status.routes[6U];
-        const auto wasapi_snapshot_now = engine.wasapi_output_snapshot();
+        if (driver_loopback_requested) {
+            const auto previous_loopback_route = status.routes[6U];
+            const bool loopback_ready = driver_loopback.rendered_blocks > 0U &&
+                                        has_rendered_blocks(wasapi_snapshot);
+            set_route(status.routes[6U], "driver-loopback", "Driver Stream Loopback",
+                      driver_loopback_detail,
+                      loopback_ready ? hibiki::ControlRouteHealthStateV1::Ready
+                                     : (wasapi_output.driver_loopback_enabled
+                                            ? hibiki::ControlRouteHealthStateV1::Pending
+                                            : hibiki::ControlRouteHealthStateV1::Degraded),
+                      wasapi_output.driver_loopback_enabled ? 0U : 1U);
+            if (!same_route(previous_loopback_route, status.routes[6U])) {
+                status_changed = true;
+            }
+        }
         if (!tab_bridge_route_detail.empty()) {
             const auto dropped = tab_bridge.queue.dropped_blocks();
             if (dropped > 0U) {
@@ -1243,22 +1466,24 @@ int wmain(const int argc, wchar_t* const* argv) {
                     " block(s) while the 4-slot capture queue was full.";
             }
         }
-        if (!tab_bridge.listening) {
-            set_route(status.routes[6U], "browser-tab", "瀏覽器分頁", tab_bridge_detail,
-                      hibiki::ControlRouteHealthStateV1::Unavailable, 1U);
-        } else if (tab_bridge.received_blocks > 0U &&
-                   has_rendered_blocks(wasapi_snapshot_now)) {
-            set_route(status.routes[6U], "browser-tab", "瀏覽器分頁",
-                      !tab_bridge_route_detail.empty()
-                          ? std::string_view(tab_bridge_route_detail)
-                          : std::string_view(
-                                "receiving user-gesture tab capture; rendered through WASAPI sink."),
-                      hibiki::ControlRouteHealthStateV1::Ready, 0U);
-        } else {
-            set_route(status.routes[6U], "browser-tab", "瀏覽器分頁", tab_bridge_detail,
-                      hibiki::ControlRouteHealthStateV1::Pending, 0U);
+        if (!driver_loopback_requested) {
+            if (!tab_bridge.listening) {
+                set_route(status.routes[6U], "browser-tab", "瀏覽器分頁", tab_bridge_detail,
+                          hibiki::ControlRouteHealthStateV1::Unavailable, 1U);
+            } else if (tab_bridge.received_blocks > 0U &&
+                       has_rendered_blocks(wasapi_snapshot)) {
+                set_route(status.routes[6U], "browser-tab", "瀏覽器分頁",
+                          !tab_bridge_route_detail.empty()
+                              ? std::string_view(tab_bridge_route_detail)
+                              : std::string_view(
+                                    "receiving user-gesture tab capture; rendered through WASAPI sink."),
+                          hibiki::ControlRouteHealthStateV1::Ready, 0U);
+            } else {
+                set_route(status.routes[6U], "browser-tab", "瀏覽器分頁", tab_bridge_detail,
+                          hibiki::ControlRouteHealthStateV1::Pending, 0U);
+            }
+            if (!same_route(previous_tab_route, status.routes[6U])) status_changed = true;
         }
-        if (!same_route(previous_tab_route, status.routes[6U])) status_changed = true;
         if (status_changed) {
             ++status.sequence;
             (void)status_store.publish(status);
