@@ -182,9 +182,11 @@ bool AudioEngineModel::prepare_ir(const std::string_view output_group,
         data.sample_rate != sample_rate_.load(std::memory_order_acquire) ||
         data.channels == 0U || data.channels > 8U || data.frames() == 0U ||
         data.frames() > kMaxRealtimeIrTapsV1 ||
-        (has_active_graph_ && data.channels != 1U &&
-         data.channels != active_graph_.output_channels) ||
-        (has_active_graph_ && active_graph_.strict_direct)) {
+        ((has_active_graph_ || has_pending_graph_) && data.channels != 1U &&
+         data.channels != (has_pending_graph_ ? pending_graph_.output_channels
+                                              : active_graph_.output_channels)) ||
+        (has_active_graph_ && active_graph_.strict_direct) ||
+        (has_pending_graph_ && pending_graph_.strict_direct)) {
         has_pending_ir_ = false;
         return false;
     }
@@ -200,8 +202,11 @@ bool AudioEngineModel::prepare_ir(const std::string_view output_group,
         has_pending_ir_ = false;
         return false;
     }
-    const auto render_channels = has_active_graph_ ? active_graph_.output_channels : data.channels;
-    if (!prepare_ir_convolver_from_wav_v1(*candidate, data, phase, render_channels)) {
+    const auto convolver_channels = has_pending_graph_
+                                       ? pending_graph_.output_channels
+                                       : (has_active_graph_ ? active_graph_.output_channels
+                                                            : data.channels);
+    if (!prepare_ir_convolver_from_wav_v1(*candidate, data, phase, convolver_channels)) {
         has_pending_ir_ = false;
         return false;
     }
@@ -262,10 +267,14 @@ bool AudioEngineModel::prepare_loudness_peq(
     candidate.output_group_bytes = static_cast<std::uint8_t>(output_group.size());
     std::copy(output_group.begin(), output_group.end(),
               candidate.output_group.begin());
+    const auto loudness_channels = has_pending_graph_
+                                      ? pending_graph_.output_channels
+                                      : (has_active_graph_ ? active_graph_.output_channels
+                                                           : 2U);
     if (!candidate.peq.prepare(
             std::span<const PeqFilterV1>(compiled.filters, compiled.filter_count),
             sample_rate_.load(std::memory_order_acquire),
-            has_active_graph_ ? active_graph_.output_channels : 2U)) {
+            loudness_channels)) {
         pending_loudness_peq_ = {};
         has_pending_loudness_peq_ = false;
         return false;

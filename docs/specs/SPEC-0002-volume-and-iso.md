@@ -185,6 +185,12 @@ opt-in 時，才會在同一 control transaction 掛載單點 1 kHz formula atta
 因此自訂 catalog scene 仍需在 wire 上把 [84] 設為 1 才會啟用；
 內建 Easy scene 則由 factory 預設帶入上述值。
 
+Scene attachment 的聲道數在 graph transaction 準備時解析。若 transaction 已有 pending
+graph，等響度 PEQ 與 multi-channel IR 必須以該 pending graph 的 output channels 編譯；
+否則才使用 active graph，沒有 graph 時 IR 使用 IR 自身的 channel layout。這讓
+stereo、5.1 與 7.1 圖形之間的 Scene 切換不會以舊聲道數留下 attachment；跨聲道數切換後，
+render 仍必須成功且 live phon update 必須可用。
+
 `EqualLoudnessPolicyV1` 會驗證 mode、phon、strength、boost cap 與 calibrated anchor；
 schema 要求 `anchor_id` 在非 null 時為 non-empty printable UTF-8 且最長 64 字，拒絕 C0/C1
 控制字元與 DEL；runtime validator 維持既有非空與 64 字邊界檢查，
