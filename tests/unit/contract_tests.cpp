@@ -6330,6 +6330,120 @@ int main() {
         CHECK(!engine.has_active_vst3_lane("main"));
     }
 
+    // VST3 tap buffer contract tests.
+    {
+        Vst3TapBufferV1 tap;
+
+        // Empty read before first publish returns false.
+        std::array<float, 64U> read_buf{};
+        std::uint32_t ch_out = 0U;
+        std::size_t frames_out = 0U;
+        std::uint64_t seq_out = 0U;
+        CHECK(!tap.read("main", read_buf.data(), 32U, ch_out, frames_out, seq_out));
+
+        // Basic publish + read round-trip.
+        const std::array<float, 4U> pub_data{0.5F, -0.25F, 0.125F, 0.75F};
+        CHECK(tap.publish("main", pub_data.data(), 2U, 2U));
+        CHECK(tap.read("main", read_buf.data(), 32U, ch_out, frames_out, seq_out));
+        CHECK(ch_out == 2U);
+        CHECK(frames_out == 2U);
+        CHECK(seq_out != 0U);
+        CHECK(read_buf[0] == 0.5F);
+        CHECK(read_buf[1] == -0.25F);
+        CHECK(read_buf[2] == 0.125F);
+        CHECK(read_buf[3] == 0.75F);
+
+        // Wrong group label is rejected.
+        std::uint32_t wrong_ch = 0U;
+        std::size_t wrong_frames = 0U;
+        std::uint64_t wrong_seq = 0U;
+        std::array<float, 64U> wrong_buf{};
+        CHECK(!tap.read("movie", wrong_buf.data(), 32U, wrong_ch, wrong_frames, wrong_seq));
+
+        // Overwrite with new data: latest snapshot wins.
+        const std::array<float, 4U> second_data{1.0F, 2.0F, 3.0F, 4.0F};
+        CHECK(tap.publish("main", second_data.data(), 2U, 2U));
+        CHECK(tap.read("main", read_buf.data(), 32U, ch_out, frames_out, seq_out));
+        CHECK(frames_out == 2U);
+        CHECK(seq_out > 0U);
+        CHECK(read_buf[0] == 1.0F);
+        CHECK(read_buf[1] == 2.0F);
+
+        // NaN is rejected.
+        const std::array<float, 2U> nan_data{
+            std::numeric_limits<float>::quiet_NaN(), 0.5F};
+        CHECK(!tap.publish("main", nan_data.data(), 1U, 2U));
+
+        // Inf is rejected.
+        const std::array<float, 2U> inf_data{
+            std::numeric_limits<float>::infinity(), 0.5F};
+        CHECK(!tap.publish("main", inf_data.data(), 1U, 2U));
+
+        // Invalid parameters.
+        CHECK(!tap.publish("", pub_data.data(), 2U, 2U));       // empty group
+        CHECK(!tap.publish("main", nullptr, 2U, 2U));           // null data
+        CHECK(!tap.publish("main", pub_data.data(), 0U, 2U));   // zero frames
+        CHECK(!tap.publish("main", pub_data.data(), 513U, 2U)); // over capacity
+        CHECK(!tap.publish("main", pub_data.data(), 2U, 0U));   // zero channels
+        CHECK(!tap.publish("main", pub_data.data(), 2U, 9U));   // over channel cap
+
+        // Max capacity round-trip (512 frames × 8 channels).
+        Vst3TapBufferV1 max_tap;
+        std::vector<float> max_data(kMaxVst3TapFramesV1 * kMaxVst3TapChannelsV1);
+        for (std::size_t i = 0U; i < max_data.size(); ++i) {
+            max_data[i] = static_cast<float>(i % 11U) * 0.01F;
+        }
+        CHECK(max_tap.publish("surround", max_data.data(),
+                               kMaxVst3TapFramesV1, kMaxVst3TapChannelsV1));
+        std::vector<float> max_read(kMaxVst3TapFramesV1 * kMaxVst3TapChannelsV1);
+        std::uint32_t max_ch = 0U;
+        std::size_t max_frames = 0U;
+        std::uint64_t max_seq = 0U;
+        CHECK(max_tap.read("surround", max_read.data(), kMaxVst3TapFramesV1,
+                            max_ch, max_frames, max_seq));
+        CHECK(max_ch == kMaxVst3TapChannelsV1);
+        CHECK(max_frames == kMaxVst3TapFramesV1);
+        bool max_match = true;
+        for (std::size_t i = 0U; i < max_data.size(); ++i) {
+            if (max_read[i] != static_cast<float>(i % 11U) * 0.01F) {
+                max_match = false; break;
+            }
+        }
+        CHECK(max_match);
+
+        // Engine-level integration: publish via process_output_group,
+        // then read back via the public accessor.
+        AudioEngineModel engine;
+        GraphConfigV1 tap_graph;
+        tap_graph.lanes.push_back(LaneConfigV1{"tap-lane", "main", 2, 0.0, true});
+        tap_graph.strict_direct = false;
+        CHECK(engine.prepare_graph(tap_graph, 1U) && engine.commit_graph());
+        engine.set_sample_rate(48000U);
+
+        std::vector<RtLaneInputV1> lane_inputs(1U);
+        lane_inputs[0].interleaved = nullptr;  // Silence input.
+        lane_inputs[0].channel_count = 2U;
+        std::array<float, 128U> render_buf{};
+        CHECK(engine.process_output_group("main",
+                                           std::span<const RtLaneInputV1>(lane_inputs),
+                                           render_buf.data(), 16U));
+
+        std::array<float, 256U> tap_out{};
+        std::uint32_t tap_channels = 0U;
+        std::size_t tap_frames = 0U;
+        std::uint64_t tap_sequence = 0U;
+        CHECK(engine.read_vst3_tap("main", tap_out.data(), 128U,
+                                    tap_channels, tap_frames, tap_sequence));
+        CHECK(tap_channels == 2U);
+        CHECK(tap_frames == 16U);
+        CHECK(tap_sequence != 0U);
+
+        // Reset invalidates the snapshot.
+        engine.reset_vst3_lane_state();
+        CHECK(!engine.read_vst3_tap("main", tap_out.data(), 128U,
+                                     tap_channels, tap_frames, tap_sequence));
+    }
+
     return 0;
 }
 

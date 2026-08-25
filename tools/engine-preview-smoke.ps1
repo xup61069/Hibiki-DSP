@@ -353,6 +353,91 @@ function ConvertTo-EngineArgumentString {
   })
   return $composed -join ' '
 }
+function Get-EnginePreviewSmokeWavSampleStats {
+  param(
+    [Parameter(Mandatory)][AllowEmptyCollection()][float[]]$Samples,
+    [Parameter(Mandatory)][ValidateRange(1, [int]::MaxValue)][int]$ChannelCount
+  )
+  if ($Samples.Count -eq 0) { throw 'WAV sample statistics require at least one sample.' }
+  if (($Samples.Count % $ChannelCount) -ne 0) {
+    throw "WAV sample count is not divisible by channel count: $($Samples.Count) / $ChannelCount."
+  }
+
+  $frameCount = [int64]($Samples.Count / $ChannelCount)
+  $peak = [double]0
+  $sumSquared = [double]0
+  $channelSums = New-Object 'double[]' $ChannelCount
+  for ($index = 0; $index -lt $Samples.Count; $index++) {
+    $value = [double]$Samples[$index]
+    $absolute = [Math]::Abs($value)
+    if ($absolute -gt $peak) { $peak = $absolute }
+    $sumSquared += $value * $value
+    $channelSums[$index % $ChannelCount] += $value
+  }
+
+  $rms = [Math]::Sqrt($sumSquared / $Samples.Count)
+  $dcOffset = [double]0
+  $maximumAbsoluteDc = [double]0
+  for ($channel = 0; $channel -lt $ChannelCount; $channel++) {
+    $channelMean = $channelSums[$channel] / $frameCount
+    if ([Math]::Abs($channelMean) -gt $maximumAbsoluteDc) {
+      $maximumAbsoluteDc = [Math]::Abs($channelMean)
+      $dcOffset = $channelMean
+    }
+  }
+
+  return [pscustomobject]@{
+    Peak = $peak
+    Rms = $rms
+    DcOffset = $dcOffset
+    FrameCount = $frameCount
+  }
+}
+
+function Read-OfflineRenderWavDataChunk {
+  param([Parameter(Mandatory)][string]$Path)
+  $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open,
+                                   [System.IO.FileAccess]::Read,
+                                   [System.IO.FileShare]::Read)
+  try {
+    $reader = [System.IO.BinaryReader]::new($stream)
+    if ([System.Text.Encoding]::ASCII.GetString($reader.ReadBytes(4)) -ne 'RIFF') {
+      throw "Offline render WAV has an invalid RIFF header: $Path."
+    }
+    [void]$reader.ReadUInt32()
+    if ([System.Text.Encoding]::ASCII.GetString($reader.ReadBytes(4)) -ne 'WAVE') {
+      throw "Offline render WAV is not a WAVE file: $Path."
+    }
+
+    while ($true) {
+      if (($stream.Length - $stream.Position) -lt 8) {
+        throw "Offline render WAV has no data chunk: $Path."
+      }
+      $chunkId = [System.Text.Encoding]::ASCII.GetString($reader.ReadBytes(4))
+      $chunkSize = $reader.ReadUInt32()
+      if ($chunkId -eq 'data') {
+        if (($chunkSize -eq 0) -or (($chunkSize % 4) -ne 0)) {
+          throw "Offline render WAV data chunk is not aligned to float32 samples: $Path."
+        }
+        if (($stream.Length - $stream.Position) -lt $chunkSize) {
+          throw "Offline render WAV data chunk is truncated: $Path."
+        }
+        [byte[]]$sampleBytes = $reader.ReadBytes($chunkSize)
+        [float[]]$samples = New-Object 'float[]' ([int]($chunkSize / 4))
+        [System.Buffer]::BlockCopy($sampleBytes, 0, $samples, 0, $chunkSize)
+        return $samples
+      }
+      if (($stream.Length - $stream.Position) -lt $chunkSize) {
+        throw "Offline render WAV chunk is truncated: $Path."
+      }
+      [void]$reader.ReadBytes($chunkSize)
+      if (($chunkSize -band 1) -eq 1) { [void]$reader.ReadByte() }
+    }
+  } finally {
+    $reader.Dispose()
+  }
+}
+
 if ($SelfTest) {
   $cases = Invoke-EnginePreviewSmokePathSelfTest
 
@@ -410,6 +495,25 @@ if ($SelfTest) {
   $constructionCaught = $false
   try { [void](New-IpcFrame 1 42 (New-Object byte[] 1048577)) } catch { $constructionCaught = $true }
   if (-not $constructionCaught) { throw 'IPC frame self-test expected constructor bound rejection.' }
+  $cases++
+
+  $knownStats = Get-EnginePreviewSmokeWavSampleStats -Samples ([float[]]@(0.5, -0.25)) -ChannelCount 1
+  $expectedRms = [Math]::Sqrt(((0.5 * 0.5) + (0.25 * 0.25)) / 2)
+  if ($knownStats.Peak -ne 0.5 -or $knownStats.FrameCount -ne 2 -or
+      [Math]::Abs($knownStats.Rms - $expectedRms) -gt 0.0000001 -or
+      [Math]::Abs($knownStats.DcOffset - 0.125) -gt 0.0000001) {
+    throw 'WAV sample-statistics self-test produced unexpected peak/RMS/DC.'
+  }
+  $cases++
+
+  $emptySamplesCaught = $false
+  try { Get-EnginePreviewSmokeWavSampleStats -Samples ([float[]]@()) -ChannelCount 1 } catch { $emptySamplesCaught = $true }
+  if (-not $emptySamplesCaught) { throw 'WAV sample-statistics self-test expected an empty-sample rejection.' }
+  $cases++
+
+  $unalignedSamplesCaught = $false
+  try { Get-EnginePreviewSmokeWavSampleStats -Samples ([float[]]@(0.1, 0.2, 0.3)) -ChannelCount 2 } catch { $unalignedSamplesCaught = $true }
+  if (-not $unalignedSamplesCaught) { throw 'WAV sample-statistics self-test expected a channel-alignment rejection.' }
   $cases++
 
   Write-Output "Engine Preview path and IPC self-test passed ($cases cases; offline/no-process/no-file-write)."
@@ -593,6 +697,14 @@ if ($RenderOffline) {
   if ($offlineText -notmatch 'resampled 44100->48000') {
     throw 'Offline render summary omitted the resample conversion.'
   }
+
+  $offlineSamples = Read-OfflineRenderWavDataChunk -Path $smokePlan.OfflineRenderPath
+  $offlineStats = Get-EnginePreviewSmokeWavSampleStats -Samples $offlineSamples -ChannelCount 2
+  $statisticsCulture = [System.Globalization.CultureInfo]::InvariantCulture
+  $peakText = $offlineStats.Peak.ToString('F6', $statisticsCulture)
+  $rmsText = $offlineStats.Rms.ToString('F6', $statisticsCulture)
+  $dcText = $offlineStats.DcOffset.ToString('F6', $statisticsCulture)
+  Write-Output ("Engine Preview offline WAV statistics: peak={0} rms={1} dc={2} frames={3}." -f $peakText, $rmsText, $dcText, $offlineStats.FrameCount)
   Write-Output ("Engine Preview offline WAV render smoke passed ({0})." -f ($offlineText.Trim() -join '; '))
   exit 0
 }
