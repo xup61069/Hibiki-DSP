@@ -48,6 +48,15 @@ public sealed partial class MainWindow : Window
         {
             SetTitleBar(dragRegion);
         }
+
+        // Keep the adaptive hero layout usable below this size.
+        var appWindow = AppWindow;
+        appWindow.Resize(new Windows.Graphics.SizeInt32(1080, 720));
+        if (appWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
+        {
+            presenter.PreferredMinimumWidth = 720;
+            presenter.PreferredMinimumHeight = 520;
+        }
     }
 
     private void ShowNavigationSection(string tag)

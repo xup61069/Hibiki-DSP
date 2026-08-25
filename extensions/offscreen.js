@@ -8,13 +8,31 @@ let activeStream = null;
 let capturing = false;
 let bridgeRetryTimer = null;
 let bridgeRetryAttempt = 0;
+let bridgeRetryExhausted = false;
 
 const BRIDGE_RETRY_MAX_ATTEMPTS = 10;
 const BRIDGE_RETRY_BASE_MS = 1000;
 const BRIDGE_RETRY_CAP_MS = 15000;
+const BRIDGE_RECONNECT_IDLE_V1 = 'idle';
+const BRIDGE_RECONNECT_WAITING_V1 = 'waiting';
+const BRIDGE_RECONNECT_RETRYING_V1 = 'retrying';
+const BRIDGE_RECONNECT_CONNECTED_V1 = 'connected';
+const BRIDGE_RECONNECT_EXHAUSTED_V1 = 'exhausted';
 
 function reportState() {
-  chrome.runtime.sendMessage({type: 'capture-state', capturing: context !== null, bridgeConnected});
+  chrome.runtime.sendMessage({
+    type: 'capture-state',
+    capturing: context !== null,
+    bridgeConnected,
+    bridgeReconnectState: bridgeReconnectState(),
+  });
+}
+
+function bridgeReconnectState() {
+  if (bridgeConnected) return BRIDGE_RECONNECT_CONNECTED_V1;
+  if (!capturing) return BRIDGE_RECONNECT_IDLE_V1;
+  if (bridgeRetryTimer !== null) return BRIDGE_RECONNECT_WAITING_V1;
+  return bridgeRetryExhausted ? BRIDGE_RECONNECT_EXHAUSTED_V1 : BRIDGE_RECONNECT_RETRYING_V1;
 }
 
 function connectBridge() {
@@ -40,7 +58,12 @@ function connectBridge() {
 
 function scheduleBridgeRetry() {
   if (!capturing || bridgeRetryTimer !== null) return;
-  if (bridgeRetryAttempt >= BRIDGE_RETRY_MAX_ATTEMPTS) return;
+  if (bridgeRetryAttempt >= BRIDGE_RETRY_MAX_ATTEMPTS) {
+    bridgeRetryExhausted = true;
+    reportState();
+    return;
+  }
+  bridgeRetryExhausted = false;
   const delay = Math.min(BRIDGE_RETRY_BASE_MS * Math.pow(2, bridgeRetryAttempt), BRIDGE_RETRY_CAP_MS);
   bridgeRetryAttempt++;
   bridgeRetryTimer = setTimeout(() => {
@@ -55,11 +78,16 @@ function cancelBridgeRetry() {
     bridgeRetryTimer = null;
   }
   bridgeRetryAttempt = 0;
+  bridgeRetryExhausted = false;
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'get-capture-state') {
-    sendResponse({capturing: context !== null, bridgeConnected});
+    sendResponse({
+      capturing: context !== null,
+      bridgeConnected,
+      bridgeReconnectState: bridgeReconnectState(),
+    });
     return false;
   }
   if (message?.type === 'stop-tab-stream') {

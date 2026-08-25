@@ -15,10 +15,13 @@ the extension never silently captures a tab or microphone.
 The popup exposes explicit Start and Stop controls. It queries the real capture
 state when opened, reports start/stop failures instead of pretending success,
 and shows whether the optional loopback native bridge is currently connected.
-If the bridge is absent, local tab playback remains unchanged; the indicator is
-diagnostic only and does not imply browser or vendor control. Stop releases the
-user-selected stream and capture graph. Closing or navigating away from the
-captured tab also ends the source stream and releases that graph.
+While capturing without a bridge, it distinguishes waiting for the next retry,
+an active retry, and exhaustion of the bounded retry budget. If retries are
+exhausted, local tab playback remains unchanged and packets continue to be
+dropped; the indicator is diagnostic only and does not imply browser or vendor
+control. Stop releases the user-selected stream and capture graph. Closing or
+navigating away from the captured tab also ends the source stream and releases
+that graph.
 
 Packet header: magic `HIBT`, version `1`, channel count, frame count and
 sample rate (all little-endian), followed by interleaved Float32 samples. The

@@ -25,19 +25,23 @@
                 <TextBlock Text="Hibiki DSP" VerticalAlignment="Center" Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" />
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                <Border CornerRadius="999" Padding="12,4" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" BorderThickness="1">
+                    <!-- Connected state: success-green border + green dot -->
+                <Grid>
+                  <Border CornerRadius="999" Padding="12,4" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource SystemFillColorSuccessBrush}" BorderThickness="1"
+                          Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibilityConverter}}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                        <Ellipse Width="8" Height="8"
-                                 Fill="{ThemeResource SystemFillColorSuccessBrush}"
-                                 Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibilityConverter}}"
-                                 VerticalAlignment="Center" />
-                        <Ellipse Width="8" Height="8"
-                                 Fill="{ThemeResource SystemFillColorCautionBrush}"
-                                 Visibility="{Binding IsConnected, Converter={StaticResource InverseBoolToVisibilityConverter}}"
-                                 VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding ConnectionStatusText}" Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" AutomationProperties.LiveSetting="Polite" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                      <Ellipse Width="8" Height="8" Fill="{ThemeResource SystemFillColorSuccessBrush}" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding ConnectionStatusText}" Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" AutomationProperties.LiveSetting="Polite" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                     </StackPanel>
-                </Border>
+                  </Border>
+                  <Border CornerRadius="999" Padding="12,4" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource SystemFillColorCautionBrush}" BorderThickness="1"
+                          Visibility="{Binding IsConnected, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Ellipse Width="8" Height="8" Fill="{ThemeResource SystemFillColorCautionBrush}" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding ConnectionStatusText}" Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" AutomationProperties.LiveSetting="Polite" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                    </StackPanel>
+                  </Border>
+                </Grid>
             </StackPanel>
         </Grid>
 
@@ -100,7 +104,7 @@
         <RowDefinition Height="Auto" />
         <RowDefinition Height="*" />
       </Grid.RowDefinitions>
-      <controls:InfoBar x:Name="DisconnectedBanner" IsOpen="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}" Severity="Warning" Title="尚未連接引擎" Message="連接後才能套用場景、音量與路由控制。點擊「連接引擎」開始。" IsClosable="False" Margin="32,12,28,0" AutomationProperties.Name="引擎連線狀態提醒" Grid.Row="0" /><ScrollViewer Grid.Row="1" Padding="32,0,28,32">
+      <controls:InfoBar x:Name="DisconnectedBanner" IsOpen="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}" Severity="Warning" Title="尚未連接引擎" Message="連接後才能套用場景、音量與路由控制。點擊「連接引擎」開始。" IsClosable="False" Margin="32,12,32,0" AutomationProperties.Name="引擎連線狀態提醒" Grid.Row="0" /><ScrollViewer Grid.Row="1" Padding="32,0,32,32">
         <StackPanel MaxWidth="1080" Spacing="20">
         <Grid x:Name="ShellHomeSection"><Border Padding="24" CornerRadius="16" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#080866CC" Offset="0.0" /><GradientStop Color="#040866CC" Offset="0.5" /><GradientStop Color="Transparent" Offset="1.0" /></LinearGradientBrush></Border.Background><Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" /></TransitionCollection></Border.Transitions>
                     <Grid x:Name="HeroLayout" ColumnSpacing="32" RowSpacing="16">
@@ -134,7 +138,7 @@
 
                         <StackPanel Spacing="12">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon Glyph="" FontSize=" 20 " Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                                <FontIcon Glyph="" FontSize="20" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
                                 <TextBlock Text="先選輸出，再一鍵變好聽" Style="{ThemeResource TitleTextBlockStyle}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             </StackPanel>
                             <ComboBox Header="輸出群組" AutomationProperties.Name="輸出群組" AutomationProperties.HelpText="選擇 Main、Low Latency 或 Surround 輸出" ItemsSource="{Binding OutputGroups}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding SelectedOutputGroup, Mode=TwoWay}" HorizontalAlignment="Stretch" />
@@ -606,7 +610,7 @@
       </ScrollViewer>
     </Grid>
   </controls:NavigationView.Content>
-</controls:NavigationView><Border Grid.Row="2" Padding="14,6" Margin="4,10,0,16" HorizontalAlignment="Left" CornerRadius="999" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+</controls:NavigationView><Border Grid.Row="2" Padding="14,6" Margin="32,10,32,16" HorizontalAlignment="Left" CornerRadius="999" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <FontIcon FontSize="12" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
                 <TextBlock Text="Easy 模式只顯示安全操作；切換 Expert 才會顯示 Matrix、DSP Graph、IR 與 VST3。" Style="{ThemeResource CaptionTextBlockStyle}" TextWrapping="Wrap" MaxWidth="640" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
