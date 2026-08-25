@@ -4,6 +4,7 @@
 #include "hibiki/control_status.hpp"
 #include "hibiki/control_service.hpp"
 #include "hibiki/engine_control.hpp"
+#include "hibiki/noise_suppressor.hpp"
 #include "hibiki/scene_presets.hpp"
 #include "hibiki/session_catalog.hpp"
 #include "hibiki/session_command_queue.hpp"
@@ -82,9 +83,11 @@ constexpr std::uint32_t kTabBridgeMaxOutputChannels = 8U;
 struct TabBridgeState final {
     hibiki::TabBridgeServer server{};
     hibiki::TabCaptureQueueV1 queue{};
+    hibiki::BasicNoiseSuppressorV1 noise_suppressor{};
     std::vector<float> input_buffer{};
     std::vector<float> output_buffer{};
     std::vector<hibiki::RtLaneInputV1> lane_inputs{};
+    hibiki::TabLaneEffectsV1 effects{};
     bool requested{false};
     bool listening{false};
     std::uint64_t received_blocks{0U};
@@ -789,6 +792,14 @@ int wmain(const int argc, wchar_t* const* argv) {
         has_command_line_flag(argc, argv, L"--enable-process-delivery");
     const bool tab_bridge_requested =
         has_command_line_flag(argc, argv, L"--enable-tab-bridge");
+    const bool tab_noise_suppressor_requested =
+        has_command_line_flag(argc, argv, L"--enable-tab-noise-suppressor");
+    if (tab_noise_suppressor_requested && !tab_bridge_requested) {
+        // Fail-closed: the basic suppressor only has meaning on the tab lane;
+        // refuse to start rather than silently running an unused effect.
+        (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+        return 2;
+    }
     if (process_delivery_requested && (!wasapi_output_requested || !session_routing_requested)) {
         // Fail-closed: process delivery needs both a WASAPI sink and session
         // routing to be meaningful. Refuse to start rather than silently
@@ -896,8 +907,19 @@ int wmain(const int argc, wchar_t* const* argv) {
     }
     const bool tab_bridge_started = wasapi_started && tab_bridge.requested;
     std::string tab_bridge_route_detail{};
+    bool suppressor_active = false;
     if (tab_bridge_started) {
         hibiki::TabBridgeServerConfigV1 tab_config{};
+        if (tab_noise_suppressor_requested) {
+            // Basic high-pass + downward-gate; explicitly not ML denoising.
+            const hibiki::BasicNoiseSuppressorPolicyV1 kTabNoisePolicy{};
+            if (tab_bridge.noise_suppressor.configure(
+                    kTabNoisePolicy, wasapi_output.config.sample_rate, 2U)) {
+                tab_bridge.effects = {nullptr, nullptr,
+                                      &tab_bridge.noise_suppressor, nullptr};
+                suppressor_active = true;
+            }
+        }
         if (tab_bridge.server.start(tab_config, hibiki::enqueue_tab_capture_packet_v1,
                                     &tab_bridge.queue)) {
             tab_bridge.listening = true;
@@ -907,8 +929,14 @@ int wmain(const int argc, wchar_t* const* argv) {
                 static_cast<std::size_t>(kTabBridgeMaxFrames) *
                 static_cast<std::size_t>(kTestToneMaxOutputChannels));
             tab_bridge.lane_inputs.assign(1U, hibiki::RtLaneInputV1{});
-            tab_bridge_route_detail =
-                "loopback listener bound; waiting for browser capture.";
+            if (suppressor_active) {
+                tab_bridge_route_detail =
+                    "loopback listener bound; basic suppressor active (stereo).";
+            } else {
+                tab_bridge_route_detail =
+                    "loopback listener bound; waiting for browser capture.";
+            }
+            tab_bridge_detail = tab_bridge_route_detail;
         } else {
             tab_bridge_detail = "loopback listener bind failed; tab bridge disabled.";
         }
@@ -1125,7 +1153,7 @@ int wmain(const int argc, wchar_t* const* argv) {
                 tab_bridge.input_buffer.data(), kTabBridgeMaxFrames,
                 std::span<hibiki::RtLaneInputV1>(tab_bridge.lane_inputs),
                 tab_bridge.output_buffer.data(), kTabBridgeMaxFrames,
-                block);
+                block, tab_noise_suppressor_requested ? &tab_bridge.effects : nullptr);
             if (delivered) {
                 ++tab_bridge.received_blocks;
             }
