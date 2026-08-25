@@ -677,7 +677,6 @@ function Assert-ExtendedPrintableContractSchemas {
       Fields = @(
         'name',
         'lanes.0',
-        'automation_timeline_ids.0',
         'ir_reference',
         'output_group'
       )
@@ -686,7 +685,6 @@ function Assert-ExtendedPrintableContractSchemas {
         id = 'scene-game'
         name = '遊戲場景'
         lanes = @('lane-音訊')
-        automation_timeline_ids = @('timeline-音訊')
         ir_reference = 'prepared-ir-label'
         output_group = 'group-音訊'
         latency_mode = 'game'
@@ -1353,7 +1351,6 @@ $required = @(
   'schemas/calibration-response-v1.schema.json',
   'schemas/vst3-latency-alignment-v1.schema.json',
   'schemas/latency-graph-commit-v1.schema.json',
-  'schemas/vst3-parameter-timeline-v1.schema.json',
   'schemas/vst3-plugin-state-v1.schema.json',
   'schemas/scene-vst3-state-binding-v1.schema.json',
   'schemas/output-group-volume-v1.schema.json',

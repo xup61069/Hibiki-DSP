@@ -6,7 +6,7 @@ authority: architecture
 last_reviewed: 2026-08-21
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["vst-host/**", "src/hub/**", "schemas/latency-graph-commit-v1.schema.json", "schemas/vst3-parameter-timeline-v1.schema.json", "tests/**"]
+source_globs: ["vst-host/**", "src/hub/**", "schemas/latency-graph-commit-v1.schema.json", "tests/**"]
 ---
 
 # SPEC-0012：VST3 lane 延遲對齊提交
