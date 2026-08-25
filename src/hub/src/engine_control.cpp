@@ -232,14 +232,12 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             engine_.rollback_program_aware();
             return EngineControlResultV1::Failed;
         }
+        // Capture the opt-in request before the swap below replaces
+        // candidate_loudness with the previous scene's policy.
+        const bool enable_live_after_commit =
+            mount_loudness_peq && candidate_loudness.live_update_enabled;
         std::swap(active_scene_, candidate_scene);
         std::swap(active_loudness_, candidate_loudness);
-        // The live-update switch belongs to the attachment; opt in after the
-        // commit when the scene's policy requests it. Failure is non-fatal:
-        // the attachment stays mounted but live recompute remains disabled.
-        if (mount_loudness_peq && candidate_loudness.live_update_enabled) {
-            engine_.set_loudness_live_update(output_group, true);
-        }
         if (!engine_.commit_graph()) {
             std::swap(active_scene_, candidate_scene);
             std::swap(active_loudness_, candidate_loudness);
@@ -277,6 +275,12 @@ EngineControlResultV1 EngineControlWorkerV1::apply_scene(
             engine_.rollback_loudness_peq();
             engine_.rollback_program_aware();
             return EngineControlResultV1::Failed;
+        }
+        // The live-update switch belongs to the committed attachment; opt in
+        // only after every commit succeeded. Failure is non-fatal: the
+        // attachment stays mounted but live recompute remains disabled.
+        if (enable_live_after_commit) {
+            engine_.set_loudness_live_update(output_group, true);
         }
         revision_ = next_revision;
         has_active_scene_ = true;
