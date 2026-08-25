@@ -1,0 +1,57 @@
+{
+  "evidence_format": 2,
+  "issue": 1335,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "docs/specs/SPEC-0008-vst3-sandbox.md",
+      "tests/unit/contract_tests.cpp",
+      "vst-host/include/hibiki/vst3_sandbox.hpp",
+      "vst-host/src/vst3_sandbox.cpp"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "c039986bd09d6c30a173c72408226bbd24b8075ce1df4af999ffc71fd4e2db59"
+  },
+  "metadata": {
+    "scope": "vst3-sandbox-job-object-failure-capture",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-git-2.55.0-cmake-4.4.0",
+    "commands": [
+      "pwsh -NoProfile -File tools/verify.ps1",
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1335",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "git diff --check",
+      "pwsh tools/evidence-audit.ps1 -DescribeCurrentChange"
+    ],
+    "results": [
+      {
+        "command": "full local verification",
+        "status": "pass",
+        "detail": "verify.ps1 passed all four local test executables, including hibiki_contract_tests with the Issue 1335 job-object-failure fixtures: an injected forced-termination failure during quarantine records exactly one de-identified job_object_failure entry (non-zero captured_utc, zero exit code, non-zero module digest) and suppresses the duplicate watchdog-timeout reason for the same lifecycle event; a subsequent independent stop() records nothing further and serialized output contains no raw plugin path bytes."
+      },
+      {
+        "command": "always-run gates",
+        "status": "pass",
+        "detail": "handoff-check #1335 (claimed ownership, scope and Git state), docs-check (87 required paths), source-policy (734 tracked paths), and git diff --check all exited 0 in the isolated worktree."
+      },
+      {
+        "command": "normal-path isolation",
+        "status": "pass",
+        "detail": "Without an injected failure, quarantine records only the original watchdog timeout reason and no job_object_failure entry appears, confirming normal-path behavior is unchanged."
+      }
+    ],
+    "limitations": [
+      "Evidence covers user-space control-plane observability of a simulated forced-termination failure via a test-only injection flag; it does not exercise a real kernel TerminateJobObject breakdown.",
+      "It does not demonstrate minidump capture, symbol resolution, production worker policy integration, WaveRT delivery, driver installation, HLK validation, or signing.",
+      "The provenance digest binds this manifest to the staged SPEC-0008, contract-test and vst-host source set; it does not independently attest that declared commands ran."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.55.0.windows.3",
+      "cmake": "4.4.0"
+    },
+    "started_at": "2026-08-25T08:20:00+08:00",
+    "finished_at": "2026-08-25T09:05:00+08:00"
+  }
+}
