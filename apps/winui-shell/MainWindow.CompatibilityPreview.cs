@@ -295,6 +295,11 @@ public sealed partial class MainWindow
         content.Children.Add(BoundText("EffectiveVolumeDb"));
         content.Children.Add(BoundText("SafetyStatusText"));
 
+        var eqStatus = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        AutomationProperties.SetName(eqStatus, "即時等化器狀態");
+        eqStatus.SetBinding(TextBlock.TextProperty, BindingFor("EqSurface.StateText"));
+        content.Children.Add(eqStatus);
+
         content.Children.Add(new TextBlock
         {
             Text = "VST3 時間軸編輯器（本機草稿）",

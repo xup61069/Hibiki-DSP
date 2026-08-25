@@ -1,5 +1,6 @@
 #include "hibiki/engine_control.hpp"
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -284,15 +285,31 @@ EngineControlResultV1 EngineControlWorkerV1::consume(
                        ? EngineControlResultV1::Applied
                        : EngineControlResultV1::Failed;
         case IpcMessageType::VolumeNotification:
-            return (command.has_volume_target
+            {
+                const auto result = command.has_volume_target
                         ? engine_.apply_windows_volume(
                               std::string_view(command.volume_target.output_group.data(),
                                                command.volume_target.output_group_bytes),
                               command.volume)
-                        : engine_.apply_windows_volume(command.volume)) ==
-                       VolumeNotificationResult::Accepted
-                       ? EngineControlResultV1::Applied
-                       : EngineControlResultV1::Invalid;
+                        : engine_.apply_windows_volume(command.volume);
+                if (result == VolumeNotificationResult::Accepted) {
+                    // Bounded proxy: 70 phon corresponds to the 0 dBFS
+                    // reference; each dB of requested Windows volume moves the
+                    // estimate one phon, clamped to the safe domain. The
+                    // engine-side live-update switch stays opt-in and debounced.
+                    const double estimated_phon =
+                        std::clamp(70.0 + command.volume.requested_db, 20.0, 90.0);
+                    const std::string_view target_group(
+                        command.has_volume_target
+                            ? std::string_view(command.volume_target.output_group.data(),
+                                               command.volume_target.output_group_bytes)
+                            : std::string_view{"main"});
+                    (void)engine_.update_loudness_phon(target_group, estimated_phon);
+                }
+                return result == VolumeNotificationResult::Accepted
+                           ? EngineControlResultV1::Applied
+                           : EngineControlResultV1::Invalid;
+            }
         case IpcMessageType::SceneApply:
             return apply_scene(command.scene);
         case IpcMessageType::SceneCatalogCommand:

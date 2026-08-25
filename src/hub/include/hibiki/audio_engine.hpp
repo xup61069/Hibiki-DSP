@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <atomic>
 #include <algorithm>
+#include <chrono>
 #include <memory>
 #include <span>
 #include <string_view>
@@ -59,13 +60,9 @@ public:
     // path. This is user-space tone shaping, not ISO conformance evidence.
 
     [[nodiscard]] bool prepare_loudness_peq(
-
         std::string_view output_group,
-
         std::span<const Iso226FormulaPointV1> points,
-
         double current_phon,
-
         const EqualLoudnessPolicyV1& policy) noexcept;
 
     [[nodiscard]] bool prepare_loudness_peq_clear() noexcept;
@@ -73,6 +70,18 @@ public:
     [[nodiscard]] bool commit_loudness_peq() noexcept;
 
     void rollback_loudness_peq() noexcept;
+
+    // Recompute loudness PEQ with a new phon value using stored formula
+    // points. Control-plane only; uses prepare/commit transaction. Fails
+    // closed outside the 20..90 phon domain, for foreign groups, while a
+    // transaction is pending, under Strict Direct, or when debounced.
+    [[nodiscard]] bool update_loudness_phon(
+        std::string_view output_group, double new_phon) noexcept;
+
+    // Opt-in switch for volume-driven phon recompute on an already committed
+    // equal-loudness attachment. Control-plane only; no-op for foreign or
+    // detached groups.
+    void set_loudness_live_update(std::string_view output_group, bool enabled) noexcept;
 
     // True when no equal-loudness transaction is pending and any committed
     // bounded RT crossfade has fully retired.
@@ -301,6 +310,12 @@ private:
         std::uint8_t output_group_bytes{0U};
         std::array<char, kMaxOutputGroupBytes> output_group{};
         PeqProcessorV1 peq{};
+        // Stored for live phon recompute. Not read by RT path.
+        std::array<Iso226FormulaPointV1, 64U> formula_points{};
+        std::size_t formula_point_count{0U};
+        double current_phon{80.0};
+        EqualLoudnessPolicyV1 policy{};
+        bool live_update_enabled{false};
     };
 
     LoudnessGraphAttachmentV1 active_loudness_peq_{};
@@ -330,6 +345,12 @@ private:
     bool has_active_loudness_peq_{false};
 
     bool has_pending_loudness_peq_{false};
+
+    // Live-update debounce state (control plane only; never touched by the
+    // audio thread). A recompute runs when at least 250 ms elapsed since the
+    // last applied update OR the phon request moved by 3.0 or more.
+    double last_loudness_phon_{80.0};
+    std::chrono::steady_clock::time_point last_phon_update_time_{};
 
     struct ProgramAwareAttachmentV1 {
         bool attached{false};

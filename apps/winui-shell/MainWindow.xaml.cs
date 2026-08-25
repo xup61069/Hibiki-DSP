@@ -6,6 +6,8 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
+using Windows.UI;
 using Microsoft.UI.Xaml.Input;
 
 namespace Hibiki.WinUI;
@@ -13,6 +15,8 @@ namespace Hibiki.WinUI;
 public sealed partial class MainWindow : Window
 {
     public EasyControlViewModel ViewModel { get; } = new();
+
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _eqVisualTransitionTimer;
 
     public MainWindow()
     {
@@ -31,6 +35,19 @@ public sealed partial class MainWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName is nameof(EasyControlViewModel.EqSurface) or
+            nameof(EasyControlViewModel.IsConnected))
+        {
+#if !HIBIKI_COMPATIBILITY_PREVIEW
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                RefreshEqVisualCanvas();
+                StartEqVisualTransitionTimer();
+            });
+#endif
+        }
+
+#if !HIBIKI_COMPATIBILITY_PREVIEW
         if (e.PropertyName == nameof(EasyControlViewModel.IsConnected))
         {
             DispatcherQueue.TryEnqueue(() =>
@@ -40,9 +57,56 @@ public sealed partial class MainWindow : Window
                     DisconnectedBanner.IsOpen = !ViewModel.IsConnected;
             });
         }
+#endif
     }
 
 #if !HIBIKI_COMPATIBILITY_PREVIEW
+    private void RefreshEqVisualCanvas()
+    {
+        if (EqVisualCanvas is null) return;
+        EqVisualCanvas.Children.Clear();
+
+        var frame = ViewModel.EqSurface;
+        var points = frame.TransitionProgress >= 1.0 ? frame.TargetPoints : InterpolatePoints(frame.Points, frame.TargetPoints, frame.TransitionProgress);
+        var width = double.IsNaN(EqVisualCanvas.ActualWidth) || EqVisualCanvas.ActualWidth < 120.0 ? 480.0 : EqVisualCanvas.ActualWidth;
+        var height = double.IsNaN(EqVisualCanvas.ActualHeight) || EqVisualCanvas.ActualHeight < 60.0 ? 140.0 : EqVisualCanvas.ActualHeight;
+        var pointCollection = new Microsoft.UI.Xaml.Media.PointCollection();
+        foreach (var point in points)
+        {
+            var gainDb = Math.Clamp(point.GainDb, -24.0, 24.0);
+            var x = width * (0.02 + (Math.Log10(point.FrequencyHz / 20.0) / Math.Log10(1000.0)) * 0.96);
+            var y = Math.Clamp(height * 0.5 - gainDb * 2.2, height * 0.08, height * 0.92);
+            pointCollection.Append(new Windows.Foundation.Point(x, y));
+        }
+
+        var strokeColor = frame.Source switch
+        {
+            EqVisualSourceV1.EqualLoudness => Color.FromArgb(255, 0, 120, 212),
+            EqVisualSourceV1.AdaptiveCorrection => Color.FromArgb(255, 0, 153, 188),
+            _ => (Color)Application.Current.Resources["SystemAccentColor"],
+        };
+
+        EqVisualCanvas.Children.Add(new Polyline
+        {
+            Stroke = new SolidColorBrush(strokeColor),
+            StrokeThickness = 3.0,
+            StrokeLineJoin = PenLineJoin.Round,
+            Points = pointCollection,
+        });
+    }
+
+    private static IReadOnlyList<EqVisualPointV1> InterpolatePoints(
+        IReadOnlyList<EqVisualPointV1> from,
+        IReadOnlyList<EqVisualPointV1> to,
+        double progress)
+    {
+        if (from.Count != to.Count || progress <= 0.0) return from;
+        if (progress >= 1.0) return to;
+        return from.Select((point, index) => new EqVisualPointV1(
+            point.FrequencyHz,
+            point.GainDb + ((to[index].GainDb - point.GainDb) * progress))).ToArray();
+    }
+
     private void ConfigureTitleBar()
     {
         ExtendsContentIntoTitleBar = true;
@@ -111,6 +175,39 @@ public sealed partial class MainWindow : Window
             ShowNavigationSection(tag);
     }
 #endif
+
+    private void OnEqVisualTransitionTick(object? sender, object e)
+    {
+        var timer = sender as Microsoft.UI.Dispatching.DispatcherQueueTimer ?? _eqVisualTransitionTimer;
+        if (ViewModel.EqSurface.TransitionProgress >= 1.0)
+        {
+            if (timer is not null)
+            {
+                timer.Stop();
+                timer.Tick -= OnEqVisualTransitionTick;
+            }
+            _eqVisualTransitionTimer = null;
+        }
+
+#if !HIBIKI_COMPATIBILITY_PREVIEW
+        RefreshEqVisualCanvas();
+#endif
+    }
+
+    private void StartEqVisualTransitionTimer()
+    {
+        if (ViewModel.EqSurface.TransitionProgress < 1.0)
+        {
+            _eqVisualTransitionTimer ??= Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().CreateTimer();
+            if (_eqVisualTransitionTimer is not null)
+            {
+                _eqVisualTransitionTimer.Interval = TimeSpan.FromMilliseconds(16);
+                _eqVisualTransitionTimer.IsRepeating = true;
+                _eqVisualTransitionTimer.Tick += OnEqVisualTransitionTick;
+                _eqVisualTransitionTimer.Start();
+            }
+        }
+    }
 
     private async void OnConnectClick(object sender, RoutedEventArgs e)
     {

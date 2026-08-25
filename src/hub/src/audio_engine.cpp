@@ -269,6 +269,16 @@ bool AudioEngineModel::prepare_loudness_peq(
         has_pending_loudness_peq_ = false;
         return false;
     }
+    // Keep the exact control inputs so a later live phon update can rebuild
+    // the attachment without re-reading any external source.
+    candidate.formula_point_count = points.size();
+    std::copy(points.begin(), points.end(), candidate.formula_points.begin());
+    candidate.current_phon = current_phon;
+    candidate.policy = policy;
+    // Every explicit prepare resets live recompute to opt-in. The phon
+    // update path re-enables it before commit so a running pipeline keeps
+    // working without leaking state into unrelated attachments.
+    candidate.live_update_enabled = false;
     pending_loudness_peq_ = std::move(candidate);
     has_pending_loudness_peq_ = true;
     return true;
@@ -321,6 +331,53 @@ void AudioEngineModel::rollback_loudness_peq() noexcept {
     has_pending_loudness_peq_ = false;
 }
 
+bool AudioEngineModel::update_loudness_phon(
+    const std::string_view output_group,
+    const double new_phon) noexcept {
+    // Fail closed outside the bounded phon proxy domain. The ISO formula
+    // itself is frequency-dependent; 20..90 is the safe superset used by the
+    // prepare path and by contract tests.
+    if (new_phon < 20.0 || new_phon > 90.0 || !std::isfinite(new_phon)) {
+        return false;
+    }
+    if (!has_active_loudness_peq_ || !active_loudness_peq_.attached ||
+        (has_active_graph_ && active_graph_.strict_direct) ||
+        !active_loudness_peq_.live_update_enabled ||
+        has_pending_loudness_peq_ ||
+        !has_active_loudness_peq(output_group)) {
+        return false;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if (last_phon_update_time_.time_since_epoch().count() != 0) {
+        const auto elapsed_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                now - last_phon_update_time_)
+                .count();
+        const bool big_step =
+            std::abs(new_phon - last_loudness_phon_) >= 3.0;
+        if (!big_step && elapsed_ms < 250) {
+            return false;
+        }
+    }
+    if (!prepare_loudness_peq(
+            output_group,
+            std::span<const Iso226FormulaPointV1>(
+                active_loudness_peq_.formula_points.data(),
+                active_loudness_peq_.formula_point_count),
+            new_phon,
+            active_loudness_peq_.policy)) {
+        return false;
+    }
+    pending_loudness_peq_.live_update_enabled = true;
+    if (!commit_loudness_peq()) {
+        rollback_loudness_peq();
+        return false;
+    }
+    last_loudness_phon_ = new_phon;
+    last_phon_update_time_ = now;
+    return true;
+}
+
 bool AudioEngineModel::loudness_peq_transaction_idle() const noexcept {
     return !has_pending_loudness_peq_;
 }
@@ -343,6 +400,19 @@ void AudioEngineModel::reset_loudness_peq_state() noexcept {
     has_pending_loudness_peq_ = false;
     previous_loudness_peq_ = {};
     loudness_crossfade_.reset();
+    last_loudness_phon_ = 80.0;
+    last_phon_update_time_ = std::chrono::steady_clock::time_point{};
+}
+
+void AudioEngineModel::set_loudness_live_update(
+    const std::string_view output_group,
+    const bool enabled) noexcept {
+    if (!has_active_loudness_peq_ || !active_loudness_peq_.attached ||
+        !has_active_loudness_peq(output_group)) {
+        return;
+    }
+    active_loudness_peq_.live_update_enabled = enabled;
+    last_loudness_phon_ = active_loudness_peq_.current_phon;
 }
 
 bool AudioEngineModel::prepare_program_aware(
