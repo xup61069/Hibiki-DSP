@@ -18,4 +18,24 @@
         <Setter Property="CornerRadius" Value="8" />
         <Setter Property="MinHeight" Value="36" />
     </Style>
+
+    <!-- Shared pill-shaped status badge surface. Apply with Style="{StaticResource StatusPillStyle}"
+         and override BorderBrush for semantic colors (success/caution). -->
+    <Style x:Key="StatusPillStyle" TargetType="Border">
+        <Setter Property="CornerRadius" Value="999" />
+        <Setter Property="Padding" Value="12,5" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <!-- Compact variant for inline list-row badges (smaller padding). -->
+    <Style x:Key="StatusPillCompactStyle" TargetType="Border">
+        <Setter Property="CornerRadius" Value="999" />
+        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="Background" Value="{ThemeResource SubtleFillColorTertiaryBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
 </ResourceDictionary>
