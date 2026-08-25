@@ -3,7 +3,7 @@ id: SPEC-0017
 status: accepted
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-25
 review_after_days: 30
 related_adrs: [ADR-0002]
 source_globs: ["src/hub/include/hibiki/control_status.hpp", "src/hub/src/control_status.cpp", "src/hub/include/hibiki/control_service.hpp", "src/hub/src/control_service.cpp", "src/hub/include/hibiki/windows_device_catalog.hpp", "src/hub/src/windows_device_catalog.cpp", "apps/engine-preview/engine_preview.cpp", "apps/control-model/IpcProtocol.cs", "apps/control-model/EasyControlViewModel.cs", "tests/**"]

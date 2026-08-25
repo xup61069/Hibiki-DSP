@@ -143,6 +143,33 @@ public sealed partial class MainWindow : Window
         SetSectionVisibility("ShellExpertSection", tag == "expert");
     }
 
+    private void OnSceneCardPrepared(ItemsRepeater sender, ItemsRepeaterElementPreparedEventArgs args)
+    {
+        var element = args.Element;
+        var delayMs = Math.Min(args.Index, 7) * 40;
+
+        element.Opacity = 0d;
+
+        var timer = DispatcherQueue.CreateTimer();
+        timer.Interval = TimeSpan.FromMilliseconds(delayMs);
+        timer.IsRepeating = false;
+        timer.Tick += (_, _) =>
+        {
+            var fade = new Microsoft.UI.Xaml.Media.Animation.DoubleAnimation
+            {
+                From = 0d,
+                To = 1d,
+                Duration = new Duration(TimeSpan.FromMilliseconds(240)),
+            };
+            Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTarget(fade, element);
+            Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTargetProperty(fade, "Opacity");
+            var sb = new Microsoft.UI.Xaml.Media.Animation.Storyboard();
+            sb.Children.Add(fade);
+            sb.Begin();
+        };
+        timer.Start();
+    }
+
     private void SetSectionVisibility(string sectionName, bool visible)
     {
         if (RootGrid.FindName(sectionName) is FrameworkElement section)

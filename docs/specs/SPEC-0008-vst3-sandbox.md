@@ -3,7 +3,7 @@ id: SPEC-0008
 status: accepted
 owner: hibiki-maintainers
 authority: architecture
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-25
 review_after_days: 30
 related_adrs: [ADR-0002]
 source_globs: ["vst-host/**", "tests/**"]

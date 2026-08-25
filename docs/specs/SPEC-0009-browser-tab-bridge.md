@@ -3,7 +3,7 @@ id: SPEC-0009
 status: accepted
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-23
+last_reviewed: 2026-08-25
 review_after_days: 30
 related_adrs: [ADR-0002]
 source_globs: ["extensions/**", "tools/extension-check.ps1"]
@@ -66,6 +66,12 @@ buffer。`process_tab_capture_lane_to_wasapi_v1` 使用相同 effects 與 lane v
 graph／Group Master／limiter 後只提交一次到 WASAPI handoff；sink 未綁定時回傳失敗且不
 宣稱已播放。降噪模型 provenance、權限提示與斷線重連 policy 仍必須在獨立 source component
 完成後，才能宣稱「單分頁掛降噪」。
+
+Engine Preview 提供 opt-in 的 `--enable-tab-bridge` 模式作為上述元件的宿主：
+該旗標必須同時要求 `--enable-wasapi-output`，缺少 sink 時直接拒絕啟動。listener 只綁定
+`127.0.0.1:17842`，控制執行緒 callback 僅 enqueue 到固定 SPSC queue；tab 音訊走專屬
+lane 經 immutable graph 處理後送入 WASAPI handoff。route-health 的 browser-tab 項目反映
+receiver 實際狀態（disabled、listening 或 waiting），沒有使用者 capture 時不得顯示 Ready。
 
 ## Extension security and CSP policy
 

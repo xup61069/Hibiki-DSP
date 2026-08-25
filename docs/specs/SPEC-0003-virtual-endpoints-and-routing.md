@@ -3,7 +3,7 @@ id: SPEC-0003
 status: draft
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-22
+last_reviewed: 2026-08-25
 review_after_days: 14
 related_adrs: [ADR-0002, ADR-0004]
 source_globs: ["driver/**", "sdk/**", "apps/**", "asio/**", "extensions/**", "src/**"]
@@ -119,9 +119,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   的完整 packet 可直接通過 engine render gate；engine outbound encode 經 ring 往返後
   逐位元組一致且 validate 通過；underrun 或損毀 packet 則 fail-closed。這些都是
   user-space contract evidence；實體 WaveRT delivery 驗收尚未涵蓋。
-- `PersistentLinearResampler` 保存跨 block 的 phase 與 boundary frame，要求 caller 提供
-  整個 input block 的 output capacity，並拒絕在不足時部分消耗；它是 clock-drift/SRC 的
-  無配置 baseline，尚未宣稱 production-quality polyphase filter。
+- `PersistentPolyphaseResampler` 是 clock-drift/SRC baseline：固定容量 8 phase × 16 tap
+  polyphase FIR bank 支援最多 8 聲道與 0.25x–4.0x source step，保留跨 block phase 與
+  bounded history，ratio 變更不重置 stream，invalid input fail-closed 且 RT path 不配置。
+  它仍是 user-space contract evidence，不是真實裝置 clock soak 或實體音訊播放驗收。
 - `OutputSinkModel` 將 `ClockDriftEstimator` 的 `sink/source` ratio 接到每個 persistent SRC
   的 effective source step（`base_step / ratio`）；clock observation 在 control side，音訊
   process 只讀已設定的 immutable pipeline state，後續仍需真實 USB/HDMI/Bluetooth clock fixture。
