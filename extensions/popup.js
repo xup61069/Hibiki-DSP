@@ -5,26 +5,34 @@ const status = document.getElementById('status');
 let capturing = false;
 let bridgeConnected = false;
 let bridgeReconnectState = 'idle';
+let droppedPackets = 0;
 
 function render() {
   button.disabled = capturing;
   stopButton.disabled = !capturing;
   if (!status.dataset.error) {
-    status.textContent = capturing ? reconnectText() : 'Idle';
+    status.textContent = capturing ? reconnectText() : '閒置';
   }
 }
 
+function droppedPacketsText() {
+  const value = Number.isFinite(droppedPackets) && droppedPackets >= 0
+    ? Math.floor(droppedPackets)
+    : 0;
+  return `；已丟棄 ${value} 個 packet`;
+}
+
 function reconnectText() {
-  if (bridgeConnected) return 'Capturing — Hibiki connected';
+  if (bridgeConnected) return `擷取中 — Hibiki 已連線${droppedPacketsText()}`;
   switch (bridgeReconnectState) {
     case 'waiting':
-      return 'Capturing — Hibiki will retry connection';
+      return `擷取中 — Hibiki 將重試連線${droppedPacketsText()}`;
     case 'retrying':
-      return 'Capturing — Hibiki is retrying connection';
+      return `擷取中 — Hibiki 正在重試連線${droppedPacketsText()}`;
     case 'exhausted':
-      return 'Capturing — Hibiki stopped after bounded retries; tab playback continues';
+      return `擷取中 — Hibiki 已停止有限次重試；分頁播放繼續${droppedPacketsText()}`;
     default:
-      return 'Capturing — native bridge not detected';
+      return `擷取中 — 未偵測到 native bridge${droppedPacketsText()}`;
   }
 }
 
@@ -34,6 +42,7 @@ function applyState(state) {
   bridgeReconnectState = typeof state?.bridgeReconnectState === 'string'
     ? state.bridgeReconnectState
     : 'idle';
+  droppedPackets = state?.droppedPackets ?? droppedPackets;
   render();
 }
 
@@ -60,11 +69,11 @@ chrome.runtime.onMessage.addListener((message) => {
 button.addEventListener('click', async () => {
   delete status.dataset.error;
   setBusy(true);
-  status.textContent = 'Requesting capture…';
+  status.textContent = '正在要求擷取…';
   try {
     const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
     if (!tab?.id) {
-      status.textContent = 'No active tab';
+      status.textContent = '沒有使用中的分頁';
       setBusy(false);
       return;
     }
@@ -73,7 +82,7 @@ button.addEventListener('click', async () => {
       capturing = true;
       render();
     } else {
-      status.textContent = response?.error ?? 'Capture failed';
+      status.textContent = response?.error ?? '擷取失敗';
       status.dataset.error = 'true';
       capturing = false;
       render();
@@ -91,13 +100,13 @@ button.addEventListener('click', async () => {
 stopButton.addEventListener('click', async () => {
   delete status.dataset.error;
   setBusy(true);
-  status.textContent = 'Stopping capture…';
+  status.textContent = '正在停止擷取…';
   try {
     const response = await chrome.runtime.sendMessage({type: 'stop-capture'});
     if (response?.ok) {
       applyState({capturing: false});
     } else {
-      status.textContent = response?.error ?? 'Stop failed';
+      status.textContent = response?.error ?? '停止失敗';
       status.dataset.error = 'true';
     }
   } catch (error) {
