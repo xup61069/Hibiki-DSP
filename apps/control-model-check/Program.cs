@@ -1657,4 +1657,7 @@ Check(doseVm.ApplyVolumeSafetyState(mutedState, out _),
 Check(!doseVm.ListeningDose.IsAccumulating,
     "A confirmed muted state must not accumulate new dose.");
 
+// Remaining safe-time countdown self-test.
+DoseRemainingCheck.Run(Check);
+
 Console.WriteLine("Control model checks passed.");
