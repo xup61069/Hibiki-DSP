@@ -4697,6 +4697,47 @@ int main() {
             "main", legal_points, 60.0, loudness_policy));
         CHECK(loudness_engine->commit_loudness_peq());
 
+        // Replacing an attachment on the same output group must use a
+        // bounded equal-power RT crossfade instead of swapping filters
+        // mid-block. A fresh attach on another group, and re-attaching
+        // after a transactional clear, remain immediate swaps.
+        EqualLoudnessPolicyV1 changed_loudness_policy = loudness_policy;
+        changed_loudness_policy.strength = 0.55;
+        CHECK(loudness_engine->loudness_peq_transition_complete());
+        CHECK(loudness_engine->prepare_loudness_peq(
+            "main", legal_points, 60.0, changed_loudness_policy));
+        CHECK(loudness_engine->commit_loudness_peq());
+        CHECK(!loudness_engine->loudness_peq_transition_complete());
+        for (std::size_t fade_block = 0U;
+             fade_block < 6U && !loudness_engine->loudness_peq_transition_complete();
+             ++fade_block) {
+            CHECK(loudness_engine->process_output_group(
+                "main", loudness_main_views,
+                loudness_output.data(), 1024U));
+            CHECK(std::all_of(loudness_output.begin(), loudness_output.end(),
+                              [](const float value) {
+                                  return std::isfinite(value);
+                              }));
+        }
+        CHECK(loudness_engine->loudness_peq_transition_complete());
+
+        CHECK(loudness_engine->prepare_loudness_peq(
+            "side", legal_points, 60.0, changed_loudness_policy));
+        CHECK(loudness_engine->commit_loudness_peq());
+        CHECK(loudness_engine->has_active_loudness_peq("side"));
+        CHECK(loudness_engine->loudness_peq_transition_complete());
+
+        CHECK(loudness_engine->prepare_loudness_peq_clear());
+        CHECK(loudness_engine->commit_loudness_peq());
+        CHECK(!loudness_engine->has_active_loudness_peq("main"));
+        CHECK(!loudness_engine->has_active_loudness_peq("side"));
+        CHECK(loudness_engine->prepare_loudness_peq(
+            "main", legal_points, 60.0, loudness_policy));
+        CHECK(loudness_engine->commit_loudness_peq());
+        CHECK(loudness_engine->has_active_loudness_peq("main"));
+        CHECK(!loudness_engine->has_active_loudness_peq("side"));
+        CHECK(loudness_engine->loudness_peq_transition_complete());
+
         // A committed attachment survives a graph switch, but Strict Direct
         // render bypasses it.
         loudness_graph.strict_direct = true;
@@ -6265,6 +6306,128 @@ int main() {
             CHECK(true);  // Worker binary not built in this configuration.
         }
 #endif
+    }
+
+    // VST3 lane ring bridge contract tests.
+    {
+        Vst3LaneRingBridgeV1 bridge;
+
+        // Basic prepare + has_lane.
+        std::vector<float> ring_a(256U * 2U);
+        CHECK(bridge.prepare_lane("main", 2U, std::span<float>(ring_a)));
+        CHECK(bridge.has_lane("main"));
+        CHECK(!bridge.has_lane("side"));
+        CHECK(bridge.channel_count("main") == 2U);
+
+        // Duplicate registration is rejected.
+        std::vector<float> ring_dup(128U);
+        CHECK(!bridge.prepare_lane("main", 2U, std::span<float>(ring_dup)));
+
+        // Invalid parameters are rejected.
+        CHECK(!bridge.prepare_lane("", 2U, std::span<float>(ring_a)));
+        CHECK(!bridge.prepare_lane("main", 0U, std::span<float>(ring_a)));
+        CHECK(!bridge.prepare_lane("main", 2U, std::span<float>()));
+
+        // Push + pop round-trip preserves data.
+        const std::array<float, 4U> push_data{0.1F, 0.2F, 0.3F, 0.4F};
+        CHECK(bridge.push("main", push_data.data(), 2U));
+        std::array<float, 4U> pop_data{};
+        CHECK(bridge.pop("main", pop_data.data(), 2U));
+        CHECK(pop_data[0] == 0.1F);
+        CHECK(pop_data[1] == 0.2F);
+        CHECK(pop_data[2] == 0.3F);
+        CHECK(pop_data[3] == 0.4F);
+
+        // Pop with insufficient data returns false (passthrough).
+        std::array<float, 4U> underflow{};
+        CHECK(!bridge.pop("main", underflow.data(), 2U));
+
+        // Push with NaN/Inf is rejected (fail-closed).
+        const std::array<float, 2U> nan_data{
+            std::numeric_limits<float>::quiet_NaN(), 0.5F};
+        CHECK(!bridge.push("main", nan_data.data(), 1U));
+        const std::array<float, 2U> inf_data{
+            std::numeric_limits<float>::infinity(), 0.5F};
+        CHECK(!bridge.push("main", inf_data.data(), 1U));
+
+        // Ring overflow is rejected without corrupting existing data.
+        const std::size_t capacity_frames = 256U;
+        std::vector<float> big_block(capacity_frames * 2U * 2U);
+        for (std::size_t i = 0U; i < big_block.size(); ++i) {
+            big_block[i] = static_cast<float>(i % 7U) * 0.1F;
+        }
+        // Fill the ring to capacity.
+        for (std::size_t offset = 0U; offset < capacity_frames; offset += 64U) {
+            CHECK(bridge.push("main", big_block.data() + offset * 2U, 64U));
+        }
+        // Overflow attempt fails.
+        CHECK(!bridge.push("main", big_block.data(), 1U));
+        // Drain and verify integrity.
+        bool drain_ok = true;
+        for (std::size_t offset = 0U; offset < capacity_frames; offset += 64U) {
+            std::vector<float> out(128U);
+            if (!bridge.pop("main", out.data(), 64U)) { drain_ok = false; break; }
+            for (std::size_t i = 0U; i < 128U; ++i) {
+                if (out[i] != static_cast<float>((offset * 2U + i) % 7U) * 0.1F) {
+                    drain_ok = false; break;
+                }
+            }
+            if (!drain_ok) break;
+        }
+        CHECK(drain_ok);
+
+        // Clear a specific lane.
+        std::vector<float> ring_b(64U * 2U);
+        CHECK(bridge.prepare_lane("side", 2U, std::span<float>(ring_b)));
+        CHECK(bridge.has_lane("side"));
+        CHECK(bridge.clear_lane("side"));
+        CHECK(!bridge.has_lane("side"));
+
+        // Clear all lanes.
+        bridge.clear_all();
+        CHECK(!bridge.has_lane("main"));
+
+        // Per-group isolation: main lane does not affect side group output.
+        Vst3LaneRingBridgeV1 isolation_bridge;
+        std::vector<float> ring_main(128U * 2U);
+        std::vector<float> ring_side(128U * 2U);
+        CHECK(isolation_bridge.prepare_lane("main", 2U,
+                                             std::span<float>(ring_main)));
+        CHECK(isolation_bridge.has_lane("main"));
+        CHECK(!isolation_bridge.has_lane("side"));
+        // Pop on an unregistered group returns false cleanly.
+        std::array<float, 2U> isolated_out{};
+        CHECK(!isolation_bridge.pop("side", isolated_out.data(), 1U));
+
+        // Engine-level prepare/commit/rollback integration.
+        AudioEngineModel engine;
+        GraphConfigV1 vst_graph;
+        vst_graph.lanes.push_back(LaneConfigV1{"vst-main", "main", 2, 0.0, true});
+        vst_graph.strict_direct = false;
+        CHECK(engine.prepare_graph(vst_graph, 1U) && engine.commit_graph());
+        engine.set_sample_rate(48000U);
+
+        // Prepare with valid storage succeeds.
+        std::vector<float> engine_ring(1024U * 2U);
+        CHECK(engine.prepare_vst3_lane("main", 2U,
+                                        std::span<float>(engine_ring)));
+        CHECK(!engine.vst3_lane_transaction_idle());
+        CHECK(!engine.has_active_vst3_lane("main"));  // Not committed yet.
+        CHECK(engine.commit_vst3_lane());
+        CHECK(engine.vst3_lane_transaction_idle());
+        CHECK(engine.has_active_vst3_lane("main"));
+
+        // Rollback discards pending changes without affecting active state.
+        std::vector<float> rollback_ring(512U * 2U);
+        CHECK(engine.prepare_vst3_lane_clear("main"));
+        CHECK(!engine.vst3_lane_transaction_idle());
+        engine.rollback_vst3_lane();
+        CHECK(engine.vst3_lane_transaction_idle());
+        CHECK(engine.has_active_vst3_lane("main"));  // Still active.
+
+        // Reset clears everything.
+        engine.reset_vst3_lane_state();
+        CHECK(!engine.has_active_vst3_lane("main"));
     }
 
     return 0;

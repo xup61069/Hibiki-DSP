@@ -14,6 +14,7 @@
 #include "hibiki/windows_wasapi_handoff.hpp"
 #include "hibiki/windows_wasapi_fanout.hpp"
 #include "hibiki/program_loudness.hpp"
+#include "hibiki/vst3_lane_bridge.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -73,9 +74,12 @@ public:
 
     void rollback_loudness_peq() noexcept;
 
-    // True when no equal-loudness prepare/clear transaction is pending.
+    // True when no equal-loudness transaction is pending and any committed
+    // bounded RT crossfade has fully retired.
 
     [[nodiscard]] bool loudness_peq_transaction_idle() const noexcept;
+
+    [[nodiscard]] bool loudness_peq_transition_complete() const noexcept;
 
     [[nodiscard]] bool has_active_loudness_peq(
 
@@ -98,6 +102,23 @@ public:
     [[nodiscard]] bool has_active_program_aware(
         std::string_view output_group = "main") const noexcept;
     void reset_program_aware_state() noexcept;
+
+    // VST3 lane bridge is an independent fixed-capacity output attachment.
+    // Prepare validates the caller ring on the control worker; commit is the
+    // only RT-visible swap. The callback never allocates, waits, or reads a
+    // pipe. Worker failure leaves the RT path as passthrough.
+    [[nodiscard]] bool prepare_vst3_lane(
+        std::string_view output_group,
+        std::uint32_t channels,
+        std::span<float> ring_storage) noexcept;
+    [[nodiscard]] bool prepare_vst3_lane_clear(
+        std::string_view output_group) noexcept;
+    [[nodiscard]] bool commit_vst3_lane() noexcept;
+    void rollback_vst3_lane() noexcept;
+    [[nodiscard]] bool vst3_lane_transaction_idle() const noexcept;
+    [[nodiscard]] bool has_active_vst3_lane(
+        std::string_view output_group = "main") const noexcept;
+    void reset_vst3_lane_state() noexcept;
     // True when no IR prepare/clear transaction is pending. SceneApply uses
     // this to decide whether an unchanged calibration reference can keep the
     // current attachment untouched instead of running a clear transaction.
@@ -271,6 +292,26 @@ private:
 
     LoudnessGraphAttachmentV1 pending_loudness_peq_{};
 
+    LoudnessGraphAttachmentV1 previous_loudness_peq_{};
+
+    struct LoudnessPeqCrossfadeState {
+        bool active{false};
+        std::size_t total_frames{0U};
+        std::size_t processed_frames{0U};
+
+        bool begin(const std::size_t frames) noexcept {
+            if (frames == 0U) return false;
+            active = true;
+            total_frames = frames;
+            processed_frames = 0U;
+            return true;
+        }
+
+        void reset() noexcept { *this = {}; }
+    };
+
+    LoudnessPeqCrossfadeState loudness_crossfade_{};
+
     bool has_active_loudness_peq_{false};
 
     bool has_pending_loudness_peq_{false};
@@ -286,6 +327,11 @@ private:
     ProgramAwareAttachmentV1 pending_program_aware_{};
     bool has_active_program_aware_{false};
     bool has_pending_program_aware_{false};
+    Vst3LaneRingBridgeV1 active_vst3_lanes_{};
+    Vst3LaneRingBridgeV1 pending_vst3_lanes_{};
+    bool has_active_vst3_lanes_{false};
+    bool has_pending_vst3_lanes_{false};
+    std::string_view pending_vst3_lane_clear_target_{};
     EngineTransactionState state_{EngineTransactionState::Ready};
     bool has_active_graph_{false};
     bool has_pending_graph_{false};
@@ -306,6 +352,9 @@ private:
     [[nodiscard]] bool apply_program_aware(std::string_view output_group,
                                             float* output_interleaved,
                                             std::size_t frames) noexcept;
+    [[nodiscard]] bool apply_vst3_lanes(std::string_view output_group,
+                                         float* output_interleaved,
+                                         std::size_t frames) noexcept;
 };
 
 }  // namespace hibiki

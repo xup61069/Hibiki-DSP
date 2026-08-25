@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <numbers>
 #include <utility>
 
 namespace hibiki {
@@ -12,6 +13,9 @@ namespace hibiki {
 namespace {
 
 constexpr std::size_t kMaxLoudnessFormulaPointsV1 = 64U;
+constexpr std::uint32_t kLoudnessPeqCrossfadeMs = 120U;
+constexpr std::size_t kMaxLoudnessPeqCrossfadeFramesV1 =
+    static_cast<std::size_t>(192000U) * 120U / 1000U;
 
 struct LoudnessPeqCompileResultV1 {
     PeqFilterV1 filters[kMaxRealtimePeqFiltersV1]{};
@@ -278,6 +282,34 @@ bool AudioEngineModel::prepare_loudness_peq_clear() noexcept {
 
 bool AudioEngineModel::commit_loudness_peq() noexcept {
     if (!has_pending_loudness_peq_) return false;
+    const bool crossfade =
+        pending_loudness_peq_.attached && has_active_loudness_peq_ &&
+        active_loudness_peq_.attached &&
+        pending_loudness_peq_.output_group_bytes ==
+            active_loudness_peq_.output_group_bytes &&
+        std::equal(pending_loudness_peq_.output_group.begin(),
+                   pending_loudness_peq_.output_group.begin() +
+                       pending_loudness_peq_.output_group_bytes,
+                   active_loudness_peq_.output_group.begin());
+    if (crossfade) {
+        const auto sample_rate = sample_rate_.load(std::memory_order_acquire);
+        const auto fade_frames = static_cast<std::uint64_t>(sample_rate) *
+                                 kLoudnessPeqCrossfadeMs / 1000U;
+        if (sample_rate == 0U ||
+            fade_frames > static_cast<std::uint64_t>(
+                              kMaxLoudnessPeqCrossfadeFramesV1)) {
+            return false;
+        }
+        previous_loudness_peq_ = std::move(active_loudness_peq_);
+        if (!loudness_crossfade_.begin(
+                static_cast<std::size_t>(fade_frames))) {
+            previous_loudness_peq_ = {};
+            return false;
+        }
+    } else {
+        previous_loudness_peq_ = {};
+        loudness_crossfade_.reset();
+    }
     active_loudness_peq_ = std::move(pending_loudness_peq_);
     has_active_loudness_peq_ = active_loudness_peq_.attached;
     has_pending_loudness_peq_ = false;
@@ -293,6 +325,10 @@ bool AudioEngineModel::loudness_peq_transaction_idle() const noexcept {
     return !has_pending_loudness_peq_;
 }
 
+bool AudioEngineModel::loudness_peq_transition_complete() const noexcept {
+    return loudness_peq_transaction_idle() && !loudness_crossfade_.active;
+}
+
 bool AudioEngineModel::has_active_loudness_peq(const std::string_view output_group) const noexcept {
     return has_active_loudness_peq_ && active_loudness_peq_.attached &&
            active_loudness_peq_.output_group_bytes == output_group.size() &&
@@ -305,6 +341,8 @@ void AudioEngineModel::reset_loudness_peq_state() noexcept {
     pending_loudness_peq_ = {};
     has_active_loudness_peq_ = false;
     has_pending_loudness_peq_ = false;
+    previous_loudness_peq_ = {};
+    loudness_crossfade_.reset();
 }
 
 bool AudioEngineModel::prepare_program_aware(
@@ -381,6 +419,79 @@ void AudioEngineModel::reset_program_aware_state() noexcept {
     has_pending_program_aware_ = false;
 }
 
+bool AudioEngineModel::prepare_vst3_lane(
+    const std::string_view output_group,
+    const std::uint32_t channels,
+    const std::span<float> ring_storage) noexcept {
+    if (output_group.empty() || output_group.size() > kMaxOutputGroupBytesV1 ||
+        output_group.find('\0') != std::string_view::npos ||
+        volume_bank_ == nullptr ||
+        !volume_bank_->has_group(output_group)) {
+        return false;
+    }
+    // Prepare on the pending bank; commit is the only RT-visible swap.
+    if (!pending_vst3_lanes_.prepare_lane(output_group, channels,
+                                           ring_storage)) {
+        return false;
+    }
+    has_pending_vst3_lanes_ = true;
+    return true;
+}
+
+bool AudioEngineModel::prepare_vst3_lane_clear(
+    const std::string_view output_group) noexcept {
+    if (output_group.empty()) { return false; }
+    if (!pending_vst3_lanes_.has_lane(output_group) &&
+        !active_vst3_lanes_.has_lane(output_group)) {
+        return false;
+    }
+    // Copy active lanes into pending, then remove the target lane.
+    pending_vst3_lanes_ = active_vst3_lanes_;
+    if (!pending_vst3_lane_clear_target_.empty()) {
+        pending_vst3_lane_clear_target_ = {};
+    }
+    pending_vst3_lane_clear_target_ = output_group;
+    has_pending_vst3_lanes_ = true;
+    return true;
+}
+
+bool AudioEngineModel::commit_vst3_lane() noexcept {
+    if (!has_pending_vst3_lanes_) { return false; }
+    if (!pending_vst3_lane_clear_target_.empty()) {
+        // Clear transaction: copy back without the removed lane.
+        pending_vst3_lanes_.clear_lane(pending_vst3_lane_clear_target_);
+        pending_vst3_lane_clear_target_ = {};
+    }
+    active_vst3_lanes_ = pending_vst3_lanes_;
+    has_active_vst3_lanes_ = true;
+    has_pending_vst3_lanes_ = false;
+    return true;
+}
+
+void AudioEngineModel::rollback_vst3_lane() noexcept {
+    pending_vst3_lanes_.clear_all();
+    pending_vst3_lane_clear_target_ = {};
+    has_pending_vst3_lanes_ = false;
+}
+
+bool AudioEngineModel::vst3_lane_transaction_idle() const noexcept {
+    return !has_pending_vst3_lanes_;
+}
+
+bool AudioEngineModel::has_active_vst3_lane(
+    const std::string_view output_group) const noexcept {
+    return has_active_vst3_lanes_ &&
+           active_vst3_lanes_.has_lane(output_group);
+}
+
+void AudioEngineModel::reset_vst3_lane_state() noexcept {
+    active_vst3_lanes_.reset();
+    pending_vst3_lanes_.reset();
+    pending_vst3_lane_clear_target_ = {};
+    has_active_vst3_lanes_ = false;
+    has_pending_vst3_lanes_ = false;
+}
+
 bool AudioEngineModel::has_active_ir(const std::string_view output_group) const noexcept {
     return has_active_ir_ && active_ir_.attached &&
            active_ir_.output_group_bytes == output_group.size() &&
@@ -443,6 +554,7 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
     if (!apply_ir(output_group, output_interleaved, frames)) return false;
     if (!apply_loudness_peq(output_group, output_interleaved, frames)) return false;
     if (!apply_program_aware(output_group, output_interleaved, frames)) return false;
+    if (!apply_vst3_lanes(output_group, output_interleaved, frames)) return false;
     if (!apply_group_master(output_group, output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
         auto* const group_limiter =
@@ -806,20 +918,92 @@ bool AudioEngineModel::apply_loudness_peq(const std::string_view output_group,
                                           float* const output_interleaved,
                                           const std::size_t frames) noexcept {
     if ((has_active_graph_ && active_graph_.strict_direct) ||
-        !has_active_loudness_peq_ ||
-        !active_loudness_peq_.attached || frames == 0U ||
-        active_loudness_peq_.output_group_bytes != output_group.size() ||
-        !std::equal(output_group.begin(), output_group.end(),
-                    active_loudness_peq_.output_group.begin())) {
+        (!has_active_loudness_peq_ && !loudness_crossfade_.active)) {
         return true;
     }
-    if (output_interleaved == nullptr || !active_loudness_peq_.peq.prepared() ||
-        active_loudness_peq_.peq.sample_rate() !=
-            sample_rate_.load(std::memory_order_relaxed) ||
-        active_loudness_peq_.peq.channels() != active_graph_.output_channels) {
+    if (frames == 0U) return true;
+    if (output_interleaved == nullptr ||
+        frames > kMaxLoudnessPeqCrossfadeFramesV1) {
         return false;
     }
-    return active_loudness_peq_.peq.process_interleaved(output_interleaved, frames);
+
+    const std::size_t channel_count = active_graph_.output_channels;
+    if (channel_count == 0U ||
+        frames > std::numeric_limits<std::size_t>::max() / channel_count) {
+        return false;
+    }
+    const auto matches_attachment =
+        [](const LoudnessGraphAttachmentV1& attachment,
+           const std::string_view group) noexcept {
+            return attachment.attached &&
+                   attachment.output_group_bytes == group.size() &&
+                   std::equal(group.begin(), group.end(),
+                              attachment.output_group.begin());
+        };
+    const bool active_matches =
+        has_active_loudness_peq_ &&
+        matches_attachment(active_loudness_peq_, output_group);
+    const bool previous_matches =
+        loudness_crossfade_.active &&
+        matches_attachment(previous_loudness_peq_, output_group);
+    if (!active_matches && !previous_matches) return true;
+
+    const auto sample_rate = sample_rate_.load(std::memory_order_relaxed);
+    if ((active_matches &&
+         (active_loudness_peq_.peq.sample_rate() != sample_rate ||
+          active_loudness_peq_.peq.channels() != channel_count)) ||
+        (previous_matches &&
+         (previous_loudness_peq_.peq.sample_rate() != sample_rate ||
+          previous_loudness_peq_.peq.channels() != channel_count))) {
+        return false;
+    }
+
+    std::array<float, kMaxLoudnessPeqCrossfadeFramesV1> old_samples{};
+    const float* old_block = nullptr;
+    if (previous_matches) {
+        std::copy_n(output_interleaved, frames * channel_count,
+                    old_samples.begin());
+        if (!previous_loudness_peq_.peq.process_interleaved(
+                old_samples.data(), frames)) {
+            return false;
+        }
+        old_block = old_samples.data();
+    }
+    if (active_matches &&
+        !active_loudness_peq_.peq.process_interleaved(output_interleaved,
+                                                      frames)) {
+        return false;
+    }
+    if (!loudness_crossfade_.active) {
+        return active_matches;
+    }
+
+    constexpr double half_pi = std::numbers::pi_v<double> / 2.0;
+    const std::size_t total_frames = loudness_crossfade_.total_frames;
+    for (std::size_t frame = 0U; frame < frames; ++frame) {
+        const auto absolute = loudness_crossfade_.processed_frames + frame;
+        const auto bounded = (std::min)(absolute, total_frames);
+        const auto position = static_cast<double>(bounded) /
+                              static_cast<double>(total_frames);
+        const auto old_gain = static_cast<float>(std::cos(position * half_pi));
+        const auto new_gain = static_cast<float>(std::sin(position * half_pi));
+        for (std::size_t channel = 0U; channel < channel_count; ++channel) {
+            const auto index = frame * channel_count + channel;
+            float value = output_interleaved[index] * new_gain;
+            if (old_block != nullptr) {
+                value += old_block[index] * old_gain;
+            }
+            output_interleaved[index] = value;
+        }
+    }
+    loudness_crossfade_.processed_frames =
+        (std::min)(total_frames,
+                   loudness_crossfade_.processed_frames + frames);
+    if (loudness_crossfade_.processed_frames >= total_frames) {
+        loudness_crossfade_.reset();
+        previous_loudness_peq_ = {};
+    }
+    return true;
 }
 
 bool AudioEngineModel::apply_program_aware(const std::string_view output_group,
@@ -847,5 +1031,36 @@ bool AudioEngineModel::apply_program_aware(const std::string_view output_group,
     return controller->process_interleaved(output_interleaved, frames,
                                            active_graph_.output_channels);
 }
+
+bool AudioEngineModel::apply_vst3_lanes(
+    const std::string_view output_group,
+    float* const output_interleaved,
+    const std::size_t frames) noexcept {
+    if ((has_active_graph_ && active_graph_.strict_direct) ||
+        !has_active_vst3_lanes_) {
+        return true;
+    }
+    if (output_interleaved == nullptr || frames == 0U) {
+        return false;
+    }
+    if (!active_vst3_lanes_.has_lane(output_group)) {
+        return true;  // No VST3 lane for this group; passthrough.
+    }
+    // Pop the processed block from the ring into a temporary buffer and
+    // overwrite the output. If insufficient data, passthrough (do not block).
+    const auto channels = active_vst3_lanes_.channel_count(output_group);
+    if (channels == 0U ||
+        frames * channels > kMaxVst3RingFramesV1 * 8U) {
+        return true;
+    }
+    std::array<float, kMaxVst3RingFramesV1 * 8U> temp{};
+    if (!active_vst3_lanes_.pop(output_group, temp.data(), frames)) {
+        return true;  // Ring underrun: passthrough.
+    }
+    std::memcpy(output_interleaved, temp.data(),
+                frames * channels * sizeof(float));
+    return true;
+}
+
 
 }  // namespace hibiki
