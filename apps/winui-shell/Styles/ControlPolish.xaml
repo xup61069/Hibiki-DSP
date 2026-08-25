@@ -10,12 +10,16 @@
             <StaticResource x:Key="SliderTrackFill" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPointerOver" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPressed" ResourceKey="HibikiSliderTrackFill" />
+            <SolidColorBrush x:Key="HibikiSectionCardBrush">#F0F4F9F0</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiRouteItemBrush">#FFFFFFB8</SolidColorBrush>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
             <SolidColorBrush x:Key="HibikiSliderTrackFill" Opacity="0.36" Color="{StaticResource SystemAccentColor}" />
             <StaticResource x:Key="SliderTrackFill" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPointerOver" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPressed" ResourceKey="HibikiSliderTrackFill" />
+            <SolidColorBrush x:Key="HibikiSectionCardBrush">#1A202C90</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiRouteItemBrush">#262D3A80</SolidColorBrush>
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
@@ -29,31 +33,34 @@
         <Setter Property="CornerRadius" Value="2" />
     </Style>
 
-    <!-- Section card surface with a subtle accent border highlight on pointer-over.
-         Hover is applied from code-behind because Border has no visual states.
-         Uses the same corner/padding rhythm as the scene cards (CR12/P16). -->
+    <!-- Bold section card with layered surface and generous corner radius. -->
     <Style x:Key="SectionCardStyle" TargetType="Border">
-        <Setter Property="Padding" Value="16" />
-        <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Background" Value="{ThemeResource SubtleFillColorTertiaryBrush}" />
+        <Setter Property="Padding" Value="20" />
+        <Setter Property="CornerRadius" Value="16" />
+        <Setter Property="Background" Value="{ThemeResource HibikiSectionCardBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Transitions">
+            <Setter.Value>
+                <TransitionCollection>
+                    <EntranceThemeTransition FromVerticalOffset="20" />
+                </TransitionCollection>
+            </Setter.Value>
+        </Setter>
     </Style>
 
-    <!-- Shared card surface for route-health rows, App session rows, matrix
-         routes and VST3 lanes. Extracted from duplicated inline attributes so
-         all inner list items share the same corner radius and padding. -->
+    <!-- Shared route/session item cards with compact inner surfaces. -->
     <Style x:Key="RouteItemCardGridStyle" TargetType="Grid">
-        <Setter Property="Padding" Value="12" />
+        <Setter Property="Padding" Value="14" />
         <Setter Property="CornerRadius" Value="10" />
-        <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+        <Setter Property="Background" Value="{ThemeResource HibikiRouteItemBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style x:Key="RouteItemCardStackStyle" TargetType="StackPanel">
-        <Setter Property="Padding" Value="12" />
+        <Setter Property="Padding" Value="14" />
         <Setter Property="CornerRadius" Value="10" />
-        <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+        <Setter Property="Background" Value="{ThemeResource HibikiRouteItemBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
     </Style>
