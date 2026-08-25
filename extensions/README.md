@@ -15,6 +15,11 @@ the extension never silently captures a tab or microphone.
 The popup exposes explicit Start and Stop controls. It queries the real capture
 state when opened, reports start/stop failures instead of pretending success,
 and shows whether the optional loopback native bridge is currently connected.
+The popup also offers an explicit "Copy diagnostics" action that places a short,
+anonymous plain-text snapshot on the clipboard: the capturing flag, the bridge
+connection flag, the bounded-retry state, the dropped-packet counter and a UTC
+timestamp. It contains no audio samples, tab URLs, tab titles or device
+identifiers, so bug reports can share connection state without private data.
 While capturing without a bridge, it distinguishes waiting for the next retry,
 an active retry, and exhaustion of the bounded retry budget. If retries are
 exhausted, the popup offers an explicit manual retry button that resets the
@@ -28,6 +33,13 @@ until the bridge reconnects, and the retry and heartbeat are diagnostic only —
 they do not imply browser or vendor control. Stop
 releases the user-selected stream and capture graph. Closing or navigating away
 from the captured tab also ends the source stream and releases that graph.
+The popup includes a "Copy diagnostics" button that places an anonymous,
+plain-text diagnostic snapshot on the clipboard. The snapshot contains only
+the current capturing flag, bridge-connected flag, bridge reconnect state
+(idle / waiting / retrying / exhausted), dropped-packet count and a UTC
+timestamp. It never contains audio samples, tab URLs, tab titles or device
+identifiers. This helps bug reports include connection state without sharing
+personal data.
 
 Packet header: magic `HIBT`, version `1`, channel count, frame count and
 sample rate (all little-endian), followed by interleaved Float32 samples. The
