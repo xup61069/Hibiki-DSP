@@ -1,15 +1,22 @@
 const button = document.getElementById('capture');
 const stopButton = document.getElementById('stop');
+const retryButton = document.getElementById('retry-bridge');
+const diagnosticsButton = document.getElementById('copy-diagnostics');
 const status = document.getElementById('status');
 
 let capturing = false;
 let bridgeConnected = false;
 let bridgeReconnectState = 'idle';
 let droppedPackets = 0;
+let retryBusy = false;
+let diagnosticsBusy = false;
+let diagnosticsTimer = 0;
 
 function render() {
   button.disabled = capturing;
   stopButton.disabled = !capturing;
+  retryButton.hidden = !(capturing && !bridgeConnected && bridgeReconnectState === 'exhausted');
+  retryButton.disabled = !retryButton.hidden || retryBusy;
   if (!status.dataset.error) {
     status.textContent = capturing ? reconnectText() : '閒置';
   }
@@ -33,6 +40,37 @@ function reconnectText() {
       return `擷取中 — Hibiki 已停止有限次重試；分頁播放繼續${droppedPacketsText()}`;
     default:
       return `擷取中 — 未偵測到 native bridge${droppedPacketsText()}`;
+  }
+}
+
+function buildDiagnosticsSnapshot() {
+  return [
+    'Hibiki extension diagnostic snapshot',
+    `capturing: ${capturing}`,
+    `bridgeConnected: ${bridgeConnected}`,
+    `bridgeReconnectState: ${bridgeReconnectState}`,
+    `droppedPackets: ${Number.isFinite(droppedPackets) && droppedPackets >= 0 ? Math.floor(droppedPackets) : 0}`,
+    `timestampUtc: ${new Date().toISOString()}`,
+  ].join('\n');
+}
+
+async function writeClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return true;
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    if (!document.execCommand('copy')) throw new Error('copy-failed');
+    return true;
+  } finally {
+    textarea.remove();
   }
 }
 
@@ -117,6 +155,53 @@ stopButton.addEventListener('click', async () => {
     return;
   }
   setBusy(false);
+});
+
+retryButton.addEventListener('click', async () => {
+  if (retryButton.hidden || retryBusy) return;
+  delete status.dataset.error;
+  retryBusy = true;
+  render();
+  status.textContent = '正在重新連線…';
+  try {
+    const response = await chrome.runtime.sendMessage({type: 'retry-tab-bridge'});
+    if (response?.ok) {
+      bridgeReconnectState = 'retrying';
+      status.textContent = '已要求重新連線；等待 Hibiki 回應';
+    } else {
+      status.textContent = response?.error === 'bridge-retry-unavailable'
+        ? '目前無法重新連線'
+        : response?.error ?? '重新連線失敗';
+      status.dataset.error = 'true';
+    }
+  } catch (error) {
+    status.textContent = error instanceof Error ? error.message : String(error);
+    status.dataset.error = 'true';
+  }
+  retryBusy = false;
+  await refreshState();
+});
+
+diagnosticsButton.addEventListener('click', async () => {
+  if (diagnosticsBusy) return;
+  delete status.dataset.error;
+  clearTimeout(diagnosticsTimer);
+  diagnosticsBusy = true;
+  diagnosticsButton.disabled = true;
+  try {
+    await refreshState();
+    await writeClipboard(buildDiagnosticsSnapshot());
+    status.textContent = '已複製匿名診斷快照';
+  } catch (error) {
+    status.textContent = error instanceof Error ? error.message : String(error);
+    status.dataset.error = 'true';
+  } finally {
+    diagnosticsBusy = false;
+    diagnosticsButton.disabled = false;
+  }
+  diagnosticsTimer = setTimeout(() => {
+    if (!status.dataset.error) render();
+  }, 2000);
 });
 
 refreshState();

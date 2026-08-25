@@ -62,6 +62,10 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         "Hibiki DSP", "scene-sync-queue-v1.json");
     private readonly Queue<PendingSceneCatalogOp> _pendingSceneCatalogOps = new();
     private int _droppedSceneCatalogOperations;
+    private CancellationTokenSource? _eqPollCts;
+    private Task? _eqPollLoop;
+
+    private const int EqPollIntervalMs = 1000;
 
     public ExpertSurfaceModel Expert { get; } = new();
 
@@ -268,6 +272,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public VolumeSafetyStateV1 VolumeState => _volumeState;
     public double EffectiveVolumeDb => _volumeState.EffectiveDb;
+    public ListeningDoseModelV1 ListeningDose { get; } = new();
     public string EffectiveVolumeDisplayText => $"實際有效音量：{EffectiveVolumeDb:0.0} dB";
     public double SafetyCeilingDb => _volumeState.SafetyCeilingDb;
     public string SafetyStatusText => _volumeState.SafetyStatusText;
@@ -1040,6 +1045,11 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         _requestedVolumeDb = state.RequestedDb;
         _muted = state.Muted;
         _generation = state.Generation;
+        // The dose indicator is a pure observer of confirmed volume state:
+        // rejection or failure above never reaches this line.
+        ListeningDose.AddSample(DateTimeOffset.UtcNow, state.EffectiveDb,
+                                state.Muted);
+        OnPropertyChanged(nameof(ListeningDose));
         OnPropertyChanged(nameof(RequestedVolumeDb));
         OnPropertyChanged(nameof(RequestedVolumeDisplayText));
         OnPropertyChanged(nameof(Muted));
@@ -1614,6 +1624,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
                 StatusText = "引擎已連線；控制狀態暫不可用，音訊保持安全狀態";
             if (IsConnected)
                 _ = await RefreshEqVisualSnapshotAsync(cancellationToken).ConfigureAwait(true);
+            StartEqVisualPolling();
             if (IsConnected && !await RefreshSessionCatalogAsync(cancellationToken).ConfigureAwait(true))
                 StatusText = "引擎已連線；App 清單暫不可用，音訊保持安全狀態";
             if (IsConnected && _pendingSceneCatalogOps.Count > 0)
@@ -1647,6 +1658,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public async Task DisconnectAsync()
     {
+        StopEqVisualPolling();
         if (_controlClient is not null)
         {
             await _controlClient.DisposeAsync().ConfigureAwait(true);
@@ -1655,6 +1667,50 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         SetConnectionState(ControlConnectionState.Disconnected);
         _ = EqSurface.Reset();
         OnPropertyChanged(nameof(EqSurface));
+    }
+
+    // Bounded periodic EQ visual polling keeps the modern-equalizer surface
+    // current while content-driven adaptive correction changes the applied
+    // curve. The loop lives only for the connected lifetime: disconnect
+    // cancels it, and a failed poll leaves the previous confirmed frame in
+    // place instead of corrupting the safe visual state.
+    private void StartEqVisualPolling()
+    {
+        if (_eqPollCts is not null) return;
+        _eqPollCts = new CancellationTokenSource();
+        var token = _eqPollCts.Token;
+        _eqPollLoop = Task.Run(async () =>
+        {
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(EqPollIntervalMs, token).ConfigureAwait(true);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                if (_controlClient is null) return;
+                try
+                {
+                    await RefreshEqVisualSnapshotAsync(token).ConfigureAwait(true);
+                }
+                catch
+                {
+                    // Silent by contract: poll failures never break the last
+                    // confirmed safe frame and never crash the control plane.
+                }
+            }
+        }, CancellationToken.None);
+    }
+
+    private void StopEqVisualPolling()
+    {
+        _eqPollCts?.Cancel();
+        _eqPollCts?.Dispose();
+        _eqPollCts = null;
+        _eqPollLoop = null;
     }
 
     public async Task<bool> OneTapEnhanceAsync(CancellationToken cancellationToken = default)

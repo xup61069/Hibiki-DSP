@@ -10,10 +10,12 @@ let droppedPackets = 0;
 let bridgeRetryTimer = null;
 let bridgeRetryAttempt = 0;
 let bridgeRetryExhausted = false;
+let stateHeartbeatTimer = null;
 
 const BRIDGE_RETRY_MAX_ATTEMPTS = 10;
 const BRIDGE_RETRY_BASE_MS = 1000;
 const BRIDGE_RETRY_CAP_MS = 15000;
+const STATE_HEARTBEAT_INTERVAL_MS = 1000;
 const BRIDGE_RECONNECT_IDLE_V1 = 'idle';
 const BRIDGE_RECONNECT_WAITING_V1 = 'waiting';
 const BRIDGE_RECONNECT_RETRYING_V1 = 'retrying';
@@ -37,6 +39,15 @@ function bridgeReconnectState() {
   return bridgeRetryExhausted ? BRIDGE_RECONNECT_EXHAUSTED_V1 : BRIDGE_RECONNECT_RETRYING_V1;
 }
 
+function setStateHeartbeat(enabled) {
+  if (enabled && stateHeartbeatTimer === null) {
+    stateHeartbeatTimer = setInterval(reportState, STATE_HEARTBEAT_INTERVAL_MS);
+  } else if (!enabled && stateHeartbeatTimer !== null) {
+    clearInterval(stateHeartbeatTimer);
+    stateHeartbeatTimer = null;
+  }
+}
+
 function connectBridge() {
   if (!capturing || bridge) return;
   try {
@@ -44,11 +55,13 @@ function connectBridge() {
     bridge.binaryType = 'arraybuffer';
     bridge.onopen = () => {
       bridgeRetryAttempt = 0;
+      setStateHeartbeat(false);
       setBridgeConnected(true);
     };
     bridge.onclose = () => {
       bridge = null;
       setBridgeConnected(false);
+      setStateHeartbeat(capturing);
       scheduleBridgeRetry();
     };
     bridge.onerror = () => {};
@@ -98,6 +111,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .then(() => sendResponse({ok: true}))
       .catch((error) => sendResponse({ok: false, error: String(error)}));
     return true;
+  }
+  if (message?.type === 'retry-tab-bridge') {
+    if (!capturing || bridgeConnected) {
+      sendResponse({ok: false, error: 'bridge-retry-unavailable'});
+      return false;
+    }
+    cancelBridgeRetry();
+    connectBridge();
+    sendResponse({ok: true});
+    return false;
   }
   if (message?.type !== 'start-tab-stream' || typeof message.streamId !== 'string') return false;
   startCapture(message)
@@ -172,6 +195,7 @@ async function closeExistingContext() {
 async function teardownCaptureGraph() {
   capturing = false;
   cancelBridgeRetry();
+  setStateHeartbeat(false);
   activeStream?.getTracks().forEach(track => track.stop());
   activeStream = null;
   source?.disconnect();
