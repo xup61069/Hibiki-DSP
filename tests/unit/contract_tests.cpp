@@ -1194,6 +1194,7 @@ int main() {
     const auto game_scene = make_easy_scene(EasySceneKind::Game, "main");
     CHECK(validate_scene(game_scene.scene));
     CHECK(validate_graph(game_scene.graph));
+    CHECK(game_scene.loudness.live_update_enabled);
     CHECK(game_scene.scene.latency_mode == LatencyMode::Game);
     CHECK(game_scene.scene.ir_phase.mode == IrPhaseMode::MinimumPhase &&
           resolve_ir_phase_policy(game_scene.scene.ir_phase).added_delay_ms == 0.0);
@@ -1203,6 +1204,7 @@ int main() {
     CHECK(studio_scene.scene.ir_phase.mode == IrPhaseMode::Bypass);
     CHECK(validate_graph(studio_scene.graph));
     CHECK(studio_scene.loudness.max_boost_db == 0.0);
+    CHECK(!studio_scene.loudness.live_update_enabled);
 
     OutputGroupVolumeStateV1 safety_volume{};
     safety_volume.requested_db = -12.0;
@@ -2212,7 +2214,7 @@ int main() {
                                      corrupted_catalog_command));
 
     std::vector<std::uint8_t> reserved_zero_payload = catalog_payload;
-    reserved_zero_payload[84U] = 1U;
+    reserved_zero_payload[85U] = 1U;
     IpcFrameV1 reserved_zero_frame;
     reserved_zero_frame.header.type = IpcMessageType::SceneCatalogCommand;
     reserved_zero_frame.payload = reserved_zero_payload;
@@ -2237,6 +2239,14 @@ int main() {
     scene_gate_open = true;
     CHECK(control_worker.consume(scene_command) == EngineControlResultV1::Applied &&
           control_worker.revision() == 2U);
+    // This block validates volume-bank gain semantics only; the dedicated
+    // scene-driven blocks below cover live loudness recompute.
+    // Game now mounts its default-on live attachment, so detach it here to
+    // keep this block's exact volume-ramp assertions unchanged.
+    CHECK(control_engine.prepare_loudness_peq_clear());
+    CHECK(control_engine.commit_loudness_peq());
+    CHECK(!control_engine.has_active_loudness_peq("main") &&
+          control_engine.loudness_peq_transaction_idle());
     bool device_switch_accepted = false;
     control_worker.set_device_switch_handler(accept_device_switch, &device_switch_accepted);
     CHECK(decode_control_command_v1(device_frame, decoded_command) &&
@@ -4866,7 +4876,7 @@ int main() {
         CHECK(loudness_scene_worker.consume(loudness_scene_command) ==
               EngineControlResultV1::Applied);
         CHECK(loudness_engine->loudness_peq_transaction_idle() &&
-              !loudness_engine->has_active_loudness_peq("main"));
+              loudness_engine->has_active_loudness_peq("main"));
         CHECK(std::abs(loudness_scene_worker.active_loudness().reference_phon -
                        80.0) < 1e-12);
     }
@@ -5015,14 +5025,16 @@ int main() {
                   EqualLoudnessMode::Relative);
         CHECK(enable_worker.consume(enable_round_trip) == EngineControlResultV1::Applied);
 
-        // Scenes without the opt-in keep the legacy clear-only behavior.
+        // Built-in Game now opts in by default, so it replaces the custom
+        // attachment with its factory live attachment.
         ControlCommandV1 disable_apply{};
         disable_apply.type = IpcMessageType::SceneApply;
         std::array<std::uint8_t, kSceneApplyPayloadBytesV1> enable_payload{};
         CHECK(encode_scene_apply_payload_v1("game", "main", enable_payload));
         CHECK(decode_scene_apply_payload_v1(enable_payload, disable_apply.scene));
         CHECK(enable_worker.consume(disable_apply) == EngineControlResultV1::Applied);
-        CHECK(!enable_engine->has_active_loudness_peq("main"));
+        CHECK(enable_engine->has_active_loudness_peq("main") &&
+              enable_engine->loudness_peq_transaction_idle());
 
         // Re-applying the opted-in scene mounts the attachment and enables
         // live recompute.
@@ -5309,6 +5321,7 @@ int main() {
         // its documented bounded policy.
         const auto movie_defaults = make_easy_scene(EasySceneKind::Movie, "main");
         CHECK(movie_defaults.program_aware.enabled);
+        CHECK(movie_defaults.loudness.live_update_enabled);
         CHECK(std::abs(movie_defaults.program_aware.target_dbfs + 23.0) < 1e-12);
         CHECK(std::abs(movie_defaults.program_aware.max_cut_db - 12.0) < 1e-12);
         AudioEngineModel movie_engine;
@@ -5323,8 +5336,20 @@ int main() {
         CHECK(encode_scene_apply_payload_v1("movie", "main", movie_payload) &&
               decode_scene_apply_payload_v1(movie_payload, movie_command.scene));
         CHECK(movie_worker.consume(movie_command) == EngineControlResultV1::Applied);
+        CHECK(movie_engine.has_active_loudness_peq("main"));
         CHECK(movie_engine.has_active_program_aware("main") &&
               movie_engine.program_aware_transaction_idle());
+
+        // The built-in Movie attachment is live-enabled, so an accepted large
+        // volume step immediately recomputes its bounded phon curve.
+        movie_engine.set_sample_rate(48000U);
+        ControlCommandV1 movie_volume{};
+        movie_volume.type = IpcMessageType::VolumeNotification;
+        movie_volume.volume = VolumeNotificationV1{-20.0, false, 1U};
+        CHECK(movie_worker.consume(movie_volume) == EngineControlResultV1::Applied);
+        CHECK(std::abs(movie_engine.volume("main").requested_db + 20.0) < 1e-12);
+        CHECK(movie_engine.loudness_peq_transaction_idle() &&
+              movie_engine.has_active_loudness_peq("main"));
     }
     AudioEngineModel ir_graph_engine;
     GraphConfigV1 ir_graph;
