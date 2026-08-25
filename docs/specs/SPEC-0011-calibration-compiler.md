@@ -44,7 +44,7 @@ endpoint ID 邊界一致。多位元組文字即使不超過 260 個字元，也
 引導式校正工作流在既有 bounded PEQ compiler 上加入三條內建目標曲線：
 `flat`（0 dB 全頻段）、`harman-in-ear` 與 `harman-over-ear`。曲線以 bounded anchor table 定義，
 在 log-frequency 空間做線性內插，全部以 1 kHz = 0 dB 為基準；這些是產品化目標偏好，不是量測
-麥克風或 ISO 226 等響度資料。
+麥克風資料，也不使用任何受限等響度（equal-loudness）表格。
 
 `sample_calibration_target_curve_v1`（C++）與 `CalibrationCompilerV1.TrySampleTargetCurve`（C#）
 對 10 Hz–24 kHz 以外的頻率或未知 curve ID 一律 fail-closed。`BuildTargetedResponse` 讓上層
