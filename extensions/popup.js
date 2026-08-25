@@ -8,6 +8,7 @@ let capturing = false;
 let bridgeConnected = false;
 let bridgeReconnectState = 'idle';
 let droppedPackets = 0;
+let bridgeRetryInSec = 0;
 let retryBusy = false;
 let diagnosticsBusy = false;
 let diagnosticsTimer = 0;
@@ -32,8 +33,11 @@ function droppedPacketsText() {
 function reconnectText() {
   if (bridgeConnected) return `擷取中 — Hibiki 已連線${droppedPacketsText()}`;
   switch (bridgeReconnectState) {
-    case 'waiting':
-      return `擷取中 — Hibiki 將重試連線${droppedPacketsText()}`;
+    case 'waiting': {
+      const seconds = bridgeRetryInSec > 0 ? String(bridgeRetryInSec) : null;
+      const retryText = seconds === null ? '將重試連線' : `將在 ${seconds} 秒後重試連線`;
+      return `擷取中 — Hibiki ${retryText}${droppedPacketsText()}`;
+    }
     case 'retrying':
       return `擷取中 — Hibiki 正在重試連線${droppedPacketsText()}`;
     case 'exhausted':
@@ -81,6 +85,9 @@ function applyState(state) {
     ? state.bridgeReconnectState
     : 'idle';
   droppedPackets = state?.droppedPackets ?? droppedPackets;
+  bridgeRetryInSec = typeof state?.bridgeRetryInSec === 'number' && state.bridgeRetryInSec >= 0
+    ? Math.floor(state.bridgeRetryInSec)
+    : 0;
   render();
 }
 

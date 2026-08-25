@@ -321,7 +321,12 @@ foreach ($requiredText in @('x:Name="RootGrid"', 'ItemsSource="{Binding Scenes}"
     'ItemsSource="{Binding CustomSceneCards}"', 'OnRemoveCustomSceneClick',
     'AutomationProperties.Name="準備 IR WAV 檔案"', 'OnPrepareIrClick',
     'OnRefreshSessionCatalogClick',
-    'AutomationProperties.Name="刷新 App 工作階段清單"')) {
+    'AutomationProperties.Name="刷新 App 工作階段清單"',
+    'ItemsSource="{Binding WizardCurveOptions}"', 'WizardTargetCurve',
+    'OnImportWizardMeasurementClick', 'OnCompileWizardClick',
+    'OnExportWizardProfileClick', 'x:Name="ShellCalibrateSection"',
+    'AutomationProperties.Name="校正精靈目標曲線"',
+    'ItemsSource="{Binding WizardPreviewFilters}"')) {
   if (-not $xaml.Contains($requiredText)) { throw "WinUI shell binding missing: $requiredText" }
 }
 if (-not $codeBehind.Contains('RootGrid.DataContext = ViewModel') -or
