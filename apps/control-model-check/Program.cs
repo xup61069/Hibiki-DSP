@@ -1888,4 +1888,58 @@ static async Task RunSceneCatalogCheckServerAsync(
     Check(surface.TransitionProgress == 1.0,
         "Transition progress must clamp at completion and cannot exceed the target curve.");
 }
+
+ var placementPath = Path.Combine(Path.GetTempPath(), $"hibiki-placement-check-{Guid.NewGuid():N}.json");
+ try
+ {
+     var placement = new WindowPlacementStoreV1();
+     Check(!placement.HasPlacement, "A new placement store must start empty.");
+     placement.SetPlacement(1280.5, 800.25, -1920, 240, false);
+     Check(placement.TrySave(placementPath, out var saveError) && saveError.Length == 0,
+         "Window placement save failed.");
+
+     var reloadedPlacement = new WindowPlacementStoreV1();
+     Check(reloadedPlacement.TryLoad(placementPath, out _) && reloadedPlacement.HasPlacement &&
+           Math.Abs(reloadedPlacement.Width!.Value - 1280.5) < 1e-9 &&
+           Math.Abs(reloadedPlacement.Height!.Value - 800.25) < 1e-9 &&
+           reloadedPlacement.X == -1920 && reloadedPlacement.Y == 240 &&
+           !reloadedPlacement.IsMaximized,
+         "Window placement round-trip must preserve bounds and position.");
+
+     File.WriteAllText(placementPath,
+         "{\"schema_version\":2,\"placement\":{\"width\":1000.0,\"height\":700.0,\"is_maximized\":false}}");
+     Check(!reloadedPlacement.TryLoad(placementPath, out _) && reloadedPlacement.HasPlacement &&
+           Math.Abs(reloadedPlacement.Width!.Value - 1280.5) < 1e-9,
+         "A wrong schema version must fail closed and preserve loaded state.");
+
+     File.WriteAllText(placementPath,
+         "{\"schema_version\":1,\"placement\":{\"width\":100.0,\"height\":700.0,\"is_maximized\":false}}");
+     Check(!reloadedPlacement.TryLoad(placementPath, out _),
+         "An out-of-range width must fail closed against the bounded contract.");
+
+     File.WriteAllText(placementPath,
+         "{\"schema_version\":1,\"placement\":{\"width\":1000.0,\"height\":700.0,\"x\":-999999,\"y\":0,\"is_maximized\":false}}");
+     Check(!reloadedPlacement.TryLoad(placementPath, out _),
+         "An out-of-range position must fail closed.");
+
+     bool rejectedSet;
+     try { placement.SetPlacement(null, null, 10, null, false); rejectedSet = false; }
+     catch (ArgumentException) { rejectedSet = true; }
+     Check(rejectedSet, "X without Y (or Y without X) must be rejected.");
+
+     try { placement.SetPlacement(500.0, null, null, null, false); rejectedSet = false; }
+     catch (ArgumentOutOfRangeException) { rejectedSet = true; }
+     Check(rejectedSet, "A below-minimum width must be rejected.");
+
+     placement.SetPlacement(null, null, null, null, true);
+     Check(placement.IsMaximized && !placement.HasPlacement && placement.X is null,
+         "Maximized-only placement must keep optional fields empty.");
+     Check(placement.TrySave(placementPath, out _) && new WindowPlacementStoreV1().TryLoad(placementPath, out _),
+         "Maximized-only placement must round-trip.");
+ }
+ finally
+ {
+     if (File.Exists(placementPath)) File.Delete(placementPath);
+ }
+
 Console.WriteLine("Control model checks passed.");

@@ -1362,6 +1362,7 @@ $required = @(
   'schemas/session-route-rule-v1.schema.json',
   'schemas/session-route-rules-v1.schema.json',
   'schemas/scene-sync-queue-v1.schema.json',
+  'schemas/window-placement-v1.schema.json',
   'docs/specs/SPEC-0010-winui-shell.md',
   'docs/specs/SPEC-0011-calibration-compiler.md',
   'docs/specs/SPEC-0012-vst3-latency-graph-commit.md',

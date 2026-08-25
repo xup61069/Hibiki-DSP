@@ -241,6 +241,15 @@ if (-not $codeBehind.Contains('RootGrid.DataContext = ViewModel') -or
   throw 'WinUI shell must bind the control model and close its pipe client.'
 }
 
+$appSource = Get-Content (Join-Path $shell 'App.xaml.cs') -Raw
+foreach ($requiredAppText in @('RestoreWindowPlacement(MainWindow)',
+    'PersistWindowPlacement(window)', 'WindowPlacementStoreV1',
+    'window-placement-v1.json', 'OnMainWindowClosed')) {
+  if (-not $appSource.Contains($requiredAppText)) {
+    throw "WinUI shell window-placement wiring missing: $requiredAppText"
+  }
+}
+
 $forbidden = @('AudioEngine', 'IAudioClient', 'Wasapi', 'CreateThread', 'NamedPipeServer')
 foreach ($token in $forbidden) {
   if ($xaml.Contains($token) -or $codeBehind.Contains($token)) {

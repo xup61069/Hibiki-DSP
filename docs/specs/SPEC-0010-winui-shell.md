@@ -125,6 +125,12 @@ ViewModel 命令只使用 `IpcEnvelopeV1` 與既有 payload；新增欄位不可
 bytes。WinUI shell 可在沒有引擎時啟動，並以 Degraded 狀態呈現；control-model
 仍可在沒有 WinUI SDK 的環境由獨立 check project 驗證。
 
+正式殼層會記住使用者上次的視窗大小與位置：啟動時在顯示前套用本機
+`window-placement-v1.json`（bounds 與位置有 bounded 範圍契約，見對應 schema），
+正常關閉時以原子替換保存目前 bounds；最大化狀態只記錄旗標，不記錄座標。
+還原或保存失敗時一律退回內建預設大小，不得阻擋啟動或關閉；此檔是 local-only
+UX 狀態，不含裝置身份、校正資料或私人路徑，也不代表任何音訊控制狀態。
+
 Compatibility Preview 在純 .NET SDK 主機保留 `EnableDefaultApplicationDefinition=false`、
 `EnableDefaultPageItems=false`，且必須維持 Core MRT resource tooling 停用：dotnet CLI
 建置不會載入 Visual Studio 的 Appx packaging 工作（MSBuild host boundary），因此

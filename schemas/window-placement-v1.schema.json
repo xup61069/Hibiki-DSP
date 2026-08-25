@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/window-placement-v1.schema.json",
+  "title": "Hibiki WinUI window placement v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "placement"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "placement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["is_maximized"],
+      "properties": {
+        "width": {"type": "number", "minimum": 720, "maximum": 10000},
+        "height": {"type": "number", "minimum": 520, "maximum": 10000},
+        "x": {"type": "integer", "minimum": -100000, "maximum": 100000},
+        "y": {"type": "integer", "minimum": -100000, "maximum": 100000},
+        "is_maximized": {"type": "boolean"}
+      }
+    }
+  }
+}
