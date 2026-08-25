@@ -33,6 +33,7 @@ internal sealed class PreviewForm : Form
     private readonly Button _switchDevice = new() { Text = "切換實體裝置", AutoSize = true, AccessibleName = "切換實體輸出裝置" };
     private readonly Button _refreshDevices = new() { Text = "重新掃描裝置", AutoSize = true, AccessibleName = "重新掃描實體輸出裝置清單" };
     private readonly TrackBar _sessionVolume = new() { Minimum = -60, Maximum = 0, TickFrequency = 5, Width = 460, AccessibleName = "選取 App 音量分貝" };
+    private readonly Label _sessionVolumeReadout = new() { AutoSize = true, Width = 80, TextAlign = ContentAlignment.MiddleLeft, AccessibleName = "App 音量分貝數值" };
     private readonly CheckBox _sessionMuted = new() { Text = "App 靜音", AutoSize = true, AccessibleName = "App 工作階段靜音" };
     private readonly Button _applySessionVolume = new() { Text = "套用選取 App 音量", AutoSize = true, AccessibleName = "套用選取 App 音量" };
     private readonly TextBox _sessionLane = new() { Width = 220, PlaceholderText = "Lane ID", AccessibleName = "Lane ID 輸入欄" };
@@ -70,6 +71,7 @@ internal sealed class PreviewForm : Form
     private readonly Label _lastSendDiagnostics = new() { AutoSize = false, Width = 550, Height = 32, AccessibleName = "最近命令診斷" };
     private readonly Button _loadIr = new() { Text = "載入 IR WAV 並準備", AutoSize = true, AccessibleName = "載入 IR WAV 並準備" };
     private readonly TrackBar _volume = new() { Minimum = -60, Maximum = 0, TickFrequency = 5, Width = 460, AccessibleName = "主音量分貝" };
+    private readonly Label _volumeReadout = new() { AutoSize = true, Width = 80, TextAlign = ContentAlignment.MiddleLeft, AccessibleName = "主音量分貝數值" };
     private readonly CheckBox _muted = new() { Text = "靜音", AutoSize = true, AccessibleName = "主輸出靜音" };
     private readonly Button _enhance = new() { Text = "一鍵改善", AutoSize = true, Margin = new Padding(3, 12, 3, 3), AccessibleName = "一鍵改善" };
     private readonly Button _connect = new() { Text = "連接引擎", AutoSize = true, Margin = new Padding(3, 12, 3, 3), AccessibleName = "連接或重新連接 Hibiki 音訊引擎" };
@@ -234,7 +236,7 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(_enhance);
         panel.Controls.Add(new Label { Text = "系統音量（dB）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
         _volume.Value = (int)_viewModel.RequestedVolumeDb;
-        _volume.ValueChanged += async (_, _) => { _viewModel.RequestedVolumeDb = _volume.Value; if (_viewModel.IsConnected) await _viewModel.QueueVolumeAsync(); RefreshView(); };
+        _volume.ValueChanged += async (_, _) => { _volumeReadout.Text = $"{_volume.Value} dB"; _viewModel.RequestedVolumeDb = _volume.Value; if (_viewModel.IsConnected) await _viewModel.QueueVolumeAsync(); RefreshView(); };
         _muted.CheckedChanged += async (_, _) =>
         {
             _viewModel.Muted = _muted.Checked;
@@ -242,6 +244,7 @@ internal sealed class PreviewForm : Form
             RefreshView();
         };
         panel.Controls.Add(_volume);
+        panel.Controls.Add(_volumeReadout);
         panel.Controls.Add(_muted);
         panel.Controls.Add(_effective);
         panel.Controls.Add(_listeningDose);
@@ -265,9 +268,11 @@ internal sealed class PreviewForm : Form
         {
             if (_updatingSession || _viewModel.SelectedSession is null) return;
             _viewModel.SessionVolumeDb = _sessionVolume.Value;
+            _sessionVolumeReadout.Text = $"{_sessionVolume.Value} dB";
             RefreshView();
         };
         panel.Controls.Add(_sessionVolume);
+        panel.Controls.Add(_sessionVolumeReadout);
         _applySessionVolume.Click += async (_, _) =>
         {
             await _viewModel.ApplySelectedSessionVolumeAsync();
@@ -508,6 +513,7 @@ internal sealed class PreviewForm : Form
         _irStatus.Text = $"{_viewModel.IrPhaseModeText}；實測延遲 {_viewModel.IrAddedDelayMs:0.0} ms。\r\n{_viewModel.IrPrepareStatus}";
         var requested = Math.Clamp((int)Math.Round(_viewModel.RequestedVolumeDb), _volume.Minimum, _volume.Maximum);
         if (_volume.Value != requested) _volume.Value = requested;
+        _volumeReadout.Text = $"{_volume.Value} dB";
         _muted.Checked = _viewModel.Muted;
         if (_irModes.SelectedValue is not IrPhaseMode currentMode || currentMode != _viewModel.IrPhaseMode)
             _irModes.SelectedValue = _viewModel.IrPhaseMode;
@@ -619,6 +625,7 @@ internal sealed class PreviewForm : Form
         var requested = Math.Clamp((int)Math.Round(_viewModel.SessionVolumeDb),
                                    _sessionVolume.Minimum, _sessionVolume.Maximum);
         if (_sessionVolume.Value != requested) _sessionVolume.Value = requested;
+        _sessionVolumeReadout.Text = $"{_sessionVolume.Value} dB";
         _sessionMuted.Checked = _viewModel.SessionMuted;
         if (_sessionLane.Text != _viewModel.SessionRouteLaneId)
             _sessionLane.Text = _viewModel.SessionRouteLaneId;
