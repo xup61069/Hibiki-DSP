@@ -23,10 +23,13 @@ const BRIDGE_RECONNECT_RETRYING_V1 = 'retrying';
 const BRIDGE_RECONNECT_CONNECTED_V1 = 'connected';
 const BRIDGE_RECONNECT_EXHAUSTED_V1 = 'exhausted';
 
-function reportState() {
-  const retryInSec = bridgeReconnectState() === BRIDGE_RECONNECT_WAITING_V1
+function bridgeRetryInSec() {
+  return bridgeReconnectState() === BRIDGE_RECONNECT_WAITING_V1
     ? Math.max(0, Math.ceil((bridgeRetryDeadlineMs - Date.now()) / 1000))
     : 0;
+}
+
+function reportState() {
   chrome.runtime.sendMessage({
     type: 'capture-state',
     capturing: context !== null,
@@ -110,6 +113,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       bridgeConnected,
       droppedPackets,
       bridgeReconnectState: bridgeReconnectState(),
+      bridgeRetryInSec: bridgeRetryInSec(),
     });
     return false;
   }
