@@ -48,7 +48,7 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   driver、WaveRT 或 ASIO 的 64-bit delivery 證據。
 - `AudioEngineModel::process_f64` 與 `process_output_group_f64` 是 model 級 bounded
   double entry points：沿用同一份已 commit 的 immutable graph、Group Master 與 limiter
-  邊界，無 active graph 或 sample format 非 0/1 時 fail-closed。與低階
+  邊界；無 active graph 或 sample format 非 0/1 時 fail-closed。與低階
   `process_graph_f64` 的差別在於 model 級入口自動套 Group Master ramp 與 limiter，
   呼叫端不需另外處理。Group Master 的 control state 由既有 volume notification API
   管理；volume_state() 只回傳目前 reconciled snapshot，不改變音訊狀態。
