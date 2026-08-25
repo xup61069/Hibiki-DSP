@@ -1,15 +1,19 @@
 const button = document.getElementById('capture');
 const stopButton = document.getElementById('stop');
+const retryButton = document.getElementById('retry-bridge');
 const status = document.getElementById('status');
 
 let capturing = false;
 let bridgeConnected = false;
 let bridgeReconnectState = 'idle';
 let droppedPackets = 0;
+let retryBusy = false;
 
 function render() {
   button.disabled = capturing;
   stopButton.disabled = !capturing;
+  retryButton.hidden = !(capturing && !bridgeConnected && bridgeReconnectState === 'exhausted');
+  retryButton.disabled = !retryButton.hidden || retryBusy;
   if (!status.dataset.error) {
     status.textContent = capturing ? reconnectText() : '閒置';
   }
@@ -117,6 +121,31 @@ stopButton.addEventListener('click', async () => {
     return;
   }
   setBusy(false);
+});
+
+retryButton.addEventListener('click', async () => {
+  if (retryButton.hidden || retryBusy) return;
+  delete status.dataset.error;
+  retryBusy = true;
+  render();
+  status.textContent = '正在重新連線…';
+  try {
+    const response = await chrome.runtime.sendMessage({type: 'retry-tab-bridge'});
+    if (response?.ok) {
+      bridgeReconnectState = 'retrying';
+      status.textContent = '已要求重新連線；等待 Hibiki 回應';
+    } else {
+      status.textContent = response?.error === 'bridge-retry-unavailable'
+        ? '目前無法重新連線'
+        : response?.error ?? '重新連線失敗';
+      status.dataset.error = 'true';
+    }
+  } catch (error) {
+    status.textContent = error instanceof Error ? error.message : String(error);
+    status.dataset.error = 'true';
+  }
+  retryBusy = false;
+  await refreshState();
 });
 
 refreshState();
