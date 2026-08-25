@@ -37,5 +37,5 @@ source-policy／`git diff --check`）與範圍相關的條件式 gates：
 
 ## 開源與隱私
 
-- [ ] 沒有 binary、private calibration、endpoint ID、credential 或 ISO 受限內容
+- [ ] 沒有 binary、private calibration、endpoint ID、credential 或等響度（equal-loudness）受限內容
 - [ ] `THIRD_PARTY.yml`、SPDX 與 NOTICE 已同步（若有依賴變更）

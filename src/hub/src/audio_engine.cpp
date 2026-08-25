@@ -597,6 +597,7 @@ AudioEngineModel::program_aware_telemetry_snapshot(
     snapshot.silence_gated = false;
     snapshot.measured_dbfs = telemetry.measured_dbfs;
     snapshot.applied_gain_db = telemetry.applied_gain_db;
+    snapshot.bass_correction_gain_db = telemetry.bass_correction_gain_db;
     snapshot.sequence = telemetry.sequence;
     return snapshot;
 }
