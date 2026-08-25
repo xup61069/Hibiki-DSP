@@ -541,6 +541,18 @@ try {
         throw "Browser tab route state is invalid: $($statusReply[$tabRouteOffset + 1])."
       }
       $tabState = $statusReply[$tabRouteOffset + 1]
+      $tabDetailBytes = [BitConverter]::ToUInt16($statusReply, $tabRouteOffset + 6)
+      if ($tabDetailBytes -eq 0 -or $tabDetailBytes -gt 120) {
+        throw "Browser tab route detail length is invalid: $tabDetailBytes."
+      }
+      $tabDetail = [System.Text.Encoding]::UTF8.GetString(
+        $statusReply, $tabRouteOffset + 104, $tabDetailBytes)
+      # The host must prove the loopback listener actually bound before it
+      # reports Pending; a generic "requested" or empty detail means the
+      # graph/listener setup did not complete as designed.
+      if ($tabDetail -notmatch 'loopback listener bound') {
+        throw "Browser tab route detail does not confirm the listener: '$tabDetail'."
+      }
       $statusSummary += "browser tab route state=$tabState; listener is loopback-only and opt-in"
     }
     if ($EnableTestTone) {
