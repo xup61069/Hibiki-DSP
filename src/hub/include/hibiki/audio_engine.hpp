@@ -74,9 +74,12 @@ public:
 
     void rollback_loudness_peq() noexcept;
 
-    // True when no equal-loudness prepare/clear transaction is pending.
+    // True when no equal-loudness transaction is pending and any committed
+    // bounded RT crossfade has fully retired.
 
     [[nodiscard]] bool loudness_peq_transaction_idle() const noexcept;
+
+    [[nodiscard]] bool loudness_peq_transition_complete() const noexcept;
 
     [[nodiscard]] bool has_active_loudness_peq(
 
@@ -288,6 +291,26 @@ private:
     LoudnessGraphAttachmentV1 active_loudness_peq_{};
 
     LoudnessGraphAttachmentV1 pending_loudness_peq_{};
+
+    LoudnessGraphAttachmentV1 previous_loudness_peq_{};
+
+    struct LoudnessPeqCrossfadeState {
+        bool active{false};
+        std::size_t total_frames{0U};
+        std::size_t processed_frames{0U};
+
+        bool begin(const std::size_t frames) noexcept {
+            if (frames == 0U) return false;
+            active = true;
+            total_frames = frames;
+            processed_frames = 0U;
+            return true;
+        }
+
+        void reset() noexcept { *this = {}; }
+    };
+
+    LoudnessPeqCrossfadeState loudness_crossfade_{};
 
     bool has_active_loudness_peq_{false};
 
