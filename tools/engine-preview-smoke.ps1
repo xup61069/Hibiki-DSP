@@ -342,6 +342,17 @@ function Receive-IpcFrame([System.IO.Stream]$Stream) {
   return ,$frame
 }
 
+
+# Start-Process joins an array argument list with spaces and never adds quotes,
+# so any value containing spaces must be wrapped exactly once here. Flags are
+# single tokens and stay bare; only values need the embedded double quotes.
+function ConvertTo-EngineArgumentString {
+  param([Parameter(Mandatory)][AllowEmptyCollection()][string[]]$Arguments)
+  $composed = @($Arguments | ForEach-Object {
+    if ($_ -match '\s') { '"' + ($_ -replace '"', ('\' + '"')) + '"' } else { $_ }
+  })
+  return $composed -join ' '
+}
 if ($SelfTest) {
   $cases = Invoke-EnginePreviewSmokePathSelfTest
 
@@ -384,6 +395,16 @@ if ($SelfTest) {
   $lengthCaught = $false
   try { Assert-IpcFrameShape -Frame $mismatchedLength -ExpectedType 1 -ExpectedRequestId 42 } catch { $lengthCaught = $true }
   if (-not $lengthCaught) { throw 'IPC frame self-test expected payload-length rejection.' }
+  $cases++
+  # Argument composition must survive spaces inside a path value.
+  $composedArgs = ConvertTo-EngineArgumentString -Arguments @(
+    '--enable-wav-source',
+    '--wav-source-path',
+    'G:\Hibiki DSP\smoke source.wav'
+  )
+  if ($composedArgs -ne '--enable-wav-source --wav-source-path "G:\Hibiki DSP\smoke source.wav"') {
+    throw "Engine argument composition lost embedded quotes: $composedArgs"
+  }
   $cases++
 
   $constructionCaught = $false
@@ -553,7 +574,7 @@ if ($RenderOffline) {
     Pop-Location
   }
 } else {
-  $engineProcess = Start-Process -FilePath $engine -ArgumentList $engineArguments `
+  $engineProcess = Start-Process -FilePath $engine -ArgumentList (ConvertTo-EngineArgumentString -Arguments $engineArguments) `
     -WorkingDirectory $smokePlan.EngineWorkingDirectory -WindowStyle Hidden -PassThru
 }
 $irPath = $smokePlan.IrPath
@@ -887,3 +908,4 @@ try {
     Remove-Item -LiteralPath $smokePlan.OfflineRenderPath -Force -ErrorAction SilentlyContinue
   }
 }
+
