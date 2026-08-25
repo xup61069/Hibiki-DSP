@@ -11,16 +11,16 @@
         <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="16" />
-        <Setter Property="Padding" Value="18" />
+        <Setter Property="CornerRadius" Value="20" />
+        <Setter Property="Padding" Value="22" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Stretch" />
-        <Setter Property="MinHeight" Value="84" />
+        <Setter Property="MinHeight" Value="92" />
         <Setter Property="Transitions">
             <Setter.Value>
                 <TransitionCollection>
-                    <EntranceThemeTransition FromVerticalOffset="16" />
+                    <EntranceThemeTransition FromVerticalOffset="24" />
                 </TransitionCollection>
             </Setter.Value>
         </Setter>
@@ -67,8 +67,8 @@
                                         </ObjectAnimationUsingKeyFrames>
                                         <DoubleAnimation Storyboard.TargetName="HoverTranslate"
                                                          Storyboard.TargetProperty="Y"
-                                                         To="-2"
-                                                         Duration="0:0:0.12" />
+                                                         To="-4"
+                                                         Duration="0:0:0.18" />
                                     </Storyboard>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
