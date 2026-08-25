@@ -31,7 +31,7 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   `ir_reference` 是 bounded UTF-8 calibration label（空值或 8..64 bytes，不含 NUL 與
   C0/C1 控制字元；schema 與 runtime validator 一致拒絕），
   用來比對「同一份已準備的 IR」。它只是 opaque 比對 token：不內嵌 IR samples、檔案路徑或
-  ISO 226 係數，也不代表任何實體播放或 driver 證據。SceneApply 在新場景帶有與 active scene
+  equal-loudness 係數，也不代表任何實體播放或 driver 證據。SceneApply 在新場景帶有與 active scene
   完全相同的非空 `ir_reference` 且 output group 不變時，可保留已 commit 的 IR attachment；
   其他情況（不同 label、空 label、無 active attachment 或 IR 交易進行中）維持原本在同一個
   control transaction 內 detach 的 fail-closed 行為。
@@ -53,7 +53,7 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   既有 volume notification API 管理；volume_state() 只回傳目前 reconciled snapshot，
   不改變音訊狀態。
 - `IrPhasePolicy v1`：minimum/mixed/linear/bypass 模式與 0..1 strength；只描述可驗證的
-  額外延遲預算，不攜帶未授權 IR 或 ISO 係數。
+  額外延遲預算，不攜帶未授權 IR 或 equal-loudness 係數。
 - `AudioSessionDescriptor v1`：endpoint/session-instance identity、lane/output group、gain
   owner 與 per-session makeup dB；JSON schema 是跨語言／跨 AI 的欄位真值。
   `display_name`／`app_id`／`lane_id` 是有界 optional labels：schema 允許空字串，但最長
@@ -138,7 +138,7 @@ payload 一律回 Error，避免 UI 任意注入未驗證 graph。SceneApply pay
 - output device change 必須與 30 ms equal-power handoff 同一交易；`OutputHandoffCoordinatorV1`
   在 crossfade 尚未完成時禁止 commit，新 sink 失敗時保留舊 sink。實體 endpoint soak 仍是
   環境驗收項目。
-- Group Master 只能套用一次；LFE 不重複套用 ISO。
+- Group Master 只能套用一次；LFE 不重複套用 equal-loudness。
 - Strict Direct 是獨立 bit-perfect Scene，不能偷偷混入 DSP 或 Windows gain。
 - `AudioEngineModel` 的 control plane 只在 pending snapshot 做 Validate → Prepare → Commit；
   RT `process` 只讀 active immutable snapshot，再對整個 Group Master 套用一次。Volume

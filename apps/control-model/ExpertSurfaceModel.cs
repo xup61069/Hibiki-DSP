@@ -54,7 +54,7 @@ public sealed class ExpertSurfaceModel : INotifyPropertyChanged
         DspGraph =
         [
             new("group-master", "Group Master", "Windows dB + 8 ms ramp", true),
-            new("iso226", "Equal-loudness", "ISO 226-derived; calibration required", false),
+            new("equal-loudness", "Equal-loudness", "equal-loudness-derived; calibration required", false),
             new("calibration", "PEQ / IR calibration", "Measured response or imported profile", false),
             new("limiter", "True-peak limiter", "−1 dBTP safety ceiling", true)
         ];

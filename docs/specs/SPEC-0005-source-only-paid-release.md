@@ -47,5 +47,5 @@ stable identity 與 JSON parse gates；任何 gate 失敗都不得視為可交�
 
 ## 不可逾越的邊界
 
-私密金鑰、憑證、購買的 ISO 標準文件與顧客資料永不進 repository、Issue、prompt 或 CI log。公開面
+私密金鑰、憑證、購買的 equal-loudness 標準文件與顧客資料永不進 repository、Issue、prompt 或 CI log。公開面
 永遠以可重建的 source 與其內容 hash 為準。

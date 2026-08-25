@@ -241,7 +241,7 @@ void AudioEngineModel::rollback_ir() noexcept {
 
 bool AudioEngineModel::prepare_loudness_peq(
     const std::string_view output_group,
-    const std::span<const Iso226FormulaPointV1> points,
+    const std::span<const EqualLoudnessFormulaPointV1> points,
     const double current_phon,
     const EqualLoudnessPolicyV1& policy) noexcept {
     if (points.data() == nullptr && !points.empty()) return false;
@@ -344,7 +344,7 @@ void AudioEngineModel::rollback_loudness_peq() noexcept {
 bool AudioEngineModel::update_loudness_phon(
     const std::string_view output_group,
     const double new_phon) noexcept {
-    // Fail closed outside the bounded phon proxy domain. The ISO formula
+    // Fail closed outside the bounded phon proxy domain. The equal-loudness formula
     // itself is frequency-dependent; 20..90 is the safe superset used by the
     // prepare path and by contract tests.
     if (new_phon < 20.0 || new_phon > 90.0 || !std::isfinite(new_phon)) {
@@ -371,7 +371,7 @@ bool AudioEngineModel::update_loudness_phon(
     }
     if (!prepare_loudness_peq(
             output_group,
-            std::span<const Iso226FormulaPointV1>(
+            std::span<const EqualLoudnessFormulaPointV1>(
                 active_loudness_peq_.formula_points.data(),
                 active_loudness_peq_.formula_point_count),
             new_phon,
@@ -437,7 +437,7 @@ AudioEngineModel::LoudnessCurveSnapshotV1 AudioEngineModel::loudness_curve_snaps
     snapshot.current_phon = active_loudness_peq_.current_phon;
 
     const auto compensation = build_formula_compensation(
-        std::span<const Iso226FormulaPointV1>(
+        std::span<const EqualLoudnessFormulaPointV1>(
             active_loudness_peq_.formula_points.data(),
             active_loudness_peq_.formula_point_count),
         active_loudness_peq_.current_phon,

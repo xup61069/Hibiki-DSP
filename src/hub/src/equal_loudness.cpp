@@ -1,4 +1,4 @@
-#include "hibiki/iso226.hpp"
+#include "hibiki/equal_loudness.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -30,7 +30,7 @@ bool valid_mode(const EqualLoudnessMode mode) noexcept {
            mode == EqualLoudnessMode::ProgramAware;
 }
 
-double value_at_1khz(const std::vector<IsoContourPoint>& curve) noexcept {
+double value_at_1khz(const std::vector<EqualLoudnessContourPoint>& curve) noexcept {
     for (const auto& point : curve) {
         if (std::abs(point.frequency_hz - kOneKhz) < 1e-6) {
             return point.spl_db;
@@ -43,8 +43,8 @@ double value_at_1khz(const std::vector<IsoContourPoint>& curve) noexcept {
 
 bool validate_policy(const EqualLoudnessPolicyV1& policy) noexcept {
     if (policy.schema_version != 1 ||
-        (policy.standard != "iso-226-2023-derived" &&
-         policy.standard != "iso-226-2023-calibrated") ||
+        (policy.standard != "equal-loudness-derived" &&
+         policy.standard != "equal-loudness-calibrated") ||
         !valid_mode(policy.mode) || !std::isfinite(policy.reference_phon) ||
         policy.reference_phon < 20.0 || policy.reference_phon > 90.0 ||
         !std::isfinite(policy.strength) || policy.strength < 0.0 || policy.strength > 1.0 ||
@@ -58,7 +58,7 @@ bool validate_policy(const EqualLoudnessPolicyV1& policy) noexcept {
         return false;
     }
     if (policy.mode == EqualLoudnessMode::Calibrated &&
-        policy.standard != "iso-226-2023-calibrated") {
+        policy.standard != "equal-loudness-calibrated") {
         return false;
     }
     if (policy.mode == EqualLoudnessMode::Relative && policy.calibrated) {
@@ -67,8 +67,8 @@ bool validate_policy(const EqualLoudnessPolicyV1& policy) noexcept {
     return true;
 }
 
-bool iso226_spl_from_phon(const Iso226FormulaPointV1& point,
-                          const Iso226FormulaReferenceV1& reference,
+bool equal_loudness_spl_from_phon(const EqualLoudnessFormulaPointV1& point,
+                          const EqualLoudnessFormulaReferenceV1& reference,
                           const double phon,
                           double& spl_db) noexcept {
     if (!std::isfinite(point.frequency_hz) || point.frequency_hz < 20.0 ||
@@ -94,23 +94,23 @@ bool iso226_spl_from_phon(const Iso226FormulaPointV1& point,
     return std::isfinite(spl_db);
 }
 
-CompensationResult build_compensation(const std::vector<IsoContourPoint>& current,
-                                      const std::vector<IsoContourPoint>& reference,
+CompensationResult build_compensation(const std::vector<EqualLoudnessContourPoint>& current,
+                                      const std::vector<EqualLoudnessContourPoint>& reference,
                                       const EqualLoudnessPolicyV1& policy) noexcept {
     CompensationResult result;
     if (!validate_policy(policy)) {
-        result.diagnostic = "invalid ISO policy; check mode, phon, strength, cap and anchor";
+        result.diagnostic = "invalid equal-loudness policy; check mode, phon, strength, cap and anchor";
         return result;
     }
     if (current.empty() || current.size() != reference.size()) {
-        result.diagnostic = "ISO contour arrays must be non-empty and have equal length";
+        result.diagnostic = "equal-loudness contour arrays must be non-empty and have equal length";
         return result;
     }
 
     const double current_1k = value_at_1khz(current);
     const double reference_1k = value_at_1khz(reference);
     if (!std::isfinite(current_1k) || !std::isfinite(reference_1k)) {
-        result.diagnostic = "ISO contour arrays must contain a 1 kHz anchor";
+        result.diagnostic = "equal-loudness contour arrays must contain a 1 kHz anchor";
         return result;
     }
 
@@ -121,7 +121,7 @@ CompensationResult build_compensation(const std::vector<IsoContourPoint>& curren
         if (std::abs(c.frequency_hz - r.frequency_hz) > 1e-6 ||
             !std::isfinite(c.frequency_hz) || !std::isfinite(c.spl_db) || !std::isfinite(r.spl_db)) {
             result.points.clear();
-            result.diagnostic = "ISO contour frequencies must align and all values must be finite";
+            result.diagnostic = "equal-loudness contour frequencies must align and all values must be finite";
             return result;
         }
 
@@ -143,22 +143,22 @@ CompensationResult build_compensation(const std::vector<IsoContourPoint>& curren
         result.points.push_back(CompensationPoint{c.frequency_hz, gain, limited});
     }
 
-    result.diagnostic = result.limited ? "curve limited by policy or valid ISO range" : "ok";
+    result.diagnostic = result.limited ? "curve limited by policy or valid equal-loudness range" : "ok";
     return result;
 }
 
 CompensationResult build_formula_compensation(
-    const std::span<const Iso226FormulaPointV1> points,
+    const std::span<const EqualLoudnessFormulaPointV1> points,
     const double current_phon,
     const EqualLoudnessPolicyV1& policy) noexcept {
     CompensationResult result;
     if (!validate_policy(policy) || !std::isfinite(current_phon) || current_phon < 20.0 ||
         current_phon > 90.0 || points.empty()) {
-        result.diagnostic = "invalid ISO formula compensation inputs";
+        result.diagnostic = "invalid equal-loudness formula compensation inputs";
         return result;
     }
 
-    const Iso226FormulaPointV1* one_khz = nullptr;
+    const EqualLoudnessFormulaPointV1* one_khz = nullptr;
     for (const auto& point : points) {
         if (std::abs(point.frequency_hz - kOneKhz) < 1e-6) {
             one_khz = &point;
@@ -166,18 +166,18 @@ CompensationResult build_formula_compensation(
         }
     }
     if (one_khz == nullptr) {
-        result.diagnostic = "ISO formula points must contain a 1 kHz anchor";
+        result.diagnostic = "equal-loudness formula points must contain a 1 kHz anchor";
         return result;
     }
 
-    Iso226FormulaReferenceV1 reference{};
+    EqualLoudnessFormulaReferenceV1 reference{};
     reference.reference_alpha = one_khz->alpha_f;
     reference.reference_threshold_db = one_khz->threshold_db;
     double current_1khz = 0.0;
     double reference_1khz = 0.0;
-    if (!iso226_spl_from_phon(*one_khz, reference, current_phon, current_1khz) ||
-        !iso226_spl_from_phon(*one_khz, reference, policy.reference_phon, reference_1khz)) {
-        result.diagnostic = "ISO formula failed at the 1 kHz anchor";
+    if (!equal_loudness_spl_from_phon(*one_khz, reference, current_phon, current_1khz) ||
+        !equal_loudness_spl_from_phon(*one_khz, reference, policy.reference_phon, reference_1khz)) {
+        result.diagnostic = "equal-loudness formula failed at the 1 kHz anchor";
         return result;
     }
 
@@ -186,10 +186,10 @@ CompensationResult build_formula_compensation(
         for (const auto& point : points) {
             double current_spl = 0.0;
             double reference_spl = 0.0;
-            if (!iso226_spl_from_phon(point, reference, current_phon, current_spl) ||
-                !iso226_spl_from_phon(point, reference, policy.reference_phon, reference_spl)) {
+            if (!equal_loudness_spl_from_phon(point, reference, current_phon, current_spl) ||
+                !equal_loudness_spl_from_phon(point, reference, policy.reference_phon, reference_spl)) {
                 result.points.clear();
-                result.diagnostic = "ISO formula point is outside the validated domain";
+                result.diagnostic = "equal-loudness formula point is outside the validated domain";
                 return result;
             }
             bool limited = false;
@@ -214,7 +214,7 @@ CompensationResult build_formula_compensation(
     } catch (...) {
         result.points.clear();
         result.limited = false;
-        result.diagnostic = "ISO formula compensation allocation failed";
+        result.diagnostic = "equal-loudness formula compensation allocation failed";
         return result;
     }
     result.diagnostic = result.limited ? "curve limited by policy or safety range" : "ok";
