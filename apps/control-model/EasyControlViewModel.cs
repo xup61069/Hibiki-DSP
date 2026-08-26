@@ -79,6 +79,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         Array.Empty<WizardPeqRow>();
     private bool _wizardMultiChannel;
     private int _wizardChannelCount = 2;
+    private List<WizardChannelMeasurement> _wizardPerChannelMeasurements = new();
 
     private const int EqPollIntervalMs = 1000;
 
@@ -532,6 +533,16 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         }
     }
 
+    public sealed record WizardChannelMeasurement(
+        int Channel, string Path, int PointCount)
+    {
+        public string AccessibleSummary =>
+            $"聲道 {Channel}：{Path}（{PointCount} 點）";
+    }
+
+    public IReadOnlyList<WizardChannelMeasurement> WizardPerChannelMeasurements =>
+        _wizardPerChannelMeasurements;
+
     public bool WizardHasResult
     {
         get => _wizardHasResult;
@@ -558,6 +569,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         _wizardExportedPath = string.Empty;
         _wizardPreviewRows = Array.Empty<WizardPeqRow>();
         _wizardStatus = "尚未載入量測；請先選擇 CSV 或 REW 文字檔";
+        _wizardPerChannelMeasurements = new();
         OnPropertyChanged(nameof(WizardMeasurementPath));
         OnPropertyChanged(nameof(WizardImportedPointCount));
         OnPropertyChanged(nameof(WizardHasMeasurement));
@@ -566,6 +578,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(WizardExportedPath));
         OnPropertyChanged(nameof(WizardPreviewFilters));
         OnPropertyChanged(nameof(WizardStatus));
+        OnPropertyChanged(nameof(WizardPerChannelMeasurements));
     }
 
     private static List<double>[] ReadMeasurementFile(string fullPath)
@@ -668,6 +681,11 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public bool CompileWizardCorrection()
     {
+        if (_wizardMultiChannel && _wizardPerChannelMeasurements.Count > 0)
+        {
+            return CompileMultiChannelFromFiles();
+        }
+
         if (_wizardMeasurementPath.Length == 0)
         {
             WizardHasResult = false;
@@ -686,45 +704,13 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
         if (_wizardMultiChannel)
         {
-            var perChannelPoints = new List<CalibrationPointV1[]>();
-            for (var channel = 0; channel < _wizardChannelCount; ++channel)
-            {
-                var channelResponse = CalibrationCompilerV1.BuildTargetedResponse(
-                    null, 48000.0, frequencies, levels, _wizardTargetCurve);
-                if (channelResponse is null)
-                {
-                    WizardHasResult = false;
-                    WizardStatus = "量測點超出有效範圍或排序錯誤（頻率需遞增、20 Hz–24 kHz）";
-                    return false;
-                }
-                perChannelPoints.Add(channelResponse.Points.ToArray());
-            }
-
-            var batch = CalibrationCompilerV1.CompileMultiChannelBatch(
-                _wizardChannelCount, perChannelPoints);
-            if (!batch.Success)
-            {
-                WizardHasResult = false;
-                WizardStatus = "多聲道編譯失敗：" + batch.Diagnostic;
-                return false;
-            }
-
-            _wizardCompiledFilters = [.. batch.ChannelFilters[0]];
-            _wizardPreviewRows = batch.ChannelFilters[0]
-                .Select((filter, index) => new WizardPeqRow(
-                    index + 1,
-                    $"{filter.FrequencyHz:0.#} Hz",
-                    $"{(filter.GainDb >= 0 ? "+" : string.Empty)}{filter.GainDb:0.##} dB",
-                    $"Q {filter.Q:0.##}"))
-                .ToArray();
-            OnPropertyChanged(nameof(WizardPreviewFilters));
-            WizardHasResult = true;
-            WizardStatus = $"已為 {_wizardChannelCount} 聲道各編譯 {batch.ChannelFilters[0].Count} 個 PEQ 濾波器" +
-                           (batch.ChannelLimited.Any(static limited => limited)
-                               ? "；部分聲道受限於安全上限"
-                               : "") +
-                           $"。{batch.Diagnostic}";
-            return true;
+            // A single shared measurement was imported: replicate it across
+            // every channel so the same bounded batch path serves both the
+            // quick "one measurement for all speakers" flow and the strict
+            // per-channel file flow below.
+            return CompileMultiChannelBatchCore(Enumerable.Range(1, _wizardChannelCount)
+                .Select(_ => (Frequencies: frequencies, Levels: levels)).ToArray(),
+                perFileMeasurements: null);
         }
 
         var response = CalibrationCompilerV1.BuildTargetedResponse(
@@ -757,6 +743,193 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         WizardStatus = $"已編譯 {compile.Filters.Count} 個 PEQ 濾波器" +
                        (compile.Limited ? "；部分修正已受限於安全上限" : "") +
                        $"。{compile.Diagnostic}";
+        return true;
+    }
+
+    private bool CompileMultiChannelFromFiles()
+    {
+        var parsedChannels = new List<(double[] Frequencies, double[] Levels)>();
+        foreach (var measurement in _wizardPerChannelMeasurements.OrderBy(static m => m.Channel))
+        {
+            List<double>[] parsed;
+            try
+            {
+                parsed = ReadMeasurementFile(measurement.Path);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                WizardHasResult = false;
+                WizardStatus = $"聲道 {measurement.Channel} 量測讀取失敗：{exception.Message}";
+                return false;
+            }
+
+            var channelFrequencies = parsed[0].ToArray();
+            var channelLevels = parsed[1].ToArray();
+            if (channelFrequencies.Length == 0)
+            {
+                WizardHasResult = false;
+                WizardStatus = $"聲道 {measurement.Channel} 檔案沒有可解析的資料列";
+                return false;
+            }
+
+            parsedChannels.Add((channelFrequencies, channelLevels));
+        }
+
+        // Channels without their own file reuse the first imported
+        // measurement so the batch always matches the configured count.
+        while (parsedChannels.Count < _wizardChannelCount)
+        {
+            var fallback = parsedChannels.Count == 0
+                ? throw new InvalidOperationException("no per-channel measurement")
+                : parsedChannels[0];
+            parsedChannels.Add(fallback);
+        }
+
+        return CompileMultiChannelBatchCore(parsedChannels.ToArray(), _wizardPerChannelMeasurements);
+    }
+
+    private bool CompileMultiChannelBatchCore(
+        (double[] Frequencies, double[] Levels)[] channels,
+        IReadOnlyList<WizardChannelMeasurement>? perFileMeasurements)
+    {
+        var perChannelPoints = new List<CalibrationPointV1[]>();
+        foreach (var (frequencies, levels) in channels)
+        {
+            var channelResponse = CalibrationCompilerV1.BuildTargetedResponse(
+                null, 48000.0, frequencies, levels, _wizardTargetCurve);
+            if (channelResponse is null)
+            {
+                WizardHasResult = false;
+                WizardStatus = "量測點超出有效範圍或排序錯誤（頻率需遞增、20 Hz–24 kHz）";
+                return false;
+            }
+
+            perChannelPoints.Add(channelResponse.Points.ToArray());
+        }
+
+        var batch = CalibrationCompilerV1.CompileMultiChannelBatch(
+            _wizardChannelCount, perChannelPoints);
+        if (!batch.Success || batch.ChannelFilters.Count != _wizardChannelCount)
+        {
+            WizardHasResult = false;
+            WizardStatus = "多聲道編譯失敗：" + batch.Diagnostic;
+            return false;
+        }
+
+        _wizardCompiledFilters = [.. batch.ChannelFilters[0]];
+        _wizardPreviewRows = batch.ChannelFilters[0]
+            .Select((filter, index) => new WizardPeqRow(
+                index + 1,
+                $"{filter.FrequencyHz:0.#} Hz",
+                $"{(filter.GainDb >= 0 ? "+" : string.Empty)}{filter.GainDb:0.##} dB",
+                $"Q {filter.Q:0.##}"))
+            .ToArray();
+        OnPropertyChanged(nameof(WizardPreviewFilters));
+        WizardHasResult = true;
+        var sourceText = perFileMeasurements is null
+            ? "共用一份量測"
+            : $"逐聲道量測檔 {perFileMeasurements.Count}/{_wizardChannelCount}";
+        WizardStatus = $"已為 {_wizardChannelCount} 聲道（{sourceText}）各編譯 {batch.ChannelFilters[0].Count} 個 PEQ 濾波器" +
+                       (batch.ChannelLimited.Any(static limited => limited)
+                           ? "；部分聲道受限於安全上限"
+                           : "") +
+                       $"。{batch.Diagnostic}";
+        return true;
+    }
+
+    public bool ImportWizardPerChannelMeasurements(IReadOnlyList<string> filePaths)
+    {
+        if (!_wizardMultiChannel)
+        {
+            WizardHasResult = false;
+            WizardStatus = "多聲道模式未啟用；請先開啟多聲道模式再匯入逐聲道量測";
+            return false;
+        }
+
+        if (filePaths is null || filePaths.Count == 0)
+        {
+            WizardHasResult = false;
+            WizardStatus = "未選擇任何量測檔";
+            return false;
+        }
+
+        if (filePaths.Count > _wizardChannelCount)
+        {
+            WizardHasResult = false;
+            WizardStatus = $"選了 {filePaths.Count} 個檔案，超過聲道數 {_wizardChannelCount}";
+            return false;
+        }
+
+        if (filePaths.Select(static path => path is null ? string.Empty : Path.GetFullPath(path))
+                     .Distinct(StringComparer.Ordinal)
+                     .Count() != filePaths.Count)
+        {
+            WizardHasResult = false;
+            WizardStatus = "量測檔重複；每個聲道必須對應不同的檔案";
+            return false;
+        }
+
+        var measurements = new List<WizardChannelMeasurement>();
+        for (var index = 0; index < filePaths.Count; ++index)
+        {
+            string fullPath;
+            try
+            {
+                fullPath = Path.GetFullPath(filePaths[index] ?? string.Empty);
+                var info = new FileInfo(fullPath);
+                if (!info.Exists || info.Length is < 1 ||
+                    info.Length > CalibrationCompilerV1.MaxMeasurementFileBytes)
+                    throw new InvalidDataException("量測檔不存在或超過大小上限");
+            }
+            catch (Exception exception) when (exception is ArgumentException or IOException or
+                                              UnauthorizedAccessException or InvalidDataException or
+                                              NotSupportedException)
+            {
+                _wizardPerChannelMeasurements = measurements;
+                WizardHasResult = false;
+                WizardStatus = $"第 {index + 1} 個量測檔無效：{exception.Message}";
+                OnPropertyChanged(nameof(WizardPerChannelMeasurements));
+                return false;
+            }
+
+            measurements.Add(new WizardChannelMeasurement(index + 1, fullPath, 0));
+        }
+
+        for (var measurementIndex = 0; measurementIndex < measurements.Count; ++measurementIndex)
+        {
+            var measurement = measurements[measurementIndex];
+            try
+            {
+                var parsed = ReadMeasurementFile(measurement.Path);
+                if (parsed[0].Count == 0)
+                {
+                    _wizardPerChannelMeasurements = measurements.Where(m => m != measurement).ToList();
+                    WizardHasResult = false;
+                    WizardStatus = $"聲道 {measurement.Channel} 檔案沒有可解析的「頻率 量級」資料列";
+                    OnPropertyChanged(nameof(WizardPerChannelMeasurements));
+                    return false;
+                }
+
+                var updated = new WizardChannelMeasurement(
+                    measurement.Channel, measurement.Path, parsed[0].Count);
+                measurements[measurementIndex] = updated;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                _wizardPerChannelMeasurements = measurements.Where(m => m != measurement).ToList();
+                WizardHasResult = false;
+                WizardStatus = $"聲道 {measurement.Channel} 讀取失敗：{exception.Message}";
+                OnPropertyChanged(nameof(WizardPerChannelMeasurements));
+                return false;
+            }
+        }
+
+        _wizardPerChannelMeasurements = measurements;
+        WizardHasResult = false;
+        WizardStatus = measurements.Count == _wizardChannelCount
+            ? $"已載入全部 {_wizardChannelCount} 聲道的獨立量測；尚未編譯校正"
+            : $"已載入 {measurements.Count}/{_wizardChannelCount} 聲道的獨立量測；其餘聲道編譯時沿用第一個檔案";
+        OnPropertyChanged(nameof(WizardPerChannelMeasurements));
         return true;
     }
 
