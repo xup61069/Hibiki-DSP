@@ -152,6 +152,9 @@ internal sealed class PreviewForm : Form
         };
         var header = CreateHeaderCard();
         panel.Controls.Add(header);
+        panel.Controls.Add(CreateSectionHeader("引擎連線"));
+        panel.Controls.Add(_connect);
+        panel.Controls.Add(_connection);
         panel.Controls.Add(CreateSectionHeader("輸出與裝置"));
         var groups = new ComboBox { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取輸出群組", DataSource = _viewModel.OutputGroups.ToList(), DisplayMember = "Name", ValueMember = "Id" };
         _outputGroups = groups;
@@ -209,8 +212,6 @@ internal sealed class PreviewForm : Form
             }
             RefreshView();
         };
-        panel.Controls.Add(_connect);
-        panel.Controls.Add(_connection);
         panel.Controls.Add(CreateSectionHeader("場景"));
         SyncSceneList();
         _scenes.SelectedIndexChanged += async (_, _) =>
