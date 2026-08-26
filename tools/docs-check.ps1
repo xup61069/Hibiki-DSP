@@ -68,8 +68,12 @@ function Assert-StructuralClaims {
 function Get-CTestRegistrations {
   param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
   $registrations = [System.Collections.Generic.List[string]]::new()
+  $repoRootFull = [IO.Path]::GetFullPath($RepositoryRoot).TrimEnd('\', '/')
   $cmakeFiles = @(Get-ChildItem -LiteralPath $RepositoryRoot -Filter 'CMakeLists.txt' -Recurse -File |
-    Where-Object { $_.FullName -notmatch '[\\/]\.local[\\/]|[\\/]build[\\/]|[\\/]\.git[\\/]' })
+    Where-Object {
+      $relative = $_.FullName.Substring($repoRootFull.Length + 1)
+      $relative -notmatch '(^|[\\/])\.local([\\/]|$)|(^|[\\/])build([\\/]|$)|(^|[\\/])\.git([\\/]|$)'
+    })
   foreach ($file in $cmakeFiles) {
     $lines = Get-Content -LiteralPath $file.FullName
     foreach ($line in $lines) {
