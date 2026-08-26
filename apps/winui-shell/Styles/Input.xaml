@@ -33,6 +33,14 @@
         <Setter Property="MinHeight" Value="36" />
     </Style>
 
+    <!-- Keep opened option rows in the same rounded, compact language as the
+         selector surface without replacing the platform popup template. -->
+    <Style TargetType="ComboBoxItem">
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Padding" Value="12,4" />
+    </Style>
+
     <!-- Keep numeric form fields in the same visual rhythm as text inputs
          while leaving the platform spin-button template intact. -->
     <Style TargetType="NumberBox">
