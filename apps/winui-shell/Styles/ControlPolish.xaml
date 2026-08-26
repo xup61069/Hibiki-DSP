@@ -13,9 +13,18 @@
             <!-- Keep the light shell cool and slightly recessed so white cards
                  remain visibly layered without becoming heavy gray panels. -->
             <SolidColorBrush x:Key="HibikiShellSurfaceBrush">#EEF3F8</SolidColorBrush>
-            <SolidColorBrush x:Key="HibikiSectionCardBrush">#E8F0F8</SolidColorBrush>
-            <SolidColorBrush x:Key="HibikiRouteItemBrush">#FFFFFFFF</SolidColorBrush>
-            <SolidColorBrush x:Key="HibikiRouteItemHoverBrush">#F1F6FF</SolidColorBrush>
+            <LinearGradientBrush x:Key="HibikiSectionCardBrush" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#E8F0F8" Offset="0" />
+                <GradientStop Color="#E3ECF6" Offset="1" />
+            </LinearGradientBrush>
+            <LinearGradientBrush x:Key="HibikiRouteItemBrush" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#FFFFFFFF" Offset="0" />
+                <GradientStop Color="#F6F9FD" Offset="1" />
+            </LinearGradientBrush>
+            <LinearGradientBrush x:Key="HibikiRouteItemHoverBrush" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#F1F6FF" Offset="0" />
+                <GradientStop Color="#EAF2FF" Offset="1" />
+            </LinearGradientBrush>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
             <SolidColorBrush x:Key="HibikiSliderTrackFill" Opacity="0.36" Color="{StaticResource SystemAccentColor}" />
@@ -24,9 +33,18 @@
             <StaticResource x:Key="SliderTrackFillPressed" ResourceKey="HibikiSliderTrackFill" />
             <SolidColorBrush x:Key="HibikiShellSurfaceBrush">#1D2430</SolidColorBrush>
             <!-- Keep the dark shell layered instead of collapsing into one black plane. -->
-            <SolidColorBrush x:Key="HibikiSectionCardBrush">#2B3547</SolidColorBrush>
-            <SolidColorBrush x:Key="HibikiRouteItemBrush">#354761</SolidColorBrush>
-            <SolidColorBrush x:Key="HibikiRouteItemHoverBrush">#405574</SolidColorBrush>
+            <LinearGradientBrush x:Key="HibikiSectionCardBrush" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#2B3547" Offset="0" />
+                <GradientStop Color="#263142" Offset="1" />
+            </LinearGradientBrush>
+            <LinearGradientBrush x:Key="HibikiRouteItemBrush" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#354761" Offset="0" />
+                <GradientStop Color="#2F4056" Offset="1" />
+            </LinearGradientBrush>
+            <LinearGradientBrush x:Key="HibikiRouteItemHoverBrush" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#405574" Offset="0" />
+                <GradientStop Color="#384D69" Offset="1" />
+            </LinearGradientBrush>
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
