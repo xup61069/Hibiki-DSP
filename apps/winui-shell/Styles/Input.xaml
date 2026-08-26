@@ -27,11 +27,19 @@
     </Style>
 
 
-    <!-- Consistent minimum height so toggle switches share the same
-         interactive row rhythm as text inputs and combo boxes.
-         Implicit style applies to every ToggleSwitch. -->
+    <!-- Keep the hit target consistent while tightening the optional header
+         row. The title-bar uses a 48px host row; without this small template
+         adjustment the default Header + switch layout crowds its On/Off
+         content against the bottom clip boundary. -->
     <Style TargetType="ToggleSwitch">
         <Setter Property="MinHeight" Value="36" />
+        <Setter Property="HeaderTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}" Margin="0,0,0,-10" />
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- Consistent minimum height and comfortable padding for check boxes.
