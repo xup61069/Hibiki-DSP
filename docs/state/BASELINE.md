@@ -1044,7 +1044,7 @@ NTSTATUS 0xC000000D，含 disable/enable 重試），明確不主張實體音訊
 或 Microsoft signing，evidence driver-vm-load-test-v1.json（Issue #462 / PR #614）。皆為
 docs/evidence 增量。
 
-目前驗證摘要：`verify.ps1` 的 9 個 CTest（hibiki_contract_tests、hibiki_driver_stream_tests、hibiki_lane_latency_tests、hibiki_noise_suppressor_tests、hibiki_output_crossfade_tests、hibiki_peq_dsp_tests、hibiki_asio_transport_selftest、hibiki_tab_bridge_selftest、hibiki_asio_transport_consumer_tests）通過（含 #1474 新增的 suppressor fail-closed 測試、#1647 新增的 lane latency 行為測試、#1667 新增的 output crossfade 行為測試、#1660 新增的 PEQ DSP 行為測試，以及 #1663 新增的 ASIO transport consumer 行為測試）；`docs-check.ps1` 的 86 個必要入口與
+目前驗證摘要：`verify.ps1` 的 10 個 CTest（hibiki_contract_tests、hibiki_driver_stream_tests、hibiki_lane_latency_tests、hibiki_noise_suppressor_tests、hibiki_output_crossfade_tests、hibiki_peq_dsp_tests、hibiki_asio_transport_selftest、hibiki_tab_bridge_selftest、hibiki_asio_transport_consumer_tests、hibiki_true_peak_limiter_tests）通過（含 #1474 新增的 suppressor fail-closed 測試、#1647 新增的 lane latency 行為測試、#1667 新增的 output crossfade 行為測試、#1660 新增的 PEQ DSP 行為測試，、#1663 新增的 ASIO transport consumer 行為測試，以及 #1684 新增的 true peak limiter 行為測試）；`docs-check.ps1` 的 86 個必要入口與
 24 份 Spec 通過；`source-policy.ps1` 掃描 tracked paths 且無 blocked
 binary/secret；volatile 計數（tracked paths、repository JSON）由 docs-check 即時量測；
 `extension-check.ps1`、`installer-check.ps1`、`control-model-check.ps1`、`winui-shell-check.ps1` 與

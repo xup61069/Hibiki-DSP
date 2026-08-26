@@ -101,6 +101,20 @@ endif()
 
 add_test(NAME hibiki_peq_dsp_tests COMMAND hibiki_peq_dsp_tests)
 
+add_executable(hibiki_true_peak_limiter_tests
+  unit/true_peak_limiter_tests.cpp
+)
+
+target_link_libraries(hibiki_true_peak_limiter_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_true_peak_limiter_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_true_peak_limiter_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_true_peak_limiter_tests COMMAND hibiki_true_peak_limiter_tests)
+
 if(HIBIKI_BUILD_LIVE_PROBES AND WIN32)
   add_executable(hibiki_live_device_catalog_probe
     live_device_catalog_probe.cpp
