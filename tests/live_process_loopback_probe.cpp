@@ -13,7 +13,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <atomic>
 #include <cstdint>
+#include <thread>
 #include <cstdio>
 
 #include "hibiki/windows_process_loopback.hpp"
@@ -139,22 +141,42 @@ int main() {
         if (SUCCEEDED(init)) CoUninitialize();
         return 0;
     }
-    const HRESULT render_result = render_tone(device, sample_rate, channels);
     std::array<float, 8U * 4096U> samples{};
     std::uint64_t captured = 0U;
     bool finite = true;
     bool nonzero = false;
-    for (std::uint32_t attempt = 0U; attempt < 120U; ++attempt) {
-        if (source.event_handle() != nullptr) (void)WaitForSingleObject(source.event_handle(), 5U);
-        std::uint32_t frames = 0U;
-        if (!source.read(samples.data(), 4096U, frames)) continue;
-        captured += frames;
-        for (std::size_t index = 0U; index < static_cast<std::size_t>(frames) * channels; ++index) {
-            finite = finite && std::isfinite(samples[index]);
-            nonzero = nonzero || std::abs(samples[index]) > 1.0e-7F;
+
+    HRESULT render_result = E_FAIL;
+    std::atomic<bool> render_done{false};
+    std::thread render_thread([&]() {
+        const HRESULT com_hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        render_result = render_tone(device, sample_rate, channels);
+        if (SUCCEEDED(com_hr)) CoUninitialize();
+        render_done.store(true);
+    });
+
+    for (std::uint32_t attempt = 0U; attempt < 600U; ++attempt) {
+        if (nonzero && captured >= static_cast<std::uint64_t>(sample_rate / 20U)) break;
+        if (!render_done.load() || captured < static_cast<std::uint64_t>(sample_rate / 20U)) {
+            if (source.event_handle() != nullptr) {
+                (void)WaitForSingleObject(source.event_handle(), 2U);
+            }
+            std::uint32_t frames = 0U;
+            if (!source.read(samples.data(), 4096U, frames)) {
+                if (render_done.load()) break;
+                continue;
+            }
+            captured += frames;
+            for (std::size_t index = 0U;
+                 index < static_cast<std::size_t>(frames) * channels; ++index) {
+                finite = finite && std::isfinite(samples[index]);
+                nonzero = nonzero || std::abs(samples[index]) > 1.0e-7F;
+            }
+        } else {
+            break;
         }
-        if (captured >= static_cast<std::uint64_t>(sample_rate / 20U) && nonzero) break;
     }
+    render_thread.join();
     const auto snapshot = source.snapshot();
     source.stop();
     if (device != nullptr) device->Release();
