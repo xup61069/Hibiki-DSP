@@ -519,14 +519,29 @@
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <ToggleSwitch Header="多聲道模式" IsOn="{Binding WizardMultiChannel, Mode=TwoWay}" MinWidth="160"
                                      AutomationProperties.Name="多聲道模式"
-                                     AutomationProperties.HelpText="啟用後同一份量測會批次套用到所有聲道"
-                                     ToolTipService.ToolTip="把一份量測複製到每個聲道後批次產生 PEQ" />
+                                     AutomationProperties.HelpText="啟用後可為每個聲道匯入獨立量測；未提供時以共用量測批次編譯"
+                                     ToolTipService.ToolTip="逐聲道量測檔優先；不足的聲道沿用第一個檔案" />
                         <controls:NumberBox Header="聲道數（1／2／6／8）" Value="{Binding WizardChannelCount, Mode=TwoWay}"
                                             SpinButtonPlacementMode="Compact" SmallChange="1" MinWidth="140"
                                             AutomationProperties.Name="聲道數"
                                             AutomationProperties.HelpText="只接受 1、2、6 或 8"
                                             ToolTipService.ToolTip="支援 1／2／6／8 聲道" />
                     </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="10" Visibility="{Binding WizardMultiChannel, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Button Content="選擇逐聲道量測檔（依序對應聲道）" Click="OnImportPerChannelWizardMeasurementsClick" MinHeight="32" AutomationProperties.Name="選擇逐聲道校正量測檔案" AutomationProperties.HelpText="依檔案選擇順序對應到聲道 1、2、6 或 8" ToolTipService.ToolTip="可一次多選；數量少於聲道數時其餘聲道沿用第一個檔案" />
+                    </StackPanel>
+                    <controls:ItemsRepeater ItemsSource="{Binding WizardPerChannelMeasurements}" MaxWidth="560" Visibility="{Binding WizardMultiChannel, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <controls:ItemsRepeater.Layout>
+                            <controls:StackLayout Spacing="4" />
+                        </controls:ItemsRepeater.Layout>
+                        <controls:ItemsRepeater.ItemTemplate>
+                            <DataTemplate>
+                                <Border CornerRadius="8" Background="{ThemeResource SubtleFillColorSecondaryBrush}" Padding="12,6">
+                                    <TextBlock Text="{Binding AccessibleSummary}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                </Border>
+                            </DataTemplate>
+                        </controls:ItemsRepeater.ItemTemplate>
+                    </controls:ItemsRepeater>
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Button Content="選擇量測檔（CSV／REW）" Click="OnImportWizardMeasurementClick" Style="{StaticResource AccentButtonStyle}" MinHeight="32" AutomationProperties.Name="選擇校正量測檔案" AutomationProperties.HelpText="選擇 CSV 或 REW 匯出的頻率量級文字檔" ToolTipService.ToolTip="選擇 CSV 或 REW 匯出的頻率量級文字檔" />
                         <Button Content="編譯校正" Click="OnCompileWizardClick" MinHeight="32" IsEnabled="{Binding WizardHasResult, Converter={StaticResource InverseBoolConverter}}" AutomationProperties.Name="編譯校正設定" AutomationProperties.HelpText="以目前量測與目標曲線編譯 PEQ 濾波器" ToolTipService.ToolTip="以目前量測與目標曲線編譯 PEQ 濾波器" />

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.ComponentModel;
+using System.Linq;
 using Hibiki.ControlModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -342,6 +343,21 @@ public sealed partial class MainWindow : Window
 
         if (file is not null)
             ViewModel.ImportWizardMeasurement(file.Path);
+    }
+
+    private async void OnImportPerChannelWizardMeasurementsClick(object sender, RoutedEventArgs e)
+    {
+        var picker = new Windows.Storage.Pickers.FileOpenPicker();
+
+        var handle = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, handle);
+
+        picker.FileTypeFilter.Add(".csv");
+        picker.FileTypeFilter.Add(".txt");
+        var files = await picker.PickMultipleFilesAsync();
+
+        if (files.Count > 0)
+            ViewModel.ImportWizardPerChannelMeasurements(files.Select(f => f.Path).ToList());
     }
 
     private void OnCompileWizardClick(object sender, RoutedEventArgs e)

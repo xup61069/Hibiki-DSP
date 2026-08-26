@@ -972,6 +972,71 @@ Check(!wizardVm.CompileWizardCorrection() && !wizardVm.WizardHasResult &&
       wizardVm.WizardStatus.Contains("尚未載入量測", StringComparison.Ordinal),
     "Wizard reset must clear the compiled result and block re-compilation.");
 
+// ---- #1564 per-channel measurement import ------------------------------
+var perChannelDir = Path.Combine(Path.GetTempPath(), $"hibiki-wizard-perchannel-{Guid.NewGuid():N}");
+Directory.CreateDirectory(perChannelDir);
+var perChannelPaths = new List<string>();
+try
+{
+    for (var channel = 1; channel <= 6; ++channel)
+    {
+        var path = Path.Combine(perChannelDir, $"ch{channel}.csv");
+        File.WriteAllText(path,
+            "20, " + (-2.0 - channel).ToString(CultureInfo.InvariantCulture) +
+            "\n1000, " + (0.25 * channel).ToString(CultureInfo.InvariantCulture) +
+            "\n8000, " + (-1.0 - 0.5 * channel).ToString(CultureInfo.InvariantCulture) +
+            "\n");
+        perChannelPaths.Add(path);
+    }
+
+    var staleVm = new EasyControlViewModel();
+    staleVm.WizardMultiChannel = true;
+    staleVm.WizardChannelCount = 6;
+    // WizardHasResult is private-set; the import path itself must clear any
+    // previous compile result, so we only assert it stays false afterwards.
+    Check(staleVm.ImportWizardPerChannelMeasurements(
+        [perChannelPaths[0], perChannelPaths[0]]) == false &&
+        !staleVm.WizardHasResult &&
+        staleVm.WizardPerChannelMeasurements.Count == 0,
+        "Duplicate per-channel import must fail closed and clear stale results.");
+
+    wizardVm.WizardMultiChannel = true;
+    wizardVm.WizardChannelCount = 6;
+    Check(wizardVm.WizardMultiChannel && wizardVm.WizardChannelCount == 6 &&
+          wizardVm.ImportWizardPerChannelMeasurements(perChannelPaths) &&
+          wizardVm.WizardPerChannelMeasurements.Count == 6,
+        "Wizard must accept one independent measurement per channel.");
+    Check(wizardVm.WizardPerChannelMeasurements.All(m => m.PointCount > 0) &&
+          wizardVm.WizardPerChannelMeasurements.Select((m, i) => m.Channel == i + 1).All(ok => ok),
+        "Per-channel measurements must be numbered by selection order.");
+    Check(!wizardVm.WizardHasResult &&
+          wizardVm.WizardStatus.Contains("尚未編譯", StringComparison.Ordinal),
+        "Importing per-channel measurements must invalidate any previous compile result.");
+    Check(wizardVm.CompileWizardCorrection() && wizardVm.WizardHasResult &&
+          wizardVm.WizardStatus.Contains("逐聲道量測檔", StringComparison.Ordinal),
+        $"Compile must use per-channel measurements when available. Status={wizardVm.WizardStatus}");
+
+    var partialVm = new EasyControlViewModel();
+    partialVm.WizardMultiChannel = true;
+    partialVm.WizardChannelCount = 6;
+    Check(partialVm.ImportWizardPerChannelMeasurements(
+        perChannelPaths.Take(3).ToList()) &&
+        partialVm.WizardPerChannelMeasurements.Count == 3 &&
+        partialVm.CompileWizardCorrection() &&
+        partialVm.WizardStatus.Contains("逐聲道量測檔 3/6", StringComparison.Ordinal),
+        $"Partial per-channel import must fall back to the first file. Status={partialVm.WizardStatus}");
+
+    var closedVm = new EasyControlViewModel();
+    Check(closedVm.ImportWizardPerChannelMeasurements([perChannelPaths[0]]) == false &&
+          !closedVm.WizardHasResult &&
+          closedVm.WizardStatus.Contains("多聲道模式未啟用", StringComparison.Ordinal),
+        "Per-channel import must be rejected while multi-channel mode is off.");
+}
+finally
+{
+    Directory.Delete(perChannelDir, recursive: true);
+}
+
 
 // ---- #823 honest custom-scene sync -------------------------------------
 const string sceneSyncBaseId = "sync-check-scene";
