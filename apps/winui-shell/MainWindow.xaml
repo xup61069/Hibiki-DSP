@@ -468,9 +468,12 @@
                         </StackPanel>
                             </Border><Border Style="{StaticResource SectionCardStyle}" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
                                 <StackPanel Spacing="10">
-                                    <TextBlock Text="App 路由預設（Expert）" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-                                    <TextBlock Text="建立後會保存到本機；只有 App 清單已同步且引擎回覆 Ack，才會顯示為已套用。App ID 或顯示名稱至少填一項。" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                    <controls:ItemsRepeater ItemsSource="{Binding RouteRules}">
+                                     <TextBlock Text="App 路由預設（Expert）" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                     <TextBlock Text="建立後會保存到本機；只有 App 清單已同步且引擎回覆 Ack，才會顯示為已套用。App ID 或顯示名稱至少填一項。" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                     <Border Style="{StaticResource StatusPillStyle}" AutomationProperties.Name="路由預設操作狀態">
+                                         <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" AutomationProperties.Name="路由預設操作狀態" AutomationProperties.LiveSetting="Polite" />
+                                     </Border>
+                                     <controls:ItemsRepeater ItemsSource="{Binding RouteRules}">
                                         <controls:ItemsRepeater.ItemTemplate>
                                             <DataTemplate>
                                                 <Grid Style="{StaticResource RouteItemCardGridStyle}" ColumnSpacing="10">
@@ -489,8 +492,8 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBox Header="預設 ID（小寫英文／數字／- _ .）" Text="{Binding RouteRuleId, Mode=TwoWay}" AutomationProperties.Name="App 路由預設 ID" />
-                                        <TextBox Grid.Column="1" Header="App ID（例如 game.exe，可留空）" Text="{Binding RouteRuleAppId, Mode=TwoWay}" AutomationProperties.Name="App 路由預設 App ID" />
+                                        <TextBox Header="預設 ID（小寫英文／數字／- _ .）" Text="{Binding RouteRuleId, Mode=TwoWay}" AutomationProperties.Name="App 路由預設 ID" AutomationProperties.HelpText="預設 ID 與 App ID 或顯示名稱一起保存；App ID 或顯示名稱至少填一項" ToolTipService.ToolTip="App ID 或顯示名稱至少填一項" />
+                                        <TextBox Grid.Column="1" Header="App ID（例如 game.exe，可留空）" Text="{Binding RouteRuleAppId, Mode=TwoWay}" AutomationProperties.Name="App 路由預設 App ID" AutomationProperties.HelpText="App ID 或顯示名稱至少填一項" ToolTipService.ToolTip="App ID 或顯示名稱至少填一項" />
                                     </Grid>
                                     <Grid ColumnSpacing="10">
                                         <Grid.ColumnDefinitions>
