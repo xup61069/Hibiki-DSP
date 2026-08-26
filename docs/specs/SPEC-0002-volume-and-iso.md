@@ -231,6 +231,10 @@ max cut 12 dB；bass 校正上限 4 dB；night-mode 壓縮上限 9 dB、knee 12 
 SceneApply 成功路徑在同一個 control transaction 清掉上一個 Scene 的
 controller；Strict Direct 維持 fail-open bypass。此整合仍是 user-space bounded proxy，
 不宣稱 BS.1770 conformance、實體 sink delivery 或 driver/WaveRT evidence。
+`ProgramAwareLevelBankV1::reset_all()` 把每個已註冊 group 的 controller 重置為
+unity gain 並清空其政策，但保留 label 註冊與 slot 佔用；因此 `group_count()`
+在重置後維持不變，且 `has_group()` 對既有 label 持續回 true。Group label 最長
+64 bytes；slot 內部以額外 byte 儲存長度，完整長度 label 不會越界。
 
 選用欄位 `bass_correction_enabled`／`bass_max_cut_db`（0–12 dB）加入內容驅動的低頻校正：
 `BassExcessDetectorV1` 以每聲道一階低通（~120 Hz）量測低頻帶對全頻帶的 RMS 能量比，
