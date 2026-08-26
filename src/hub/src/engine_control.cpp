@@ -322,6 +322,12 @@ EngineControlResultV1 EngineControlWorkerV1::consume(
             return ir_prepare_handler_(command.ir_prepare, ir_prepare_context_)
                        ? EngineControlResultV1::Applied
                        : EngineControlResultV1::Failed;
+        case IpcMessageType::CalibrationPeqPrepare:
+            if (calibration_peq_handler_ == nullptr) return EngineControlResultV1::Failed;
+            return calibration_peq_handler_(command.calibration_peq,
+                                             calibration_peq_context_)
+                       ? EngineControlResultV1::Applied
+                       : EngineControlResultV1::Failed;
         case IpcMessageType::VolumeNotification:
             {
                 const auto result = command.has_volume_target

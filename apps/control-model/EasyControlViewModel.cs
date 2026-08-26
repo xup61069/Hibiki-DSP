@@ -1006,6 +1006,50 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         return sent;
     }
 
+    public async Task<bool> ApplyWizardToSceneAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (!WizardHasResult || _wizardCompiledFilters.Count == 0)
+        {
+            WizardStatus = "尚未編譯校正結果；請先匯入量測並編譯";
+            OnPropertyChanged(nameof(WizardStatus));
+            return false;
+        }
+        if (!IsConnected)
+        {
+            WizardStatus = "引擎未連線；校正尚未送出";
+            OnPropertyChanged(nameof(WizardStatus));
+            return false;
+        }
+        var outputGroup = _session.ActiveOutputGroup ?? "main";
+        try
+        {
+            LastCommand = _commands.PrepareCalibrationPeq(
+                outputGroup,
+                _wizardCompiledFilters.Select(f => (f.FrequencyHz, f.GainDb, f.Q))
+                    .ToList());
+            OnPropertyChanged(nameof(LastCommand));
+        }
+        catch (Exception exception) when (exception is ArgumentException or
+                                           InvalidOperationException or OverflowException)
+        {
+            WizardStatus = $"校正 PEQ 編碼失敗：{exception.Message}";
+            OnPropertyChanged(nameof(WizardStatus));
+            return false;
+        }
+        var sent = await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
+        if (sent)
+        {
+            WizardStatus = $"已將 {_wizardCompiledFilters.Count} 個校正濾波器套用到場景（{outputGroup}）";
+        }
+        else
+        {
+            WizardStatus = "引擎未接受校正；請確認引擎已連線且支援 calibration PEQ";
+        }
+        OnPropertyChanged(nameof(WizardStatus));
+        return sent;
+    }
+
     public IpcEnvelopeV1? LastCommand { get; private set; }
 
     public bool OneTapEnhance()

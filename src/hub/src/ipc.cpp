@@ -71,6 +71,7 @@ bool is_valid_message_type(const IpcMessageType type) noexcept {
         case IpcMessageType::SceneCatalogCommand:
         case IpcMessageType::EqVisualSnapshotRequest:
         case IpcMessageType::EqVisualSnapshot:
+        case IpcMessageType::CalibrationPeqPrepare:
             return true;
     }
     return false;

@@ -724,6 +724,7 @@ bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
     }
     if (!apply_ir("main", output_interleaved, frames)) return false;
     if (!apply_loudness_peq("main", output_interleaved, frames)) return false;
+    if (!apply_calibration_peq("main", output_interleaved, frames)) return false;
     if (!apply_group_master("main", output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
         auto* const main_limiter =
@@ -751,6 +752,7 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
     if (!apply_ir(output_group, output_interleaved, frames)) return false;
     if (!apply_loudness_peq(output_group, output_interleaved, frames)) return false;
     if (!apply_program_aware(output_group, output_interleaved, frames)) return false;
+    if (!apply_calibration_peq(output_group, output_interleaved, frames)) return false;
     // The tap is control-plane telemetry for VST3 lane workers. When no
     // lane is active the sandbox never reads it, so skip the isfinite scan
     // and copies entirely instead of paying the cost every RT block.
@@ -1292,6 +1294,83 @@ bool AudioEngineModel::apply_program_aware(const std::string_view output_group,
     }
     return controller->process_interleaved(output_interleaved, frames,
                                            active_graph_.output_channels);
+}
+
+bool AudioEngineModel::apply_calibration_peq(
+    const std::string_view output_group,
+    float* const output_interleaved,
+    const std::size_t frames) noexcept {
+    if ((has_active_graph_ && active_graph_.strict_direct) ||
+        !has_active_calibration_peq_ || !active_calibration_peq_.attached) {
+        return true;
+    }
+    if (frames == 0U || output_interleaved == nullptr) return true;
+    if (active_calibration_peq_.output_group_bytes != output_group.size() ||
+        !std::equal(output_group.begin(), output_group.end(),
+                    active_calibration_peq_.output_group.begin())) {
+        return true;
+    }
+    return active_calibration_peq_.peq.process_interleaved(
+        output_interleaved, frames);
+}
+
+bool AudioEngineModel::prepare_calibration_peq(
+    const std::string_view output_group,
+    const std::span<const PeqFilterV1> filters) noexcept {
+    if (filters.data() == nullptr && !filters.empty()) return false;
+    if (output_group.empty() || output_group.size() > kMaxOutputGroupBytes ||
+        output_group.find('\0') != std::string_view::npos ||
+        volume_bank_ == nullptr || !volume_bank_->has_group(output_group) ||
+        filters.empty()) {
+        has_pending_calibration_peq_ = false;
+        return false;
+    }
+    CalibrationPeqAttachmentV1 candidate{};
+    candidate.attached = true;
+    candidate.output_group_bytes = static_cast<std::uint8_t>(output_group.size());
+    std::copy(output_group.begin(), output_group.end(),
+              candidate.output_group.begin());
+    const auto channels = has_pending_graph_
+                              ? pending_graph_.output_channels
+                              : (has_active_graph_ ? active_graph_.output_channels
+                                                    : 2U);
+    if (!candidate.peq.prepare(filters,
+                               sample_rate_.load(std::memory_order_acquire),
+                               channels)) {
+        pending_calibration_peq_ = {};
+        has_pending_calibration_peq_ = false;
+        return false;
+    }
+    pending_calibration_peq_ = std::move(candidate);
+    has_pending_calibration_peq_ = true;
+    return true;
+}
+
+bool AudioEngineModel::commit_calibration_peq() noexcept {
+    if (!has_pending_calibration_peq_) return false;
+    active_calibration_peq_ = std::move(pending_calibration_peq_);
+    pending_calibration_peq_ = {};
+    has_active_calibration_peq_ = active_calibration_peq_.attached;
+    has_pending_calibration_peq_ = false;
+    return true;
+}
+
+void AudioEngineModel::rollback_calibration_peq() noexcept {
+    pending_calibration_peq_ = {};
+    has_pending_calibration_peq_ = false;
+}
+
+bool AudioEngineModel::calibration_peq_transaction_idle() const noexcept {
+    return !has_pending_calibration_peq_;
+}
+
+bool AudioEngineModel::has_active_calibration_peq(
+    const std::string_view output_group) const noexcept {
+    if (!has_active_calibration_peq_ || !active_calibration_peq_.attached) return false;
+    if (output_group.empty()) return true;
+    return active_calibration_peq_.output_group_bytes == output_group.size() &&
+           std::equal(output_group.begin(), output_group.end(),
+                      active_calibration_peq_.output_group.begin());
 }
 
 bool AudioEngineModel::apply_vst3_lanes(

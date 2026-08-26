@@ -1003,6 +1003,126 @@ bool decode_session_route_rule_command_v1(
            command.output_group_bytes == 0U;
 }
 
+// ---- Calibration PEQ prepare command (bounded v1 wire format) ----
+// Layout is little-endian and fully positional:
+//   [0..3]    schema version (u32 LE)
+//   [4]       filter count (1..kCalibrationPeqMaxFiltersV1)
+//   [5]       output group bytes (1..64)
+//   [6]       clear existing flag (must be 0 when filter_count > 0)
+//   [7..15]   reserved zero
+//   [16..79]  NUL-padded printable UTF-8 output group
+//   [80..463] filter entries, each 24 bytes:
+//             frequency_hz (f64 LE), gain_db (f64 LE), q (f64 LE);
+//             unused entries must stay all-zero
+
+bool encode_calibration_peq_prepare_command_v1(
+    const CalibrationPeqPrepareCommandV1& command,
+    std::vector<std::uint8_t>& payload) noexcept {
+    payload.clear();
+    if (command.schema_version != 1U ||
+        command.filter_count == 0U ||
+        command.filter_count > kCalibrationPeqMaxFiltersV1 ||
+        command.output_group_bytes == 0U ||
+        command.output_group_bytes > command.output_group.size() ||
+        command.clear_existing != 0U) {
+        return false;
+    }
+    if (!is_printable_utf8(std::string_view(
+            command.output_group.data(), command.output_group_bytes))) {
+        return false;
+    }
+    const auto validate_filter = [](const auto& filter) noexcept {
+        return std::isfinite(filter.frequency_hz) &&
+               filter.frequency_hz >= 10.0 &&
+               filter.frequency_hz <= 22000.0 &&
+               std::isfinite(filter.gain_db) &&
+               filter.gain_db >= -24.0 &&
+               filter.gain_db <= 24.0 &&
+               std::isfinite(filter.q) &&
+               filter.q >= 0.05 &&
+               filter.q <= 20.0;
+    };
+    for (std::size_t index = 0U; index < command.filter_count; ++index) {
+        if (!validate_filter(command.filters[index])) return false;
+    }
+    for (std::size_t index = command.filter_count;
+         index < kCalibrationPeqMaxFiltersV1; ++index) {
+        const auto& entry = command.filters[index];
+        if (entry.frequency_hz != 0.0 || entry.gain_db != 0.0 || entry.q != 0.0) {
+            return false;
+        }
+    }
+    payload.assign(kCalibrationPeqCommandPayloadBytesV1, std::uint8_t{0U});
+    write_u32(payload.data(), command.schema_version);
+    payload[4U] = command.filter_count;
+    payload[5U] = static_cast<std::uint8_t>(command.output_group_bytes);
+    payload[6U] = command.clear_existing;
+    std::copy_n(command.output_group.data(), command.output_group_bytes,
+                payload.data() + 16U);
+    auto* base = payload.data() + 80U;
+    for (std::size_t index = 0U; index < command.filter_count; ++index) {
+        auto* offset = base + index * 24U;
+        write_f64_bits(offset, command.filters[index].frequency_hz);
+        write_f64_bits(offset + 8U, command.filters[index].gain_db);
+        write_f64_bits(offset + 16U, command.filters[index].q);
+    }
+    return true;
+}
+
+bool decode_calibration_peq_prepare_command_v1(
+    const std::span<const std::uint8_t> payload,
+    CalibrationPeqPrepareCommandV1& command) noexcept {
+    command = {};
+    if (payload.size() != kCalibrationPeqCommandPayloadBytesV1) return false;
+    for (std::size_t index = 7U; index < 16U; ++index) {
+        if (payload[index] != 0U) return false;
+    }
+    const auto filter_count = payload[4U];
+    const auto output_group_bytes = payload[5U];
+    const auto clear_existing = payload[6U];
+    if (filter_count == 0U || filter_count > kCalibrationPeqMaxFiltersV1 ||
+        clear_existing != 0U || output_group_bytes == 0U ||
+        output_group_bytes > kCalibrationPeqOutputGroupMaxBytesV1) {
+        return false;
+    }
+    for (std::size_t index = output_group_bytes;
+         index < kCalibrationPeqOutputGroupMaxBytesV1; ++index) {
+        if (payload[16U + index] != 0U) return false;
+    }
+    const std::string_view output_group(
+        reinterpret_cast<const char*>(payload.data() + 16U), output_group_bytes);
+    if (!is_printable_utf8(output_group)) return false;
+    for (std::size_t index = 0U; index < filter_count; ++index) {
+        const auto* offset = payload.data() + 80U + index * 24U;
+        const double freq = read_f64_bits(offset);
+        const double gain = read_f64_bits(offset + 8U);
+        const double q_value = read_f64_bits(offset + 16U);
+        if (!std::isfinite(freq) || freq < 10.0 || freq > 22000.0 ||
+            !std::isfinite(gain) || gain < -24.0 || gain > 24.0 ||
+            !std::isfinite(q_value) || q_value < 0.05 || q_value > 20.0) {
+            return false;
+        }
+        command.filters[index].frequency_hz = freq;
+        command.filters[index].gain_db = gain;
+        command.filters[index].q = q_value;
+    }
+    for (std::size_t index = filter_count;
+         index < kCalibrationPeqMaxFiltersV1; ++index) {
+        const auto* offset = payload.data() + 80U + index * 24U;
+        if (read_f64_bits(offset) != 0.0 ||
+            read_f64_bits(offset + 8U) != 0.0 ||
+            read_f64_bits(offset + 16U) != 0.0) {
+            return false;
+        }
+    }
+    command.schema_version = read_u32(payload.data());
+    command.filter_count = filter_count;
+    command.output_group_bytes = output_group_bytes;
+    command.clear_existing = clear_existing;
+    std::copy_n(output_group.data(), output_group.size(), command.output_group.data());
+    return true;
+}
+
 std::array<std::uint8_t, kGroupedVolumeNotificationPayloadBytesV1>
 encode_grouped_volume_notification_payload_v1(
     const std::string_view output_group,
@@ -1309,6 +1429,9 @@ bool decode_control_command_v1(const IpcFrameV1& frame,
             return decode_scene_apply_payload_v1(frame.payload, command.scene);
         case IpcMessageType::SceneCatalogCommand:
             return decode_scene_catalog_command_v1(frame.payload, command.scene_catalog);
+        case IpcMessageType::CalibrationPeqPrepare:
+            return decode_calibration_peq_prepare_command_v1(
+                frame.payload, command.calibration_peq);
         case IpcMessageType::DeviceSwitch:
             return decode_device_switch_payload_v1(frame.payload, command.device_switch);
         case IpcMessageType::GraphPrepare:

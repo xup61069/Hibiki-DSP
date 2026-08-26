@@ -143,6 +143,20 @@ public:
     program_aware_visual_snapshot() const noexcept;
     void reset_program_aware_state() noexcept;
 
+    // Calibration PEQ is an independent fixed-capacity output attachment.
+    // Prepare validates the caller-supplied bounded filter set on the
+    // control worker and compiles it into a bounded PEQ; commit is the only
+    // RT-visible swap. This is user-space correction, not a physical-audio
+    // or equal-loudness conformance claim.
+    [[nodiscard]] bool prepare_calibration_peq(
+        std::string_view output_group,
+        std::span<const PeqFilterV1> filters) noexcept;
+    [[nodiscard]] bool commit_calibration_peq() noexcept;
+    void rollback_calibration_peq() noexcept;
+    [[nodiscard]] bool calibration_peq_transaction_idle() const noexcept;
+    [[nodiscard]] bool has_active_calibration_peq(
+        std::string_view output_group = "main") const noexcept;
+
     // VST3 lane bridge is an independent fixed-capacity output attachment.
     // Prepare validates the caller ring on the control worker; commit is the
     // only RT-visible swap. The callback never allocates, waits, or reads a
@@ -180,6 +194,9 @@ public:
                                              std::span<const RtLaneInputV1> inputs,
                                              float* output_interleaved,
                                              std::size_t frames) noexcept;
+    [[nodiscard]] bool apply_calibration_peq(std::string_view output_group,
+                                              float* output_interleaved,
+                                              std::size_t frames) noexcept;
     // Bounded double-precision model entry points. These use the same
     // committed immutable graph as the float32 path and apply Group Master,
     // but intentionally exclude the final TruePeakLimiter, the plugin-latency
@@ -410,6 +427,16 @@ private:
     ProgramAwareAttachmentV1 pending_program_aware_{};
     bool has_active_program_aware_{false};
     bool has_pending_program_aware_{false};
+    struct CalibrationPeqAttachmentV1 {
+        bool attached{false};
+        std::uint8_t output_group_bytes{0U};
+        std::array<char, kMaxOutputGroupBytes> output_group{};
+        PeqProcessorV1 peq{};
+    };
+    CalibrationPeqAttachmentV1 active_calibration_peq_{};
+    CalibrationPeqAttachmentV1 pending_calibration_peq_{};
+    bool has_active_calibration_peq_{false};
+    bool has_pending_calibration_peq_{false};
     Vst3LaneRingBridgeV1 active_vst3_lanes_{};
     Vst3LaneRingBridgeV1 pending_vst3_lanes_{};
     mutable Vst3TapBufferV1 vst3_tap_{};
