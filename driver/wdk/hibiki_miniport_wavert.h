@@ -62,6 +62,7 @@ private:
     PMDL                            m_DmaBufferMdl;
     ULONG                           m_DmaBufferSize;
     ULONG                           m_AllocatedBytes;
+    BOOLEAN                         m_StreamInitialized;
     hibiki_wdk_stream_context_v1    m_StreamContext;
 
     // Notification event handles

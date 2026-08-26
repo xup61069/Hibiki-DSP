@@ -75,6 +75,27 @@ static bool HibikiWaveRtFormatMatchesEndpointV1(
         IsEqualGUIDAligned(format->WaveFormatExt.SubFormat, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT);
 }
 
+static bool HibikiWaveRtStateTransitionAllowedV1(
+    _In_ KSSTATE Current,
+    _In_ KSSTATE Next) {
+    if (Current == Next) {
+        return true;
+    }
+
+    switch (Current) {
+        case KSSTATE_STOP:
+            return Next == KSSTATE_ACQUIRE;
+        case KSSTATE_ACQUIRE:
+            return Next == KSSTATE_PAUSE || Next == KSSTATE_STOP;
+        case KSSTATE_PAUSE:
+            return Next == KSSTATE_RUN || Next == KSSTATE_ACQUIRE;
+        case KSSTATE_RUN:
+            return Next == KSSTATE_PAUSE;
+        default:
+            return false;
+    }
+}
+
 //=============================================================================
 // HibikiMiniportWaveRtStreamV1 Implementation
 //=============================================================================
@@ -91,6 +112,7 @@ HibikiMiniportWaveRtStreamV1::HibikiMiniportWaveRtStreamV1()
       m_DmaBufferMdl(nullptr),
       m_DmaBufferSize(0),
       m_AllocatedBytes(0),
+      m_StreamInitialized(FALSE),
       m_NotificationEventCount(0),
       m_TotalBytesProcessed(0) {
     RtlZeroMemory(&m_StreamContext, sizeof(m_StreamContext));
@@ -223,6 +245,15 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferCore(
         return STATUS_INVALID_PARAMETER;
     }
 
+    if (m_StreamInitialized || m_DmaBuffer != nullptr || m_DmaBufferMdl != nullptr) {
+        return STATUS_INVALID_DEVICE_STATE;
+    }
+
+    *AudioBufferMdl = nullptr;
+    *ActualSize = 0;
+    *OffsetFromFirstPage = 0;
+    *CacheType = MmCached;
+
     hibiki_endpoint_topology_v1 topology{};
     if (hibiki_endpoint_topology_get_v1(m_EndpointIndex, &topology) == 0) {
         return STATUS_INVALID_DEVICE_STATE;
@@ -267,9 +298,12 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferCore(
         m_DmaBuffer = nullptr;
         m_DmaBufferMdl = nullptr;
         m_DmaBufferSize = 0;
+        m_AllocatedBytes = 0;
+        m_StreamInitialized = FALSE;
         return ntStatus;
     }
 
+    m_StreamInitialized = TRUE;
     *AudioBufferMdl = m_DmaBufferMdl;
     *ActualSize = m_DmaBufferSize;
     *OffsetFromFirstPage = 0;
@@ -289,8 +323,12 @@ VOID HibikiMiniportWaveRtStreamV1::FreeBufferWithNotification(
     // the WDK free callback is the ownership boundary for this buffer.
     PMDL allocated_mdl = m_DmaBufferMdl;
 
-    if (m_DmaBuffer != nullptr) {
+    if (m_StreamInitialized) {
         HibikiWaveRtPinResetV1(&m_StreamContext);
+        m_StreamInitialized = FALSE;
+    }
+
+    if (m_DmaBuffer != nullptr) {
         m_PortStream->UnmapAllocatedPages(m_DmaBuffer, m_DmaBufferMdl);
         m_DmaBuffer = nullptr;
     }
@@ -372,9 +410,15 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::SetFormat(
 
 NTSTATUS HibikiMiniportWaveRtStreamV1::SetState(
     _In_ KSSTATE                  State) {
+    if (!HibikiWaveRtStateTransitionAllowedV1(m_State, State)) {
+        return STATUS_INVALID_PARAMETER;
+    }
+
     switch (State) {
         case KSSTATE_STOP:
-            HibikiWaveRtPinResetV1(&m_StreamContext);
+            if (m_StreamInitialized) {
+                HibikiWaveRtPinResetV1(&m_StreamContext);
+            }
             m_TotalBytesProcessed = 0;
             m_State = KSSTATE_STOP;
             break;
