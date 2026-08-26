@@ -11,10 +11,33 @@
         <ResourceDictionary x:Key="Light">
             <SolidColorBrush x:Key="HibikiStatusPillBrush">#DDE8F4</SolidColorBrush>
             <SolidColorBrush x:Key="HibikiStatusPillCompactBrush">#E7EEF6</SolidColorBrush>
+            <!-- Keep disabled actions visibly unavailable without sacrificing
+                 readable text on the cool light shell. These keys are consumed
+                 by the platform Button and AccentButton templates. -->
+            <SolidColorBrush x:Key="HibikiDisabledButtonBackgroundBrush">#D7E0EA</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiDisabledButtonForegroundBrush">#4E5D70</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiDisabledButtonBorderBrush">#B6C3D2</SolidColorBrush>
+            <StaticResource x:Key="ButtonBackgroundDisabled" ResourceKey="HibikiDisabledButtonBackgroundBrush" />
+            <StaticResource x:Key="ButtonForegroundDisabled" ResourceKey="HibikiDisabledButtonForegroundBrush" />
+            <StaticResource x:Key="ButtonBorderBrushDisabled" ResourceKey="HibikiDisabledButtonBorderBrush" />
+            <StaticResource x:Key="AccentButtonBackgroundDisabled" ResourceKey="HibikiDisabledButtonBackgroundBrush" />
+            <StaticResource x:Key="AccentButtonForegroundDisabled" ResourceKey="HibikiDisabledButtonForegroundBrush" />
+            <StaticResource x:Key="AccentButtonBorderBrushDisabled" ResourceKey="HibikiDisabledButtonBorderBrush" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
             <SolidColorBrush x:Key="HibikiStatusPillBrush">#3D4C62</SolidColorBrush>
             <SolidColorBrush x:Key="HibikiStatusPillCompactBrush">#344256</SolidColorBrush>
+            <!-- Use a lifted neutral surface in dark mode so disabled labels
+                 remain legible without competing with the accent actions. -->
+            <SolidColorBrush x:Key="HibikiDisabledButtonBackgroundBrush">#46546A</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiDisabledButtonForegroundBrush">#DCE5F0</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiDisabledButtonBorderBrush">#6C7B91</SolidColorBrush>
+            <StaticResource x:Key="ButtonBackgroundDisabled" ResourceKey="HibikiDisabledButtonBackgroundBrush" />
+            <StaticResource x:Key="ButtonForegroundDisabled" ResourceKey="HibikiDisabledButtonForegroundBrush" />
+            <StaticResource x:Key="ButtonBorderBrushDisabled" ResourceKey="HibikiDisabledButtonBorderBrush" />
+            <StaticResource x:Key="AccentButtonBackgroundDisabled" ResourceKey="HibikiDisabledButtonBackgroundBrush" />
+            <StaticResource x:Key="AccentButtonForegroundDisabled" ResourceKey="HibikiDisabledButtonForegroundBrush" />
+            <StaticResource x:Key="AccentButtonBorderBrushDisabled" ResourceKey="HibikiDisabledButtonBorderBrush" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
