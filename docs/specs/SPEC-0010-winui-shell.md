@@ -30,6 +30,8 @@ process loopback、瀏覽器單分頁與 direct bypass 的路由健康卡片、A
 「Expert Panel」（Ctrl+6）與「校正精靈」（Ctrl+7）；正式 shell 不提供 VST3 時間軸編輯面。
 這些頁面是同一 shell 內的面板切換，不新增 IPC 命令，也不改變 Easy/Expert 的
 顯示邊界：Expert Panel 頁面只收納既有 Expert 唯讀摘要與本機編輯面。
+「自訂預設」表單在標準視窗寬度（約 640 effective px 以上）以雙欄顯示 Scene ID 與名稱，
+窄視窗退回單欄堆疊；說明、loudness toggle 與欄位驗證在任何寬度都必須完整可用。
 正式 shell 不再暴露 VST3 時間軸編輯卡片；VST3 host 能力仍由 SPEC-0008 的 bounded
 model seams 管理，不得由 shell 宣稱已同步到 worker、plugin 或持久儲存。
 
