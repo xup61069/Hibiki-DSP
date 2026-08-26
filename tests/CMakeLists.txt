@@ -157,6 +157,19 @@ endif()
 
 add_test(NAME hibiki_output_fanout_tests COMMAND hibiki_output_fanout_tests)
 
+add_executable(hibiki_device_recovery_tests
+  unit/device_recovery_tests.cpp
+)
+
+target_link_libraries(hibiki_device_recovery_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_device_recovery_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_device_recovery_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_device_recovery_tests COMMAND hibiki_device_recovery_tests)
 add_executable(hibiki_ir_convolver_tests
   unit/ir_convolver_tests.cpp
 )
