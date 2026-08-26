@@ -83,6 +83,7 @@ internal sealed class PreviewForm : Form
     private bool _statusRefreshActive;
     private bool _restoredPersistedState;
     private bool _windowBoundsRestored;
+    private ComboBox _outputGroups = null!;
     internal PreviewForm(EasyControlViewModel viewModel)
     {
         _viewModel = viewModel;
@@ -96,6 +97,7 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(new Label { Text = "離線預覽模式：先啟動 user-space Engine Preview，才能測試場景或音量命令。", AutoSize = true, ForeColor = Color.DimGray });
         panel.Controls.Add(new Label { Text = "輸出群組", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
         var groups = new ComboBox { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取輸出群組", DataSource = _viewModel.OutputGroups.ToList(), DisplayMember = "Name", ValueMember = "Id" };
+        _outputGroups = groups;
         groups.SelectedIndexChanged += (_, _) => { if (groups.SelectedValue is string id) _viewModel.SelectedOutputGroup = id; };
         panel.Controls.Add(groups);
         panel.Controls.Add(_devices);
@@ -505,6 +507,12 @@ internal sealed class PreviewForm : Form
         {
             _ = ApplyRestoredSceneAsync(sceneId);
         }
+        if (state.SelectedOutputGroupId is string groupId &&
+            _viewModel.OutputGroups.Any(group => group.Id == groupId))
+        {
+            _viewModel.SelectedOutputGroup = groupId;
+            _outputGroups.SelectedValue = groupId;
+        }
     }
 
     private async Task ApplyRestoredSceneAsync(string sceneId)
@@ -523,6 +531,7 @@ internal sealed class PreviewForm : Form
     private void PersistUiState() =>
         PreviewUiState.Save(_viewModel.SelectedPhysicalDeviceId,
             _scenes.SelectedValue as string ?? _viewModel.SelectedScene?.Id,
+            _viewModel.SelectedOutputGroup,
             WindowState == FormWindowState.Normal ? Bounds : null);
 
     private void RefreshView()
