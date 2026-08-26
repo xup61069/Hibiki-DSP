@@ -44,6 +44,37 @@ extern "C" NTSTATUS HibikiPropertyContextInitializeEndpointV1(
     _In_ ULONG endpoint_index,
     _In_ ULONG actuator);
 
+static bool HibikiWaveRtFormatMatchesEndpointV1(
+    _In_ PKSDATAFORMAT                         DataFormat,
+    _In_ const hibiki_endpoint_topology_v1*    Topology) {
+    if (DataFormat == nullptr || Topology == nullptr ||
+        DataFormat->FormatSize < sizeof(KSDATAFORMAT_WAVEFORMATEXTENSIBLE)) {
+        return false;
+    }
+
+    if (!IsEqualGUIDAligned(DataFormat->MajorFormat, KSDATAFORMAT_TYPE_AUDIO) ||
+        !IsEqualGUIDAligned(DataFormat->SubFormat, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT) ||
+        !IsEqualGUIDAligned(DataFormat->Specifier, KSDATAFORMAT_SPECIFIER_WAVEFORMATEX)) {
+        return false;
+    }
+
+    const auto* format = reinterpret_cast<const KSDATAFORMAT_WAVEFORMATEXTENSIBLE*>(DataFormat);
+    const ULONG bytes_per_frame = Topology->channel_count * sizeof(float);
+    const ULONG expected_avg_bytes = Topology->sample_rate * bytes_per_frame;
+    const ULONG required_cb_size = sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX);
+
+    return format->WaveFormatExt.Format.wFormatTag == WAVE_FORMAT_EXTENSIBLE &&
+        format->WaveFormatExt.Format.nChannels == Topology->channel_count &&
+        format->WaveFormatExt.Format.nSamplesPerSec == Topology->sample_rate &&
+        format->WaveFormatExt.Format.wBitsPerSample == 32U &&
+        format->WaveFormatExt.Format.nBlockAlign == bytes_per_frame &&
+        format->WaveFormatExt.Format.nAvgBytesPerSec == expected_avg_bytes &&
+        format->WaveFormatExt.Format.cbSize >= required_cb_size &&
+        format->WaveFormatExt.Samples.wValidBitsPerSample == 32U &&
+        format->WaveFormatExt.dwChannelMask == Topology->channel_mask &&
+        IsEqualGUIDAligned(format->WaveFormatExt.SubFormat, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT);
+}
+
 //=============================================================================
 // HibikiMiniportWaveRtStreamV1 Implementation
 //=============================================================================
@@ -127,18 +158,12 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::Init(
     // Verify direction matching
     const ULONG expected_direction = Capture ? HIBIKI_ENDPOINT_DIRECTION_CAPTURE_V1
                                              : HIBIKI_ENDPOINT_DIRECTION_RENDER_V1;
-    if (topology.direction != expected_direction) {
+    const ULONG expected_pin = Capture ? 1U : 0U;
+    if (topology.direction != expected_direction || Pin != expected_pin) {
         return STATUS_INVALID_PARAMETER;
     }
 
-    // Verify format is extensible float matching topology
-    if (DataFormat->FormatSize < sizeof(KSDATAFORMAT_WAVEFORMATEXTENSIBLE)) {
-        return STATUS_INVALID_PARAMETER;
-    }
-    auto* waveFormatExt = reinterpret_cast<const KSDATAFORMAT_WAVEFORMATEXTENSIBLE*>(DataFormat);
-    if (!IsEqualGUIDAligned(waveFormatExt->WaveFormatExt.SubFormat, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT) ||
-        waveFormatExt->WaveFormatExt.Format.nSamplesPerSec != topology.sample_rate ||
-        waveFormatExt->WaveFormatExt.Format.nChannels != topology.channel_count) {
+    if (!HibikiWaveRtFormatMatchesEndpointV1(DataFormat, &topology)) {
         return STATUS_INVALID_PARAMETER;
     }
 
@@ -318,12 +343,9 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::SetFormat(
         DataFormat->FormatSize < sizeof(KSDATAFORMAT_WAVEFORMATEXTENSIBLE)) {
         return STATUS_INVALID_PARAMETER;
     }
-    auto* waveFormatExt = reinterpret_cast<const KSDATAFORMAT_WAVEFORMATEXTENSIBLE*>(DataFormat);
     hibiki_endpoint_topology_v1 topology{};
     if (hibiki_endpoint_topology_get_v1(m_EndpointIndex, &topology) == 0 ||
-        !IsEqualGUIDAligned(waveFormatExt->WaveFormatExt.SubFormat, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT) ||
-        waveFormatExt->WaveFormatExt.Format.nSamplesPerSec != topology.sample_rate ||
-        waveFormatExt->WaveFormatExt.Format.nChannels != topology.channel_count) {
+        !HibikiWaveRtFormatMatchesEndpointV1(DataFormat, &topology)) {
         return STATUS_INVALID_PARAMETER;
     }
     return STATUS_SUCCESS;
