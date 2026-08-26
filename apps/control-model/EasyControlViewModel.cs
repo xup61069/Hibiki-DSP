@@ -2048,6 +2048,79 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     public bool SaveRouteRules(out string error) =>
         _session.RouteRules.TrySave(RouteRuleCatalogPath, out error);
 
+    public string RouteRuleExportDocument()
+    {
+        var document = new SessionRouteRuleCatalogV1();
+        foreach (var rule in _session.RouteRules.Rules) document.Upsert(rule);
+        return document.ToJsonForImportExport();
+    }
+
+    public bool ExportRouteRules(string jsonFilePath)
+    {
+        if (string.IsNullOrWhiteSpace(jsonFilePath))
+        {
+            StatusText = "請先選擇路由預設匯出路徑";
+            return false;
+        }
+        try
+        {
+            File.WriteAllText(jsonFilePath, RouteRuleExportDocument());
+            StatusText = $"已匯出路由預設到檔案；可在其他機器匯入";
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            StatusText = $"路由預設匯出失敗：{ex.Message}";
+            return false;
+        }
+    }
+
+    public bool ImportRouteRules(string jsonFilePath)
+    {
+        if (string.IsNullOrWhiteSpace(jsonFilePath))
+        {
+            StatusText = "請先選擇要匯入的路由預設檔";
+            return false;
+        }
+        var imported = new SessionRouteRuleCatalogV1();
+        if (!imported.TryLoad(jsonFilePath, out var loadError))
+        {
+            StatusText = $"路由預設匯入失敗：{loadError}";
+            return false;
+        }
+        var previous = _session.RouteRules.Rules.ToDictionary(item => item.RuleId);
+        var added = new List<string>();
+        foreach (var rule in imported.Rules)
+        {
+            if (!_session.RouteRules.Upsert(rule)) continue;
+            added.Add(rule.RuleId);
+            previous.Remove(rule.RuleId);
+        }
+        if (added.Count == 0)
+        {
+            StatusText = "沒有可匯入的路由預設（全部無效、重複或超出上限）";
+            return false;
+        }
+        if (!SaveRouteRules(out var saveError))
+        {
+            foreach (var ruleId in added) _session.RouteRules.Remove(ruleId);
+            foreach (var pair in previous)
+            {
+                if (!_session.RouteRules.Rules.Any(item => item.RuleId == pair.Key))
+                    _session.RouteRules.Upsert(pair.Value);
+            }
+            OnPropertyChanged(nameof(RouteRules));
+            StatusText = $"路由預設已匯入但未保存：{saveError}";
+            return false;
+        }
+        OnPropertyChanged(nameof(RouteRules));
+        LastCommand = null;
+        OnPropertyChanged(nameof(LastCommand));
+        if (SelectedSession is not null) ApplySelectedRouteRulePreview();
+        StatusText = $"已從檔案匯入 {added.Count} 筆路由預設；等待引擎確認套用";
+        return true;
+    }
+
     public async Task<bool> RemoveCustomSceneAsync(
         string sceneId, CancellationToken cancellationToken = default)
     {

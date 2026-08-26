@@ -2,6 +2,7 @@
 
 using System.ComponentModel;
 using System.Globalization;
+using System.Windows.Forms;
 using Hibiki.ControlModel;
 
 namespace Hibiki.DesktopPreview;
@@ -52,6 +53,8 @@ internal sealed class PreviewForm : Form
     private readonly Button _applyRouteRule = new() { Text = "新增／更新預設", AutoSize = true, AccessibleName = "新增或更新 App 路由預設" };
     private readonly Button _removeRouteRule = new() { Text = "移除選取預設", AutoSize = true, AccessibleName = "移除選取的 App 路由預設" };
     private readonly Button _clearRouteRules = new() { Text = "清除全部預設", AutoSize = true, AccessibleName = "清除全部 App 路由預設" };
+    private readonly Button _exportRouteRules = new() { Text = "匯出預設", AutoSize = true, AccessibleName = "匯出 App 路由預設到檔案" };
+    private readonly Button _importRouteRules = new() { Text = "匯入預設", AutoSize = true, AccessibleName = "從檔案匯入 App 路由預設" };
     private readonly Label _effective = new() { AutoSize = true };
     private readonly Label _listeningDose = new() { AutoSize = true, AccessibleName = "聆聽劑量（今日）" };
     private readonly ComboBox _scenes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取情境設定檔" };
@@ -410,6 +413,8 @@ internal sealed class PreviewForm : Form
             SyncRouteRuleList();
             RefreshView();
         };
+        _exportRouteRules.Click += (_, _) => ExportRouteRules();
+        _importRouteRules.Click += (_, _) => ImportRouteRules();
         var routeRuleActions = new FlowLayoutPanel
         {
             AutoSize = true,
@@ -419,6 +424,8 @@ internal sealed class PreviewForm : Form
         routeRuleActions.Controls.Add(_applyRouteRule);
         routeRuleActions.Controls.Add(_removeRouteRule);
         routeRuleActions.Controls.Add(_clearRouteRules);
+        routeRuleActions.Controls.Add(_exportRouteRules);
+        routeRuleActions.Controls.Add(_importRouteRules);
         panel.Controls.Add(routeRuleActions);
         _routeRuleList.SelectedIndexChanged += (_, _) =>
         {
@@ -767,6 +774,32 @@ internal sealed class PreviewForm : Form
         };
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
         if (_viewModel.ImportCustomScenes(dialog.FileName)) SyncSceneList();
+        RefreshView();
+    }
+
+    private void ExportRouteRules()
+    {
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "路由預設 JSON (*.json)|*.json",
+            DefaultExt = "json",
+            Title = "匯出 App 路由預設"
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        _viewModel.ExportRouteRules(dialog.FileName);
+        RefreshView();
+    }
+
+    private void ImportRouteRules()
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Filter = "路由預設 JSON (*.json)|*.json",
+            DefaultExt = "json",
+            Title = "匯入 App 路由預設"
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        if (_viewModel.ImportRouteRules(dialog.FileName)) SyncRouteRuleList();
         RefreshView();
     }
 
