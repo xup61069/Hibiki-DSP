@@ -3,15 +3,84 @@
 #include "hibiki/noise_suppressor.hpp"
 
 #include <array>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
+#include <limits>
+#include <vector>
 
-#define CHECK(expr)                                                             \
-    do {                                                                        \
-        if (!(expr)) {                                                          \
-            std::fputs("FAILED: " #expr "\n", stderr);                          \
-            return 1;                                                           \
-        }                                                                       \
+#define CHECK(expr) \
+    do { \
+        if (!(expr)) { \
+            std::fputs("FAILED: " #expr "\n", stderr); \
+            return 1; \
+        } \
     } while (false)
+
+namespace {
+
+constexpr std::uint32_t kSampleRate = 48000U;
+constexpr std::uint32_t kChannels = 1U;
+
+hibiki::BasicNoiseSuppressorPolicyV1 make_gate_policy() {
+    hibiki::BasicNoiseSuppressorPolicyV1 policy{};
+    policy.enabled = true;
+    policy.threshold_dbfs = -40.0;   // linear 0.01; reopen level ~0.012589
+    policy.floor_db = -30.0;         // linear ~0.031623
+    policy.attack_ms = 2.0;
+    policy.release_ms = 20.0;
+    policy.highpass_hz = 0.0;        // bypass filter: output == input * gain
+    return policy;
+}
+
+bool run_constant(hibiki::BasicNoiseSuppressorV1& suppressor,
+                  std::vector<float>& block,
+                  const float value,
+                  const std::size_t frames) noexcept {
+    block.assign(frames, value);
+    return suppressor.process_interleaved(block.data(), frames);
+}
+
+bool all_finite(const std::vector<float>& block) noexcept {
+    for (const auto sample : block) {
+        if (!std::isfinite(sample)) return false;
+    }
+    return true;
+}
+
+// After reset() the very next frame must be bit-for-bit identical to what a
+// freshly configured instance produces from the same input. Any residual
+// envelope, gain, gate, high-pass or previous-input state would change the
+// first-frame result, so this catches incomplete state restoration exactly.
+bool reset_restores_initial_response(const double highpass_hz) noexcept {
+    auto policy = make_gate_policy();
+    policy.highpass_hz = highpass_hz;
+
+    // Drive the reused instance into a loud, open-gate steady state so every
+    // piece of per-channel state differs from the initial one before reset.
+    std::vector<float> warm(5000U, 0.5F);
+
+    hibiki::BasicNoiseSuppressorV1 fresh;
+    if (!fresh.configure(policy, kSampleRate, kChannels)) return false;
+    hibiki::BasicNoiseSuppressorV1 warmed;
+    if (!warmed.configure(policy, kSampleRate, kChannels)) return false;
+    if (!warmed.process_interleaved(warm.data(), warm.size())) return false;
+    warmed.reset();
+
+    // process_interleaved writes output in-place over the input, so each
+    // instance needs its own probe buffer holding the same input sample.
+    std::vector<float> probe_fresh{0.5F};
+    std::vector<float> probe_warm{0.5F};
+    if (!fresh.process_interleaved(probe_fresh.data(), probe_fresh.size()))
+        return false;
+    if (!warmed.process_interleaved(probe_warm.data(), probe_warm.size()))
+        return false;
+
+    return probe_fresh[0] == probe_warm[0];
+}
+
+}  // namespace
 
 int main() {
     // A disabled policy is not a valid configuration: configure() must reject
@@ -35,6 +104,89 @@ int main() {
     hibiki::BasicNoiseSuppressorV1 active;
     CHECK(active.configure(enabled, 48000U, 2U));
     CHECK(active.process_interleaved(block.data(), block.size()));
+
+    // Configured instances still reject null buffers and empty blocks.
+    CHECK(!active.process_interleaved(nullptr, 100U));
+    CHECK(!active.process_interleaved(block.data(), 0U));
+
+    // ---- policy boundaries -------------------------------------------------
+    auto boundary = make_gate_policy();
+    boundary.threshold_dbfs = 0.0;
+    CHECK(!hibiki::validate_noise_suppressor_policy(boundary));
+    hibiki::BasicNoiseSuppressorV1 reject_zero_threshold;
+    CHECK(!reject_zero_threshold.configure(boundary, kSampleRate, kChannels));
+
+    boundary = make_gate_policy();
+    boundary.floor_db = -96.0;
+    CHECK(hibiki::validate_noise_suppressor_policy(boundary));
+    hibiki::BasicNoiseSuppressorV1 accept_floor_limit;
+    CHECK(accept_floor_limit.configure(boundary, kSampleRate, kChannels));
+
+    boundary = make_gate_policy();
+    boundary.highpass_hz = 2000.5;
+    CHECK(!hibiki::validate_noise_suppressor_policy(boundary));
+
+    boundary = make_gate_policy();
+    boundary.highpass_hz = 2000.0;
+    CHECK(hibiki::validate_noise_suppressor_policy(boundary));
+    // 2000 Hz is the validation ceiling. At the minimum supported rate the
+    // configure-time Nyquist guard (highpass >= rate / 2) stays defense-in-
+    // depth only: 8000 / 2 = 4000 Hz exceeds every value validate accepts,
+    // so this legal edge must configure successfully.
+    hibiki::BasicNoiseSuppressorV1 accept_highpass_ceiling;
+    CHECK(accept_highpass_ceiling.configure(boundary, 8000U, kChannels));
+
+    // ---- gate closes: quiet input converges toward the floor ---------------
+    // threshold linear is 0.01; 0.001 sits far below it. After the gain has
+    // settled the output approaches input * floor_linear ~= 3.16e-5.
+    hibiki::BasicNoiseSuppressorV1 quieter;
+    std::vector<float> samples;
+    CHECK(quieter.configure(make_gate_policy(), kSampleRate, kChannels));
+    CHECK(run_constant(quieter, samples, 0.001F, 20000U));
+    CHECK(all_finite(samples));
+    CHECK(samples.back() < 5.0e-5F);
+
+    // ---- gate opens: sustained loud input converges toward unity -----------
+    hibiki::BasicNoiseSuppressorV1 louder;
+    CHECK(louder.configure(make_gate_policy(), kSampleRate, kChannels));
+    CHECK(run_constant(louder, samples, 0.5F, 5000U));
+    CHECK(all_finite(samples));
+    CHECK(samples.back() > 0.495F);
+
+    // ---- upper-only hysteresis: hold band keeps an open gate open ----------
+    // Drop from 0.5 into the 0.01..0.012589 hold band. The envelope decays
+    // toward 0.011, which stays above the close threshold forever, so the
+    // gate must remain open and the output must stay near unity gain.
+    CHECK(run_constant(louder, samples, 0.011F, 8000U));
+    CHECK(all_finite(samples));
+    CHECK(samples.back() > 0.01045F);
+
+    // ---- hysteresis: a closed gate must not self-open inside the band ------
+    // A fresh instance fed only the hold-band amplitude never crosses the
+    // reopen level, so it must converge to the floor-attenuated output.
+    hibiki::BasicNoiseSuppressorV1 hold_band_closed;
+    CHECK(hold_band_closed.configure(make_gate_policy(), kSampleRate, kChannels));
+    CHECK(run_constant(hold_band_closed, samples, 0.011F, 20000U));
+    CHECK(all_finite(samples));
+    CHECK(samples.back() < 5.5e-4F);
+
+    // ---- reset restores the exact initial response -------------------------
+    CHECK(reset_restores_initial_response(0.0));
+    CHECK(reset_restores_initial_response(80.0));
+
+    // ---- non-finite samples are neutralized without poisoning state --------
+    hibiki::BasicNoiseSuppressorV1 sanitizer;
+    CHECK(sanitizer.configure(make_gate_policy(), kSampleRate, kChannels));
+    samples = {std::numeric_limits<float>::quiet_NaN(),
+               std::numeric_limits<float>::infinity(),
+               -std::numeric_limits<float>::infinity(),
+               0.25F,
+               -0.25F};
+    CHECK(sanitizer.process_interleaved(samples.data(), samples.size()));
+    CHECK(all_finite(samples));
+    CHECK(run_constant(sanitizer, samples, 0.5F, 200U));
+    CHECK(all_finite(samples));
+    CHECK(samples.back() > 0.4F);
 
     return 0;
 }
