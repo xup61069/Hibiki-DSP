@@ -277,7 +277,9 @@ internal sealed class PreviewForm : Form
             _irStrengthReadout.Text = $"{_irStrength.Value} %";
             RefreshView();
         };
+        panel.Controls.Add(CreateFieldLabel("相位模式"));
         panel.Controls.Add(_irModes);
+        panel.Controls.Add(CreateFieldLabel("IR 強度"));
         panel.Controls.Add(_irStrength);
         panel.Controls.Add(_irStrengthReadout);
 
@@ -309,6 +311,7 @@ internal sealed class PreviewForm : Form
             if (_viewModel.IsConnected) await _viewModel.QueueVolumeAsync();
             RefreshView();
         };
+        panel.Controls.Add(CreateFieldLabel("主音量"));
         panel.Controls.Add(_volume);
         panel.Controls.Add(_volumeReadout);
         panel.Controls.Add(_muted);
@@ -321,6 +324,7 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(CreateSectionHeader("Expert App／工作階段（需以 -EnableSessionRouting 啟動）"));
         panel.Controls.Add(_sessions);
         _sessionFilter.TextChanged += (_, _) => SyncSessionList();
+        panel.Controls.Add(CreateFieldLabel("篩選工作階段"));
         panel.Controls.Add(_sessionFilter);
         _sessionSelector.SelectedIndexChanged += (_, _) =>
         {
@@ -329,6 +333,7 @@ internal sealed class PreviewForm : Form
             SyncSessionControls();
             RefreshView();
         };
+        panel.Controls.Add(CreateFieldLabel("工作階段"));
         panel.Controls.Add(_sessionSelector);
         _sessionVolume.ValueChanged += async (_, _) =>
         {
@@ -337,6 +342,7 @@ internal sealed class PreviewForm : Form
             _sessionVolumeReadout.Text = $"{_sessionVolume.Value} dB";
             RefreshView();
         };
+        panel.Controls.Add(CreateFieldLabel("App 音量"));
         panel.Controls.Add(_sessionVolume);
         panel.Controls.Add(_sessionVolumeReadout);
         _applySessionVolume.Click += async (_, _) =>
@@ -379,6 +385,7 @@ internal sealed class PreviewForm : Form
             Height = 42
         });
         SyncRouteRuleList();
+        panel.Controls.Add(CreateFieldLabel("已建立的 App 路由預設"));
         panel.Controls.Add(_routeRuleList);
         panel.Controls.Add(_routeRuleEmptyState);
         _routeRuleId.TextChanged += (_, _) => _viewModel.RouteRuleId = _routeRuleId.Text;
@@ -431,6 +438,7 @@ internal sealed class PreviewForm : Form
         };
         routeRuleNumericFields.Controls.Add(_routeRulePriority);
         routeRuleNumericFields.Controls.Add(_routeRuleMakeupGain);
+        panel.Controls.Add(CreateFieldLabel("優先級／補償增益（dB）"));
         panel.Controls.Add(routeRuleNumericFields);
         var routeRuleOptionFields = new FlowLayoutPanel
         {
@@ -582,6 +590,16 @@ internal sealed class PreviewForm : Form
         ForeColor = Accent,
         Margin = new Padding(0, 16, 0, 4),
         Tag = "section-header",
+    };
+
+    private static Label CreateFieldLabel(string text) => new()
+    {
+        Text = text,
+        AutoSize = true,
+        Font = new Font("Segoe UI", 9, FontStyle.Bold),
+        ForeColor = TextSecondary,
+        Margin = new Padding(0, 8, 8, 0),
+        Tag = "field-label",
     };
 
     private void ApplyModernStyles(Control root)
