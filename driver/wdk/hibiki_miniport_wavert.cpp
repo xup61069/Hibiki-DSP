@@ -279,14 +279,19 @@ VOID HibikiMiniportWaveRtStreamV1::FreeAudioBufferWithNotification(
 
 NTSTATUS HibikiMiniportWaveRtStreamV1::GetClockRegister(
     _Out_ KSRTAUDIO_HWREGISTER*   Register) {
-    UNREFERENCED_PARAMETER(Register);
-    return STATUS_NOT_IMPLEMENTED;
+    if (Register == nullptr) return STATUS_INVALID_PARAMETER;
+    RtlZeroMemory(Register, sizeof(*Register));
+    // This software-backed endpoint has no hardware clock register to map.
+    return STATUS_NOT_SUPPORTED;
 }
 
 NTSTATUS HibikiMiniportWaveRtStreamV1::GetPositionRegister(
     _Out_ KSRTAUDIO_HWREGISTER*   Register) {
-    UNREFERENCED_PARAMETER(Register);
-    return STATUS_NOT_IMPLEMENTED;
+    if (Register == nullptr) return STATUS_INVALID_PARAMETER;
+    RtlZeroMemory(Register, sizeof(*Register));
+    // Keep clients on the GetPosition/KSPROPERTY_AUDIO_POSITION path when
+    // this software-backed endpoint has no position register.
+    return STATUS_NOT_SUPPORTED;
 }
 
 VOID HibikiMiniportWaveRtStreamV1::GetHWLatency(
