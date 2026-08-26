@@ -483,6 +483,25 @@ if(WIN32)
 endif()
 
 
+add_executable(hibiki_driver_volume_link_tests
+  unit/driver_volume_link_tests.cpp
+)
+
+target_link_libraries(hibiki_driver_volume_link_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_driver_volume_link_tests PRIVATE /W4 /permissive- /EHsc)
+  # DriverVolumeLinkV1 tests construct AudioEngineModel instances whose
+  # fixed-capacity IR/loudness attachments exceed the default Windows stack;
+  # match the contract_tests harness reservation.
+  target_link_options(hibiki_driver_volume_link_tests PRIVATE /STACK:16777216)
+else()
+  target_compile_options(hibiki_driver_volume_link_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_driver_volume_link_tests COMMAND hibiki_driver_volume_link_tests)
+
+
 if(HIBIKI_BUILD_LIVE_PROBES AND WIN32)
   add_executable(hibiki_live_device_catalog_probe
     live_device_catalog_probe.cpp
