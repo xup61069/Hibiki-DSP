@@ -625,45 +625,42 @@ internal sealed class PreviewForm : Form
             }
             else if (control is TextBox textBox)
             {
-                textBox.BackColor = CardBackground;
-                textBox.ForeColor = TextPrimary;
                 textBox.BorderStyle = BorderStyle.FixedSingle;
                 textBox.AutoSize = false;
                 textBox.Height = Math.Max(36, textBox.Height);
                 textBox.Margin = new Padding(0, 4, 8, 4);
+                StyleModernInput(textBox, CardBackground);
             }
             else if (control is ComboBox comboBox)
             {
-                comboBox.BackColor = CardBackground;
-                comboBox.ForeColor = TextPrimary;
                 comboBox.FlatStyle = FlatStyle.Standard;
                 comboBox.Height = Math.Max(36, comboBox.Height);
                 comboBox.Margin = new Padding(0, 4, 8, 4);
+                StyleModernInput(comboBox, CardBackground);
             }
             else if (control is NumericUpDown numericUpDown)
             {
-                numericUpDown.BackColor = CardBackground;
-                numericUpDown.ForeColor = TextPrimary;
                 numericUpDown.BorderStyle = BorderStyle.FixedSingle;
                 numericUpDown.Height = Math.Max(36, numericUpDown.Height);
                 numericUpDown.Margin = new Padding(0, 4, 8, 4);
+                StyleModernInput(numericUpDown, CardBackground);
             }
             else if (control is ListBox listBox)
             {
-                listBox.BackColor = CardBackground;
-                listBox.ForeColor = TextPrimary;
                 listBox.BorderStyle = BorderStyle.FixedSingle;
                 listBox.Margin = new Padding(0, 4, 8, 4);
+                StyleModernInput(listBox, CardBackground);
             }
             else if (control is CheckBox checkBox)
             {
-                checkBox.ForeColor = TextPrimary;
                 checkBox.Margin = new Padding(0, 7, 12, 7);
+                checkBox.EnabledChanged += (_, _) => UpdateModernInputColors(checkBox, CardBackground);
+                UpdateModernInputColors(checkBox, CardBackground);
             }
             else if (control is TrackBar trackBar)
             {
-                trackBar.BackColor = GroupBackground;
                 trackBar.Margin = new Padding(0, 6, 8, 6);
+                StyleModernInput(trackBar, GroupBackground);
             }
             else if (control is Label label && label.Tag is not string)
             {
@@ -693,6 +690,18 @@ internal sealed class PreviewForm : Form
             label.Padding = new Padding(10, 7, 10, 7);
             label.Margin = new Padding(0, 4, 8, 4);
         }
+    }
+
+    private static void StyleModernInput(Control control, Color enabledBackground)
+    {
+        control.EnabledChanged += (_, _) => UpdateModernInputColors(control, enabledBackground);
+        UpdateModernInputColors(control, enabledBackground);
+    }
+
+    private static void UpdateModernInputColors(Control control, Color enabledBackground)
+    {
+        control.BackColor = control.Enabled ? enabledBackground : DisabledBackground;
+        control.ForeColor = control.Enabled ? TextPrimary : DisabledText;
     }
 
     private void StyleModernButton(Button button)
@@ -903,6 +912,7 @@ internal sealed class PreviewForm : Form
         _sessionSelector.Enabled = _viewModel.IsConnected && _sessionSelector.Items.Count > 0;
         _sessionVolume.Enabled = _viewModel.IsConnected && hasSession && _viewModel.SelectedSession?.VolumeAvailable == true;
         _applySessionVolume.Enabled = _sessionVolume.Enabled;
+        _sessionMuted.Enabled = _sessionVolume.Enabled;
         _sessionLane.Enabled = _viewModel.IsConnected && hasSession;
         _sessionOutput.Enabled = _viewModel.IsConnected && hasSession;
         _applySessionRoute.Enabled = _viewModel.IsConnected && hasSession;
@@ -910,6 +920,7 @@ internal sealed class PreviewForm : Form
         _clearRouteRules.Enabled = _viewModel.RouteRules.Count > 0;
         _loadIr.Enabled = _viewModel.IsConnected && _viewModel.IrPhaseMode != IrPhaseMode.Bypass;
         _irStrength.Enabled = _viewModel.IrPhaseMode is IrPhaseMode.MixedPhase or IrPhaseMode.LinearPhase;
+        _muted.Enabled = _viewModel.IsConnected;
         _effective.Text = $"實際有效音量：{_viewModel.EffectiveVolumeDb:0.0} dB；{_viewModel.VolumeOriginText}；{_viewModel.VolumeActuatorText}";
         var pauseHint = _viewModel.ListeningDose.PauseHintText;
         _listeningDose.Text = $"{_viewModel.ListeningDose.StateText}｜剩餘安全時間：{_viewModel.ListeningDose.RemainingSafeTimeText}" + (string.IsNullOrEmpty(pauseHint) ? "" : $"｜{pauseHint}");
