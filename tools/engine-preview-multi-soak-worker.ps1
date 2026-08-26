@@ -14,9 +14,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $argumentList = @(
-  '--render-offline', $RenderPath,
+  '--render-offline', ('"{0}"' -f $RenderPath),
   '--enable-wav-source',
-  '--wav-source-path', $SourcePath
+  '--wav-source-path', ('"{0}"' -f $SourcePath)
 )
 # capture paths are supplied by the caller
 $process = Start-Process -FilePath $EnginePath -ArgumentList $argumentList `

@@ -32,65 +32,73 @@ bool is_float32(const WAVEFORMATEX& format) noexcept {
     return IsEqualGUID(extensible.SubFormat, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT) != FALSE;
 }
 
-HRESULT render_tone(IMMDevice* const device,
-                    const std::uint32_t expected_rate,
-                    const std::uint32_t expected_channels) {
+struct RenderContext {
+    IAudioClient* client{nullptr};
+    IAudioRenderClient* render{nullptr};
+    UINT32 buffer_frames{0U};
+    double phase{0.0};
+    double phase_step{0.0};
+    std::uint32_t channels{2U};
+};
+
+HRESULT start_render(IMMDevice* const device, RenderContext& ctx,
+                     const std::uint32_t expected_rate,
+                     const std::uint32_t expected_channels) {
     if (device == nullptr) return E_INVALIDARG;
-    IAudioClient* client = nullptr;
-    IAudioRenderClient* render = nullptr;
     WAVEFORMATEX* format = nullptr;
     HRESULT result = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
-                                      reinterpret_cast<void**>(&client));
-    if (SUCCEEDED(result)) result = client->GetMixFormat(&format);
+                                      reinterpret_cast<void**>(&ctx.client));
+    if (SUCCEEDED(result)) result = ctx.client->GetMixFormat(&format);
     if (SUCCEEDED(result) &&
         (format == nullptr || !is_float32(*format) || format->nSamplesPerSec != expected_rate ||
          format->nChannels != expected_channels)) {
         result = AUDCLNT_E_UNSUPPORTED_FORMAT;
     }
     if (SUCCEEDED(result)) {
-        result = client->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
-                                    200000, 0, format, nullptr);
+        result = ctx.client->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
+                                        200000, 0, format, nullptr);
     }
-    UINT32 buffer_frames = 0U;
-    if (SUCCEEDED(result)) result = client->GetBufferSize(&buffer_frames);
+    if (SUCCEEDED(result)) result = ctx.client->GetBufferSize(&ctx.buffer_frames);
     if (SUCCEEDED(result)) {
-        result = client->GetService(__uuidof(IAudioRenderClient),
-                                    reinterpret_cast<void**>(&render));
+        result = ctx.client->GetService(__uuidof(IAudioRenderClient),
+                                        reinterpret_cast<void**>(&ctx.render));
     }
-    if (SUCCEEDED(result)) result = client->Start();
-    const double phase_step = 2.0 * 3.14159265358979323846 * 220.0 /
-                              static_cast<double>(expected_rate);
-    double phase = 0.0;
-    for (std::uint32_t iteration = 0U; SUCCEEDED(result) && iteration < 120U; ++iteration) {
-        UINT32 padding = 0U;
-        result = client->GetCurrentPadding(&padding);
-        if (FAILED(result)) break;
-        const UINT32 available = buffer_frames > padding ? buffer_frames - padding : 0U;
-        if (available == 0U) {
-            Sleep(5U);
-            continue;
-        }
-        BYTE* data = nullptr;
-        result = render->GetBuffer(available, &data);
-        if (SUCCEEDED(result) && data != nullptr) {
-            auto* samples = reinterpret_cast<float*>(data);
-            for (UINT32 frame = 0U; frame < available; ++frame) {
-                const float value = static_cast<float>(0.001 * std::sin(phase));
-                phase += phase_step;
-                if (phase > 2.0 * 3.14159265358979323846) phase -= 2.0 * 3.14159265358979323846;
-                for (UINT32 channel = 0U; channel < expected_channels; ++channel) {
-                    samples[static_cast<std::size_t>(frame) * expected_channels + channel] = value;
-                }
-            }
-            result = render->ReleaseBuffer(available, 0U);
-        }
-        Sleep(5U);
-    }
-    if (client != nullptr) (void)client->Stop();
-    if (render != nullptr) render->Release();
-    if (client != nullptr) client->Release();
+    if (SUCCEEDED(result)) result = ctx.client->Start();
+    ctx.phase_step = 2.0 * 3.14159265358979323846 * 220.0 /
+                     static_cast<double>(expected_rate);
+    ctx.channels = expected_channels;
     if (format != nullptr) CoTaskMemFree(format);
     return result;
+}
+
+HRESULT render_one_block(RenderContext& ctx) {
+    UINT32 padding = 0U;
+    HRESULT result = ctx.client->GetCurrentPadding(&padding);
+    if (FAILED(result)) return result;
+    const UINT32 available = ctx.buffer_frames > padding ? ctx.buffer_frames - padding : 0U;
+    if (available == 0U) return S_OK;
+    BYTE* data = nullptr;
+    result = ctx.render->GetBuffer(available, &data);
+    if (SUCCEEDED(result) && data != nullptr) {
+        auto* samples = reinterpret_cast<float*>(data);
+        for (UINT32 frame = 0U; frame < available; ++frame) {
+            const float value = static_cast<float>(0.5 * std::sin(ctx.phase));
+            ctx.phase += ctx.phase_step;
+            if (ctx.phase > 2.0 * 3.14159265358979323846)
+                ctx.phase -= 2.0 * 3.14159265358979323846;
+            for (UINT32 channel = 0U; channel < ctx.channels; ++channel) {
+                samples[static_cast<std::size_t>(frame) * ctx.channels + channel] = value;
+            }
+        }
+        result = ctx.render->ReleaseBuffer(available, 0U);
+    }
+    return result;
+}
+
+void stop_render(RenderContext& ctx) {
+    if (ctx.client != nullptr) (void)ctx.client->Stop();
+    if (ctx.render != nullptr) ctx.render->Release();
+    if (ctx.client != nullptr) ctx.client->Release();
 }
 
 }  // namespace
@@ -139,31 +147,48 @@ int main() {
         if (SUCCEEDED(init)) CoUninitialize();
         return 0;
     }
-    const HRESULT render_result = render_tone(device, sample_rate, channels);
+
+    // Interleaved: start render first, then alternate render/read so the
+    // loopback capture sees live audio rather than post-stop silence.
+    RenderContext render_ctx{};
+    const HRESULT start_render_result = start_render(device, render_ctx, sample_rate, channels);
+    HRESULT render_result = start_render_result;
+
     std::array<float, 8U * 4096U> samples{};
     std::uint64_t captured = 0U;
     bool finite = true;
     bool nonzero = false;
-    for (std::uint32_t attempt = 0U; attempt < 120U; ++attempt) {
+    for (std::uint32_t attempt = 0U; attempt < 240U; ++attempt) {
+        if (SUCCEEDED(render_result)) render_result = render_one_block(render_ctx);
         if (source.event_handle() != nullptr) (void)WaitForSingleObject(source.event_handle(), 5U);
         std::uint32_t frames = 0U;
-        if (!source.read(samples.data(), 4096U, frames)) continue;
-        captured += frames;
-        for (std::size_t index = 0U; index < static_cast<std::size_t>(frames) * channels; ++index) {
-            finite = finite && std::isfinite(samples[index]);
-            nonzero = nonzero || std::abs(samples[index]) > 1.0e-7F;
+        bool has_data = false;
+        while (source.read(samples.data(), 4096U, frames)) {
+            has_data = frames > 0U;
+            if (frames > 0U) {
+                captured += frames;
+                for (std::size_t index = 0U; index < static_cast<std::size_t>(frames) * channels; ++index) {
+                    finite = finite && std::isfinite(samples[index]);
+                    nonzero = nonzero || std::abs(samples[index]) > 1.0e-7F;
+                }
+            }
+            break;
         }
-        if (captured >= static_cast<std::uint64_t>(sample_rate / 20U) && nonzero) break;
+        if (!has_data) Sleep(3U);
+        if (nonzero && captured >= static_cast<std::uint64_t>(sample_rate / 20U)) break;
+        Sleep(3U);
     }
+    stop_render(render_ctx);
+
     const auto snapshot = source.snapshot();
     source.stop();
     if (device != nullptr) device->Release();
     if (enumerator != nullptr) enumerator->Release();
     if (SUCCEEDED(init)) CoUninitialize();
-    const bool pass = SUCCEEDED(render_result) && snapshot.state == hibiki::WindowsProcessLoopbackStateV1::Running &&
+    const bool pass = SUCCEEDED(start_render_result) && snapshot.state == hibiki::WindowsProcessLoopbackStateV1::Running &&
                       captured > 0U && finite && nonzero;
     std::printf("loopback=%s render=%s frames=%llu channels=%u rate=%u finite=%s nonzero=%s\n",
-                pass ? "pass" : "fail", SUCCEEDED(render_result) ? "pass" : "fail",
+                pass ? "pass" : "fail", SUCCEEDED(start_render_result) ? "pass" : "fail",
                 static_cast<unsigned long long>(captured), channels, sample_rate,
                 finite ? "pass" : "fail", nonzero ? "pass" : "fail");
     return pass ? 0 : 5;
