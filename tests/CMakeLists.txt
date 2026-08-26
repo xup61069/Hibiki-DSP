@@ -247,6 +247,20 @@ endif()
 
 add_test(NAME hibiki_ir_convolver_tests COMMAND hibiki_ir_convolver_tests)
 
+add_executable(hibiki_ir_phase_tests
+  unit/ir_phase_tests.cpp
+)
+
+target_link_libraries(hibiki_ir_phase_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_ir_phase_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_ir_phase_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_ir_phase_tests COMMAND hibiki_ir_phase_tests)
+
 
 
 if(HIBIKI_BUILD_LIVE_PROBES AND WIN32)
