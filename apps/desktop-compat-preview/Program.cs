@@ -144,6 +144,7 @@ internal sealed class PreviewForm : Form
     private ComboBox _outputGroups = null!;
     private FlowLayoutPanel _modernPanel = null!;
     private Panel _modernHeader = null!;
+    private FlowLayoutPanel _connectionControls = null!;
     internal PreviewForm(EasyControlViewModel viewModel)
     {
         _viewModel = viewModel;
@@ -170,8 +171,16 @@ internal sealed class PreviewForm : Form
         _modernHeader = header;
         panel.Controls.Add(header);
         panel.Controls.Add(CreateSectionHeader("引擎連線"));
-        panel.Controls.Add(_connect);
-        panel.Controls.Add(_connection);
+        var connectionControls = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+        };
+        _connectionControls = connectionControls;
+        connectionControls.Controls.Add(_connect);
+        connectionControls.Controls.Add(_connection);
+        panel.Controls.Add(connectionControls);
         panel.Controls.Add(CreateSectionHeader("輸出與裝置"));
         var groups = new ComboBox { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取輸出群組", DataSource = _viewModel.OutputGroups.ToList(), DisplayMember = "Name", ValueMember = "Id" };
         _outputGroups = groups;
@@ -781,6 +790,7 @@ internal sealed class PreviewForm : Form
         _sessionVolume.Width = Math.Max(360, contentWidth - 72);
         _routeRuleList.Width = contentWidth;
         _routeRuleOutputGroup.Width = contentWidth;
+        _connectionControls.Width = contentWidth;
 
         foreach (var label in new[]
                  {
@@ -797,6 +807,10 @@ internal sealed class PreviewForm : Form
             label.Height = Math.Max(GetStatusMinimumHeight(label),
                                     measuredHeight + label.Padding.Vertical + 2);
         }
+
+        var connectionButtonWidth = _connect.PreferredSize.Width + _connect.Margin.Horizontal;
+        _connection.Width = Math.Max(260,
+            contentWidth - connectionButtonWidth - _connectionControls.Padding.Horizontal - 8);
 
         var halfWidth = Math.Max(260, (contentWidth - 26) / 2);
         foreach (var fields in panel.Controls.OfType<FlowLayoutPanel>())
