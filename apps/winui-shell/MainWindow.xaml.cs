@@ -2,6 +2,7 @@
 
 using System.ComponentModel;
 using System.Linq;
+using System.Text.Json;
 using Hibiki.ControlModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -18,6 +19,13 @@ public sealed partial class MainWindow : Window
     public EasyControlViewModel ViewModel { get; } = new();
 
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _eqVisualTransitionTimer;
+#if !HIBIKI_COMPATIBILITY_PREVIEW
+    private static readonly string ThemePreferencePath = System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Hibiki DSP", "ui-theme-v1.json");
+    private bool _isDarkTheme;
+    private bool _ignoreThemeToggle;
+#endif
 
     public MainWindow()
     {
@@ -30,10 +38,61 @@ public sealed partial class MainWindow : Window
         RootGrid.DataContext = ViewModel;
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
         EqVisualCanvas.SizeChanged += OnEqVisualCanvasSizeChanged;
+        ApplyTheme(LoadDarkThemePreference(), persist: false);
         ConfigureTitleBar();
 #endif
         Closed += OnClosed;
     }
+
+#if !HIBIKI_COMPATIBILITY_PREVIEW
+    private void OnThemeToggled(object sender, RoutedEventArgs e)
+    {
+        if (_ignoreThemeToggle || ThemeToggleSwitch is null) return;
+        ApplyTheme(ThemeToggleSwitch.IsOn, persist: true);
+    }
+
+    private void ApplyTheme(bool isDark, bool persist)
+    {
+        _isDarkTheme = isDark;
+        RootGrid.RequestedTheme = isDark ? ElementTheme.Dark : ElementTheme.Light;
+        _ignoreThemeToggle = true;
+        ThemeToggleSwitch.IsOn = isDark;
+        _ignoreThemeToggle = false;
+        if (persist) SaveDarkThemePreference();
+    }
+
+    private static bool LoadDarkThemePreference()
+    {
+        try
+        {
+            if (!File.Exists(ThemePreferencePath)) return false;
+            using var document = JsonDocument.Parse(File.ReadAllText(ThemePreferencePath));
+            return document.RootElement.TryGetProperty("dark", out var dark) &&
+                   dark.ValueKind is JsonValueKind.True && dark.GetBoolean();
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void SaveDarkThemePreference()
+    {
+        try
+        {
+            var directory = System.IO.Path.GetDirectoryName(ThemePreferencePath);
+            if (string.IsNullOrWhiteSpace(directory)) return;
+            Directory.CreateDirectory(directory);
+            var json = JsonSerializer.Serialize(new { schema_version = 1, dark = _isDarkTheme });
+            File.WriteAllText(ThemePreferencePath, json);
+        }
+        catch
+        {
+            // Theme persistence is best effort; a failed write must not affect
+            // the current visual state or any engine/control-plane operation.
+        }
+    }
+#endif
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
