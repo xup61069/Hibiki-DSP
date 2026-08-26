@@ -19,6 +19,13 @@
         <Setter Property="MinHeight" Value="36" />
     </Style>
 
+    <!-- Keep numeric form fields in the same visual rhythm as text inputs
+         while leaving the platform spin-button template intact. -->
+    <Style TargetType="NumberBox">
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="MinHeight" Value="36" />
+    </Style>
+
 
     <!-- Consistent minimum height so toggle switches share the same
          interactive row rhythm as text inputs and combo boxes.
