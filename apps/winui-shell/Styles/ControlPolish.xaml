@@ -65,6 +65,12 @@
         <Setter Property="Background" Value="{ThemeResource HibikiShellSurfaceBrush}" />
     </Style>
 
+    <!-- Keep the navigation rail in the same modern visual language as the
+         rounded cards and controls without changing item content or behavior. -->
+    <Style TargetType="NavigationViewItem">
+        <Setter Property="CornerRadius" Value="10" />
+    </Style>
+
     <!-- Bold section card with layered surface and generous corner radius. -->
     <Style x:Key="SectionCardStyle" TargetType="Border">
         <Setter Property="Padding" Value="20" />
