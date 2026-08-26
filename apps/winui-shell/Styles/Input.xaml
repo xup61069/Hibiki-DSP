@@ -84,8 +84,9 @@
         <Setter Property="BorderThickness" Value="1" />
     </Style>
 
-    <!-- Subtle button elevation: all buttons get a gentle entrance transition.
-         Primary (accent) buttons already have color feedback; this adds motion. -->
+    <!-- Keep button corners and the shared 36px hit target consistent.
+         Primary (accent) buttons retain their explicit 40px hierarchy. -->
     <Style TargetType="Button">
         <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="MinHeight" Value="36" />
     </Style></ResourceDictionary>
