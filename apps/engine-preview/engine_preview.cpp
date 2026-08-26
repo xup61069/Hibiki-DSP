@@ -919,6 +919,28 @@ hibiki::ControlRouteHealthStateV1 wasapi_route_state(
     return hibiki::ControlRouteHealthStateV1::Pending;
 }
 
+std::string truncate_utf8_prefix(const std::string& text, const std::size_t max_bytes) {
+    if (text.size() <= max_bytes) return text;
+    auto prefix = text.substr(0U, max_bytes);
+    while (!prefix.empty()) {
+        const auto byte = static_cast<unsigned char>(prefix.back());
+        if ((byte & 0x80U) == 0U) break;
+        std::size_t lead_position = prefix.size() - 1U;
+        while (lead_position > 0U &&
+               (static_cast<unsigned char>(prefix[lead_position]) & 0xC0U) == 0x80U) {
+            --lead_position;
+        }
+        const auto lead = static_cast<unsigned char>(prefix[lead_position]);
+        std::size_t expected_length = 1U;
+        if ((lead & 0xE0U) == 0xC0U) expected_length = 2U;
+        else if ((lead & 0xF0U) == 0xE0U) expected_length = 3U;
+        else if ((lead & 0xF8U) == 0xF0U) expected_length = 4U;
+        if (expected_length > 1U && prefix.size() - lead_position >= expected_length) break;
+        prefix.resize(lead_position);
+    }
+    return prefix;
+}
+
 std::string wasapi_route_detail(
     const WasapiOutputState& state,
     const hibiki::WasapiSinkHandoffSnapshotV1& snapshot) {
@@ -927,8 +949,7 @@ std::string wasapi_route_detail(
     // 120-byte route detail budget after trimming.
     std::string prefix;
     if (!state.display_name.empty()) {
-        prefix = state.display_name.substr(0U, 40U);
-        while (!prefix.empty() && (prefix.back() & 0xC0U) == 0x80U) prefix.pop_back();
+        prefix = truncate_utf8_prefix(state.display_name, 40U);
         while (!prefix.empty() && prefix.back() == ' ') prefix.pop_back();
     }
     const char* body = [&] {
@@ -1253,7 +1274,7 @@ void publish_eq_visual_snapshot(const hibiki::EqVisualSnapshotV1& snapshot,
 
 hibiki::ControlStatusSnapshotV1 make_initial_status(
     const hibiki::OutputGroupVolumeStateV1 volume,
-    const std::string_view physical_catalog_detail,
+    const std::string_view main_output_detail,
     const WasapiOutputState& wasapi_output,
     const hibiki::WasapiSinkHandoffSnapshotV1& wasapi_snapshot,
     const bool system_volume_enabled,
@@ -1276,12 +1297,7 @@ hibiki::ControlStatusSnapshotV1 make_initial_status(
               "named pipe 已啟動；目前為本機 user-space preview。",
               hibiki::ControlRouteHealthStateV1::Ready);
     set_route(snapshot.routes[1U], "main-output", "主輸出",
-              [&] {
-                  const std::string detail_text = wasapi_output.requested
-                                                      ? wasapi_route_detail(wasapi_output, wasapi_snapshot)
-                                                      : std::string(physical_catalog_detail);
-                  return std::string_view(detail_text);
-              }(),
+              main_output_detail,
               wasapi_output.requested ? wasapi_route_state(wasapi_output, wasapi_snapshot)
                                       : hibiki::ControlRouteHealthStateV1::Unavailable,
               wasapi_output.requested ? 0U : 1U);
@@ -1765,7 +1781,11 @@ int wmain(const int argc, wchar_t* const* argv) {
     hibiki::EqVisualSnapshotStoreV1 eq_visual_store;
     control_worker.set_eq_visual_publisher(publish_eq_visual_snapshot, &eq_visual_store);
     hibiki::ControlStatusSnapshotStoreV1 status_store;
-    auto status = make_initial_status(engine.volume(), catalog_detail, wasapi_output,
+    const std::string initial_main_output_detail = wasapi_output.requested
+        ? wasapi_route_detail(wasapi_output, initial_wasapi_snapshot)
+        : catalog_detail;
+    auto status = make_initial_status(engine.volume(), initial_main_output_detail,
+                                      wasapi_output,
                                       initial_wasapi_snapshot, system_volume_active,
                                       system_volume_detail, session_routing_active,
                                       session_routing_detail, process_loopback_detail,
