@@ -231,6 +231,18 @@ public sealed class SessionRouteRuleCatalogV1
         }
     }
 
+    // Serializes the current rules using the same bounded document format as
+    // TrySave so an export stays byte-compatible with the on-disk catalog.
+    public string ToJsonForImportExport()
+    {
+        var document = new CatalogDocument
+        {
+            SchemaVersion = SchemaVersion,
+            Rules = _rules.Select(item => (CatalogRule?)ToDocument(item)).ToList()
+        };
+        return JsonSerializer.Serialize(document, JsonOptions);
+    }
+
     private static CatalogRule ToDocument(SessionRouteRuleCard rule) => new()
     {
         RuleId = rule.RuleId,
