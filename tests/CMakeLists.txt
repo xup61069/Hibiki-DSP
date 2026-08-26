@@ -59,6 +59,19 @@ else()
 endif()
 
 add_test(NAME hibiki_lane_latency_tests COMMAND hibiki_lane_latency_tests)
+add_executable(hibiki_asio_transport_consumer_tests
+  unit/asio_transport_consumer_tests.cpp
+)
+
+target_link_libraries(hibiki_asio_transport_consumer_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_asio_transport_consumer_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_asio_transport_consumer_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_asio_transport_consumer_tests COMMAND hibiki_asio_transport_consumer_tests)
 
 add_executable(hibiki_output_crossfade_tests
   unit/output_crossfade_tests.cpp
