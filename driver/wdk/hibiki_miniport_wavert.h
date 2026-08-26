@@ -71,6 +71,13 @@ private:
     // Position tracking
     ULONGLONG                       m_TotalBytesProcessed;
 
+    NTSTATUS AllocateBufferCore(
+        _In_  ULONG                   RequestedSize,
+        _Out_ PMDL*                   AudioBufferMdl,
+        _Out_ ULONG*                 ActualSize,
+        _Out_ ULONG*                 OffsetFromFirstPage,
+        _Out_ MEMORY_CACHING_TYPE*   CacheType);
+
 public:
     HibikiMiniportWaveRtStreamV1();
     ~HibikiMiniportWaveRtStreamV1();

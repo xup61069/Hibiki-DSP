@@ -187,8 +187,8 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateAudioBuffer(
     _Out_ ULONG*                  ActualSize,
     _Out_ ULONG*                  OffsetFromFirstPage,
     _Out_ MEMORY_CACHING_TYPE*    CacheType) {
-    return AllocateBufferWithNotification(
-        0U, RequestedSize, AudioBufferMdl, ActualSize, OffsetFromFirstPage, CacheType);
+    return AllocateBufferCore(
+        RequestedSize, AudioBufferMdl, ActualSize, OffsetFromFirstPage, CacheType);
 }
 
 VOID HibikiMiniportWaveRtStreamV1::FreeAudioBuffer(
@@ -204,11 +204,24 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferWithNotification(
     _Out_    ULONG*               ActualSize,
     _Out_    ULONG*               OffsetFromFirstPage,
     _Out_    MEMORY_CACHING_TYPE* CacheType) {
+    if (NotificationCount != 1U && NotificationCount != 2U) {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    return AllocateBufferCore(
+        RequestedSize, AudioBufferMdl, ActualSize, OffsetFromFirstPage, CacheType);
+}
+
+NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferCore(
+    _In_  ULONG                   RequestedSize,
+    _Out_ PMDL*                   AudioBufferMdl,
+    _Out_ ULONG*                  ActualSize,
+    _Out_ ULONG*                  OffsetFromFirstPage,
+    _Out_ MEMORY_CACHING_TYPE*    CacheType) {
     if (AudioBufferMdl == nullptr || ActualSize == nullptr ||
         OffsetFromFirstPage == nullptr || CacheType == nullptr) {
         return STATUS_INVALID_PARAMETER;
     }
-    UNREFERENCED_PARAMETER(NotificationCount);
 
     hibiki_endpoint_topology_v1 topology{};
     if (hibiki_endpoint_topology_get_v1(m_EndpointIndex, &topology) == 0) {
