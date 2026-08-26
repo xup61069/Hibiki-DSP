@@ -237,7 +237,7 @@ controller；Strict Direct 維持 fail-open bypass。此整合仍是 user-space 
 在約兩秒滑動窗內平滑成 dB 差。比值接近 0 dB（低頻明顯偏高）時，RT 路徑以一階 low-shelf
 施加有界衰減（Movie 預設上限 4 dB），增益滑移速率與音量控制相同。遙測新增
 `bass_correction_gain_db`，source=2 自適應幀在低頻點發布實際校正值。這是固定濾波器
-能量比代理，不是 FFT 頻譜分析或 BS.1770 loudness meter，也不宣稱 ISO 226 conformance。
+能量比代理，不是 FFT 頻譜分析或 BS.1770 loudness meter，也不宣稱任何等響度標準符合性。
 
 選用欄位 night_compression_enabled／night_compression_max_reduction_db（0–24 dB）與
 night_compression_knee_db（6–30 dB）加入有界動態範圍壓縮：RT 路徑以 5 ms attack／
