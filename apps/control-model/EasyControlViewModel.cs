@@ -1902,6 +1902,78 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     public bool SaveCustomScenes(out string error) =>
         _session.CustomScenes.TrySave(CustomSceneCatalogPath, out error);
 
+    public string CustomSceneExportDocument() =>
+        _session.CustomScenes.ToJsonForImportExport();
+
+    public bool ExportCustomScenes(string jsonFilePath)
+    {
+        if (string.IsNullOrWhiteSpace(jsonFilePath))
+        {
+            StatusText = "請先選擇自訂場景匯出路徑";
+            return false;
+        }
+        try
+        {
+            File.WriteAllText(jsonFilePath, CustomSceneExportDocument());
+            StatusText = "已匯出自訂場景到檔案；可在其他機器匯入";
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            StatusText = $"自訂場景匯出失敗：{ex.Message}";
+            return false;
+        }
+    }
+
+    public bool ImportCustomScenes(string jsonFilePath)
+    {
+        if (string.IsNullOrWhiteSpace(jsonFilePath))
+        {
+            StatusText = "請先選擇要匯入的自訂場景檔";
+            return false;
+        }
+        var imported = new CustomSceneCatalogV1();
+        if (!imported.TryLoad(jsonFilePath, out var loadError))
+        {
+            StatusText = $"自訂場景匯入失敗：{loadError}";
+            return false;
+        }
+        if (imported.Scenes.Count == 0)
+        {
+            StatusText = "沒有可匯入的自訂場景（檔案內容為空）";
+            return false;
+        }
+        var previousById = _session.CustomScenes.Scenes.ToDictionary(item => item.Id);
+        var upserted = new List<string>();
+        foreach (var scene in imported.Scenes)
+        {
+            if (!_session.CustomScenes.Upsert(scene)) continue;
+            upserted.Add(scene.Id);
+        }
+        if (upserted.Count == 0)
+        {
+            StatusText = "沒有可匯入的自訂場景（全部無效或超出上限）";
+            return false;
+        }
+        if (!SaveCustomScenes(out var saveError))
+        {
+            foreach (var sceneId in upserted) _session.CustomScenes.Remove(sceneId);
+            foreach (var pair in previousById)
+            {
+                if (!_session.CustomScenes.Scenes.Any(item => item.Id == pair.Key))
+                    _session.CustomScenes.Upsert(pair.Value);
+            }
+            OnPropertyChanged(nameof(Scenes));
+            OnPropertyChanged(nameof(CustomSceneCards));
+            StatusText = $"自訂場景已匯入但未保存：{saveError}";
+            return false;
+        }
+        OnPropertyChanged(nameof(Scenes));
+        OnPropertyChanged(nameof(CustomSceneCards));
+        StatusText = $"已從檔案匯入 {upserted.Count} 筆自訂場景；等待引擎確認套用";
+        return true;
+    }
+
     private bool SavePendingSceneCatalogOps()
     {
         var queue = new CustomSceneSyncQueueV1();
