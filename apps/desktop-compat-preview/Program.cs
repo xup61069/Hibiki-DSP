@@ -33,6 +33,10 @@ internal sealed class PreviewForm : Form
     private static readonly Color Border = Color.FromArgb(207, 218, 231);
     private static readonly Color DisabledBackground = Color.FromArgb(216, 225, 235);
     private static readonly Color DisabledText = Color.FromArgb(78, 93, 112);
+    private static readonly Color SuccessBackground = Color.FromArgb(228, 246, 236);
+    private static readonly Color SuccessText = Color.FromArgb(31, 105, 62);
+    private static readonly Color WarningBackground = Color.FromArgb(255, 244, 218);
+    private static readonly Color WarningText = Color.FromArgb(125, 82, 0);
 
     private readonly EasyControlViewModel _viewModel;
     private readonly Label _connection = new()
@@ -857,6 +861,8 @@ internal sealed class PreviewForm : Form
     private void RefreshView()
     {
         _connection.Text = _viewModel.ConnectionStatusText;
+        _connection.BackColor = _viewModel.IsConnected ? SuccessBackground : WarningBackground;
+        _connection.ForeColor = _viewModel.IsConnected ? SuccessText : WarningText;
         var renderDevices = _viewModel.PhysicalDevices
             .Where(device => device.Flow == PhysicalDeviceFlowV1.Render)
             .ToArray();
@@ -874,6 +880,8 @@ internal sealed class PreviewForm : Form
         _physicalDeviceEmptyState.Text = _viewModel.IsConnected
             ? "沒有可用的已驗證實體輸出裝置。"
             : "尚未連接引擎；連接後才會顯示已驗證的實體輸出裝置。";
+        _physicalDeviceEmptyState.BackColor = _viewModel.IsConnected ? WarningBackground : GroupBackground;
+        _physicalDeviceEmptyState.ForeColor = _viewModel.IsConnected ? WarningText : TextSecondary;
         _physicalDeviceSelector.Enabled = _viewModel.IsConnected && selectableRenderCount > 0;
         _switchDevice.Enabled = _viewModel.IsConnected && !_viewModel.IsBusy &&
                                 _physicalDeviceSelector.SelectedValue is string;
