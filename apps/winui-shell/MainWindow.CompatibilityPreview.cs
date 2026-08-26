@@ -39,12 +39,12 @@ public sealed partial class MainWindow
         {
             Padding = new Thickness(28, 24, 28, 20),
             DataContext = ViewModel,
+            Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 244, 247, 251)),
             // The fallback host does not load App.xaml resources. Keep its
             // controls on a deterministic light surface instead of inheriting
             // a dark system theme and rendering as a black page.
             RequestedTheme = ElementTheme.Light,
         };
-        SystemBackdrop = new MicaBackdrop { Kind = Microsoft.UI.Composition.SystemBackdrops.MicaKind.Base };
 
         var content = new StackPanel
         {

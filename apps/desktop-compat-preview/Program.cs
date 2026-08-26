@@ -231,8 +231,11 @@ internal sealed class PreviewForm : Form
         };
         customSceneIdentity.Controls.Add(_customSceneId);
         customSceneIdentity.Controls.Add(_customSceneName);
+        panel.Controls.Add(CreateFieldLabel("場景識別"));
         panel.Controls.Add(customSceneIdentity);
+        panel.Controls.Add(CreateFieldLabel("場景說明"));
         panel.Controls.Add(_customSceneDescription);
+        panel.Controls.Add(CreateFieldLabel("同步選項"));
         panel.Controls.Add(_customSceneLoudnessLiveUpdate);
         panel.Controls.Add(_customSceneQueueStatus);
         _addCustomScene.Click += async (_, _) =>
@@ -369,6 +372,7 @@ internal sealed class PreviewForm : Form
         };
         sessionRouteFields.Controls.Add(_sessionLane);
         sessionRouteFields.Controls.Add(_sessionOutput);
+        panel.Controls.Add(CreateFieldLabel("App 路由"));
         panel.Controls.Add(sessionRouteFields);
         _applySessionRoute.Click += async (_, _) =>
         {
@@ -419,6 +423,7 @@ internal sealed class PreviewForm : Form
         };
         routeRuleIdentityFields.Controls.Add(_routeRuleId);
         routeRuleIdentityFields.Controls.Add(_routeRuleAppId);
+        panel.Controls.Add(CreateFieldLabel("識別與 App"));
         panel.Controls.Add(routeRuleIdentityFields);
         var routeRuleMatcherFields = new FlowLayoutPanel
         {
@@ -428,7 +433,9 @@ internal sealed class PreviewForm : Form
         };
         routeRuleMatcherFields.Controls.Add(_routeRuleDisplayName);
         routeRuleMatcherFields.Controls.Add(_routeRuleLaneId);
+        panel.Controls.Add(CreateFieldLabel("顯示與 Lane"));
         panel.Controls.Add(routeRuleMatcherFields);
+        panel.Controls.Add(CreateFieldLabel("輸出群組"));
         panel.Controls.Add(_routeRuleOutputGroup);
         var routeRuleNumericFields = new FlowLayoutPanel
         {
@@ -448,6 +455,7 @@ internal sealed class PreviewForm : Form
         };
         routeRuleOptionFields.Controls.Add(_routeRuleEnabled);
         routeRuleOptionFields.Controls.Add(_routeRuleGainOwner);
+        panel.Controls.Add(CreateFieldLabel("預設選項"));
         panel.Controls.Add(routeRuleOptionFields);
         _applyRouteRule.Click += async (_, _) =>
         {
