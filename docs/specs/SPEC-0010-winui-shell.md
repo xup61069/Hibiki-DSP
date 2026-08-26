@@ -130,6 +130,8 @@ Hello 與裝置 catalog 成功後，ViewModel 會以序列化的 `ControlStatusR
   避免導覽時前一頁文字或卡片殘影短暫覆蓋新頁面。動效只是裝飾，不得是理解狀態或完成控制的必要條件。
 - 主要導覽的每個 `NavigationViewItem` 都必須提供非空且語意可辨識的 Fluent icon；
   圖示只作為視覺路由提示，文字與 `AutomationProperties.Name` 仍是完整語意來源。
+- 場景卡片使用兩欄 grid 時，卡片外緣必須保留一致的水平與垂直間距；hover lift
+  不得讓相鄰卡片的圓角或內容互相碰撞。
 - Expert Panel 在 `IsExpert=false` 時必須顯示可理解的 empty state，不得只留下無語意的
   空白容器；empty state 應提供開啟既有 Expert toggle 的明確入口，且不改變 Expert
   內容的唯讀 contract。
