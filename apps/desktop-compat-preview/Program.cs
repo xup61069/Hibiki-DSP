@@ -59,6 +59,19 @@ internal sealed class PreviewForm : Form
     private readonly Label _status = new() { AutoSize = false, Height = 48 };
     private readonly Label _routes = new() { AutoSize = false, Width = 550, Height = 58 };
     private readonly Label _sessions = new() { AutoSize = false, Width = 550, Height = 72 };
+    private readonly Label _sessionEmptyState = new()
+    {
+        AutoSize = false,
+        Height = 48,
+        Visible = false,
+        AccessibleName = "Expert App 工作階段空狀態",
+        Tag = "empty-state",
+    };
+    private readonly Label _sessionFilterLabel = CreateFieldLabel("篩選工作階段");
+    private readonly Label _sessionSelectorLabel = CreateFieldLabel("工作階段");
+    private readonly Label _sessionVolumeLabel = CreateFieldLabel("App 音量");
+    private readonly Label _sessionRouteLabel = CreateFieldLabel("App 路由");
+    private FlowLayoutPanel _sessionRouteFields = null!;
     private readonly ComboBox _sessionSelector = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取 Expert App" };
     private readonly TextBox _sessionFilter = new() { Width = 460, PlaceholderText = "篩選 App 名稱或 App ID", AccessibleName = "Expert App 清單篩選" };
     private readonly ComboBox _physicalDeviceSelector = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取實體輸出裝置" };
@@ -331,8 +344,9 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(_routes);
         panel.Controls.Add(CreateSectionHeader("Expert App／工作階段（需以 -EnableSessionRouting 啟動）"));
         panel.Controls.Add(_sessions);
+        panel.Controls.Add(_sessionEmptyState);
         _sessionFilter.TextChanged += (_, _) => SyncSessionList();
-        panel.Controls.Add(CreateFieldLabel("篩選工作階段"));
+        panel.Controls.Add(_sessionFilterLabel);
         panel.Controls.Add(_sessionFilter);
         _sessionSelector.SelectedIndexChanged += (_, _) =>
         {
@@ -341,7 +355,7 @@ internal sealed class PreviewForm : Form
             SyncSessionControls();
             RefreshView();
         };
-        panel.Controls.Add(CreateFieldLabel("工作階段"));
+        panel.Controls.Add(_sessionSelectorLabel);
         panel.Controls.Add(_sessionSelector);
         _sessionVolume.ValueChanged += async (_, _) =>
         {
@@ -350,7 +364,7 @@ internal sealed class PreviewForm : Form
             _sessionVolumeReadout.Text = $"{_sessionVolume.Value} dB";
             RefreshView();
         };
-        panel.Controls.Add(CreateFieldLabel("App 音量"));
+        panel.Controls.Add(_sessionVolumeLabel);
         panel.Controls.Add(_sessionVolume);
         panel.Controls.Add(_sessionVolumeReadout);
         _applySessionVolume.Click += async (_, _) =>
@@ -375,9 +389,10 @@ internal sealed class PreviewForm : Form
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false
         };
+        _sessionRouteFields = sessionRouteFields;
         sessionRouteFields.Controls.Add(_sessionLane);
         sessionRouteFields.Controls.Add(_sessionOutput);
-        panel.Controls.Add(CreateFieldLabel("App 路由"));
+        panel.Controls.Add(_sessionRouteLabel);
         panel.Controls.Add(sessionRouteFields);
         _applySessionRoute.Click += async (_, _) =>
         {
@@ -681,8 +696,9 @@ internal sealed class PreviewForm : Form
 
         foreach (var label in new[]
                  {
-                     _connection, _devices, _physicalDeviceEmptyState, _status, _routes, _sessions, _irStatus,
-                     _eqStatus, _lastSendDiagnostics, _customSceneQueueStatus, _routeRuleEmptyState,
+                      _connection, _devices, _physicalDeviceEmptyState, _status, _routes, _sessions,
+                      _sessionEmptyState, _irStatus, _eqStatus, _lastSendDiagnostics,
+                      _customSceneQueueStatus, _routeRuleEmptyState,
                  })
         {
             label.BackColor = GroupBackground;
@@ -764,8 +780,8 @@ internal sealed class PreviewForm : Form
 
         foreach (var label in new[]
                  {
-                     _connection, _devices, _physicalDeviceEmptyState, _status, _routes, _sessions, _irStatus,
-                     _eqStatus, _lastSendDiagnostics, _routeRuleEmptyState,
+                      _connection, _devices, _physicalDeviceEmptyState, _status, _routes, _sessions,
+                      _sessionEmptyState, _irStatus, _eqStatus, _lastSendDiagnostics, _routeRuleEmptyState,
                  })
         {
             label.Width = contentWidth;
@@ -886,14 +902,16 @@ internal sealed class PreviewForm : Form
               $"預設輸出：{defaultRender ?? "未指定"}\r\n切換會先預熱新裝置再以 30 ms 交叉淡化；失敗自動回復上一個裝置。";
         SyncPhysicalDeviceList();
         var selectableRenderCount = renderDevices.Count(device => device.IsSelectable);
-        _physicalDeviceEmptyState.Visible = selectableRenderCount == 0;
+        var hasSelectableRenderDevices = _viewModel.IsConnected && selectableRenderCount > 0;
+        _physicalDeviceEmptyState.Visible = !hasSelectableRenderDevices;
         _physicalDeviceEmptyState.Text = _viewModel.IsConnected
             ? "沒有可用的已驗證實體輸出裝置。"
             : "尚未連接引擎；連接後才會顯示已驗證的實體輸出裝置。";
         _physicalDeviceEmptyState.BackColor = _viewModel.IsConnected ? WarningBackground : GroupBackground;
         _physicalDeviceEmptyState.ForeColor = _viewModel.IsConnected ? WarningText : TextSecondary;
-        _physicalDeviceSelector.Enabled = _viewModel.IsConnected && selectableRenderCount > 0;
-        _switchDevice.Enabled = _viewModel.IsConnected && !_viewModel.IsBusy &&
+        _physicalDeviceSelector.Visible = hasSelectableRenderDevices;
+        _physicalDeviceSelector.Enabled = hasSelectableRenderDevices;
+        _switchDevice.Enabled = hasSelectableRenderDevices && !_viewModel.IsBusy &&
                                 _physicalDeviceSelector.SelectedValue is string;
         _refreshDevices.Enabled = _viewModel.IsConnected && !_viewModel.IsBusy;
         _enhance.Enabled = _viewModel.IsConnected;
@@ -908,8 +926,28 @@ internal sealed class PreviewForm : Form
             : $"App catalog：{sessionCount} 筆；{seqText} 只顯示 bounded metadata。套用 App 音量會寫入 Windows session，" +
               "實體 per-App 送出已由 process-loopback E2E 覆蓋；仍屬使用者空間控制證據。";
         SyncSessionList();
-        var hasSession = _viewModel.HasSelectedSession;
-        _sessionSelector.Enabled = _viewModel.IsConnected && _sessionSelector.Items.Count > 0;
+        var sessionControlsVisible = _viewModel.IsConnected && sessionCount > 0;
+        var hasVisibleSessions = sessionControlsVisible && _sessionSelector.Items.Count > 0;
+        _sessionEmptyState.Visible = !hasVisibleSessions;
+        _sessionEmptyState.Text = !sessionControlsVisible && !_viewModel.IsConnected
+            ? "尚未連接引擎；連接後才會同步可控制的 App 工作階段。"
+            : sessionControlsVisible && !hasVisibleSessions
+                ? "找不到符合目前篩選條件的 App 工作階段；清除篩選即可查看全部。"
+                : "尚未收到可控制的 App 工作階段；請確認目標 App 正在播放音訊，且引擎以 -EnableSessionRouting 啟動。";
+        _sessionFilterLabel.Visible = sessionControlsVisible;
+        _sessionFilter.Visible = sessionControlsVisible;
+        _sessionSelectorLabel.Visible = hasVisibleSessions;
+        _sessionSelector.Visible = hasVisibleSessions;
+        _sessionVolumeLabel.Visible = hasVisibleSessions;
+        _sessionVolume.Visible = hasVisibleSessions;
+        _sessionVolumeReadout.Visible = hasVisibleSessions;
+        _sessionMuted.Visible = hasVisibleSessions;
+        _applySessionVolume.Visible = hasVisibleSessions;
+        _sessionRouteLabel.Visible = hasVisibleSessions;
+        _sessionRouteFields.Visible = hasVisibleSessions;
+        _applySessionRoute.Visible = hasVisibleSessions;
+        var hasSession = hasVisibleSessions && _viewModel.HasSelectedSession;
+        _sessionSelector.Enabled = hasVisibleSessions;
         _sessionVolume.Enabled = _viewModel.IsConnected && hasSession && _viewModel.SelectedSession?.VolumeAvailable == true;
         _applySessionVolume.Enabled = _sessionVolume.Enabled;
         _sessionMuted.Enabled = _sessionVolume.Enabled;
