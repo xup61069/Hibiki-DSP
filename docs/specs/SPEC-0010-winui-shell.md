@@ -30,6 +30,8 @@ process loopback、瀏覽器單分頁與 direct bypass 的路由健康卡片、A
 「Expert Panel」（Ctrl+6）與「校正精靈」（Ctrl+7）；正式 shell 不提供 VST3 時間軸編輯面。
 這些頁面是同一 shell 內的面板切換，不新增 IPC 命令，也不改變 Easy/Expert 的
 顯示邊界：Expert Panel 頁面只收納既有 Expert 唯讀摘要與本機編輯面。
+「自訂預設」表單在標準視窗寬度（約 640 effective px 以上）以雙欄顯示 Scene ID 與名稱，
+窄視窗退回單欄堆疊；說明、loudness toggle 與欄位驗證在任何寬度都必須完整可用。
 正式 shell 不再暴露 VST3 時間軸編輯卡片；VST3 host 能力仍由 SPEC-0008 的 bounded
 model seams 管理，不得由 shell 宣稱已同步到 worker、plugin 或持久儲存。
 
@@ -37,6 +39,8 @@ model seams 管理，不得由 shell 宣稱已同步到 worker、plugin 或持�
 `%LOCALAPPDATA%\Hibiki DSP\ui-theme-v1.json`，讀取或寫入失敗時回到淺色，且不影響
 engine/control-plane 狀態。Root theme 以 `ElementTheme.Light`／`ElementTheme.Dark`
 套用到 NavigationView、InfoBar、cards、inputs、footer 與自訂 ThemeResource。
+深色主題的 section card 與 route/item card 必須使用可辨識的分層 surface token，不能與
+頁面或導覽背景合併成難以辨識的單一黑色平面；兩種主題都必須保留可讀文字與狀態邊界。
 
 音量保護頁的主要視覺卡稱為「等響度補償」，顯示既有 `EqVisualSurface` 的狀態、來源圖例
 與曲線。它只呈現引擎確認的 user-space `EqVisualSnapshotV1`；這不是音量量測、耳機校準、
@@ -128,6 +132,9 @@ Hello 與裝置 catalog 成功後，ViewModel 會以序列化的 `ControlStatusR
 - 狀態文字以 polite live region 告知連線／控制結果，避免螢幕閱讀器被高頻音量事件打斷。
 - 頁面切換的進場動效以頁面層級容器為主；共用 section card 不得再疊加獨立進場動效，
   避免導覽時前一頁文字或卡片殘影短暫覆蓋新頁面。動效只是裝飾，不得是理解狀態或完成控制的必要條件。
+- 導覽切換頁面時，共用的內容 ScrollViewer 必須將垂直捲動位置重設到頂端；重設不得
+  清除 ViewModel 或頁面狀態，也不得破壞鍵盤 focus。使用者每次導覽都應從新頁面的標題
+  開始閱讀，而不是接續上一頁的捲動偏移。
 - 主要導覽的每個 `NavigationViewItem` 都必須提供非空且語意可辨識的 Fluent icon；
   圖示只作為視覺路由提示，文字與 `AutomationProperties.Name` 仍是完整語意來源。
 - 場景卡片使用兩欄 grid 時，卡片外緣必須保留一致的水平與垂直間距；hover lift
