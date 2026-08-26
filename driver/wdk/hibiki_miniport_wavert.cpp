@@ -282,6 +282,12 @@ VOID HibikiMiniportWaveRtStreamV1::FreeBufferWithNotification(
     _In_opt_ PMDL                 AudioBufferMdl,
     _In_     ULONG                BufferSize) {
     UNREFERENCED_PARAMETER(BufferSize);
+    UNREFERENCED_PARAMETER(AudioBufferMdl);
+
+    // The stream owns the MDL paired with its mapped buffer.  Release that
+    // stored allocation even when a compatibility caller passes a null MDL;
+    // the WDK free callback is the ownership boundary for this buffer.
+    PMDL allocated_mdl = m_DmaBufferMdl;
 
     if (m_DmaBuffer != nullptr) {
         HibikiWaveRtPinResetV1(&m_StreamContext);
@@ -289,8 +295,8 @@ VOID HibikiMiniportWaveRtStreamV1::FreeBufferWithNotification(
         m_DmaBuffer = nullptr;
     }
 
-    if (AudioBufferMdl != nullptr && AudioBufferMdl == m_DmaBufferMdl) {
-        m_PortStream->FreePagesFromMdl(m_DmaBufferMdl);
+    if (allocated_mdl != nullptr) {
+        m_PortStream->FreePagesFromMdl(allocated_mdl);
         m_DmaBufferMdl = nullptr;
     }
 
