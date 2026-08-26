@@ -68,6 +68,14 @@ internal sealed class PreviewForm : Form
     private readonly TextBox _sessionOutput = new() { Width = 220, PlaceholderText = "Output Group", AccessibleName = "Output Group 輸入欄" };
     private readonly Button _applySessionRoute = new() { Text = "套用選取 App 路由", AutoSize = true, AccessibleName = "套用選取 App 路由" };
     private readonly ListBox _routeRuleList = new() { Width = 550, Height = 110, AccessibleName = "App 路由預設列表" };
+    private readonly Label _routeRuleEmptyState = new()
+    {
+        AutoSize = false,
+        Height = 48,
+        Visible = false,
+        AccessibleName = "App 路由預設空狀態",
+        Tag = "empty-state",
+    };
     private readonly TextBox _routeRuleId = new() { Width = 260, PlaceholderText = "預設 ID（小寫英文／數字／- _ .）", AccessibleName = "App 路由預設 ID" };
     private readonly TextBox _routeRuleAppId = new() { Width = 260, PlaceholderText = "App ID（例如 game.exe，可留空）", AccessibleName = "App 路由預設 App ID" };
     private readonly TextBox _routeRuleDisplayName = new() { Width = 260, PlaceholderText = "顯示名稱（可留空）", AccessibleName = "App 路由預設顯示名稱" };
@@ -372,6 +380,7 @@ internal sealed class PreviewForm : Form
         });
         SyncRouteRuleList();
         panel.Controls.Add(_routeRuleList);
+        panel.Controls.Add(_routeRuleEmptyState);
         _routeRuleId.TextChanged += (_, _) => _viewModel.RouteRuleId = _routeRuleId.Text;
         _routeRuleAppId.TextChanged += (_, _) => _viewModel.RouteRuleAppId = _routeRuleAppId.Text;
         _routeRuleDisplayName.TextChanged += (_, _) => _viewModel.RouteRuleDisplayName = _routeRuleDisplayName.Text;
@@ -645,7 +654,7 @@ internal sealed class PreviewForm : Form
         foreach (var label in new[]
                  {
                      _connection, _devices, _physicalDeviceEmptyState, _status, _routes, _sessions, _irStatus,
-                     _eqStatus, _lastSendDiagnostics, _customSceneQueueStatus,
+                     _eqStatus, _lastSendDiagnostics, _customSceneQueueStatus, _routeRuleEmptyState,
                  })
         {
             label.BackColor = GroupBackground;
@@ -716,7 +725,7 @@ internal sealed class PreviewForm : Form
         foreach (var label in new[]
                  {
                      _connection, _devices, _physicalDeviceEmptyState, _status, _routes, _sessions, _irStatus,
-                     _eqStatus, _lastSendDiagnostics,
+                     _eqStatus, _lastSendDiagnostics, _routeRuleEmptyState,
                  })
         {
             label.Width = contentWidth;
@@ -1009,10 +1018,14 @@ internal sealed class PreviewForm : Form
         try
         {
             var rules = _viewModel.RouteRules.ToArray();
+            var hasRules = rules.Length > 0;
             _routeRuleList.DataSource = null;
             _routeRuleList.DisplayMember = nameof(SessionRouteRuleCard.Summary);
             _routeRuleList.ValueMember = nameof(SessionRouteRuleCard.RuleId);
             _routeRuleList.DataSource = rules;
+            _routeRuleList.Visible = hasRules;
+            _routeRuleEmptyState.Visible = !hasRules;
+            _routeRuleEmptyState.Text = "尚未建立 App 路由預設；填寫 App ID 或顯示名稱後，按「新增／更新預設」即可建立。";
             if (selectedId is null) return;
             var selectedIndex = Array.FindIndex(rules, item => item.RuleId == selectedId);
             if (selectedIndex >= 0) _routeRuleList.SelectedIndex = selectedIndex;
