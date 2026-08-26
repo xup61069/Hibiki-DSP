@@ -323,6 +323,13 @@ public sealed partial class MainWindow : Window
         if (args.SelectedItem is NavigationViewItem item && item.Tag is string tag)
             ShowNavigationSection(tag);
     }
+
+    private void OnOpenExpertClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.IsExpert = true;
+        if (ShellNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(item => item.Tag as string == "volume") is { } volumeItem)
+            ShellNav.SelectedItem = volumeItem;
+    }
 #endif
 
     private void OnEqVisualTransitionTick(object? sender, object e)
