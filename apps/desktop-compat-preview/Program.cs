@@ -82,11 +82,11 @@ internal sealed class PreviewForm : Form
     private bool _updatingRouteRules;
     private bool _statusRefreshActive;
     private bool _restoredPersistedState;
+    private bool _windowBoundsRestored;
     internal PreviewForm(EasyControlViewModel viewModel)
     {
         _viewModel = viewModel;
         Text = "Hibiki DSP — Compatibility Preview";
-        ClientSize = new Size(620, 540);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 10);
 
@@ -445,10 +445,35 @@ internal sealed class PreviewForm : Form
             // double-click experience when the local Engine Preview is already
             // running, while still remaining safe when no engine is present.
             await _viewModel.ConnectAsync(TimeSpan.FromSeconds(1));
+            RestoreWindowBounds();
             RestorePersistedSelections();
             RefreshView();
         };
+        ResizeEnd += (_, _) => PersistUiState();
+        FormClosing += (_, _) => PersistUiState();
         RefreshView();
+    }
+
+    private void RestoreWindowBounds()
+    {
+        if (_windowBoundsRestored || IsDisposed) return;
+        _windowBoundsRestored = true;
+        var state = PreviewUiState.Load();
+        if (state.WindowX is not int x || state.WindowY is not int y ||
+            state.WindowWidth is not int width || state.WindowHeight is not int height) return;
+        if (width < MinimumSize.Width || height < MinimumSize.Height) return;
+        if (!IsVisibleOnAnyScreen(new Rectangle(x, y, width, height))) return;
+        StartPosition = FormStartPosition.Manual;
+        Bounds = new Rectangle(x, y, width, height);
+    }
+
+    private static bool IsVisibleOnAnyScreen(Rectangle bounds)
+    {
+        foreach (var screen in Screen.AllScreens)
+        {
+            if (screen.WorkingArea.IntersectsWith(bounds)) return true;
+        }
+        return false;
     }
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
@@ -497,7 +522,8 @@ internal sealed class PreviewForm : Form
 
     private void PersistUiState() =>
         PreviewUiState.Save(_viewModel.SelectedPhysicalDeviceId,
-            _scenes.SelectedValue as string ?? _viewModel.SelectedScene?.Id);
+            _scenes.SelectedValue as string ?? _viewModel.SelectedScene?.Id,
+            WindowState == FormWindowState.Normal ? Bounds : null);
 
     private void RefreshView()
     {
