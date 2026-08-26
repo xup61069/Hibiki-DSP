@@ -691,6 +691,37 @@ function Write-WavSourceFixture([string]$Path) {
   }
 }
 
+function Write-ProcessDeliveryTone([string]$Path) {
+  # A longer, clearly audible WAV so the Windows session catalog reports an
+  # active audio session for process-loopback capture during the smoke test.
+  $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Create,
+                                   [System.IO.FileAccess]::Write,
+                                   [System.IO.FileShare]::None)
+  try {
+    $writer = [System.IO.BinaryWriter]::new($stream, [System.Text.Encoding]::ASCII, $false)
+    $frameCount = 48000  # 1 second of stereo float32 at 48 kHz
+    $dataBytes = $frameCount * 2 * 4
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('RIFF'))
+    $writer.Write([uint32](36 + $dataBytes))
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('WAVE'))
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('fmt '))
+    $writer.Write([uint32]16)
+    $writer.Write([uint16]3) # IEEE Float32
+    $writer.Write([uint16]2) # stereo
+    $writer.Write([uint32]48000)
+    $writer.Write([uint32]384000)
+    $writer.Write([uint16]8)
+    $writer.Write([uint16]32)
+    $writer.Write([System.Text.Encoding]::ASCII.GetBytes('data'))
+    $writer.Write([uint32]$dataBytes)
+    for ($frame = 0; $frame -lt $frameCount; $frame++) {
+      $sample = [single](0.3 * [Math]::Sin(2 * [Math]::PI * 440 * $frame / 48000))
+      $writer.Write($sample); $writer.Write($sample)
+    }
+    $writer.Flush(); $writer.Dispose()
+  } finally { $stream.Dispose() }
+}
+
 $engineArguments = @()
 if ($EnableSystemVolume) { $engineArguments += '--enable-system-volume' }
 if ($EnableSessionRouting) { $engineArguments += '--enable-session-routing' }
@@ -754,6 +785,20 @@ if ($EnableVst3Lane) {
 }
 $engineProcess = $null
 $offlineExitCode = $null
+$processDeliveryAudioProcess = $null
+if ($EnableProcessDelivery -and -not $RenderOffline) {
+  # Start a short-lived audible WAV playback so the Windows session catalog
+  # has at least one active session for process-loopback capture.
+  $tonePath = Join-Path (Join-Path $repo '.local') 'engine-preview-smoke-delivery-tone.wav'
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $tonePath) | Out-Null
+  Write-ProcessDeliveryTone $tonePath
+  $safeTonePath = $tonePath.Replace("'", "''")
+  $playCommand = "(New-Object System.Media.SoundPlayer('$safeTonePath')).PlaySync()"
+  $processDeliveryAudioProcess = Start-Process -FilePath 'powershell.exe' `
+    -ArgumentList @('-NoProfile', '-Command', $playCommand) `
+    -WindowStyle Hidden -PassThru
+  Start-Sleep -Milliseconds 500
+}
 if ($RenderOffline) {
   if ($EnableWasapiOutput -or $EnableTestTone -or $EnableSessionRouting -or
       $EnableProcessDelivery -or $EnableTabBridge -or $EnableDriverLoopback -or
@@ -886,10 +931,44 @@ try {
       $statusSummary += "WASAPI output route state=$mainOutputState; physical delivery is endpoint-dependent"
     }
     if ($EnableProcessDelivery) {
-      # Route 5 is process-loopback. When delivery is enabled the detail must
-      # eventually change from "waiting for captured audio" to "blocks rendered
-      # through WASAPI sink" (or stay waiting on a quiet machine, which is a
-      # pass because it proves the source started without crashing).
+      # Bind the first active session to main so process delivery has a routed
+      # source. Retry briefly because the background tone may not have appeared
+      # in the session catalog yet on this run.
+      $bindAttempt = 0; $routeBound = $false; $routeBindDetail = ''
+      while (-not $routeBound -and $bindAttempt -lt 20) {
+        $sessionFrame = New-IpcFrame 15 ([uint64](48 + $bindAttempt)) @()
+        Send-IpcFrame $client $sessionFrame
+        $sessionReply = Receive-IpcFrame $client
+        Assert-IpcFrameShape -Frame $sessionReply -ExpectedType 14 -ExpectedRequestId ([uint64](48 + $bindAttempt))
+        if ($sessionReply.Length -ge (24 + 256)) {
+          $catalogSeq = [BitConverter]::ToUInt64($sessionReply, 24)
+          $entryHandle = [BitConverter]::ToUInt64($sessionReply, 44)
+          $entryActive = $sessionReply[52]
+          if ($entryActive -eq 1 -and $entryHandle -gt 0) {
+            [byte[]]$routePayload = New-Object byte[] 128
+            [BitConverter]::GetBytes([uint64]$entryHandle).CopyTo($routePayload, 0)
+            [BitConverter]::GetBytes([uint64]$catalogSeq).CopyTo($routePayload, 8)
+            $rl = [System.Text.Encoding]::UTF8.GetBytes("process-delivery-lane")
+            $rg = [System.Text.Encoding]::UTF8.GetBytes("main")
+            $routePayload[16] = [byte]$rl.Length
+            $routePayload[17] = [byte]$rg.Length
+            $rl.CopyTo($routePayload, 20); $rg.CopyTo($routePayload, 68)
+            $rf = New-IpcFrame 17 49 $routePayload
+            Send-IpcFrame $client $rf
+            $rr = Receive-IpcFrame $client
+            $rrType = [BitConverter]::ToUInt16($rr, 6)
+            if ($rrType -ne 6) { throw "Route bind reply type=$rrType (expected Ack=6)." }
+            $routeBound = $true
+            $routeBindDetail = "handle=$entryHandle seq=$catalogSeq"
+          }
+        }
+        if (-not $routeBound) { Start-Sleep -Milliseconds 100; $bindAttempt++ }
+      }
+      if (-not $routeBound) {
+        Write-Warning 'No active audio session found for route bind.'
+      } else {
+        Write-Host "Route bind Ack confirmed ($routeBindDetail)."
+      }
       $processRouteOffset = 20 + 40 + (5 * 224)
       $processDetailBytes = [BitConverter]::ToUInt16($statusReply, $processRouteOffset + 6)
       $processDetail = [System.Text.Encoding]::UTF8.GetString(
@@ -897,7 +976,14 @@ try {
       if ($processDetail -notmatch 'per-App process delivery') {
         throw "Process delivery route detail is unexpected: '$processDetail'."
       }
-      $statusSummary += "process delivery enabled; route detail='$processDetail'"
+      $processState = $statusReply[$processRouteOffset + 1]
+      if ($processState -eq 0) {
+        $statusSummary += "per-App process delivery E2E verified; Ready; detail='$processDetail'"
+      } elseif ($routeBound) {
+        $statusSummary += "route bound ($routeBindDetail); state=$processState; detail='$processDetail'"
+      } else {
+        $statusSummary += "no active session to bind; state=$processState; detail='$processDetail'"
+      }
     }
     if ($EnableTabBridge) {
       $tabRouteOffset = 20 + 40 + (6 * 224)
@@ -1135,6 +1221,9 @@ try {
   Write-Output 'Engine Preview bounded IR WAV prepare and phase-policy ACK smoke passed.'
 } finally {
   if ($null -ne $client) { $client.Dispose() }
+  if ($null -ne $processDeliveryAudioProcess -and -not $processDeliveryAudioProcess.HasExited) {
+    Stop-Process -Id $processDeliveryAudioProcess.Id -Force
+  }
   if ($null -ne $engineProcess -and -not $engineProcess.HasExited) {
     Stop-Process -Id $engineProcess.Id; $engineProcess.WaitForExit()
   }
