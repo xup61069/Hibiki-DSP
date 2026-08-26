@@ -1614,6 +1614,18 @@ int wmain(const int argc, wchar_t* const* argv) {
         vst3_lane.block_frames =
             static_cast<std::size_t>((std::min)(512U, wasapi_output.config.channels * 64U));
         vst3_lane.sample_rate = static_cast<double>(wasapi_output.config.sample_rate);
+        // The VST3 lane rides on the same immutable graph as other explicit
+        // sources: without an active graph process_output_group rejects every
+        // WASAPI render and the tap never publishes audio. Prepare a Studio
+        // scene graph so the lane can deliver plugin output to WASAPI.
+        auto vst3_scene = hibiki::make_easy_scene(
+            hibiki::EasySceneKind::Studio, "main");
+        vst3_scene.graph.output_channels = vst3_lane.channels;
+        engine.set_sample_rate(wasapi_output.config.sample_rate);
+        if (!engine.prepare_graph(vst3_scene.graph, 1U) ||
+            !engine.commit_graph()) {
+            engine.rollback_graph();
+        }
         vst3_lane.ring_storage.resize(kVst3LaneRingCapacityFrames *
                                        static_cast<std::size_t>(vst3_lane.channels));
         vst3_lane.tap_buffer.resize(
