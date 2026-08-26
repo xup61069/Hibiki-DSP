@@ -15,6 +15,7 @@
             <SolidColorBrush x:Key="HibikiShellSurfaceBrush">#EEF3F8</SolidColorBrush>
             <SolidColorBrush x:Key="HibikiSectionCardBrush">#E8F0F8</SolidColorBrush>
             <SolidColorBrush x:Key="HibikiRouteItemBrush">#FFFFFFFF</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiRouteItemHoverBrush">#F1F6FF</SolidColorBrush>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
             <SolidColorBrush x:Key="HibikiSliderTrackFill" Opacity="0.36" Color="{StaticResource SystemAccentColor}" />
@@ -25,6 +26,7 @@
             <!-- Keep the dark shell layered instead of collapsing into one black plane. -->
             <SolidColorBrush x:Key="HibikiSectionCardBrush">#2B3547</SolidColorBrush>
             <SolidColorBrush x:Key="HibikiRouteItemBrush">#354761</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiRouteItemHoverBrush">#405574</SolidColorBrush>
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
