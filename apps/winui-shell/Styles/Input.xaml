@@ -48,6 +48,7 @@
     <Style x:Key="StatusPillCompactStyle" TargetType="Border">
         <Setter Property="CornerRadius" Value="999" />
         <Setter Property="Padding" Value="8,2" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
         <Setter Property="Background" Value="{ThemeResource SubtleFillColorTertiaryBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
