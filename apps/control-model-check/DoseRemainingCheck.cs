@@ -62,5 +62,35 @@ public static class DoseRemainingCheck
         dose.ResetDaily();
         check(dose.RemainingSafeTimeText == "尚無資料",
             "ResetDaily must restore the no-data label.");
+
+        // Daily rollover: samples carry their own UTC offset, so the local
+        // wall-clock date is judged from the sample itself. Accumulation from
+        // the previous day must not bill into the new day.
+        var lateNight = new DateTimeOffset(2026, 8, 26, 23, 55, 0,
+            TimeSpan.FromHours(8));
+        var afterMidnight = new DateTimeOffset(2026, 8, 27, 0, 5, 0,
+            TimeSpan.FromHours(8));
+        var rollover = new ListeningDoseModelV1();
+        check(rollover.AddSample(lateNight, 0.0, false),
+            "A pre-midnight loud sample must be accepted.");
+        for (var t = 1; t <= 4; ++t)
+            rollover.AddSample(lateNight.AddMinutes(t), 0.0, false);
+        check(rollover.AccumulatedDosePercent > 6.0 && rollover.AccumulatedDosePercent < 10.0,
+            $"Five pre-midnight minutes at 100%/h should accumulate about 8.3%, got {rollover.AccumulatedDosePercent:0.#}%.");
+        check(rollover.AddSample(afterMidnight, 0.0, false),
+            "A post-midnight loud sample must be accepted.");
+        check(rollover.AccumulatedDosePercent == 0.0,
+            "Crossing local midnight must restart accumulation from zero at the new sample.");
+        check(rollover.LastSampleGap == TimeSpan.Zero,
+            "The rollover sample must not be billed as a gap from yesterday.");
+
+        // Same-day continuation is unaffected by the rollover logic.
+        for (var t = 5; t <= 9; ++t)
+            rollover.AddSample(afterMidnight.AddMinutes(t), 0.0, false);
+        check(rollover.AccumulatedDosePercent > 13.0 && rollover.AccumulatedDosePercent < 17.0,
+            $"Nine post-midnight minutes at 100%/h should accumulate about 15%, got {rollover.AccumulatedDosePercent:0.#}%.");
+        check(rollover.StateText.Contains("今日", StringComparison.Ordinal) &&
+              !rollover.StateText.Contains("自啟動起", StringComparison.Ordinal),
+            "The state label must say 今日 after a fresh-day window.");
     }
 }
