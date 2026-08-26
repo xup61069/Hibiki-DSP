@@ -149,7 +149,7 @@
         <RowDefinition Height="Auto" />
         <RowDefinition Height="*" />
       </Grid.RowDefinitions>
-      <controls:InfoBar x:Name="DisconnectedBanner" IsOpen="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}" Severity="Warning" CornerRadius="12" Title="尚未連接引擎" Message="連接後才能套用場景、音量與路由控制。點擊「連接引擎」開始。" IsClosable="False" Margin="36,16,36,0" AutomationProperties.Name="引擎連線狀態提醒" Grid.Row="0" /><ScrollViewer Grid.Row="1" Padding="36,8,36,36">
+      <controls:InfoBar x:Name="DisconnectedBanner" IsOpen="{Binding IsConnected, Converter={StaticResource InverseBoolConverter}}" Severity="Warning" CornerRadius="12" Title="尚未連接引擎" Message="連接後才能套用場景、音量與路由控制。點擊「連接引擎」開始。" IsClosable="False" Margin="36,16,36,0" AutomationProperties.Name="引擎連線狀態提醒" Grid.Row="0" /><ScrollViewer x:Name="ShellContentScroller" Grid.Row="1" Padding="36,8,36,36" AutomationProperties.AccessibilityView="Raw">
         <StackPanel MaxWidth="1080" Spacing="20">
         <Grid x:Name="ShellHomeSection"><Grid.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" IsStaggeringEnabled="True" /></TransitionCollection></Grid.Transitions><Border Padding="28" CornerRadius="16" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"><Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#1A0866CC" Offset="0.0" /><GradientStop Color="#0C0866CC" Offset="0.5" /><GradientStop Color="Transparent" Offset="1.0" /></LinearGradientBrush></Border.Background>
                     <Grid x:Name="HeroLayout" ColumnSpacing="32" RowSpacing="16">

@@ -130,6 +130,9 @@ Hello 與裝置 catalog 成功後，ViewModel 會以序列化的 `ControlStatusR
 - 狀態文字以 polite live region 告知連線／控制結果，避免螢幕閱讀器被高頻音量事件打斷。
 - 頁面切換的進場動效以頁面層級容器為主；共用 section card 不得再疊加獨立進場動效，
   避免導覽時前一頁文字或卡片殘影短暫覆蓋新頁面。動效只是裝飾，不得是理解狀態或完成控制的必要條件。
+- 導覽切換頁面時，共用的內容 ScrollViewer 必須將垂直捲動位置重設到頂端；重設不得
+  清除 ViewModel 或頁面狀態，也不得破壞鍵盤 focus。使用者每次導覽都應從新頁面的標題
+  開始閱讀，而不是接續上一頁的捲動偏移。
 - 主要導覽的每個 `NavigationViewItem` 都必須提供非空且語意可辨識的 Fluent icon；
   圖示只作為視覺路由提示，文字與 `AutomationProperties.Name` 仍是完整語意來源。
 - 場景卡片使用兩欄 grid 時，卡片外緣必須保留一致的水平與垂直間距；hover lift
