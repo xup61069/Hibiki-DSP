@@ -4852,6 +4852,44 @@ int main() {
         CHECK(movie_engine.has_active_program_aware("main") &&
               movie_engine.program_aware_transaction_idle());
 
+        // The engine-level projection must preserve the controller's
+        // night-compression telemetry instead of dropping the field at the
+        // AudioEngineModel boundary.
+        AudioEngineModel night_engine;
+        GraphConfigV1 night_graph;
+        night_graph.lanes.push_back(
+            LaneConfigV1{"night-lane", "main", 2, 0.0, true});
+        CHECK(night_engine.prepare_graph(night_graph, 1U) &&
+              night_engine.commit_graph());
+        night_engine.set_sample_rate(48000U);
+        ProgramAwareLevelPolicyV1 night_policy{};
+        night_policy.enabled = true;
+        night_policy.analysis_window_ms = 100.0;
+        night_policy.max_rate_db_per_second = 60.0;
+        night_policy.night_compression_enabled = true;
+        night_policy.night_compression_max_reduction_db = 9.0;
+        night_policy.night_compression_knee_db = 6.0;
+        CHECK(night_engine.prepare_program_aware("main", night_policy) &&
+              night_engine.commit_program_aware());
+        std::array<float, 2048> night_input{};
+        night_input[0] = 0.8F;
+        night_input[1] = -0.8F;
+        const RtLaneInputV1 night_view{night_input.data(), 2U};
+        const std::array<RtLaneInputV1, 1> night_views{{night_view}};
+        std::array<float, 2048> night_output{};
+        CHECK(night_engine.process_output_group(
+            "main", night_views, night_output.data(), 1024U));
+        const auto night_telemetry =
+            night_engine.program_aware_telemetry_snapshot("main");
+        CHECK(night_telemetry.valid && night_telemetry.enabled &&
+              !night_telemetry.silence_gated);
+        CHECK(night_telemetry.night_compression_gain_db < -1.0 &&
+              night_telemetry.night_compression_gain_db >= -9.0);
+        const auto night_visual = night_engine.program_aware_visual_snapshot();
+        CHECK(night_visual.valid &&
+              night_visual.night_compression_gain_db ==
+                  night_telemetry.night_compression_gain_db);
+
         // The committed attachment must carry the live opt-in: a direct
         // recompute request succeeds only when the flag survives the
         // pending-to-active promotion during SceneApply commit.
@@ -6626,14 +6664,15 @@ int main() {
         CHECK(detector_ok);
         CHECK(detector_allocations == 0U);
 
-        // Controller: the bass-correction shelf path must also avoid hidden
-        // vector/string growth inside process_interleaved.
+        // Controller: the bass-correction shelf and enabled night-compressor
+        // paths must avoid hidden vector/string growth inside processing.
         ProgramAwareLevelControllerV1 no_alloc_controller;
-        CHECK(no_alloc_controller.configure(
-            ProgramAwareLevelPolicyV1{1, true, -40.0, 0.0, 24.0, 3000.0, 60.0,
-                                      -70.0, ProgramAwareMeterModeV1::RmsProxy,
-                                      -1, true, 6.0},
-            48000U));
+        auto no_alloc_policy =
+            ProgramAwareLevelPolicyV1{1, true, -40.0, 0.0, 24.0, 3000.0,
+                                      60.0, -70.0,
+                                      ProgramAwareMeterModeV1::RmsProxy, -1,
+                                      true, 6.0, true, 9.0, 12.0};
+        CHECK(no_alloc_controller.configure(no_alloc_policy, 48000U));
         bool controller_ok = true;
         const auto controller_allocations = rt_noalloc_probe::allocations_during([&] {
             for (unsigned repeat = 0U; repeat < 4U; ++repeat) {
