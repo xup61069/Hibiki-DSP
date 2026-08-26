@@ -219,6 +219,7 @@ struct Vst3LaneState final {
     std::uint32_t channels{0U};
     std::size_t block_frames{0U};
     double sample_rate{0.0};
+    std::uint64_t tap_sequence{0U};
     bool requested{false};
     bool launched{false};
 };
@@ -1258,12 +1259,20 @@ void set_route(hibiki::ControlRouteHealthEntryV1& route,
     route = {};
     route.id_bytes = static_cast<std::uint8_t>(id.size());
     route.name_bytes = static_cast<std::uint16_t>(name.size());
-    route.detail_bytes = static_cast<std::uint16_t>(detail.size());
+    // Defensive bound: callers compose details from device prefixes and
+    // telemetry counters; never let a longer composition overflow the wire
+    // entry even though current call sites stay inside the budget.
+    route.detail_bytes = static_cast<std::uint16_t>(
+        std::min<std::size_t>(detail.size(), route.detail.size()));
     route.state = state;
     route.flags = flags;
     std::copy(id.begin(), id.end(), route.id.begin());
     std::copy(name.begin(), name.end(), route.name.begin());
-    std::copy(detail.begin(), detail.end(), route.detail.begin());
+    const auto detail_copy_bytes = std::min<std::size_t>(
+        detail.size(), route.detail.size());
+    std::copy(detail.begin(),
+              detail.begin() + static_cast<std::ptrdiff_t>(detail_copy_bytes),
+              route.detail.begin());
 }
 
 bool prepare_calibration_peq(
@@ -1315,11 +1324,13 @@ hibiki::ControlStatusSnapshotV1 make_initial_status(
     const bool driver_loopback_ready,
     const std::string_view driver_loopback_detail,
     const bool wav_source_enabled, const std::string_view wav_source_detail,
-    const bool tab_bridge_enabled, const std::string_view tab_bridge_detail) noexcept {
+    const bool tab_bridge_enabled, const std::string_view tab_bridge_detail,
+    const bool vst3_lane_enabled) noexcept {
     hibiki::ControlStatusSnapshotV1 snapshot{};
     snapshot.sequence = 1U;
     snapshot.volume = volume;
-    snapshot.route_count = wav_source_enabled || driver_loopback_enabled || tab_bridge_enabled
+    snapshot.route_count = vst3_lane_enabled ? 8U
+        : (wav_source_enabled || driver_loopback_enabled || tab_bridge_enabled)
                               ? 7U
                               : 6U;
     set_route(snapshot.routes[0U], "engine-control", "引擎控制面",
@@ -1369,6 +1380,11 @@ hibiki::ControlStatusSnapshotV1 make_initial_status(
                       ? hibiki::ControlRouteHealthStateV1::Pending
                       : hibiki::ControlRouteHealthStateV1::Unavailable,
                   tab_bridge_enabled ? 0U : 1U);
+    }
+    if (vst3_lane_enabled) {
+        set_route(snapshot.routes[7U], "vst3-lane", "VST3 Lane",
+                  "vst3 lane armed; waiting for first processed block.",
+                  hibiki::ControlRouteHealthStateV1::Pending);
     }
     return snapshot;
 }
@@ -1457,6 +1473,8 @@ int wmain(const int argc, wchar_t* const* argv) {
     const bool vst3_lane_requested =
         has_command_line_flag(argc, argv, L"--enable-vst3-lane");
     std::wstring vst3_module_path{};
+    std::wstring vst3_class_id{};
+    std::wstring vst3_worker_path{};
     for (int index = 1; index < argc; ++index) {
         const std::wstring_view argument = argv[index] != nullptr
                                                ? std::wstring_view(argv[index])
@@ -1464,6 +1482,16 @@ int wmain(const int argc, wchar_t* const* argv) {
         if (argument == L"--vst3-module-path" && index + 1 < argc &&
             argv[index + 1] != nullptr) {
             vst3_module_path = argv[index + 1];
+            ++index;
+        }
+        if (argument == L"--vst3-class-id" && index + 1 < argc &&
+            argv[index + 1] != nullptr) {
+            vst3_class_id = argv[index + 1];
+            ++index;
+        }
+        if (argument == L"--vst3-worker-path" && index + 1 < argc &&
+            argv[index + 1] != nullptr) {
+            vst3_worker_path = argv[index + 1];
             ++index;
         }
     }
@@ -1549,6 +1577,21 @@ int wmain(const int argc, wchar_t* const* argv) {
     }
     if (vst3_lane_requested && !wasapi_output_requested) {
         // Fail-closed: the VST3 lane needs a sink to be meaningful.
+        (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+        return 2;
+    }
+    if (vst3_lane_requested && vst3_class_id.empty()) {
+        // Fail-closed: the SDK-backed sandbox worker requires a non-empty
+        // VST3 class ID to load the requested processor. Refuse to start
+        // rather than launching a worker that cannot succeed.
+        std::fwprintf(stderr,
+                      L"error: --enable-vst3-lane requires --vst3-class-id.\n");
+        (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+        return 2;
+    }
+    if (vst3_lane_requested && vst3_module_path.empty()) {
+        std::fwprintf(stderr,
+                      L"error: --enable-vst3-lane requires --vst3-module-path.\n");
         (void)SetConsoleCtrlHandler(on_console_control, FALSE);
         return 2;
     }
@@ -1638,12 +1681,38 @@ int wmain(const int argc, wchar_t* const* argv) {
     if (wasapi_started && wav_source_requested) {
         wav_source_ready = prepare_wav_file_source(wav_source, wav_source_path,
                                                    wasapi_output, engine);
+        if (!wav_source_ready) {
+            // Honest diagnostics: a silently skipped source looks identical
+            // to a working pipeline downstream (e.g. VST3 tap never gets
+            // published), so report the failed preparation explicitly.
+            std::fwprintf(
+                stderr,
+                L"error: wav source prepare failed; path=%ls\n",
+                wav_source_path.wstring().c_str());
+        }
     }
     if (wasapi_started && vst3_lane_requested) {
         vst3_lane.channels = wasapi_output.config.channels;
+        // The worker lane must accept exactly the block size the sink will
+        // render; a smaller prepared max silently degrades on the first tap
+        // read when the endpoint reports larger buffer frames.
         vst3_lane.block_frames =
-            static_cast<std::size_t>((std::min)(512U, wasapi_output.config.channels * 64U));
+            static_cast<std::size_t>(wasapi_output.block_frames);
         vst3_lane.sample_rate = static_cast<double>(wasapi_output.config.sample_rate);
+        if (!engine.has_active_graph()) {
+            // The VST3 lane rides on the same immutable graph as an explicit
+            // source. When no source has committed a graph yet, create a
+            // minimal one so process_output_group can render and publish the
+            // VST3 tap; otherwise preserve the source-owned graph contract.
+            auto vst3_scene = hibiki::make_easy_scene(
+                hibiki::EasySceneKind::Studio, "main");
+            vst3_scene.graph.output_channels = vst3_lane.channels;
+            engine.set_sample_rate(wasapi_output.config.sample_rate);
+            if (!engine.prepare_graph(vst3_scene.graph, 1U) ||
+                !engine.commit_graph()) {
+                engine.rollback_graph();
+            }
+        }
         vst3_lane.ring_storage.resize(kVst3LaneRingCapacityFrames *
                                        static_cast<std::size_t>(vst3_lane.channels));
         vst3_lane.tap_buffer.resize(
@@ -1823,7 +1892,8 @@ int wmain(const int argc, wchar_t* const* argv) {
                                       driver_loopback_ready,
                                       driver_loopback_detail,
                                       wasapi_output.wav_source_enabled, wav_source_detail,
-                                      tab_bridge.listening, tab_bridge_detail);
+                                      tab_bridge.listening, tab_bridge_detail,
+                                      vst3_lane_requested);
     if (!status_store.publish(status)) return 4;
     hibiki::ControlPlaneHostV1 host;
     hibiki::IpcNamedPipeConfigV1 pipe_config{kPipeName, 64U * 1024U, 1000U};
@@ -1971,14 +2041,21 @@ int wmain(const int argc, wchar_t* const* argv) {
         if (vst3_lane.requested && wasapi_started) {
             // Launch the sandbox worker on the first iteration.
             if (!vst3_lane.launched) {
-                vst3_lane.worker_executable =
-                    L".local\\vst3-build\\vst-host\\Release\\hibiki_vst3_sdk_worker.exe";
+                if (!vst3_worker_path.empty()) {
+                    vst3_lane.worker_executable = vst3_worker_path;
+                } else {
+                    vst3_lane.worker_executable =
+                        L".local\\vst3-build\\vst-host\\Release\\hibiki_vst3_sdk_worker.exe";
+                }
                 vst3_lane.plugin_path = vst3_module_path;
                 hibiki::Vst3SandboxLaunchV1 launch{};
                 launch.worker_executable = vst3_lane.worker_executable;
                 launch.plugin_path = vst3_lane.plugin_path;
+                launch.vst3_class_id = vst3_class_id;
                 launch.watchdog_timeout_ms = 250U;
                 launch.start_time_ms = 1U;
+                launch.worker_pipe_name = L"\\\\.\\pipe\\HibikiDSP_preview_vst3_worker_v1";
+                launch.worker_pipe_timeout_ms = 1000U;
                 launch.vst3_sample_rate = vst3_lane.sample_rate;
                 launch.vst3_channels = vst3_lane.channels;
                 if (hibiki::validate_vst3_sandbox_launch_v1(launch) &&
@@ -1989,7 +2066,21 @@ int wmain(const int argc, wchar_t* const* argv) {
                     if (vst3_lane.host.prepare_worker_session(
                             vst3_lane.sandbox, vst3_lane.sample_rate,
                             static_cast<std::uint32_t>(vst3_lane.block_frames))) {
-                        (void)vst3_lane.host.handshake_worker(vst3_lane.request_id++);
+                        const bool worker_connected = vst3_lane.sandbox.wait_for_worker(1000U);
+                        if (!worker_connected) {
+                            std::fwprintf(
+                                stderr,
+                                L"error: vst3 worker did not connect within 1s.\n");
+                            ++vst3_lane.failed_blocks;
+                        } else {
+                            const auto hs = vst3_lane.host.handshake_worker(vst3_lane.request_id++);
+                            if (hs != hibiki::Vst3WorkerExchangeResultV1::ok) {
+                                std::fwprintf(
+                                    stderr,
+                                    L"error: vst3 worker handshake failed result=%d.\n",
+                                    static_cast<int>(hs));
+                            }
+                        }
                         vst3_lane.launched = true;
                         // Prepare the lane ring so apply_vst3_lanes can pop.
                         (void)engine.prepare_vst3_lane("main", vst3_lane.channels,
@@ -2002,13 +2093,28 @@ int wmain(const int argc, wchar_t* const* argv) {
                 }
             }
             // Read tap -> process in worker -> push into ring.
+            if (vst3_lane.launched && !vst3_lane.host.can_process()) {
+                static bool diag_host_dead_printed = false;
+                if (!diag_host_dead_printed) {
+                    diag_host_dead_printed = true;
+                    std::fwprintf(
+                        stderr,
+                        L"error: vst3 host cannot process after launch.\n");
+                }
+                ++vst3_lane.failed_blocks;
+            }
             if (vst3_lane.launched && vst3_lane.host.can_process()) {
                 std::uint32_t tap_channels = 0U;
                 std::size_t tap_frames = 0U;
                 std::uint64_t tap_sequence = 0U;
-                if (engine.read_vst3_tap("main", vst3_lane.tap_buffer.data(),
-                                         kVst3LaneRingCapacityFrames,
-                                         tap_channels, tap_frames, tap_sequence)) {
+                const bool tap_read = engine.read_vst3_tap(
+                    "main", vst3_lane.tap_buffer.data(),
+                    kVst3LaneRingCapacityFrames,
+                    tap_channels, tap_frames, tap_sequence);
+                if (tap_read) {
+                    if (tap_sequence == vst3_lane.tap_sequence) {
+                        // Same snapshot already consumed; skip duplicate work.
+                    } else {
                     const std::size_t sample_count =
                         tap_frames * static_cast<std::size_t>(tap_channels);
                     auto result = vst3_lane.host.process_worker_block(
@@ -2022,8 +2128,10 @@ int wmain(const int argc, wchar_t* const* argv) {
                         (void)engine.push_vst3_lane("main", vst3_lane.worker_output.data(),
                                                     tap_frames);
                         ++vst3_lane.processed_blocks;
+                        vst3_lane.tap_sequence = tap_sequence;
                     } else {
                         ++vst3_lane.failed_blocks;
+                    }
                     }
                 }
             }
@@ -2234,6 +2342,31 @@ int wmain(const int argc, wchar_t* const* argv) {
                                 : hibiki::ControlRouteHealthStateV1::Pending,
                       wav_source.prepared ? 0U : 1U);
             if (!same_route(previous_wav_route, status.routes[6U])) status_changed = true;
+        }
+        if (vst3_lane_requested) {
+            static thread_local std::string vst3_detail_buffer;
+            const auto previous_vst3_route = status.routes[7U];
+            if (!vst3_lane.launched && vst3_lane.failed_blocks > 0U) {
+                set_route(status.routes[7U], "vst3-lane", "VST3 Lane",
+                          "vst3 lane unavailable; worker or plugin setup failed.",
+                          hibiki::ControlRouteHealthStateV1::Degraded, 1U);
+            } else if (vst3_lane.processed_blocks > 0U) {
+                vst3_detail_buffer =
+                    "vst3 lane rendering; blocks=" +
+                    std::to_string(vst3_lane.processed_blocks);
+                if (vst3_lane.failed_blocks != 0U) {
+                    vst3_detail_buffer +=
+                        "; failed=" + std::to_string(vst3_lane.failed_blocks);
+                }
+                set_route(status.routes[7U], "vst3-lane", "VST3 Lane",
+                          std::string_view(vst3_detail_buffer),
+                          hibiki::ControlRouteHealthStateV1::Ready, 0U);
+            } else {
+                set_route(status.routes[7U], "vst3-lane", "VST3 Lane",
+                          "vst3 lane armed; waiting for first processed block.",
+                          hibiki::ControlRouteHealthStateV1::Pending, 0U);
+            }
+            if (!same_route(previous_vst3_route, status.routes[7U])) status_changed = true;
         }
         if (status_changed) {
             ++status.sequence;

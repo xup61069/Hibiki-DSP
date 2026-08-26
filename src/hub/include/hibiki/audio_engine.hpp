@@ -338,7 +338,25 @@ public:
         const float* interleaved,
         std::size_t frames) noexcept;
     [[nodiscard]] EngineTransactionState transaction_state() const noexcept { return state_; }
+    [[nodiscard]] bool has_active_graph() const noexcept { return has_active_graph_; }
     [[nodiscard]] const RtGraphSnapshotV1& active_graph() const noexcept { return active_graph_; }
+    // Control-plane diagnostic accessor for the VST3 lane tap bridge.
+    [[nodiscard]] bool vst3_tap_valid() const noexcept {
+        return vst3_tap_.is_valid_for_diagnostics();
+    }
+    [[nodiscard]] bool vst3_lane_active(std::string_view output_group) const noexcept {
+        return has_active_vst3_lane(output_group);
+    }
+    // Publish counters forwarded from the tap bridge for preview diagnostics.
+    [[nodiscard]] std::uint64_t vst3_tap_publish_attempts() const noexcept {
+        return vst3_tap_.publish_attempt_count();
+    }
+    [[nodiscard]] std::uint64_t vst3_tap_publish_successes() const noexcept {
+        return vst3_tap_.publish_success_count();
+    }
+    [[nodiscard]] std::uint64_t vst3_tap_publish_nonfinite_rejects() const noexcept {
+        return vst3_tap_.publish_nonfinite_reject_count();
+    }
     // Control-plane snapshot.  The RT process path reads the two atomics
     // below instead of touching this mutable control-plane object.
     [[nodiscard]] OutputGroupVolumeStateV1 volume() const noexcept {
