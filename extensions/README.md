@@ -39,7 +39,9 @@ The popup includes a "Copy diagnostics" button that places an anonymous,
 plain-text diagnostic snapshot on the clipboard. The snapshot contains only
 the current capturing flag, bridge-connected flag, bridge reconnect state
 (idle / waiting / retrying / exhausted), dropped-packet count and a UTC
-timestamp. It never contains audio samples, tab URLs, tab titles or device
+timestamp, plus the cumulative total-packet count (reset on each Start).
+The counters let maintainers see from pasted text whether packets are being
+sent at all or silently dropped. It never contains audio samples, tab URLs, tab titles or device
 identifiers. This helps bug reports include connection state without sharing
 personal data.
 
