@@ -406,6 +406,7 @@ endif()
 
 add_test(NAME hibiki_device_catalog_snapshot_tests COMMAND hibiki_device_catalog_snapshot_tests)
 
+
 add_executable(hibiki_session_catalog_snapshot_tests
   unit/session_catalog_snapshot_tests.cpp
 )
@@ -419,6 +420,21 @@ else()
 endif()
 
 add_test(NAME hibiki_session_catalog_snapshot_tests COMMAND hibiki_session_catalog_snapshot_tests)
+
+
+add_executable(hibiki_ipc_pipe_tests
+  unit/ipc_pipe_server_tests.cpp
+)
+
+target_link_libraries(hibiki_ipc_pipe_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_ipc_pipe_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_ipc_pipe_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_ipc_pipe_tests COMMAND hibiki_ipc_pipe_tests)
 
 add_executable(hibiki_scene_graph_tests
   unit/scene_graph_tests.cpp
