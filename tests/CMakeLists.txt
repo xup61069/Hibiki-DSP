@@ -87,6 +87,20 @@ endif()
 
 add_test(NAME hibiki_output_crossfade_tests COMMAND hibiki_output_crossfade_tests)
 
+add_executable(hibiki_control_status_tests
+  unit/control_status_tests.cpp
+)
+
+target_link_libraries(hibiki_control_status_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_control_status_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_control_status_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_control_status_tests COMMAND hibiki_control_status_tests)
+
 add_executable(hibiki_peq_dsp_tests
   unit/peq_dsp_tests.cpp
 )
