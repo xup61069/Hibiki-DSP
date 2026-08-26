@@ -37,6 +37,14 @@ internal sealed class PreviewForm : Form
     private readonly EasyControlViewModel _viewModel;
     private readonly Label _connection = new() { AutoSize = true };
     private readonly Label _devices = new() { AutoSize = false, Width = 550, Height = 48 };
+    private readonly Label _physicalDeviceEmptyState = new()
+    {
+        AutoSize = false,
+        Height = 48,
+        Visible = false,
+        AccessibleName = "實體輸出裝置狀態",
+        Tag = "empty-state",
+    };
     private readonly Label _status = new() { AutoSize = false, Height = 48 };
     private readonly Label _routes = new() { AutoSize = false, Width = 550, Height = 58 };
     private readonly Label _sessions = new() { AutoSize = false, Width = 550, Height = 72 };
@@ -158,6 +166,7 @@ internal sealed class PreviewForm : Form
         };
         panel.Controls.Add(CreateSectionHeader("實體輸出裝置"));
         panel.Controls.Add(_physicalDeviceSelector);
+        panel.Controls.Add(_physicalDeviceEmptyState);
         var physicalDeviceActions = new FlowLayoutPanel
         {
             AutoSize = true,
@@ -628,7 +637,7 @@ internal sealed class PreviewForm : Form
 
         foreach (var label in new[]
                  {
-                     _devices, _status, _routes, _sessions, _irStatus,
+                     _devices, _physicalDeviceEmptyState, _status, _routes, _sessions, _irStatus,
                      _eqStatus, _lastSendDiagnostics, _customSceneQueueStatus,
                  })
         {
@@ -699,7 +708,7 @@ internal sealed class PreviewForm : Form
 
         foreach (var label in new[]
                  {
-                     _devices, _status, _routes, _sessions, _irStatus,
+                     _devices, _physicalDeviceEmptyState, _status, _routes, _sessions, _irStatus,
                      _eqStatus, _lastSendDiagnostics,
                  })
         {
@@ -819,6 +828,10 @@ internal sealed class PreviewForm : Form
               $"預設輸出：{defaultRender ?? "未指定"}\r\n切換會先預熱新裝置再以 30 ms 交叉淡化；失敗自動回復上一個裝置。";
         SyncPhysicalDeviceList();
         var selectableRenderCount = renderDevices.Count(device => device.IsSelectable);
+        _physicalDeviceEmptyState.Visible = selectableRenderCount == 0;
+        _physicalDeviceEmptyState.Text = _viewModel.IsConnected
+            ? "沒有可用的已驗證實體輸出裝置。"
+            : "尚未連接引擎；連接後才會顯示已驗證的實體輸出裝置。";
         _physicalDeviceSelector.Enabled = _viewModel.IsConnected && selectableRenderCount > 0;
         _switchDevice.Enabled = _viewModel.IsConnected && !_viewModel.IsBusy &&
                                 _physicalDeviceSelector.SelectedValue is string;
