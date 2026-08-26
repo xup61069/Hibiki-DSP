@@ -100,6 +100,7 @@ else()
 endif()
 
 add_test(NAME hibiki_peq_dsp_tests COMMAND hibiki_peq_dsp_tests)
+
 add_executable(hibiki_true_peak_limiter_tests
   unit/true_peak_limiter_tests.cpp
 )
