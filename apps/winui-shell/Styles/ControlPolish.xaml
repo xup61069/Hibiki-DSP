@@ -10,9 +10,11 @@
             <StaticResource x:Key="SliderTrackFill" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPointerOver" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPressed" ResourceKey="HibikiSliderTrackFill" />
-            <SolidColorBrush x:Key="HibikiShellSurfaceBrush">#F4F7FB</SolidColorBrush>
-            <SolidColorBrush x:Key="HibikiSectionCardBrush">#F6F9FC</SolidColorBrush>
-            <SolidColorBrush x:Key="HibikiRouteItemBrush">#FFFFFFD8</SolidColorBrush>
+            <!-- Keep the light shell cool and slightly recessed so white cards
+                 remain visibly layered without becoming heavy gray panels. -->
+            <SolidColorBrush x:Key="HibikiShellSurfaceBrush">#EEF3F8</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiSectionCardBrush">#E8F0F8</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiRouteItemBrush">#FFFFFFFF</SolidColorBrush>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
             <SolidColorBrush x:Key="HibikiSliderTrackFill" Opacity="0.36" Color="{StaticResource SystemAccentColor}" />
