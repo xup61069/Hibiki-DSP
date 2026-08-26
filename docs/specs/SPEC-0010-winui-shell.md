@@ -37,6 +37,8 @@ model seams 管理，不得由 shell 宣稱已同步到 worker、plugin 或持�
 `%LOCALAPPDATA%\Hibiki DSP\ui-theme-v1.json`，讀取或寫入失敗時回到淺色，且不影響
 engine/control-plane 狀態。Root theme 以 `ElementTheme.Light`／`ElementTheme.Dark`
 套用到 NavigationView、InfoBar、cards、inputs、footer 與自訂 ThemeResource。
+深色主題的 section card 與 route/item card 必須使用可辨識的分層 surface token，不能與
+頁面或導覽背景合併成難以辨識的單一黑色平面；兩種主題都必須保留可讀文字與狀態邊界。
 
 音量保護頁的主要視覺卡稱為「等響度補償」，顯示既有 `EqVisualSurface` 的狀態、來源圖例
 與曲線。它只呈現引擎確認的 user-space `EqVisualSnapshotV1`；這不是音量量測、耳機校準、
