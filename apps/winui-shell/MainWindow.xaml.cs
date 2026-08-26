@@ -467,6 +467,38 @@ public sealed partial class MainWindow : Window
         if (sender is Button { Tag: string sceneId })
             await ViewModel.RemoveCustomSceneAsync(sceneId);
     }
+    private async void OnExportCustomScenesClick(object sender, RoutedEventArgs e)
+    {
+        var picker = new Windows.Storage.Pickers.FileSavePicker();
+
+        var handle = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, handle);
+
+        picker.SuggestedFileName = "hibiki-custom-scenes";
+        picker.FileTypeChoices.Add("JSON", [".json"]);
+        var file = await picker.PickSaveFileAsync();
+
+        if (file is not null)
+        {
+            ViewModel.ExportCustomScenes(file.Path);
+        }
+    }
+
+    private async void OnImportCustomScenesClick(object sender, RoutedEventArgs e)
+    {
+        var picker = new Windows.Storage.Pickers.FileOpenPicker();
+
+        var handle = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, handle);
+
+        picker.FileTypeFilter.Add(".json");
+        var file = await picker.PickSingleFileAsync();
+
+        if (file is not null)
+        {
+            ViewModel.ImportCustomScenes(file.Path);
+        }
+    }
 
     private async void OnVolumeChanged(object sender, RangeBaseValueChangedEventArgs e)
     {

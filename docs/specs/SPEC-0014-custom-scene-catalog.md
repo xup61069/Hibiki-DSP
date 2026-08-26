@@ -122,6 +122,15 @@ ViewModel 先更新記憶體 mirror，再以既有暫存檔替換流程保存；
 保存失敗時回復原卡片與選取狀態並顯示可讀錯誤。選取自訂卡片仍只能送出既有
 `SceneApply(scene_id, output_group)`。
 
+## 正式殼層的本機卡片匯出與匯入
+
+正式 WinUI 殼層的「自訂預設」區提供「匯出自訂預設」與「匯入自訂預設」入口。匯出以 FileSavePicker
+選擇 JSON 目的地，並呼叫既有 ViewModel 匯出流程；匯入以 FileOpenPicker 選擇 JSON 來源，
+呼叫既有 ViewModel 匯入流程：無效、空、超過剩餘容量的檔案在寫入前即被拒絕，不會改變目前
+catalog；成功匯入後刷新卡片清單，並以 StatusText 如實回報結果。兩顆按鈕都有非空
+AutomationProperties.Name 與 HelpText。此入口只重用既有 user-space 卡片保存契約，不改變
+engine、wire contract 或 DesktopCompat 行為。
+
 ## 驗收
 
 1. 合法 custom Scene 可在引擎 catalog upsert、find、替換並透過 SceneApply commit；C# UI
