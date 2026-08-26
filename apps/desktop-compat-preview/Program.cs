@@ -142,6 +142,8 @@ internal sealed class PreviewForm : Form
     private bool _restoredPersistedState;
     private bool _windowBoundsRestored;
     private ComboBox _outputGroups = null!;
+    private FlowLayoutPanel _modernPanel = null!;
+    private Panel _modernHeader = null!;
     internal PreviewForm(EasyControlViewModel viewModel)
     {
         _viewModel = viewModel;
@@ -164,6 +166,8 @@ internal sealed class PreviewForm : Form
             BackColor = ShellBackground,
         };
         var header = CreateHeaderCard();
+        _modernPanel = panel;
+        _modernHeader = header;
         panel.Controls.Add(header);
         panel.Controls.Add(CreateSectionHeader("引擎連線"));
         panel.Controls.Add(_connect);
@@ -785,6 +789,13 @@ internal sealed class PreviewForm : Form
                  })
         {
             label.Width = contentWidth;
+            var textWidth = Math.Max(1, contentWidth - label.Padding.Horizontal);
+            var measuredHeight = string.IsNullOrEmpty(label.Text)
+                ? 0
+                : TextRenderer.MeasureText(label.Text, label.Font,
+                    new Size(textWidth, int.MaxValue), TextFormatFlags.WordBreak).Height;
+            label.Height = Math.Max(GetStatusMinimumHeight(label),
+                                    measuredHeight + label.Padding.Vertical + 2);
         }
 
         var halfWidth = Math.Max(260, (contentWidth - 26) / 2);
@@ -805,6 +816,14 @@ internal sealed class PreviewForm : Form
             fields.Height = Math.Max(fields.Height, rowHeight + fields.Padding.Vertical + 4);
         }
     }
+
+    private int GetStatusMinimumHeight(Label label) =>
+        ReferenceEquals(label, _connection) ? 42 :
+        ReferenceEquals(label, _routes) ? 58 :
+        ReferenceEquals(label, _sessions) ? 72 :
+        ReferenceEquals(label, _irStatus) ? 58 :
+        ReferenceEquals(label, _eqStatus) || ReferenceEquals(label, _lastSendDiagnostics) ? 32 :
+        48;
 
     private void RestoreWindowBounds()
     {
@@ -1003,6 +1022,9 @@ internal sealed class PreviewForm : Form
             _scenes.SelectedValue = selectedScene;
             _updatingScene = false;
         }
+
+        if (_modernPanel is not null && !_modernPanel.IsDisposed)
+            ResizeModernSurface(_modernPanel, _modernHeader);
     }
 
     private void SyncSessionList()
