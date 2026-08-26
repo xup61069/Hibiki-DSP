@@ -45,8 +45,13 @@ void WindowsDeviceWatcher::publish(const WindowsDeviceChangeKind kind,
     flow_.store(static_cast<std::int32_t>(flow), std::memory_order_relaxed);
     role_.store(static_cast<std::int32_t>(role), std::memory_order_relaxed);
     state_.store(state, std::memory_order_relaxed);
+    // Keep the bounded snapshot fail-closed: never read past the caller's
+    // string terminator and always leave a terminating NUL in the fixed
+    // endpoint-id slots.
+    const auto last_index = endpoint_id_.size() - 1;
     for (std::size_t index = 0; index < endpoint_id_.size(); ++index) {
-        const auto value = id == nullptr ? L'\0' : id[index];
+        const auto value =
+            (id == nullptr || index == last_index) ? L'\0' : id[index];
         endpoint_id_[index].store(value, std::memory_order_relaxed);
         if (value == L'\0') {
             for (std::size_t rest = index + 1; rest < endpoint_id_.size(); ++rest) {
