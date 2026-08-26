@@ -25,9 +25,9 @@ DeviceSwitch request、Windows 音量與 IR 相位滑桿、有效音量／安全
 process loopback、瀏覽器單分頁與 direct bypass 的路由健康卡片、App 工作階段清單與「刷新 App 工作階段清單」動作（附帶實體 per-App 擷取／重新送出未驗證的清楚邊界說明）、版本化 named-pipe Hello／SceneApply／VolumeNotification／DeviceSwitch／IrPrepareCommand
 ／DeviceCatalogRequest／DeviceCatalogSnapshot／ControlStatusRequest／ControlStatusSnapshot／SessionCatalogRequest／SessionCatalogSnapshot 命令、連線失敗回復；音量拖曳使用 40 ms bounded debounce 與 command serialization，
 只送出最新的控制值。
-正式殼層使用單一 NavigationView 導覽，固定六頁依序為「快速開始」（Ctrl+1）、
-「場景」（Ctrl+2）、「自訂預設」（Ctrl+3）、「音量保護」（Ctrl+4）、「路由健康」（Ctrl+5）
-與「Expert Panel」（Ctrl+6）；正式 shell 不提供 VST3 時間軸編輯面。
+正式殼層使用單一 NavigationView 導覽，固定七頁依序為「快速開始」（Ctrl+1）、
+「場景」（Ctrl+2）、「自訂預設」（Ctrl+3）、「音量保護」（Ctrl+4）、「路由健康」（Ctrl+5）、
+「Expert Panel」（Ctrl+6）與「校正精靈」（Ctrl+7）；正式 shell 不提供 VST3 時間軸編輯面。
 這些頁面是同一 shell 內的面板切換，不新增 IPC 命令，也不改變 Easy/Expert 的
 顯示邊界：Expert Panel 頁面只收納既有 Expert 唯讀摘要與本機編輯面。
 正式 shell 不再暴露 VST3 時間軸編輯卡片；VST3 host 能力仍由 SPEC-0008 的 bounded
@@ -133,7 +133,7 @@ Hello 與裝置 catalog 成功後，ViewModel 會以序列化的 `ControlStatusR
 - Expert Panel 在 `IsExpert=false` 時必須顯示可理解的 empty state，不得只留下無語意的
   空白容器；empty state 應提供開啟既有 Expert toggle 的明確入口，且不改變 Expert
   內容的唯讀 contract。
-- 主要導覽提供 Ctrl+1 到 Ctrl+6 的快捷鍵，依序切換六個頁面；每個導覽項目都有
+- 主要導覽提供 Ctrl+1 到 Ctrl+7 的快捷鍵，依序切換七個頁面；每個導覽項目都有
   明確的 AutomationProperties.Name，鍵盤使用者不需依賴視覺位置或顏色即可到達任一頁。
 - XAML 靜態 gate 必須檢查上述 binding；目標 Windows App SDK 環境仍需做真正的鍵盤、
   螢幕閱讀器、高對比與文字縮放驗收。
