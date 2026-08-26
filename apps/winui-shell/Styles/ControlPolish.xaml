@@ -18,8 +18,9 @@
             <StaticResource x:Key="SliderTrackFill" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPointerOver" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPressed" ResourceKey="HibikiSliderTrackFill" />
-            <SolidColorBrush x:Key="HibikiSectionCardBrush">#222A38</SolidColorBrush>
-            <SolidColorBrush x:Key="HibikiRouteItemBrush">#2E3848</SolidColorBrush>
+            <!-- Keep the dark shell layered instead of collapsing into one black plane. -->
+            <SolidColorBrush x:Key="HibikiSectionCardBrush">#2B3547</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiRouteItemBrush">#354761</SolidColorBrush>
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
