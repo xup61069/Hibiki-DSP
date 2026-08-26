@@ -324,6 +324,20 @@ endif()
 
 add_test(NAME hibiki_virtual_mic_tests COMMAND hibiki_virtual_mic_tests)
 
+add_executable(hibiki_calibration_compiler_tests
+  unit/calibration_compiler_tests.cpp
+)
+
+target_link_libraries(hibiki_calibration_compiler_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_calibration_compiler_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_calibration_compiler_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_calibration_compiler_tests COMMAND hibiki_calibration_compiler_tests)
+
 
 
 if(HIBIKI_BUILD_LIVE_PROBES AND WIN32)
