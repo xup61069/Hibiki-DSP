@@ -275,6 +275,16 @@ endif()
 
 add_test(NAME hibiki_ir_phase_tests COMMAND hibiki_ir_phase_tests)
 
+add_executable(hibiki_exporters_tests
+  unit/exporters_tests.cpp
+)
+target_link_libraries(hibiki_exporters_tests PRIVATE hibiki_hub)
+if(MSVC)
+  target_compile_options(hibiki_exporters_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_exporters_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+add_test(NAME hibiki_exporters_tests COMMAND hibiki_exporters_tests)
 add_executable(hibiki_output_sink_tests
   unit/output_sink_tests.cpp
 )
