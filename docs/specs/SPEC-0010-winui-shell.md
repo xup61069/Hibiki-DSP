@@ -33,6 +33,15 @@ process loopback、瀏覽器單分頁與 direct bypass 的路由健康卡片、A
 正式 shell 不再暴露 VST3 時間軸編輯卡片；VST3 host 能力仍由 SPEC-0008 的 bounded
 model seams 管理，不得由 shell 宣稱已同步到 worker、plugin 或持久儲存。
 
+正式 shell title bar 提供可及的深色模式切換；選擇以 bounded JSON 保存於
+`%LOCALAPPDATA%\Hibiki DSP\ui-theme-v1.json`，讀取或寫入失敗時回到淺色，且不影響
+engine/control-plane 狀態。Root theme 以 `ElementTheme.Light`／`ElementTheme.Dark`
+套用到 NavigationView、InfoBar、cards、inputs、footer 與自訂 ThemeResource。
+
+音量保護頁的主要視覺卡稱為「等響度補償」，顯示既有 `EqVisualSurface` 的狀態、來源圖例
+與曲線。它只呈現引擎確認的 user-space `EqVisualSnapshotV1`；這不是音量量測、耳機校準、
+受限等響度表格或任何聲學合規證據。
+
 Out：WaveRT/PortCls 驅動、實體裝置枚舉、音訊處理、VST3 host UI、校正量測與
 任何編譯後的 EXE／DLL。這些能力仍由各自 Spec 與 worker 負責。
 
@@ -102,11 +111,15 @@ Hello 與裝置 catalog 成功後，ViewModel 會以序列化的 `ControlStatusR
 - 路由健康卡片不得以顏色作為唯一狀態訊息；每張卡片都要有可讀的狀態標籤與邊界說明。
 - 音量安全投影不得把 `requestedDb` 當成實際輸出；`effectiveDb` 必須不高於要求值與
   safety ceiling，並拒絕過期 generation。
+- Theme preference 不是控制狀態；解析失敗時必須 fail-soft 回到淺色，不能阻塞 shell
+  啟動、改寫音量或送出任何 engine 命令。
 
 ## 可及性與易用性
 
 - Root、連接、一鍵改善、輸出群組、Expert、音量、靜音與詳細控制面板都必須有
   明確的 `AutomationProperties.Name`；需要上下文的控制項提供 `HelpText`。
+- 深色模式切換與等響度補償曲線都必須有明確的 `AutomationProperties.Name`；狀態文字
+  使用 polite live region，圖例不得只靠顏色區分。
 - `tools/winui-shell-check.ps1` 必須枚舉 `MainWindow.xaml` 內的 `Button`、`ComboBox`、
   `Slider`、`ToggleSwitch`、`CheckBox`、`TextBox` 與 `NumberBox` opening elements，任何
   缺少或空白的 `AutomationProperties.Name` 都要 fail closed；固定 anchor 檢查只是額外
@@ -144,3 +157,5 @@ Compatibility Preview 的建置與啟動 smoke 不構成樣式、資源載入、
 4. UI 關閉或連線失敗不會寫回 Windows Master，也不會把音量恢復到 100%。
 5. WinUI source gate 通過 accessibility names/help text/live-region 檢查；目標環境再補
    UI Automation 與螢幕閱讀器實機證據。
+6. 正式 preview 實際驗證淺色與深色主題切換；等響度補償卡在未連線時顯示安全的離線狀態，
+   連線後只隨確認的 `EqVisualSnapshotV1` 更新。

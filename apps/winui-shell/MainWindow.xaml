@@ -5,7 +5,7 @@
         <MicaBackdrop Kind="BaseAlt" />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="RootGrid" RequestedTheme="Light" Padding="0" AutomationProperties.Name="Hibiki DSP 音訊場景控制">
+    <Grid x:Name="RootGrid" Padding="0" AutomationProperties.Name="Hibiki DSP 音訊場景控制">
         <Grid.Resources>
             <ResourceDictionary>
                 <ResourceDictionary.ThemeDictionaries>
@@ -45,6 +45,15 @@
                 <TextBlock Text="Hibiki DSP" VerticalAlignment="Center" Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" />
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <ToggleSwitch x:Name="ThemeToggleSwitch"
+                              Header="深色"
+                              OnContent="開"
+                              OffContent="關"
+                              Toggled="OnThemeToggled"
+                              MinWidth="112"
+                              AutomationProperties.Name="深色模式"
+                              AutomationProperties.HelpText="切換整個 Hibiki DSP 介面的深色或淺色主題；選擇會保存到本機"
+                              ToolTipService.ToolTip="切換深色模式（會保存選擇）" />
                     <!-- Connected state: success-green border + green dot -->
                 <Grid>
                   <Border Style="{StaticResource StatusPillStyle}" BorderBrush="{ThemeResource SystemFillColorSuccessBrush}"
@@ -357,12 +366,17 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="現代等化器" Style="{ThemeResource BodyStrongTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                    <TextBlock Text="等響度補償" Style="{ThemeResource BodyStrongTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                     <Border Grid.Column="1" CornerRadius="999" Padding="10,4" Background="{ThemeResource AccentFillColorDefaultBrush}">
                                         <TextBlock Text="{Binding EqSurface.StateText}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" AutomationProperties.LiveSetting="Polite" />
                                     </Border>
                                 </Grid>
-                                <Canvas x:Name="EqVisualCanvas" Height="140" Background="{ThemeResource SubtleFillColorSecondaryBrush}" AutomationProperties.Name="即時等化器曲線" />
+                                <TextBlock Text="依目前聆聽音量調整頻率補償；只有引擎確認的 user-space 視覺快照才會更新曲線。" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <Canvas x:Name="EqVisualCanvas" Height="140" Background="{ThemeResource SubtleFillColorSecondaryBrush}" AutomationProperties.Name="等響度補償曲線" AutomationProperties.HelpText="引擎確認的等響度或自適應校正曲線；不是音量量測" />
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <TextBlock Text="實線：等響度補償" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="虛線：自適應校正" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource SectionCardStyle}" Margin="0,4,0,0" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
