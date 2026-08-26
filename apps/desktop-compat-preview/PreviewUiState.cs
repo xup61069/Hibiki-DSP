@@ -17,6 +17,9 @@ internal sealed record PreviewUiStateV1
     [JsonPropertyName("selected_scene_id")]
     public string? SelectedSceneId { get; init; }
 
+    [JsonPropertyName("selected_output_group_id")]
+    public string? SelectedOutputGroupId { get; init; }
+
     [JsonPropertyName("window_x")]
     public int? WindowX { get; init; }
 
@@ -52,7 +55,8 @@ internal static class PreviewUiState
             var state = JsonSerializer.Deserialize<PreviewUiStateV1>(json);
             return state is not null && state.SchemaVersion == SchemaVersion &&
                    IsValidId(state.SelectedPhysicalDeviceEndpointId) &&
-                   IsValidId(state.SelectedSceneId)
+                   IsValidId(state.SelectedSceneId) &&
+                   IsValidId(state.SelectedOutputGroupId)
                 ? state
                 : new PreviewUiStateV1();
         }
@@ -64,7 +68,7 @@ internal static class PreviewUiState
     }
 
     public static void Save(string? selectedPhysicalDeviceEndpointId, string? selectedSceneId,
-        Rectangle? windowBounds)
+        string? selectedOutputGroupId, Rectangle? windowBounds)
     {
         try
         {
@@ -74,6 +78,7 @@ internal static class PreviewUiState
                 SelectedPhysicalDeviceEndpointId =
                     NormalizeId(selectedPhysicalDeviceEndpointId),
                 SelectedSceneId = NormalizeId(selectedSceneId),
+                SelectedOutputGroupId = NormalizeId(selectedOutputGroupId),
                 WindowX = windowBounds?.X,
                 WindowY = windowBounds?.Y,
                 WindowWidth = windowBounds?.Width,
