@@ -10,6 +10,7 @@
             <StaticResource x:Key="SliderTrackFill" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPointerOver" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPressed" ResourceKey="HibikiSliderTrackFill" />
+            <SolidColorBrush x:Key="HibikiShellSurfaceBrush">#F4F7FB</SolidColorBrush>
             <SolidColorBrush x:Key="HibikiSectionCardBrush">#F6F9FC</SolidColorBrush>
             <SolidColorBrush x:Key="HibikiRouteItemBrush">#FFFFFFD8</SolidColorBrush>
         </ResourceDictionary>
@@ -18,8 +19,10 @@
             <StaticResource x:Key="SliderTrackFill" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPointerOver" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPressed" ResourceKey="HibikiSliderTrackFill" />
-            <SolidColorBrush x:Key="HibikiSectionCardBrush">#222A38</SolidColorBrush>
-            <SolidColorBrush x:Key="HibikiRouteItemBrush">#2E3848</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiShellSurfaceBrush">#1D2430</SolidColorBrush>
+            <!-- Keep the dark shell layered instead of collapsing into one black plane. -->
+            <SolidColorBrush x:Key="HibikiSectionCardBrush">#2B3547</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiRouteItemBrush">#354761</SolidColorBrush>
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
@@ -31,6 +34,13 @@
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Foreground" Value="{ThemeResource AccentFillColorDefaultBrush}" />
         <Setter Property="CornerRadius" Value="2" />
+    </Style>
+
+    <!-- Keep the page canvas distinct from the Mica backdrop in both themes.
+         This is intentionally an implicit shell-level style so every page
+         gets the same surface without changing its bindings or layout. -->
+    <Style TargetType="NavigationView">
+        <Setter Property="Background" Value="{ThemeResource HibikiShellSurfaceBrush}" />
     </Style>
 
     <!-- Bold section card with layered surface and generous corner radius. -->
@@ -64,7 +74,7 @@
          Keep all border values here so local attributes cannot override
          the intended accent treatment. -->
     <Style x:Key="FooterAccentBorderStyle" TargetType="Border">
-        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Background" Value="{ThemeResource HibikiShellSurfaceBrush}" />
         <Setter Property="Padding" Value="36,12,36,16" />
         <Setter Property="BorderBrush">
             <Setter.Value>
