@@ -175,6 +175,22 @@ endif()
 
 add_test(NAME hibiki_output_fanout_tests COMMAND hibiki_output_fanout_tests)
 
+
+add_executable(hibiki_volume_state_tests
+  unit/volume_state_tests.cpp
+)
+
+target_link_libraries(hibiki_volume_state_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_volume_state_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_volume_state_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_volume_state_tests COMMAND hibiki_volume_state_tests)
+
+
 add_executable(hibiki_device_recovery_tests
   unit/device_recovery_tests.cpp
 )
@@ -188,6 +204,21 @@ else()
 endif()
 
 add_test(NAME hibiki_device_recovery_tests COMMAND hibiki_device_recovery_tests)
+
+add_executable(hibiki_scene_safety_tests
+  unit/scene_safety_tests.cpp
+)
+
+target_link_libraries(hibiki_scene_safety_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_scene_safety_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_scene_safety_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_scene_safety_tests COMMAND hibiki_scene_safety_tests)
+
 add_executable(hibiki_ir_convolver_tests
   unit/ir_convolver_tests.cpp
 )
@@ -201,6 +232,8 @@ else()
 endif()
 
 add_test(NAME hibiki_ir_convolver_tests COMMAND hibiki_ir_convolver_tests)
+
+
 
 if(HIBIKI_BUILD_LIVE_PROBES AND WIN32)
   add_executable(hibiki_live_device_catalog_probe
