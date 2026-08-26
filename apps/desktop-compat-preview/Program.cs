@@ -572,6 +572,8 @@ internal sealed class PreviewForm : Form
                 textBox.BackColor = CardBackground;
                 textBox.ForeColor = TextPrimary;
                 textBox.BorderStyle = BorderStyle.FixedSingle;
+                textBox.AutoSize = false;
+                textBox.Height = Math.Max(36, textBox.Height);
                 textBox.Margin = new Padding(0, 4, 8, 4);
             }
             else if (control is ComboBox comboBox)
@@ -579,6 +581,7 @@ internal sealed class PreviewForm : Form
                 comboBox.BackColor = CardBackground;
                 comboBox.ForeColor = TextPrimary;
                 comboBox.FlatStyle = FlatStyle.Standard;
+                comboBox.Height = Math.Max(36, comboBox.Height);
                 comboBox.Margin = new Padding(0, 4, 8, 4);
             }
             else if (control is NumericUpDown numericUpDown)
@@ -586,6 +589,7 @@ internal sealed class PreviewForm : Form
                 numericUpDown.BackColor = CardBackground;
                 numericUpDown.ForeColor = TextPrimary;
                 numericUpDown.BorderStyle = BorderStyle.FixedSingle;
+                numericUpDown.Height = Math.Max(36, numericUpDown.Height);
                 numericUpDown.Margin = new Padding(0, 4, 8, 4);
             }
             else if (control is ListBox listBox)
@@ -705,12 +709,19 @@ internal sealed class PreviewForm : Form
         var halfWidth = Math.Max(260, (contentWidth - 26) / 2);
         foreach (var fields in panel.Controls.OfType<FlowLayoutPanel>())
         {
+            fields.AutoSize = false;
+            fields.Width = contentWidth;
             var children = fields.Controls.Cast<Control>().ToArray();
             if (children.Length == 2 && children.All(control => control is TextBox or NumericUpDown))
             {
                 foreach (var child in children)
                     child.Width = halfWidth;
             }
+
+            var rowHeight = children.Length == 0
+                ? 0
+                : children.Max(control => control.PreferredSize.Height + control.Margin.Vertical);
+            fields.Height = Math.Max(fields.Height, rowHeight + fields.Padding.Vertical + 4);
         }
     }
 
