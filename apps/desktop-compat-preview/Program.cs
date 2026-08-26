@@ -35,7 +35,14 @@ internal sealed class PreviewForm : Form
     private static readonly Color DisabledText = Color.FromArgb(78, 93, 112);
 
     private readonly EasyControlViewModel _viewModel;
-    private readonly Label _connection = new() { AutoSize = true };
+    private readonly Label _connection = new()
+    {
+        AutoSize = false,
+        Height = 42,
+        TextAlign = ContentAlignment.MiddleLeft,
+        AccessibleName = "引擎連線狀態",
+        Tag = "connection-status",
+    };
     private readonly Label _devices = new() { AutoSize = false, Width = 550, Height = 48 };
     private readonly Label _physicalDeviceEmptyState = new()
     {
@@ -637,7 +644,7 @@ internal sealed class PreviewForm : Form
 
         foreach (var label in new[]
                  {
-                     _devices, _physicalDeviceEmptyState, _status, _routes, _sessions, _irStatus,
+                     _connection, _devices, _physicalDeviceEmptyState, _status, _routes, _sessions, _irStatus,
                      _eqStatus, _lastSendDiagnostics, _customSceneQueueStatus,
                  })
         {
@@ -708,7 +715,7 @@ internal sealed class PreviewForm : Form
 
         foreach (var label in new[]
                  {
-                     _devices, _physicalDeviceEmptyState, _status, _routes, _sessions, _irStatus,
+                     _connection, _devices, _physicalDeviceEmptyState, _status, _routes, _sessions, _irStatus,
                      _eqStatus, _lastSendDiagnostics,
                  })
         {
