@@ -947,6 +947,15 @@ Check(wizardPreview.Count == 2 &&
                               row.GainText.EndsWith(" dB", StringComparison.Ordinal) &&
                               row.QText.StartsWith("Q ", StringComparison.Ordinal)),
     "Wizard preview rows must expose one formatted PEQ filter per compiled band.");
+wizardVm.WizardChannelCount = 4;
+Check(wizardVm.WizardChannelCount == 2,
+    "Wizard channel count must reject unsupported values and keep the previous count.");
+wizardVm.WizardMultiChannel = true;
+wizardVm.WizardChannelCount = 6;
+Check(wizardVm.CompileWizardCorrection() && wizardVm.WizardHasResult &&
+      wizardVm.WizardStatus.Contains("6 聲道", StringComparison.Ordinal),
+    $"Wizard multi-channel compile must batch the imported measurement across all channels. Status={wizardVm.WizardStatus}");
+wizardVm.WizardMultiChannel = false;
 var wizardExportPath = Path.Combine(Path.GetTempPath(), $"hibiki-wizard-export-{Guid.NewGuid():N}.json");
 try
 {
