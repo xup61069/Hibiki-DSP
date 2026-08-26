@@ -813,7 +813,7 @@ internal sealed class PreviewForm : Form
             var rowHeight = children.Length == 0
                 ? 0
                 : children.Max(control => control.PreferredSize.Height + control.Margin.Vertical);
-            fields.Height = Math.Max(fields.Height, rowHeight + fields.Padding.Vertical + 4);
+            fields.Height = Math.Max(20, rowHeight + fields.Padding.Vertical + 4);
         }
     }
 
