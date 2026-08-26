@@ -1902,9 +1902,6 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     public bool SaveCustomScenes(out string error) =>
         _session.CustomScenes.TrySave(CustomSceneCatalogPath, out error);
 
-    public string CustomSceneExportDocument() =>
-        _session.CustomScenes.ToJsonForImportExport();
-
     public bool ExportCustomScenes(string jsonFilePath)
     {
         if (string.IsNullOrWhiteSpace(jsonFilePath))
@@ -1912,17 +1909,13 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             StatusText = "請先選擇自訂場景匯出路徑";
             return false;
         }
-        try
+        if (!_session.CustomScenes.TryExportJson(jsonFilePath))
         {
-            File.WriteAllText(jsonFilePath, CustomSceneExportDocument());
-            StatusText = "已匯出自訂場景到檔案；可在其他機器匯入";
-            return true;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            StatusText = $"自訂場景匯出失敗：{ex.Message}";
+            StatusText = "自訂場景匯出失敗：路徑無效或無法寫入";
             return false;
         }
+        StatusText = $"已匯出 {_session.CustomScenes.Count} 筆自訂場景；可在其他機器匯入";
+        return true;
     }
 
     public bool ImportCustomScenes(string jsonFilePath)
@@ -1943,34 +1936,47 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             StatusText = "沒有可匯入的自訂場景（檔案內容為空）";
             return false;
         }
+
+        // Pre-check capacity against the current count so a file that cannot
+        // fully fit is rejected before any live upsert. This keeps import
+        // all-or-nothing for the same user-visible failure mode as an invalid
+        // or truncated file.
+        var remainingCapacity =
+            Math.Max(0, CustomSceneCatalogV1.MaxScenes - _session.CustomScenes.Count);
+        if (imported.Scenes.Count > remainingCapacity)
+        {
+            StatusText =
+                $"自訂場景匯入失敗：容量不足，目前最多還能加入 {remainingCapacity} 筆";
+            return false;
+        }
+
         var previousById = _session.CustomScenes.Scenes.ToDictionary(item => item.Id);
-        var upserted = new List<string>();
+        var upsertedCount = 0;
         foreach (var scene in imported.Scenes)
         {
             if (!_session.CustomScenes.Upsert(scene)) continue;
-            upserted.Add(scene.Id);
+            upsertedCount++;
         }
-        if (upserted.Count == 0)
+        if (upsertedCount == 0)
         {
             StatusText = "沒有可匯入的自訂場景（全部無效或超出上限）";
             return false;
         }
         if (!SaveCustomScenes(out var saveError))
         {
-            foreach (var sceneId in upserted) _session.CustomScenes.Remove(sceneId);
-            foreach (var pair in previousById)
-            {
-                if (!_session.CustomScenes.Scenes.Any(item => item.Id == pair.Key))
-                    _session.CustomScenes.Upsert(pair.Value);
-            }
+            // Restore the entire previous catalog exactly, including scenes
+            // that the import would have overwritten by ID.
+            _session.CustomScenes.Clear();
+            foreach (var pair in previousById) _session.CustomScenes.Upsert(pair.Value);
             OnPropertyChanged(nameof(Scenes));
             OnPropertyChanged(nameof(CustomSceneCards));
-            StatusText = $"自訂場景已匯入但未保存：{saveError}";
+            StatusText = $"自訂場景匯入未保存：{saveError}";
             return false;
         }
         OnPropertyChanged(nameof(Scenes));
         OnPropertyChanged(nameof(CustomSceneCards));
-        StatusText = $"已從檔案匯入 {upserted.Count} 筆自訂場景；等待引擎確認套用";
+        StatusText =
+            $"已從檔案匯入 {upsertedCount} 筆自訂場景；下次啟動或重新整理後生效";
         return true;
     }
 

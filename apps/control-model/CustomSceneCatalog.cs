@@ -162,17 +162,23 @@ public sealed class CustomSceneCatalogV1
         }
     }
 
-    // Serialize the current catalog to the same bounded document format used
+    // Serialize a validated snapshot to the same bounded document format used
     // by TrySave so exported files round-trip through TryLoad without a new
-    // schema. Callers write the returned string to their chosen path.
-    public string ToJsonForImportExport()
+    // schema. Export goes through TrySave's same-directory temporary file plus
+    // replacement, so a crash cannot leave a half-written export file.
+    public bool TryExportJson(string filePath)
     {
         var document = new CatalogDocument
         {
             SchemaVersion = CustomSceneCatalogV1.SchemaVersion,
             Scenes = _scenes.Select(scene => (CatalogScene?)ToDocument(scene)).ToList()
         };
-        return JsonSerializer.Serialize(document, JsonOptions);
+        var snapshot = new CustomSceneCatalogV1();
+        foreach (var scene in _scenes)
+        {
+            if (!snapshot.Upsert(scene)) return false;
+        }
+        return snapshot.TrySave(filePath, out _);
     }
 
     private static CatalogScene ToDocument(SceneCard scene) => new()
