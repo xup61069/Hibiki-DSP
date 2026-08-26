@@ -388,6 +388,7 @@ function Assert-AdmissionOverlap {
   $seenScopes = [System.Collections.Generic.List[object]]::new()
   $seenBranches = @{}
   foreach ($issue in $OpenIssues) {
+    if (-not ([string]$issue.body).Contains('hibiki:handoff-v1')) { continue }
     $path = "issue/$($issue.number)"
     $branch = Get-HandoffScalar -Body $issue.body -Key 'branch'
     Assert-SafeBranch -Value $branch -Key 'branch' -Path $path
@@ -707,6 +708,13 @@ if ($SelfTest) {
   Assert-Throws {
     Assert-AdmissionOverlap -OpenIssues @($leftIssue, $sameBranch) -SelectedIssueNumber 104
   } 'admission duplicate branch'
+  $noBlockIssue = @{
+    number = 105; state = 'OPEN'; title = 'Maintainer issue without handoff block';
+    labels = @(); assignees = @();
+    body = 'Plain maintainer-created body without any handoff annotation.'
+  }
+  Assert-AdmissionOverlap -OpenIssues @($leftIssue, $noBlockIssue) -SelectedIssueNumber 101 | Out-Null
+  $caseCount++
 
   # claim-pending with claimed must fail closed (two lifecycle labels)
   Assert-Throws {
