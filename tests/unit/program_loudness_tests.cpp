@@ -610,6 +610,12 @@ int main() {
         CHECK(bank.has_group(longest_allowed));
         CHECK(bank.group_count() == 2U);
 
+        const std::string max_label(64U, 'M');
+        CHECK(bank.register_group(max_label));
+        CHECK(bank.has_group(max_label));
+        CHECK(bank.controller_for_group(max_label) != nullptr);
+        CHECK(bank.group_count() == 3U);
+
         CHECK(!bank.has_group("missing"));
         CHECK(bank.controller_for_group("missing") == nullptr);
         CHECK(!bank.configure_group("missing", base_policy(), 48000U));
@@ -630,11 +636,13 @@ int main() {
         CHECK(controller->process_interleaved(work.data(), 480U, 1U));
 
         bank.reset_all();
-        CHECK(bank.group_count() == 0U);
         // reset_all() keeps labels registered while clearing every policy
-        // and controller state; only the public counter is cleared.
+        // and controller state; the public counter keeps matching the number
+        // of live slots.
+        CHECK(bank.group_count() == 3U);
         CHECK(bank.has_group("speakers"));
         CHECK(bank.has_group(longest_allowed));
+        CHECK(bank.has_group(max_label));
         auto* reset_controller = bank.controller_for_group("speakers");
         CHECK(reset_controller != nullptr);
         CHECK(!reset_controller->process_interleaved(work.data(), 480U, 1U));
