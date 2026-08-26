@@ -87,6 +87,20 @@ endif()
 
 add_test(NAME hibiki_output_crossfade_tests COMMAND hibiki_output_crossfade_tests)
 
+add_executable(hibiki_control_status_tests
+  unit/control_status_tests.cpp
+)
+
+target_link_libraries(hibiki_control_status_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_control_status_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_control_status_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_control_status_tests COMMAND hibiki_control_status_tests)
+
 add_executable(hibiki_peq_dsp_tests
   unit/peq_dsp_tests.cpp
 )
@@ -114,6 +128,24 @@ else()
 endif()
 
 add_test(NAME hibiki_program_loudness_tests COMMAND hibiki_program_loudness_tests)
+
+add_executable(hibiki_wav_ir_tests
+  unit/wav_ir_tests.cpp
+)
+
+target_link_libraries(hibiki_wav_ir_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_wav_ir_tests PRIVATE /W4 /permissive- /EHsc)
+  # wav_ir fixtures stage bounded IrConvolverV1 objects (about 256 KiB each)
+  # directly on the stack; keep the harness above the Windows default stack.
+  # Runtime/RT code has no dependency on this linker setting.
+  target_link_options(hibiki_wav_ir_tests PRIVATE /STACK:16777216)
+else()
+  target_compile_options(hibiki_wav_ir_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_wav_ir_tests COMMAND hibiki_wav_ir_tests)
 
 add_executable(hibiki_true_peak_limiter_tests
   unit/true_peak_limiter_tests.cpp
@@ -157,6 +189,22 @@ endif()
 
 add_test(NAME hibiki_output_fanout_tests COMMAND hibiki_output_fanout_tests)
 
+
+add_executable(hibiki_volume_state_tests
+  unit/volume_state_tests.cpp
+)
+
+target_link_libraries(hibiki_volume_state_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_volume_state_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_volume_state_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_volume_state_tests COMMAND hibiki_volume_state_tests)
+
+
 add_executable(hibiki_device_recovery_tests
   unit/device_recovery_tests.cpp
 )
@@ -170,6 +218,49 @@ else()
 endif()
 
 add_test(NAME hibiki_device_recovery_tests COMMAND hibiki_device_recovery_tests)
+
+add_executable(hibiki_scene_safety_tests
+  unit/scene_safety_tests.cpp
+)
+
+target_link_libraries(hibiki_scene_safety_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_scene_safety_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_scene_safety_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_scene_safety_tests COMMAND hibiki_scene_safety_tests)
+
+add_executable(hibiki_session_route_rule_tests
+  unit/session_route_rule_tests.cpp
+)
+
+target_link_libraries(hibiki_session_route_rule_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_session_route_rule_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_session_route_rule_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_session_route_rule_tests COMMAND hibiki_session_route_rule_tests)
+
+add_executable(hibiki_device_switch_tests
+  unit/device_switch_tests.cpp
+)
+
+target_link_libraries(hibiki_device_switch_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_device_switch_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_device_switch_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_device_switch_tests COMMAND hibiki_device_switch_tests)
+
 add_executable(hibiki_ir_convolver_tests
   unit/ir_convolver_tests.cpp
 )
@@ -183,6 +274,246 @@ else()
 endif()
 
 add_test(NAME hibiki_ir_convolver_tests COMMAND hibiki_ir_convolver_tests)
+
+add_executable(hibiki_ir_phase_kernel_tests
+  unit/ir_phase_kernel_tests.cpp
+)
+
+target_link_libraries(hibiki_ir_phase_kernel_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_ir_phase_kernel_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_ir_phase_kernel_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_ir_phase_kernel_tests COMMAND hibiki_ir_phase_kernel_tests)
+
+
+add_executable(hibiki_ir_phase_tests
+  unit/ir_phase_tests.cpp
+)
+
+target_link_libraries(hibiki_ir_phase_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_ir_phase_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_ir_phase_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_ir_phase_tests COMMAND hibiki_ir_phase_tests)
+add_executable(hibiki_process_loopback_plan_tests
+  unit/process_loopback_plan_tests.cpp
+)
+target_link_libraries(hibiki_process_loopback_plan_tests PRIVATE hibiki_hub)
+if(MSVC)
+  target_compile_options(hibiki_process_loopback_plan_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_process_loopback_plan_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+add_test(NAME hibiki_process_loopback_plan_tests COMMAND hibiki_process_loopback_plan_tests)
+
+add_executable(hibiki_session_command_queue_tests
+  unit/session_command_queue_tests.cpp
+)
+target_link_libraries(hibiki_session_command_queue_tests PRIVATE hibiki_hub)
+if(MSVC)
+  target_compile_options(hibiki_session_command_queue_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_session_command_queue_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+add_test(NAME hibiki_session_command_queue_tests COMMAND hibiki_session_command_queue_tests)
+
+add_executable(hibiki_output_sink_tests
+  unit/output_sink_tests.cpp
+)
+
+target_link_libraries(hibiki_output_sink_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_output_sink_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_output_sink_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_output_sink_tests COMMAND hibiki_output_sink_tests)
+
+add_executable(hibiki_virtual_mic_tests
+  unit/virtual_mic_tests.cpp
+)
+
+target_link_libraries(hibiki_virtual_mic_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_virtual_mic_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_virtual_mic_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_virtual_mic_tests COMMAND hibiki_virtual_mic_tests)
+
+add_executable(hibiki_calibration_compiler_tests
+  unit/calibration_compiler_tests.cpp
+)
+
+target_link_libraries(hibiki_calibration_compiler_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_calibration_compiler_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_calibration_compiler_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_calibration_compiler_tests COMMAND hibiki_calibration_compiler_tests)
+
+
+add_executable(hibiki_exporters_tests
+  unit/exporters_tests.cpp
+)
+target_link_libraries(hibiki_exporters_tests PRIVATE hibiki_hub)
+if(MSVC)
+  target_compile_options(hibiki_exporters_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_exporters_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+add_test(NAME hibiki_exporters_tests COMMAND hibiki_exporters_tests)
+add_executable(hibiki_scene_presets_tests
+  unit/scene_presets_tests.cpp
+)
+
+target_link_libraries(hibiki_scene_presets_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_scene_presets_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_scene_presets_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_scene_presets_tests COMMAND hibiki_scene_presets_tests)
+
+add_executable(hibiki_device_catalog_snapshot_tests
+  unit/device_catalog_snapshot_tests.cpp
+)
+
+target_link_libraries(hibiki_device_catalog_snapshot_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_device_catalog_snapshot_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_device_catalog_snapshot_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_device_catalog_snapshot_tests COMMAND hibiki_device_catalog_snapshot_tests)
+
+add_executable(hibiki_session_catalog_snapshot_tests
+  unit/session_catalog_snapshot_tests.cpp
+)
+
+target_link_libraries(hibiki_session_catalog_snapshot_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_session_catalog_snapshot_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_session_catalog_snapshot_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_session_catalog_snapshot_tests COMMAND hibiki_session_catalog_snapshot_tests)
+
+add_executable(hibiki_scene_graph_tests
+  unit/scene_graph_tests.cpp
+)
+
+target_link_libraries(hibiki_scene_graph_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_scene_graph_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_scene_graph_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_scene_graph_tests COMMAND hibiki_scene_graph_tests)
+
+
+add_executable(hibiki_audio_session_registry_tests
+  unit/audio_session_registry_tests.cpp
+)
+
+target_link_libraries(hibiki_audio_session_registry_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_audio_session_registry_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_audio_session_registry_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_audio_session_registry_tests COMMAND hibiki_audio_session_registry_tests)
+
+
+add_executable(hibiki_vst3_lane_bridge_tests
+  unit/vst3_lane_bridge_tests.cpp
+)
+
+target_link_libraries(hibiki_vst3_lane_bridge_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_vst3_lane_bridge_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_vst3_lane_bridge_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_vst3_lane_bridge_tests COMMAND hibiki_vst3_lane_bridge_tests)
+
+
+add_executable(hibiki_output_handoff_tests
+  unit/output_handoff_tests.cpp
+)
+
+target_link_libraries(hibiki_output_handoff_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_output_handoff_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_output_handoff_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_output_handoff_tests COMMAND hibiki_output_handoff_tests)
+
+if(WIN32)
+  add_executable(hibiki_windows_device_watcher_tests
+    unit/windows_device_watcher_tests.cpp
+  )
+
+  target_link_libraries(hibiki_windows_device_watcher_tests PRIVATE hibiki_hub)
+
+  if(MSVC)
+    target_compile_options(hibiki_windows_device_watcher_tests PRIVATE /W4 /permissive- /EHsc)
+  else()
+    target_compile_options(hibiki_windows_device_watcher_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+  endif()
+
+  add_test(NAME hibiki_windows_device_watcher_tests COMMAND hibiki_windows_device_watcher_tests)
+endif()
+
+
+add_executable(hibiki_driver_volume_link_tests
+  unit/driver_volume_link_tests.cpp
+)
+
+target_link_libraries(hibiki_driver_volume_link_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_driver_volume_link_tests PRIVATE /W4 /permissive- /EHsc)
+  # DriverVolumeLinkV1 tests construct AudioEngineModel instances whose
+  # fixed-capacity IR/loudness attachments exceed the default Windows stack;
+  # match the contract_tests harness reservation.
+  target_link_options(hibiki_driver_volume_link_tests PRIVATE /STACK:16777216)
+else()
+  target_compile_options(hibiki_driver_volume_link_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_driver_volume_link_tests COMMAND hibiki_driver_volume_link_tests)
+
 
 if(HIBIKI_BUILD_LIVE_PROBES AND WIN32)
   add_executable(hibiki_live_device_catalog_probe

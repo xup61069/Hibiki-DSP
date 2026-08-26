@@ -7,7 +7,7 @@
     <!-- Modern selectable scene card surface with hover lift + accent glow.
          Fluent theme brushes keep light and dark themes consistent. -->
     <Style x:Key="SceneCardStyle" TargetType="Button">
-        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+        <Setter Property="Background" Value="{ThemeResource HibikiRouteItemBrush}" />
         <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
@@ -48,12 +48,29 @@
                                 HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
                                 VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
                         </Border>
+                        <!-- Keep keyboard focus visible without changing the card's
+                             measured size. WinUI focus resources also adapt to
+                             high-contrast themes. -->
+                        <Border x:Name="FocusRingOuter"
+                                Margin="-2"
+                                CornerRadius="22"
+                                BorderBrush="{ThemeResource SystemControlFocusVisualPrimaryBrush}"
+                                BorderThickness="2"
+                                IsHitTestVisible="False"
+                                Opacity="0" />
+                        <Border x:Name="FocusRingInner"
+                                Margin="2"
+                                CornerRadius="18"
+                                BorderBrush="{ThemeResource SystemControlFocusVisualSecondaryBrush}"
+                                BorderThickness="1"
+                                IsHitTestVisible="False"
+                                Opacity="0" />
                         <VisualStateManager.VisualStateGroups>
                             <VisualStateGroup x:Name="CommonStates">
                                 <VisualState x:Name="Normal">
                                     <Storyboard>
                                         <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="Background">
-                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource CardBackgroundFillColorSecondaryBrush}" />
+                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource HibikiRouteItemBrush}" />
                                         </ObjectAnimationUsingKeyFrames>
                                         <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="BorderBrush">
                                             <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
@@ -63,7 +80,7 @@
                                 <VisualState x:Name="PointerOver">
                                     <Storyboard>
                                         <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="Background">
-                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource CardBackgroundFillColorSecondaryBrush}" />
+                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource HibikiRouteItemHoverBrush}" />
                                         </ObjectAnimationUsingKeyFrames>
                                         <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="BorderBrush">
                                             <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentFillColorDefaultBrush}" />
@@ -101,10 +118,40 @@
                                         <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootBorder" Storyboard.TargetProperty="BorderBrush">
                                             <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentFillColorDefaultBrush}" />
                                         </ObjectAnimationUsingKeyFrames>
+                                        <DoubleAnimation Storyboard.TargetName="FocusRingOuter"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="0:0:0.1" />
+                                        <DoubleAnimation Storyboard.TargetName="FocusRingInner"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="0:0:0.1" />
                                     </Storyboard>
                                 </VisualState>
-                                <VisualState x:Name="PointerFocused" />
-                                <VisualState x:Name="Unfocused" />
+                                <VisualState x:Name="PointerFocused">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="FocusRingOuter"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="0:0:0.1" />
+                                        <DoubleAnimation Storyboard.TargetName="FocusRingInner"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="0:0:0.1" />
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Unfocused">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="FocusRingOuter"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0"
+                                                         Duration="0:0:0.1" />
+                                        <DoubleAnimation Storyboard.TargetName="FocusRingInner"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0"
+                                                         Duration="0:0:0.1" />
+                                    </Storyboard>
+                                </VisualState>
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
                     </Grid>

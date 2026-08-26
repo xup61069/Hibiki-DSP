@@ -8,6 +8,8 @@ let activeStream = null;
 let capturing = false;
 let droppedPackets = 0;
 let totalPackets = 0;
+let captureStartedAtMs = 0;
+let lastPacketActivityAtMs = 0;
 let bridgeRetryTimer = null;
 let bridgeRetryAttempt = 0;
 let bridgeRetryExhausted = false;
@@ -37,6 +39,8 @@ function reportState() {
     bridgeConnected,
     droppedPackets,
     totalPackets,
+    captureStartedAtMs,
+    lastPacketActivityAtMs,
     bridgeReconnectState: bridgeReconnectState(),
     bridgeRetryInSec: bridgeRetryInSec(),
   });
@@ -115,6 +119,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       bridgeConnected,
       droppedPackets,
       totalPackets,
+      captureStartedAtMs,
+      lastPacketActivityAtMs,
       bridgeReconnectState: bridgeReconnectState(),
       bridgeRetryInSec: bridgeRetryInSec(),
     });
@@ -153,6 +159,8 @@ async function startCapture(message) {
   capturing = true;
   droppedPackets = 0;
   totalPackets = 0;
+  captureStartedAtMs = Date.now();
+  lastPacketActivityAtMs = 0;
   cancelBridgeRetry();
   bridge?.close();
   bridge = null;
@@ -178,6 +186,7 @@ async function startCapture(message) {
     source.connect(packetizer).connect(destination);
     connectBridge();
     packetizer.port.onmessage = (event) => {
+      lastPacketActivityAtMs = Date.now();
       if (bridge?.readyState === WebSocket.OPEN && event.data instanceof ArrayBuffer) {
         bridge.send(event.data);
         totalPackets++;
@@ -212,6 +221,8 @@ async function teardownCaptureGraph() {
   capturing = false;
   cancelBridgeRetry();
   setStateHeartbeat(false);
+  captureStartedAtMs = 0;
+  lastPacketActivityAtMs = 0;
   activeStream?.getTracks().forEach(track => track.stop());
   activeStream = null;
   source?.disconnect();
