@@ -60,6 +60,20 @@ endif()
 
 add_test(NAME hibiki_lane_latency_tests COMMAND hibiki_lane_latency_tests)
 
+add_executable(hibiki_output_crossfade_tests
+  unit/output_crossfade_tests.cpp
+)
+
+target_link_libraries(hibiki_output_crossfade_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_output_crossfade_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_output_crossfade_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_output_crossfade_tests COMMAND hibiki_output_crossfade_tests)
+
 if(HIBIKI_BUILD_LIVE_PROBES AND WIN32)
   add_executable(hibiki_live_device_catalog_probe
     live_device_catalog_probe.cpp
