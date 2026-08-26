@@ -8,6 +8,10 @@ param(
   [switch]$EnableTestTone,
   [switch]$EnableTabBridge,
   [switch]$EnableTabNoiseSuppressor,
+  [switch]$EnableVst3Lane,
+  [string]$Vst3ClassId = '',
+  [string]$Vst3ModulePath = '',
+  [string]$Vst3WorkerPath = '',
   [switch]$EnableDriverLoopback,
   [switch]$EnableWavSource,
   [switch]$RenderOffline,
@@ -728,6 +732,26 @@ if ($EnableWavSource) {
   $engineArguments += '--wav-source-path'
   $engineArguments += $wavSourcePath
 }
+if ($EnableVst3Lane) {
+  if (-not $EnableWasapiOutput) { throw 'EnableVst3Lane requires EnableWasapiOutput.' }
+  if ($EnableTestTone -or $EnableTabBridge -or $EnableDriverLoopback -or
+      ($EnableProcessDelivery -and $EnableSessionRouting)) {
+    throw 'EnableVst3Lane is exclusive with the other explicit audio sources.'
+  }
+  if ([string]::IsNullOrWhiteSpace($Vst3ClassId)) { throw 'EnableVst3Lane requires Vst3ClassId.' }
+  if ([string]::IsNullOrWhiteSpace($Vst3ModulePath)) { throw 'EnableVst3Lane requires Vst3ModulePath.' }
+  $engineArguments += '--enable-vst3-lane'
+  $engineArguments += '--vst3-module-path'
+  # The engine runs with .local/engine-preview as its working directory, so a
+  # relative plugin/worker path would silently miss; resolve both up front.
+  $engineArguments += (Resolve-Path $Vst3ModulePath -ErrorAction Stop).Path
+  $engineArguments += '--vst3-class-id'
+  $engineArguments += $Vst3ClassId
+  if (-not [string]::IsNullOrWhiteSpace($Vst3WorkerPath)) {
+    $engineArguments += '--vst3-worker-path'
+    $engineArguments += (Resolve-Path $Vst3WorkerPath -ErrorAction Stop).Path
+  }
+}
 $engineProcess = $null
 $offlineExitCode = $null
 if ($RenderOffline) {
@@ -823,6 +847,7 @@ try {
     if ($EnableTabBridge) { $expectedRouteCount = 7 }
     if ($EnableDriverLoopback) { $expectedRouteCount = 7 }
     if ($EnableWavSource) { $expectedRouteCount = 7 }
+    if ($EnableVst3Lane) { $expectedRouteCount = 8 }
     if ($statusPayloadBytes -ne ($statusReply.Length - 20) -or
         $statusPayloadBytes -lt (40 + ($expectedRouteCount * 224))) {
       throw "Engine Preview status payload shape is invalid: bytes=$statusPayloadBytes."
@@ -996,6 +1021,33 @@ try {
         throw "WAV file source did not report rendered WASAPI blocks. Detail: '$wavDetail'."
       }
       $statusSummary += "WAV file source rendered through the user-space graph and WASAPI sink ($wavDetail)"
+    }
+    if ($EnableVst3Lane) {
+      $vst3RouteOffset = 20 + 40 + (7 * 224)
+      $vst3Detail = ''
+      $vst3Ready = $false
+      for ($attempt = 0; $attempt -lt 50; $attempt++) {
+        if ($statusReply.Length -ge (20 + 40 + (8 * 224))) {
+          $detailBytes = [BitConverter]::ToUInt16($statusReply, $vst3RouteOffset + 6)
+          if ($detailBytes -gt 0 -and $detailBytes -le 120) {
+            $vst3Detail = [System.Text.Encoding]::UTF8.GetString(
+              $statusReply, $vst3RouteOffset + 104, $detailBytes)
+            if ($vst3Detail -match 'vst3 lane rendering') {
+              $vst3Ready = $true
+              break
+            }
+          }
+        }
+        Start-Sleep -Milliseconds 20
+        $statusFrame = New-IpcFrame 13 ([uint64](110 + $attempt)) @()
+        Send-IpcFrame $client $statusFrame
+        $statusReply = Receive-IpcFrame $client
+        Assert-IpcFrameShape -Frame $statusReply -ExpectedType 12 -ExpectedRequestId ([uint64](110 + $attempt)) -MinimumPayloadLength (40 + (8 * 224))
+      }
+      if (-not $vst3Ready) {
+        throw "VST3 lane did not report processed blocks. Detail: '$vst3Detail'."
+      }
+      $statusSummary += "VST3 lane processed through the sandbox worker and RT graph ($vst3Detail)"
     }
     Write-Output "Engine Preview status-only smoke passed ($($statusSummary -join '; '))."
     return
