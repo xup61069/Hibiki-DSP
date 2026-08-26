@@ -92,5 +92,23 @@ public static class DoseRemainingCheck
         check(rollover.StateText.Contains("今日", StringComparison.Ordinal) &&
               !rollover.StateText.Contains("自啟動起", StringComparison.Ordinal),
             "The state label must say 今日 after a fresh-day window.");
+
+        // Mute pause hint: a muted latest sample pauses billing and must be
+        // visible to the user; an unmuted follow-up clears the hint and the
+        // accumulator resumes from the fresh time anchor.
+        var paused = new ListeningDoseModelV1();
+        check(!paused.IsPaused && paused.PauseHintText.Length == 0,
+            "A fresh dose must not show the pause hint.");
+        check(paused.AddSample(new DateTimeOffset(2026, 8, 26, 12, 0, 0, TimeSpan.Zero), 0.0, false),
+            "An unmuted loud sample must be accepted before pausing.");
+        check(paused.AddSample(new DateTimeOffset(2026, 8, 26, 12, 2, 0, TimeSpan.Zero), 0.0, true),
+            "A muted loud sample must be accepted to pause accumulation.");
+        check(paused.IsPaused &&
+              paused.PauseHintText == "靜音中：劑量暫停累積",
+            $"A muted latest sample must show the pause hint, got '{paused.PauseHintText}'.");
+        check(paused.AddSample(new DateTimeOffset(2026, 8, 26, 12, 4, 0, TimeSpan.Zero), 0.0, false),
+            "An unmuted follow-up sample must be accepted after pausing.");
+        check(!paused.IsPaused && paused.PauseHintText.Length == 0,
+            "The pause hint must clear once listening resumes unmuted.");
     }
 }
