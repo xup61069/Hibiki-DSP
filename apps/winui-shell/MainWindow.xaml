@@ -128,7 +128,7 @@
     </controls:NavigationViewItem>
     <controls:NavigationViewItem Content="校正精靈" Tag="calibrate" AutomationProperties.Name="校正精靈頁面">
       <controls:NavigationViewItem.Icon>
-        <FontIcon Glyph="" />
+        <FontIcon Glyph="&#xE90F;" />
       </controls:NavigationViewItem.Icon>
       <controls:NavigationViewItem.KeyboardAccelerators>
         <KeyboardAccelerator Modifiers="Control" Key="Number7" />
