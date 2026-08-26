@@ -922,7 +922,7 @@ try {
           $sessionPayloadBytes -ne (24 + ($sessionCount * 256))) {
         throw "Engine Preview session catalog payload shape is invalid: bytes=$sessionPayloadBytes count=$sessionCount."
       }
-      $statusSummary += "session catalog Ready; entries=$sessionCount; per-App delivery E2E verified (PR #1542)"
+      $statusSummary += "session catalog Ready; entries=$sessionCount"
     }
     if ($EnableWasapiOutput) {
       $mainOutputRouteOffset = 20 + 40 + (1 * 224)
@@ -991,11 +991,10 @@ try {
         if ($processState -eq 0) { break }
         Start-Sleep -Milliseconds 50
       }
-      $processState = $statusReply[$processRouteOffset + 1]
       if ($processState -eq 0) {
         $statusSummary += "per-App process delivery E2E verified; Ready; detail='$processDetail'"
       } elseif ($routeBound) {
-        $statusSummary += "route bound ($routeBindDetail); state=$processState; detail='$processDetail'"
+        throw "Process delivery remained not Ready after bind ($routeBindDetail): state=$processState; detail='$processDetail'."
       } else {
         $statusSummary += "no active session to bind; state=$processState; detail='$processDetail'"
       }
