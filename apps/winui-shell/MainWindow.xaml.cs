@@ -283,6 +283,12 @@ public sealed partial class MainWindow : Window
         SetSectionVisibility("ShellRouteSection", tag == "route");
         SetSectionVisibility("ShellCalibrateSection", tag == "calibrate");
         SetSectionVisibility("ShellExpertSection", tag == "expert");
+        // Navigation must land on the new page's title, not inherit the
+        // previous page's scroll offset. ViewModel state is untouched.
+        if (RootGrid.FindName("ShellContentScroller") is ScrollViewer scroller && scroller.VerticalOffset != 0d)
+        {
+            scroller.ChangeView(null, 0d, null, disableAnimation: true);
+        }
     }
 
     private void OnSceneCardPrepared(ItemsRepeater sender, ItemsRepeaterElementPreparedEventArgs args)
