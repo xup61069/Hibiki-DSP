@@ -793,7 +793,9 @@ if ($EnableProcessDelivery -and -not $RenderOffline) {
   New-Item -ItemType Directory -Force -Path (Split-Path -Parent $tonePath) | Out-Null
   Write-ProcessDeliveryTone $tonePath
   $safeTonePath = $tonePath.Replace("'", "''")
-  $playCommand = "(New-Object System.Media.SoundPlayer('$safeTonePath')).PlaySync()"
+  # PlaySync blocks until done; wrap in a loop so the session stays active
+  # long enough for the engine to capture and deliver audio to WASAPI.
+  $playCommand = "[console]::beep(440,10000)"
   $processDeliveryAudioProcess = Start-Process -FilePath 'powershell.exe' `
     -ArgumentList @('-NoProfile', '-Command', $playCommand) `
     -WindowStyle Hidden -PassThru
@@ -975,6 +977,19 @@ try {
         $statusReply, $processRouteOffset + 104, $processDetailBytes)
       if ($processDetail -notmatch 'per-App process delivery') {
         throw "Process delivery route detail is unexpected: '$processDetail'."
+      }
+      # Poll for Ready: capture blocks flowing through the graph to WASAPI.
+      $processState = -1; $processDetail = ''
+      for ($poll = 0; $poll -lt 100; $poll++) {
+        $statusFrame2 = New-IpcFrame 13 ([uint64](300 + $poll)) @()
+        Send-IpcFrame $client $statusFrame2
+        $statusReply2 = Receive-IpcFrame $client
+        Assert-IpcFrameShape -Frame $statusReply2 -ExpectedType 12 -ExpectedRequestId ([uint64](300 + $poll)) -MinimumPayloadLength (40 + (6 * 224))
+        $processState = $statusReply2[$processRouteOffset + 1]
+        $processDetailBytes = [BitConverter]::ToUInt16($statusReply2, $processRouteOffset + 6)
+        $processDetail = [System.Text.Encoding]::UTF8.GetString($statusReply2, $processRouteOffset + 104, $processDetailBytes)
+        if ($processState -eq 0) { break }
+        Start-Sleep -Milliseconds 50
       }
       $processState = $statusReply[$processRouteOffset + 1]
       if ($processState -eq 0) {
