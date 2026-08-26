@@ -77,6 +77,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     private double[]? _wizardMeasurementLevels;
     private IReadOnlyList<WizardPeqRow> _wizardPreviewRows =
         Array.Empty<WizardPeqRow>();
+    private bool _wizardMultiChannel;
+    private int _wizardChannelCount = 2;
 
     private const int EqPollIntervalMs = 1000;
 
@@ -508,6 +510,28 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     public bool WizardHasMeasurement => _wizardMeasurementPath.Length > 0;
     public string WizardImportedCountText => $"量測點數：{_wizardImportedPointCount}";
 
+    public bool WizardMultiChannel
+    {
+        get => _wizardMultiChannel;
+        set
+        {
+            if (value == _wizardMultiChannel) return;
+            _wizardMultiChannel = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public int WizardChannelCount
+    {
+        get => _wizardChannelCount;
+        set
+        {
+            if (value == _wizardChannelCount || value is not (1 or 2 or 6 or 8)) return;
+            _wizardChannelCount = value;
+            OnPropertyChanged();
+        }
+    }
+
     public bool WizardHasResult
     {
         get => _wizardHasResult;
@@ -658,6 +682,49 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             ResetWizardState();
             WizardStatus = "量測資料遺失；請重新選擇量測檔";
             return false;
+        }
+
+        if (_wizardMultiChannel)
+        {
+            var perChannelPoints = new List<CalibrationPointV1[]>();
+            for (var channel = 0; channel < _wizardChannelCount; ++channel)
+            {
+                var channelResponse = CalibrationCompilerV1.BuildTargetedResponse(
+                    null, 48000.0, frequencies, levels, _wizardTargetCurve);
+                if (channelResponse is null)
+                {
+                    WizardHasResult = false;
+                    WizardStatus = "量測點超出有效範圍或排序錯誤（頻率需遞增、20 Hz–24 kHz）";
+                    return false;
+                }
+                perChannelPoints.Add(channelResponse.Points.ToArray());
+            }
+
+            var batch = CalibrationCompilerV1.CompileMultiChannelBatch(
+                _wizardChannelCount, perChannelPoints);
+            if (!batch.Success)
+            {
+                WizardHasResult = false;
+                WizardStatus = "多聲道編譯失敗：" + batch.Diagnostic;
+                return false;
+            }
+
+            _wizardCompiledFilters = [.. batch.ChannelFilters[0]];
+            _wizardPreviewRows = batch.ChannelFilters[0]
+                .Select((filter, index) => new WizardPeqRow(
+                    index + 1,
+                    $"{filter.FrequencyHz:0.#} Hz",
+                    $"{(filter.GainDb >= 0 ? "+" : string.Empty)}{filter.GainDb:0.##} dB",
+                    $"Q {filter.Q:0.##}"))
+                .ToArray();
+            OnPropertyChanged(nameof(WizardPreviewFilters));
+            WizardHasResult = true;
+            WizardStatus = $"已為 {_wizardChannelCount} 聲道各編譯 {batch.ChannelFilters[0].Count} 個 PEQ 濾波器" +
+                           (batch.ChannelLimited.Any(static limited => limited)
+                               ? "；部分聲道受限於安全上限"
+                               : "") +
+                           $"。{batch.Diagnostic}";
+            return true;
         }
 
         var response = CalibrationCompilerV1.BuildTargetedResponse(

@@ -450,6 +450,7 @@ public sealed partial class MainWindow : Window
         }
     }
 
+#if !HIBIKI_COMPATIBILITY_PREVIEW
     private static double[] ParseWizardNumbers(string? text, out bool parseFailed)
     {
         parseFailed = false;
@@ -490,4 +491,5 @@ public sealed partial class MainWindow : Window
             CalibrationWizardStatusText.Text = error;
         }
     }
+#endif
 }

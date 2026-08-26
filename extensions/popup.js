@@ -8,6 +8,7 @@ let capturing = false;
 let bridgeConnected = false;
 let bridgeReconnectState = 'idle';
 let droppedPackets = 0;
+let totalPackets = 0;
 let bridgeRetryInSec = 0;
 let retryBusy = false;
 let diagnosticsBusy = false;
@@ -54,6 +55,7 @@ function buildDiagnosticsSnapshot() {
     `bridgeConnected: ${bridgeConnected}`,
     `bridgeReconnectState: ${bridgeReconnectState}`,
     `droppedPackets: ${Number.isFinite(droppedPackets) && droppedPackets >= 0 ? Math.floor(droppedPackets) : 0}`,
+    `totalPackets: ${Number.isFinite(totalPackets) && totalPackets >= 0 ? Math.floor(totalPackets) : 0}`,
     `timestampUtc: ${new Date().toISOString()}`,
   ].join('\n');
 }
@@ -85,6 +87,7 @@ function applyState(state) {
     ? state.bridgeReconnectState
     : 'idle';
   droppedPackets = state?.droppedPackets ?? droppedPackets;
+  totalPackets = state?.totalPackets ?? totalPackets;
   bridgeRetryInSec = typeof state?.bridgeRetryInSec === 'number' && state.bridgeRetryInSec >= 0
     ? Math.floor(state.bridgeRetryInSec)
     : 0;
