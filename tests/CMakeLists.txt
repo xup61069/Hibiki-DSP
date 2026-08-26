@@ -449,6 +449,19 @@ endif()
 
 add_test(NAME hibiki_session_catalog_snapshot_tests COMMAND hibiki_session_catalog_snapshot_tests)
 
+add_executable(hibiki_control_plane_service_tests
+  unit/control_plane_service_tests.cpp
+)
+
+target_link_libraries(hibiki_control_plane_service_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_control_plane_service_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_control_plane_service_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_control_plane_service_tests COMMAND hibiki_control_plane_service_tests)
 
 add_executable(hibiki_ipc_pipe_tests
   unit/ipc_pipe_server_tests.cpp
