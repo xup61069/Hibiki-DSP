@@ -70,6 +70,8 @@
         <Setter Property="CornerRadius" Value="999" />
         <Setter Property="Padding" Value="12,5" />
         <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="0,0,20,0" />
         <Setter Property="Background" Value="{ThemeResource HibikiStatusPillBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
@@ -80,6 +82,7 @@
         <Setter Property="CornerRadius" Value="999" />
         <Setter Property="Padding" Value="8,2" />
         <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="Background" Value="{ThemeResource HibikiStatusPillCompactBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
