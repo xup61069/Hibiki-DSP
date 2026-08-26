@@ -18,8 +18,9 @@
             <StaticResource x:Key="SliderTrackFill" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPointerOver" ResourceKey="HibikiSliderTrackFill" />
             <StaticResource x:Key="SliderTrackFillPressed" ResourceKey="HibikiSliderTrackFill" />
-            <SolidColorBrush x:Key="HibikiSectionCardBrush">#222A38</SolidColorBrush>
-            <SolidColorBrush x:Key="HibikiRouteItemBrush">#2E3848</SolidColorBrush>
+            <!-- Keep the dark shell layered instead of collapsing into one black plane. -->
+            <SolidColorBrush x:Key="HibikiSectionCardBrush">#2B3547</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiRouteItemBrush">#354761</SolidColorBrush>
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
@@ -45,6 +46,7 @@
     <!-- Shared route/session item cards with compact inner surfaces. -->
     <Style x:Key="RouteItemCardGridStyle" TargetType="Grid">
         <Setter Property="Padding" Value="14" />
+        <Setter Property="Margin" Value="0,0,0,8" />
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="Background" Value="{ThemeResource HibikiRouteItemBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
@@ -52,6 +54,7 @@
     </Style>
     <Style x:Key="RouteItemCardStackStyle" TargetType="StackPanel">
         <Setter Property="Padding" Value="14" />
+        <Setter Property="Margin" Value="0,0,0,8" />
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="Background" Value="{ThemeResource HibikiRouteItemBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />

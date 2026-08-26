@@ -37,6 +37,8 @@ model seams 管理，不得由 shell 宣稱已同步到 worker、plugin 或持�
 `%LOCALAPPDATA%\Hibiki DSP\ui-theme-v1.json`，讀取或寫入失敗時回到淺色，且不影響
 engine/control-plane 狀態。Root theme 以 `ElementTheme.Light`／`ElementTheme.Dark`
 套用到 NavigationView、InfoBar、cards、inputs、footer 與自訂 ThemeResource。
+深色主題的 section card 與 route/item card 必須使用可辨識的分層 surface token，不能與
+頁面或導覽背景合併成難以辨識的單一黑色平面；兩種主題都必須保留可讀文字與狀態邊界。
 
 音量保護頁的主要視覺卡稱為「等響度補償」，顯示既有 `EqVisualSurface` 的狀態、來源圖例
 與曲線。它只呈現引擎確認的 user-space `EqVisualSnapshotV1`；這不是音量量測、耳機校準、
@@ -132,6 +134,8 @@ Hello 與裝置 catalog 成功後，ViewModel 會以序列化的 `ControlStatusR
   圖示只作為視覺路由提示，文字與 `AutomationProperties.Name` 仍是完整語意來源。
 - 場景卡片使用兩欄 grid 時，卡片外緣必須保留一致的水平與垂直間距；hover lift
   不得讓相鄰卡片的圓角或內容互相碰撞。
+- Expert 路由頁的 route health、App session 與 route rule 清單卡片必須保留一致的
+  垂直間距；多筆資料不得讓卡片邊框或 status pill 互相貼合。
 - Expert Panel 在 `IsExpert=false` 時必須顯示可理解的 empty state，不得只留下無語意的
   空白容器；empty state 應提供開啟既有 Expert toggle 的明確入口，且不改變 Expert
   內容的唯讀 contract。

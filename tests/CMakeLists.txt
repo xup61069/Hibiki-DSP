@@ -115,6 +115,24 @@ endif()
 
 add_test(NAME hibiki_program_loudness_tests COMMAND hibiki_program_loudness_tests)
 
+add_executable(hibiki_wav_ir_tests
+  unit/wav_ir_tests.cpp
+)
+
+target_link_libraries(hibiki_wav_ir_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_wav_ir_tests PRIVATE /W4 /permissive- /EHsc)
+  # wav_ir fixtures stage bounded IrConvolverV1 objects (about 256 KiB each)
+  # directly on the stack; keep the harness above the Windows default stack.
+  # Runtime/RT code has no dependency on this linker setting.
+  target_link_options(hibiki_wav_ir_tests PRIVATE /STACK:16777216)
+else()
+  target_compile_options(hibiki_wav_ir_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_wav_ir_tests COMMAND hibiki_wav_ir_tests)
+
 add_executable(hibiki_true_peak_limiter_tests
   unit/true_peak_limiter_tests.cpp
 )
@@ -156,6 +174,33 @@ else()
 endif()
 
 add_test(NAME hibiki_output_fanout_tests COMMAND hibiki_output_fanout_tests)
+
+add_executable(hibiki_device_recovery_tests
+  unit/device_recovery_tests.cpp
+)
+
+target_link_libraries(hibiki_device_recovery_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_device_recovery_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_device_recovery_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_device_recovery_tests COMMAND hibiki_device_recovery_tests)
+add_executable(hibiki_ir_convolver_tests
+  unit/ir_convolver_tests.cpp
+)
+
+target_link_libraries(hibiki_ir_convolver_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_ir_convolver_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_ir_convolver_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_ir_convolver_tests COMMAND hibiki_ir_convolver_tests)
 
 if(HIBIKI_BUILD_LIVE_PROBES AND WIN32)
   add_executable(hibiki_live_device_catalog_probe
