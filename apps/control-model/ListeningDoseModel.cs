@@ -24,6 +24,8 @@ public sealed class ListeningDoseModelV1
     private double _accumulatedDosePercent;
     private TimeSpan _lastGap;
     private DateTimeOffset _windowStartUtc = DateTimeOffset.UtcNow;
+    private bool _hasWindowDate;
+    private DateTime _windowLocalDate;
 
     // A sample arriving after longer than this bound ends accumulation for
     // that interval; the silent gap contributes nothing. Sleep, suspend or a
@@ -35,16 +37,17 @@ public sealed class ListeningDoseModelV1
     public TimeSpan LastSampleGap => _lastGap;
     public DateTimeOffset WindowStartUtc => _windowStartUtc;
 
-    // There is no automatic local-date rollover yet, so the visible label stays
-    // honest about the accumulation window instead of claiming a day that has
-    // not actually been reset.
+    // Accumulation is keyed to the sample's local wall-clock date (the offset
+    // travels with the sample), so a session crossing local midnight restarts
+    // from the next sample and yesterday's dose never bills into today. The
+    // visible label says 今日 rather than 自啟動起 for the same reason.
 
     public string StateText =>
         _accumulatedDosePercent >= 100.0
-            ? $"聆聽劑量（自啟動起）：{_accumulatedDosePercent:0}%（過量；建議讓耳朵休息）"
+            ? $"聆聽劑量（今日）：{_accumulatedDosePercent:0}%（過量；建議讓耳朵休息）"
             : _accumulatedDosePercent >= 50.0
-                ? $"聆聽劑量（自啟動起）：{_accumulatedDosePercent:0}%（注意；接近每日上限）"
-                : $"聆聽劑量（自啟動起）：{_accumulatedDosePercent:0}%（安全；未校正參考值）";
+                ? $"聆聽劑量（今日）：{_accumulatedDosePercent:0}%（注意；接近每日上限）"
+                : $"聆聽劑量（今日）：{_accumulatedDosePercent:0}%（安全；未校正參考值）";
 
     /// <summary>
     /// Shows how long until the accumulated dose reaches 100% at the current
@@ -99,6 +102,25 @@ public sealed class ListeningDoseModelV1
             : 100.0 * Math.Pow(2.0, excessDb / ExchangeDb) / 8.0;
         var ratePerSecond = muted ? 0.0 : doseRatePerHour / 3600.0;
 
+        // Daily rollover: compare wall-clock dates carried by the samples.
+        // A different local date discards the previous day's accumulation and
+        // starts a fresh window anchored at this sample; the date check runs
+        // before any gap/trapezoid math so nothing leaks across midnight.
+        // DateTime (not LocalDateTime) keeps the wall clock in the sample's
+        // own offset; LocalDateTime would re-anchor to the host time zone.
+        var sampleDate = atUtc.DateTime.Date;
+        if (_hasWindowDate && sampleDate != _windowLocalDate)
+        {
+            _accumulatedDosePercent = 0.0;
+            _lastGap = TimeSpan.Zero;
+            _lastSampleUtc = atUtc;
+            _lastRatePerSecond = ratePerSecond;
+            _hasLastSample = true;
+            _windowStartUtc = atUtc;
+            _windowLocalDate = sampleDate;
+            return true;
+        }
+
         if (_hasLastSample)
         {
             var delta = atUtc - _lastSampleUtc;
@@ -121,6 +143,11 @@ public sealed class ListeningDoseModelV1
         _lastSampleUtc = atUtc;
         _lastRatePerSecond = ratePerSecond;
         _hasLastSample = true;
+        if (!_hasWindowDate)
+        {
+            _hasWindowDate = true;
+            _windowLocalDate = sampleDate;
+        }
         return true;
     }
 

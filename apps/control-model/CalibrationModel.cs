@@ -184,7 +184,7 @@ public static class CalibrationCompilerV1
             return false;
         }
 
-        // Bounded anchor tables normalised to 0 dB at 1 kHz; no ISO 226 data.
+        // Bounded anchor tables normalised to 0 dB at 1 kHz; no licensed-standard data.
         ReadOnlySpan<(double FrequencyHz, double TargetDb)> anchors = id switch
         {
             CalibrationTargetCurveIdV1.Flat =>
