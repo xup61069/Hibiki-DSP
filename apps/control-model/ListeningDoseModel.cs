@@ -21,6 +21,7 @@ public sealed class ListeningDoseModelV1
     private DateTimeOffset _lastSampleUtc;
     private double _lastRatePerSecond;
     private bool _hasLastSample;
+    private bool _mutedLastSample;
     private double _accumulatedDosePercent;
     private TimeSpan _lastGap;
     private DateTimeOffset _windowStartUtc = DateTimeOffset.UtcNow;
@@ -34,6 +35,9 @@ public sealed class ListeningDoseModelV1
 
     public double AccumulatedDosePercent => _accumulatedDosePercent;
     public bool IsAccumulating => _hasLastSample && _lastRatePerSecond > 0.0;
+    /// <summary>True when the most recent valid sample arrived while muted;
+    /// accumulation is paused until the next unmuted sample.</summary>
+    public bool IsPaused => _hasLastSample && _mutedLastSample;
     public TimeSpan LastSampleGap => _lastGap;
     public DateTimeOffset WindowStartUtc => _windowStartUtc;
 
@@ -48,6 +52,14 @@ public sealed class ListeningDoseModelV1
             : _accumulatedDosePercent >= 50.0
                 ? $"聆聽劑量（今日）：{_accumulatedDosePercent:0}%（注意；接近每日上限）"
                 : $"聆聽劑量（今日）：{_accumulatedDosePercent:0}%（安全；未校正參考值）";
+
+    /// <summary>
+    /// Empty unless the latest valid sample was muted; then explains why the
+    /// dose counter is holding still so users can tell a deliberate pause
+    /// apart from an intrinsically safe listening level.
+    /// </summary>
+    public string PauseHintText =>
+        IsPaused ? "靜音中：劑量暫停累積" : string.Empty;
 
     /// <summary>
     /// Shows how long until the accumulated dose reaches 100% at the current
@@ -101,6 +113,7 @@ public sealed class ListeningDoseModelV1
             ? 0.0
             : 100.0 * Math.Pow(2.0, excessDb / ExchangeDb) / 8.0;
         var ratePerSecond = muted ? 0.0 : doseRatePerHour / 3600.0;
+        _mutedLastSample = muted;
 
         // Daily rollover: compare wall-clock dates carried by the samples.
         // A different local date discards the previous day's accumulation and
@@ -155,6 +168,7 @@ public sealed class ListeningDoseModelV1
     public void ResetDaily()
     {
         _hasLastSample = false;
+        _mutedLastSample = false;
         _lastRatePerSecond = 0.0;
         _lastGap = TimeSpan.Zero;
         _accumulatedDosePercent = 0.0;

@@ -358,6 +358,7 @@
                             </Border>
                         </StackPanel>
                         <ToggleSwitch Header="靜音" IsOn="{Binding Muted, Mode=TwoWay}" AutomationProperties.Name="靜音" AutomationProperties.HelpText="淡出目前輸出並保留音量設定" />
+                        <TextBlock Text="{Binding ListeningDose.PauseHintText}" Visibility="{Binding ListeningDose.IsPaused, Converter={StaticResource BoolToVisibilityConverter}}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.Name="靜音劑量暫停提示" AutomationProperties.LiveSetting="Polite" />
                         <TextBlock Text="{Binding ListeningDose.RemainingSafeTimeText}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.Name="剩餘安全時間" AutomationProperties.LiveSetting="Polite" />
                         <Border Style="{StaticResource SectionCardStyle}" Margin="0,4,0,0" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
                             <StackPanel Spacing="12">
