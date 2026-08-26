@@ -75,6 +75,7 @@ struct WasapiOutputState final {
     hibiki::AudioEngineModel* engine{nullptr};
     hibiki::WasapiOutputConfigV1 config{};
     std::string endpoint_id{};
+    std::string display_name{};
     std::uint32_t block_frames{128U};
     bool requested{false};
     bool active{false};
@@ -237,6 +238,7 @@ bool start_default_wasapi_output(
     const hibiki::PhysicalDeviceCatalogV1& catalog) noexcept {
     state.active = false;
     state.endpoint_id.clear();
+    state.display_name.clear();
     state.config = {};
     const auto* const descriptor = catalog.default_device(hibiki::PhysicalDeviceFlowV1::Render);
     if (descriptor == nullptr || descriptor->availability !=
@@ -256,6 +258,7 @@ bool start_default_wasapi_output(
     state.engine = &engine;
     state.config = std::move(config);
     state.endpoint_id = descriptor->endpoint_id;
+    state.display_name = descriptor->display_name;
     state.block_frames = block_frames;
     state.active = true;
     return true;
@@ -916,27 +919,64 @@ hibiki::ControlRouteHealthStateV1 wasapi_route_state(
     return hibiki::ControlRouteHealthStateV1::Pending;
 }
 
-std::string_view wasapi_route_detail(
-    const WasapiOutputState& state,
-    const hibiki::WasapiSinkHandoffSnapshotV1& snapshot) noexcept {
-    if (!state.requested) {
-        return "physical catalog ready; shared-mode WASAPI sink disabled by default.";
-    }
-    if (!state.active) {
-        return "WASAPI sink requested; no supported active default render endpoint; output remains muted.";
-    }
-    if (snapshot.state == hibiki::WasapiSinkHandoffStateV1::Degraded ||
-        snapshot.primary.degraded || snapshot.secondary.degraded) {
-        return "WASAPI sink degraded; fail-closed until a supported endpoint is available.";
-    }
-    if (snapshot.state == hibiki::WasapiSinkHandoffStateV1::Synced &&
-        snapshot.primary.endpoint_ready) {
-        if (state.test_tone_enabled && has_rendered_blocks(snapshot)) {
-            return "test tone rendering.";
+std::string truncate_utf8_prefix(const std::string& text, const std::size_t max_bytes) {
+    if (text.size() <= max_bytes) return text;
+    auto prefix = text.substr(0U, max_bytes);
+    while (!prefix.empty()) {
+        const auto byte = static_cast<unsigned char>(prefix.back());
+        if ((byte & 0x80U) == 0U) break;
+        std::size_t lead_position = prefix.size() - 1U;
+        while (lead_position > 0U &&
+               (static_cast<unsigned char>(prefix[lead_position]) & 0xC0U) == 0x80U) {
+            --lead_position;
         }
-        return "shared-mode WASAPI sink ready; graph/ASIO delivery remains an explicit source boundary.";
+        const auto lead = static_cast<unsigned char>(prefix[lead_position]);
+        std::size_t expected_length = 1U;
+        if ((lead & 0xE0U) == 0xC0U) expected_length = 2U;
+        else if ((lead & 0xF0U) == 0xE0U) expected_length = 3U;
+        else if ((lead & 0xF8U) == 0xF0U) expected_length = 4U;
+        if (expected_length > 1U && prefix.size() - lead_position >= expected_length) break;
+        prefix.resize(lead_position);
     }
-    return "WASAPI sink warming; no audio is reported ready until the worker confirms the endpoint.";
+    return prefix;
+}
+
+std::string wasapi_route_detail(
+    const WasapiOutputState& state,
+    const hibiki::WasapiSinkHandoffSnapshotV1& snapshot) {
+    // Bounded device-name prefix. The descriptor name is capped at 128 bytes by
+    // the physical-device catalog contract, so this stays well inside the
+    // 120-byte route detail budget after trimming.
+    std::string prefix;
+    if (!state.display_name.empty()) {
+        prefix = truncate_utf8_prefix(state.display_name, 40U);
+        while (!prefix.empty() && prefix.back() == ' ') prefix.pop_back();
+    }
+    const char* body = [&] {
+        if (!state.requested) {
+            return "physical catalog ready; shared-mode WASAPI sink disabled by default.";
+        }
+        if (!state.active) {
+            return "WASAPI sink requested; no supported active default render endpoint; output remains muted.";
+        }
+        if (snapshot.state == hibiki::WasapiSinkHandoffStateV1::Degraded ||
+            snapshot.primary.degraded || snapshot.secondary.degraded) {
+            return "WASAPI sink degraded; fail-closed until a supported endpoint is available.";
+        }
+        if (snapshot.state == hibiki::WasapiSinkHandoffStateV1::Synced &&
+            snapshot.primary.endpoint_ready) {
+            if (state.test_tone_enabled && has_rendered_blocks(snapshot)) {
+                return "test tone rendering.";
+            }
+            return "shared-mode WASAPI sink ready; graph/ASIO delivery remains an explicit source boundary.";
+        }
+        return "WASAPI sink warming; no audio is reported ready until the worker confirms the endpoint.";
+    }();
+    if (prefix.empty() || !state.requested) return std::string(body);
+    prefix.push_back(':');
+    prefix.push_back(' ');
+    prefix.append(body);
+    return prefix;
 }
 
 bool has_command_line_flag(const int argc,
@@ -1263,7 +1303,7 @@ void publish_eq_visual_snapshot(const hibiki::EqVisualSnapshotV1& snapshot,
 
 hibiki::ControlStatusSnapshotV1 make_initial_status(
     const hibiki::OutputGroupVolumeStateV1 volume,
-    const std::string_view physical_catalog_detail,
+    const std::string_view main_output_detail,
     const WasapiOutputState& wasapi_output,
     const hibiki::WasapiSinkHandoffSnapshotV1& wasapi_snapshot,
     const bool system_volume_enabled,
@@ -1286,8 +1326,7 @@ hibiki::ControlStatusSnapshotV1 make_initial_status(
               "named pipe 已啟動；目前為本機 user-space preview。",
               hibiki::ControlRouteHealthStateV1::Ready);
     set_route(snapshot.routes[1U], "main-output", "主輸出",
-              wasapi_output.requested ? wasapi_route_detail(wasapi_output, wasapi_snapshot)
-                                      : physical_catalog_detail,
+              main_output_detail,
               wasapi_output.requested ? wasapi_route_state(wasapi_output, wasapi_snapshot)
                                       : hibiki::ControlRouteHealthStateV1::Unavailable,
               wasapi_output.requested ? 0U : 1U);
@@ -1772,7 +1811,11 @@ int wmain(const int argc, wchar_t* const* argv) {
     hibiki::EqVisualSnapshotStoreV1 eq_visual_store;
     control_worker.set_eq_visual_publisher(publish_eq_visual_snapshot, &eq_visual_store);
     hibiki::ControlStatusSnapshotStoreV1 status_store;
-    auto status = make_initial_status(engine.volume(), catalog_detail, wasapi_output,
+    const std::string initial_main_output_detail = wasapi_output.requested
+        ? wasapi_route_detail(wasapi_output, initial_wasapi_snapshot)
+        : catalog_detail;
+    auto status = make_initial_status(engine.volume(), initial_main_output_detail,
+                                      wasapi_output,
                                       initial_wasapi_snapshot, system_volume_active,
                                       system_volume_detail, session_routing_active,
                                       session_routing_detail, process_loopback_detail,
@@ -1992,14 +2035,14 @@ int wmain(const int argc, wchar_t* const* argv) {
             status.volume = volume;
             status_changed = true;
         }
+        const std::string main_output_detail = wasapi_output.requested
+            ? wasapi_route_detail(wasapi_output, wasapi_snapshot)
+            : (physical_catalog_ready
+                   ? std::string("physical catalog ready; shared-mode WASAPI sink disabled by default.")
+                   : std::string("physical catalog unavailable; safe Preview retained."));
         const auto previous_main_output_route = status.routes[1U];
         set_route(status.routes[1U], "main-output", "主輸出",
-                  wasapi_output.requested
-                      ? wasapi_route_detail(wasapi_output, wasapi_snapshot)
-                      : (physical_catalog_ready
-                             ? std::string_view(
-                                   "physical catalog ready; shared-mode WASAPI sink disabled by default.")
-                             : std::string_view("physical catalog unavailable; safe Preview retained.")),
+                  main_output_detail,
                   wasapi_output.requested
                       ? wasapi_route_state(wasapi_output, wasapi_snapshot)
                       : hibiki::ControlRouteHealthStateV1::Unavailable,
