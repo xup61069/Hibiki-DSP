@@ -58,7 +58,7 @@ internal sealed class PreviewForm : Form
     };
     private readonly Label _status = new() { AutoSize = false, Height = 48 };
     private readonly Label _routes = new() { AutoSize = false, Width = 550, Height = 58 };
-    private readonly Label _sessions = new() { AutoSize = false, Width = 550, Height = 72 };
+    private readonly Label _sessions = new() { AutoSize = false, Width = 550, Height = 48 };
     private readonly Label _sessionEmptyState = new()
     {
         AutoSize = false,
@@ -820,7 +820,7 @@ internal sealed class PreviewForm : Form
     private int GetStatusMinimumHeight(Label label) =>
         ReferenceEquals(label, _connection) ? 42 :
         ReferenceEquals(label, _routes) ? 58 :
-        ReferenceEquals(label, _sessions) ? 72 :
+        ReferenceEquals(label, _sessions) ? 48 :
         ReferenceEquals(label, _irStatus) ? 58 :
         ReferenceEquals(label, _eqStatus) || ReferenceEquals(label, _lastSendDiagnostics) ? 32 :
         48;
