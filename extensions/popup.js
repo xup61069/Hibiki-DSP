@@ -9,10 +9,47 @@ let bridgeConnected = false;
 let bridgeReconnectState = 'idle';
 let droppedPackets = 0;
 let totalPackets = 0;
+let captureStartedAtMs = 0;
+let lastPacketActivityAtMs = 0;
 let bridgeRetryInSec = 0;
 let retryBusy = false;
 let diagnosticsBusy = false;
 let diagnosticsTimer = 0;
+
+function finiteCount(value) {
+  return Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
+}
+
+function formatElapsed(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours} 小時 ${minutes} 分 ${seconds} 秒`;
+  }
+  if (minutes > 0) {
+    return `${minutes} 分 ${seconds} 秒`;
+  }
+  return `${seconds} 秒`;
+}
+
+function captureDurationText() {
+  if (!Number.isFinite(captureStartedAtMs) || captureStartedAtMs <= 0) {
+    return '';
+  }
+  return `；已擷取 ${formatElapsed(Date.now() - captureStartedAtMs)}`;
+}
+
+function packetActivityText() {
+  if (!Number.isFinite(lastPacketActivityAtMs) || lastPacketActivityAtMs <= 0) {
+    return '；尚未收到音訊封包';
+  }
+  const ageMs = Date.now() - lastPacketActivityAtMs;
+  const age = ageMs >= 0 ? Math.min(Math.floor(ageMs / 1000), 999) : 0;
+  const stale = age >= 10 ? '（超過 10 秒）' : '';
+  return `；最近音訊 ${age} 秒前${stale}`;
+}
 
 function render() {
   button.disabled = capturing;
@@ -20,14 +57,14 @@ function render() {
   retryButton.hidden = !(capturing && !bridgeConnected && bridgeReconnectState === 'exhausted');
   retryButton.disabled = !retryButton.hidden || retryBusy;
   if (!status.dataset.error) {
-    status.textContent = capturing ? reconnectText() : '閒置';
+    status.textContent = capturing
+      ? reconnectText() + captureDurationText() + packetActivityText()
+      : '閒置';
   }
 }
 
 function droppedPacketsText() {
-  const value = Number.isFinite(droppedPackets) && droppedPackets >= 0
-    ? Math.floor(droppedPackets)
-    : 0;
+  const value = finiteCount(droppedPackets);
   return `；已丟棄 ${value} 個 packet`;
 }
 
@@ -54,8 +91,12 @@ function buildDiagnosticsSnapshot() {
     `capturing: ${capturing}`,
     `bridgeConnected: ${bridgeConnected}`,
     `bridgeReconnectState: ${bridgeReconnectState}`,
-    `droppedPackets: ${Number.isFinite(droppedPackets) && droppedPackets >= 0 ? Math.floor(droppedPackets) : 0}`,
-    `totalPackets: ${Number.isFinite(totalPackets) && totalPackets >= 0 ? Math.floor(totalPackets) : 0}`,
+    `droppedPackets: ${finiteCount(droppedPackets)}`,
+    `totalPackets: ${finiteCount(totalPackets)}`,
+    `captureStartedAtMs: ${Number.isFinite(captureStartedAtMs) && captureStartedAtMs > 0 ? Math.floor(captureStartedAtMs) : 'none'}`,
+    `lastPacketActivityAtMs: ${Number.isFinite(lastPacketActivityAtMs) && lastPacketActivityAtMs > 0 ? Math.floor(lastPacketActivityAtMs) : 'none'}`,
+    `captureElapsed: ${Number.isFinite(captureStartedAtMs) && captureStartedAtMs > 0 ? formatElapsed(Date.now() - captureStartedAtMs) : 'inactive'}`,
+    `packetAgeSeconds: ${Number.isFinite(lastPacketActivityAtMs) && lastPacketActivityAtMs > 0 ? Math.max(0, Math.floor((Date.now() - lastPacketActivityAtMs) / 1000)) : 'no-packets'}`,
     `timestampUtc: ${new Date().toISOString()}`,
   ].join('\n');
 }
@@ -88,6 +129,12 @@ function applyState(state) {
     : 'idle';
   droppedPackets = state?.droppedPackets ?? droppedPackets;
   totalPackets = state?.totalPackets ?? totalPackets;
+  captureStartedAtMs = typeof state?.captureStartedAtMs === 'number' && state.captureStartedAtMs > 0
+    ? state.captureStartedAtMs
+    : 0;
+  lastPacketActivityAtMs = typeof state?.lastPacketActivityAtMs === 'number' && state.lastPacketActivityAtMs > 0
+    ? state.lastPacketActivityAtMs
+    : 0;
   bridgeRetryInSec = typeof state?.bridgeRetryInSec === 'number' && state.bridgeRetryInSec >= 0
     ? Math.floor(state.bridgeRetryInSec)
     : 0;
