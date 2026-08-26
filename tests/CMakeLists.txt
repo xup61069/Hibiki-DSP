@@ -392,6 +392,108 @@ endif()
 
 add_test(NAME hibiki_scene_presets_tests COMMAND hibiki_scene_presets_tests)
 
+add_executable(hibiki_device_catalog_snapshot_tests
+  unit/device_catalog_snapshot_tests.cpp
+)
+
+target_link_libraries(hibiki_device_catalog_snapshot_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_device_catalog_snapshot_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_device_catalog_snapshot_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_device_catalog_snapshot_tests COMMAND hibiki_device_catalog_snapshot_tests)
+
+
+add_executable(hibiki_session_catalog_snapshot_tests
+  unit/session_catalog_snapshot_tests.cpp
+)
+
+target_link_libraries(hibiki_session_catalog_snapshot_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_session_catalog_snapshot_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_session_catalog_snapshot_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_session_catalog_snapshot_tests COMMAND hibiki_session_catalog_snapshot_tests)
+
+
+add_executable(hibiki_ipc_pipe_tests
+  unit/ipc_pipe_server_tests.cpp
+)
+
+target_link_libraries(hibiki_ipc_pipe_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_ipc_pipe_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_ipc_pipe_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_ipc_pipe_tests COMMAND hibiki_ipc_pipe_tests)
+
+add_executable(hibiki_scene_graph_tests
+  unit/scene_graph_tests.cpp
+)
+
+target_link_libraries(hibiki_scene_graph_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_scene_graph_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_scene_graph_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_scene_graph_tests COMMAND hibiki_scene_graph_tests)
+
+
+add_executable(hibiki_audio_session_registry_tests
+  unit/audio_session_registry_tests.cpp
+)
+
+target_link_libraries(hibiki_audio_session_registry_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_audio_session_registry_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_audio_session_registry_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_audio_session_registry_tests COMMAND hibiki_audio_session_registry_tests)
+
+
+add_executable(hibiki_vst3_lane_bridge_tests
+  unit/vst3_lane_bridge_tests.cpp
+)
+
+target_link_libraries(hibiki_vst3_lane_bridge_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_vst3_lane_bridge_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_vst3_lane_bridge_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_vst3_lane_bridge_tests COMMAND hibiki_vst3_lane_bridge_tests)
+
+
+add_executable(hibiki_output_handoff_tests
+  unit/output_handoff_tests.cpp
+)
+
+target_link_libraries(hibiki_output_handoff_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_output_handoff_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_output_handoff_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_output_handoff_tests COMMAND hibiki_output_handoff_tests)
 
 if(WIN32)
   add_executable(hibiki_windows_device_watcher_tests
@@ -408,6 +510,25 @@ if(WIN32)
 
   add_test(NAME hibiki_windows_device_watcher_tests COMMAND hibiki_windows_device_watcher_tests)
 endif()
+
+
+add_executable(hibiki_driver_volume_link_tests
+  unit/driver_volume_link_tests.cpp
+)
+
+target_link_libraries(hibiki_driver_volume_link_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_driver_volume_link_tests PRIVATE /W4 /permissive- /EHsc)
+  # DriverVolumeLinkV1 tests construct AudioEngineModel instances whose
+  # fixed-capacity IR/loudness attachments exceed the default Windows stack;
+  # match the contract_tests harness reservation.
+  target_link_options(hibiki_driver_volume_link_tests PRIVATE /STACK:16777216)
+else()
+  target_compile_options(hibiki_driver_volume_link_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_driver_volume_link_tests COMMAND hibiki_driver_volume_link_tests)
 
 
 if(HIBIKI_BUILD_LIVE_PROBES AND WIN32)

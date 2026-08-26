@@ -312,7 +312,7 @@
                                     </VisualState>
                                     <VisualState x:Name="CustomFormWideState">
                                         <VisualState.StateTriggers>
-                                            <AdaptiveTrigger MinWindowWidth="720" />
+                                            <AdaptiveTrigger MinWindowWidth="640" />
                                         </VisualState.StateTriggers>
                                         <VisualState.Setters>
                                             <Setter Target="CustomFormSecondColumn.Width" Value="1*" />

@@ -59,6 +59,7 @@
     <!-- Consistent minimum height and comfortable padding for check boxes.
          Implicit style applies to every CheckBox. -->
     <Style TargetType="CheckBox">
+        <Setter Property="CornerRadius" Value="5" />
         <Setter Property="MinHeight" Value="36" />
         <Setter Property="Padding" Value="8,4" />
     </Style>
@@ -69,6 +70,8 @@
         <Setter Property="CornerRadius" Value="999" />
         <Setter Property="Padding" Value="12,5" />
         <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="0,0,20,0" />
         <Setter Property="Background" Value="{ThemeResource HibikiStatusPillBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
@@ -79,13 +82,15 @@
         <Setter Property="CornerRadius" Value="999" />
         <Setter Property="Padding" Value="8,2" />
         <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="Background" Value="{ThemeResource HibikiStatusPillCompactBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
     </Style>
 
-    <!-- Subtle button elevation: all buttons get a gentle entrance transition.
-         Primary (accent) buttons already have color feedback; this adds motion. -->
+    <!-- Keep button corners and the shared 36px hit target consistent.
+         Primary (accent) buttons retain their explicit 40px hierarchy. -->
     <Style TargetType="Button">
-        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="MinHeight" Value="36" />
     </Style></ResourceDictionary>
