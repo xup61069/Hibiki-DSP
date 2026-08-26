@@ -245,6 +245,26 @@ function Assert-ExtensionSourcePolicy(
   if ($offscreenSource -notmatch 'BRIDGE_RETRY_MAX_ATTEMPTS\s*=\s*\d+') {
     throw "Offscreen source must declare a bounded BRIDGE_RETRY_MAX_ATTEMPTS constant in $sourceName."
 }
+  foreach ($activityPattern in @(
+      'captureStartedAtMs',
+      'lastPacketActivityAtMs',
+      'lastPacketActivityAtMs\s*=\s*Date\.now\(\)',
+      'capture-state[\s\S]{0,400}captureStartedAtMs'
+    )) {
+    if ($offscreenSource -notmatch $activityPattern) {
+      throw ("Offscreen source is missing capture timing/activity boundary [{0}] in {1}." -f $activityPattern, $sourceName)
+    }
+  }
+  foreach ($popupActivityPattern in @(
+      'captureStartedAtMs',
+      'lastPacketActivityAtMs',
+      '尚未收到音訊封包',
+      'buildDiagnosticsSnapshot[\s\S]{0,900}packetAgeSeconds'
+    )) {
+    if ($popupSource -notmatch $popupActivityPattern) {
+      throw ("Popup source is missing capture timing/activity boundary [{0}] in {1}." -f $popupActivityPattern, $sourceName)
+    }
+  }
   foreach ($progressPattern in @(
       'function\s+bridgeReconnectState\s*\(\s*\)',
       'BRIDGE_RECONNECT_IDLE_V1',

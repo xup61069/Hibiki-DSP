@@ -61,7 +61,13 @@ retrying、exhausted 或 idle；popup 在 capture 中顯示等待重試、正在
 歸零）與既有 `droppedPackets`；兩個匿名計數器都會放進 capture-state / get-capture-state
 path，popup 的「複製診斷資訊」快照也會包含這兩行，讓使用者貼進 issue 的快照能直接顯示
 packet 是否有在送出或全部被丟棄。此計數是 user-space 匿名健康資訊，不宣稱 engine 接收率
-或音訊品質。`TabCaptureQueueV1` 將 validated packet 複製到四格固定 SPSC ring，
+或音訊品質。
+offscreen 另追蹤每次 Start capture 重置的匿名時間戳：capture 開始的 `captureStartedAtMs`
+與最後一次收到 packetizer packet 的 `lastPacketActivityAtMs`（送出或丟棄都算活動）。這些欄位
+隨 capture-state 傳給 popup；popup 顯示擷取已持續多久與最近是否仍有音訊活動，並在尚未收到
+packet 時誠實顯示「尚未收到音訊封包」，不偽造時間。停止或自然結束後不再回報 active timing。
+「複製診斷資訊」快照也會包含兩個時間戳與當下的 elapsed／age 值。此為 user-space 匿名健康資訊，
+不宣稱 engine 接收率或音訊品質。`TabCaptureQueueV1` 將 validated packet 複製到四格固定 SPSC ring，
 控制執行緒可用 `enqueue_tab_capture_packet_v1` 作 callback，RT lane 再以 caller-owned
 buffer pop；滿載會回報 dropped blocks，不阻塞 WebSocket。`process_tab_capture_lane_v1`
 會把一個 queue block 送入 `AudioEngineModel::process_lane_block`，因此沿用同一份

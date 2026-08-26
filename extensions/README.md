@@ -20,6 +20,12 @@ anonymous plain-text snapshot on the clipboard: the capturing flag, the bridge
 connection flag, the bounded-retry state, the dropped-packet counter and a UTC
 timestamp. It contains no audio samples, tab URLs, tab titles or device
 identifiers, so bug reports can share connection state without private data.
+While capture is active, the popup also shows how long capture has been running
+and whether packet activity is recent, using anonymous epoch timestamps that are
+reset on each Start and cleared when capture stops or ends naturally. A silent or
+stalled graph shows "no packets yet" or an increasing age instead of pretending
+to be healthy. The copied diagnostics snapshot includes both timestamps plus the
+elapsed/age values at copy time; it still contains no audio content or identity.
 While capturing without a bridge, the popup shows a per-second countdown to
 the next retry while waiting; when no countdown value is available it falls
 back to the plain waiting wording. It keeps distinguishing an active retry and
