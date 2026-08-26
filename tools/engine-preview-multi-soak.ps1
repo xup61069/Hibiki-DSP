@@ -356,13 +356,13 @@ foreach ($scenario in $script:MultiSoakScenarios) {
     $stderrPath = Join-Path $soakPlan.ScenarioDirectory ("{0}-round{1}-stderr.txt" -f $scenario.Id, $round)
     Write-MultiSoakScenarioWav -Scenario $scenario -Path $sourcePath
     $process = Start-Process -FilePath 'pwsh' -ArgumentList @(
-      '-NoProfile', '-File', $workerScript,
-      '-EnginePath', $soakPlan.EnginePath,
-      '-WorkingDirectory', $soakPlan.EngineWorkingDirectory,
-      '-SourcePath', $sourcePath,
-      '-RenderPath', $renderPath,
-      '-StdoutCapturePath', $stdoutPath,
-      '-StderrCapturePath', $stderrPath
+      '-NoProfile', '-File', ('"{0}"' -f $workerScript),
+      '-EnginePath', ('"{0}"' -f $soakPlan.EnginePath),
+      '-WorkingDirectory', ('"{0}"' -f $soakPlan.EngineWorkingDirectory),
+      '-SourcePath', ('"{0}"' -f $sourcePath),
+      '-RenderPath', ('"{0}"' -f $renderPath),
+      '-StdoutCapturePath', ('"{0}"' -f $stdoutPath),
+      '-StderrCapturePath', ('"{0}"' -f $stderrPath)
     ) -WorkingDirectory $repo -WindowStyle Hidden -PassThru
     $roundJobs += [pscustomobject]@{
       Scenario = $scenario
