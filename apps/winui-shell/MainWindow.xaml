@@ -598,9 +598,17 @@
                 </StackPanel>
             </Border></Grid>
           <Grid x:Name="ShellExpertSection" Visibility="Collapsed"><Grid.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" IsStaggeringEnabled="True" /></TransitionCollection></Grid.Transitions>
-            <TextBlock Text="Easy 模式已隱藏 Expert 內容；切換「Expert」後就會顯示這一頁。" TextWrapping="Wrap" Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="{Binding IsExpert, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
             <Border x:Name="ExpertPanel" Style="{StaticResource SectionCardStyle}" Padding="28">
-              <StackPanel x:Name="ShellExpertContent" Spacing="16" Visibility="{Binding IsExpert, Converter={StaticResource BoolToVisibilityConverter}}"><TextBlock Text="{Binding Expert.StatusText}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" /><Border Style="{StaticResource SectionCardStyle}" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
+              <StackPanel Spacing="20">
+                <StackPanel x:Name="ExpertEasyModeEmptyState" Spacing="12" Visibility="{Binding IsExpert, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <FontIcon Glyph="" FontSize="20" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                    <TextBlock Text="Expert 詳細模式尚未開啟" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <TextBlock Text="目前只顯示 Easy 模式的安全操作；開啟 Expert 後可查看 Matrix、DSP Graph、VST3 隔離 Lane 與校正狀態。" TextWrapping="Wrap" Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                  <Button Content="前往音量保護開啟 Expert" Click="OnOpenExpertClick" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Left" MinHeight="40" AutomationProperties.Name="開啟 Expert 詳細模式" AutomationProperties.HelpText="前往音量保護頁面並開啟唯讀 Expert 檢視" ToolTipService.ToolTip="前往音量保護頁面並開啟 Expert 檢視" />
+                </StackPanel>
+                <StackPanel x:Name="ShellExpertContent" Spacing="16" Visibility="{Binding IsExpert, Converter={StaticResource BoolToVisibilityConverter}}"><TextBlock Text="{Binding Expert.StatusText}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" /><Border Style="{StaticResource SectionCardStyle}" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
                                 <StackPanel Spacing="10">
                                     <TextBlock Text="Matrix" Style="{ThemeResource SubtitleTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                     <TextBlock Text="{Binding Expert.MatrixSummary}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -707,6 +715,7 @@
                                     </controls:ItemsRepeater>
                                 </StackPanel>
                             </Border></StackPanel>
+              </StackPanel>
             </Border>
           </Grid>
         </StackPanel>
