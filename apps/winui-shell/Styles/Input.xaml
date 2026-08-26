@@ -87,6 +87,6 @@
     <!-- Keep button corners and the shared 36px hit target consistent.
          Primary (accent) buttons retain their explicit 40px hierarchy. -->
     <Style TargetType="Button">
-        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="CornerRadius" Value="8" />
         <Setter Property="MinHeight" Value="36" />
     </Style></ResourceDictionary>
