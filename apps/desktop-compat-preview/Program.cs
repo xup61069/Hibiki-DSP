@@ -543,7 +543,8 @@ internal sealed class PreviewForm : Form
         _loadIr.Enabled = _viewModel.IsConnected && _viewModel.IrPhaseMode != IrPhaseMode.Bypass;
         _irStrength.Enabled = _viewModel.IrPhaseMode is IrPhaseMode.MixedPhase or IrPhaseMode.LinearPhase;
         _effective.Text = $"實際有效音量：{_viewModel.EffectiveVolumeDb:0.0} dB；{_viewModel.VolumeOriginText}；{_viewModel.VolumeActuatorText}";
-        _listeningDose.Text = $"{_viewModel.ListeningDose.StateText}｜剩餘安全時間：{_viewModel.ListeningDose.RemainingSafeTimeText}";
+        var pauseHint = _viewModel.ListeningDose.PauseHintText;
+        _listeningDose.Text = $"{_viewModel.ListeningDose.StateText}｜剩餘安全時間：{_viewModel.ListeningDose.RemainingSafeTimeText}" + (string.IsNullOrEmpty(pauseHint) ? "" : $"｜{pauseHint}");
         _safetyStatus.Text = _viewModel.SafetyStatusText;
         _deviceSwitchStatus.Text = _viewModel.DeviceSwitchStatusText;
         _lastSendDiagnostics.Text = string.IsNullOrEmpty(_viewModel.LastSendDiagnostics)
