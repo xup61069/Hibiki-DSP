@@ -408,6 +408,21 @@ endif()
 add_test(NAME hibiki_scene_graph_tests COMMAND hibiki_scene_graph_tests)
 
 
+add_executable(hibiki_audio_session_registry_tests
+  unit/audio_session_registry_tests.cpp
+)
+
+target_link_libraries(hibiki_audio_session_registry_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_audio_session_registry_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_audio_session_registry_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_audio_session_registry_tests COMMAND hibiki_audio_session_registry_tests)
+
+
 if(WIN32)
   add_executable(hibiki_windows_device_watcher_tests
     unit/windows_device_watcher_tests.cpp
