@@ -91,6 +91,9 @@
                             <StaticResource ResourceKey="SystemAccentColor" />
                         </GradientStop.Color>
                     </GradientStop>
+                    <!-- Fade the horizontal divider into the shell; the left
+                         border remains the visible accent anchor. -->
+                    <GradientStop Offset="1.0" Color="Transparent" />
                 </LinearGradientBrush>
             </Setter.Value>
         </Setter>
