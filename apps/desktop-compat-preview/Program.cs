@@ -65,6 +65,8 @@ internal sealed class PreviewForm : Form
     private readonly Label _customSceneQueueStatus = new() { AutoSize = true, AccessibleName = "離線場景同步佇列狀態" };
     private readonly Button _addCustomScene = new() { Text = "加入自訂場景", AutoSize = true, AccessibleName = "加入自訂場景" };
     private readonly Button _removeCustomScene = new() { Text = "移除選取的自訂場景", AutoSize = true, AccessibleName = "移除選取的自訂場景" };
+    private readonly Button _exportCustomScenes = new() { Text = "匯出場景", AutoSize = true, AccessibleName = "匯出自訂場景到檔案" };
+    private readonly Button _importCustomScenes = new() { Text = "匯入場景", AutoSize = true, AccessibleName = "從檔案匯入自訂場景" };
     private readonly ComboBox _irModes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取 IR 模式" };
     private readonly TrackBar _irStrength = new() { Minimum = 0, Maximum = 100, TickFrequency = 10, Width = 460, AccessibleName = "IR 強度百分比" };
     private readonly Label _irStrengthReadout = new() { AutoSize = true, Width = 80, TextAlign = ContentAlignment.MiddleLeft, AccessibleName = "IR 強度百分比數值" };
@@ -198,6 +200,8 @@ internal sealed class PreviewForm : Form
             SyncSceneList();
             RefreshView();
         };
+        _exportCustomScenes.Click += (_, _) => ExportCustomScenes();
+        _importCustomScenes.Click += (_, _) => ImportCustomScenes();
         var customSceneActions = new FlowLayoutPanel
         {
             AutoSize = true,
@@ -206,6 +210,8 @@ internal sealed class PreviewForm : Form
         };
         customSceneActions.Controls.Add(_addCustomScene);
         customSceneActions.Controls.Add(_removeCustomScene);
+        customSceneActions.Controls.Add(_exportCustomScenes);
+        customSceneActions.Controls.Add(_importCustomScenes);
         panel.Controls.Add(customSceneActions);
         panel.Controls.Add(new Label { Text = "IR 檔案與相位", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
         _irModes.DataSource = _viewModel.IrPhaseModeOptions.ToList();
@@ -743,6 +749,32 @@ internal sealed class PreviewForm : Form
         {
             _updatingRouteRules = false;
         }
+    }
+
+    private void ExportCustomScenes()
+    {
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "自訂場景 JSON (*.json)|*.json",
+            DefaultExt = "json",
+            Title = "匯出自訂場景"
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        _viewModel.ExportCustomScenes(dialog.FileName);
+        RefreshView();
+    }
+
+    private void ImportCustomScenes()
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Filter = "自訂場景 JSON (*.json)|*.json",
+            DefaultExt = "json",
+            Title = "匯入自訂場景"
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        if (_viewModel.ImportCustomScenes(dialog.FileName)) SyncSceneList();
+        RefreshView();
     }
 
     private void ExportRouteRules()
