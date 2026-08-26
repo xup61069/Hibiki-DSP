@@ -233,6 +233,20 @@ endif()
 
 add_test(NAME hibiki_session_route_rule_tests COMMAND hibiki_session_route_rule_tests)
 
+add_executable(hibiki_device_switch_tests
+  unit/device_switch_tests.cpp
+)
+
+target_link_libraries(hibiki_device_switch_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_device_switch_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_device_switch_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_device_switch_tests COMMAND hibiki_device_switch_tests)
+
 add_executable(hibiki_ir_convolver_tests
   unit/ir_convolver_tests.cpp
 )
