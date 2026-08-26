@@ -67,6 +67,7 @@ internal sealed class PreviewForm : Form
     private readonly Button _removeCustomScene = new() { Text = "移除選取的自訂場景", AutoSize = true, AccessibleName = "移除選取的自訂場景" };
     private readonly ComboBox _irModes = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取 IR 模式" };
     private readonly TrackBar _irStrength = new() { Minimum = 0, Maximum = 100, TickFrequency = 10, Width = 460, AccessibleName = "IR 強度百分比" };
+    private readonly Label _irStrengthReadout = new() { AutoSize = true, Width = 80, TextAlign = ContentAlignment.MiddleLeft, AccessibleName = "IR 強度百分比數值" };
     private readonly Label _irStatus = new() { AutoSize = false, Width = 550, Height = 58 };
     private readonly Label _eqStatus = new() { AutoSize = false, Width = 550, Height = 32, AccessibleName = "等化器視覺狀態" };
     private readonly Label _safetyStatus = new() { AutoSize = true, AccessibleName = "安全上限狀態" };
@@ -219,10 +220,13 @@ internal sealed class PreviewForm : Form
         _irStrength.ValueChanged += (_, _) =>
         {
             _viewModel.IrPhaseStrength = _irStrength.Value / 100.0;
+            _irStrengthReadout.Text = $"{_irStrength.Value} %";
             RefreshView();
         };
         panel.Controls.Add(_irModes);
         panel.Controls.Add(_irStrength);
+        panel.Controls.Add(_irStrengthReadout);
+
         _loadIr.Click += async (_, _) =>
         {
             using var dialog = new OpenFileDialog
@@ -605,6 +609,7 @@ internal sealed class PreviewForm : Form
         var strength = Math.Clamp((int)Math.Round(_viewModel.IrPhaseStrength * 100.0),
                                   _irStrength.Minimum, _irStrength.Maximum);
         if (_irStrength.Value != strength) _irStrength.Value = strength;
+        _irStrengthReadout.Text = $"{_irStrength.Value} %";
         if (!string.Equals(_customSceneId.Text, _viewModel.CustomSceneId, StringComparison.Ordinal))
             _customSceneId.Text = _viewModel.CustomSceneId;
         if (!string.Equals(_customSceneName.Text, _viewModel.CustomSceneName, StringComparison.Ordinal))
