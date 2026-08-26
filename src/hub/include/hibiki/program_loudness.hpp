@@ -215,6 +215,7 @@ public:
         const ProgramAwareLevelPolicyV1& policy,
         std::uint32_t sample_rate) noexcept;
     // Resets every configured controller to unity gain and clears policies.
+    // Registered labels and the slot occupancy they imply are preserved.
     void reset_all() noexcept;
     [[nodiscard]] bool has_group(std::string_view output_group) const noexcept;
     [[nodiscard]] std::size_t group_count() const noexcept { return group_count_; }
@@ -222,7 +223,9 @@ public:
 private:
     struct Slot {
         bool used{false};
-        std::array<char, kMaxProgramAwareGroupBytesV1> group{};
+        // One extra byte beyond the maximum label size stores the label
+        // length so a full-length label never overruns the array.
+        std::array<char, kMaxProgramAwareGroupBytesV1 + 1U> group{};
         ProgramAwareLevelPolicyV1 policy{};
         mutable ProgramAwareLevelControllerV1 controller{};
     };
