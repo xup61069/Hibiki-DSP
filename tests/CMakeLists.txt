@@ -274,6 +274,16 @@ else()
 endif()
 
 add_test(NAME hibiki_ir_phase_tests COMMAND hibiki_ir_phase_tests)
+add_executable(hibiki_process_loopback_plan_tests
+  unit/process_loopback_plan_tests.cpp
+)
+target_link_libraries(hibiki_process_loopback_plan_tests PRIVATE hibiki_hub)
+if(MSVC)
+  target_compile_options(hibiki_process_loopback_plan_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_process_loopback_plan_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+add_test(NAME hibiki_process_loopback_plan_tests COMMAND hibiki_process_loopback_plan_tests)
 
 add_executable(hibiki_output_sink_tests
   unit/output_sink_tests.cpp
