@@ -1,0 +1,37 @@
+{
+  "evidence_format": 2,
+  "issue": 1746,
+  "source_provenance": {
+    "mode": "change",
+    "paths": ["docs/specs/SPEC-0009-browser-tab-bridge.md", "extensions/README.md", "extensions/offscreen.js", "extensions/popup.js", "tools/extension-check.ps1"],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "4f34f9e802a876439679bd88b6a875225fd1fc5cfb9040496ca48480942efba5"
+  },
+  "metadata": {
+    "scope": "browser-capture-duration-activity-diagnostics",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-msbuild-18.9.1-cmake-4.4.0",
+    "commands": [
+      "pwsh -NoProfile -File tools/extension-check.ps1",
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 1746",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "git diff --check",
+      "pwsh -NoProfile -File tools/verify.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange"
+    ],
+    "results": [
+      {"command": "offline extension checks and repository gates", "status": "pass", "detail": "Extension boundary self-test and targeted checks passed; handoff, docs, source policy, and whitespace checks also passed."},
+      {"command": "build and tests", "status": "pass", "detail": "The unsigned local verification build completed and all 15 configured tests passed."},
+      {"command": "implementation behavior", "status": "pass", "detail": "Capture start records the start time, packetizer activity records the latest packet time, stop or natural end clears both fields, and popup diagnostics distinguish no-packet-yet from stale activity."}
+    ],
+    "limitations": [
+      "This is deterministic user-space diagnostic evidence only; it does not prove physical audio delivery, browser runtime behavior on every host, privacy guarantees beyond the documented anonymous fields, driver behavior, WaveRT behavior, HLK validation, or signing.",
+      "The provenance digest binds this manifest to the source set at the reviewed commit; it does not independently attest that declared commands ran.",
+      "A previous verification retry hit an unrelated transient compiler database lock in the shared local build directory; the recorded result is from a later clean successful run."
+    ],
+    "logs": {},
+    "tool_versions": {"powershell": "7.6.4"},
+    "started_at": "2026-08-26T12:29:10+08:00",
+    "finished_at": "2026-08-26T12:35:47+08:00"
+  }
+}
