@@ -518,7 +518,8 @@ void ProgramAwareLevelBankV1::reset_all() noexcept {
         slot.controller.~ProgramAwareLevelControllerV1();
         new (&slot.controller) ProgramAwareLevelControllerV1{};
     }
-    group_count_ = 0U;
+    // Slots stay occupied (labels preserved), so the public counter must
+    // keep matching the number of live slots.
 }
 
 bool ProgramAwareLevelBankV1::has_group(const std::string_view output_group) const noexcept {
