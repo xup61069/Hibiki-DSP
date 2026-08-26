@@ -40,13 +40,6 @@
         <Setter Property="Background" Value="{ThemeResource HibikiSectionCardBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="Transitions">
-            <Setter.Value>
-                <TransitionCollection>
-                    <EntranceThemeTransition FromVerticalOffset="20" />
-                </TransitionCollection>
-            </Setter.Value>
-        </Setter>
     </Style>
 
     <!-- Shared route/session item cards with compact inner surfaces. -->
