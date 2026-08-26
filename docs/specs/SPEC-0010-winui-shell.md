@@ -126,6 +126,8 @@ Hello 與裝置 catalog 成功後，ViewModel 會以序列化的 `ControlStatusR
   的 binding gate，不得取代完整 control 掃描。
 - 場景按鈕的可及性名稱與說明從 `SceneCard` 綁定，不依賴視覺排版或顏色傳達狀態。
 - 狀態文字以 polite live region 告知連線／控制結果，避免螢幕閱讀器被高頻音量事件打斷。
+- 頁面切換的進場動效只由頁面層級容器負責；共用 section card 不得再疊加獨立進場動效，
+  避免導覽時前一頁文字或卡片殘影短暫覆蓋新頁面。動效只是裝飾，不得是理解狀態或完成控制的必要條件。
 - 主要導覽提供 Ctrl+1 到 Ctrl+6 的快捷鍵，依序切換六個頁面；每個導覽項目都有
   明確的 AutomationProperties.Name，鍵盤使用者不需依賴視覺位置或顏色即可到達任一頁。
 - XAML 靜態 gate 必須檢查上述 binding；目標 Windows App SDK 環境仍需做真正的鍵盤、
