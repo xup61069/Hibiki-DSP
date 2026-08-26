@@ -523,6 +523,21 @@ endif()
 
 add_test(NAME hibiki_output_handoff_tests COMMAND hibiki_output_handoff_tests)
 
+add_executable(hibiki_session_route_graph_tests
+  unit/session_route_graph_tests.cpp
+)
+
+target_link_libraries(hibiki_session_route_graph_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_session_route_graph_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_session_route_graph_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_session_route_graph_tests COMMAND hibiki_session_route_graph_tests)
+
+
 if(WIN32)
   add_executable(hibiki_windows_device_watcher_tests
     unit/windows_device_watcher_tests.cpp
