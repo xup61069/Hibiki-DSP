@@ -285,6 +285,17 @@ else()
 endif()
 add_test(NAME hibiki_process_loopback_plan_tests COMMAND hibiki_process_loopback_plan_tests)
 
+add_executable(hibiki_session_command_queue_tests
+  unit/session_command_queue_tests.cpp
+)
+target_link_libraries(hibiki_session_command_queue_tests PRIVATE hibiki_hub)
+if(MSVC)
+  target_compile_options(hibiki_session_command_queue_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_session_command_queue_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+add_test(NAME hibiki_session_command_queue_tests COMMAND hibiki_session_command_queue_tests)
+
 add_executable(hibiki_output_sink_tests
   unit/output_sink_tests.cpp
 )
