@@ -135,6 +135,7 @@ public:
         double measured_dbfs{-144.0};
         double applied_gain_db{0.0};
         double bass_correction_gain_db{0.0};
+        double night_compression_gain_db{0.0};
         std::uint64_t sequence{0U};
     };
     [[nodiscard]] ProgramAwareTelemetrySnapshotV1

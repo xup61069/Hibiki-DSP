@@ -25,6 +25,15 @@
                 <GradientStop Color="#F1F6FF" Offset="0" />
                 <GradientStop Color="#EAF2FF" Offset="1" />
             </LinearGradientBrush>
+            <!-- Give the selected navigation row a clear but quiet surface so
+                 the accent indicator is not the only selection cue. -->
+            <SolidColorBrush x:Key="HibikiNavigationSelectedBrush">#E2EAF4</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiNavigationSelectedHoverBrush">#D8E4F2</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiNavigationSelectedPressedBrush">#CDDCEC</SolidColorBrush>
+            <StaticResource x:Key="NavigationViewItemBackgroundSelected" ResourceKey="HibikiNavigationSelectedBrush" />
+            <StaticResource x:Key="NavigationViewItemBackgroundSelectedPointerOver" ResourceKey="HibikiNavigationSelectedHoverBrush" />
+            <StaticResource x:Key="NavigationViewItemBackgroundSelectedPressed" ResourceKey="HibikiNavigationSelectedPressedBrush" />
+            <StaticResource x:Key="NavigationViewItemBackgroundSelectedDisabled" ResourceKey="HibikiNavigationSelectedBrush" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
             <SolidColorBrush x:Key="HibikiSliderTrackFill" Opacity="0.36" Color="{StaticResource SystemAccentColor}" />
@@ -45,6 +54,15 @@
                 <GradientStop Color="#405574" Offset="0" />
                 <GradientStop Color="#384D69" Offset="1" />
             </LinearGradientBrush>
+            <!-- Lift selected navigation rows from the dark rail while keeping
+                 the slate surface quieter than the main content cards. -->
+            <SolidColorBrush x:Key="HibikiNavigationSelectedBrush">#2A3548</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiNavigationSelectedHoverBrush">#32415A</SolidColorBrush>
+            <SolidColorBrush x:Key="HibikiNavigationSelectedPressedBrush">#233047</SolidColorBrush>
+            <StaticResource x:Key="NavigationViewItemBackgroundSelected" ResourceKey="HibikiNavigationSelectedBrush" />
+            <StaticResource x:Key="NavigationViewItemBackgroundSelectedPointerOver" ResourceKey="HibikiNavigationSelectedHoverBrush" />
+            <StaticResource x:Key="NavigationViewItemBackgroundSelectedPressed" ResourceKey="HibikiNavigationSelectedPressedBrush" />
+            <StaticResource x:Key="NavigationViewItemBackgroundSelectedDisabled" ResourceKey="HibikiNavigationSelectedBrush" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
