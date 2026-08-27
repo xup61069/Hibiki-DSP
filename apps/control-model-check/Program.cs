@@ -1661,6 +1661,8 @@ static async Task RunSceneCatalogCheckServerAsync(
           adaptiveViewModel.EqSurface.LastAppliedSequence == 21UL &&
           adaptiveViewModel.EqSurface.StateText.Contains("自適應", StringComparison.Ordinal),
         "A confirmed adaptive frame must use the adaptive visual state.");
+    Check(adaptiveViewModel.EqSurface.StateText.Contains("-4.0 dB", StringComparison.Ordinal),
+        "A confirmed adaptive frame must expose its low-frequency correction amount.");
     Check(!adaptiveViewModel.ApplyEqVisualFrame(new EqVisualFrameV1(
             20UL, EqVisualSourceV1.AdaptiveCorrection, adaptivePoints),
         out var staleError) && staleError.Contains("stale"),
