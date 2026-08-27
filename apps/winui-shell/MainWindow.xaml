@@ -177,6 +177,11 @@
                                     <VisualState.StateTriggers>
                                         <AdaptiveTrigger MinWindowWidth="840" />
                                     </VisualState.StateTriggers>
+                                    <VisualState.Setters>
+                                        <Setter Target="HeroQuickStartPanel.(Grid.Column)" Value="1" />
+                                        <Setter Target="HeroQuickStartPanel.(Grid.Row)" Value="0" />
+                                        <Setter Target="HeroQuickStartColumn.Width" Value="380" />
+                                    </VisualState.Setters>
                                 </VisualState>
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
