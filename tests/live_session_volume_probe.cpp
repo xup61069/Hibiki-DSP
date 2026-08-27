@@ -125,7 +125,10 @@ int wmain() {
     IAudioClient* client = nullptr;
     IAudioRenderClient* render = nullptr;
     hibiki::WindowsAudioSessionRouteCoordinatorV1 coordinator;
-    bool changed = false;
+    // Arm cleanup before issuing the write. A successful write can lose its
+    // later readback, so cleanup must assume the temporary session changed
+    // until restoration is confirmed.
+    bool restore_required = false;
     bool passed = false;
     double original_db = -144.0;
     double attenuated_db = -144.0;
@@ -134,7 +137,7 @@ int wmain() {
     std::uint64_t target_handle = 0U;
 
     auto restore = [&]() noexcept -> bool {
-        if (!changed) return true;
+        if (!restore_required) return true;
         GUID event_context{};
         (void)CoCreateGuid(&event_context);
         const HRESULT write_result = coordinator.write_session_volume_handle(
@@ -147,8 +150,11 @@ int wmain() {
             return false;
         }
         restored_db = read_db;
-        changed = false;
-        return close_db(read_db, original_db) && read_mute == original_mute;
+        if (!close_db(read_db, original_db) || read_mute != original_mute) {
+            return false;
+        }
+        restore_required = false;
+        return true;
     };
 
     do {
@@ -206,12 +212,12 @@ int wmain() {
         const double target_db = std::max(-144.0, original_db - 3.0);
         GUID event_context{};
         (void)CoCreateGuid(&event_context);
+        restore_required = true;
         if (FAILED(coordinator.write_session_volume_handle(
                 target_handle, target_db, original_mute, event_context))) {
             std::printf("session_volume_live=fail reason=attenuation-write\n");
             break;
         }
-        changed = true;
         std::this_thread::sleep_for(std::chrono::milliseconds(120));
         bool attenuated_mute = false;
         if (FAILED(coordinator.read_session_volume_handle(
