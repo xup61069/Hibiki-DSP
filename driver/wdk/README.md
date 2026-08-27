@@ -56,12 +56,13 @@ ring/underrun boundary for pin callbacks; WDK code must add the required
 interlocked producer/consumer publication around it.
 
 The companion `hibiki_stream_adapter.cpp` demonstrates that WDK boundary with a
-spin lock, render submit, underrun-safe render read, and reset. The current
-miniport validates endpoint format and buffer/notification ownership contracts,
-but it does not yet provide a scheduler that advances stream position, signals
-registered notification events, or connects those pin callbacks to a running
-capture/render data path. `GetPosition` therefore remains a contract boundary,
-not evidence of progressing audio delivery.
+spin lock, render submit, underrun-safe render read, and reset. The miniport
+also runs a bounded software clock from a 1 ms timer DPC after `RUN`, reports a
+monotonic modulo-buffer position, and signals registered notification events at
+the requested one- or two-boundary cadence. The scheduler is deliberately
+separated from pin data delivery: it does not connect those callbacks to a
+running capture/render engine or establish physical audio playback. The
+position and notification behavior is therefore software-timing evidence only.
 
 The endpoint-indexed entry points consume the fixed `endpoint_topology_v1`
 catalog rather than accepting free-form channel/rate values: render pin

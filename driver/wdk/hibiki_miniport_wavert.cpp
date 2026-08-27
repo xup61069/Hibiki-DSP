@@ -114,12 +114,26 @@ HibikiMiniportWaveRtStreamV1::HibikiMiniportWaveRtStreamV1()
       m_AllocatedBytes(0),
       m_StreamInitialized(FALSE),
       m_NotificationEventCount(0),
+      m_BufferNotificationCount(0),
+      m_PositionTimerActive(0),
+      m_RunStartTime100ns(0),
+      m_RunBaseBytes(0),
+      m_BytesPerSecond(0),
+      m_LastNotificationBoundary(0),
       m_TotalBytesProcessed(0) {
+    KeInitializeSpinLock(&m_NotificationLock);
+    KeInitializeSpinLock(&m_PositionLock);
+    KeInitializeTimer(&m_PositionTimer);
+    KeInitializeDpc(&m_PositionDpc, &HibikiMiniportWaveRtStreamV1::PositionTimerDpc, this);
+    ExInitializeRundownProtection(&m_PositionDpcRundown);
+    ExWaitForRundownProtectionRelease(&m_PositionDpcRundown);
+    ExRundownCompleted(&m_PositionDpcRundown);
     RtlZeroMemory(&m_StreamContext, sizeof(m_StreamContext));
     RtlZeroMemory(m_NotificationEvents, sizeof(m_NotificationEvents));
 }
 
 HibikiMiniportWaveRtStreamV1::~HibikiMiniportWaveRtStreamV1() {
+    StopPositionTimer();
     if (m_PortStream != nullptr) {
         m_PortStream->Release();
         m_PortStream = nullptr;
@@ -158,6 +172,165 @@ STDMETHODIMP_(ULONG) HibikiMiniportWaveRtStreamV1::Release() {
         return 0;
     }
     return static_cast<ULONG>(count);
+}
+
+VOID HibikiMiniportWaveRtStreamV1::PositionTimerDpc(
+    _In_ PKDPC Dpc,
+    _In_opt_ PVOID DeferredContext,
+    _In_opt_ PVOID SystemArgument1,
+    _In_opt_ PVOID SystemArgument2) {
+    UNREFERENCED_PARAMETER(Dpc);
+    UNREFERENCED_PARAMETER(SystemArgument1);
+    UNREFERENCED_PARAMETER(SystemArgument2);
+
+    auto* stream = static_cast<HibikiMiniportWaveRtStreamV1*>(DeferredContext);
+    if (stream == nullptr ||
+        !ExAcquireRundownProtection(&stream->m_PositionDpcRundown)) {
+        return;
+    }
+
+    BOOLEAN notify = FALSE;
+    KeAcquireSpinLockAtDpcLevel(&stream->m_PositionLock);
+    stream->UpdatePositionLocked(KeQueryInterruptTime(), &notify);
+    KeReleaseSpinLockFromDpcLevel(&stream->m_PositionLock);
+
+    if (notify) {
+        stream->SignalNotificationEventsAtDpc();
+    }
+
+    ExReleaseRundownProtection(&stream->m_PositionDpcRundown);
+}
+
+VOID HibikiMiniportWaveRtStreamV1::StartPositionTimer() {
+    if (InterlockedCompareExchange(&m_PositionTimerActive, 0, 0) != 0) {
+        return;
+    }
+
+    KIRQL oldIrql;
+    KeAcquireSpinLock(&m_PositionLock, &oldIrql);
+    if (!m_StreamInitialized || m_DmaBufferSize == 0 || m_BytesPerSecond == 0) {
+        KeReleaseSpinLock(&m_PositionLock, oldIrql);
+        return;
+    }
+
+    const ULONGLONG now100ns = KeQueryInterruptTime();
+    m_RunStartTime100ns = now100ns;
+    m_RunBaseBytes = m_TotalBytesProcessed;
+    m_LastNotificationBoundary =
+        NotificationBoundaryLocked(m_TotalBytesProcessed);
+    KeReleaseSpinLock(&m_PositionLock, oldIrql);
+
+    ExReInitializeRundownProtection(&m_PositionDpcRundown);
+    InterlockedExchange(&m_PositionTimerActive, 1);
+
+    LARGE_INTEGER dueTime{};
+    dueTime.QuadPart = -10000; // 1 ms in relative 100ns units.
+    KeSetTimerEx(&m_PositionTimer, dueTime, 1, &m_PositionDpc);
+}
+
+VOID HibikiMiniportWaveRtStreamV1::StopPositionTimer() {
+    const LONG wasActive = InterlockedExchange(&m_PositionTimerActive, 0);
+    KeCancelTimer(&m_PositionTimer);
+    KeRemoveQueueDpc(&m_PositionDpc);
+
+    if (wasActive != 0) {
+        // The wait prevents new DPC callbacks from acquiring the stream and
+        // drains any callback already in flight before the buffer is released.
+        ExWaitForRundownProtectionRelease(&m_PositionDpcRundown);
+        ExRundownCompleted(&m_PositionDpcRundown);
+    }
+}
+
+ULONGLONG HibikiMiniportWaveRtStreamV1::NotificationBoundaryLocked(
+    _In_ ULONGLONG TotalBytes) const {
+    if (m_BufferNotificationCount == 0 || m_DmaBufferSize == 0) {
+        return 0;
+    }
+
+    const ULONGLONG maxValue = static_cast<ULONGLONG>(-1);
+    const ULONGLONG bufferSize = static_cast<ULONGLONG>(m_DmaBufferSize);
+    const ULONGLONG notificationCount =
+        static_cast<ULONGLONG>(m_BufferNotificationCount);
+    const ULONGLONG bufferNumber = TotalBytes / bufferSize;
+    ULONGLONG boundary = bufferNumber > maxValue / notificationCount
+        ? maxValue
+        : bufferNumber * notificationCount;
+
+    // The WDK contract admits one or two notifications.  For two, use the
+    // first byte at or past the halfway point; the full-buffer boundary is
+    // represented by the next cycle's base ordinal.
+    if (notificationCount == 2 &&
+        (TotalBytes % bufferSize) >= (bufferSize + 1U) / 2U &&
+        boundary != maxValue) {
+        ++boundary;
+    }
+    return boundary;
+}
+
+VOID HibikiMiniportWaveRtStreamV1::UpdatePositionLocked(
+    _In_ ULONGLONG Now100ns,
+    _Out_ BOOLEAN* Notify) {
+    if (Notify == nullptr) {
+        return;
+    }
+
+    *Notify = FALSE;
+    if (InterlockedCompareExchange(&m_PositionTimerActive, 0, 0) == 0 ||
+        !m_StreamInitialized || m_DmaBufferSize == 0 || m_BytesPerSecond == 0 ||
+        Now100ns < m_RunStartTime100ns) {
+        return;
+    }
+
+    const ULONGLONG ticksPerSecond = 10000000ULL;
+    const ULONGLONG maxValue = static_cast<ULONGLONG>(-1);
+    const ULONGLONG elapsed100ns = Now100ns - m_RunStartTime100ns;
+    const ULONGLONG wholeSeconds = elapsed100ns / ticksPerSecond;
+    const ULONGLONG remainder100ns = elapsed100ns % ticksPerSecond;
+    const ULONGLONG bytesPerSecond = m_BytesPerSecond;
+
+    const ULONGLONG wholeBytes = wholeSeconds > maxValue / bytesPerSecond
+        ? maxValue
+        : wholeSeconds * bytesPerSecond;
+    const ULONGLONG partialProduct = remainder100ns > maxValue / bytesPerSecond
+        ? maxValue
+        : remainder100ns * bytesPerSecond;
+    const ULONGLONG partialBytes = partialProduct / ticksPerSecond;
+    const ULONGLONG elapsedBytes = wholeBytes > maxValue - partialBytes
+        ? maxValue
+        : wholeBytes + partialBytes;
+    const ULONGLONG totalBytes = m_RunBaseBytes > maxValue - elapsedBytes
+        ? maxValue
+        : m_RunBaseBytes + elapsedBytes;
+
+    if (totalBytes <= m_TotalBytesProcessed) {
+        return;
+    }
+
+    m_TotalBytesProcessed = totalBytes;
+    const ULONGLONG currentBoundary = NotificationBoundaryLocked(totalBytes);
+    if (currentBoundary > m_LastNotificationBoundary) {
+        m_LastNotificationBoundary = currentBoundary;
+        *Notify = TRUE;
+    }
+}
+
+VOID HibikiMiniportWaveRtStreamV1::SignalNotificationEventsAtDpc() {
+    KeAcquireSpinLockAtDpcLevel(&m_NotificationLock);
+    for (ULONG i = 0; i < m_NotificationEventCount; ++i) {
+        PKEVENT notificationEvent = m_NotificationEvents[i];
+        if (notificationEvent == nullptr) {
+            continue;
+        }
+
+        // PortCls supplies kernel event objects, but the registration API
+        // explicitly permits defensive exception handling around signaling.
+        __try {
+            KeSetEvent(notificationEvent, IO_NO_INCREMENT, FALSE);
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER) {
+        }
+    }
+    KeReleaseSpinLockFromDpcLevel(&m_NotificationLock);
 }
 
 NTSTATUS HibikiMiniportWaveRtStreamV1::Init(
@@ -210,7 +383,7 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateAudioBuffer(
     _Out_ ULONG*                  OffsetFromFirstPage,
     _Out_ MEMORY_CACHING_TYPE*    CacheType) {
     return AllocateBufferCore(
-        RequestedSize, AudioBufferMdl, ActualSize, OffsetFromFirstPage, CacheType);
+        RequestedSize, 0U, AudioBufferMdl, ActualSize, OffsetFromFirstPage, CacheType);
 }
 
 VOID HibikiMiniportWaveRtStreamV1::FreeAudioBuffer(
@@ -231,11 +404,13 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferWithNotification(
     }
 
     return AllocateBufferCore(
-        RequestedSize, AudioBufferMdl, ActualSize, OffsetFromFirstPage, CacheType);
+        RequestedSize, NotificationCount, AudioBufferMdl, ActualSize,
+        OffsetFromFirstPage, CacheType);
 }
 
 NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferCore(
     _In_  ULONG                   RequestedSize,
+    _In_  ULONG                   NotificationCount,
     _Out_ PMDL*                   AudioBufferMdl,
     _Out_ ULONG*                  ActualSize,
     _Out_ ULONG*                  OffsetFromFirstPage,
@@ -292,8 +467,11 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferCore(
 
     m_DmaBuffer = buffer;
     m_DmaBufferMdl = mdl;
+    KIRQL positionIrql;
+    KeAcquireSpinLock(&m_PositionLock, &positionIrql);
     m_DmaBufferSize = actual_size;
     m_AllocatedBytes = actual_size;
+    KeReleaseSpinLock(&m_PositionLock, positionIrql);
 
     // Initialize the stream ring context
     NTSTATUS ntStatus = m_Capture
@@ -305,13 +483,26 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferCore(
         m_PortStream->FreePagesFromMdl(m_DmaBufferMdl);
         m_DmaBuffer = nullptr;
         m_DmaBufferMdl = nullptr;
+        KeAcquireSpinLock(&m_PositionLock, &positionIrql);
         m_DmaBufferSize = 0;
         m_AllocatedBytes = 0;
+        KeReleaseSpinLock(&m_PositionLock, positionIrql);
         m_StreamInitialized = FALSE;
         return ntStatus;
     }
 
     m_StreamInitialized = TRUE;
+    KeAcquireSpinLock(&m_PositionLock, &positionIrql);
+    const ULONGLONG bytes_per_second =
+        static_cast<ULONGLONG>(topology.sample_rate) *
+        static_cast<ULONGLONG>(bytes_per_frame);
+    m_BufferNotificationCount = NotificationCount;
+    m_BytesPerSecond = bytes_per_second;
+    m_RunStartTime100ns = 0;
+    m_RunBaseBytes = 0;
+    m_LastNotificationBoundary = 0;
+    m_TotalBytesProcessed = 0;
+    KeReleaseSpinLock(&m_PositionLock, positionIrql);
     *AudioBufferMdl = m_DmaBufferMdl;
     *ActualSize = m_DmaBufferSize;
     *OffsetFromFirstPage = 0;
@@ -325,6 +516,8 @@ VOID HibikiMiniportWaveRtStreamV1::FreeBufferWithNotification(
     _In_     ULONG                BufferSize) {
     UNREFERENCED_PARAMETER(BufferSize);
     UNREFERENCED_PARAMETER(AudioBufferMdl);
+
+    StopPositionTimer();
 
     // The stream owns the MDL paired with its mapped buffer.  Release that
     // stored allocation even when a compatibility caller passes a null MDL;
@@ -346,8 +539,17 @@ VOID HibikiMiniportWaveRtStreamV1::FreeBufferWithNotification(
         m_DmaBufferMdl = nullptr;
     }
 
+    KIRQL positionIrql;
+    KeAcquireSpinLock(&m_PositionLock, &positionIrql);
     m_DmaBufferSize = 0;
     m_AllocatedBytes = 0;
+    m_BufferNotificationCount = 0;
+    m_BytesPerSecond = 0;
+    m_RunStartTime100ns = 0;
+    m_RunBaseBytes = 0;
+    m_LastNotificationBoundary = 0;
+    m_TotalBytesProcessed = 0;
+    KeReleaseSpinLock(&m_PositionLock, positionIrql);
 }
 
 NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateAudioBufferWithNotification(
@@ -424,16 +626,36 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::SetState(
 
     switch (State) {
         case KSSTATE_STOP:
+            StopPositionTimer();
             if (m_StreamInitialized) {
                 HibikiWaveRtPinResetV1(&m_StreamContext);
             }
-            m_TotalBytesProcessed = 0;
+            {
+                KIRQL positionIrql;
+                KeAcquireSpinLock(&m_PositionLock, &positionIrql);
+                m_TotalBytesProcessed = 0;
+                m_RunStartTime100ns = 0;
+                m_RunBaseBytes = 0;
+                m_LastNotificationBoundary = 0;
+                KeReleaseSpinLock(&m_PositionLock, positionIrql);
+            }
             m_State = KSSTATE_STOP;
             break;
         case KSSTATE_ACQUIRE:
         case KSSTATE_PAUSE:
-        case KSSTATE_RUN:
+            if (m_State == KSSTATE_RUN) {
+                StopPositionTimer();
+            }
             m_State = State;
+            break;
+        case KSSTATE_RUN:
+            if (!m_StreamInitialized || m_DmaBufferSize == 0) {
+                return STATUS_INVALID_DEVICE_STATE;
+            }
+            if (m_State != KSSTATE_RUN) {
+                m_State = KSSTATE_RUN;
+                StartPositionTimer();
+            }
             break;
         default:
             return STATUS_INVALID_PARAMETER;
@@ -445,13 +667,23 @@ STDMETHODIMP_(NTSTATUS) HibikiMiniportWaveRtStreamV1::GetPosition(
     _Out_ PKSAUDIO_POSITION       Position) {
     if (Position == nullptr) return STATUS_INVALID_PARAMETER;
 
-    if (m_DmaBufferSize == 0) {
+    BOOLEAN ignoredNotify = FALSE;
+    KIRQL positionIrql;
+    KeAcquireSpinLock(&m_PositionLock, &positionIrql);
+    if (InterlockedCompareExchange(&m_PositionTimerActive, 0, 0) != 0) {
+        UpdatePositionLocked(KeQueryInterruptTime(), &ignoredNotify);
+    }
+    const ULONG dmaBufferSize = m_DmaBufferSize;
+    const ULONGLONG totalBytesProcessed = m_TotalBytesProcessed;
+    KeReleaseSpinLock(&m_PositionLock, positionIrql);
+
+    if (dmaBufferSize == 0) {
         Position->PlayOffset = 0;
         Position->WriteOffset = 0;
         return STATUS_SUCCESS;
     }
 
-    const ULONGLONG current_offset = m_TotalBytesProcessed % m_DmaBufferSize;
+    const ULONGLONG current_offset = totalBytesProcessed % dmaBufferSize;
     Position->PlayOffset = current_offset;
     Position->WriteOffset = current_offset;
     return STATUS_SUCCESS;
@@ -461,19 +693,24 @@ STDMETHODIMP_(NTSTATUS) HibikiMiniportWaveRtStreamV1::RegisterNotificationEvent(
     _In_ PKEVENT                  NotificationEvent) {
     if (NotificationEvent == nullptr) return STATUS_INVALID_PARAMETER;
 
+    KIRQL notificationIrql;
+    KeAcquireSpinLock(&m_NotificationLock, &notificationIrql);
     if (m_NotificationEventCount >= HIBIKI_MAX_NOTIFICATION_EVENTS_V1) {
+        KeReleaseSpinLock(&m_NotificationLock, notificationIrql);
         return STATUS_INSUFFICIENT_RESOURCES;
     }
 
     // Check for duplicates
     for (ULONG i = 0; i < m_NotificationEventCount; ++i) {
         if (m_NotificationEvents[i] == NotificationEvent) {
+            KeReleaseSpinLock(&m_NotificationLock, notificationIrql);
             return STATUS_SUCCESS;
         }
     }
 
     m_NotificationEvents[m_NotificationEventCount] = NotificationEvent;
     ++m_NotificationEventCount;
+    KeReleaseSpinLock(&m_NotificationLock, notificationIrql);
     return STATUS_SUCCESS;
 }
 
@@ -481,6 +718,8 @@ STDMETHODIMP_(NTSTATUS) HibikiMiniportWaveRtStreamV1::UnregisterNotificationEven
     _In_ PKEVENT                  NotificationEvent) {
     if (NotificationEvent == nullptr) return STATUS_INVALID_PARAMETER;
 
+    KIRQL notificationIrql;
+    KeAcquireSpinLock(&m_NotificationLock, &notificationIrql);
     for (ULONG i = 0; i < m_NotificationEventCount; ++i) {
         if (m_NotificationEvents[i] == NotificationEvent) {
             for (ULONG j = i; j + 1 < m_NotificationEventCount; ++j) {
@@ -488,9 +727,11 @@ STDMETHODIMP_(NTSTATUS) HibikiMiniportWaveRtStreamV1::UnregisterNotificationEven
             }
             m_NotificationEvents[m_NotificationEventCount - 1] = nullptr;
             --m_NotificationEventCount;
+            KeReleaseSpinLock(&m_NotificationLock, notificationIrql);
             return STATUS_SUCCESS;
         }
     }
+    KeReleaseSpinLock(&m_NotificationLock, notificationIrql);
     return STATUS_NOT_FOUND;
 }
 
