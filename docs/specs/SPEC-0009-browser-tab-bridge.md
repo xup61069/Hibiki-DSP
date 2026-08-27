@@ -6,7 +6,7 @@ authority: product-behavior
 last_reviewed: 2026-08-25
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["extensions/**", "tools/extension-check.ps1"]
+source_globs: ["extensions/**", "tools/extension-check.ps1", "apps/engine-preview/engine_preview.cpp", "tools/run-preview.ps1", "tools/engine-preview-smoke.ps1"]
 ---
 
 # SPEC-0009：瀏覽器單分頁音訊 bridge
@@ -92,6 +92,18 @@ sample rate、stereo（2 聲道）初始化；非 stereo 區塊會被 fail-close
 仍只代表 listener 狀態，不因此宣稱降噪品質或 AI/ML denoising。設定失敗時不得把
 未設定的 effect 接到 lane。此功能是基本降噪，不是 ML/spectral denoising；不得宣稱
 AI denoising 或 RNNoise。未加此旗標時，預設行為與先前完全相同。
+
+Engine Preview 另提供 opt-in 的 `--enable-tab-bass-correction` 旗標：啟用時必須同時
+傳入 `--enable-tab-bridge --enable-wasapi-output`，否則 host 在建立 listener 或音訊
+路徑前 fail-closed 拒絕啟動。此旗標把只含 bounded bass correction 的
+`ProgramAwareLevelPolicyV1` 掛在 engine-owned `main` output attachment；它不在 tab
+bridge adapter 外另建 controller，因此同一個已提交的 RT controller 會同時產生低頻
+修正與 control-plane telemetry。`EngineControlWorkerV1` 在收到有效、非靜音 telemetry
+後發布 source=2 `EqVisualSnapshot`，正式 EQ UI 取得確認 frame 後以既有 transition
+動畫顯示低頻曲線與 dB 狀態。此 detector 是 generic low-frequency energy proxy，不讀取
+YouTube URL、DOM 或內容 metadata；使用者仍須在 extension popup 明確點擊開始擷取。
+`tools/run-preview.ps1` 與 `tools/engine-preview-smoke.ps1` 只負責傳遞並驗證這個
+explicit opt-in。未加此旗標時，tab bridge 不套用自適應低頻修正，行為維持原狀。
 
 ## Extension security and CSP policy
 
