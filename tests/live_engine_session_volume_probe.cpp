@@ -461,8 +461,11 @@ int wmain() {
             return false;
         }
         restored_db = current.requested_db;
+        if (!close_db(restored_db, original_db) || current.mute != original_mute) {
+            return false;
+        }
         restore_required = false;
-        return close_db(restored_db, original_db) && current.mute == original_mute;
+        return true;
     };
 
     do {
