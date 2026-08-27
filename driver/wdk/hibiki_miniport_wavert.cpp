@@ -846,7 +846,8 @@ NTSTATUS HibikiMiniportWaveRtV1::InitEndpoint(
 STDMETHODIMP HibikiMiniportWaveRtV1::GetDescription(
     _Out_ PPCFILTER_DESCRIPTOR*    Description) {
     if (Description == nullptr) return STATUS_INVALID_PARAMETER;
-    if (!m_Initialized) {
+    *Description = nullptr;
+    if (!m_Initialized || m_Port == nullptr) {
         DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
                    "HIBIKI: GetDescription before init\n");
         return STATUS_INVALID_DEVICE_STATE;
@@ -872,7 +873,9 @@ STDMETHODIMP HibikiMiniportWaveRtV1::DataRangeIntersection(
     _Out_writes_bytes_to_opt_(OutputBufferLength, *ResultantFormatLength)
                 PVOID              ResultantFormat,
     _Out_       PULONG             ResultantFormatLength) {
-    if (!m_Initialized) return STATUS_INVALID_DEVICE_STATE;
+    if (ResultantFormatLength == nullptr) return STATUS_INVALID_PARAMETER;
+    *ResultantFormatLength = 0;
+    if (!m_Initialized || m_Port == nullptr) return STATUS_INVALID_DEVICE_STATE;
 
     return HibikiDataRangeIntersectionEndpointV1(
         m_EndpointIndex, PinId, DataRange, MatchingDataRange,
@@ -892,7 +895,7 @@ STDMETHODIMP HibikiMiniportWaveRtV1::NewStream(
     if (PortStream == nullptr || DataFormat == nullptr) {
         return STATUS_INVALID_PARAMETER;
     }
-    if (!m_Initialized) {
+    if (!m_Initialized || m_Port == nullptr) {
         return STATUS_INVALID_DEVICE_STATE;
     }
 
