@@ -57,7 +57,11 @@ void HibikiMiniportTopologyV1::InitDescriptor(
 
 STDMETHODIMP HibikiMiniportTopologyV1::GetDescription(
     _Out_ PPCFILTER_DESCRIPTOR* Description) {
-    if (Description == nullptr || m_FilterDescriptor == nullptr) {
+    if (Description == nullptr) {
+        return STATUS_INVALID_PARAMETER;
+    }
+    *Description = nullptr;
+    if (m_FilterDescriptor == nullptr) {
         return STATUS_INVALID_PARAMETER;
     }
     *Description = m_FilterDescriptor;
@@ -72,6 +76,10 @@ STDMETHODIMP HibikiMiniportTopologyV1::DataRangeIntersection(
     _Out_writes_bytes_to_opt_(OutputBufferLength, *ResultantFormatLength)
                 PVOID              ResultantFormat,
     _Out_       PULONG             ResultantFormatLength) {
+    if (ResultantFormatLength == nullptr) {
+        return STATUS_INVALID_PARAMETER;
+    }
+    *ResultantFormatLength = 0;
     UNREFERENCED_PARAMETER(PinId);
     UNREFERENCED_PARAMETER(DataRange);
     UNREFERENCED_PARAMETER(MatchingDataRange);
