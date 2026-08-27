@@ -166,6 +166,61 @@ bool acknowledge_ipc_request(const hibiki::IpcFrameV1& request,
     response.payload.clear();
     return true;
 }
+
+class RetainedAudioSessionControl final : public IAudioSessionControl {
+public:
+    RetainedAudioSessionControl(std::atomic<std::uint32_t>& add_ref_calls,
+                                std::atomic<std::uint32_t>& release_calls,
+                                std::atomic<std::uint32_t>& destruction_count) noexcept
+        : add_ref_calls_(add_ref_calls),
+          release_calls_(release_calls),
+          destruction_count_(destruction_count) {}
+
+    ~RetainedAudioSessionControl() { ++destruction_count_; }
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
+        if (object == nullptr) return E_POINTER;
+        *object = nullptr;
+        if (iid == IID_IUnknown || iid == __uuidof(IAudioSessionControl)) {
+            *object = static_cast<IAudioSessionControl*>(this);
+            AddRef();
+            return S_OK;
+        }
+        return E_NOINTERFACE;
+    }
+
+    ULONG STDMETHODCALLTYPE AddRef() override {
+        ++add_ref_calls_;
+        return references_.fetch_add(1U, std::memory_order_relaxed) + 1U;
+    }
+
+    ULONG STDMETHODCALLTYPE Release() override {
+        ++release_calls_;
+        const auto remaining = references_.fetch_sub(1U, std::memory_order_acq_rel) - 1U;
+        if (remaining == 0U) delete this;
+        return remaining;
+    }
+
+    HRESULT STDMETHODCALLTYPE GetState(AudioSessionState*) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE GetDisplayName(LPWSTR*) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE SetDisplayName(LPCWSTR, LPCGUID) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE GetIconPath(LPWSTR*) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE SetIconPath(LPCWSTR, LPCGUID) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE GetGroupingParam(GUID*) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE SetGroupingParam(LPCGUID, LPCGUID) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE RegisterAudioSessionNotification(IAudioSessionEvents*) override {
+        return E_NOTIMPL;
+    }
+    HRESULT STDMETHODCALLTYPE UnregisterAudioSessionNotification(IAudioSessionEvents*) override {
+        return E_NOTIMPL;
+    }
+
+private:
+    std::atomic<ULONG> references_{1U};
+    std::atomic<std::uint32_t>& add_ref_calls_;
+    std::atomic<std::uint32_t>& release_calls_;
+    std::atomic<std::uint32_t>& destruction_count_;
+};
 #endif
 
 bool accept_control_command(const hibiki::ControlCommandV1& command, void* context) noexcept {
@@ -5720,6 +5775,14 @@ int main() {
     CHECK(!session_watcher->poll(session_sequence));
     CHECK(session_watcher->OnSessionCreated(nullptr) == S_OK);
     CHECK(session_watcher->poll(session_sequence) && session_sequence == 1U);
+    std::atomic<std::uint32_t> session_add_ref_calls{0U};
+    std::atomic<std::uint32_t> session_release_calls{0U};
+    std::atomic<std::uint32_t> session_destruction_count{0U};
+    auto* retained_session = new RetainedAudioSessionControl(
+        session_add_ref_calls, session_release_calls, session_destruction_count);
+    CHECK(session_watcher->OnSessionCreated(retained_session) == S_OK &&
+          session_add_ref_calls.load(std::memory_order_relaxed) == 1U &&
+          session_watcher->poll(session_sequence) && session_sequence == 2U);
     CHECK(session_watcher->write_session_volume("missing", -12.0, false, session_context) ==
           E_UNEXPECTED);
     double session_db = 0.0;
@@ -5727,6 +5790,11 @@ int main() {
     CHECK(session_watcher->read_session_volume("missing", session_db, session_mute) ==
           E_UNEXPECTED);
     CHECK(session_watcher->Release() == 0U);
+    CHECK(session_release_calls.load(std::memory_order_relaxed) == 1U &&
+          session_destruction_count.load(std::memory_order_relaxed) == 0U);
+    CHECK(retained_session->Release() == 0U &&
+          session_release_calls.load(std::memory_order_relaxed) == 2U &&
+          session_destruction_count.load(std::memory_order_relaxed) == 1U);
     WindowsAudioSessionRouteCoordinatorV1 session_route_coordinator;
     GraphConfigV1 session_route_graph;
     ProcessLoopbackPlanV1 session_process_plan;
