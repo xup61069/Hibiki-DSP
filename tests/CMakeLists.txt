@@ -367,6 +367,20 @@ endif()
 
 add_test(NAME hibiki_ipc_codec_tests COMMAND hibiki_ipc_codec_tests)
 
+add_executable(hibiki_engine_control_tests
+  unit/engine_control_dispatch_tests.cpp
+)
+
+target_link_libraries(hibiki_engine_control_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_engine_control_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_engine_control_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_engine_control_tests COMMAND hibiki_engine_control_tests)
+
 add_executable(hibiki_calibration_compiler_tests
   unit/calibration_compiler_tests.cpp
 )
@@ -578,6 +592,21 @@ endif()
 
 add_test(NAME hibiki_output_handoff_tests COMMAND hibiki_output_handoff_tests)
 
+add_executable(hibiki_session_route_graph_tests
+  unit/session_route_graph_tests.cpp
+)
+
+target_link_libraries(hibiki_session_route_graph_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_session_route_graph_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_session_route_graph_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_session_route_graph_tests COMMAND hibiki_session_route_graph_tests)
+
+
 if(WIN32)
   add_executable(hibiki_windows_device_watcher_tests
     unit/windows_device_watcher_tests.cpp
@@ -641,6 +670,36 @@ else()
 endif()
 
 add_test(NAME hibiki_control_plane_tests COMMAND hibiki_control_plane_tests)
+
+
+add_executable(hibiki_control_volume_dispatch_tests
+  unit/control_volume_dispatch_tests.cpp
+)
+
+target_link_libraries(hibiki_control_volume_dispatch_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_control_volume_dispatch_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_control_volume_dispatch_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_control_volume_dispatch_tests COMMAND hibiki_control_volume_dispatch_tests)
+
+
+add_executable(hibiki_control_payload_wire_tests
+  unit/control_payload_wire_tests.cpp
+)
+
+target_link_libraries(hibiki_control_payload_wire_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_control_payload_wire_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_control_payload_wire_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_control_payload_wire_tests COMMAND hibiki_control_payload_wire_tests)
 
 
 if(HIBIKI_BUILD_LIVE_PROBES AND WIN32)
