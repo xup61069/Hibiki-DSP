@@ -119,6 +119,6 @@ int main() {
         CHECK(catalog.remove("kept") == SceneCatalogResultV1::NotFound);
     }
 
-    std::fputs("scene_catalog_tests passed\n", stdout);
+    std::fputs("scene_catalog_id_tests passed\n", stdout);
     return 0;
 }
