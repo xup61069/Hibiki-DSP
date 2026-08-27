@@ -362,6 +362,7 @@ extern "C" NTSTATUS HibikiGetFilterDescriptorEndpointV1(
     _In_  ULONG                     EndpointIndex,
     _Out_ const PCFILTER_DESCRIPTOR** Description) {
     if (Description == nullptr) return STATUS_INVALID_PARAMETER;
+    *Description = nullptr;
 
     // EndpointIndex is a zero-based slot into the topology table (same as
     // hibiki_endpoint_topology_get_v1), not the one-based endpoint_kind enum.

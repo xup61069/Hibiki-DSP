@@ -37,6 +37,11 @@ static NTSTATUS hibiki_wdk_pin_initialize_endpoint_v1(
     _In_ ULONG endpoint_index,
     _In_ ULONG period_count,
     _In_ ULONG expected_direction) {
+    if (context == nullptr) {
+        return STATUS_INVALID_PARAMETER;
+    }
+    RtlZeroMemory(context, sizeof(*context));
+
     hibiki_endpoint_topology_v1 topology{};
     if (hibiki_endpoint_topology_get_v1(endpoint_index, &topology) == 0 ||
         (expected_direction != MAXULONG && topology.direction != expected_direction)) {
@@ -55,10 +60,13 @@ extern "C" NTSTATUS HibikiWaveRtPinInitializeV1(
     _In_ ULONG sample_rate,
     _In_ ULONG frames_per_period,
     _In_ ULONG period_count) {
-    if (context == nullptr || storage == nullptr || storage_bytes > MAXSIZE_T) {
+    if (context == nullptr) {
         return STATUS_INVALID_PARAMETER;
     }
     RtlZeroMemory(context, sizeof(*context));
+    if (storage == nullptr || storage_bytes > MAXSIZE_T) {
+        return STATUS_INVALID_PARAMETER;
+    }
     KeInitializeSpinLock(&context->lock);
     if (hibiki_wavert_stream_init_v1(
             &context->stream, storage, static_cast<size_t>(storage_bytes), channels,
