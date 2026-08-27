@@ -122,7 +122,9 @@ function Get-PropertyMap {
   $map = @{}
   foreach ($property in @($Properties)) {
     $key = [string]$property.KeyName
-    if (-not [string]::IsNullOrWhiteSpace($key)) { $map[$key] = $property.Data }
+    if ([string]::IsNullOrWhiteSpace($key)) { continue }
+    $dataProperty = $property.PSObject.Properties['Data']
+    $map[$key] = if ($null -eq $dataProperty) { $null } else { $dataProperty.Value }
   }
   $map
 }
@@ -262,6 +264,15 @@ function Invoke-DriverPnpInspectionSelfTest {
   }
   if ($null -ne (ConvertTo-HibikiDeviceSummary -Device $otherDevice -Properties @())) {
     throw 'Driver PnP inspection self-test accepted an unrelated device.'
+  }
+  $cases++
+
+  $missingDataMap = Get-PropertyMap -Properties @(
+    [pscustomobject]@{ KeyName = 'DEVPKEY_Device_ProblemStatus' }
+  )
+  if (-not $missingDataMap.ContainsKey('DEVPKEY_Device_ProblemStatus') -or
+      $null -ne $missingDataMap['DEVPKEY_Device_ProblemStatus']) {
+    throw 'Driver PnP inspection self-test failed missing-Data property normalization.'
   }
   $cases++
 
