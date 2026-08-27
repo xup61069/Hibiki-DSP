@@ -253,10 +253,12 @@ if ($LASTEXITCODE -ne 0) { throw "Live system-volume probe build failed: $LASTEX
 
 $probe = $plan.ProbePath
 if (-not (Test-Path -LiteralPath $probe)) { throw "Live system-volume probe was not produced: $probe" }
+& $probe --self-test
+if ($LASTEXITCODE -ne 0) { throw "Live system-volume target-selection self-test failed: $LASTEXITCODE" }
 if ($DirectBroker) {
   & $probe
   if ($LASTEXITCODE -ne 0) { throw "Live system-volume probe failed: $LASTEXITCODE" }
-  Write-Output 'Live broker-only system-volume probe completed; any temporary attenuation was restored.'
+  Write-Output 'Live broker-only system-volume probe completed; a successful mutation was restored, while unavailable state left the endpoint unchanged.'
   exit 0
 }
 
@@ -279,4 +281,4 @@ try {
     $engineProcess.WaitForExit()
   }
 }
-Write-Output 'Live system-volume probe completed; any temporary attenuation was restored.'
+Write-Output 'Live system-volume probe completed; a successful mutation was restored, while unavailable state left the endpoint unchanged.'
