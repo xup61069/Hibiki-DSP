@@ -107,6 +107,13 @@ public sealed partial class MainWindow : Window
             });
 #endif
         }
+        else if (e.PropertyName is nameof(EasyControlViewModel.SelectedScene) or
+                 nameof(EasyControlViewModel.SelectedSceneId))
+        {
+#if !HIBIKI_COMPATIBILITY_PREVIEW
+            DispatcherQueue.TryEnqueue(UpdateAllSceneCardsSelection);
+#endif
+        }
 
 #if !HIBIKI_COMPATIBILITY_PREVIEW
         if (e.PropertyName == nameof(EasyControlViewModel.IsConnected))
@@ -294,6 +301,7 @@ public sealed partial class MainWindow : Window
     private void OnSceneCardPrepared(ItemsRepeater sender, ItemsRepeaterElementPreparedEventArgs args)
     {
         var element = args.Element;
+        UpdateSceneCardSelection(element);
         var delayMs = Math.Min(args.Index, 7) * 40;
 
         element.Opacity = 0d;
@@ -465,7 +473,38 @@ public sealed partial class MainWindow : Window
     private async void OnSceneClick(object sender, RoutedEventArgs e)
     {
         if (sender is Button { Tag: string sceneId })
+        {
             await ViewModel.SelectSceneAsync(sceneId);
+            UpdateAllSceneCardsSelection();
+        }
+    }
+
+    private void UpdateSceneCardSelection(UIElement element)
+    {
+        if (element is Button btn && btn.Tag is string sceneId)
+        {
+            var isSelected = ViewModel.SelectedSceneId == sceneId;
+            btn.BorderThickness = new Thickness(isSelected ? 2 : 1);
+            if (Application.Current.Resources.TryGetValue(
+                isSelected ? "AccentTextFillColorPrimaryBrush" : "CardStrokeColorDefaultBrush",
+                out var brushObj) && brushObj is Brush brush)
+            {
+                btn.BorderBrush = brush;
+            }
+        }
+    }
+
+    private void UpdateAllSceneCardsSelection()
+    {
+        if (SceneCardRepeater is null) return;
+        var count = ViewModel.Scenes.Count;
+        for (var i = 0; i < count; i++)
+        {
+            if (SceneCardRepeater.TryGetElement(i) is { } element)
+            {
+                UpdateSceneCardSelection(element);
+            }
+        }
     }
 
     private async void OnAddCustomSceneClick(object sender, RoutedEventArgs e)
