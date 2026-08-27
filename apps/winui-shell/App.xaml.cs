@@ -33,8 +33,14 @@ public partial class App : Application
         if (!WindowPlacement.TryLoad(WindowPlacement.DefaultPath, out var placement)) return;
         try
         {
-            window.AppWindow.Resize(new Windows.Graphics.SizeInt32(placement.Width, placement.Height));
-            window.AppWindow.Move(new Windows.Graphics.PointInt32(placement.X, placement.Y));
+            var appWindow = window.AppWindow;
+            var rect = new Windows.Graphics.RectInt32(placement.X, placement.Y, placement.Width, placement.Height);
+            var displayArea = Microsoft.UI.Windowing.DisplayArea.GetFromRect(rect, Microsoft.UI.Windowing.DisplayAreaFallback.Primary);
+            var workArea = displayArea.WorkArea;
+            var normalized = WindowPlacement.Normalize(placement, workArea.X, workArea.Y, workArea.Width, workArea.Height);
+
+            appWindow.Resize(new Windows.Graphics.SizeInt32(normalized.Width, normalized.Height));
+            appWindow.Move(new Windows.Graphics.PointInt32(normalized.X, normalized.Y));
         }
         catch (InvalidOperationException)
         {
