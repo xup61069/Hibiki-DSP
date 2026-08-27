@@ -7,6 +7,7 @@ param(
   [switch]$EnableWasapiOutput,
   [switch]$EnableTestTone,
   [switch]$EnableTabBridge,
+  [switch]$EnableTabBassCorrection,
   [switch]$EnableTabNoiseSuppressor,
   [switch]$EnableVst3Lane,
   [string]$Vst3ClassId = '',
@@ -739,6 +740,11 @@ if ($EnableTabBridge) {
   if (-not $EnableWasapiOutput) { throw 'EnableTabBridge requires EnableWasapiOutput.' }
   $engineArguments += '--enable-tab-bridge'
 }
+if ($EnableTabBassCorrection) {
+  if (-not $EnableTabBridge) { throw 'EnableTabBassCorrection requires EnableTabBridge.' }
+  if (-not $EnableWasapiOutput) { throw 'EnableTabBassCorrection requires EnableWasapiOutput.' }
+  $engineArguments += '--enable-tab-bass-correction'
+}
 if ($EnableTabNoiseSuppressor) {
   if (-not $EnableTabBridge) { throw 'EnableTabNoiseSuppressor requires EnableTabBridge.' }
   $engineArguments += '--enable-tab-noise-suppressor'
@@ -803,7 +809,7 @@ if ($EnableProcessDelivery -and -not $RenderOffline) {
 }
 if ($RenderOffline) {
   if ($EnableWasapiOutput -or $EnableTestTone -or $EnableSessionRouting -or
-      $EnableProcessDelivery -or $EnableTabBridge -or $EnableDriverLoopback -or
+      $EnableProcessDelivery -or $EnableTabBridge -or $EnableTabBassCorrection -or $EnableDriverLoopback -or
       $EnableSystemVolume) {
     throw 'RenderOffline is exclusive with live-delivery switches.'
   }
@@ -931,6 +937,16 @@ try {
         throw "WASAPI main output route state is invalid: $mainOutputState."
       }
       $statusSummary += "WASAPI output route state=$mainOutputState; physical delivery is endpoint-dependent"
+    }
+    if ($EnableTabBassCorrection) {
+      $tabRouteOffset = 20 + 40 + (6 * 224)
+      $tabDetailBytes = [BitConverter]::ToUInt16($statusReply, $tabRouteOffset + 6)
+      $tabDetail = [System.Text.Encoding]::UTF8.GetString(
+        $statusReply, $tabRouteOffset + 104, $tabDetailBytes)
+      if ($tabDetail -notmatch 'adaptive bass correction armed') {
+        throw "Tab route detail omitted the adaptive bass opt-in: '$tabDetail'."
+      }
+      $statusSummary += 'tab adaptive bass correction armed; visual publication remains telemetry-gated'
     }
     if ($EnableProcessDelivery) {
       # Bind the first active session to main so process delivery has a routed
