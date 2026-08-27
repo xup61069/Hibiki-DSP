@@ -513,8 +513,14 @@ public sealed partial class MainWindow : Window
 
     private async void OnVolumeChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
-        if (ViewModel.IsConnected)
-            await ViewModel.QueueVolumeAsync();
+        if (!ViewModel.IsConnected) return;
+
+        // WinUI can raise ValueChanged before the TwoWay binding has copied the
+        // new slider value into the ViewModel. Synchronize from the event args
+        // first so the queued volume notification and the following confirmed
+        // EQ visual snapshot describe the same user action.
+        ViewModel.RequestedVolumeDb = e.NewValue;
+        await ViewModel.QueueVolumeAsync();
     }
 
     private void OnSessionSelectClick(object sender, RoutedEventArgs e)
