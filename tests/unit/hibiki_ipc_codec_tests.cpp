@@ -109,7 +109,9 @@ int main() {
         CHECK(error == IpcDecodeError::UnsupportedVersion);
     }
 
-    // InvalidType: type 0 and every out-of-range value are rejected.
+    // InvalidType: type 0 and every out-of-range value are rejected. The
+    // calibration prepare command occupies type 23, so the next value is the
+    // first invalid value after the current v1 registry.
     {
         auto bytes = make_valid_frame_bytes();
         set_type(bytes, 0U);
@@ -117,7 +119,13 @@ int main() {
         CHECK(!decode_ipc_frame(bytes, error).has_value());
         CHECK(error == IpcDecodeError::InvalidType);
 
-        set_type(bytes, 23U);  // One past EqVisualSnapshot (=22).
+        set_type(bytes, static_cast<std::uint16_t>(IpcMessageType::CalibrationPeqPrepare));
+        error = IpcDecodeError::None;
+        const auto calibration = decode_ipc_frame(bytes, error);
+        CHECK(calibration.has_value() && error == IpcDecodeError::None &&
+              calibration->header.type == IpcMessageType::CalibrationPeqPrepare);
+
+        set_type(bytes, 24U);  // One past CalibrationPeqPrepare (=23).
         error = IpcDecodeError::None;
         CHECK(!decode_ipc_frame(bytes, error).has_value());
         CHECK(error == IpcDecodeError::InvalidType);

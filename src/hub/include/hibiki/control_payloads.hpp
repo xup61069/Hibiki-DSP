@@ -52,6 +52,11 @@ constexpr std::size_t kSceneCatalogTimelineCapacityV1 = 16U;
 constexpr std::size_t kSceneCatalogTimelineIdBytesV1 = 64U;
 constexpr std::size_t kSceneCatalogCommandPayloadBytesV1 = 3260U;
 
+constexpr std::size_t kCalibrationPeqOutputGroupMaxBytesV1 = 64U;
+constexpr std::size_t kCalibrationPeqMaxFiltersV1 = 16U;
+constexpr std::size_t kCalibrationPeqCommandPayloadBytesV1 =
+    16U + 64U + (kCalibrationPeqMaxFiltersV1 * 24U); // header + group + filters
+
 enum class SessionRouteRuleOperationV1 : std::uint8_t {
     Upsert = 1U,
     Remove = 2U,
@@ -157,6 +162,27 @@ encode_ir_prepare_command_v1(const IrPrepareCommandV1& command) noexcept;
 [[nodiscard]] bool decode_scene_catalog_command_v1(
     std::span<const std::uint8_t> payload,
     SceneCatalogCommandV1& command) noexcept;
+
+struct CalibrationPeqPrepareCommandV1 {
+    std::uint32_t schema_version{1U};
+    std::uint8_t filter_count{0U};
+    std::uint16_t output_group_bytes{0U};
+    std::uint8_t clear_existing{0U};
+    std::array<char, kCalibrationPeqOutputGroupMaxBytesV1> output_group{};
+    struct WireFilter {
+        double frequency_hz{0.0};
+        double gain_db{0.0};
+        double q{0.0};
+    };
+    std::array<WireFilter, kCalibrationPeqMaxFiltersV1> filters{};
+};
+
+[[nodiscard]] bool encode_calibration_peq_prepare_command_v1(
+    const CalibrationPeqPrepareCommandV1& command,
+    std::vector<std::uint8_t>& payload) noexcept;
+[[nodiscard]] bool decode_calibration_peq_prepare_command_v1(
+    std::span<const std::uint8_t> payload,
+    CalibrationPeqPrepareCommandV1& command) noexcept;
 
 [[nodiscard]] std::array<std::uint8_t, kSessionRouteCommandPayloadBytesV1>
 encode_session_route_command_v1(const SessionRouteCommandV1& command) noexcept;
@@ -363,6 +389,7 @@ struct ControlCommandV1 {
     SessionRouteRuleCommandV1 session_route_rule{};
     IrPrepareCommandV1 ir_prepare{};
     SceneCatalogCommandV1 scene_catalog{};
+    CalibrationPeqPrepareCommandV1 calibration_peq{};
     bool has_volume_target{false};
 };
 

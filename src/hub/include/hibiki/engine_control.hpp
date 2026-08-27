@@ -34,6 +34,8 @@ using SessionRouteRuleHandlerFnV1 = bool (*)(const SessionRouteRuleCommandV1& re
                                              void* context) noexcept;
 using IrPrepareHandlerFnV1 = bool (*)(const IrPrepareCommandV1& request,
                                       void* context) noexcept;
+using CalibrationPeqPrepareHandlerFnV1 =
+    bool (*)(const CalibrationPeqPrepareCommandV1& request, void* context) noexcept;
 using EqVisualPublishFnV1 = void (*)(const EqVisualSnapshotV1& snapshot,
                                      void* context) noexcept;
 
@@ -125,6 +127,12 @@ public:
         ir_prepare_context_ = context;
     }
 
+    void set_calibration_peq_handler(
+        CalibrationPeqPrepareHandlerFnV1 handler, void* context) noexcept {
+        calibration_peq_handler_ = handler;
+        calibration_peq_context_ = context;
+    }
+
     // Called on the control worker only after update_loudness_phon reports a
     // confirmed recompute. The callback must not throw, wait, or touch RT.
     void set_eq_visual_publisher(EqVisualPublishFnV1 publisher, void* context) noexcept {
@@ -166,6 +174,8 @@ private:
     void* session_route_rule_context_{nullptr};
     IrPrepareHandlerFnV1 ir_prepare_handler_{nullptr};
     void* ir_prepare_context_{nullptr};
+    CalibrationPeqPrepareHandlerFnV1 calibration_peq_handler_{nullptr};
+    void* calibration_peq_context_{nullptr};
     EqVisualPublishFnV1 eq_visual_publisher_{nullptr};
     void* eq_visual_publisher_context_{nullptr};
     std::uint64_t next_eq_visual_sequence_{1U};

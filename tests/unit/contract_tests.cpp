@@ -2248,6 +2248,54 @@ int main() {
     CHECK(decode_control_command_v1(ir_prepare_frame, decoded_command) &&
           decoded_command.type == IpcMessageType::IrPrepareCommand &&
           decoded_command.ir_prepare.path_bytes == ir_prepare_path.size());
+
+    // Calibration PEQ prepare round-trip and fail-closed paths.
+    CalibrationPeqPrepareCommandV1 calibration_peq_command{};
+    calibration_peq_command.filter_count = 2U;
+    calibration_peq_command.output_group_bytes = 4U;
+    const std::string_view calibration_group{"main"};
+    std::copy(calibration_group.begin(), calibration_group.end(),
+              calibration_peq_command.output_group.begin());
+    calibration_peq_command.filters[0].frequency_hz = 100.0;
+    calibration_peq_command.filters[0].gain_db = -3.5;
+    calibration_peq_command.filters[0].q = 0.7;
+    calibration_peq_command.filters[1].frequency_hz = 8000.0;
+    calibration_peq_command.filters[1].gain_db = 2.0;
+    calibration_peq_command.filters[1].q = 1.5;
+    std::vector<std::uint8_t> calibration_peq_payload;
+    CHECK(encode_calibration_peq_prepare_command_v1(calibration_peq_command,
+                                                      calibration_peq_payload));
+    CHECK(calibration_peq_payload.size() == kCalibrationPeqCommandPayloadBytesV1);
+    CalibrationPeqPrepareCommandV1 decoded_calibration_peq{};
+    CHECK(decode_calibration_peq_prepare_command_v1(
+        calibration_peq_payload, decoded_calibration_peq));
+    CHECK(decoded_calibration_peq.schema_version == 1U &&
+          decoded_calibration_peq.filter_count == 2U &&
+          decoded_calibration_peq.output_group_bytes == 4U);
+    CHECK(std::string_view(decoded_calibration_peq.output_group.data(),
+                           decoded_calibration_peq.output_group_bytes) == "main");
+    CHECK(decoded_calibration_peq.filters[0].frequency_hz == 100.0 &&
+          decoded_calibration_peq.filters[0].gain_db == -3.5 &&
+          decoded_calibration_peq.filters[0].q == 0.7 &&
+          decoded_calibration_peq.filters[1].frequency_hz == 8000.0 &&
+          decoded_calibration_peq.filters[1].gain_db == 2.0 &&
+          decoded_calibration_peq.filters[1].q == 1.5);
+    CHECK(is_valid_message_type(IpcMessageType::CalibrationPeqPrepare));
+    calibration_peq_command.filters[0].gain_db = 30.0;
+    std::vector<std::uint8_t> invalid_calibration_payload;
+    CHECK(!encode_calibration_peq_prepare_command_v1(
+        calibration_peq_command, invalid_calibration_payload));
+    CHECK(decode_calibration_peq_prepare_command_v1(
+        calibration_peq_payload, decoded_calibration_peq));
+    auto tampered_calibration = calibration_peq_payload;
+    tampered_calibration[10U] = 1U;
+    CHECK(!decode_calibration_peq_prepare_command_v1(
+        tampered_calibration, decoded_calibration_peq));
+    auto invalid_calibration_schema = calibration_peq_payload;
+    invalid_calibration_schema[0U] = 2U;
+    CHECK(!decode_calibration_peq_prepare_command_v1(
+        invalid_calibration_schema, decoded_calibration_peq));
+
     ControlCommandQueueV1 command_queue;
     ControlCommandV1 queued_command{};
     queued_command.type = IpcMessageType::SceneApply;

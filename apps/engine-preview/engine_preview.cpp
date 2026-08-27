@@ -1275,6 +1275,35 @@ void set_route(hibiki::ControlRouteHealthEntryV1& route,
               route.detail.begin());
 }
 
+bool prepare_calibration_peq(
+    const hibiki::CalibrationPeqPrepareCommandV1& request,
+    void* const context) noexcept {
+    auto* engine = static_cast<hibiki::AudioEngineModel*>(context);
+    if (engine == nullptr || request.filter_count == 0U ||
+        request.filter_count > hibiki::kCalibrationPeqMaxFiltersV1) {
+        return false;
+    }
+    const std::string_view output_group(request.output_group.data(),
+                                         request.output_group_bytes);
+    std::array<hibiki::PeqFilterV1, hibiki::kCalibrationPeqMaxFiltersV1> filters{};
+    for (std::size_t index = 0U; index < request.filter_count; ++index) {
+        filters[index].frequency_hz = request.filters[index].frequency_hz;
+        filters[index].gain_db = request.filters[index].gain_db;
+        filters[index].q = request.filters[index].q;
+    }
+    if (!engine->prepare_calibration_peq(output_group,
+                                          std::span(filters.data(),
+                                                     request.filter_count))) {
+        engine->rollback_calibration_peq();
+        return false;
+    }
+    if (!engine->commit_calibration_peq()) {
+        engine->rollback_calibration_peq();
+        return false;
+    }
+    return true;
+}
+
 void publish_eq_visual_snapshot(const hibiki::EqVisualSnapshotV1& snapshot,
                                 void* const context) noexcept {
     auto* store = static_cast<hibiki::EqVisualSnapshotStoreV1*>(context);
@@ -1605,6 +1634,7 @@ int wmain(const int argc, wchar_t* const* argv) {
     control_worker.ensure_owned_scene_catalog();
     IrPrepareState ir_state{&engine};
     control_worker.set_ir_prepare_handler(prepare_ir_file, &ir_state);
+    control_worker.set_calibration_peq_handler(prepare_calibration_peq, &engine);
     SystemVolumeState system_volume;
     system_volume.enabled = system_volume_requested;
     SessionRoutingState session_routing;

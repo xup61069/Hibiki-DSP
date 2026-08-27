@@ -32,6 +32,7 @@ public enum ControlMessageType : ushort
     SceneCatalogCommand = 20,
     EqVisualSnapshotRequest = 21,
     EqVisualSnapshot = 22,
+    CalibrationPeqPrepare = 23,
 }
 
 public enum IpcDecodeError
@@ -162,7 +163,8 @@ public static class IpcCodecV1
         ControlMessageType.SessionRouteRuleCommand or ControlMessageType.IrPrepareCommand or
         ControlMessageType.SceneCatalogCommand or
         ControlMessageType.EqVisualSnapshotRequest or
-        ControlMessageType.EqVisualSnapshot;
+        ControlMessageType.EqVisualSnapshot or
+        ControlMessageType.CalibrationPeqPrepare;
 }
 
 public static class ControlPayloadsV1
@@ -206,6 +208,10 @@ public static class ControlPayloadsV1
     public const int SessionRouteRuleCommandBytes = 480;
     public const int IrPreparePathMaxBytes = 260;
     public const int IrPrepareCommandBytes = 288;
+    public const int CalibrationPeqMaxFilters = 16;
+    public const int CalibrationPeqOutputGroupMaxBytes = 64;
+    public const int CalibrationPeqCommandBytes =
+        16 + CalibrationPeqOutputGroupMaxBytes + (CalibrationPeqMaxFilters * 24);
     private static readonly System.Text.UTF8Encoding StrictUtf8 =
         new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
@@ -542,6 +548,42 @@ public static class ControlPayloadsV1
         BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(16), expectedChannels);
         BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(20), (ushort)pathBytes.Length);
         pathBytes.CopyTo(payload.AsSpan(24));
+        return payload;
+    }
+
+    public static byte[] EncodeCalibrationPeqPrepare(
+        string outputGroup,
+        IReadOnlyList<(double FrequencyHz, double GainDb, double Q)> filters)
+    {
+        var groupBytes = StrictUtf8.GetBytes(outputGroup ?? string.Empty);
+        if (groupBytes.Length is < 1 or > CalibrationPeqOutputGroupMaxBytes ||
+            groupBytes.Any(value => value < 0x20) ||
+            filters is null || filters.Count is < 1 or > CalibrationPeqMaxFilters)
+            throw new ArgumentException(
+                "Calibration PEQ prepare is outside the v1 limit.", nameof(outputGroup));
+        foreach (var (freq, gain, q) in filters)
+        {
+            if (!double.IsFinite(freq) || freq < 10.0 || freq > 22000.0 ||
+                !double.IsFinite(gain) || gain < -24.0 || gain > 24.0 ||
+                !double.IsFinite(q) || q < 0.05 || q > 20.0)
+                throw new ArgumentException(
+                    "Calibration PEQ filter is outside the v1 limit.", nameof(filters));
+        }
+        var payload = new byte[CalibrationPeqCommandBytes];
+        BinaryPrimitives.WriteUInt32LittleEndian(payload, 1U);
+        payload[4] = (byte)filters.Count;
+        payload[5] = (byte)groupBytes.Length;
+        groupBytes.CopyTo(payload.AsSpan(16));
+        for (var index = 0; index < filters.Count; ++index)
+        {
+            var offset = 80 + (index * 24);
+            BinaryPrimitives.WriteDoubleLittleEndian(
+                payload.AsSpan(offset), filters[index].FrequencyHz);
+            BinaryPrimitives.WriteDoubleLittleEndian(
+                payload.AsSpan(offset + 8), filters[index].GainDb);
+            BinaryPrimitives.WriteDoubleLittleEndian(
+                payload.AsSpan(offset + 16), filters[index].Q);
+        }
         return payload;
     }
 
@@ -1293,6 +1335,12 @@ public sealed class ControlCommandFactoryV1
         _requests.Create(ControlMessageType.IrPrepareCommand,
             ControlPayloadsV1.EncodeIrPrepare(path, policy, expectedSampleRate,
                                                expectedChannels));
+
+    public IpcEnvelopeV1 PrepareCalibrationPeq(
+        string outputGroup,
+        IReadOnlyList<(double FrequencyHz, double GainDb, double Q)> filters) =>
+        _requests.Create(ControlMessageType.CalibrationPeqPrepare,
+            ControlPayloadsV1.EncodeCalibrationPeqPrepare(outputGroup, filters));
 
     public IpcEnvelopeV1 SwitchDevice(PhysicalDeviceCard device) =>
         _requests.Create(ControlMessageType.DeviceSwitch,
