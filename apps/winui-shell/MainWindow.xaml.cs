@@ -452,6 +452,11 @@ public sealed partial class MainWindow : Window
             ViewModel.ExportWizardProfile(file.Path);
     }
 
+    private async void OnApplyWizardToSceneClick(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.ApplyWizardToSceneAsync();
+    }
+
     private async void OnRefreshPhysicalDevicesClick(object sender, RoutedEventArgs e)
     {
         await ViewModel.RefreshPhysicalDevicePickerAsync();

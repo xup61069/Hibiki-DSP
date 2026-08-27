@@ -37,6 +37,7 @@ enum class IpcMessageType : std::uint16_t {
     SceneCatalogCommand = 20,
     EqVisualSnapshotRequest = 21,
     EqVisualSnapshot = 22,
+    CalibrationPeqPrepare = 23,
 };
 
 struct IpcHeaderV1 {

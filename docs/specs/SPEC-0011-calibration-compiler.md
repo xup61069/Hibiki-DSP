@@ -6,7 +6,7 @@ authority: product-behavior
 last_reviewed: 2026-08-24
 review_after_days: 30
 related_adrs: [ADR-0002]
-source_globs: ["src/hub/include/hibiki/calibration_compiler.hpp", "src/hub/src/calibration_compiler.cpp", "apps/control-model/CalibrationModel.cs", "schemas/calibration-response-v1.schema.json", "schemas/peq-filter-v1.schema.json"]
+source_globs: ["src/hub/include/hibiki/calibration_compiler.hpp", "src/hub/src/calibration_compiler.cpp", "apps/control-model/CalibrationModel.cs", "apps/control-model/EasyControlViewModel.cs", "apps/control-model/IpcProtocol.cs", "src/hub/include/hibiki/ipc.hpp", "src/hub/src/ipc.cpp", "src/hub/include/hibiki/control_payloads.hpp", "src/hub/src/control_payloads.cpp", "schemas/calibration-response-v1.schema.json", "schemas/peq-filter-v1.schema.json"]
 ---
 
 # SPEC-0011：量測頻響到 bounded PEQ 校正
@@ -54,6 +54,21 @@ wizard 把 caller-supplied 的量測電平配對到所選曲線後直接取得�
 `CompileMultiChannelBatch` 接受固定 1／2／6／8 聲道陣列並逐聲道呼叫同一個 bounded compiler：
 任一聲道驗證失敗時整批 fail-closed 且不回傳部分結果；任一聲道被 boost/cut cap 或 filter 數量
 限制時，批次結果標示 limited。多聲道輸出仍受每聲道最多 16 段 PEQ 上限。
+
+### Engine apply wire boundary
+
+校正結果送往 engine control plane 使用 v1 `CalibrationPeqPrepare` 訊息（`IpcMessageType = 23`）。
+其 payload 固定為 464 bytes、little-endian positional layout：`[0..3]` 為 schema version
+`uint32 = 1`；`[4]` 為 filter count（1–16）；`[5]` 為 output-group UTF-8 byte count（1–64）；
+`[6]` 為 `clear_existing`（目前必須為 0）；`[7..15]` 為保留且必須全 0；`[16..79]` 為
+NUL-padding 的 printable UTF-8 output group；`[80..463]` 為 16 個 24-byte filter entry，
+每筆依序為 little-endian `f64 frequency_hz`、`f64 gain_db`、`f64 Q`。未使用的 entry 必須全 0。
+
+每個 filter 必須符合 10–22000 Hz、-24..+24 dB、Q 0.05–20.0；schema version、reserved bytes、
+group padding、有限值與上述範圍任一不符時，decoder 必須拒絕整個 payload，不產生部分命令。
+這個固定容量命令只代表 control plane 已接受／入列；UI 不得在收到 Ack 時宣稱音訊已完成套用。
+真正的 prepare／commit 由 engine control worker 執行，audio-side 的處理順序為既有 IR、等響度
+PEQ、calibration PEQ、Group Master、limiter；Strict Direct 仍不套用這條 calibration PEQ 路徑。
 
 ## 限制與安全
 
