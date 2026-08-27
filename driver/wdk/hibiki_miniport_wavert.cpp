@@ -344,6 +344,10 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::Init(
         return STATUS_INVALID_PARAMETER;
     }
 
+    if (m_Miniport != nullptr || m_PortStream != nullptr) {
+        return STATUS_INVALID_DEVICE_STATE;
+    }
+
     hibiki_endpoint_topology_v1 topology{};
     if (hibiki_endpoint_topology_get_v1(EndpointIndex, &topology) == 0 ||
         hibiki_endpoint_topology_validate_v1(&topology) == 0) {
@@ -418,6 +422,10 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferCore(
     if (AudioBufferMdl == nullptr || ActualSize == nullptr ||
         OffsetFromFirstPage == nullptr || CacheType == nullptr) {
         return STATUS_INVALID_PARAMETER;
+    }
+
+    if (m_Miniport == nullptr || m_PortStream == nullptr) {
+        return STATUS_INVALID_DEVICE_STATE;
     }
 
     if (m_StreamInitialized || m_DmaBuffer != nullptr || m_DmaBufferMdl != nullptr) {
