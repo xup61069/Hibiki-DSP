@@ -163,6 +163,7 @@ bool Vst3TapBufferV1::publish(
     const float* interleaved,
     const std::size_t frames,
     const std::uint32_t channels) noexcept {
+    publish_attempts_.fetch_add(1U, std::memory_order_relaxed);
     if (output_group.empty() ||
         output_group.size() > kMaxOutputGroupBytesV1 ||
         interleaved == nullptr || frames == 0U ||
@@ -174,7 +175,10 @@ bool Vst3TapBufferV1::publish(
     // Reject NaN/Inf — the worker must never receive garbage.
     const std::size_t sample_count = frames * static_cast<std::size_t>(channels);
     for (std::size_t i = 0U; i < sample_count; ++i) {
-        if (!std::isfinite(interleaved[i])) { return false; }
+        if (!std::isfinite(interleaved[i])) {
+            publish_nonfinite_rejects_.fetch_add(1U, std::memory_order_relaxed);
+            return false;
+        }
     }
 
     // Acquire sequence: even = stable, odd = mid-write. We increment to
@@ -191,6 +195,7 @@ bool Vst3TapBufferV1::publish(
     sequence_ = seq;
 
     // Release: publish with release ordering so readers see complete data.
+    publish_successes_.fetch_add(1U, std::memory_order_relaxed);
     valid_.store(true, std::memory_order_release);
     write_seq_.fetch_add(1U, std::memory_order_release);
     return true;

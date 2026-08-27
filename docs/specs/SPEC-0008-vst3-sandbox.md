@@ -34,6 +34,21 @@ VST3 plugin 不得在 Hibiki RT thread 或主 UI process 內直接執行。contr
   時 host 直接 quarantine。`PluginHostModel::latency_lane_input()` 只在 plugin 可處理時輸出
   active lane，供 SPEC-0012 的 latency graph commit 使用，避免 PID 或暫時 index 對錯延遲。
 
+## Engine Preview VST3 lane 邊界
+
+Engine Preview 提供 opt-in `--enable-vst3-lane`，把既有 sandbox worker 接進 RT 音訊路徑：
+主輸出 graph 的 pre-VST3 tap 由 control loop 讀取（seqlock sequence 去重，同一 snapshot 不會
+重複送進 worker），worker 處理後的 Float32 block push 回 lane ring，由 RT graph 的
+apply_vst3_lanes 在 render 時 pop。此模式必須同時給 --vst3-module-path 與
+--vst3-class-id，缺一即 fail-closed 拒絕啟動；--vst3-worker-path 可覆蓋預設的本地
+SDK worker 位置。lane 狀態透過 control status snapshot 的 route slot vst3-lane 曝光：
+armed（Pending）→ rendering with processed-block counter（Ready）→ setup 失敗時
+Degraded。worker lane session 必須以 sink 的實際 block frames 準備；tap block 超過
+prepared 上限時整個 exchange fail-closed 進入 Degraded，不得靜默截斷或丟棄。
+WAV source 準備失敗時必須輸出明確錯誤，不得讓下游（例如 VST3 tap）呈現為
+「無聲音可處理」的假正常。本邊界屬 user-space engine preview evidence，不等於 driver/WaveRT、實體
+音訊 delivery 或第三方 plugin certification。
+
 ## Worker IPC frame
 
 `vst3_worker_protocol.hpp` 定義固定 36-byte little-endian frame header：Hello、HelloAck、

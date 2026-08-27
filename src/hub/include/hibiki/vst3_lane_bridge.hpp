@@ -14,7 +14,11 @@ namespace hibiki {
 constexpr std::size_t kMaxVst3LaneGroupsV1 = 32U;
 constexpr std::size_t kMaxOutputGroupBytesV1 = 64U;
 constexpr std::size_t kMaxVst3RingFramesV1 = 4096U;
-constexpr std::size_t kMaxVst3TapFramesV1 = 512U;
+// Must match the WASAPI sink block-frame ceiling (clamp(..., 16, 4096) in
+// engine_preview.cpp). A smaller value silently drops every tap publish when
+// the endpoint reports a larger buffer size, so the VST3 lane never receives
+// audio. 4096 is the shared ceiling for both the tap snapshot and the ring.
+constexpr std::size_t kMaxVst3TapFramesV1 = 4096U;
 constexpr std::size_t kMaxVst3TapChannelsV1 = 8U;
 
 // Fixed-capacity lock-free bridge that carries VST3 sandbox worker output
@@ -88,6 +92,25 @@ public:
                             std::uint64_t& sequence_out) const noexcept;
 
     void reset() noexcept;
+    [[nodiscard]] bool is_valid_for_diagnostics() const noexcept {
+        return valid_.load(std::memory_order_acquire);
+    }
+    // Control-plane diagnostic counters. publish_attempts_ counts every
+    // entry into publish(); publish_nonfinite_rejects_ counts rejections
+    // caused by non-finite samples after the shape checks passed; the
+    // remaining rejects are shape/group errors counted implicitly by
+    // attempts minus (successes + nonfinite rejects). All are relaxed
+    // atomics: diagnostics only, never used for control flow.
+    [[nodiscard]] std::uint64_t publish_attempt_count() const noexcept {
+        return publish_attempts_.load(std::memory_order_relaxed);
+    }
+    [[nodiscard]] std::uint64_t publish_success_count() const noexcept {
+        return publish_successes_.load(std::memory_order_relaxed);
+    }
+    [[nodiscard]] std::uint64_t
+    publish_nonfinite_reject_count() const noexcept {
+        return publish_nonfinite_rejects_.load(std::memory_order_relaxed);
+    }
 
     // Test-only hook: forces the internal sequence into an odd (mid-write)
     // state so contract tests can exercise the torn-read rejection path
@@ -106,6 +129,9 @@ private:
     mutable std::uint64_t sequence_{0U};
     mutable std::atomic<std::uint64_t> write_seq_{0U};
     mutable std::atomic<bool> valid_{false};
+    mutable std::atomic<std::uint64_t> publish_attempts_{0U};
+    mutable std::atomic<std::uint64_t> publish_successes_{0U};
+    mutable std::atomic<std::uint64_t> publish_nonfinite_rejects_{0U};
 };
 
 }  // namespace hibiki
