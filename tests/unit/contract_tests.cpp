@@ -5795,6 +5795,38 @@ int main() {
     CHECK(retained_session->Release() == 0U &&
           session_release_calls.load(std::memory_order_relaxed) == 2U &&
           session_destruction_count.load(std::memory_order_relaxed) == 1U);
+    {
+        constexpr std::size_t pending_capacity = 64U;
+        WindowsAudioSessionWatcher bounded_watcher;
+        std::atomic<std::uint32_t> bounded_add_ref_calls{0U};
+        std::atomic<std::uint32_t> bounded_release_calls{0U};
+        std::atomic<std::uint32_t> bounded_destruction_count{0U};
+        std::array<RetainedAudioSessionControl*, pending_capacity + 1U> pending_sessions{};
+        for (auto& pending_session : pending_sessions) {
+            pending_session = new RetainedAudioSessionControl(
+                bounded_add_ref_calls, bounded_release_calls, bounded_destruction_count);
+        }
+        bool callbacks_succeeded = true;
+        for (auto* pending_session : pending_sessions) {
+            callbacks_succeeded = callbacks_succeeded &&
+                                  bounded_watcher.OnSessionCreated(pending_session) == S_OK;
+        }
+        std::uint64_t bounded_sequence = 0U;
+        CHECK(callbacks_succeeded &&
+              bounded_add_ref_calls.load(std::memory_order_relaxed) == pending_capacity &&
+              bounded_watcher.poll(bounded_sequence) &&
+              bounded_sequence == pending_sessions.size());
+        bounded_watcher.unbind();
+        CHECK(bounded_release_calls.load(std::memory_order_relaxed) == pending_capacity &&
+              bounded_destruction_count.load(std::memory_order_relaxed) == 0U);
+        for (auto* pending_session : pending_sessions) {
+            (void)pending_session->Release();
+        }
+        CHECK(bounded_release_calls.load(std::memory_order_relaxed) ==
+                  pending_capacity + pending_sessions.size() &&
+              bounded_destruction_count.load(std::memory_order_relaxed) ==
+                  pending_sessions.size());
+    }
     WindowsAudioSessionRouteCoordinatorV1 session_route_coordinator;
     GraphConfigV1 session_route_graph;
     ProcessLoopbackPlanV1 session_process_plan;
