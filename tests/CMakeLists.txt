@@ -396,6 +396,21 @@ endif()
 add_test(NAME hibiki_calibration_anchor_tests COMMAND hibiki_calibration_anchor_tests)
 
 
+add_executable(hibiki_vst3_sandbox_launch_tests
+  unit/vst3_sandbox_launch_tests.cpp
+)
+
+target_link_libraries(hibiki_vst3_sandbox_launch_tests PRIVATE hibiki_hub hibiki_vst_host)
+
+if(MSVC)
+  target_compile_options(hibiki_vst3_sandbox_launch_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_vst3_sandbox_launch_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_vst3_sandbox_launch_tests COMMAND hibiki_vst3_sandbox_launch_tests)
+
+
 add_executable(hibiki_exporters_tests
   unit/exporters_tests.cpp
 )
