@@ -576,11 +576,11 @@
         <Button Content="匯出校正設定" Click="OnExportWizardProfileClick" MinHeight="32" IsEnabled="{Binding WizardHasResult}" AutomationProperties.Name="匯出校正 PEQ 設定檔" AutomationProperties.HelpText="將已編譯的 PEQ 濾波器存成 JSON 檔" ToolTipService.ToolTip="將已編譯的 PEQ 濾波器存成 JSON 檔" />
         <Button Content="套用到場景" Click="OnApplyWizardToSceneClick" MinHeight="32" IsEnabled="{Binding WizardHasResult}" AutomationProperties.Name="套用校正到場景" AutomationProperties.HelpText="將已編譯的校正濾波器送進引擎，掛到目前的輸出場景" ToolTipService.ToolTip="將已編譯的校正濾波器送進引擎，掛到目前的輸出場景" />
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" Spacing="10">
+                    <StackPanel Orientation="Horizontal" Spacing="10" Visibility="{Binding WizardHasMeasurement, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Border Style="{StaticResource StatusPillStyle}">
                             <TextBlock Text="{Binding WizardMeasurementPath}" Style="{ThemeResource CaptionTextBlockStyle}" AutomationProperties.Name="量測檔路徑" Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxWidth="420" TextTrimming="CharacterEllipsis" />
                         </Border>
-                        <Border Style="{StaticResource StatusPillStyle}" Visibility="{Binding WizardHasMeasurement, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Border Style="{StaticResource StatusPillStyle}">
                             <TextBlock Text="{Binding WizardImportedCountText}" Style="{ThemeResource CaptionTextBlockStyle}" AutomationProperties.Name="量測點數" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </Border>
                     </StackPanel>
