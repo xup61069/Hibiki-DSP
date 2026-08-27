@@ -260,13 +260,21 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferCore(
     }
 
     const ULONG period_count = 2U; // Default double-buffered period count
-    const ULONG bytes_per_frame = topology.channel_count * sizeof(float);
-    const ULONG period_bytes = topology.frames_per_buffer * bytes_per_frame;
-    const ULONG required_size = period_bytes * period_count;
+    const SIZE_T bytes_per_frame = static_cast<SIZE_T>(topology.channel_count) * sizeof(float);
+    const SIZE_T period_bytes = static_cast<SIZE_T>(topology.frames_per_buffer) * bytes_per_frame;
+    const SIZE_T maximum_size =
+        static_cast<SIZE_T>(HIBIKI_WAVERT_STREAM_MAX_PERIOD_FRAMES_V1) *
+        HIBIKI_WAVERT_STREAM_MAX_PERIOD_COUNT_V1 * bytes_per_frame;
+    if (period_bytes > maximum_size / period_count ||
+        static_cast<SIZE_T>(RequestedSize) > maximum_size) {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    const SIZE_T required_size = period_bytes * period_count;
 
     ULONG actual_size = RequestedSize;
     if (actual_size < required_size) {
-        actual_size = required_size;
+        actual_size = static_cast<ULONG>(required_size);
     }
 
     // Allocate continuous memory through port stream
