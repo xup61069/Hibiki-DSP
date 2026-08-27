@@ -404,7 +404,18 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(IrAddedDelayDisplayText));
             OnPropertyChanged(nameof(IrPhaseUsesFir));
             OnPropertyChanged(nameof(IrPhaseModeText));
+            OnPropertyChanged(nameof(IrPhaseModeIndex));
             MarkIrPrepareStale();
+        }
+    }
+
+    public int IrPhaseModeIndex
+    {
+        get => (int)_irPhaseMode;
+        set
+        {
+            if (value is >= 0 and <= 3)
+                IrPhaseMode = (IrPhaseMode)value;
         }
     }
 
