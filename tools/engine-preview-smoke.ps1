@@ -358,6 +358,16 @@ function ConvertTo-EngineArgumentString {
   })
   return $composed -join ' '
 }
+
+function Test-EnginePreviewTestToneRouteDetail {
+  param([AllowNull()][AllowEmptyString()][string]$Detail)
+
+  if ($null -eq $Detail) { return $false }
+  $renderingBody = 'test tone rendering.'
+  return [string]::Equals($Detail, $renderingBody, [StringComparison]::Ordinal) -or
+    $Detail.EndsWith(": $renderingBody", [StringComparison]::Ordinal)
+}
+
 function Get-EnginePreviewSmokeWavSampleStats {
   param(
     [Parameter(Mandatory)][AllowEmptyCollection()][float[]]$Samples,
@@ -523,6 +533,23 @@ if ($SelfTest) {
   )
   if ($composedArgs -ne '--enable-wav-source --wav-source-path "G:\Hibiki DSP\smoke source.wav"') {
     throw "Engine argument composition lost embedded quotes: $composedArgs"
+  }
+  $cases++
+
+  if (-not (Test-EnginePreviewTestToneRouteDetail -Detail 'test tone rendering.')) {
+    throw 'Test-tone route-detail self-test rejected the unprefixed rendering status.'
+  }
+  $cases++
+  if (-not (Test-EnginePreviewTestToneRouteDetail -Detail 'Anonymous endpoint: test tone rendering.')) {
+    throw 'Test-tone route-detail self-test rejected a bounded display-name prefix.'
+  }
+  $cases++
+  if (Test-EnginePreviewTestToneRouteDetail -Detail 'Anonymous endpoint: test tone rendering. trailing') {
+    throw 'Test-tone route-detail self-test accepted trailing status text.'
+  }
+  $cases++
+  if (Test-EnginePreviewTestToneRouteDetail -Detail $null) {
+    throw 'Test-tone route-detail self-test accepted a missing status.'
   }
   $cases++
 
@@ -936,7 +963,9 @@ try {
       if ($mainOutputState -gt 4) {
         throw "WASAPI main output route state is invalid: $mainOutputState."
       }
-      $statusSummary += "WASAPI output route state=$mainOutputState; physical delivery is endpoint-dependent"
+      if (-not $EnableTestTone) {
+        $statusSummary += "WASAPI output route state=$mainOutputState; physical delivery is endpoint-dependent"
+      }
     }
     if ($EnableTabBassCorrection) {
       $tabRouteOffset = 20 + 40 + (6 * 224)
@@ -1062,11 +1091,13 @@ try {
     }
     if ($EnableTestTone) {
       $toneRendering = $false
+      $mainOutputState = -1
       for ($attempt = 0; $attempt -lt 50; $attempt++) {
         $mainOutputRouteOffset = 20 + 40 + (1 * 224)
+        $mainOutputState = $statusReply[$mainOutputRouteOffset + 1]
         $detailBytes = [BitConverter]::ToUInt16($statusReply, $mainOutputRouteOffset + 6)
         $detail = [System.Text.Encoding]::UTF8.GetString($statusReply, $mainOutputRouteOffset + 104, $detailBytes)
-        if ($detail -eq 'test tone rendering.') {
+        if (Test-EnginePreviewTestToneRouteDetail -Detail $detail) {
           $toneRendering = $true
           break
         }
@@ -1077,8 +1108,9 @@ try {
         Assert-IpcFrameShape -Frame $statusReply -ExpectedType 12 -ExpectedRequestId ([uint64](44 + $attempt)) -MinimumPayloadLength (40 + (6 * 224))
       }
       if (-not $toneRendering) {
-        throw 'Engine Preview test tone did not report rendered WASAPI blocks in the status snapshot.'
+        throw "Engine Preview test tone did not report rendered WASAPI blocks in the status snapshot (anonymous route state=$mainOutputState)."
       }
+      $statusSummary += "WASAPI output route state=$mainOutputState; physical delivery is endpoint-dependent"
       $statusSummary += 'test tone rendered through the user-space graph and WASAPI sink'
     }
     if ($EnableDriverLoopback) {
