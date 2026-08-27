@@ -29,7 +29,7 @@ static const PCWSTR EndpointSubdeviceNames[HIBIKI_MAX_SUBDEVICES_V1] = {
 
 extern "C" NTSTATUS HibikiRegisterSingleSubdeviceV1(
     _In_ PDEVICE_OBJECT   DeviceObject,
-    _In_ PRESOURCELIST    ResourceList,
+    _In_opt_ PRESOURCELIST ResourceList,
     _In_opt_ PIRP         Irp,
     _In_ ULONG            EndpointIndex,
     _In_ PCWSTR           SubdeviceName) {
@@ -184,7 +184,7 @@ extern "C" NTSTATUS HibikiRegisterSingleSubdeviceV1(
 }
 extern "C" NTSTATUS HibikiRegisterSubdevicesV1(
     _In_ PDEVICE_OBJECT   DeviceObject,
-    _In_ PRESOURCELIST    ResourceList,
+    _In_opt_ PRESOURCELIST ResourceList,
     _In_opt_ PIRP         Irp) {
     if (DeviceObject == nullptr) {
         DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: RegisterSubdevices null device\n");
@@ -212,10 +212,10 @@ extern "C" NTSTATUS HibikiRegisterSubdevicesV1(
 extern "C" NTSTATUS HibikiStartDevice(
     _In_ PDEVICE_OBJECT   DeviceObject,
     _In_ PIRP             Irp,
-    _In_ PRESOURCELIST    ResourceList) {
+    _In_opt_ PRESOURCELIST ResourceList) {
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL, "HIBIKI: StartDevice enter irp=%p\n", Irp);
-    if (DeviceObject == nullptr || ResourceList == nullptr) {
-        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: StartDevice null param dev=%p res=%p\n", DeviceObject, ResourceList);
+    if (DeviceObject == nullptr) {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "HIBIKI: StartDevice null device\n");
         return STATUS_INVALID_PARAMETER;
     }
 

@@ -28,13 +28,13 @@ extern "C" NTSTATUS HibikiPropertyContextInitializeEndpointV1(
     _In_ ULONG endpoint_index,
     _In_ ULONG actuator) {
     if (context == nullptr) return STATUS_INVALID_PARAMETER;
+    RtlZeroMemory(context, sizeof(*context));
     hibiki_endpoint_topology_v1 topology{};
     if (hibiki_endpoint_topology_get_v1(endpoint_index, &topology) == 0 ||
         hibiki_endpoint_topology_validate_v1(&topology) == 0 ||
         topology.channel_count > 8U) {
         return STATUS_INVALID_PARAMETER;
     }
-    RtlZeroMemory(context, sizeof(*context));
     ExInitializeFastMutex(&context->property_lock);
     if (hibiki_wavert_endpoint_state_init_v1(
             &context->state, topology.endpoint_guid, topology.channel_count,

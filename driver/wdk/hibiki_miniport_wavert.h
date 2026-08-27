@@ -62,14 +62,48 @@ private:
     PMDL                            m_DmaBufferMdl;
     ULONG                           m_DmaBufferSize;
     ULONG                           m_AllocatedBytes;
+    BOOLEAN                         m_StreamInitialized;
     hibiki_wdk_stream_context_v1    m_StreamContext;
 
     // Notification event handles
+    KSPIN_LOCK                      m_NotificationLock;
     PKEVENT                         m_NotificationEvents[HIBIKI_MAX_NOTIFICATION_EVENTS_V1];
     ULONG                           m_NotificationEventCount;
+    ULONG                           m_BufferNotificationCount;
 
-    // Position tracking
+    // Position tracking and software-clock scheduling
+    KSPIN_LOCK                      m_PositionLock;
+    KTIMER                          m_PositionTimer;
+    KDPC                            m_PositionDpc;
+    EX_RUNDOWN_REF                  m_PositionDpcRundown;
+    volatile LONG                   m_PositionTimerActive;
+    ULONGLONG                       m_RunStartTime100ns;
+    ULONGLONG                       m_RunBaseBytes;
+    ULONGLONG                       m_BytesPerSecond;
+    ULONGLONG                       m_LastNotificationBoundary;
     ULONGLONG                       m_TotalBytesProcessed;
+
+    NTSTATUS AllocateBufferCore(
+        _In_  ULONG                   RequestedSize,
+        _In_  ULONG                   NotificationCount,
+        _Out_ PMDL*                   AudioBufferMdl,
+        _Out_ ULONG*                 ActualSize,
+        _Out_ ULONG*                 OffsetFromFirstPage,
+        _Out_ MEMORY_CACHING_TYPE*   CacheType);
+
+    static VOID PositionTimerDpc(
+        _In_ PKDPC                     Dpc,
+        _In_opt_ PVOID                 DeferredContext,
+        _In_opt_ PVOID                 SystemArgument1,
+        _In_opt_ PVOID                 SystemArgument2);
+    VOID StartPositionTimer();
+    VOID StopPositionTimer();
+    ULONGLONG NotificationBoundaryLocked(
+        _In_  ULONGLONG                TotalBytes) const;
+    VOID UpdatePositionLocked(
+        _In_  ULONGLONG                Now100ns,
+        _Out_ BOOLEAN*                 Notify);
+    VOID SignalNotificationEventsAtDpc();
 
 public:
     HibikiMiniportWaveRtStreamV1();

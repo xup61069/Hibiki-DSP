@@ -362,6 +362,7 @@ extern "C" NTSTATUS HibikiGetFilterDescriptorEndpointV1(
     _In_  ULONG                     EndpointIndex,
     _Out_ const PCFILTER_DESCRIPTOR** Description) {
     if (Description == nullptr) return STATUS_INVALID_PARAMETER;
+    *Description = nullptr;
 
     // EndpointIndex is a zero-based slot into the topology table (same as
     // hibiki_endpoint_topology_get_v1), not the one-based endpoint_kind enum.
@@ -384,6 +385,37 @@ extern "C" NTSTATUS HibikiGetFilterDescriptorEndpointV1(
     }
 }
 
+static bool HibikiAudioRangeSupportsEndpointFormatV1(
+    _In_ PKSDATARANGE Range,
+    _In_ ULONG        ChannelCount,
+    _In_ ULONG        SampleRate,
+    _In_ ULONG        BitsPerSample) {
+    if (Range == nullptr || Range->FormatSize < sizeof(KSDATARANGE_AUDIO)) {
+        return false;
+    }
+
+    if (!IsEqualGUIDAligned(Range->MajorFormat, KSDATAFORMAT_TYPE_AUDIO) ||
+        !IsEqualGUIDAligned(Range->SubFormat, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT) ||
+        !IsEqualGUIDAligned(Range->Specifier, KSDATAFORMAT_SPECIFIER_WAVEFORMATEX)) {
+        return false;
+    }
+
+    const auto* audioRange = reinterpret_cast<const KSDATARANGE_AUDIO*>(Range);
+    if (audioRange->MinimumBitsPerSample > audioRange->MaximumBitsPerSample ||
+        audioRange->MinimumSampleFrequency > audioRange->MaximumSampleFrequency) {
+        return false;
+    }
+
+    const bool channelCountSupported =
+        audioRange->MaximumChannels == MAXULONG ||
+        audioRange->MaximumChannels >= ChannelCount;
+    return channelCountSupported &&
+        audioRange->MinimumBitsPerSample <= BitsPerSample &&
+        audioRange->MaximumBitsPerSample >= BitsPerSample &&
+        audioRange->MinimumSampleFrequency <= SampleRate &&
+        audioRange->MaximumSampleFrequency >= SampleRate;
+}
+
 extern "C" NTSTATUS HibikiDataRangeIntersectionEndpointV1(
     _In_        ULONG              EndpointIndex,
     _In_        ULONG              PinId,
@@ -393,7 +425,11 @@ extern "C" NTSTATUS HibikiDataRangeIntersectionEndpointV1(
     _Out_writes_bytes_to_opt_(OutputBufferLength, *ResultantFormatLength)
                 PVOID              ResultantFormat,
     _Out_       PULONG             ResultantFormatLength) {
-    if (ResultantFormatLength == nullptr || DataRange == nullptr || MatchingDataRange == nullptr) {
+    if (ResultantFormatLength == nullptr) {
+        return STATUS_INVALID_PARAMETER;
+    }
+    *ResultantFormatLength = 0;
+    if (DataRange == nullptr || MatchingDataRange == nullptr) {
         return STATUS_INVALID_PARAMETER;
     }
 
@@ -409,10 +445,13 @@ extern "C" NTSTATUS HibikiDataRangeIntersectionEndpointV1(
         return STATUS_NOT_FOUND;
     }
 
-    // Verify format specifiers
-    if (!IsEqualGUIDAligned(DataRange->MajorFormat, KSDATAFORMAT_TYPE_AUDIO) ||
-        !IsEqualGUIDAligned(DataRange->SubFormat, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT) ||
-        !IsEqualGUIDAligned(DataRange->Specifier, KSDATAFORMAT_SPECIFIER_WAVEFORMATEX)) {
+    // Both ranges must contain the endpoint's fixed format. DataRange is the
+    // client range and MatchingDataRange is the miniport range supplied by
+    // PortCls; checking both prevents accepting a false intersection.
+    if (!HibikiAudioRangeSupportsEndpointFormatV1(
+            DataRange, topology.channel_count, topology.sample_rate, 32U) ||
+        !HibikiAudioRangeSupportsEndpointFormatV1(
+            MatchingDataRange, topology.channel_count, topology.sample_rate, 32U)) {
         return STATUS_NO_MATCH;
     }
 
@@ -540,6 +579,7 @@ extern "C" NTSTATUS HibikiGetTopologyFilterDescriptorEndpointV1(
     _In_  ULONG                     EndpointIndex,
     _Out_ const PCFILTER_DESCRIPTOR** Description) {
     if (Description == nullptr) return STATUS_INVALID_PARAMETER;
+    *Description = nullptr;
     switch (EndpointIndex) {
         case 0: *Description = &TopoFilterDescriptor_TopoMain; return STATUS_SUCCESS;
         case 1: *Description = &TopoFilterDescriptor_TopoLowLatency; return STATUS_SUCCESS;

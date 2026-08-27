@@ -36,34 +36,52 @@ driver entry point (`DriverEntry`), device object initialization
 to the Windows audio driver life cycle without linking GPL user-space code.
 
 It is deliberately not part of the default CMake target: the default build does
-not invoke the kernel-mode toolchain and no `.sys` is produced by CMake. A future WDK
-adapter must provide one context per endpoint, wire the functions into the
-SYSVAD property/automation tables, expose the fixed LPCM pin formats and use
-the Apache driver-control ABI over IPC. For endpoint-state and volume
-notifications, use `hibiki_driver_control_transport_v1.h`'s explicit 136-byte
-little-endian encoder rather than copying a C struct; the future driver may
-share that Apache C codec without linking GPL code. It must not include or link
-GPL user-space code. The portable `wavert_stream_v1` core is the intended ring/
-underrun boundary for those pin callbacks; WDK code must add the required
-interlocked producer/consumer publication around it. The companion
-`hibiki_stream_adapter.cpp` demonstrates that WDK boundary with a spin lock,
-render submit, underrun-safe render read and reset; it is source-only until
-compiled inside a SYSVAD/PortCls project.
+not invoke the kernel-mode toolchain and no `.sys` is produced by CMake. The
+repository's `tools/build-driver.ps1` provides a separate local WDK/MSVC build
+and Inf2Cat signability check; its object, package, and `.sys` outputs remain
+under `.local/` and are not committed. This is source/build evidence only and
+does not establish target-machine installation, PnP enumeration, default-device
+selection, or physical playback.
+
+The current adapter assumes a resource-less software device: `HibikiStartDevice`
+passes an optional PortCls resource list through to subdevice registration but
+does not reject a null list. It still must provide one context per endpoint,
+wire the functions into the SYSVAD property/automation tables, expose the fixed
+LPCM pin formats, and use the Apache driver-control ABI over IPC. For
+endpoint-state and volume notifications, use
+`hibiki_driver_control_transport_v1.h`'s explicit 136-byte little-endian
+encoder rather than copying a C struct; the driver must not include or link GPL
+user-space code. The portable `wavert_stream_v1` core is the intended
+ring/underrun boundary for pin callbacks; WDK code must add the required
+interlocked producer/consumer publication around it.
+
+The companion `hibiki_stream_adapter.cpp` demonstrates that WDK boundary with a
+spin lock, render submit, underrun-safe render read, and reset. The miniport
+also runs a bounded software clock from a 1 ms timer DPC after `RUN`, reports a
+monotonic modulo-buffer position, and signals registered notification events at
+the requested one- or two-boundary cadence. The scheduler is deliberately
+separated from pin data delivery: it does not connect those callbacks to a
+running capture/render engine or establish physical audio playback. The
+position and notification behavior is therefore software-timing evidence only.
 
 The endpoint-indexed entry points consume the fixed `endpoint_topology_v1`
 catalog rather than accepting free-form channel/rate values: render pin
 initialization uses catalog buffer geometry, format construction emits the
 catalog channel mask, and property-context initialization uses the catalog
 GUID/channel/rate. This keeps the eventual SYSVAD tables and portable contract
-on one identity source. It still does not provide a WDK build or `.sys`.
+on one identity source. The adapter has a local WDK build path, but no compiled
+`.sys` is checked into the repository.
 `HibikiWaveRtPinInitializeCaptureEndpointV1`
 and the generic `HibikiWaveRtBuildFormatEndpointV1` cover the Virtual Mic
 capture direction without creating a second format contract.
 
-Before enabling a driver build, the maintainer should compile this source in a
-clean WDK project and verify target-machine behavior on Windows 11 24H2+; source
-presence alone is not driver evidence. HLK and signing are not project
-requirements.
+For source/build validation, run `pwsh -NoProfile -File
+tools/build-driver.ps1 -Configuration Release` in an environment with the
+required WDK and MSVC toolchain. Before enabling a device for users, the
+maintainer must separately verify target-machine installation, PnP behavior,
+endpoint selection, and playback on Windows 11 24H2+; source or local build
+presence alone is not driver or physical-audio evidence. HLK and signing are
+not project requirements.
 
 The Apache transport also provides a 16-byte header-only Hello/Ack/Error
 exchange for request correlation. It is suitable for a future bounded kernel/
