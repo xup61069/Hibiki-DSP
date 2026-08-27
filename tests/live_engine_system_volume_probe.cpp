@@ -7,6 +7,7 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+#include <endpointvolume.h>
 #include <mmdeviceapi.h>
 
 #include <algorithm>
@@ -15,6 +16,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cwchar>
 #include <optional>
 #include <span>
 #include <thread>
@@ -30,6 +32,64 @@ constexpr wchar_t kPipeName[] = L"\\\\.\\pipe\\HibikiDSP_v1_control";
 
 bool close_db(const double left, const double right) noexcept {
     return std::isfinite(left) && std::isfinite(right) && std::abs(left - right) <= 0.5;
+}
+
+enum class WriteTestMode {
+    Attenuate,
+    Mute,
+};
+
+bool choose_safe_write_target(const hibiki::OutputGroupVolumeStateV1& original,
+                              const float range_min_db,
+                              const float range_max_db,
+                              const float range_increment_db,
+                              hibiki::OutputGroupVolumeStateV1& target,
+                              WriteTestMode& mode) noexcept {
+    if (!std::isfinite(range_min_db) || !std::isfinite(range_max_db) ||
+        !std::isfinite(range_increment_db) || range_min_db > range_max_db ||
+        range_increment_db <= 0.0F ||
+        original.requested_db < static_cast<double>(range_min_db) - 0.5 ||
+        original.requested_db > static_cast<double>(range_max_db) + 0.5) {
+        return false;
+    }
+    target = original;
+    const double minimum = std::max(-144.0, static_cast<double>(range_min_db));
+    const double attenuation = std::max(3.0, static_cast<double>(range_increment_db));
+    if (original.requested_db > minimum + (static_cast<double>(range_increment_db) * 0.5)) {
+        target.requested_db = std::max(minimum, original.requested_db - attenuation);
+        mode = WriteTestMode::Attenuate;
+        return target.requested_db < original.requested_db;
+    }
+    if (!original.mute) {
+        target.mute = true;
+        mode = WriteTestMode::Mute;
+        return true;
+    }
+    return false;
+}
+
+bool write_target_self_test() noexcept {
+    hibiki::OutputGroupVolumeStateV1 original{};
+    hibiki::OutputGroupVolumeStateV1 target{};
+    WriteTestMode mode{WriteTestMode::Mute};
+    original.requested_db = -20.0;
+    if (!choose_safe_write_target(original, -64.0F, 0.0F, 0.5F, target, mode) ||
+        mode != WriteTestMode::Attenuate || !close_db(target.requested_db, -23.0) ||
+        target.mute) {
+        return false;
+    }
+    original.requested_db = -64.0;
+    if (!choose_safe_write_target(original, -64.0F, 0.0F, 0.5F, target, mode) ||
+        mode != WriteTestMode::Mute || !close_db(target.requested_db, -64.0) ||
+        !target.mute) {
+        return false;
+    }
+    original.mute = true;
+    if (choose_safe_write_target(original, -64.0F, 0.0F, 0.5F, target, mode) ||
+        choose_safe_write_target(original, 0.0F, -64.0F, 0.5F, target, mode)) {
+        return false;
+    }
+    return true;
 }
 
 void write_u32_le(std::uint8_t* const bytes, const std::uint32_t value) noexcept {
@@ -159,7 +219,14 @@ bool wait_for_endpoint(hibiki::WindowsVolumeBroker& broker,
 
 }  // namespace
 
-int wmain() {
+int wmain(const int argc, wchar_t* const* argv) {
+    if (argc == 2 && argv != nullptr && argv[1] != nullptr &&
+        std::wcscmp(argv[1], L"--self-test") == 0) {
+        const bool passed = write_target_self_test();
+        std::printf("system_volume_engine_live_selftest=%s cases=4\n",
+                    passed ? "pass" : "fail");
+        return passed ? 0 : 2;
+    }
     const HRESULT com_result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     const bool com_initialized = SUCCEEDED(com_result) || com_result == RPC_E_CHANGED_MODE;
     if (!com_initialized) {
@@ -169,13 +236,18 @@ int wmain() {
 
     IMMDeviceEnumerator* enumerator = nullptr;
     IMMDevice* device = nullptr;
+    IAudioEndpointVolume* endpoint = nullptr;
     hibiki::WindowsVolumeBroker broker;
     PipeClient pipe;
     hibiki::OutputGroupVolumeStateV1 original{};
     bool changed = false;
     bool passed = false;
+    bool unavailable = false;
     double attenuated_db = -144.0;
     double restored_db = -144.0;
+    float range_min_db = 0.0F;
+    float range_max_db = 0.0F;
+    float range_increment_db = 0.0F;
     std::uint64_t request_id = 200U;
     std::uint64_t next_generation = 1U;
 
@@ -200,29 +272,62 @@ int wmain() {
         if (SUCCEEDED(result)) {
             result = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
         }
-        if (FAILED(result) || device == nullptr || FAILED(broker.bind(device)) ||
+        if (SUCCEEDED(result) && device != nullptr) {
+            result = device->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_ALL, nullptr,
+                                      reinterpret_cast<void**>(&endpoint));
+        }
+        if (SUCCEEDED(result) && endpoint != nullptr) {
+            result = endpoint->GetVolumeRange(&range_min_db, &range_max_db,
+                                              &range_increment_db);
+        }
+        if (FAILED(result) || device == nullptr || endpoint == nullptr ||
+            FAILED(broker.bind(device)) ||
             FAILED(broker.read_state(original))) {
             std::printf("system_volume_engine_live=unavailable reason=endpoint-or-broker\n");
+            unavailable = true;
             break;
         }
         next_generation = std::max<std::uint64_t>(original.generation + 1U, 1U);
         if (!pipe.connect()) {
             std::printf("system_volume_engine_live=unavailable reason=engine-pipe\n");
+            unavailable = true;
             break;
         }
-        const double target_db = std::max(-144.0, original.requested_db - 3.0);
-        if (!send_volume(pipe, request_id++, target_db, original.mute, next_generation++)) {
+        auto target = original;
+        WriteTestMode mode{WriteTestMode::Attenuate};
+        if (!choose_safe_write_target(original, range_min_db, range_max_db,
+                                      range_increment_db, target, mode)) {
+            std::printf(
+                "system_volume_engine_live=unavailable reason=no-safe-attenuation "
+                "original_db=%.2f original_mute=%s range_db=%.2f..%.2f "
+                "increment_db=%.2f\n",
+                original.requested_db, original.mute ? "true" : "false",
+                static_cast<double>(range_min_db),
+                static_cast<double>(range_max_db),
+                static_cast<double>(range_increment_db));
+            unavailable = true;
+            break;
+        }
+        if (!send_volume(pipe, request_id++, target.requested_db, target.mute,
+                         next_generation++)) {
             std::printf("system_volume_engine_live=fail reason=queue-write\n");
             break;
         }
         changed = true;
         hibiki::OutputGroupVolumeStateV1 attenuated{};
-        if (!wait_for_endpoint(broker, target_db, original.mute, attenuated)) {
-            std::printf("system_volume_engine_live=fail reason=endpoint-readback\n");
+        if (!wait_for_endpoint(broker, target.requested_db, target.mute, attenuated)) {
+            std::printf(
+                "system_volume_engine_live=fail reason=endpoint-readback mode=%s "
+                "target_db=%.2f target_mute=%s range_db=%.2f..%.2f increment_db=%.2f\n",
+                mode == WriteTestMode::Attenuate ? "attenuate" : "mute",
+                target.requested_db, target.mute ? "true" : "false",
+                static_cast<double>(range_min_db),
+                static_cast<double>(range_max_db),
+                static_cast<double>(range_increment_db));
             break;
         }
         attenuated_db = attenuated.requested_db;
-        if (attenuated_db > original.requested_db + 0.5 || attenuated.mute != original.mute) {
+        if (attenuated_db > original.requested_db + 0.5 || attenuated.mute != target.mute) {
             std::printf("system_volume_engine_live=fail reason=unsafe-readback\n");
             break;
         }
@@ -231,14 +336,21 @@ int wmain() {
             std::printf("system_volume_engine_live=fail reason=restore\n");
             break;
         }
-        std::printf("system_volume_engine_live=pass original_db=%.2f attenuated_db=%.2f restored_db=%.2f transport=ipc-engine-broker\n",
-                    original.requested_db, attenuated_db, restored_db);
+        std::printf(
+            "system_volume_engine_live=pass mode=%s original_db=%.2f test_db=%.2f "
+            "restored_db=%.2f range_db=%.2f..%.2f increment_db=%.2f "
+            "transport=ipc-engine-broker\n",
+            mode == WriteTestMode::Attenuate ? "attenuate" : "mute",
+            original.requested_db, attenuated_db, restored_db,
+            static_cast<double>(range_min_db), static_cast<double>(range_max_db),
+            static_cast<double>(range_increment_db));
     } while (false);
 
     if (!restore()) passed = false;
     broker.unbind();
+    if (endpoint != nullptr) endpoint->Release();
     if (device != nullptr) device->Release();
     if (enumerator != nullptr) enumerator->Release();
     if (com_initialized && com_result != RPC_E_CHANGED_MODE) CoUninitialize();
-    return passed ? 0 : 1;
+    return passed || unavailable ? 0 : 1;
 }
