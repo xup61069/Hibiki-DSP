@@ -255,6 +255,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         _ => "尚未連接 Hibiki 音訊引擎"
     };
     public SceneCard? SelectedScene => _selectedScene;
+    public string? SelectedSceneId => _selectedScene?.Id;
     public string? SelectedOutputGroup
     {
         get => _selectedOutputGroup;
@@ -1069,6 +1070,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         _selectedScene = result.Scene;
         StatusText = result.Message ?? (result.Succeeded ? "已控制" : "控制失敗");
         OnPropertyChanged(nameof(SelectedScene));
+        OnPropertyChanged(nameof(SelectedSceneId));
         OnPropertyChanged(nameof(Status));
         if (!result.Succeeded) return false;
         LastCommand = _commands.ApplyScene(_selectedScene!.Id, _session.ActiveOutputGroup!);
@@ -2199,6 +2201,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(Scenes));
         OnPropertyChanged(nameof(CustomSceneCards));
         OnPropertyChanged(nameof(SelectedScene));
+        OnPropertyChanged(nameof(SelectedSceneId));
 
         if (!SaveCustomScenes(out var saveError))
         {
@@ -2207,6 +2210,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(Scenes));
             OnPropertyChanged(nameof(CustomSceneCards));
             OnPropertyChanged(nameof(SelectedScene));
+            OnPropertyChanged(nameof(SelectedSceneId));
             StatusText = $"自訂場景未移除：{saveError}";
             return false;
         }
@@ -2230,6 +2234,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(Scenes));
                 OnPropertyChanged(nameof(CustomSceneCards));
                 OnPropertyChanged(nameof(SelectedScene));
+                OnPropertyChanged(nameof(SelectedSceneId));
                 return false;
             }
             ReportSceneCatalogStatus(
@@ -2504,6 +2509,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         _selectedScene = _session.Scenes.First(item => item.Id == sceneId);
         StatusText = $"已選擇 {_selectedScene.Name}";
         OnPropertyChanged(nameof(SelectedScene));
+        OnPropertyChanged(nameof(SelectedSceneId));
         if (_session.ActiveOutputGroup is not null)
         {
             LastCommand = _commands.ApplyScene(_selectedScene.Id, _session.ActiveOutputGroup);
