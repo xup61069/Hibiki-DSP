@@ -39,12 +39,12 @@ extern "C" NTSTATUS HibikiAddDevice(
 extern "C" NTSTATUS HibikiStartDevice(
     _In_ PDEVICE_OBJECT   DeviceObject,
     _In_ PIRP             Irp,
-    _In_ PRESOURCELIST    ResourceList);
+    _In_opt_ PRESOURCELIST ResourceList);
 
 // Subdevice registration helper
 extern "C" NTSTATUS HibikiRegisterSubdevicesV1(
     _In_ PDEVICE_OBJECT   DeviceObject,
-    _In_ PRESOURCELIST    ResourceList,
+    _In_opt_ PRESOURCELIST ResourceList,
     _In_opt_ PIRP         Irp);
 
 // PNP and Power handlers
