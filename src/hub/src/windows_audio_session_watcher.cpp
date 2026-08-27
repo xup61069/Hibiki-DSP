@@ -56,6 +56,10 @@ double session_scalar_to_db(const float scalar) {
 
 }  // namespace
 
+WindowsAudioSessionWatcher::WindowsAudioSessionWatcher() noexcept {
+    reset_pending_sessions();
+}
+
 WindowsAudioSessionWatcher::~WindowsAudioSessionWatcher() {
     unbind();
 }
@@ -86,8 +90,125 @@ ULONG STDMETHODCALLTYPE WindowsAudioSessionWatcher::Release() {
     return remaining;
 }
 
+bool WindowsAudioSessionWatcher::enqueue_pending_session(
+    IAudioSessionControl* const control) noexcept {
+    if (control == nullptr) return false;
+
+    auto position = pending_enqueue_.load(std::memory_order_relaxed);
+    for (;;) {
+        auto& slot = pending_sessions_[position % kPendingSessionCapacity];
+        const auto slot_sequence = slot.sequence.load(std::memory_order_acquire);
+        const auto difference = static_cast<std::int64_t>(slot_sequence) -
+                                static_cast<std::int64_t>(position);
+        if (difference == 0) {
+            if (pending_enqueue_.compare_exchange_weak(
+                    position, position + 1U, std::memory_order_relaxed,
+                    std::memory_order_relaxed)) {
+                // The callback is not an RT audio callback. Retain only the
+                // control pointer here; all COM queries stay on the worker.
+                control->AddRef();
+                slot.control = control;
+                slot.sequence.store(position + 1U, std::memory_order_release);
+                return true;
+            }
+            continue;
+        }
+        if (difference < 0) return false;
+        position = pending_enqueue_.load(std::memory_order_relaxed);
+    }
+}
+
+bool WindowsAudioSessionWatcher::dequeue_pending_session(
+    IAudioSessionControl*& control) noexcept {
+    auto position = pending_dequeue_.load(std::memory_order_relaxed);
+    for (;;) {
+        auto& slot = pending_sessions_[position % kPendingSessionCapacity];
+        const auto slot_sequence = slot.sequence.load(std::memory_order_acquire);
+        const auto difference = static_cast<std::int64_t>(slot_sequence) -
+                                static_cast<std::int64_t>(position + 1U);
+        if (difference == 0) {
+            if (pending_dequeue_.compare_exchange_weak(
+                    position, position + 1U, std::memory_order_relaxed,
+                    std::memory_order_relaxed)) {
+                control = slot.control;
+                slot.control = nullptr;
+                slot.sequence.store(position + kPendingSessionCapacity,
+                                    std::memory_order_release);
+                return true;
+            }
+            continue;
+        }
+        if (difference < 0) return false;
+        position = pending_dequeue_.load(std::memory_order_relaxed);
+    }
+}
+
+void WindowsAudioSessionWatcher::reset_pending_sessions() noexcept {
+    for (std::size_t index = 0U; index < kPendingSessionCapacity; ++index) {
+        pending_sessions_[index].control = nullptr;
+        pending_sessions_[index].sequence.store(index, std::memory_order_relaxed);
+    }
+    pending_enqueue_.store(0U, std::memory_order_relaxed);
+    pending_dequeue_.store(0U, std::memory_order_relaxed);
+}
+
+void WindowsAudioSessionWatcher::release_pending_sessions() noexcept {
+    IAudioSessionControl* control = nullptr;
+    while (dequeue_pending_session(control)) {
+        if (control != nullptr) control->Release();
+        control = nullptr;
+    }
+}
+
+void WindowsAudioSessionWatcher::release_cached_session_controls() noexcept {
+    for (auto& cached : cached_session_controls_) {
+        if (cached.control != nullptr) cached.control->Release();
+        cached.control = nullptr;
+    }
+    cached_session_controls_.clear();
+}
+
+bool WindowsAudioSessionWatcher::cache_session_control(
+    const std::string_view session_instance_id,
+    IAudioSessionControl* const control) noexcept {
+    if (session_instance_id.empty() || control == nullptr) return false;
+    for (auto& cached : cached_session_controls_) {
+        if (cached.session_instance_id != session_instance_id) continue;
+        if (cached.control != control) {
+            control->AddRef();
+            if (cached.control != nullptr) cached.control->Release();
+            cached.control = control;
+        }
+        return true;
+    }
+    if (cached_session_controls_.size() >= 256U) return false;
+    IAudioSessionControl* retained = nullptr;
+    try {
+        CachedSessionControl cached;
+        cached.session_instance_id = std::string(session_instance_id);
+        control->AddRef();
+        retained = control;
+        cached.control = control;
+        cached_session_controls_.push_back(std::move(cached));
+        retained = nullptr;
+        return true;
+    } catch (...) {
+        if (retained != nullptr) retained->Release();
+        return false;
+    }
+}
+
+IAudioSessionControl* WindowsAudioSessionWatcher::find_cached_session_control(
+    const std::string_view session_instance_id) const noexcept {
+    for (const auto& cached : cached_session_controls_) {
+        if (cached.session_instance_id == session_instance_id) return cached.control;
+    }
+    return nullptr;
+}
+
 HRESULT STDMETHODCALLTYPE WindowsAudioSessionWatcher::OnSessionCreated(
-    IAudioSessionControl* const) {
+    IAudioSessionControl* const new_session) {
+    if (new_session != nullptr) (void)enqueue_pending_session(new_session);
     sequence_.fetch_add(1, std::memory_order_release);
     return S_OK;
 }
@@ -123,6 +244,7 @@ HRESULT WindowsAudioSessionWatcher::bind(IMMDevice* const device) {
     }
     registered_ = true;
     last_sequence_ = 0;
+    sequence_.store(0U, std::memory_order_release);
     return S_OK;
 }
 
@@ -134,9 +256,76 @@ void WindowsAudioSessionWatcher::unbind() noexcept {
         manager_->Release();
         manager_ = nullptr;
     }
+    release_pending_sessions();
+    release_cached_session_controls();
+    reset_pending_sessions();
     registered_ = false;
     endpoint_id_.clear();
     last_sequence_ = 0;
+    sequence_.store(0U, std::memory_order_release);
+}
+
+HRESULT WindowsAudioSessionWatcher::upsert_session_control(
+    AudioSessionRegistry& registry,
+    IAudioSessionControl* const control) {
+    if (control == nullptr || endpoint_id_.empty()) return E_INVALIDARG;
+
+    IAudioSessionControl2* control2 = nullptr;
+    AudioSessionState state = AudioSessionStateExpired;
+    DWORD process_id = 0;
+    LPWSTR instance_id = nullptr;
+    LPWSTR session_id = nullptr;
+    LPWSTR display_name = nullptr;
+
+    HRESULT result = control->QueryInterface(__uuidof(IAudioSessionControl2),
+                                             reinterpret_cast<void**>(&control2));
+    if (SUCCEEDED(result)) result = control->GetState(&state);
+    if (SUCCEEDED(result)) result = control2->GetSessionInstanceIdentifier(&instance_id);
+    if (SUCCEEDED(result)) result = control2->GetSessionIdentifier(&session_id);
+    if (SUCCEEDED(result)) result = control2->GetProcessId(&process_id);
+    if (SUCCEEDED(result)) {
+        // Display name is optional; failure must not hide a usable session.
+        control->GetDisplayName(&display_name);
+    }
+
+    bool rule_error = false;
+    if (SUCCEEDED(result)) {
+        const auto instance = take_wide_string(instance_id);
+        instance_id = nullptr;
+        auto app_id = take_wide_string(session_id);
+        session_id = nullptr;
+        if (app_id.empty()) app_id = instance;
+        const bool control_cached = cache_session_control(instance, control);
+
+        AudioSessionDescriptorV1 descriptor;
+        descriptor.identity = AudioSessionIdentityV1{endpoint_id_, instance, process_id};
+        descriptor.display_name = take_wide_string(display_name);
+        display_name = nullptr;
+        descriptor.app_id = std::move(app_id);
+        descriptor.active = state == AudioSessionStateActive;
+        if (route_rules_ != nullptr) {
+            const auto rule_result = route_rules_->apply(descriptor);
+            if (rule_result == SessionRouteRuleResultV1::ambiguous ||
+                rule_result == SessionRouteRuleResultV1::invalid_argument ||
+                rule_result == SessionRouteRuleResultV1::capacity_exhausted) {
+                // Keep the session visible but leave it unbound. A bad rule
+                // must never silently pick a route or alter the Windows
+                // session gain owner.
+                rule_error = true;
+            }
+        }
+        if (instance.empty() || !control_cached || !registry.upsert(std::move(descriptor))) {
+            result = E_FAIL;
+        } else if (rule_error) {
+            result = E_FAIL;
+        }
+    }
+
+    if (instance_id != nullptr) CoTaskMemFree(instance_id);
+    if (session_id != nullptr) CoTaskMemFree(session_id);
+    if (display_name != nullptr) CoTaskMemFree(display_name);
+    if (control2 != nullptr) control2->Release();
+    return result;
 }
 
 HRESULT WindowsAudioSessionWatcher::enumerate(AudioSessionRegistry& registry) {
@@ -145,95 +334,41 @@ HRESULT WindowsAudioSessionWatcher::enumerate(AudioSessionRegistry& registry) {
     }
     registry.mark_endpoint_sessions_inactive(endpoint_id_);
 
+    // GetSessionEnumerator is not guaranteed to include sessions delivered by
+    // IAudioSessionNotification. Process the retained controls first so a new
+    // session remains discoverable even when the enumerator snapshot lags.
+    HRESULT first_error = S_OK;
+    IAudioSessionControl* pending_control = nullptr;
+    while (dequeue_pending_session(pending_control)) {
+        if (pending_control != nullptr) {
+            const auto result = upsert_session_control(registry, pending_control);
+            if (FAILED(result) && SUCCEEDED(first_error)) first_error = result;
+            pending_control->Release();
+        }
+        pending_control = nullptr;
+    }
+
     IAudioSessionEnumerator* enumerator = nullptr;
     HRESULT result = manager_->GetSessionEnumerator(&enumerator);
     if (FAILED(result)) {
-        return result;
+        return SUCCEEDED(first_error) ? result : first_error;
     }
 
     int session_count = 0;
     result = enumerator->GetCount(&session_count);
     if (FAILED(result)) {
         enumerator->Release();
-        return result;
+        return SUCCEEDED(first_error) ? result : first_error;
     }
 
-    HRESULT first_error = S_OK;
     for (int index = 0; index < session_count; ++index) {
         IAudioSessionControl* control = nullptr;
-        IAudioSessionControl2* control2 = nullptr;
-        AudioSessionState state = AudioSessionStateExpired;
-        DWORD process_id = 0;
-        LPWSTR instance_id = nullptr;
-        LPWSTR session_id = nullptr;
-        LPWSTR display_name = nullptr;
 
         result = enumerator->GetSession(index, &control);
         if (SUCCEEDED(result)) {
-            result = control->QueryInterface(__uuidof(IAudioSessionControl2),
-                                             reinterpret_cast<void**>(&control2));
+            result = upsert_session_control(registry, control);
         }
-        if (SUCCEEDED(result)) {
-            result = control->GetState(&state);
-        }
-        if (SUCCEEDED(result)) {
-            result = control2->GetSessionInstanceIdentifier(&instance_id);
-        }
-        if (SUCCEEDED(result)) {
-            result = control2->GetSessionIdentifier(&session_id);
-        }
-        if (SUCCEEDED(result)) {
-            result = control2->GetProcessId(&process_id);
-        }
-        if (control != nullptr) {
-            // Display name is optional; failure must not hide a usable session.
-            control->GetDisplayName(&display_name);
-        }
-
-        if (SUCCEEDED(result)) {
-            const auto instance = take_wide_string(instance_id);
-            instance_id = nullptr;
-            auto app_id = take_wide_string(session_id);
-            session_id = nullptr;
-            if (app_id.empty()) {
-                app_id = instance;
-            }
-            AudioSessionDescriptorV1 descriptor;
-            descriptor.identity = AudioSessionIdentityV1{endpoint_id_, instance, process_id};
-            descriptor.display_name = take_wide_string(display_name);
-            display_name = nullptr;
-            descriptor.app_id = std::move(app_id);
-            descriptor.active = state == AudioSessionStateActive;
-            if (route_rules_ != nullptr) {
-                const auto rule_result = route_rules_->apply(descriptor);
-                if (rule_result == SessionRouteRuleResultV1::ambiguous ||
-                    rule_result == SessionRouteRuleResultV1::invalid_argument ||
-                    rule_result == SessionRouteRuleResultV1::capacity_exhausted) {
-                    // Keep the session visible but leave it unbound. A bad
-                    // rule must never silently pick a route or alter the
-                    // Windows session gain owner.
-                    if (SUCCEEDED(first_error)) first_error = E_FAIL;
-                }
-            }
-            if (instance.empty() || !registry.upsert(std::move(descriptor))) {
-                first_error = E_FAIL;
-            }
-        } else if (SUCCEEDED(first_error)) {
-            first_error = result;
-        }
-
-        if (instance_id != nullptr) {
-            CoTaskMemFree(instance_id);
-        }
-        if (session_id != nullptr) {
-            CoTaskMemFree(session_id);
-        }
-        if (display_name != nullptr) {
-            CoTaskMemFree(display_name);
-        }
-        if (control2 != nullptr) {
-            control2->Release();
-        }
+        if (FAILED(result) && SUCCEEDED(first_error)) first_error = result;
         if (control != nullptr) {
             control->Release();
         }
@@ -313,7 +448,15 @@ HRESULT WindowsAudioSessionWatcher::write_session_volume(
         return E_INVALIDARG;
     }
     ISimpleAudioVolume* volume = nullptr;
-    HRESULT result = acquire_session_volume(manager_, endpoint_id_, session_instance_id, &volume);
+    HRESULT result = E_INVALIDARG;
+    if (auto* const cached = find_cached_session_control(session_instance_id);
+        cached != nullptr) {
+        result = cached->QueryInterface(__uuidof(ISimpleAudioVolume),
+                                        reinterpret_cast<void**>(&volume));
+    }
+    if (FAILED(result)) {
+        result = acquire_session_volume(manager_, endpoint_id_, session_instance_id, &volume);
+    }
     if (SUCCEEDED(result)) {
         result = volume->SetMasterVolume(scalar, &event_context);
     }
@@ -334,7 +477,15 @@ HRESULT WindowsAudioSessionWatcher::read_session_volume(
         return E_UNEXPECTED;
     }
     ISimpleAudioVolume* volume = nullptr;
-    const HRESULT result = acquire_session_volume(manager_, endpoint_id_, session_instance_id, &volume);
+    HRESULT result = E_INVALIDARG;
+    if (auto* const cached = find_cached_session_control(session_instance_id);
+        cached != nullptr) {
+        result = cached->QueryInterface(__uuidof(ISimpleAudioVolume),
+                                        reinterpret_cast<void**>(&volume));
+    }
+    if (FAILED(result)) {
+        result = acquire_session_volume(manager_, endpoint_id_, session_instance_id, &volume);
+    }
     if (FAILED(result)) {
         return result;
     }

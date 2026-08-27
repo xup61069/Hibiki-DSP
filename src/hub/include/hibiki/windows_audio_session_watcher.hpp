@@ -11,18 +11,22 @@
 #include <audioclient.h>
 #include <mmdeviceapi.h>
 
+#include <array>
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace hibiki {
 
 // IAudioSessionNotification callback boundary. The callback does not query
-// COM objects or allocate; it only signals the worker to enumerate sessions.
+// COM objects or allocate; it only retains a bounded control reference and
+// signals the worker to enumerate sessions.
 class WindowsAudioSessionWatcher final : public IAudioSessionNotification {
 public:
-    WindowsAudioSessionWatcher() noexcept = default;
+    WindowsAudioSessionWatcher() noexcept;
     ~WindowsAudioSessionWatcher();
 
     WindowsAudioSessionWatcher(const WindowsAudioSessionWatcher&) = delete;
@@ -52,6 +56,25 @@ public:
     [[nodiscard]] const std::string& endpoint_id() const noexcept { return endpoint_id_; }
 
 private:
+    static constexpr std::size_t kPendingSessionCapacity = 64U;
+
+    struct PendingSessionSlot final {
+        std::atomic<std::size_t> sequence{0U};
+        IAudioSessionControl* control{nullptr};
+    };
+
+    [[nodiscard]] bool enqueue_pending_session(IAudioSessionControl* control) noexcept;
+    [[nodiscard]] bool dequeue_pending_session(IAudioSessionControl*& control) noexcept;
+    void reset_pending_sessions() noexcept;
+    void release_pending_sessions() noexcept;
+    void release_cached_session_controls() noexcept;
+    [[nodiscard]] bool cache_session_control(std::string_view session_instance_id,
+                                              IAudioSessionControl* control) noexcept;
+    [[nodiscard]] IAudioSessionControl* find_cached_session_control(
+        std::string_view session_instance_id) const noexcept;
+    [[nodiscard]] HRESULT upsert_session_control(AudioSessionRegistry& registry,
+                                                 IAudioSessionControl* control);
+
     std::atomic<ULONG> references_{1};
     std::atomic<std::uint64_t> sequence_{0};
     std::uint64_t last_sequence_{0};
@@ -59,6 +82,15 @@ private:
     bool registered_{false};
     std::string endpoint_id_;
     const SessionRouteRuleStoreV1* route_rules_{nullptr};
+    std::array<PendingSessionSlot, kPendingSessionCapacity> pending_sessions_{};
+    std::atomic<std::size_t> pending_enqueue_{0U};
+    std::atomic<std::size_t> pending_dequeue_{0U};
+
+    struct CachedSessionControl final {
+        std::string session_instance_id;
+        IAudioSessionControl* control{nullptr};
+    };
+    std::vector<CachedSessionControl> cached_session_controls_;
 };
 
 }  // namespace hibiki

@@ -228,9 +228,19 @@ struct SessionReadingV1 {
     std::array<char, hibiki::kSessionRouteCommandOutputMaxBytesV1> output{};
 };
 
+struct CatalogDiagnosticsV1 {
+    bool snapshot_received{false};
+    std::uint16_t entry_count{0U};
+    std::uint16_t active_count{0U};
+    bool controlled_label_seen{false};
+    bool controlled_session_active{false};
+    bool controlled_volume_available{false};
+};
+
 bool read_catalog(PipeClient& pipe,
                   const std::uint64_t request_id,
-                  SessionReadingV1& reading) noexcept {
+                  SessionReadingV1& reading,
+                  CatalogDiagnosticsV1* const diagnostics = nullptr) noexcept {
     const auto response = pipe.transact(hibiki::IpcMessageType::SessionCatalogRequest,
                                         request_id, {});
     if (!response.has_value() ||
@@ -242,11 +252,24 @@ bool read_catalog(PipeClient& pipe,
         catalog.sequence == 0U) {
         return false;
     }
+    if (diagnostics != nullptr) {
+        *diagnostics = {};
+        diagnostics->snapshot_received = true;
+        diagnostics->entry_count = catalog.entry_count;
+    }
     for (std::size_t index = 0U; index < catalog.entry_count; ++index) {
         const auto& entry = catalog.entries[index];
+        if (diagnostics != nullptr && entry.active != 0U) {
+            ++diagnostics->active_count;
+        }
         const std::string_view name(entry.name.data(), entry.name_bytes);
-        if (name == "Hibiki live engine session volume probe" && entry.active != 0U &&
-            (entry.flags & 1U) != 0U) {
+        const bool controlled_label = name == "Hibiki live engine session volume probe";
+        if (diagnostics != nullptr && controlled_label) {
+            diagnostics->controlled_label_seen = true;
+            diagnostics->controlled_session_active = entry.active != 0U;
+            diagnostics->controlled_volume_available = (entry.flags & 1U) != 0U;
+        }
+        if (controlled_label && entry.active != 0U && (entry.flags & 1U) != 0U) {
             reading.handle = entry.handle;
             reading.catalog_sequence = catalog.sequence;
             reading.requested_db = hibiki::q16_16_to_db(entry.requested_db_q16_16);
@@ -266,9 +289,10 @@ bool read_catalog(PipeClient& pipe,
 
 bool wait_for_catalog(PipeClient& pipe,
                       std::uint64_t& request_id,
-                      SessionReadingV1& reading) noexcept {
+                      SessionReadingV1& reading,
+                      CatalogDiagnosticsV1* const diagnostics = nullptr) noexcept {
     for (std::uint32_t attempt = 0U; attempt < 80U; ++attempt) {
-        if (read_catalog(pipe, request_id++, reading)) return true;
+        if (read_catalog(pipe, request_id++, reading, diagnostics)) return true;
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
     return false;
@@ -458,8 +482,18 @@ int wmain() {
             break;
         }
         SessionReadingV1 current{};
-        if (!wait_for_catalog(pipe, request_id, current)) {
-            std::printf("session_volume_engine_live=unavailable reason=session-catalog\n");
+        CatalogDiagnosticsV1 diagnostics{};
+        if (!wait_for_catalog(pipe, request_id, current, &diagnostics)) {
+            std::printf(
+                "session_volume_engine_live=unavailable reason=session-catalog "
+                "snapshot=%s entries=%u active=%u controlled_label=%s "
+                "controlled_active=%s controlled_volume=%s\n",
+                diagnostics.snapshot_received ? "true" : "false",
+                static_cast<unsigned int>(diagnostics.entry_count),
+                static_cast<unsigned int>(diagnostics.active_count),
+                diagnostics.controlled_label_seen ? "true" : "false",
+                diagnostics.controlled_session_active ? "true" : "false",
+                diagnostics.controlled_volume_available ? "true" : "false");
             break;
         }
         original_db = current.requested_db;
