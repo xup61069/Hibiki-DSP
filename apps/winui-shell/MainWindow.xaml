@@ -521,6 +521,9 @@
                                 <Button Content="新增／更新預設" Click="OnApplyRouteRuleClick" Style="{StaticResource AccentButtonStyle}" MinHeight="32" AutomationProperties.Name="新增或更新 App 路由預設" AutomationProperties.HelpText="建立或更新此 App 的路由預設" ToolTipService.ToolTip="建立或更新此 App 的路由預設" />
                                 <Button Content="清除全部預設" Click="OnClearRouteRulesClick" MinHeight="32" AutomationProperties.Name="清除全部 App 路由預設" AutomationProperties.HelpText="刪除所有已保存的路由預設" ToolTipService.ToolTip="刪除所有已保存的路由預設" />
                                     </StackPanel>
+                                    <Border Style="{StaticResource StatusPillStyle}">
+                                        <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" MaxWidth="720" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.Name="App 路由預設狀態" AutomationProperties.HelpText="顯示路由預設的驗證、保存與套用結果" AutomationProperties.LiveSetting="Polite" />
+                                    </Border>
                                 </StackPanel>
                             </Border></Grid>
           <Grid x:Name="ShellCalibrateSection" Visibility="Collapsed"><Grid.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" IsStaggeringEnabled="True" /></TransitionCollection></Grid.Transitions><Border Style="{StaticResource SectionCardStyle}" Padding="28">
