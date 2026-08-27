@@ -801,6 +801,7 @@ STDMETHODIMP HibikiMiniportWaveRtV1::Init(
     UNREFERENCED_PARAMETER(ResourceList);
 
     if (Port == nullptr) return STATUS_INVALID_PARAMETER;
+    if (m_Port != nullptr) return STATUS_INVALID_DEVICE_STATE;
 
     m_Port = Port;
     m_Port->AddRef();
@@ -813,6 +814,12 @@ NTSTATUS HibikiMiniportWaveRtV1::InitEndpoint(
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL,
                "HIBIKI: miniport InitEndpoint idx=%lu actuator=%lu enter\n",
                EndpointIndex, Actuator);
+    // The adapter factory initializes the endpoint contract before PortCls
+    // invokes IMiniport::Init during wavePort->Init.
+    if (m_Initialized) {
+        return STATUS_INVALID_DEVICE_STATE;
+    }
+
     if (hibiki_endpoint_topology_get_v1(EndpointIndex, &m_Topology) == 0 ||
         hibiki_endpoint_topology_validate_v1(&m_Topology) == 0) {
         DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL,
@@ -878,7 +885,11 @@ STDMETHODIMP HibikiMiniportWaveRtV1::NewStream(
     _In_  ULONG                    Pin,
     _In_  BOOLEAN                  Capture,
     _In_  PKSDATAFORMAT            DataFormat) {
-    if (Stream == nullptr || PortStream == nullptr || DataFormat == nullptr) {
+    if (Stream == nullptr) {
+        return STATUS_INVALID_PARAMETER;
+    }
+    *Stream = nullptr;
+    if (PortStream == nullptr || DataFormat == nullptr) {
         return STATUS_INVALID_PARAMETER;
     }
     if (!m_Initialized) {
@@ -894,7 +905,6 @@ STDMETHODIMP HibikiMiniportWaveRtV1::NewStream(
         this, PortStream, Pin, Capture, DataFormat, m_EndpointIndex);
     if (!NT_SUCCESS(ntStatus)) {
         newStream->Release();
-        *Stream = nullptr;
         return ntStatus;
     }
 
