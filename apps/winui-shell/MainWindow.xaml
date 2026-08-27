@@ -177,6 +177,11 @@
                                     <VisualState.StateTriggers>
                                         <AdaptiveTrigger MinWindowWidth="840" />
                                     </VisualState.StateTriggers>
+                                    <VisualState.Setters>
+                                        <Setter Target="HeroQuickStartPanel.(Grid.Column)" Value="1" />
+                                        <Setter Target="HeroQuickStartPanel.(Grid.Row)" Value="0" />
+                                        <Setter Target="HeroQuickStartColumn.Width" Value="380" />
+                                    </VisualState.Setters>
                                 </VisualState>
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
@@ -187,7 +192,7 @@
                                 <TextBlock Text="先選輸出，再一鍵變好聽" Style="{ThemeResource TitleTextBlockStyle}" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                             </StackPanel>
                             <ComboBox Header="輸出群組" AutomationProperties.Name="輸出群組" AutomationProperties.HelpText="選擇 Main、Low Latency 或 Surround 輸出" ItemsSource="{Binding OutputGroups}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding SelectedOutputGroup, Mode=TwoWay}" HorizontalAlignment="Stretch" />
-                            <ComboBox Header="實體輸出裝置" AutomationProperties.Name="實體輸出裝置" AutomationProperties.HelpText="只顯示引擎已驗證且目前 Active 的 render 裝置" ItemsSource="{Binding PhysicalDevices}" DisplayMemberPath="DisplayName" SelectedValuePath="EndpointId" SelectedValue="{Binding SelectedPhysicalDeviceId, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+                            <ComboBox Header="實體輸出裝置" AutomationProperties.Name="實體輸出裝置" AutomationProperties.HelpText="只顯示引擎已驗證且目前 Active 的 render 裝置" ItemsSource="{Binding PhysicalDevices}" DisplayMemberPath="DisplayName" SelectedValuePath="EndpointId" SelectedValue="{Binding SelectedPhysicalDeviceId, Mode=TwoWay}" PlaceholderText="尚未連接引擎（或無已驗證裝置）" HorizontalAlignment="Stretch" />
                             <StackPanel x:Name="DeviceActionRow" Orientation="Vertical" Spacing="6" AutomationProperties.Name="實體裝置控制">
                                 <TextBlock Text="裝置動作" Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 <Border Style="{StaticResource SectionCardStyle}" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
@@ -287,10 +292,10 @@
                                 </DataTemplate>
                             </controls:ItemsRepeater.ItemTemplate>
                         </controls:ItemsRepeater>
-                        <Grid x:Name="CustomFormLayout" ColumnSpacing="16" RowSpacing="0">
+                        <Grid x:Name="CustomFormLayout" ColumnSpacing="16" RowSpacing="10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" MinWidth="280" />
-                                <ColumnDefinition x:Name="CustomFormSecondColumn" Width="0" />
+                                <ColumnDefinition x:Name="CustomFormSecondColumn" Width="*" />
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -305,8 +310,10 @@
                                             <AdaptiveTrigger MinWindowWidth="0" />
                                         </VisualState.StateTriggers>
                                         <VisualState.Setters>
-                                            <Setter Target="CustomFormDescriptionBox.(Grid.Column)" Value="0" />
+                                            <Setter Target="CustomFormNameBox.(Grid.Column)" Value="0" />
+                                            <Setter Target="CustomFormNameBox.(Grid.Row)" Value="1" />
                                             <Setter Target="CustomFormDescriptionBox.(Grid.Row)" Value="2" />
+                                            <Setter Target="CustomFormLiveUpdateToggle.(Grid.Row)" Value="3" />
                                             <Setter Target="CustomFormSecondColumn.Width" Value="0" />
                                         </VisualState.Setters>
                                     </VisualState>
@@ -315,15 +322,19 @@
                                             <AdaptiveTrigger MinWindowWidth="640" />
                                         </VisualState.StateTriggers>
                                         <VisualState.Setters>
-                                            <Setter Target="CustomFormSecondColumn.Width" Value="1*" />
+                                            <Setter Target="CustomFormNameBox.(Grid.Column)" Value="1" />
+                                            <Setter Target="CustomFormNameBox.(Grid.Row)" Value="0" />
+                                            <Setter Target="CustomFormDescriptionBox.(Grid.Row)" Value="1" />
+                                            <Setter Target="CustomFormLiveUpdateToggle.(Grid.Row)" Value="2" />
+                                            <Setter Target="CustomFormSecondColumn.Width" Value="*" />
                                         </VisualState.Setters>
                                     </VisualState>
                                 </VisualStateGroup>
                             </VisualStateManager.VisualStateGroups>
                             <TextBox Header="Scene ID（英文小寫）" Text="{Binding CustomSceneId, Mode=TwoWay}" AutomationProperties.Name="自訂場景 ID" AutomationProperties.HelpText="使用小寫英數、點、底線或連字號，最多 31 字元" />
                             <TextBox x:Name="CustomFormNameBox" Grid.Column="1" Header="名稱" Text="{Binding CustomSceneName, Mode=TwoWay}" AutomationProperties.Name="自訂場景名稱" />
-                            <TextBox x:Name="CustomFormDescriptionBox" Grid.Row="2" Header="說明" Text="{Binding CustomSceneDescription, Mode=TwoWay}" AutomationProperties.Name="自訂場景說明" />
-                            <ToggleSwitch Grid.Row="3" Header="音量連動等響度" IsOn="{Binding CustomSceneLoudnessLiveUpdate, Mode=TwoWay}" AutomationProperties.Name="音量連動等響度" AutomationProperties.HelpText="開啟後此場景的等響度補償會隨輸出音量自動重新計算；關閉時維持固定曲線" ToolTipService.ToolTip="隨音量自動更新等響度補償（選用）" />
+                            <TextBox x:Name="CustomFormDescriptionBox" Grid.Row="1" Grid.ColumnSpan="2" Header="說明" Text="{Binding CustomSceneDescription, Mode=TwoWay}" AutomationProperties.Name="自訂場景說明" />
+                            <ToggleSwitch x:Name="CustomFormLiveUpdateToggle" Grid.Row="2" Grid.ColumnSpan="2" Header="音量連動等響度" IsOn="{Binding CustomSceneLoudnessLiveUpdate, Mode=TwoWay}" AutomationProperties.Name="音量連動等響度" AutomationProperties.HelpText="開啟後此場景的等響度補償會隨輸出音量自動重新計算；關閉時維持固定曲線" ToolTipService.ToolTip="隨音量自動更新等響度補償（選用）" />
                         </Grid>
                         <Button Content="加入自訂預設" Click="OnAddCustomSceneClick" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" MinHeight="40" FontWeight="SemiBold" AutomationProperties.Name="加入自訂預設" AutomationProperties.HelpText="加入後會保存到本機 user-space preset 檔案" ToolTipService.ToolTip="保存到本機 user-space preset 檔案" />
                     </StackPanel>
@@ -387,7 +398,7 @@
                         <Border Style="{StaticResource SectionCardStyle}" Margin="0,4,0,0" PointerEntered="OnSectionCardPointerEntered" PointerExited="OnSectionCardPointerExited">
                             <StackPanel Spacing="12">
                                 <TextBlock Text="IR 相位塑形" Style="{ThemeResource BodyStrongTextBlockStyle}" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-                                <ComboBox Header="IR 相位模式" ItemsSource="{Binding IrPhaseModeOptions}" DisplayMemberPath="Label" SelectedValuePath="Mode" SelectedValue="{Binding IrPhaseMode, Mode=TwoWay}" AutomationProperties.Name="IR 相位模式" AutomationProperties.HelpText="Game 低延遲、Balanced 混合相位、Movie 線性相位或 Bypass" HorizontalAlignment="Stretch" MaxWidth="360" />
+                                <ComboBox Header="IR 相位模式" ItemsSource="{Binding IrPhaseModeOptions}" DisplayMemberPath="Label" SelectedValuePath="Mode" SelectedValue="{Binding IrPhaseMode, Mode=TwoWay}" SelectedIndex="{Binding IrPhaseModeIndex, Mode=TwoWay}" AutomationProperties.Name="IR 相位模式" AutomationProperties.HelpText="Game 低延遲、Balanced 混合相位、Movie 線性相位或 Bypass" HorizontalAlignment="Stretch" MaxWidth="360" />
                                 <Slider Header="IR 相位強度" Minimum="0" Maximum="1" StepFrequency="0.05" Value="{Binding IrPhaseStrength, Mode=TwoWay}" IsEnabled="{Binding IrPhaseUsesFir}" Style="{StaticResource HibikiSliderStyle}" AutomationProperties.Name="IR 相位強度" AutomationProperties.HelpText="調整 mixed-phase 或 linear-phase 的延遲與相位折衷" />
                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                     <Border Style="{StaticResource StatusPillStyle}">
@@ -521,6 +532,9 @@
                                 <Button Content="新增／更新預設" Click="OnApplyRouteRuleClick" Style="{StaticResource AccentButtonStyle}" MinHeight="32" AutomationProperties.Name="新增或更新 App 路由預設" AutomationProperties.HelpText="建立或更新此 App 的路由預設" ToolTipService.ToolTip="建立或更新此 App 的路由預設" />
                                 <Button Content="清除全部預設" Click="OnClearRouteRulesClick" MinHeight="32" AutomationProperties.Name="清除全部 App 路由預設" AutomationProperties.HelpText="刪除所有已保存的路由預設" ToolTipService.ToolTip="刪除所有已保存的路由預設" />
                                     </StackPanel>
+                                    <Border Style="{StaticResource StatusPillStyle}" Margin="0,4,0,0">
+                                        <TextBlock Text="{Binding StatusText}" Style="{ThemeResource CaptionTextBlockStyle}" TextWrapping="Wrap" MaxWidth="500" Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.Name="App 路由預設操作狀態" AutomationProperties.LiveSetting="Polite" />
+                                    </Border>
                                 </StackPanel>
                             </Border></Grid>
           <Grid x:Name="ShellCalibrateSection" Visibility="Collapsed"><Grid.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="24" IsStaggeringEnabled="True" /></TransitionCollection></Grid.Transitions><Border Style="{StaticResource SectionCardStyle}" Padding="28">
@@ -562,11 +576,11 @@
         <Button Content="匯出校正設定" Click="OnExportWizardProfileClick" MinHeight="32" IsEnabled="{Binding WizardHasResult}" AutomationProperties.Name="匯出校正 PEQ 設定檔" AutomationProperties.HelpText="將已編譯的 PEQ 濾波器存成 JSON 檔" ToolTipService.ToolTip="將已編譯的 PEQ 濾波器存成 JSON 檔" />
         <Button Content="套用到場景" Click="OnApplyWizardToSceneClick" MinHeight="32" IsEnabled="{Binding WizardHasResult}" AutomationProperties.Name="套用校正到場景" AutomationProperties.HelpText="將已編譯的校正濾波器送進引擎，掛到目前的輸出場景" ToolTipService.ToolTip="將已編譯的校正濾波器送進引擎，掛到目前的輸出場景" />
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" Spacing="10">
+                    <StackPanel Orientation="Horizontal" Spacing="10" Visibility="{Binding WizardHasMeasurement, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Border Style="{StaticResource StatusPillStyle}">
                             <TextBlock Text="{Binding WizardMeasurementPath}" Style="{ThemeResource CaptionTextBlockStyle}" AutomationProperties.Name="量測檔路徑" Foreground="{ThemeResource TextFillColorSecondaryBrush}" MaxWidth="420" TextTrimming="CharacterEllipsis" />
                         </Border>
-                        <Border Style="{StaticResource StatusPillStyle}" Visibility="{Binding WizardHasMeasurement, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Border Style="{StaticResource StatusPillStyle}">
                             <TextBlock Text="{Binding WizardImportedCountText}" Style="{ThemeResource CaptionTextBlockStyle}" AutomationProperties.Name="量測點數" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </Border>
                     </StackPanel>
