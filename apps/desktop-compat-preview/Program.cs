@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 using System.ComponentModel;
+using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
 using Hibiki.ControlModel;
@@ -22,12 +23,55 @@ internal static class Program
 
 internal sealed class PreviewForm : Form
 {
+    private static readonly Color ShellBackground = Color.FromArgb(244, 247, 251);
+    private static readonly Color CardBackground = Color.FromArgb(255, 255, 255);
+    private static readonly Color GroupBackground = Color.FromArgb(235, 242, 249);
+    private static readonly Color TextPrimary = Color.FromArgb(31, 41, 55);
+    private static readonly Color TextSecondary = Color.FromArgb(82, 96, 112);
+    private static readonly Color Accent = Color.FromArgb(143, 56, 173);
+    private static readonly Color AccentHover = Color.FromArgb(121, 42, 151);
+    private static readonly Color Border = Color.FromArgb(207, 218, 231);
+    private static readonly Color DisabledBackground = Color.FromArgb(216, 225, 235);
+    private static readonly Color DisabledText = Color.FromArgb(78, 93, 112);
+    private static readonly Color SuccessBackground = Color.FromArgb(228, 246, 236);
+    private static readonly Color SuccessText = Color.FromArgb(31, 105, 62);
+    private static readonly Color WarningBackground = Color.FromArgb(255, 244, 218);
+    private static readonly Color WarningText = Color.FromArgb(125, 82, 0);
+
     private readonly EasyControlViewModel _viewModel;
-    private readonly Label _connection = new() { AutoSize = true };
+    private readonly Label _connection = new()
+    {
+        AutoSize = false,
+        Height = 42,
+        TextAlign = ContentAlignment.MiddleLeft,
+        AccessibleName = "引擎連線狀態",
+        Tag = "connection-status",
+    };
     private readonly Label _devices = new() { AutoSize = false, Width = 550, Height = 48 };
+    private readonly Label _physicalDeviceEmptyState = new()
+    {
+        AutoSize = false,
+        Height = 48,
+        Visible = false,
+        AccessibleName = "實體輸出裝置狀態",
+        Tag = "empty-state",
+    };
     private readonly Label _status = new() { AutoSize = false, Height = 48 };
     private readonly Label _routes = new() { AutoSize = false, Width = 550, Height = 58 };
-    private readonly Label _sessions = new() { AutoSize = false, Width = 550, Height = 72 };
+    private readonly Label _sessions = new() { AutoSize = false, Width = 550, Height = 48 };
+    private readonly Label _sessionEmptyState = new()
+    {
+        AutoSize = false,
+        Height = 48,
+        Visible = false,
+        AccessibleName = "Expert App 工作階段空狀態",
+        Tag = "empty-state",
+    };
+    private readonly Label _sessionFilterLabel = CreateFieldLabel("篩選工作階段");
+    private readonly Label _sessionSelectorLabel = CreateFieldLabel("工作階段");
+    private readonly Label _sessionVolumeLabel = CreateFieldLabel("App 音量");
+    private readonly Label _sessionRouteLabel = CreateFieldLabel("App 路由");
+    private FlowLayoutPanel _sessionRouteFields = null!;
     private readonly ComboBox _sessionSelector = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取 Expert App" };
     private readonly TextBox _sessionFilter = new() { Width = 460, PlaceholderText = "篩選 App 名稱或 App ID", AccessibleName = "Expert App 清單篩選" };
     private readonly ComboBox _physicalDeviceSelector = new() { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取實體輸出裝置" };
@@ -41,6 +85,14 @@ internal sealed class PreviewForm : Form
     private readonly TextBox _sessionOutput = new() { Width = 220, PlaceholderText = "Output Group", AccessibleName = "Output Group 輸入欄" };
     private readonly Button _applySessionRoute = new() { Text = "套用選取 App 路由", AutoSize = true, AccessibleName = "套用選取 App 路由" };
     private readonly ListBox _routeRuleList = new() { Width = 550, Height = 110, AccessibleName = "App 路由預設列表" };
+    private readonly Label _routeRuleEmptyState = new()
+    {
+        AutoSize = false,
+        Height = 48,
+        Visible = false,
+        AccessibleName = "App 路由預設空狀態",
+        Tag = "empty-state",
+    };
     private readonly TextBox _routeRuleId = new() { Width = 260, PlaceholderText = "預設 ID（小寫英文／數字／- _ .）", AccessibleName = "App 路由預設 ID" };
     private readonly TextBox _routeRuleAppId = new() { Width = 260, PlaceholderText = "App ID（例如 game.exe，可留空）", AccessibleName = "App 路由預設 App ID" };
     private readonly TextBox _routeRuleDisplayName = new() { Width = 260, PlaceholderText = "顯示名稱（可留空）", AccessibleName = "App 路由預設顯示名稱" };
@@ -90,18 +142,46 @@ internal sealed class PreviewForm : Form
     private bool _restoredPersistedState;
     private bool _windowBoundsRestored;
     private ComboBox _outputGroups = null!;
+    private FlowLayoutPanel _modernPanel = null!;
+    private Panel _modernHeader = null!;
+    private FlowLayoutPanel _connectionControls = null!;
     internal PreviewForm(EasyControlViewModel viewModel)
     {
         _viewModel = viewModel;
         Text = "Hibiki DSP — Compatibility Preview";
         StartPosition = FormStartPosition.CenterScreen;
+        AutoScaleMode = AutoScaleMode.Dpi;
+        ClientSize = new Size(1040, 700);
+        MinimumSize = new Size(900, 620);
+        BackColor = ShellBackground;
+        ForeColor = TextPrimary;
         Font = new Font("Segoe UI", 10);
 
-        var panel = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24), FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
-        panel.Controls.Add(new Label { Text = "Hibiki DSP", AutoSize = true, Font = new Font("Segoe UI", 24, FontStyle.Bold) });
-        panel.Controls.Add(new Label { Text = "本機 Compatibility Preview：自帶 .NET runtime，不需要 Windows App Runtime；不含 driver、系統攔截或正式音訊處理。", AutoSize = false, Width = 550, Height = 42 });
-        panel.Controls.Add(new Label { Text = "離線預覽模式：先啟動 user-space Engine Preview，才能測試場景或音量命令。", AutoSize = true, ForeColor = Color.DimGray });
-        panel.Controls.Add(new Label { Text = "輸出群組", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        var panel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            Padding = new Padding(32, 28, 32, 28),
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoScroll = true,
+            BackColor = ShellBackground,
+        };
+        var header = CreateHeaderCard();
+        _modernPanel = panel;
+        _modernHeader = header;
+        panel.Controls.Add(header);
+        panel.Controls.Add(CreateSectionHeader("引擎連線"));
+        var connectionControls = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+        };
+        _connectionControls = connectionControls;
+        connectionControls.Controls.Add(_connect);
+        connectionControls.Controls.Add(_connection);
+        panel.Controls.Add(connectionControls);
+        panel.Controls.Add(CreateSectionHeader("輸出與裝置"));
         var groups = new ComboBox { Width = 460, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "選取輸出群組", DataSource = _viewModel.OutputGroups.ToList(), DisplayMember = "Name", ValueMember = "Id" };
         _outputGroups = groups;
         groups.SelectedIndexChanged += (_, _) => { if (groups.SelectedValue is string id) _viewModel.SelectedOutputGroup = id; };
@@ -132,8 +212,9 @@ internal sealed class PreviewForm : Form
             await _viewModel.RefreshPhysicalDevicePickerAsync();
             RefreshView();
         };
-        panel.Controls.Add(new Label { Text = "實體輸出裝置", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        panel.Controls.Add(CreateSectionHeader("實體輸出裝置"));
         panel.Controls.Add(_physicalDeviceSelector);
+        panel.Controls.Add(_physicalDeviceEmptyState);
         var physicalDeviceActions = new FlowLayoutPanel
         {
             AutoSize = true,
@@ -157,9 +238,7 @@ internal sealed class PreviewForm : Form
             }
             RefreshView();
         };
-        panel.Controls.Add(_connect);
-        panel.Controls.Add(_connection);
-        panel.Controls.Add(new Label { Text = "場景", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        panel.Controls.Add(CreateSectionHeader("場景"));
         SyncSceneList();
         _scenes.SelectedIndexChanged += async (_, _) =>
         {
@@ -170,7 +249,7 @@ internal sealed class PreviewForm : Form
             RefreshView();
         };
         panel.Controls.Add(_scenes);
-        panel.Controls.Add(new Label { Text = "自訂場景（最多 32 筆）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        panel.Controls.Add(CreateSectionHeader("自訂場景（最多 32 筆）"));
         _customSceneId.TextChanged += (_, _) => _viewModel.CustomSceneId = _customSceneId.Text;
         _customSceneName.TextChanged += (_, _) => _viewModel.CustomSceneName = _customSceneName.Text;
         _customSceneDescription.TextChanged += (_, _) => _viewModel.CustomSceneDescription = _customSceneDescription.Text;
@@ -183,8 +262,11 @@ internal sealed class PreviewForm : Form
         };
         customSceneIdentity.Controls.Add(_customSceneId);
         customSceneIdentity.Controls.Add(_customSceneName);
+        panel.Controls.Add(CreateFieldLabel("場景識別"));
         panel.Controls.Add(customSceneIdentity);
+        panel.Controls.Add(CreateFieldLabel("場景說明"));
         panel.Controls.Add(_customSceneDescription);
+        panel.Controls.Add(CreateFieldLabel("同步選項"));
         panel.Controls.Add(_customSceneLoudnessLiveUpdate);
         panel.Controls.Add(_customSceneQueueStatus);
         _addCustomScene.Click += async (_, _) =>
@@ -213,7 +295,7 @@ internal sealed class PreviewForm : Form
         customSceneActions.Controls.Add(_exportCustomScenes);
         customSceneActions.Controls.Add(_importCustomScenes);
         panel.Controls.Add(customSceneActions);
-        panel.Controls.Add(new Label { Text = "IR 檔案與相位", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        panel.Controls.Add(CreateSectionHeader("IR 檔案與相位"));
         _irModes.DataSource = _viewModel.IrPhaseModeOptions.ToList();
         _irModes.DisplayMember = "Label";
         _irModes.ValueMember = "Mode";
@@ -229,7 +311,9 @@ internal sealed class PreviewForm : Form
             _irStrengthReadout.Text = $"{_irStrength.Value} %";
             RefreshView();
         };
+        panel.Controls.Add(CreateFieldLabel("相位模式"));
         panel.Controls.Add(_irModes);
+        panel.Controls.Add(CreateFieldLabel("IR 強度"));
         panel.Controls.Add(_irStrength);
         panel.Controls.Add(_irStrengthReadout);
 
@@ -252,7 +336,7 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(_irStatus);
         _enhance.Click += async (_, _) => { await _viewModel.OneTapEnhanceAsync(); RefreshView(); };
         panel.Controls.Add(_enhance);
-        panel.Controls.Add(new Label { Text = "系統音量（dB）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        panel.Controls.Add(CreateSectionHeader("音量與安全"));
         _volume.Value = (int)_viewModel.RequestedVolumeDb;
         _volume.ValueChanged += async (_, _) => { _volumeReadout.Text = $"{_volume.Value} dB"; _viewModel.RequestedVolumeDb = _volume.Value; if (_viewModel.IsConnected) await _viewModel.QueueVolumeAsync(); RefreshView(); };
         _muted.CheckedChanged += async (_, _) =>
@@ -261,6 +345,7 @@ internal sealed class PreviewForm : Form
             if (_viewModel.IsConnected) await _viewModel.QueueVolumeAsync();
             RefreshView();
         };
+        panel.Controls.Add(CreateFieldLabel("主音量"));
         panel.Controls.Add(_volume);
         panel.Controls.Add(_volumeReadout);
         panel.Controls.Add(_muted);
@@ -270,9 +355,11 @@ internal sealed class PreviewForm : Form
         panel.Controls.Add(_deviceSwitchStatus);
         panel.Controls.Add(_lastSendDiagnostics);
         panel.Controls.Add(_routes);
-        panel.Controls.Add(new Label { Text = "Expert App／工作階段（需以 -EnableSessionRouting 啟動）", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        panel.Controls.Add(CreateSectionHeader("Expert App／工作階段（需以 -EnableSessionRouting 啟動）"));
         panel.Controls.Add(_sessions);
+        panel.Controls.Add(_sessionEmptyState);
         _sessionFilter.TextChanged += (_, _) => SyncSessionList();
+        panel.Controls.Add(_sessionFilterLabel);
         panel.Controls.Add(_sessionFilter);
         _sessionSelector.SelectedIndexChanged += (_, _) =>
         {
@@ -281,6 +368,7 @@ internal sealed class PreviewForm : Form
             SyncSessionControls();
             RefreshView();
         };
+        panel.Controls.Add(_sessionSelectorLabel);
         panel.Controls.Add(_sessionSelector);
         _sessionVolume.ValueChanged += async (_, _) =>
         {
@@ -289,6 +377,7 @@ internal sealed class PreviewForm : Form
             _sessionVolumeReadout.Text = $"{_sessionVolume.Value} dB";
             RefreshView();
         };
+        panel.Controls.Add(_sessionVolumeLabel);
         panel.Controls.Add(_sessionVolume);
         panel.Controls.Add(_sessionVolumeReadout);
         _applySessionVolume.Click += async (_, _) =>
@@ -313,8 +402,10 @@ internal sealed class PreviewForm : Form
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false
         };
+        _sessionRouteFields = sessionRouteFields;
         sessionRouteFields.Controls.Add(_sessionLane);
         sessionRouteFields.Controls.Add(_sessionOutput);
+        panel.Controls.Add(_sessionRouteLabel);
         panel.Controls.Add(sessionRouteFields);
         _applySessionRoute.Click += async (_, _) =>
         {
@@ -322,7 +413,7 @@ internal sealed class PreviewForm : Form
             RefreshView();
         };
         panel.Controls.Add(_applySessionRoute);
-        panel.Controls.Add(new Label { Text = "App 路由預設（Expert）", AutoSize = true, Margin = new Padding(3, 18, 3, 0) });
+        panel.Controls.Add(CreateSectionHeader("App 路由預設（Expert）"));
         panel.Controls.Add(new Label
         {
             Text = "建立後會保存到本機；只有 App 清單已同步且引擎回覆 Ack，才會顯示為已套用。App ID 或顯示名稱至少填一項。",
@@ -331,7 +422,9 @@ internal sealed class PreviewForm : Form
             Height = 42
         });
         SyncRouteRuleList();
+        panel.Controls.Add(CreateFieldLabel("已建立的 App 路由預設"));
         panel.Controls.Add(_routeRuleList);
+        panel.Controls.Add(_routeRuleEmptyState);
         _routeRuleId.TextChanged += (_, _) => _viewModel.RouteRuleId = _routeRuleId.Text;
         _routeRuleAppId.TextChanged += (_, _) => _viewModel.RouteRuleAppId = _routeRuleAppId.Text;
         _routeRuleDisplayName.TextChanged += (_, _) => _viewModel.RouteRuleDisplayName = _routeRuleDisplayName.Text;
@@ -363,6 +456,7 @@ internal sealed class PreviewForm : Form
         };
         routeRuleIdentityFields.Controls.Add(_routeRuleId);
         routeRuleIdentityFields.Controls.Add(_routeRuleAppId);
+        panel.Controls.Add(CreateFieldLabel("識別與 App"));
         panel.Controls.Add(routeRuleIdentityFields);
         var routeRuleMatcherFields = new FlowLayoutPanel
         {
@@ -372,7 +466,9 @@ internal sealed class PreviewForm : Form
         };
         routeRuleMatcherFields.Controls.Add(_routeRuleDisplayName);
         routeRuleMatcherFields.Controls.Add(_routeRuleLaneId);
+        panel.Controls.Add(CreateFieldLabel("顯示與 Lane"));
         panel.Controls.Add(routeRuleMatcherFields);
+        panel.Controls.Add(CreateFieldLabel("輸出群組"));
         panel.Controls.Add(_routeRuleOutputGroup);
         var routeRuleNumericFields = new FlowLayoutPanel
         {
@@ -382,6 +478,7 @@ internal sealed class PreviewForm : Form
         };
         routeRuleNumericFields.Controls.Add(_routeRulePriority);
         routeRuleNumericFields.Controls.Add(_routeRuleMakeupGain);
+        panel.Controls.Add(CreateFieldLabel("優先級／補償增益（dB）"));
         panel.Controls.Add(routeRuleNumericFields);
         var routeRuleOptionFields = new FlowLayoutPanel
         {
@@ -391,6 +488,7 @@ internal sealed class PreviewForm : Form
         };
         routeRuleOptionFields.Controls.Add(_routeRuleEnabled);
         routeRuleOptionFields.Controls.Add(_routeRuleGainOwner);
+        panel.Controls.Add(CreateFieldLabel("預設選項"));
         panel.Controls.Add(routeRuleOptionFields);
         _applyRouteRule.Click += async (_, _) =>
         {
@@ -432,10 +530,13 @@ internal sealed class PreviewForm : Form
             if (_updatingRouteRules) return;
             RefreshView();
         };
-        panel.Controls.Add(new Label { Text = "等化器", AutoSize = true, Margin = new Padding(3, 12, 3, 0) });
+        panel.Controls.Add(CreateSectionHeader("等化器"));
         panel.Controls.Add(_eqStatus);
         panel.Controls.Add(_status);
         Controls.Add(panel);
+        ApplyModernStyles(panel);
+        panel.Resize += (_, _) => ResizeModernSurface(panel, header);
+        ResizeModernSurface(panel, header);
         _viewModel.PropertyChanged += OnViewModelChanged;
         _statusTimer.Tick += async (_, _) =>
         {
@@ -472,6 +573,271 @@ internal sealed class PreviewForm : Form
         FormClosing += (_, _) => PersistUiState();
         RefreshView();
     }
+
+    private static Panel CreateHeaderCard()
+    {
+        var card = new Panel
+        {
+            Height = 122,
+            BackColor = CardBackground,
+            Margin = new Padding(0, 0, 0, 8),
+            Tag = "header-card",
+        };
+        var title = new Label
+        {
+            Text = "Hibiki DSP",
+            AutoSize = true,
+            Font = new Font("Segoe UI", 24, FontStyle.Bold),
+            ForeColor = TextPrimary,
+            Location = new Point(24, 16),
+            Tag = "header-title",
+        };
+        var subtitle = new Label
+        {
+            Name = "header-subtitle",
+            Text = "本機 Compatibility Preview：自帶 .NET runtime，不需要 Windows App Runtime；不含 driver、系統攔截或正式音訊處理。",
+            AutoSize = false,
+            Height = 36,
+            ForeColor = TextSecondary,
+            Location = new Point(24, 55),
+            Tag = "header-subtitle",
+        };
+        var mode = new Label
+        {
+            Text = "離線預覽模式：先啟動 user-space Engine Preview，才能測試場景或音量命令。",
+            AutoSize = true,
+            ForeColor = TextSecondary,
+            Location = new Point(24, 96),
+            Tag = "header-mode",
+        };
+        card.Controls.Add(mode);
+        card.Controls.Add(subtitle);
+        card.Controls.Add(title);
+        card.Paint += (_, e) =>
+        {
+            using var borderPen = new Pen(Border);
+            using var accentBrush = new SolidBrush(Accent);
+            e.Graphics.DrawRectangle(borderPen, 0, 0, Math.Max(0, card.Width - 1), Math.Max(0, card.Height - 1));
+            e.Graphics.FillRectangle(accentBrush, 0, 0, 5, card.Height);
+        };
+        return card;
+    }
+
+    private static Label CreateSectionHeader(string text) => new()
+    {
+        Text = text,
+        AutoSize = true,
+        Font = new Font("Segoe UI", 12, FontStyle.Bold),
+        ForeColor = Accent,
+        Margin = new Padding(0, 16, 0, 4),
+        Tag = "section-header",
+    };
+
+    private static Label CreateFieldLabel(string text) => new()
+    {
+        Text = text,
+        AutoSize = true,
+        Font = new Font("Segoe UI", 9, FontStyle.Bold),
+        ForeColor = TextSecondary,
+        Margin = new Padding(0, 8, 8, 0),
+        Tag = "field-label",
+    };
+
+    private void ApplyModernStyles(Control root)
+    {
+        foreach (Control control in root.Controls)
+        {
+            if (control is Button button)
+            {
+                StyleModernButton(button);
+            }
+            else if (control is TextBox textBox)
+            {
+                textBox.BorderStyle = BorderStyle.FixedSingle;
+                textBox.AutoSize = false;
+                textBox.Height = Math.Max(36, textBox.Height);
+                textBox.Margin = new Padding(0, 4, 8, 4);
+                StyleModernInput(textBox, CardBackground);
+            }
+            else if (control is ComboBox comboBox)
+            {
+                comboBox.FlatStyle = FlatStyle.Standard;
+                comboBox.Height = Math.Max(36, comboBox.Height);
+                comboBox.Margin = new Padding(0, 4, 8, 4);
+                StyleModernInput(comboBox, CardBackground);
+            }
+            else if (control is NumericUpDown numericUpDown)
+            {
+                numericUpDown.BorderStyle = BorderStyle.FixedSingle;
+                numericUpDown.Height = Math.Max(36, numericUpDown.Height);
+                numericUpDown.Margin = new Padding(0, 4, 8, 4);
+                StyleModernInput(numericUpDown, CardBackground);
+            }
+            else if (control is ListBox listBox)
+            {
+                listBox.BorderStyle = BorderStyle.FixedSingle;
+                listBox.Margin = new Padding(0, 4, 8, 4);
+                StyleModernInput(listBox, CardBackground);
+            }
+            else if (control is CheckBox checkBox)
+            {
+                checkBox.Margin = new Padding(0, 7, 12, 7);
+                checkBox.EnabledChanged += (_, _) => UpdateModernInputColors(checkBox, CardBackground);
+                UpdateModernInputColors(checkBox, CardBackground);
+            }
+            else if (control is TrackBar trackBar)
+            {
+                trackBar.Margin = new Padding(0, 6, 8, 6);
+                StyleModernInput(trackBar, GroupBackground);
+            }
+            else if (control is Label label && label.Tag is not string)
+            {
+                label.ForeColor = TextSecondary;
+                label.Margin = new Padding(0, 4, 8, 4);
+            }
+
+            if (control is FlowLayoutPanel flow && !ReferenceEquals(flow, root))
+            {
+                flow.BackColor = GroupBackground;
+                flow.Padding = new Padding(8);
+                flow.Margin = new Padding(0, 4, 0, 4);
+            }
+
+            if (control.HasChildren)
+                ApplyModernStyles(control);
+        }
+
+        foreach (var label in new[]
+                 {
+                      _connection, _devices, _physicalDeviceEmptyState, _status, _routes, _sessions,
+                      _sessionEmptyState, _irStatus, _eqStatus, _lastSendDiagnostics,
+                      _customSceneQueueStatus, _routeRuleEmptyState,
+                 })
+        {
+            label.BackColor = GroupBackground;
+            label.ForeColor = TextSecondary;
+            label.Padding = new Padding(10, 7, 10, 7);
+            label.Margin = new Padding(0, 4, 8, 4);
+        }
+    }
+
+    private static void StyleModernInput(Control control, Color enabledBackground)
+    {
+        control.EnabledChanged += (_, _) => UpdateModernInputColors(control, enabledBackground);
+        UpdateModernInputColors(control, enabledBackground);
+    }
+
+    private static void UpdateModernInputColors(Control control, Color enabledBackground)
+    {
+        control.BackColor = control.Enabled ? enabledBackground : DisabledBackground;
+        control.ForeColor = control.Enabled ? TextPrimary : DisabledText;
+    }
+
+    private void StyleModernButton(Button button)
+    {
+        var primary = IsPrimaryButton(button);
+        button.AutoSize = true;
+        button.FlatStyle = FlatStyle.Flat;
+        button.FlatAppearance.BorderSize = 0;
+        button.FlatAppearance.MouseOverBackColor = primary ? AccentHover : Border;
+        button.FlatAppearance.MouseDownBackColor = primary ? AccentHover : Border;
+        button.UseVisualStyleBackColor = false;
+        button.Padding = new Padding(14, 8, 14, 8);
+        button.Margin = new Padding(0, 4, 8, 4);
+        button.Cursor = Cursors.Hand;
+        button.EnabledChanged += (_, _) => UpdateModernButtonColors(button, primary);
+        UpdateModernButtonColors(button, primary);
+    }
+
+    private bool IsPrimaryButton(Button button) =>
+        ReferenceEquals(button, _connect) ||
+        ReferenceEquals(button, _enhance) ||
+        ReferenceEquals(button, _addCustomScene) ||
+        ReferenceEquals(button, _loadIr) ||
+        ReferenceEquals(button, _applySessionVolume) ||
+        ReferenceEquals(button, _applySessionRoute) ||
+        ReferenceEquals(button, _applyRouteRule);
+
+    private static void UpdateModernButtonColors(Button button, bool primary)
+    {
+        if (!button.Enabled)
+        {
+            button.BackColor = DisabledBackground;
+            button.ForeColor = DisabledText;
+            return;
+        }
+
+        button.BackColor = primary ? Accent : CardBackground;
+        button.ForeColor = primary ? Color.White : TextPrimary;
+    }
+
+    private void ResizeModernSurface(FlowLayoutPanel panel, Panel header)
+    {
+        var contentWidth = Math.Max(620, panel.ClientSize.Width - panel.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth);
+        header.Width = contentWidth;
+        if (header.Controls["header-subtitle"] is Label subtitle)
+            subtitle.Width = Math.Max(420, contentWidth - 48);
+
+        _outputGroups.Width = contentWidth;
+        _physicalDeviceSelector.Width = contentWidth;
+        _scenes.Width = contentWidth;
+        _customSceneDescription.Width = contentWidth;
+        _irModes.Width = contentWidth;
+        _irStrength.Width = Math.Max(360, contentWidth - 72);
+        _volume.Width = Math.Max(360, contentWidth - 72);
+        _sessionFilter.Width = contentWidth;
+        _sessionSelector.Width = contentWidth;
+        _sessionVolume.Width = Math.Max(360, contentWidth - 72);
+        _routeRuleList.Width = contentWidth;
+        _routeRuleOutputGroup.Width = contentWidth;
+        _connectionControls.Width = contentWidth;
+
+        foreach (var label in new[]
+                 {
+                      _connection, _devices, _physicalDeviceEmptyState, _status, _routes, _sessions,
+                      _sessionEmptyState, _irStatus, _eqStatus, _lastSendDiagnostics, _routeRuleEmptyState,
+                 })
+        {
+            label.Width = contentWidth;
+            var textWidth = Math.Max(1, contentWidth - label.Padding.Horizontal);
+            var measuredHeight = string.IsNullOrEmpty(label.Text)
+                ? 0
+                : TextRenderer.MeasureText(label.Text, label.Font,
+                    new Size(textWidth, int.MaxValue), TextFormatFlags.WordBreak).Height;
+            label.Height = Math.Max(GetStatusMinimumHeight(label),
+                                    measuredHeight + label.Padding.Vertical + 2);
+        }
+
+        var connectionButtonWidth = _connect.PreferredSize.Width + _connect.Margin.Horizontal;
+        _connection.Width = Math.Max(260,
+            contentWidth - connectionButtonWidth - _connectionControls.Padding.Horizontal - 8);
+
+        var halfWidth = Math.Max(260, (contentWidth - 26) / 2);
+        foreach (var fields in panel.Controls.OfType<FlowLayoutPanel>())
+        {
+            fields.AutoSize = false;
+            fields.Width = contentWidth;
+            var children = fields.Controls.Cast<Control>().ToArray();
+            if (children.Length == 2 && children.All(control => control is TextBox or NumericUpDown))
+            {
+                foreach (var child in children)
+                    child.Width = halfWidth;
+            }
+
+            var rowHeight = children.Length == 0
+                ? 0
+                : children.Max(control => control.PreferredSize.Height + control.Margin.Vertical);
+            fields.Height = Math.Max(20, rowHeight + fields.Padding.Vertical + 4);
+        }
+    }
+
+    private int GetStatusMinimumHeight(Label label) =>
+        ReferenceEquals(label, _connection) ? 42 :
+        ReferenceEquals(label, _routes) ? 58 :
+        ReferenceEquals(label, _sessions) ? 48 :
+        ReferenceEquals(label, _irStatus) ? 58 :
+        ReferenceEquals(label, _eqStatus) || ReferenceEquals(label, _lastSendDiagnostics) ? 32 :
+        48;
 
     private void RestoreWindowBounds()
     {
@@ -554,6 +920,8 @@ internal sealed class PreviewForm : Form
     private void RefreshView()
     {
         _connection.Text = _viewModel.ConnectionStatusText;
+        _connection.BackColor = _viewModel.IsConnected ? SuccessBackground : WarningBackground;
+        _connection.ForeColor = _viewModel.IsConnected ? SuccessText : WarningText;
         var renderDevices = _viewModel.PhysicalDevices
             .Where(device => device.Flow == PhysicalDeviceFlowV1.Render)
             .ToArray();
@@ -567,8 +935,16 @@ internal sealed class PreviewForm : Form
               $"預設輸出：{defaultRender ?? "未指定"}\r\n切換會先預熱新裝置再以 30 ms 交叉淡化；失敗自動回復上一個裝置。";
         SyncPhysicalDeviceList();
         var selectableRenderCount = renderDevices.Count(device => device.IsSelectable);
-        _physicalDeviceSelector.Enabled = _viewModel.IsConnected && selectableRenderCount > 0;
-        _switchDevice.Enabled = _viewModel.IsConnected && !_viewModel.IsBusy &&
+        var hasSelectableRenderDevices = _viewModel.IsConnected && selectableRenderCount > 0;
+        _physicalDeviceEmptyState.Visible = !hasSelectableRenderDevices;
+        _physicalDeviceEmptyState.Text = _viewModel.IsConnected
+            ? "沒有可用的已驗證實體輸出裝置。"
+            : "尚未連接引擎；連接後才會顯示已驗證的實體輸出裝置。";
+        _physicalDeviceEmptyState.BackColor = _viewModel.IsConnected ? WarningBackground : GroupBackground;
+        _physicalDeviceEmptyState.ForeColor = _viewModel.IsConnected ? WarningText : TextSecondary;
+        _physicalDeviceSelector.Visible = hasSelectableRenderDevices;
+        _physicalDeviceSelector.Enabled = hasSelectableRenderDevices;
+        _switchDevice.Enabled = hasSelectableRenderDevices && !_viewModel.IsBusy &&
                                 _physicalDeviceSelector.SelectedValue is string;
         _refreshDevices.Enabled = _viewModel.IsConnected && !_viewModel.IsBusy;
         _enhance.Enabled = _viewModel.IsConnected;
@@ -583,10 +959,31 @@ internal sealed class PreviewForm : Form
             : $"App catalog：{sessionCount} 筆；{seqText} 只顯示 bounded metadata。套用 App 音量會寫入 Windows session，" +
               "實體 per-App 送出已由 process-loopback E2E 覆蓋；仍屬使用者空間控制證據。";
         SyncSessionList();
-        var hasSession = _viewModel.HasSelectedSession;
-        _sessionSelector.Enabled = _viewModel.IsConnected && _sessionSelector.Items.Count > 0;
+        var sessionControlsVisible = _viewModel.IsConnected && sessionCount > 0;
+        var hasVisibleSessions = sessionControlsVisible && _sessionSelector.Items.Count > 0;
+        _sessionEmptyState.Visible = !hasVisibleSessions;
+        _sessionEmptyState.Text = !sessionControlsVisible && !_viewModel.IsConnected
+            ? "尚未連接引擎；連接後才會同步可控制的 App 工作階段。"
+            : sessionControlsVisible && !hasVisibleSessions
+                ? "找不到符合目前篩選條件的 App 工作階段；清除篩選即可查看全部。"
+                : "尚未收到可控制的 App 工作階段；請確認目標 App 正在播放音訊，且引擎以 -EnableSessionRouting 啟動。";
+        _sessionFilterLabel.Visible = sessionControlsVisible;
+        _sessionFilter.Visible = sessionControlsVisible;
+        _sessionSelectorLabel.Visible = hasVisibleSessions;
+        _sessionSelector.Visible = hasVisibleSessions;
+        _sessionVolumeLabel.Visible = hasVisibleSessions;
+        _sessionVolume.Visible = hasVisibleSessions;
+        _sessionVolumeReadout.Visible = hasVisibleSessions;
+        _sessionMuted.Visible = hasVisibleSessions;
+        _applySessionVolume.Visible = hasVisibleSessions;
+        _sessionRouteLabel.Visible = hasVisibleSessions;
+        _sessionRouteFields.Visible = hasVisibleSessions;
+        _applySessionRoute.Visible = hasVisibleSessions;
+        var hasSession = hasVisibleSessions && _viewModel.HasSelectedSession;
+        _sessionSelector.Enabled = hasVisibleSessions;
         _sessionVolume.Enabled = _viewModel.IsConnected && hasSession && _viewModel.SelectedSession?.VolumeAvailable == true;
         _applySessionVolume.Enabled = _sessionVolume.Enabled;
+        _sessionMuted.Enabled = _sessionVolume.Enabled;
         _sessionLane.Enabled = _viewModel.IsConnected && hasSession;
         _sessionOutput.Enabled = _viewModel.IsConnected && hasSession;
         _applySessionRoute.Enabled = _viewModel.IsConnected && hasSession;
@@ -594,6 +991,7 @@ internal sealed class PreviewForm : Form
         _clearRouteRules.Enabled = _viewModel.RouteRules.Count > 0;
         _loadIr.Enabled = _viewModel.IsConnected && _viewModel.IrPhaseMode != IrPhaseMode.Bypass;
         _irStrength.Enabled = _viewModel.IrPhaseMode is IrPhaseMode.MixedPhase or IrPhaseMode.LinearPhase;
+        _muted.Enabled = _viewModel.IsConnected;
         _effective.Text = $"實際有效音量：{_viewModel.EffectiveVolumeDb:0.0} dB；{_viewModel.VolumeOriginText}；{_viewModel.VolumeActuatorText}";
         var pauseHint = _viewModel.ListeningDose.PauseHintText;
         _listeningDose.Text = $"{_viewModel.ListeningDose.StateText}｜剩餘安全時間：{_viewModel.ListeningDose.RemainingSafeTimeText}" + (string.IsNullOrEmpty(pauseHint) ? "" : $"｜{pauseHint}");
@@ -638,6 +1036,9 @@ internal sealed class PreviewForm : Form
             _scenes.SelectedValue = selectedScene;
             _updatingScene = false;
         }
+
+        if (_modernPanel is not null && !_modernPanel.IsDisposed)
+            ResizeModernSurface(_modernPanel, _modernHeader);
     }
 
     private void SyncSessionList()
@@ -737,10 +1138,14 @@ internal sealed class PreviewForm : Form
         try
         {
             var rules = _viewModel.RouteRules.ToArray();
+            var hasRules = rules.Length > 0;
             _routeRuleList.DataSource = null;
             _routeRuleList.DisplayMember = nameof(SessionRouteRuleCard.Summary);
             _routeRuleList.ValueMember = nameof(SessionRouteRuleCard.RuleId);
             _routeRuleList.DataSource = rules;
+            _routeRuleList.Visible = hasRules;
+            _routeRuleEmptyState.Visible = !hasRules;
+            _routeRuleEmptyState.Text = "尚未建立 App 路由預設；填寫 App ID 或顯示名稱後，按「新增／更新預設」即可建立。";
             if (selectedId is null) return;
             var selectedIndex = Array.FindIndex(rules, item => item.RuleId == selectedId);
             if (selectedIndex >= 0) _routeRuleList.SelectedIndex = selectedIndex;
