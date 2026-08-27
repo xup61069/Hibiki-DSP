@@ -94,12 +94,12 @@ extern "C" NTSTATUS HibikiWaveRtBuildFormatEndpointV1(
     _In_ ULONG endpoint_index,
     _Out_ WAVEFORMATEXTENSIBLE* format) {
     if (format == nullptr) return STATUS_INVALID_PARAMETER;
+    RtlZeroMemory(format, sizeof(*format));
     hibiki_endpoint_topology_v1 topology{};
     if (hibiki_endpoint_topology_get_v1(endpoint_index, &topology) == 0 ||
         topology.channel_mask > MAXULONG) {
         return STATUS_INVALID_PARAMETER;
     }
-    RtlZeroMemory(format, sizeof(*format));
     format->Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
     format->Format.nChannels = static_cast<WORD>(topology.channel_count);
     format->Format.nSamplesPerSec = topology.sample_rate;
@@ -116,6 +116,8 @@ extern "C" NTSTATUS HibikiWaveRtBuildFormatEndpointV1(
 extern "C" NTSTATUS HibikiWaveRtBuildFormatV1(
     _In_ ULONG endpoint_index,
     _Out_ WAVEFORMATEXTENSIBLE* format) {
+    if (format == nullptr) return STATUS_INVALID_PARAMETER;
+    RtlZeroMemory(format, sizeof(*format));
     hibiki_endpoint_topology_v1 topology{};
     if (hibiki_endpoint_topology_get_v1(endpoint_index, &topology) == 0 ||
         topology.direction != HIBIKI_ENDPOINT_DIRECTION_RENDER_V1) {

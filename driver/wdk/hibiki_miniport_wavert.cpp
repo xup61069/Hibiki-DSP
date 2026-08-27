@@ -403,6 +403,16 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferWithNotification(
     _Out_    ULONG*               ActualSize,
     _Out_    ULONG*               OffsetFromFirstPage,
     _Out_    MEMORY_CACHING_TYPE* CacheType) {
+    if (AudioBufferMdl == nullptr || ActualSize == nullptr ||
+        OffsetFromFirstPage == nullptr || CacheType == nullptr) {
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    *AudioBufferMdl = nullptr;
+    *ActualSize = 0;
+    *OffsetFromFirstPage = 0;
+    *CacheType = MmCached;
+
     if (NotificationCount != 1U && NotificationCount != 2U) {
         return STATUS_INVALID_PARAMETER;
     }
@@ -424,6 +434,11 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferCore(
         return STATUS_INVALID_PARAMETER;
     }
 
+    *AudioBufferMdl = nullptr;
+    *ActualSize = 0;
+    *OffsetFromFirstPage = 0;
+    *CacheType = MmCached;
+
     if (m_Miniport == nullptr || m_PortStream == nullptr) {
         return STATUS_INVALID_DEVICE_STATE;
     }
@@ -431,11 +446,6 @@ NTSTATUS HibikiMiniportWaveRtStreamV1::AllocateBufferCore(
     if (m_StreamInitialized || m_DmaBuffer != nullptr || m_DmaBufferMdl != nullptr) {
         return STATUS_INVALID_DEVICE_STATE;
     }
-
-    *AudioBufferMdl = nullptr;
-    *ActualSize = 0;
-    *OffsetFromFirstPage = 0;
-    *CacheType = MmCached;
 
     hibiki_endpoint_topology_v1 topology{};
     if (hibiki_endpoint_topology_get_v1(m_EndpointIndex, &topology) == 0) {
@@ -703,17 +713,17 @@ STDMETHODIMP_(NTSTATUS) HibikiMiniportWaveRtStreamV1::RegisterNotificationEvent(
 
     KIRQL notificationIrql;
     KeAcquireSpinLock(&m_NotificationLock, &notificationIrql);
-    if (m_NotificationEventCount >= HIBIKI_MAX_NOTIFICATION_EVENTS_V1) {
-        KeReleaseSpinLock(&m_NotificationLock, notificationIrql);
-        return STATUS_INSUFFICIENT_RESOURCES;
-    }
-
-    // Check for duplicates
+    // Registration is idempotent, including when the bounded table is full.
     for (ULONG i = 0; i < m_NotificationEventCount; ++i) {
         if (m_NotificationEvents[i] == NotificationEvent) {
             KeReleaseSpinLock(&m_NotificationLock, notificationIrql);
             return STATUS_SUCCESS;
         }
+    }
+
+    if (m_NotificationEventCount >= HIBIKI_MAX_NOTIFICATION_EVENTS_V1) {
+        KeReleaseSpinLock(&m_NotificationLock, notificationIrql);
+        return STATUS_INSUFFICIENT_RESOURCES;
     }
 
     m_NotificationEvents[m_NotificationEventCount] = NotificationEvent;

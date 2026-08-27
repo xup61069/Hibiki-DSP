@@ -424,7 +424,11 @@ extern "C" NTSTATUS HibikiDataRangeIntersectionEndpointV1(
     _Out_writes_bytes_to_opt_(OutputBufferLength, *ResultantFormatLength)
                 PVOID              ResultantFormat,
     _Out_       PULONG             ResultantFormatLength) {
-    if (ResultantFormatLength == nullptr || DataRange == nullptr || MatchingDataRange == nullptr) {
+    if (ResultantFormatLength == nullptr) {
+        return STATUS_INVALID_PARAMETER;
+    }
+    *ResultantFormatLength = 0;
+    if (DataRange == nullptr || MatchingDataRange == nullptr) {
         return STATUS_INVALID_PARAMETER;
     }
 
@@ -574,6 +578,7 @@ extern "C" NTSTATUS HibikiGetTopologyFilterDescriptorEndpointV1(
     _In_  ULONG                     EndpointIndex,
     _Out_ const PCFILTER_DESCRIPTOR** Description) {
     if (Description == nullptr) return STATUS_INVALID_PARAMETER;
+    *Description = nullptr;
     switch (EndpointIndex) {
         case 0: *Description = &TopoFilterDescriptor_TopoMain; return STATUS_SUCCESS;
         case 1: *Description = &TopoFilterDescriptor_TopoLowLatency; return STATUS_SUCCESS;
