@@ -13,7 +13,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 function Assert-LiveSystemVolumeWriteTestOptIn([bool]$writeTest, [bool]$selfTest) {
   if (-not $writeTest -and -not $selfTest) {
-    throw 'This opt-in probe writes a temporary -3 dB change and restores it. Re-run with -WriteTest to confirm.'
+    throw 'This opt-in probe chooses a device-safe attenuation or mute without raising volume, restores every successful temporary change, and may report unavailable without mutation. Re-run with -WriteTest to confirm.'
   }
 }
 
@@ -159,12 +159,19 @@ function Assert-LiveSystemVolumePath {
 $repo = Split-Path -Parent $PSScriptRoot
 if ($SelfTest) {
   $guardCaught = $false
+  $guardMessage = ''
   try {
     Assert-LiveSystemVolumeWriteTestOptIn $false $false
   } catch {
-    $guardCaught = $_.Exception.Message -match 'Re-run with -WriteTest'
+    $guardMessage = $_.Exception.Message
+    $guardCaught = $guardMessage -match 'device-safe attenuation or mute' -and
+      $guardMessage -match 'without raising volume' -and
+      $guardMessage -match 'restores every successful temporary change' -and
+      $guardMessage -match 'may report unavailable without mutation' -and
+      $guardMessage -match 'Re-run with -WriteTest' -and
+      $guardMessage -notmatch '-3 dB'
   }
-  if (-not $guardCaught) { throw 'Live system-volume self-test expected WriteTest opt-in rejection.' }
+  if (-not $guardCaught) { throw "Live system-volume self-test expected current WriteTest safety guidance, got: '$guardMessage'." }
   Assert-LiveSystemVolumeWriteTestOptIn $false $true
 
   $directPlan = Get-LiveSystemVolumePlan $repo $true
