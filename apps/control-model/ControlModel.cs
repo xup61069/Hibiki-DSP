@@ -234,7 +234,7 @@ public static class ScenePresetCatalog
     public static IReadOnlyList<SceneCard> EasyDefaults { get; } =
     [
         new("game", "遊戲", "快速反應、低延遲與智慧保護", "零額外緩衝", true),
-        new("movie", "電影", "完整校正、對白清楚與安全音量", "影音同步補償", true),
+        new("movie", "電影", "等響度 EQ、內容驅動低頻自適應與安全音量", "影音同步補償", true),
         new("voice", "人聲", "降低風聲與背景干擾", "平衡", true),
         new("studio", "Studio / Direct", "維持原始訊號，不加入處理", "Strict Direct", false)
     ];
