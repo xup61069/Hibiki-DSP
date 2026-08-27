@@ -1435,6 +1435,8 @@ int wmain(const int argc, wchar_t* const* argv) {
         has_command_line_flag(argc, argv, L"--enable-process-delivery");
     const bool tab_bridge_requested =
         has_command_line_flag(argc, argv, L"--enable-tab-bridge");
+    const bool tab_bass_correction_requested =
+        has_command_line_flag(argc, argv, L"--enable-tab-bass-correction");
     const bool tab_noise_suppressor_requested =
         has_command_line_flag(argc, argv, L"--enable-tab-noise-suppressor");
     const bool driver_loopback_requested =
@@ -1482,6 +1484,14 @@ int wmain(const int argc, wchar_t* const* argv) {
     if (tab_bridge_requested && !wasapi_output_requested) {
         // Fail-closed: tab bridge requires a WASAPI sink to be meaningful.
         // Refuse to start rather than silently running with a half-enabled path.
+        (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+        return 2;
+    }
+    if (tab_bass_correction_requested && !tab_bridge_requested) {
+        // Fail-closed: the adaptive tab policy only has meaning for the
+        // explicitly requested browser-tab source.
+        std::fwprintf(stderr,
+                      L"error: --enable-tab-bass-correction requires --enable-tab-bridge.\n");
         (void)SetConsoleCtrlHandler(on_console_control, FALSE);
         return 2;
     }
@@ -1697,6 +1707,7 @@ int wmain(const int argc, wchar_t* const* argv) {
     std::string tab_bridge_detail = tab_bridge_requested
         ? "tab bridge requested; binding loopback listener..."
         : "tab bridge disabled; Preview will not accept browser packets.";
+    bool tab_bass_correction_active = false;
     if (wasapi_started && tab_bridge_requested) {
         // Dedicated tab-capture lane routed to the main output group. This is
         // the graph the merged host was missing: without it the adapter
@@ -1718,6 +1729,30 @@ int wmain(const int argc, wchar_t* const* argv) {
             engine.rollback_graph();
             (void)SetConsoleCtrlHandler(on_console_control, FALSE);
             return 2;
+        }
+        if (tab_bass_correction_requested) {
+            // Keep this attachment inside AudioEngineModel rather than on the
+            // bridge adapter. That makes the same committed controller own
+            // both the RT bass correction and the confirmed source=2 EQ
+            // visual snapshot published by EngineControlWorkerV1.
+            hibiki::ProgramAwareLevelPolicyV1 tab_bass_policy{};
+            tab_bass_policy.enabled = true;
+            tab_bass_policy.target_dbfs = -23.0;
+            tab_bass_policy.max_boost_db = 0.0;
+            tab_bass_policy.max_cut_db = 0.0;
+            tab_bass_policy.analysis_window_ms = 2000.0;
+            tab_bass_policy.max_rate_db_per_second = 6.0;
+            tab_bass_policy.silence_gate_dbfs = -70.0;
+            tab_bass_policy.bass_correction_enabled = true;
+            tab_bass_policy.bass_max_cut_db = 4.0;
+            tab_bass_policy.night_compression_enabled = false;
+            if (!engine.prepare_program_aware("main", tab_bass_policy) ||
+                !engine.commit_program_aware()) {
+                engine.rollback_program_aware();
+                (void)SetConsoleCtrlHandler(on_console_control, FALSE);
+                return 2;
+            }
+            tab_bass_correction_active = true;
         }
     }
     const bool tab_bridge_started = wasapi_started && tab_bridge.requested;
@@ -1751,6 +1786,10 @@ int wmain(const int argc, wchar_t* const* argv) {
             } else {
                 tab_bridge_route_detail =
                     "loopback listener bound; waiting for browser capture.";
+            }
+            if (tab_bass_correction_active) {
+                tab_bridge_route_detail +=
+                    " adaptive bass correction armed; curve follows telemetry.";
             }
             tab_bridge_detail = tab_bridge_route_detail;
         } else {
