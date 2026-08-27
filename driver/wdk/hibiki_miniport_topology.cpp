@@ -11,6 +11,10 @@ HibikiMiniportTopologyV1::HibikiMiniportTopologyV1()
 }
 
 HibikiMiniportTopologyV1::~HibikiMiniportTopologyV1() {
+    if (m_Port != nullptr) {
+        m_Port->Release();
+        m_Port = nullptr;
+    }
 }
 
 STDMETHODIMP HibikiMiniportTopologyV1::QueryInterface(
@@ -87,6 +91,12 @@ STDMETHODIMP HibikiMiniportTopologyV1::Init(
     if (Port == nullptr || m_FilterDescriptor == nullptr) {
         return STATUS_INVALID_PARAMETER;
     }
+
+    if (m_Port != nullptr) {
+        return STATUS_INVALID_DEVICE_STATE;
+    }
+
     m_Port = Port;
+    m_Port->AddRef();
     return STATUS_SUCCESS;
 }
