@@ -8,6 +8,8 @@ param(
   [switch]$EnableSystemVolume,
   [switch]$EnableSessionRouting,
   [switch]$EnableWasapiOutput,
+  [switch]$EnableTabBridge,
+  [switch]$EnableTabBassCorrection,
   [switch]$SelfTest
 )
 
@@ -55,11 +57,25 @@ function Resolve-SelectedUi {
 }
 
 function Get-EngineArguments {
-  param([bool]$SystemVolume, [bool]$SessionRouting, [bool]$WasapiOutput)
+  param(
+    [bool]$SystemVolume,
+    [bool]$SessionRouting,
+    [bool]$WasapiOutput,
+    [bool]$TabBridge = $false,
+    [bool]$TabBassCorrection = $false
+  )
+  if ($TabBridge -and -not $WasapiOutput) {
+    throw 'TabBridge requires WasapiOutput.'
+  }
+  if ($TabBassCorrection -and -not $TabBridge) {
+    throw 'TabBassCorrection requires TabBridge.'
+  }
   $engineArguments = @()
   if ($SystemVolume) { $engineArguments += '--enable-system-volume' }
   if ($SessionRouting) { $engineArguments += '--enable-session-routing' }
   if ($WasapiOutput) { $engineArguments += '--enable-wasapi-output' }
+  if ($TabBridge) { $engineArguments += '--enable-tab-bridge' }
+  if ($TabBassCorrection) { $engineArguments += '--enable-tab-bass-correction' }
   return , $engineArguments
 }
 
@@ -206,7 +222,8 @@ if ($SelfTest) {
   $caseCount++
 
   # Case 11: all engine flags off produce no arguments.
-  $arguments = Get-EngineArguments -SystemVolume:$false -SessionRouting:$false -WasapiOutput:$false
+  $arguments = Get-EngineArguments -SystemVolume:$false -SessionRouting:$false -WasapiOutput:$false `
+    -TabBridge:$false -TabBassCorrection:$false
   if (@($arguments).Count -ne 0) { throw "run-preview self-test case 'engine-args-none' expected zero arguments, got: $($arguments -join ' ')." }
   $caseCount++
 
@@ -217,7 +234,8 @@ if ($SelfTest) {
     @{ SystemVolume = $false; SessionRouting = $false; WasapiOutput = $true;  Expected = '--enable-wasapi-output' }
   )
   foreach ($entry in $singleCases) {
-    $arguments = Get-EngineArguments -SystemVolume:$entry.SystemVolume -SessionRouting:$entry.SessionRouting -WasapiOutput:$entry.WasapiOutput
+    $arguments = Get-EngineArguments -SystemVolume:$entry.SystemVolume -SessionRouting:$entry.SessionRouting `
+      -WasapiOutput:$entry.WasapiOutput -TabBridge:$false -TabBassCorrection:$false
     if (@($arguments).Count -ne 1 -or $arguments[0] -ne $entry.Expected) {
       throw ("run-preview self-test case 'engine-args-single' expected [{0}], got: {1}.") -f $entry.Expected, ($arguments -join ' ')
     }
@@ -225,11 +243,26 @@ if ($SelfTest) {
   }
 
   # Case 15: all flags on produce the exact ordered tokens.
-  $arguments = Get-EngineArguments -SystemVolume:$true -SessionRouting:$true -WasapiOutput:$true
+  $arguments = Get-EngineArguments -SystemVolume:$true -SessionRouting:$true -WasapiOutput:$true `
+    -TabBridge:$false -TabBassCorrection:$false
   $expectedAll = @('--enable-system-volume', '--enable-session-routing', '--enable-wasapi-output')
   if (($arguments -join ' ') -ne ($expectedAll -join ' ')) {
     throw "run-preview self-test case 'engine-args-all' expected [$($expectedAll -join ' ')], got: $($arguments -join ' ')."
   }
+  $caseCount++
+
+  # Case 16: tab capture plus explicit adaptive bass correction emits both
+  # ordered engine flags and cannot be requested without the tab source.
+  $arguments = Get-EngineArguments -SystemVolume:$false -SessionRouting:$false -WasapiOutput:$true `
+    -TabBridge:$true -TabBassCorrection:$true
+  $expectedTab = @('--enable-wasapi-output', '--enable-tab-bridge', '--enable-tab-bass-correction')
+  if (($arguments -join ' ') -ne ($expectedTab -join ' ')) {
+    throw "run-preview self-test case 'engine-args-tab-bass' expected [$($expectedTab -join ' ')], got: $($arguments -join ' ')."
+  }
+  $caseCount++
+  Assert-GateRejection -Label 'tab-bass-without-tab-bridge' -ExpectedPattern 'TabBassCorrection requires TabBridge' `
+    -Action { Get-EngineArguments -SystemVolume:$false -SessionRouting:$false -WasapiOutput:$true `
+      -TabBridge:$false -TabBassCorrection:$true }
   $caseCount++
 
   $selfTestLocalRoot = Join-Path $repo '.local'
@@ -294,10 +327,15 @@ if (@(Get-Process -Name hibiki_engine_preview -ErrorAction SilentlyContinue).Cou
   throw 'Another Engine Preview process is already running; close it before starting the combined preview.'
 }
 
-$engineArguments = @()
-if ($EnableSystemVolume) { $engineArguments += '--enable-system-volume' }
-if ($EnableSessionRouting) { $engineArguments += '--enable-session-routing' }
-if ($EnableWasapiOutput) { $engineArguments += '--enable-wasapi-output' }
+if ($EnableTabBridge -and -not $EnableWasapiOutput) {
+  throw 'EnableTabBridge requires EnableWasapiOutput.'
+}
+if ($EnableTabBassCorrection -and -not $EnableTabBridge) {
+  throw 'EnableTabBassCorrection requires EnableTabBridge.'
+}
+$engineArguments = Get-EngineArguments -SystemVolume:$EnableSystemVolume `
+  -SessionRouting:$EnableSessionRouting -WasapiOutput:$EnableWasapiOutput `
+  -TabBridge:$EnableTabBridge -TabBassCorrection:$EnableTabBassCorrection
 $localRoot = Join-Path $repo '.local'
 $engineItem = Get-Item -LiteralPath $engine -Force -ErrorAction Stop
 $engineAncestors = Get-PreviewAncestorAttributes -Path $engine -Root $localRoot
