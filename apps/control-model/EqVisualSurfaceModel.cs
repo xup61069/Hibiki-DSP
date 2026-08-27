@@ -85,7 +85,9 @@ public sealed class EqVisualSurfaceModelV1 : INotifyPropertyChanged
             return Source switch
             {
                 EqVisualSourceV1.EqualLoudness => "等響度補償已更新",
-                EqVisualSourceV1.AdaptiveCorrection => "自適應低頻校正已更新",
+                EqVisualSourceV1.AdaptiveCorrection => _targetPoints.Count > 0
+                    ? $"自適應低頻校正已更新（{_targetPoints[0].FrequencyHz:0.#} Hz {_targetPoints[0].GainDb:+0.0;-0.0;0.0} dB）"
+                    : "自適應低頻校正已更新",
                 _ => "等化器狀態已同步",
             };
         }
