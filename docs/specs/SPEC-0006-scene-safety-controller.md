@@ -41,3 +41,6 @@ audio callback 直接呼叫 COM、寫 registry 或配置記憶體。
 
 內容感知 loudness（BS.1770/LUFS）、equal-loudness 曲線、limiter DSP 與實際
 `IAudioEndpointVolume` 寫入各由既有 volume／equal-loudness／Windows adapter 契約負責。
+Program-aware 的 night-mode 壓縮（`night_compression_enabled`）是 SPEC-0002
+定義的有界內容音量 proxy，不是本規格的 scene-safety action、peak limiter 或
+實體輸出安全證據；本規格不定義其演算法或 telemetry。

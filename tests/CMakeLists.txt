@@ -367,6 +367,20 @@ endif()
 
 add_test(NAME hibiki_ipc_codec_tests COMMAND hibiki_ipc_codec_tests)
 
+add_executable(hibiki_engine_control_tests
+  unit/engine_control_dispatch_tests.cpp
+)
+
+target_link_libraries(hibiki_engine_control_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_engine_control_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_engine_control_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_engine_control_tests COMMAND hibiki_engine_control_tests)
+
 add_executable(hibiki_calibration_compiler_tests
   unit/calibration_compiler_tests.cpp
 )
@@ -394,6 +408,21 @@ else()
 endif()
 
 add_test(NAME hibiki_calibration_anchor_tests COMMAND hibiki_calibration_anchor_tests)
+
+
+add_executable(hibiki_vst3_sandbox_launch_tests
+  unit/vst3_sandbox_launch_tests.cpp
+)
+
+target_link_libraries(hibiki_vst3_sandbox_launch_tests PRIVATE hibiki_hub hibiki_vst_host)
+
+if(MSVC)
+  target_compile_options(hibiki_vst3_sandbox_launch_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_vst3_sandbox_launch_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_vst3_sandbox_launch_tests COMMAND hibiki_vst3_sandbox_launch_tests)
 
 
 add_executable(hibiki_exporters_tests
@@ -449,6 +478,19 @@ endif()
 
 add_test(NAME hibiki_session_catalog_snapshot_tests COMMAND hibiki_session_catalog_snapshot_tests)
 
+add_executable(hibiki_control_plane_service_tests
+  unit/control_plane_service_tests.cpp
+)
+
+target_link_libraries(hibiki_control_plane_service_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_control_plane_service_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_control_plane_service_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_control_plane_service_tests COMMAND hibiki_control_plane_service_tests)
 
 add_executable(hibiki_ipc_pipe_tests
   unit/ipc_pipe_server_tests.cpp
@@ -463,6 +505,33 @@ else()
 endif()
 
 add_test(NAME hibiki_ipc_pipe_tests COMMAND hibiki_ipc_pipe_tests)
+add_executable(hibiki_scene_catalog_tests
+  unit/scene_catalog_tests.cpp
+)
+
+target_link_libraries(hibiki_scene_catalog_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_scene_catalog_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_scene_catalog_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_scene_catalog_tests COMMAND hibiki_scene_catalog_tests)
+
+add_executable(hibiki_scene_catalog_id_tests
+  unit/scene_catalog_id_tests.cpp
+)
+
+target_link_libraries(hibiki_scene_catalog_id_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_scene_catalog_id_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_scene_catalog_id_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_scene_catalog_id_tests COMMAND hibiki_scene_catalog_id_tests)
 
 add_executable(hibiki_scene_graph_tests
   unit/scene_graph_tests.cpp
@@ -522,6 +591,21 @@ else()
 endif()
 
 add_test(NAME hibiki_output_handoff_tests COMMAND hibiki_output_handoff_tests)
+
+add_executable(hibiki_session_route_graph_tests
+  unit/session_route_graph_tests.cpp
+)
+
+target_link_libraries(hibiki_session_route_graph_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_session_route_graph_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_session_route_graph_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_session_route_graph_tests COMMAND hibiki_session_route_graph_tests)
+
 
 if(WIN32)
   add_executable(hibiki_windows_device_watcher_tests
@@ -586,6 +670,21 @@ else()
 endif()
 
 add_test(NAME hibiki_control_plane_tests COMMAND hibiki_control_plane_tests)
+
+
+add_executable(hibiki_control_volume_dispatch_tests
+  unit/control_volume_dispatch_tests.cpp
+)
+
+target_link_libraries(hibiki_control_volume_dispatch_tests PRIVATE hibiki_hub)
+
+if(MSVC)
+  target_compile_options(hibiki_control_volume_dispatch_tests PRIVATE /W4 /permissive- /EHsc)
+else()
+  target_compile_options(hibiki_control_volume_dispatch_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+add_test(NAME hibiki_control_volume_dispatch_tests COMMAND hibiki_control_volume_dispatch_tests)
 
 
 if(HIBIKI_BUILD_LIVE_PROBES AND WIN32)
