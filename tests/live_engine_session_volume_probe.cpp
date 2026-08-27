@@ -441,7 +441,10 @@ int wmain() {
     IAudioRenderClient* render = nullptr;
     PipeClient pipe;
     std::uint64_t request_id = 100U;
-    bool changed = false;
+    // Arm cleanup before issuing the write. An acknowledged write can still
+    // lose its later catalog readback, so cleanup must assume the temporary
+    // session may already have changed until restoration is confirmed.
+    bool restore_required = false;
     bool passed = false;
     double original_db = -144.0;
     double attenuated_db = -144.0;
@@ -450,7 +453,7 @@ int wmain() {
     SessionReadingV1 latest{};
 
     auto restore = [&]() noexcept -> bool {
-        if (!changed) return true;
+        if (!restore_required) return true;
         SessionReadingV1 current{};
         if (!wait_for_catalog(pipe, request_id, current) ||
             !send_volume_command(pipe, request_id++, current, original_db, original_mute) ||
@@ -458,7 +461,7 @@ int wmain() {
             return false;
         }
         restored_db = current.requested_db;
-        changed = false;
+        restore_required = false;
         return close_db(restored_db, original_db) && current.mute == original_mute;
     };
 
@@ -499,6 +502,7 @@ int wmain() {
         original_db = current.requested_db;
         original_mute = current.mute;
         const double target_db = std::max(-144.0, original_db - 3.0);
+        restore_required = true;
         if (!send_volume_command(pipe, request_id++, current, target_db, original_mute)) {
             std::printf("session_volume_engine_live=fail reason=queue-write\n");
             break;
@@ -507,7 +511,6 @@ int wmain() {
             std::printf("session_volume_engine_live=fail reason=queue-readback\n");
             break;
         }
-        changed = true;
         attenuated_db = latest.requested_db;
         if (!close_db(attenuated_db, target_db) || attenuated_db > original_db + 0.5 ||
             latest.mute != original_mute) {
