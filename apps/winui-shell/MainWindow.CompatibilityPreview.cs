@@ -18,9 +18,19 @@ public sealed partial class MainWindow
     private readonly StackPanel _compatibilityCustomSceneList = new() { Spacing = 8 };
     private readonly StackPanel _compatibilityRouteRuleList = new() { Spacing = 8 };
 
-    private static T ResolveThemeResource<T>(string key) where T : class
+    private static void PolishCompatibilityControl(Control control)
     {
-        return Application.Current.Resources.TryGetValue(key, out var value) && value is T typed ? typed : null!;
+        // Keep layout polish to properties supported by the fallback host.
+        // CornerRadius and custom XAML brushes are target-shell features and
+        // can fail-fast when the compiled XAML resources are unavailable.
+        control.Margin = new Thickness(0, 2, 0, 2);
+        control.MinHeight = 40;
+        if (control is Button button)
+            button.Padding = new Thickness(16, 8, 16, 8);
+        else if (control is TextBox textBox)
+            textBox.Padding = new Thickness(12, 8, 12, 8);
+        else if (control is ComboBox comboBox)
+            comboBox.Padding = new Thickness(10, 0, 10, 0);
     }
 
     private Grid BuildCompatibilityPreview()
@@ -29,8 +39,12 @@ public sealed partial class MainWindow
         {
             Padding = new Thickness(28, 24, 28, 20),
             DataContext = ViewModel,
+            Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 244, 247, 251)),
+            // The fallback host does not load App.xaml resources. Keep its
+            // controls on a deterministic light surface instead of inheriting
+            // a dark system theme and rendering as a black page.
+            RequestedTheme = ElementTheme.Light,
         };
-        SystemBackdrop = new MicaBackdrop { Kind = Microsoft.UI.Composition.SystemBackdrops.MicaKind.Base };
 
         var content = new StackPanel
         {
@@ -42,27 +56,39 @@ public sealed partial class MainWindow
         content.Children.Add(new TextBlock
         {
             Text = "Hibiki DSP",
-            Style = ResolveThemeResource<Style>("TitleTextBlockStyle"),
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
         });
         content.Children.Add(new TextBlock
         {
             Text = "Compatibility Preview — 本機控制模型展示；不含虛擬 driver、系統攔截或正式品質驗證。",
             TextWrapping = TextWrapping.Wrap,
-            Foreground = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush"),
         });
+        content.Children.Add(new TextBlock
+        {
+            Text = "連線與工作區",
+            FontSize = 16,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Margin = new Thickness(0, 8, 0, 0),
+        });
+
+        void Add(UIElement element)
+        {
+            if (element is Control control) PolishCompatibilityControl(control);
+            content.Children.Add(element);
+        }
 
         var connection = new Button { Content = "連接預覽引擎" };
         AutomationProperties.SetName(connection, "連接 Hibiki 預覽引擎");
         connection.Click += OnConnectClick;
-        content.Children.Add(connection);
-        content.Children.Add(BoundText("ConnectionStatusText"));
+        Add(connection);
+        Add(BoundText("ConnectionStatusText"));
 
-        content.Children.Add(new TextBlock
+        Add(new TextBlock
         {
             Text = "輸出群組",
-            Style = ResolveThemeResource<Style>("SubtitleTextBlockStyle"),
+            FontSize = 16,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Margin = new Thickness(0, 8, 0, 0),
         });
         var outputGroup = new ComboBox
         {
@@ -72,13 +98,14 @@ public sealed partial class MainWindow
         AutomationProperties.SetName(outputGroup, "輸出群組");
         outputGroup.SetBinding(ItemsControl.ItemsSourceProperty, BindingFor("OutputGroups"));
         outputGroup.SetBinding(Selector.SelectedValueProperty, TwoWayBindingFor("SelectedOutputGroup"));
-        content.Children.Add(outputGroup);
+        Add(outputGroup);
 
-        content.Children.Add(new TextBlock
+        Add(new TextBlock
         {
             Text = "場景",
-            Style = ResolveThemeResource<Style>("SubtitleTextBlockStyle"),
+            FontSize = 16,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Margin = new Thickness(0, 8, 0, 0),
         });
         var sceneSelector = new ComboBox
         {
@@ -90,69 +117,86 @@ public sealed partial class MainWindow
         sceneSelector.SetBinding(ItemsControl.ItemsSourceProperty, BindingFor("Scenes"));
         sceneSelector.SetBinding(ComboBox.SelectedItemProperty, BindingFor("SelectedScene"));
         sceneSelector.SelectionChanged += OnCompatibilitySceneSelect;
-        content.Children.Add(sceneSelector);
+        Add(sceneSelector);
 
+        Add(new TextBlock
+        {
+            Text = "自訂場景",
+            FontSize = 16,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Margin = new Thickness(0, 16, 0, 0),
+        });
         AutomationProperties.SetName(_compatibilityCustomSceneList, "自訂場景列表");
-        content.Children.Add(_compatibilityCustomSceneList);
+        Add(_compatibilityCustomSceneList);
         var customSceneIdBox = new TextBox { Header = "Scene ID（英文小寫）", PlaceholderText = "例如 game-bgm" };
         AutomationProperties.SetName(customSceneIdBox, "自訂場景 ID");
         customSceneIdBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("CustomSceneId"));
-        content.Children.Add(customSceneIdBox);
+        Add(customSceneIdBox);
         var customSceneNameBox = new TextBox { Header = "名稱" };
         AutomationProperties.SetName(customSceneNameBox, "自訂場景名稱");
         customSceneNameBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("CustomSceneName"));
-        content.Children.Add(customSceneNameBox);
+        Add(customSceneNameBox);
         var customSceneDescriptionBox = new TextBox { Header = "說明" };
         AutomationProperties.SetName(customSceneDescriptionBox, "自訂場景說明");
         customSceneDescriptionBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("CustomSceneDescription"));
-        content.Children.Add(customSceneDescriptionBox);
+        Add(customSceneDescriptionBox);
         var addCustomSceneButton = new Button { Content = "加入自訂場景" };
         AutomationProperties.SetName(addCustomSceneButton, "加入自訂場景");
         addCustomSceneButton.Click += OnCompatibilityAddCustomSceneClick;
-        content.Children.Add(addCustomSceneButton);
-        content.Children.Add(BoundText("StatusText"));
+        Add(addCustomSceneButton);
+        Add(BoundText("StatusText"));
         ViewModel.PropertyChanged += OnCompatibilityViewModelPropertyChanged;
         Closed += OnCompatibilityPreviewClosed;
         SyncCompatibilityCustomScenes();
 
+        Add(new TextBlock
+        {
+            Text = "音量保護與快速改善",
+            FontSize = 16,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Margin = new Thickness(0, 16, 0, 0),
+        });
         var enhance = new Button { Content = "一鍵改善" };
         AutomationProperties.SetName(enhance, "一鍵改善聲音");
         enhance.Click += OnEnhanceClick;
-        content.Children.Add(enhance);
-        content.Children.Add(BoundText("StatusText"));
+        Add(enhance);
+        Add(BoundText("StatusText"));
 
-        content.Children.Add(new TextBlock
+        Add(new TextBlock
         {
             Text = "音量保護",
-            Style = ResolveThemeResource<Style>("SubtitleTextBlockStyle"),
+            FontSize = 16,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Margin = new Thickness(0, 8, 0, 0),
         });
         var prepareIrButton = new Button { Content = "選擇並準備 IR WAV 檔" };
         AutomationProperties.SetName(prepareIrButton, "準備 IR WAV 檔案");
         prepareIrButton.Click += OnPrepareIrClick;
-        content.Children.Add(prepareIrButton);
-        content.Children.Add(BoundText("IrPrepareStatus"));
-        content.Children.Add(new TextBlock
+        Add(prepareIrButton);
+        Add(BoundText("IrPrepareStatus"));
+        Add(new TextBlock
         {
             Text = "路由狀態",
-            Style = ResolveThemeResource<Style>("SubtitleTextBlockStyle"),
+            FontSize = 16,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Margin = new Thickness(0, 8, 0, 0),
         });
         var routeSummary = new TextBlock { TextWrapping = TextWrapping.Wrap };
         AutomationProperties.SetName(routeSummary, "路由健康狀態摘要");
         routeSummary.SetBinding(TextBlock.TextProperty, BindingFor("Expert.RouteHealthAccessibleSummary"));
-        content.Children.Add(routeSummary);
+        Add(routeSummary);
 
-        content.Children.Add(new TextBlock
+        Add(new TextBlock
         {
             Text = "App 工作階段（需以 -EnableSessionRouting 啟動引擎）",
-            Style = ResolveThemeResource<Style>("SubtitleTextBlockStyle"),
+            FontSize = 16,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Margin = new Thickness(0, 16, 0, 0),
         });
-        content.Children.Add(new TextBlock
+        Add(new TextBlock
         {
             Text = "只顯示 bounded metadata；套用 App 音量會寫入 Windows session，實體 per-App 重新送出仍未驗證。",
             TextWrapping = TextWrapping.Wrap,
-            Foreground = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush"),
         });
         var sessionSelector = new ComboBox { Header = "選取 Expert App", MinWidth = 280 };
         AutomationProperties.SetName(sessionSelector, "選取 Expert App");
@@ -161,15 +205,15 @@ public sealed partial class MainWindow
         sessionSelector.SetBinding(ItemsControl.ItemsSourceProperty, BindingFor("SessionCatalog"));
         sessionSelector.SetBinding(Selector.SelectedValueProperty, TwoWayBindingFor("SelectedSessionHandle"));
         sessionSelector.SelectionChanged += OnCompatibilitySessionSelect;
-        content.Children.Add(sessionSelector);
+        Add(sessionSelector);
         var refreshSessionsButton = new Button { Content = "刷新 App 清單" };
         AutomationProperties.SetName(refreshSessionsButton, "刷新 App 工作階段清單");
         refreshSessionsButton.Click += OnCompatibilityRefreshSessionsClick;
-        content.Children.Add(refreshSessionsButton);
-        content.Children.Add(BoundText("SelectedSessionDisplayText"));
-        content.Children.Add(BoundText("SessionCatalogSequenceDisplayText"));
-        content.Children.Add(BoundText("SelectedRouteRuleSummary"));
-        content.Children.Add(BoundText("SessionVolumeDisplayText"));
+        Add(refreshSessionsButton);
+        Add(BoundText("SelectedSessionDisplayText"));
+        Add(BoundText("SessionCatalogSequenceDisplayText"));
+        Add(BoundText("SelectedRouteRuleSummary"));
+        Add(BoundText("SessionVolumeDisplayText"));
 
         var sessionVolumeSlider = new Slider
         {
@@ -180,63 +224,63 @@ public sealed partial class MainWindow
         };
         AutomationProperties.SetName(sessionVolumeSlider, "選取 App 音量分貝");
         sessionVolumeSlider.SetBinding(RangeBase.ValueProperty, TwoWayBindingFor("SessionVolumeDb"));
-        content.Children.Add(sessionVolumeSlider);
+        Add(sessionVolumeSlider);
         var sessionMuteCheck = new CheckBox { Content = "靜音選取 App" };
         AutomationProperties.SetName(sessionMuteCheck, "靜音選取的 App 工作階段");
         sessionMuteCheck.SetBinding(CheckBox.IsCheckedProperty, TwoWayBindingFor("SessionMuted"));
-        content.Children.Add(sessionMuteCheck);
+        Add(sessionMuteCheck);
         var applySessionVolumeButton = new Button { Content = "套用選取 App 音量" };
         AutomationProperties.SetName(applySessionVolumeButton, "套用選取 App 的音量與靜音設定");
         applySessionVolumeButton.Click += OnCompatibilityApplySessionVolumeClick;
-        content.Children.Add(applySessionVolumeButton);
+        Add(applySessionVolumeButton);
 
         var sessionLaneBox = new TextBox { Header = "App 路由 Lane ID" };
         AutomationProperties.SetName(sessionLaneBox, "選取 App 路由 Lane ID");
         sessionLaneBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("SessionRouteLaneId"));
-        content.Children.Add(sessionLaneBox);
+        Add(sessionLaneBox);
         var sessionOutputGroupBox = new TextBox { Header = "App 路由 Output Group（main／low-latency／surround）" };
         AutomationProperties.SetName(sessionOutputGroupBox, "選取 App 路由 Output Group");
         sessionOutputGroupBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("SessionRouteOutputGroup"));
-        content.Children.Add(sessionOutputGroupBox);
+        Add(sessionOutputGroupBox);
         var applySessionRouteButton = new Button { Content = "套用選取 App 路由" };
         AutomationProperties.SetName(applySessionRouteButton, "套用選取 App 的路由設定");
         applySessionRouteButton.Click += OnCompatibilityApplySessionRouteClick;
-        content.Children.Add(applySessionRouteButton);
+        Add(applySessionRouteButton);
 
-        content.Children.Add(new TextBlock
+        Add(new TextBlock
         {
             Text = "App 路由預設（Expert）",
-            Style = ResolveThemeResource<Style>("SubtitleTextBlockStyle"),
+            FontSize = 16,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Margin = new Thickness(0, 16, 0, 0),
         });
-        content.Children.Add(new TextBlock
+        Add(new TextBlock
         {
             Text = "建立後會保存到本機；只有 App 清單已同步且引擎回覆 Ack，才會顯示為已套用。App ID 或顯示名稱至少填一項。",
             TextWrapping = TextWrapping.Wrap,
-            Foreground = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush"),
         });
         AutomationProperties.SetName(_compatibilityRouteRuleList, "App 路由預設列表");
-        content.Children.Add(_compatibilityRouteRuleList);
+        Add(_compatibilityRouteRuleList);
         var routeRuleIdBox = new TextBox { Header = "預設 ID（小寫英文／數字／- _ .）" };
         AutomationProperties.SetName(routeRuleIdBox, "App 路由預設 ID");
         routeRuleIdBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("RouteRuleId"));
-        content.Children.Add(routeRuleIdBox);
+        Add(routeRuleIdBox);
         var routeRuleAppIdBox = new TextBox { Header = "App ID（例如 game.exe，可留空）" };
         AutomationProperties.SetName(routeRuleAppIdBox, "App 路由預設 App ID");
         routeRuleAppIdBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("RouteRuleAppId"));
-        content.Children.Add(routeRuleAppIdBox);
+        Add(routeRuleAppIdBox);
         var routeRuleDisplayNameBox = new TextBox { Header = "顯示名稱（可留空）" };
         AutomationProperties.SetName(routeRuleDisplayNameBox, "App 路由預設顯示名稱");
         routeRuleDisplayNameBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("RouteRuleDisplayName"));
-        content.Children.Add(routeRuleDisplayNameBox);
+        Add(routeRuleDisplayNameBox);
         var routeRuleLaneBox = new TextBox { Header = "Lane ID" };
         AutomationProperties.SetName(routeRuleLaneBox, "App 路由預設 Lane ID");
         routeRuleLaneBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("RouteRuleLaneId"));
-        content.Children.Add(routeRuleLaneBox);
+        Add(routeRuleLaneBox);
         var routeRuleOutputBox = new TextBox { Header = "Output Group（main／low-latency／surround）" };
         AutomationProperties.SetName(routeRuleOutputBox, "App 路由預設 Output Group");
         routeRuleOutputBox.SetBinding(TextBox.TextProperty, TwoWayBindingFor("RouteRuleOutputGroup"));
-        content.Children.Add(routeRuleOutputBox);
+        Add(routeRuleOutputBox);
         var routeRulePriorityBox = new NumberBox
         {
             Header = "優先級",
@@ -246,7 +290,7 @@ public sealed partial class MainWindow
         };
         AutomationProperties.SetName(routeRulePriorityBox, "App 路由預設優先級");
         routeRulePriorityBox.SetBinding(NumberBox.ValueProperty, TwoWayBindingFor("RouteRulePriority"));
-        content.Children.Add(routeRulePriorityBox);
+        Add(routeRulePriorityBox);
         var routeRuleGainBox = new NumberBox
         {
             Header = "補償增益 dB",
@@ -257,26 +301,33 @@ public sealed partial class MainWindow
         };
         AutomationProperties.SetName(routeRuleGainBox, "App 路由預設補償增益分貝");
         routeRuleGainBox.SetBinding(NumberBox.ValueProperty, TwoWayBindingFor("RouteRuleMakeupGainDb"));
-        content.Children.Add(routeRuleGainBox);
+        Add(routeRuleGainBox);
         var routeRuleEnabledCheck = new CheckBox { Content = "啟用預設" };
         AutomationProperties.SetName(routeRuleEnabledCheck, "啟用 App 路由預設");
         routeRuleEnabledCheck.SetBinding(CheckBox.IsCheckedProperty, TwoWayBindingFor("RouteRuleEnabled"));
-        content.Children.Add(routeRuleEnabledCheck);
+        Add(routeRuleEnabledCheck);
         var routeRuleGainOwnerSelector = new ComboBox { Header = "增益控制者" };
         AutomationProperties.SetName(routeRuleGainOwnerSelector, "App 路由預設增益控制者");
         routeRuleGainOwnerSelector.SetBinding(ItemsControl.ItemsSourceProperty, BindingFor("RouteRuleGainOwners"));
         routeRuleGainOwnerSelector.SetBinding(Selector.SelectedItemProperty, TwoWayBindingFor("RouteRuleGainOwner"));
-        content.Children.Add(routeRuleGainOwnerSelector);
+        Add(routeRuleGainOwnerSelector);
         var applyRouteRuleButton = new Button { Content = "新增／更新預設" };
         AutomationProperties.SetName(applyRouteRuleButton, "新增或更新 App 路由預設");
         applyRouteRuleButton.Click += OnCompatibilityApplyRouteRuleClick;
-        content.Children.Add(applyRouteRuleButton);
+        Add(applyRouteRuleButton);
         var clearRouteRulesButton = new Button { Content = "清除全部預設" };
         AutomationProperties.SetName(clearRouteRulesButton, "清除全部 App 路由預設");
         clearRouteRulesButton.Click += OnCompatibilityClearRouteRulesClick;
-        content.Children.Add(clearRouteRulesButton);
+        Add(clearRouteRulesButton);
         SyncCompatibilityRouteRules();
 
+        Add(new TextBlock
+        {
+            Text = "主音量與診斷",
+            FontSize = 16,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Margin = new Thickness(0, 16, 0, 0),
+        });
         var volume = new Slider
         {
             Minimum = -60,
@@ -285,25 +336,23 @@ public sealed partial class MainWindow
         AutomationProperties.SetName(volume, "系統音量");
         volume.SetBinding(RangeBase.ValueProperty, TwoWayBindingFor("RequestedVolumeDb"));
         volume.ValueChanged += OnVolumeChanged;
-        content.Children.Add(volume);
-        content.Children.Add(new TextBlock
+        Add(volume);
+        Add(new TextBlock
         {
             Text = "實際有效音量（dB）",
-            Foreground = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush"),
         });
-        content.Children.Add(BoundText("EffectiveVolumeDb"));
-        content.Children.Add(BoundText("SafetyStatusText"));
+        Add(BoundText("EffectiveVolumeDb"));
+        Add(BoundText("SafetyStatusText"));
 
         var eqStatus = new TextBlock { TextWrapping = TextWrapping.Wrap };
         AutomationProperties.SetName(eqStatus, "即時等化器狀態");
         eqStatus.SetBinding(TextBlock.TextProperty, BindingFor("EqSurface.StateText"));
-        content.Children.Add(eqStatus);
+        Add(eqStatus);
 
-        content.Children.Add(new TextBlock
+        Add(new TextBlock
         {
             Text = "正式預覽會在 Windows 11 24H2+、VS 2026 與鎖定 SDK/WDK 上重跑完整 XAML、無障礙與音訊驗收。",
             TextWrapping = TextWrapping.Wrap,
-            Foreground = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush"),
         });
         return root;
     }
@@ -356,7 +405,6 @@ public sealed partial class MainWindow
     private void SyncCompatibilityCustomScenes()
     {
         _compatibilityCustomSceneList.Children.Clear();
-        var secondaryBrush = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush");
         foreach (var scene in ViewModel.CustomSceneCards)
         {
             var row = new Grid { ColumnSpacing = 8 };
@@ -369,11 +417,12 @@ public sealed partial class MainWindow
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                 TextWrapping = TextWrapping.Wrap,
             };
-            var id = new TextBlock { Text = scene.Id, TextWrapping = TextWrapping.Wrap, Foreground = secondaryBrush };
+            var id = new TextBlock { Text = scene.Id, TextWrapping = TextWrapping.Wrap };
             details.Children.Add(name);
             details.Children.Add(id);
             Grid.SetColumn(details, 0);
             var removeButton = new Button { Content = "移除", Tag = scene.Id };
+            PolishCompatibilityControl(removeButton);
             AutomationProperties.SetName(removeButton, "移除自訂場景");
             removeButton.Click += OnCompatibilityRemoveCustomSceneClick;
             Grid.SetColumn(removeButton, 1);
@@ -413,7 +462,6 @@ public sealed partial class MainWindow
     private void SyncCompatibilityRouteRules()
     {
         _compatibilityRouteRuleList.Children.Clear();
-        var secondaryBrush = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush");
         foreach (var rule in ViewModel.RouteRules)
         {
             var row = new Grid { ColumnSpacing = 8 };
@@ -424,11 +472,11 @@ public sealed partial class MainWindow
                 Text = rule.Summary,
                 TextWrapping = TextWrapping.Wrap,
                 VerticalAlignment = VerticalAlignment.Center,
-                Foreground = secondaryBrush,
             };
             AutomationProperties.SetName(summary, $"App 路由預設 {rule.RuleId}");
             Grid.SetColumn(summary, 0);
             var removeButton = new Button { Content = "移除", Tag = rule.RuleId };
+            PolishCompatibilityControl(removeButton);
             AutomationProperties.SetName(removeButton, $"移除 App 路由預設 {rule.RuleId}");
             removeButton.Click += OnCompatibilityRemoveRouteRuleClick;
             Grid.SetColumn(removeButton, 1);
@@ -455,7 +503,6 @@ public sealed partial class MainWindow
         var text = new TextBlock
         {
             TextWrapping = TextWrapping.Wrap,
-            Foreground = ResolveThemeResource<Brush>("TextFillColorSecondaryBrush"),
         };
         text.SetBinding(TextBlock.TextProperty, new Binding
         {
