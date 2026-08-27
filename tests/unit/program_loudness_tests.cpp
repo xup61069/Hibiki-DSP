@@ -504,6 +504,65 @@ int main() {
         CHECK(treble_excess < bass_excess - 20.0);
     }
 
+    // ---- low-frequency correction reaches the bounded RT projection ---------
+    {
+        constexpr std::uint32_t kSampleRate = 48000U;
+        constexpr std::size_t kFrames = 4800U;  // 100 ms blocks
+        constexpr double kMaxStepDb = 0.6;      // 6 dB/s across 100 ms
+
+        auto policy = base_policy();
+        policy.target_dbfs = -9.0;
+        policy.analysis_window_ms = 100.0;
+        policy.max_rate_db_per_second = 6.0;
+        policy.bass_correction_enabled = true;
+        policy.bass_max_cut_db = 4.0;
+
+        ProgramAwareLevelControllerV1 controller;
+        CHECK(controller.configure(policy, kSampleRate));
+
+        std::vector<float> source(kFrames, 0.0F);
+        std::vector<float> work(kFrames, 0.0F);
+        std::size_t phase = 0U;
+        double previous_cut = 0.0;
+        bool correction_engaged = false;
+        bool output_changed = false;
+        for (int block_index = 0; block_index < 24; ++block_index) {
+            fill_sine(source, kFrames, 1U, phase, 60.0, kSampleRate, 0.5F);
+            phase += kFrames;
+            work = source;
+            CHECK(controller.process_interleaved(work.data(), kFrames, 1U));
+
+            const auto& status = controller.status();
+            CHECK(status.valid);
+            CHECK(status.bass_correction_gain_db <= 0.0);
+            CHECK(status.bass_correction_gain_db >=
+                  -policy.bass_max_cut_db - 1.0e-6);
+            CHECK(std::abs(status.bass_correction_gain_db - previous_cut) <=
+                  kMaxStepDb + 1.0e-6);
+            if (status.bass_correction_gain_db < -0.25) {
+                correction_engaged = true;
+            }
+            for (std::size_t index = 0; index < work.size(); ++index) {
+                if (std::abs(static_cast<double>(work[index]) -
+                             static_cast<double>(source[index])) > 1.0e-5) {
+                    output_changed = true;
+                    break;
+                }
+            }
+            previous_cut = status.bass_correction_gain_db;
+        }
+
+        CHECK(correction_engaged);
+        CHECK(output_changed);
+        const auto& final_status = controller.status();
+        const auto telemetry = controller.read_telemetry();
+        CHECK(telemetry.valid);
+        CHECK(telemetry.enabled);
+        CHECK(telemetry.bass_correction_gain_db < -0.25);
+        CHECK(std::abs(telemetry.bass_correction_gain_db -
+                       final_status.bass_correction_gain_db) < 1.0e-9);
+    }
+
     // ---- night compression engages bounded and silence does not amplify -------
     {
         auto policy = base_policy();
