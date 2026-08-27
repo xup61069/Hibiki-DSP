@@ -63,4 +63,40 @@ public static class WindowPlacement
         catch (System.Security.SecurityException) { return false; }
         catch (UnauthorizedAccessException) { return false; }
     }
+
+    /// <summary>Normalizes placement coordinates and size against a supplied display work area.</summary>
+    public static WindowPlacementV1 Normalize(WindowPlacementV1 placement, int workAreaX, int workAreaY, int workAreaWidth, int workAreaHeight)
+    {
+        // Enforce baseline minimum dimensions
+        int width = Math.Max(placement.Width, MinWidth);
+        int height = Math.Max(placement.Height, MinHeight);
+
+        // Clamp size against the work area, unless the work area itself is too small to fit the minimums.
+        int targetWidth = workAreaWidth >= MinWidth ? Math.Clamp(width, MinWidth, workAreaWidth) : MinWidth;
+        int targetHeight = workAreaHeight >= MinHeight ? Math.Clamp(height, MinHeight, workAreaHeight) : MinHeight;
+
+        // Check if the adjusted window rectangle overlaps/intersects with the display work area.
+        bool intersects = (placement.X < workAreaX + workAreaWidth) &&
+                          (placement.X + targetWidth > workAreaX) &&
+                          (placement.Y < workAreaY + workAreaHeight) &&
+                          (placement.Y + targetHeight > workAreaY);
+
+        int targetX;
+        int targetY;
+
+        if (intersects)
+        {
+            // Preserve position, clamping to reasonable system safety boundaries.
+            targetX = Math.Clamp(placement.X, -MaxPosition, MaxPosition);
+            targetY = Math.Clamp(placement.Y, -MaxPosition, MaxPosition);
+        }
+        else
+        {
+            // Reset to the work area top-left.
+            targetX = workAreaX;
+            targetY = workAreaY;
+        }
+
+        return new WindowPlacementV1(targetWidth, targetHeight, targetX, targetY);
+    }
 }
