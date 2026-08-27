@@ -2291,6 +2291,10 @@ int main() {
     tampered_calibration[10U] = 1U;
     CHECK(!decode_calibration_peq_prepare_command_v1(
         tampered_calibration, decoded_calibration_peq));
+    auto invalid_calibration_schema = calibration_peq_payload;
+    invalid_calibration_schema[0U] = 2U;
+    CHECK(!decode_calibration_peq_prepare_command_v1(
+        invalid_calibration_schema, decoded_calibration_peq));
 
     ControlCommandQueueV1 command_queue;
     ControlCommandV1 queued_command{};

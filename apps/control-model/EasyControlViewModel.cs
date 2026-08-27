@@ -1040,7 +1040,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         var sent = await SendLastCommandAsync(cancellationToken).ConfigureAwait(true);
         if (sent)
         {
-            WizardStatus = $"已將 {_wizardCompiledFilters.Count} 個校正濾波器套用到場景（{outputGroup}）";
+            WizardStatus = $"已送出 {_wizardCompiledFilters.Count} 個校正濾波器，等待引擎處理（{outputGroup}）";
         }
         else
         {

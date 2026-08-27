@@ -1074,6 +1074,8 @@ bool decode_calibration_peq_prepare_command_v1(
     CalibrationPeqPrepareCommandV1& command) noexcept {
     command = {};
     if (payload.size() != kCalibrationPeqCommandPayloadBytesV1) return false;
+    const auto schema_version = read_u32(payload.data());
+    if (schema_version != 1U) return false;
     for (std::size_t index = 7U; index < 16U; ++index) {
         if (payload[index] != 0U) return false;
     }
@@ -1115,7 +1117,7 @@ bool decode_calibration_peq_prepare_command_v1(
             return false;
         }
     }
-    command.schema_version = read_u32(payload.data());
+    command.schema_version = schema_version;
     command.filter_count = filter_count;
     command.output_group_bytes = output_group_bytes;
     command.clear_existing = clear_existing;
