@@ -5827,6 +5827,61 @@ int main() {
               bounded_destruction_count.load(std::memory_order_relaxed) ==
                   pending_sessions.size());
     }
+    {
+        // The notification queue has multiple possible COM callback producers.
+        // Exercise concurrent enqueue and verify that the bounded ownership
+        // contract remains exact when no worker is consuming yet.
+        constexpr std::size_t producer_count = 4U;
+        constexpr std::size_t callbacks_per_producer = 32U;
+        constexpr std::size_t callback_count = producer_count * callbacks_per_producer;
+        constexpr std::size_t pending_capacity = 64U;
+        WindowsAudioSessionWatcher concurrent_watcher;
+        std::atomic<std::uint32_t> concurrent_add_ref_calls{0U};
+        std::atomic<std::uint32_t> concurrent_release_calls{0U};
+        std::atomic<std::uint32_t> concurrent_destruction_count{0U};
+        std::array<RetainedAudioSessionControl*, callback_count> concurrent_sessions{};
+        for (auto& session : concurrent_sessions) {
+            session = new RetainedAudioSessionControl(concurrent_add_ref_calls,
+                                                       concurrent_release_calls,
+                                                       concurrent_destruction_count);
+        }
+        std::atomic<std::size_t> ready_producers{0U};
+        std::atomic<bool> start_producers{false};
+        std::atomic<bool> callbacks_succeeded{true};
+        std::array<std::thread, producer_count> producers;
+        for (std::size_t producer = 0U; producer < producer_count; ++producer) {
+            producers[producer] = std::thread([&, producer] {
+                ready_producers.fetch_add(1U, std::memory_order_release);
+                while (!start_producers.load(std::memory_order_acquire)) {
+                    std::this_thread::yield();
+                }
+                const auto first = producer * callbacks_per_producer;
+                for (std::size_t index = 0U; index < callbacks_per_producer; ++index) {
+                    if (concurrent_watcher.OnSessionCreated(concurrent_sessions[first + index]) !=
+                        S_OK) {
+                        callbacks_succeeded.store(false, std::memory_order_release);
+                    }
+                }
+            });
+        }
+        while (ready_producers.load(std::memory_order_acquire) != producer_count) {
+            std::this_thread::yield();
+        }
+        start_producers.store(true, std::memory_order_release);
+        for (auto& producer : producers) producer.join();
+        std::uint64_t concurrent_sequence = 0U;
+        CHECK(callbacks_succeeded.load(std::memory_order_acquire) &&
+              concurrent_add_ref_calls.load(std::memory_order_relaxed) == pending_capacity &&
+              concurrent_watcher.poll(concurrent_sequence) &&
+              concurrent_sequence == callback_count);
+        concurrent_watcher.unbind();
+        CHECK(concurrent_release_calls.load(std::memory_order_relaxed) == pending_capacity &&
+              concurrent_destruction_count.load(std::memory_order_relaxed) == 0U);
+        for (auto* session : concurrent_sessions) (void)session->Release();
+        CHECK(concurrent_release_calls.load(std::memory_order_relaxed) ==
+                  pending_capacity + callback_count &&
+              concurrent_destruction_count.load(std::memory_order_relaxed) == callback_count);
+    }
     WindowsAudioSessionRouteCoordinatorV1 session_route_coordinator;
     GraphConfigV1 session_route_graph;
     ProcessLoopbackPlanV1 session_process_plan;
