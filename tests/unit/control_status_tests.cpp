@@ -414,7 +414,8 @@ int main() {
         auto zero = make_valid_snapshot(0U);
         zero.sequence = 0U;
         CHECK(!store.publish(zero));
-        CHECK(!store.has_snapshot() && store.sequence() == 0U);
+        CHECK(!store.has_snapshot() && !store.reply(response) &&
+              store.sequence() == 0U);
 
         auto first = make_valid_snapshot(1U);
         first.sequence = 5U;
