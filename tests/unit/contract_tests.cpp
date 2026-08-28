@@ -6105,6 +6105,13 @@ int main() {
               volume_registry.sessions().size() == 1U);
         const float original_scalar = volume_control.scalar;
         const BOOL original_mute = volume_control.muted;
+        const auto set_master_before_platform_cap = volume_control.set_master_calls;
+        const auto set_mute_before_platform_cap = volume_control.set_mute_calls;
+        CHECK(volume_watcher.write_session_volume("fake-session", 12.0, true,
+                                                  volume_context) == E_INVALIDARG &&
+              volume_control.scalar == original_scalar && volume_control.muted == original_mute &&
+              volume_control.set_master_calls == set_master_before_platform_cap &&
+              volume_control.set_mute_calls == set_mute_before_platform_cap);
         volume_control.fail_mute_calls = 1U;
         CHECK(volume_watcher.write_session_volume("fake-session", -6.0, false,
                                                   volume_context) == E_FAIL &&
