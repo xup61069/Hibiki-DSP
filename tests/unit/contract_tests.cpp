@@ -1245,6 +1245,15 @@ int main() {
         CHECK(isolated_fanout.prepare(clock_fanout_plan, 1.0));
         CHECK(isolated_fanout.observe_clock(1U, 48000.0, 47952.0, 1.0));
         CHECK(!isolated_fanout.observe_clock(2U, 48000.0, 47952.0, 1.0));
+        std::array<float, 64> isolated_clock_a{};
+        std::array<float, 64> isolated_clock_b{};
+        std::array<float*, 3> isolated_clock_outputs{
+            {isolated_clock_a.data(), isolated_clock_b.data(), nullptr}};
+        const std::array<std::size_t, 3> isolated_clock_capacities{{32U, 32U, 0U}};
+        std::array<std::size_t, 3> isolated_clock_frames{};
+        CHECK(isolated_fanout.process(
+            first_block, 2U, isolated_clock_outputs, isolated_clock_capacities,
+            isolated_clock_frames));
         CHECK(isolated_fanout.snapshot().sinks[0].ratio == 1.0 &&
               isolated_fanout.snapshot().sinks[0].drift_ppm == 0.0);
         CHECK(isolated_fanout.snapshot().sinks[1].ratio < 1.0 &&
@@ -1351,6 +1360,8 @@ int main() {
           runtime_frames[0] == 1U && runtime_frames[1] == 1U && runtime_frames[2] == 0U &&
           runtime_a[0] == fanout_input[0] && runtime_b[1] == fanout_input[1]);
     CHECK(fanout_runtime.observe_clock(0U, 48000.0, 48012.0, 1.0));
+    CHECK(fanout_runtime.process(fanout_input, 2U, runtime_outputs, runtime_capacities,
+                                 runtime_frames));
     CHECK(fanout_runtime.snapshot().sinks[0].drift_ppm > 0.0);
     const std::array<std::size_t, 3> runtime_short_capacities{{16U, 0U, 16U}};
     CHECK(!fanout_runtime.process(fanout_input, 2U, runtime_outputs,
@@ -5306,6 +5317,10 @@ int main() {
           engine_fanout_frames[0] == 1U && engine_fanout_frames[1] == 1U &&
           engine_fanout_frames[2] == 0U && engine_fanout_a[0] == engine_fanout_b[0]);
     CHECK(engine.observe_output_fanout_clock(0U, 48000.0, 48012.0, 1.0));
+    CHECK(engine.process_output_group_fanout(
+              "main", std::span<const RtLaneInputV1>(&engine_input_view, 1),
+              engine_output.data(), 2U, engine_fanout_outputs, engine_fanout_capacities,
+              engine_fanout_frames));
     CHECK(engine.output_fanout_snapshot().sinks[0].drift_ppm > 0.0);
     CHECK(engine.apply_windows_volume(VolumeNotificationV1{-6.0206, true, 2}) ==
           VolumeNotificationResult::Accepted);
