@@ -400,7 +400,9 @@ private:
 
 class FakeSessionManager final : public IAudioSessionManager2 {
 public:
-    explicit FakeSessionManager(IAudioSessionControl2* const control) noexcept : control_(control) {}
+    explicit FakeSessionManager(IAudioSessionControl2* const control,
+                                const bool notify_on_register = false) noexcept
+        : control_(control), notify_on_register_(notify_on_register) {}
 
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
         if (object == nullptr) return E_POINTER;
@@ -443,6 +445,10 @@ public:
         if (notification_ != nullptr) return E_FAIL;
         notification_ = notification;
         notification_->AddRef();
+        if (notify_on_register_ && control_ != nullptr) {
+            (void)notification_->OnSessionCreated(
+                static_cast<IAudioSessionControl*>(control_));
+        }
         return S_OK;
     }
     HRESULT STDMETHODCALLTYPE UnregisterSessionNotification(
@@ -465,6 +471,7 @@ private:
     ULONG references_{1U};
     IAudioSessionControl2* control_;
     IAudioSessionNotification* notification_{nullptr};
+    bool notify_on_register_{false};
 };
 
 class FakeSessionDevice final : public IMMDevice {
@@ -6093,6 +6100,23 @@ int main() {
     CHECK(retained_session->Release() == 0U &&
           session_release_calls.load(std::memory_order_relaxed) == 1U &&
           session_destruction_count.load(std::memory_order_relaxed) == 1U);
+    {
+        // Registration may synchronously publish a notification before the
+        // RegisterSessionNotification call returns. The watcher must retain
+        // that callback and preserve its sequence for the worker refresh.
+        FakeSessionVolumeControl registration_volume_control;
+        FakeSessionManager registration_manager(&registration_volume_control, true);
+        FakeSessionDevice registration_device(&registration_manager);
+        WindowsAudioSessionWatcher registration_watcher;
+        AudioSessionRegistry registration_registry;
+        std::uint64_t registration_sequence = 0U;
+        CHECK(registration_watcher.bind(&registration_device) == S_OK &&
+              registration_watcher.poll(registration_sequence) &&
+              registration_sequence == 1U &&
+              registration_watcher.enumerate(registration_registry) == S_OK &&
+              registration_registry.sessions().size() == 1U);
+        registration_watcher.unbind();
+    }
     {
         // A two-step volume write must not expose a half-applied state when
         // the second setter fails; rollback failure remains an explicit error.

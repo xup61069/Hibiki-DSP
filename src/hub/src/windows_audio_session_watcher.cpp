@@ -272,17 +272,21 @@ HRESULT WindowsAudioSessionWatcher::bind(IMMDevice* const device) {
         endpoint_id_.clear();
         return result;
     }
-    result = manager_->RegisterSessionNotification(this);
-    if (FAILED(result)) {
-        manager_->Release();
-        manager_ = nullptr;
-        endpoint_id_.clear();
-        return result;
-    }
-    registered_ = true;
+    // Open callback admission before registration. The session manager may
+    // deliver a notification synchronously (or from another thread) before
+    // RegisterSessionNotification returns; closing the gate until after the
+    // call would lose that session when the enumerator snapshot lags.
     last_sequence_ = 0;
     sequence_.store(0U, std::memory_order_release);
     callbacks_state_.store(0U, std::memory_order_seq_cst);
+    result = manager_->RegisterSessionNotification(this);
+    if (FAILED(result)) {
+        // Registration can fail after a callback has entered. Reuse the
+        // callback-safe teardown path so any retained control is released.
+        unbind();
+        return result;
+    }
+    registered_ = true;
     return S_OK;
 }
 
