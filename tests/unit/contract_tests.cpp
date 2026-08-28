@@ -6370,6 +6370,42 @@ int main() {
         expired_coordinator.unbind();
     }
     {
+        // A refresh creates a new handle generation. An old index must not be
+        // reused for volume or route control after that refresh.
+        FakeSessionVolumeControl stale_handle_session;
+        FakeSessionManager stale_handle_manager(&stale_handle_session);
+        FakeSessionDevice stale_handle_device(&stale_handle_manager);
+        WindowsAudioSessionRouteCoordinatorV1 stale_handle_coordinator;
+        const HRESULT session_not_found = HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        const auto first_handle = (1ULL << 32U) | 1U;
+        double preserved_db = 17.0;
+        bool preserved_mute = true;
+        GUID stale_handle_context{};
+        CHECK(stale_handle_coordinator.bind(&stale_handle_device) == S_OK &&
+              stale_handle_coordinator.refresh() ==
+                  WindowsAudioSessionRouteRefreshResultV1::NoRoutes &&
+              stale_handle_coordinator.snapshot().generation == 1U &&
+              stale_handle_coordinator.read_session_volume_handle(
+                  first_handle, preserved_db, preserved_mute) == S_OK &&
+              stale_handle_coordinator.refresh() ==
+                  WindowsAudioSessionRouteRefreshResultV1::NoRoutes &&
+              stale_handle_coordinator.snapshot().generation == 2U);
+        preserved_db = 17.0;
+        preserved_mute = true;
+        const auto set_master_before_stale = stale_handle_session.set_master_calls;
+        const auto set_mute_before_stale = stale_handle_session.set_mute_calls;
+        CHECK(stale_handle_coordinator.read_session_volume_handle(
+                  first_handle, preserved_db, preserved_mute) == session_not_found &&
+              preserved_db == 17.0 && preserved_mute &&
+              stale_handle_coordinator.write_session_volume_handle(
+                  first_handle, -6.0, false, stale_handle_context) == session_not_found &&
+              stale_handle_coordinator.bind_session_route_handle(
+                  first_handle, "game", "surround") == session_not_found &&
+              stale_handle_session.set_master_calls == set_master_before_stale &&
+              stale_handle_session.set_mute_calls == set_mute_before_stale);
+        stale_handle_coordinator.unbind();
+    }
+    {
         // Teardown must not drain/reset the queue while a session-manager
         // callback is still retaining its control pointer.
         WindowsAudioSessionWatcher teardown_watcher;

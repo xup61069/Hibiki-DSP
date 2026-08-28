@@ -152,9 +152,7 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::write_session_volume_handle(
     if (!bound_) return E_UNEXPECTED;
     const auto handle_generation = handle >> 32U;
     const auto handle_index = static_cast<std::uint32_t>(handle & 0xffffffffULL);
-    // Accept stale-but-not-future generations: a client may have captured a
-    // handle one refresh ago while our poll cycle bumped the generation.
-    if (handle == 0U || handle_generation == 0U || handle_generation > generation_ ||
+    if (handle == 0U || handle_generation == 0U || handle_generation != generation_ ||
         handle_index == 0U || handle_index > registry_.sessions().size()) {
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     }
@@ -169,7 +167,7 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::read_session_volume_handle(
     if (!bound_) return E_UNEXPECTED;
     const auto handle_generation = handle >> 32U;
     const auto handle_index = static_cast<std::uint32_t>(handle & 0xffffffffULL);
-    if (handle == 0U || handle_generation == 0U || handle_generation > generation_ ||
+    if (handle == 0U || handle_generation == 0U || handle_generation != generation_ ||
         handle_index == 0U || handle_index > registry_.sessions().size()) {
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     }
@@ -189,10 +187,7 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::bind_session_route_handle(
     }
     const auto handle_generation = handle >> 32U;
     const auto handle_index = static_cast<std::uint32_t>(handle & 0xffffffffULL);
-    // Accept stale generations: the client may have read a catalog one poll
-    // cycle ago. The index bounds-check against the live registry prevents
-    // out-of-range access; identity matching below guards correctness.
-    if (handle == 0U || handle_generation == 0U || handle_generation > generation_ ||
+    if (handle == 0U || handle_generation == 0U || handle_generation != generation_ ||
         handle_index == 0U || handle_index > registry_.sessions().size()) {
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     }
