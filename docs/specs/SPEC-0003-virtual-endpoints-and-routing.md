@@ -219,6 +219,11 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   （在設定 threshold 關閉、envelope 回升到 threshold +2 dB 才重新開啟，中間維持狀態），
   臨界附近訊號不會造成 chatter。這是 bounded baseline，不宣稱 acoustic AEC、
   RNNoise 或 conformance，driver/IPC/permission indicator 仍需另行驗收。
+  所有 `VirtualMicDspV1` 與 `VirtualMicRouteModel` 的 caller-owned interleaved
+  processing entry point 都必須先以 checked arithmetic 驗證 `frames * channels`
+  可由 `size_t` 表示；溢位時在 sample scan、privacy fill、reference copy 或 DSP
+  state mutation 前 fail-closed。lane adapter 另外以 caller 宣告的 frame capacity
+  驗證整個 block，兩層檢查都不能省略。
 - `process_virtual_mic_lane_to_wasapi_v1` 在 privacy gate／optional DSP 後共用 lane-to-WASAPI
   adapter；capture、reference、graph 或 sink 任一邊界失敗都不提交。這只提供 user-space
   monitor/output path，不能取代真正的 signed Virtual Mic capture driver。
