@@ -43,34 +43,44 @@ float TruePeakLimiterV1::limit_in_place(float* const interleaved,
         return 1.0F;
     }
     const auto ceiling = static_cast<float>(std::pow(10.0, std::clamp(ceiling_dbtp, -144.0, 0.0) / 20.0));
-    float peak = 0.0F;
+    // Keep the peak scan in double so a finite transition between opposite
+    // extreme float samples cannot overflow the interpolation difference.
+    double peak = 0.0;
     for (std::size_t frame = 0U; frame < frames; ++frame) {
         for (std::uint32_t channel = 0U; channel < channels; ++channel) {
             auto& sample = interleaved[frame * channels + channel];
             if (!std::isfinite(sample)) sample = 0.0F;
-            const auto current = sample;
+            const auto current = static_cast<double>(sample);
             peak = std::max(peak, std::abs(current));
             if (has_previous_) {
-                const auto prior = previous_[channel];
+                const auto prior = static_cast<double>(previous_[channel]);
                 for (std::uint32_t step = 1U; step <= 3U; ++step) {
-                    const auto fraction = static_cast<float>(step) * 0.25F;
+                    const auto fraction = static_cast<double>(step) * 0.25;
                     peak = std::max(peak, std::abs(prior + (current - prior) * fraction));
                 }
             }
-            previous_[channel] = current;
+            previous_[channel] = sample;
         }
         has_previous_ = true;
     }
     const auto required_gain =
-        (peak <= ceiling || peak <= 0.0F) ? 1.0F : ceiling / peak;
+        (peak <= static_cast<double>(ceiling) || peak <= 0.0) ? 1.0F
+                                                               : static_cast<float>(ceiling / peak);
     const auto gain = required_gain >= applied_gain_
                           ? std::min(required_gain,
                                      recovery_gain_for_block(applied_gain_,
                                                              frames,
                                                              sample_rate))
                           : required_gain;
-    for (std::size_t index = 0U; index < frames * channels; ++index) {
-        interleaved[index] *= gain;
+    if (!std::isfinite(gain) || gain <= 0.0F) {
+        // A very small but valid ceiling can make the representable float
+        // gain zero. Assign zero explicitly: multiplying FLT_MAX by zero
+        // would otherwise create NaN even though the input was finite.
+        std::fill_n(interleaved, frames * channels, 0.0F);
+    } else {
+        for (std::size_t index = 0U; index < frames * channels; ++index) {
+            interleaved[index] *= gain;
+        }
     }
     for (std::uint32_t channel = 0U; channel < channels; ++channel) {
         previous_[channel] *= gain;
