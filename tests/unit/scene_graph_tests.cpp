@@ -168,6 +168,44 @@ int main() {
         CHECK(!compile_rt_snapshot(bad_latency, 43U, snapshot));
     }
 
+    // Render entry points reject frame geometry that cannot safely address
+    // the maximum supported eight-channel interleaved lane/output buffers.
+    {
+        constexpr std::size_t kOverflowFrames =
+            std::numeric_limits<std::size_t>::max() / 8U + 1U;
+        const std::array<float, 2> input{1.0F, 2.0F};
+        const std::array<hibiki::RtLaneInputV1, 2> inputs{{
+            {input.data(), 2U},
+            {input.data(), 2U},
+        }};
+        RtGraphSnapshotV1 snapshot;
+        CHECK(compile_rt_snapshot(stereo_two_lane_graph(), 1U, snapshot));
+        std::array<float, 2> rendered{9.0F, 9.0F};
+        CHECK(!process_graph(snapshot,
+                             std::span<const hibiki::RtLaneInputV1>(inputs),
+                             rendered.data(), kOverflowFrames));
+        CHECK(rendered[0] == 9.0F && rendered[1] == 9.0F);
+        CHECK(!process_graph_for_output_group(
+            snapshot, "main", std::span<const hibiki::RtLaneInputV1>(inputs),
+            rendered.data(), kOverflowFrames));
+        CHECK(rendered[0] == 9.0F && rendered[1] == 9.0F);
+
+        const std::array<double, 2> input_f64{1.0, 2.0};
+        const std::array<hibiki::RtLaneInputF64V1, 2> inputs_f64{{
+            {input_f64.data(), 2U},
+            {input_f64.data(), 2U},
+        }};
+        std::array<double, 2> rendered_f64{9.0, 9.0};
+        CHECK(!process_graph_f64(
+            snapshot, std::span<const hibiki::RtLaneInputF64V1>(inputs_f64),
+            rendered_f64.data(), kOverflowFrames));
+        CHECK(rendered_f64[0] == 9.0 && rendered_f64[1] == 9.0);
+        CHECK(!process_graph_for_output_group_f64(
+            snapshot, "main", std::span<const hibiki::RtLaneInputF64V1>(inputs_f64),
+            rendered_f64.data(), kOverflowFrames));
+        CHECK(rendered_f64[0] == 9.0 && rendered_f64[1] == 9.0);
+    }
+
     // render f32: identity map sums both lanes into the shared group; muted channels are skipped.
     {
         const std::array<float, 4> music_input{1.0F, 2.0F, 3.0F, 4.0F};
