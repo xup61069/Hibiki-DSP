@@ -69,7 +69,9 @@ struct OutputFanoutRuntimeSnapshotV1 {
 
 // Owns one persistent clock/SRC pipeline per enabled fan-out sink. Scratch is
 // allocated once during prepare(); process() performs no allocation, lock or
-// wait and only publishes output after every enabled sink succeeds.
+// wait and only publishes output after every enabled sink succeeds. When the
+// caller supplies an output_frames span covering every planned sink, a
+// rejected block clears all of those frame counts before returning false.
 class OutputFanoutRuntimeV1 final {
 public:
     OutputFanoutRuntimeV1() noexcept = default;
