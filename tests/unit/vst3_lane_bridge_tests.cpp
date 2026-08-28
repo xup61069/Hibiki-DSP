@@ -102,6 +102,35 @@ int main() {
     // Drain everything to leave a clean state for the next section.
     CHECK(bridge.pop("main", sink.data(), kRingFrames));
 
+    // ---- shared VST3 block-frame boundary -----------------------------------
+    // The ring may have enough physical storage for more than one maximum
+    // block, but each exchange still obeys the worker's 4096-frame limit.
+    constexpr std::size_t kOversizedFrames =
+        hibiki::kMaxVst3RingFramesV1 + 1U;
+    std::vector<float> bounded_storage(kOversizedFrames * kStereo, 0.0F);
+    std::vector<float> bounded_block(kOversizedFrames * kStereo, 0.75F);
+    std::vector<float> bounded_max_block(
+        hibiki::kMaxVst3RingFramesV1 * kStereo, 0.5F);
+    std::vector<float> bounded_sink(kOversizedFrames * kStereo, -1.0F);
+    hibiki::Vst3LaneRingBridgeV1 bounded_bridge;
+    CHECK(bounded_bridge.prepare_lane("bounded", kStereo,
+                                      bounded_storage));
+    CHECK(!bounded_bridge.push("bounded", bounded_block.data(),
+                               kOversizedFrames));
+    CHECK(bounded_bridge.push("bounded", bounded_max_block.data(),
+                              hibiki::kMaxVst3RingFramesV1));
+    CHECK(bounded_bridge.push("bounded", bounded_block.data(), 1U));
+    CHECK(!bounded_bridge.pop("bounded", bounded_sink.data(),
+                             kOversizedFrames));
+    CHECK(bounded_bridge.pop("bounded", bounded_sink.data(),
+                            hibiki::kMaxVst3RingFramesV1));
+    for (std::size_t i = 0U;
+         i < hibiki::kMaxVst3RingFramesV1 * kStereo; ++i) {
+        CHECK(bounded_sink[i] == 0.5F);
+    }
+    CHECK(bounded_bridge.pop("bounded", bounded_sink.data(), 1U));
+    CHECK(bounded_sink[0] == 0.75F && bounded_sink[1] == 0.75F);
+
     // ---- NaN/Inf rejection -----------------------------------------------------
     auto poison = big;
     poison[0] = std::numeric_limits<float>::quiet_NaN();

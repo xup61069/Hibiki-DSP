@@ -74,8 +74,7 @@ bool valid_entry(const SessionCatalogEntryV1& entry) noexcept {
         return false;
     }
     if ((entry.flags & 1U) != 0U &&
-        (entry.requested_db_q16_16 < (-144 * 65536) ||
-         entry.requested_db_q16_16 > (12 * 65536))) {
+        !is_valid_session_volume_db_q16_16_v1(entry.requested_db_q16_16)) {
         return false;
     }
     return true;
