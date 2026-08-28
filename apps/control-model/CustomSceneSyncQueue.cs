@@ -119,7 +119,11 @@ public sealed class CustomSceneSyncQueueV1
         {
             var fullPath = Path.GetFullPath(filePath);
             var info = new FileInfo(fullPath);
-            if (!info.Exists) return true;
+            if (!info.Exists)
+            {
+                Clear();
+                return true;
+            }
             if (info.Length < 1 || info.Length > MaxFileBytes)
             {
                 error = "場景同步佇列檔案不存在或超過大小上限";
