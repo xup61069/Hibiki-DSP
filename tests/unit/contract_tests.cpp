@@ -268,9 +268,13 @@ public:
         return S_OK;
     }
 
-    ULONG STDMETHODCALLTYPE AddRef() override { return ++references_; }
+    ULONG STDMETHODCALLTYPE AddRef() override {
+        ++add_ref_calls;
+        return ++references_;
+    }
 
     ULONG STDMETHODCALLTYPE Release() override {
+        ++release_calls;
         if (references_ > 0U) --references_;
         return references_;
     }
@@ -347,6 +351,8 @@ public:
     bool fail_master_after_mute_failure{false};
     std::uint32_t set_master_calls{0U};
     std::uint32_t set_mute_calls{0U};
+    std::uint32_t add_ref_calls{0U};
+    std::uint32_t release_calls{0U};
 
 private:
     ULONG references_{1U};
@@ -401,8 +407,11 @@ private:
 class FakeSessionManager final : public IAudioSessionManager2 {
 public:
     explicit FakeSessionManager(IAudioSessionControl2* const control,
-                                const bool notify_on_register = false) noexcept
-        : control_(control), notify_on_register_(notify_on_register) {}
+                                const bool notify_on_register = false,
+                                const bool fail_registration = false) noexcept
+        : control_(control),
+          notify_on_register_(notify_on_register),
+          fail_registration_(fail_registration) {}
 
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
         if (object == nullptr) return E_POINTER;
@@ -449,6 +458,11 @@ public:
             (void)notification_->OnSessionCreated(
                 static_cast<IAudioSessionControl*>(control_));
         }
+        if (fail_registration_) {
+            notification_->Release();
+            notification_ = nullptr;
+            return E_FAIL;
+        }
         return S_OK;
     }
     HRESULT STDMETHODCALLTYPE UnregisterSessionNotification(
@@ -472,6 +486,7 @@ private:
     IAudioSessionControl2* control_;
     IAudioSessionNotification* notification_{nullptr};
     bool notify_on_register_{false};
+    bool fail_registration_{false};
 };
 
 class FakeSessionDevice final : public IMMDevice {
@@ -6116,6 +6131,22 @@ int main() {
               registration_watcher.enumerate(registration_registry) == S_OK &&
               registration_registry.sessions().size() == 1U);
         registration_watcher.unbind();
+    }
+    {
+        // If registration reports failure after delivering a callback, the
+        // retained control must still be drained and callback admission must
+        // remain closed for the failed binding.
+        FakeSessionVolumeControl failed_registration_control;
+        FakeSessionManager failed_registration_manager(&failed_registration_control, true, true);
+        FakeSessionDevice failed_registration_device(&failed_registration_manager);
+        WindowsAudioSessionWatcher failed_registration_watcher;
+        std::uint64_t failed_registration_sequence = 0U;
+        CHECK(failed_registration_watcher.bind(&failed_registration_device) == E_FAIL &&
+              failed_registration_control.add_ref_calls == 1U &&
+              failed_registration_control.release_calls == 1U &&
+              !failed_registration_watcher.poll(failed_registration_sequence) &&
+              failed_registration_watcher.OnSessionCreated(&failed_registration_control) == S_OK &&
+              !failed_registration_watcher.poll(failed_registration_sequence));
     }
     {
         // A two-step volume write must not expose a half-applied state when
