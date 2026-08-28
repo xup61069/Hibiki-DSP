@@ -36,6 +36,10 @@ grouped target；未知 label、非零 padding、非法 UTF-8 或格式長度一
 
 Group render 完成後，非 Strict Direct Scene 會經過 `TruePeakLimiterV1` 的 −1 dBTP
 bounded guard；它以三個線性 inter-sample probes 作保守估算並採 block-coherent gain。
+`ProgramAwareLevelControllerV1` 與 `BassExcessDetectorV1` 的 caller-owned interleaved
+processing 也先驗證 `channels` 的 1..8 邊界與 `frames <= SIZE_MAX / channels`；無法代表的
+frame/channel 乘積會在 sample scan 或 controller state update 前 fail-closed。這只保護
+`size_t` arithmetic，不另訂新的 render block-size 上限。
 `limit_in_place` 先驗證 interleaved geometry：`channels` 必須落在 1..8，且
 `frames <= SIZE_MAX / channels`；無法代表的 frame/channel 乘積會在掃描或寫回 caller
 buffer 前 fail-closed。這只保護 `size_t` arithmetic，不另訂新的 render block-size 上限。

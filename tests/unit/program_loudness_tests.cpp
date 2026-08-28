@@ -210,6 +210,27 @@ int main() {
         CHECK(!controller.process_interleaved(block.data(), 0U, 2U));
         CHECK(!controller.process_interleaved(block.data(), 64U, 0U));
         CHECK(!controller.process_interleaved(block.data(), 64U, 9U));
+
+        constexpr auto max_frames_for_eight_channels =
+            std::numeric_limits<std::size_t>::max() / 8U;
+        CHECK(max_frames_for_eight_channels * 8U <=
+              std::numeric_limits<std::size_t>::max());
+        CHECK(max_frames_for_eight_channels + 1U >
+              std::numeric_limits<std::size_t>::max() / 8U);
+        std::vector<float> eight_channel_boundary(8U, 0.0F);
+        CHECK(controller.process_interleaved(eight_channel_boundary.data(), 1U,
+                                             8U));
+        const auto telemetry_before = controller.read_telemetry();
+        const auto status_before = controller.status();
+        std::vector<float> overflow_guard{0.125F, -0.25F, 0.5F, -0.75F,
+                                          0.875F, -1.0F, 0.25F, -0.5F};
+        CHECK(!controller.process_interleaved(
+            overflow_guard.data(), max_frames_for_eight_channels + 1U, 8U));
+        CHECK(controller.read_telemetry().sequence == telemetry_before.sequence);
+        CHECK(controller.status().valid == status_before.valid &&
+              controller.status().measured_dbfs == status_before.measured_dbfs &&
+              controller.status().applied_gain_db == status_before.applied_gain_db);
+        CHECK(overflow_guard[0] == 0.125F && overflow_guard[7] == -0.5F);
     }
 
     // ---- disabled policy is a bit-exact passthrough -------------------------
@@ -477,6 +498,22 @@ int main() {
         CHECK(!detector.process(small.data(), 480U, 0U));
         CHECK(!detector.process(small.data(), 480U, 9U));
         CHECK(detector.smoothed_excess_db() == -144.0);
+
+        constexpr auto max_frames_for_eight_channels =
+            std::numeric_limits<std::size_t>::max() / 8U;
+        CHECK(max_frames_for_eight_channels * 8U <=
+              std::numeric_limits<std::size_t>::max());
+        CHECK(max_frames_for_eight_channels + 1U >
+              std::numeric_limits<std::size_t>::max() / 8U);
+        std::vector<float> eight_channel_boundary(8U, 0.25F);
+        CHECK(detector.process(eight_channel_boundary.data(), 1U, 8U));
+        const auto excess_before_overflow = detector.smoothed_excess_db();
+        std::vector<float> overflow_guard{0.125F, -0.25F, 0.5F, -0.75F,
+                                          0.875F, -1.0F, 0.25F, -0.5F};
+        CHECK(!detector.process(overflow_guard.data(),
+                                max_frames_for_eight_channels + 1U, 8U));
+        CHECK(detector.smoothed_excess_db() == excess_before_overflow);
+        CHECK(overflow_guard[0] == 0.125F && overflow_guard[7] == -0.5F);
 
         constexpr std::size_t kFrames = 4800U;
         std::vector<float> work(kFrames, 0.0F);

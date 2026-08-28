@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <limits>
 
 namespace hibiki {
 namespace {
@@ -14,6 +15,20 @@ constexpr double kPi = 3.14159265358979323846;
 constexpr double kKWeightHighPassHz = 38.1358;
 constexpr double kKWeightShelfHz = 1681.974;
 constexpr double kKWeightShelfDb = 4.0;
+
+[[nodiscard]] bool checked_interleaved_sample_count(
+    const std::size_t frames,
+    const std::uint32_t channels,
+    const std::size_t max_channels,
+    std::size_t& sample_count) noexcept {
+    if (frames == 0U || channels == 0U || channels > max_channels) return false;
+    const auto channel_count = static_cast<std::size_t>(channels);
+    if (frames > std::numeric_limits<std::size_t>::max() / channel_count) {
+        return false;
+    }
+    sample_count = frames * channel_count;
+    return true;
+}
 
 double db_from_energy(const double energy) noexcept {
     if (!std::isfinite(energy) || energy <= kMinEnergy) return -144.0;
@@ -136,8 +151,10 @@ void BassExcessDetectorV1::reset() noexcept {
 bool BassExcessDetectorV1::process(const float* const interleaved,
                                    const std::size_t frames,
                                    const std::uint32_t channels) noexcept {
-    if (sample_rate_ == 0U || interleaved == nullptr || frames == 0U ||
-        channels == 0U || channels > lp_state_.size()) {
+    std::size_t sample_count = 0U;
+    if (sample_rate_ == 0U || interleaved == nullptr ||
+        !checked_interleaved_sample_count(frames, channels, lp_state_.size(),
+                                          sample_count)) {
         return false;
     }
     // One-pole coefficient from the fixed ~120 Hz cutoff; recomputed only on
@@ -281,14 +298,14 @@ void ProgramAwareLevelControllerV1::reset() noexcept {
 bool ProgramAwareLevelControllerV1::process_interleaved(float* const interleaved,
                                                         const std::size_t frames,
                                                         const std::uint32_t channels) noexcept {
-    if (!configured_ || interleaved == nullptr || frames == 0U || channels == 0U ||
-        channels > 8U) {
+    std::size_t samples = 0U;
+    if (!configured_ || interleaved == nullptr ||
+        !checked_interleaved_sample_count(frames, channels, 8U, samples)) {
         return false;
     }
 
     double energy_sum = 0.0;
     std::size_t finite_samples = 0U;
-    const auto samples = frames * static_cast<std::size_t>(channels);
     for (std::size_t frame = 0U; frame < frames; ++frame) {
         for (std::uint32_t channel = 0U; channel < channels; ++channel) {
             auto& sample_ref = interleaved[frame * channels + channel];
