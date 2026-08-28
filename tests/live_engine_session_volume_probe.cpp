@@ -298,6 +298,23 @@ bool wait_for_catalog(PipeClient& pipe,
     return false;
 }
 
+bool wait_for_catalog_handle(PipeClient& pipe,
+                             std::uint64_t& request_id,
+                             const std::uint64_t expected_handle,
+                             SessionReadingV1& reading) noexcept {
+    if (expected_handle == 0U) return false;
+    for (std::uint32_t attempt = 0U; attempt < 80U; ++attempt) {
+        SessionReadingV1 candidate{};
+        if (read_catalog(pipe, request_id++, candidate) &&
+            candidate.handle == expected_handle) {
+            reading = candidate;
+            return true;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    return false;
+}
+
 bool send_volume_command(PipeClient& pipe,
                          const std::uint64_t request_id,
                          const SessionReadingV1& current,
@@ -317,12 +334,15 @@ bool send_volume_command(PipeClient& pipe,
 
 bool wait_for_value(PipeClient& pipe,
                     std::uint64_t& request_id,
+                    const std::uint64_t expected_handle,
                     const double requested_db,
                     const bool mute,
                     SessionReadingV1& reading) noexcept {
+    if (expected_handle == 0U) return false;
     for (std::uint32_t attempt = 0U; attempt < 80U; ++attempt) {
         SessionReadingV1 candidate{};
         if (read_catalog(pipe, request_id++, candidate) &&
+            candidate.handle == expected_handle &&
             close_db(candidate.requested_db, requested_db) && candidate.mute == mute) {
             reading = candidate;
             return true;
@@ -396,14 +416,17 @@ bool send_route_rule_command(PipeClient& pipe,
 
 bool wait_for_route_state(PipeClient& pipe,
                           std::uint64_t& request_id,
+                          const std::uint64_t expected_handle,
                           const hibiki::SessionCatalogRouteStateV1 expected_state,
                           const std::string_view lane,
                           const std::string_view output_group,
                           const std::uint64_t minimum_sequence,
                           SessionReadingV1& reading) noexcept {
+    if (expected_handle == 0U) return false;
     for (std::uint32_t attempt = 0U; attempt < 80U; ++attempt) {
         SessionReadingV1 candidate{};
         if (read_catalog(pipe, request_id++, candidate) &&
+            candidate.handle == expected_handle &&
             candidate.catalog_sequence > minimum_sequence &&
             candidate.route_state == static_cast<std::uint8_t>(expected_state) &&
             std::string_view(candidate.lane.data(), candidate.lane_bytes) == lane &&
@@ -418,11 +441,13 @@ bool wait_for_route_state(PipeClient& pipe,
 
 bool wait_for_route(PipeClient& pipe,
                     std::uint64_t& request_id,
+                    const std::uint64_t expected_handle,
                     const std::string_view lane,
                     const std::string_view output_group,
                     SessionReadingV1& reading) noexcept {
-    return wait_for_route_state(pipe, request_id, hibiki::SessionCatalogRouteStateV1::Ready,
-                                lane, output_group, 0U, reading);
+    return wait_for_route_state(pipe, request_id, expected_handle,
+                                hibiki::SessionCatalogRouteStateV1::Ready, lane, output_group,
+                                0U, reading);
 }
 
 }  // namespace
@@ -451,14 +476,15 @@ int wmain() {
     double attenuated_db = -144.0;
     double restored_db = -144.0;
     bool original_mute = false;
+    std::uint64_t target_handle = 0U;
     SessionReadingV1 latest{};
 
     auto restore = [&]() noexcept -> bool {
         if (!restore_required) return true;
         SessionReadingV1 current{};
-        if (!wait_for_catalog(pipe, request_id, current) ||
+        if (!wait_for_catalog_handle(pipe, request_id, target_handle, current) ||
             !send_volume_command(pipe, request_id++, current, original_db, original_mute) ||
-            !wait_for_value(pipe, request_id, original_db, original_mute, current)) {
+            !wait_for_value(pipe, request_id, target_handle, original_db, original_mute, current)) {
             return false;
         }
         restored_db = current.requested_db;
@@ -509,13 +535,14 @@ int wmain() {
         }
         original_db = current.requested_db;
         original_mute = current.mute;
+        target_handle = current.handle;
         const double target_db = std::max(-144.0, original_db - 3.0);
         restore_required = true;
         if (!send_volume_command(pipe, request_id++, current, target_db, original_mute)) {
             std::printf("session_volume_engine_live=fail reason=queue-write\n");
             break;
         }
-        if (!wait_for_value(pipe, request_id, target_db, original_mute, latest)) {
+        if (!wait_for_value(pipe, request_id, target_handle, target_db, original_mute, latest)) {
             std::printf("session_volume_engine_live=fail reason=queue-readback\n");
             break;
         }
@@ -533,13 +560,13 @@ int wmain() {
         constexpr std::string_view kProbeLane = "live-engine-session-lane";
         constexpr std::string_view kProbeOutput = "main";
         SessionReadingV1 route_current{};
-        if (!wait_for_catalog(pipe, request_id, route_current) ||
+        if (!wait_for_catalog_handle(pipe, request_id, target_handle, route_current) ||
             !send_route_command(pipe, request_id++, route_current, kProbeLane, kProbeOutput)) {
             std::printf("session_volume_engine_live=fail reason=route-queue-write\n");
             break;
         }
         SessionReadingV1 routed{};
-        if (!wait_for_route(pipe, request_id, kProbeLane, kProbeOutput, routed)) {
+        if (!wait_for_route(pipe, request_id, target_handle, kProbeLane, kProbeOutput, routed)) {
             std::printf("session_volume_engine_live=fail reason=route-readback\n");
             break;
         }
@@ -552,9 +579,9 @@ int wmain() {
             break;
         }
         SessionReadingV1 rule_ready{};
-        if (!wait_for_route_state(pipe, request_id, hibiki::SessionCatalogRouteStateV1::Ready,
-                                  kProbeLane, kProbeOutput, routed.catalog_sequence,
-                                  rule_ready)) {
+        if (!wait_for_route_state(pipe, request_id, target_handle,
+                                  hibiki::SessionCatalogRouteStateV1::Ready, kProbeLane,
+                                  kProbeOutput, routed.catalog_sequence, rule_ready)) {
             std::printf("session_volume_engine_live=fail reason=route-rule-readback\n");
             break;
         }
@@ -565,8 +592,9 @@ int wmain() {
             break;
         }
         SessionReadingV1 rule_removed{};
-        if (!wait_for_route_state(pipe, request_id, hibiki::SessionCatalogRouteStateV1::Pending,
-                                  {}, {}, rule_ready.catalog_sequence, rule_removed)) {
+        if (!wait_for_route_state(pipe, request_id, target_handle,
+                                  hibiki::SessionCatalogRouteStateV1::Pending, {}, {},
+                                  rule_ready.catalog_sequence, rule_removed)) {
             std::printf("session_volume_engine_live=fail reason=route-rule-clear-readback\n");
             break;
         }
