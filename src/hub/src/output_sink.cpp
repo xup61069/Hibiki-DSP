@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
 
 namespace {
 
@@ -117,8 +118,17 @@ bool linear_resample_interleaved(const float* const input,
         channels == 0 || channels > 8 || !std::isfinite(source_step) || source_step <= 0.0) {
         return false;
     }
+    const auto channel_count = static_cast<std::size_t>(channels);
+    const auto max_frames = std::numeric_limits<std::size_t>::max() / channel_count;
+    if (input_frames > max_frames || output_frames > max_frames) {
+        return false;
+    }
     for (std::size_t output_frame = 0; output_frame < output_frames; ++output_frame) {
         const double source_position = static_cast<double>(output_frame) * source_step;
+        if (!std::isfinite(source_position) ||
+            source_position >= static_cast<double>(input_frames)) {
+            return false;
+        }
         const auto left = static_cast<std::size_t>(source_position);
         const auto right = std::min(left + 1, input_frames - 1);
         const float fraction = static_cast<float>(source_position - static_cast<double>(left));
