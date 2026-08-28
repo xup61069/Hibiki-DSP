@@ -135,9 +135,11 @@ IEEE-float WAV IR；它只負責檔案格式，不替任何未授權量測資料
 
 `PeqProcessorV1` 會把最多 16 個 `PeqFilterV1` 編譯成 RBJ peaking biquad，固定支援 1–8
 聲道；係數在 control side 準備，`process_interleaved` 只使用固定 state，不配置、不等待，
-並對非有限輸入 fail-safe。單分頁 adapter 可選擇在 Graph 前套用這組 PEQ；filter 的 sample
-rate／聲道不符時整個 lane block fail-closed。這是 per-lane EQ，不代表已完成 VST3 或正式
-equal-loudness 係數 fit。
+並對非有限輸入 fail-safe；它在讀取 caller buffer、更新 state 或寫回輸出前檢查
+`frames <= SIZE_MAX / channels`，無法代表的 interleaved geometry 會 fail-closed，且不
+另訂新的 render block-size 上限。單分頁 adapter 可選擇在 Graph 前套用這組 PEQ；filter 的
+sample rate／聲道不符時整個 lane block fail-closed。這是 per-lane EQ，不代表已完成 VST3
+或正式 equal-loudness 係數 fit。
 
 `IrConvolverV1` 提供最多 4096 taps、mono 或逐聲道 kernel 的固定容量 direct FIR；它保存
 跨 block history，會檢查 `IrPhaseResolutionV1` 已經 valid、sample rate／聲道一致與所有
