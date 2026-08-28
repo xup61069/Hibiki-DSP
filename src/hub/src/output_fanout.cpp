@@ -203,15 +203,14 @@ bool OutputFanoutRuntimeV1::prepare(const OutputFanoutPlanV1& plan,
     sinks_ = candidates;
     scratch_ = std::move(candidate_scratch);
     applied_clock_sequences_.fill(0U);
+    // Invalidate prior tokens without clearing an in-flight reader hazard;
+    // publish_clock_snapshot() will select a different slot until that
+    // reader's guard releases it.
     for (std::size_t index = 0U; index < kOutputFanoutMaxSinksV1; ++index) {
         auto& request = clock_requests_[index];
         request.publication.store(0U, std::memory_order_seq_cst);
-        request.reader_slot.store(kNoPublicationReaderSlot,
-                                  std::memory_order_seq_cst);
         clock_publications_[index].publication.store(
             0U, std::memory_order_seq_cst);
-        clock_publications_[index].reader_slot.store(
-            kNoPublicationReaderSlot, std::memory_order_seq_cst);
         publish_clock_snapshot(index, sinks_[index].snapshot());
     }
     prepared_ = true;
@@ -222,32 +221,26 @@ void OutputFanoutRuntimeV1::reset() noexcept {
     if (!prepared_) {
         return;
     }
+    // Keep reader hazards intact while invalidating and republishing every
+    // request/snapshot generation.
     for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
         if (plan_.sinks[index].enabled) {
             sinks_[index].reset();
         }
         auto& request = clock_requests_[index];
         request.publication.store(0U, std::memory_order_seq_cst);
-        request.reader_slot.store(kNoPublicationReaderSlot,
-                                  std::memory_order_seq_cst);
         applied_clock_sequences_[index] = 0U;
         clock_publications_[index].publication.store(
             0U, std::memory_order_seq_cst);
-        clock_publications_[index].reader_slot.store(
-            kNoPublicationReaderSlot, std::memory_order_seq_cst);
         publish_clock_snapshot(index, sinks_[index].snapshot());
     }
     for (std::size_t index = plan_.sink_count; index < kOutputFanoutMaxSinksV1;
          ++index) {
         clock_requests_[index].publication.store(0U,
                                                   std::memory_order_seq_cst);
-        clock_requests_[index].reader_slot.store(
-            kNoPublicationReaderSlot, std::memory_order_seq_cst);
         applied_clock_sequences_[index] = 0U;
         clock_publications_[index].publication.store(
             0U, std::memory_order_seq_cst);
-        clock_publications_[index].reader_slot.store(
-            kNoPublicationReaderSlot, std::memory_order_seq_cst);
         publish_clock_snapshot(index, sinks_[index].snapshot());
     }
 }

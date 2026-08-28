@@ -456,6 +456,14 @@ int main() {
               std::isfinite(final_snapshot.sinks[0].ratio) &&
               std::isfinite(final_snapshot.sinks[0].source_step) &&
               std::abs(final_snapshot.sinks[0].ratio - 1.0) > 1.0e-12);
+
+        // Reset invalidates the active tokens but preserves any in-flight
+        // reader hazard before publishing the neutral snapshots again.
+        runtime.reset();
+        const auto reset_snapshot = runtime.snapshot();
+        CHECK(reset_snapshot.prepared && reset_snapshot.sinks[0].prepared &&
+              reset_snapshot.sinks[0].ratio == 1.0 &&
+              reset_snapshot.sinks[0].source_step == 1.0);
     }
 
     // The request and snapshot protocols must preserve complete
