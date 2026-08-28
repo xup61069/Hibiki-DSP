@@ -115,9 +115,13 @@ function Assert-LiveSessionVolumePipeIoContract([string]$repoRoot) {
         'if\s*\(!decoded\.has_value\(\).*?\)\s*\{\s*close\(\);',
         'bool\s+connected\(\)\s+const\s+noexcept\s*\{\s*return\s+handle_\s*!=\s*INVALID_HANDLE_VALUE;',
         'void\s+fail_closed\(\)\s+noexcept\s*\{\s*close\(\);',
+        'StringFromGUID2\(',
+        'hibiki-live-probe-',
         'if\s*\(response->header\.type\s*!=\s*hibiki::IpcMessageType::SessionCatalogSnapshot\)\s*\{',
         'if\s*\(response->header\.type\s*!=\s*hibiki::IpcMessageType::Error\)\s*pipe\.fail_closed\(\);',
-        'decode_session_catalog_snapshot_v1\(response->payload,\s*catalog\)'
+        'decode_session_catalog_snapshot_v1\(response->payload,\s*catalog\)',
+        'auto\s+clear_route_rule\s*=\s*\[&\]\(\)\s*noexcept',
+        'if\s*\(!clear_route_rule\(\)\)\s*passed\s*=\s*false;'
     )
     foreach ($pattern in $requiredPatterns) {
         if ($source -notmatch $pattern) {
@@ -131,6 +135,10 @@ function Assert-LiveSessionVolumePipeIoContract([string]$repoRoot) {
     $catalogFailClosed = ([regex]::Matches($source, 'pipe\.fail_closed\(\)')).Count
     if ($catalogFailClosed -ne 2) {
         throw "Live Engine session-volume catalog failures must fail closed (found $catalogFailClosed)."
+    }
+    $routeRuleArms = ([regex]::Matches($source, 'route_rule_required\s*=\s*true;')).Count
+    if ($routeRuleArms -ne 1) {
+        throw "Live Engine session-volume route-rule cleanup must arm before upsert (found $routeRuleArms)."
     }
     $boundedRetryLoops = ([regex]::Matches(
         $source,

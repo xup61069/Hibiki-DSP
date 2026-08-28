@@ -37,6 +37,35 @@ bool close_db(const double left, const double right) noexcept {
     return std::isfinite(left) && std::isfinite(right) && std::abs(left - right) <= 0.5;
 }
 
+struct ProbeRuleIdV1 {
+    std::array<char, hibiki::kSessionRouteRuleIdMaxBytesV1> bytes{};
+    std::size_t size{0U};
+};
+
+bool make_probe_rule_id(ProbeRuleIdV1& output) noexcept {
+    output = {};
+    GUID guid{};
+    if (FAILED(CoCreateGuid(&guid))) return false;
+
+    wchar_t guid_text[40]{};
+    if (StringFromGUID2(guid, guid_text,
+                        static_cast<int>(sizeof(guid_text) / sizeof(guid_text[0]))) <= 0) {
+        return false;
+    }
+    constexpr std::string_view kPrefix = "hibiki-live-probe-";
+    if (kPrefix.size() >= output.bytes.size()) return false;
+    std::copy(kPrefix.begin(), kPrefix.end(), output.bytes.begin());
+    output.size = kPrefix.size();
+    for (std::size_t index = 0U;
+         index < (sizeof(guid_text) / sizeof(guid_text[0])) && guid_text[index] != L'\0';
+         ++index) {
+        if (guid_text[index] == L'{' || guid_text[index] == L'}') continue;
+        if (guid_text[index] > 0x7f || output.size >= output.bytes.size()) return false;
+        output.bytes[output.size++] = static_cast<char>(guid_text[index]);
+    }
+    return output.size > kPrefix.size();
+}
+
 // Start a silent shared-mode stream so Windows creates a real session for this
 // probe process. No sample data is written; every submitted block is marked
 // AUDCLNT_BUFFERFLAGS_SILENT.
@@ -534,6 +563,9 @@ int wmain() {
     double restored_db = -144.0;
     bool original_mute = false;
     std::uint64_t target_handle = 0U;
+    ProbeRuleIdV1 probe_rule_id{};
+    std::string_view probe_rule;
+    bool route_rule_required = false;
     SessionReadingV1 latest{};
 
     auto restore = [&]() noexcept -> bool {
@@ -549,6 +581,25 @@ int wmain() {
             return false;
         }
         restore_required = false;
+        return true;
+    };
+
+    auto clear_route_rule = [&]() noexcept -> bool {
+        if (!route_rule_required) return true;
+        SessionReadingV1 current{};
+        if (!wait_for_catalog_handle(pipe, request_id, target_handle, current) ||
+            !send_route_rule_command(pipe, request_id++, current,
+                                     hibiki::SessionRouteRuleOperationV1::Remove, probe_rule,
+                                     {}, {}, {})) {
+            return false;
+        }
+        SessionReadingV1 removed{};
+        if (!wait_for_route_state(pipe, request_id, target_handle,
+                                  hibiki::SessionCatalogRouteStateV1::Pending, {}, {},
+                                  current.catalog_sequence, removed)) {
+            return false;
+        }
+        route_rule_required = false;
         return true;
     };
 
@@ -590,6 +641,12 @@ int wmain() {
             unavailable = true;
             break;
         }
+        if (!make_probe_rule_id(probe_rule_id)) {
+            std::printf("session_volume_engine_live=unavailable reason=route-rule-id\n");
+            unavailable = true;
+            break;
+        }
+        probe_rule = std::string_view(probe_rule_id.bytes.data(), probe_rule_id.size);
         original_db = current.requested_db;
         original_mute = current.mute;
         target_handle = current.handle;
@@ -627,10 +684,12 @@ int wmain() {
             std::printf("session_volume_engine_live=fail reason=route-readback\n");
             break;
         }
-        constexpr std::string_view kProbeRule = "live-engine-route-rule";
         constexpr std::string_view kProbeMatch = "Hibiki live engine session volume probe";
+        // Arm cleanup before issuing the upsert: the command may apply even
+        // when its acknowledgement or later catalog readback is lost.
+        route_rule_required = true;
         if (!send_route_rule_command(pipe, request_id++, routed,
-                                     hibiki::SessionRouteRuleOperationV1::Upsert, kProbeRule,
+                                     hibiki::SessionRouteRuleOperationV1::Upsert, probe_rule,
                                      kProbeMatch, kProbeLane, kProbeOutput)) {
             std::printf("session_volume_engine_live=fail reason=route-rule-upsert\n");
             break;
@@ -642,17 +701,8 @@ int wmain() {
             std::printf("session_volume_engine_live=fail reason=route-rule-readback\n");
             break;
         }
-        if (!send_route_rule_command(pipe, request_id++, rule_ready,
-                                     hibiki::SessionRouteRuleOperationV1::Remove, kProbeRule, {},
-                                     {}, {})) {
+        if (!clear_route_rule()) {
             std::printf("session_volume_engine_live=fail reason=route-rule-remove\n");
-            break;
-        }
-        SessionReadingV1 rule_removed{};
-        if (!wait_for_route_state(pipe, request_id, target_handle,
-                                  hibiki::SessionCatalogRouteStateV1::Pending, {}, {},
-                                  rule_ready.catalog_sequence, rule_removed)) {
-            std::printf("session_volume_engine_live=fail reason=route-rule-clear-readback\n");
             break;
         }
         passed = true;
@@ -660,6 +710,7 @@ int wmain() {
                     original_db, attenuated_db, restored_db);
     } while (false);
 
+    if (!clear_route_rule()) passed = false;
     if (!restore()) passed = false;
     if (client != nullptr) (void)client->Stop();
     if (render != nullptr) render->Release();

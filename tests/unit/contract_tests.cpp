@@ -3062,6 +3062,10 @@ int main() {
                 GetLastError() == ERROR_PIPE_BUSY) {
                 (void)WaitNamedPipeW(between_pipe.c_str(), 100U);
             }
+            // start() returns before the worker necessarily creates its first
+            // pipe instance; yield so ERROR_FILE_NOT_FOUND cannot exhaust the
+            // bounded client attempts before the worker is scheduled.
+            Sleep(10U);
         }
         CHECK(between_client != INVALID_HANDLE_VALUE);
         DisconnectNamedPipe(between_client);
