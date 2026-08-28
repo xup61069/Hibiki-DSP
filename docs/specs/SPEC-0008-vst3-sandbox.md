@@ -81,8 +81,11 @@ protocol limit，SDK worker 才會把它轉成 `IParameterChanges`。
 
 `Vst3WorkerLaneSessionV1` 將這個 exchange 與 stable `lane_token` 及 latency projection 接起來。
 它要求成功 handshake 後才進入 `Ready`，每次成功 block 必須連續銜接 `block_start`。worker
-錯誤會把 lane 置為 `Degraded`，不自動重啟或重送未知結果。這是 control/IPC session boundary，
-不是 RT graph plugin callback；跨版本 plugin state persistence 仍由更上層規格負責。
+錯誤會把 lane 置為 `Degraded`，不自動重啟或重送未知結果。每個 block 的 exclusive end
+`block_start + frames` 必須在 `uint64` timeline 內可表示，否則 lane 會在 worker exchange
+前 fail-closed 為 `Degraded`；可表示且剛好結束於 `UINT64_MAX` 的 block 仍然有效。這是
+control/IPC session boundary，不是 RT graph plugin callback；跨版本 plugin state persistence
+仍由更上層規格負責。
 
 `PluginHostModel` 的 `prepare_worker_session`、`handshake_worker` 與
 `process_worker_block` 是目前 host model 的接線點：只有 trusted/certified、same-channel、
