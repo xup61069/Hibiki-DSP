@@ -87,6 +87,29 @@ function Assert-LiveSessionVolumeProbeExitContract([string]$repoRoot) {
     }
 }
 
+function Assert-LiveSessionVolumePipeIoContract([string]$repoRoot) {
+    if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+        throw 'Live session-volume pipe I/O contract requires a repository root.'
+    }
+    $probePath = Join-Path $repoRoot 'tests/live_engine_session_volume_probe.cpp'
+    if (-not (Test-Path -LiteralPath $probePath -PathType Leaf)) {
+        throw "Live Engine session-volume probe source is missing: $probePath"
+    }
+    $source = Get-Content -LiteralPath $probePath -Raw
+    $requiredPatterns = @(
+        'FILE_ATTRIBUTE_NORMAL\s*\|\s*FILE_FLAG_OVERLAPPED',
+        'OVERLAPPED\s+overlapped\s*\{\}',
+        'WaitForSingleObject\(event,\s*kIoTimeoutMs\)',
+        'CancelIoEx\(handle_,\s*&overlapped\)',
+        'CancelIoEx\(handle_,\s*nullptr\)'
+    )
+    foreach ($pattern in $requiredPatterns) {
+        if ($source -notmatch $pattern) {
+            throw "Live Engine session-volume pipe I/O contract is missing: $pattern"
+        }
+    }
+}
+
 function Get-LiveSessionVolumePlan([string]$repoRoot, [bool]$directCoordinator) {
     if ([string]::IsNullOrWhiteSpace($repoRoot)) { throw 'Live session-volume plan requires a repository root.' }
 
@@ -245,6 +268,7 @@ if ($SelfTest) {
     if (-not $writeTestCaught) { throw 'Live session-volume self-test expected WriteTest opt-in rejection.' }
     Assert-LiveSessionVolumeOptIn $true $false $true
     Assert-LiveSessionVolumeProbeExitContract $repo
+    Assert-LiveSessionVolumePipeIoContract $repo
 
     $directPlan = Get-LiveSessionVolumePlan $repo $true
     Assert-LiveSessionVolumePlan $directPlan $repo $true

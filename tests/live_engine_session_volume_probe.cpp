@@ -143,7 +143,8 @@ public:
         while (std::chrono::steady_clock::now() < deadline) {
             if (WaitNamedPipeW(kPipeName, 250U) != FALSE) {
                 handle_ = CreateFileW(kPipeName, GENERIC_READ | GENERIC_WRITE, 0U, nullptr,
-                                      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+                                      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
+                                      nullptr);
                 if (handle_ != INVALID_HANDLE_VALUE) {
                     DWORD mode = PIPE_READMODE_BYTE;
                     if (SetNamedPipeHandleState(handle_, &mode, nullptr, nullptr) != FALSE) {
@@ -190,15 +191,35 @@ public:
 
 private:
     bool transfer(const bool writing, void* const data, const std::size_t bytes) noexcept {
+        constexpr DWORD kIoTimeoutMs = 5000U;
         auto* cursor = static_cast<std::uint8_t*>(data);
         std::size_t remaining = bytes;
         while (remaining > 0U) {
+            HANDLE event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+            if (event == nullptr) return false;
+            OVERLAPPED overlapped{};
+            overlapped.hEvent = event;
             const DWORD chunk = static_cast<DWORD>(std::min<std::size_t>(remaining, 1U << 20U));
             DWORD transferred = 0U;
-            const BOOL ok = writing
-                                ? WriteFile(handle_, cursor, chunk, &transferred, nullptr)
-                                : ReadFile(handle_, cursor, chunk, &transferred, nullptr);
-            if (ok == FALSE || transferred == 0U) return false;
+            const BOOL immediate = writing
+                                      ? WriteFile(handle_, cursor, chunk, &transferred, &overlapped)
+                                      : ReadFile(handle_, cursor, chunk, &transferred, &overlapped);
+            bool completed = immediate != FALSE;
+            if (!completed && GetLastError() == ERROR_IO_PENDING) {
+                const DWORD wait_result = WaitForSingleObject(event, kIoTimeoutMs);
+                if (wait_result == WAIT_OBJECT_0) {
+                    completed = GetOverlappedResult(handle_, &overlapped, &transferred, FALSE) !=
+                                FALSE;
+                } else {
+                    (void)CancelIoEx(handle_, &overlapped);
+                }
+            }
+            if (!completed || transferred == 0U) {
+                (void)CancelIoEx(handle_, &overlapped);
+                CloseHandle(event);
+                return false;
+            }
+            CloseHandle(event);
             cursor += transferred;
             remaining -= transferred;
         }
@@ -207,6 +228,7 @@ private:
 
     void close() noexcept {
         if (handle_ != INVALID_HANDLE_VALUE) {
+            (void)CancelIoEx(handle_, nullptr);
             CloseHandle(handle_);
             handle_ = INVALID_HANDLE_VALUE;
         }
