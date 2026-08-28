@@ -201,6 +201,29 @@ int main() {
         CHECK(tap_dest[i] == 0.5F);
     }
 
+    // A caller capacity whose interleaved product wraps must fail before the
+    // snapshot copy. The wrapped product is deliberately larger than this
+    // snapshot so the old unchecked comparison would accept it.
+    constexpr auto kMaxFramesForStereo =
+        std::numeric_limits<std::size_t>::max() / kStereo;
+    constexpr auto kWrappingCapacity =
+        kMaxFramesForStereo + kTapFrames + 2U;
+    CHECK(kWrappingCapacity > kMaxFramesForStereo);
+    CHECK(kWrappingCapacity * kStereo > kTapFrames * kStereo);
+    std::vector<float> overflow_destination(tap_dest.size(), -3.0F);
+    const auto overflow_untouched = overflow_destination;
+    const auto channels_before_overflow = tap_channels;
+    const auto frames_before_overflow = tap_frames;
+    const auto sequence_before_overflow = tap_seq;
+    CHECK(!tap.read("tap-group", overflow_destination.data(), kWrappingCapacity,
+                    tap_channels, tap_frames, tap_seq));
+    CHECK(overflow_destination == overflow_untouched);
+    CHECK(tap_channels == channels_before_overflow);
+    CHECK(tap_frames == frames_before_overflow);
+    CHECK(tap_seq == sequence_before_overflow);
+    CHECK(tap.read("tap-group", tap_dest.data(), hibiki::kMaxVst3TapFramesV1,
+                   tap_channels, tap_frames, tap_seq));
+
     // ---- tap group mismatch ------------------------------------------------------
     CHECK(!tap.read("wrong-group", tap_dest.data(), hibiki::kMaxVst3TapFramesV1,
                     tap_channels, tap_frames, tap_seq));
