@@ -502,6 +502,11 @@ HRESULT WindowsAudioSessionWatcher::write_session_volume(
         // partial setter failure can be rolled back and verified before the
         // failure is returned to the caller.
         result = volume->GetMasterVolume(&previous_scalar);
+        if (SUCCEEDED(result) &&
+            (!std::isfinite(previous_scalar) || previous_scalar < 0.0F ||
+             previous_scalar > 1.0F)) {
+            result = E_FAIL;
+        }
         if (SUCCEEDED(result)) result = volume->GetMute(&previous_mute);
         if (SUCCEEDED(result)) {
             write_started = true;

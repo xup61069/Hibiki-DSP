@@ -6116,9 +6116,15 @@ int main() {
             volume_control.scalar = invalid_scalar;
             double preserved_db = 17.0;
             bool preserved_mute = true;
+            const auto set_master_before_invalid_write = volume_control.set_master_calls;
+            const auto set_mute_before_invalid_write = volume_control.set_mute_calls;
             CHECK(volume_watcher.read_session_volume("fake-session", preserved_db,
                                                      preserved_mute) == E_FAIL &&
                   preserved_db == 17.0 && preserved_mute);
+            CHECK(volume_watcher.write_session_volume("fake-session", -6.0, false,
+                                                      volume_context) == E_FAIL &&
+                  volume_control.set_master_calls == set_master_before_invalid_write &&
+                  volume_control.set_mute_calls == set_mute_before_invalid_write);
         }
         volume_control.scalar = original_scalar;
         volume_control.fail_mute_calls = 1U;
