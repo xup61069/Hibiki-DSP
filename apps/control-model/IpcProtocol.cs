@@ -1004,9 +1004,10 @@ public static class ControlPayloadsV1
         var expected = SessionCatalogSnapshotHeaderBytes +
                        (count * SessionCatalogSnapshotEntryBytes);
         if (count > SessionCatalogSnapshotCapacity || payload.Length != expected) return false;
-        sequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[4..]);
-        generation = BinaryPrimitives.ReadUInt64LittleEndian(payload[12..]);
-        if (sequence == 0UL || generation == 0UL || generation > uint.MaxValue) return false;
+        var decodedSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[4..]);
+        var decodedGeneration = BinaryPrimitives.ReadUInt64LittleEndian(payload[12..]);
+        if (decodedSequence == 0UL || decodedGeneration == 0UL || decodedGeneration > uint.MaxValue)
+            return false;
         var list = new List<SessionCatalogEntryV1>(count);
         var seen = new HashSet<ulong>();
         for (var index = 0; index < count; index++)
@@ -1023,7 +1024,7 @@ public static class ControlPayloadsV1
             var appBytes = BinaryPrimitives.ReadUInt16LittleEndian(entry[22..]);
             var laneBytes = BinaryPrimitives.ReadUInt16LittleEndian(entry[24..]);
             var outputBytes = BinaryPrimitives.ReadUInt16LittleEndian(entry[26..]);
-            if (!HasExpectedHandle(handle, generation, index) || !seen.Add(handle) || active > 1 ||
+            if (!HasExpectedHandle(handle, decodedGeneration, index) || !seen.Add(handle) || active > 1 ||
                 rawState > (byte)SessionCatalogRouteStateV1.Unavailable || (flags & 0xfffe) != 0 ||
                 muted > 1 || entry[17] != 0 || entry[18] != 0 || entry[19] != 0 ||
                 nameBytes > 64 || appBytes > 64 || laneBytes > 48 || outputBytes > 48 ||
@@ -1057,6 +1058,8 @@ public static class ControlPayloadsV1
                                                 volumeAvailable, requestedDb, muted != 0,
                                                 name, app, lane, output));
         }
+        sequence = decodedSequence;
+        generation = decodedGeneration;
         sessions = list;
         return true;
     }

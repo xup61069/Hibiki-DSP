@@ -307,6 +307,18 @@ BinaryPrimitives.WriteUInt64LittleEndian(
 Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(wrongIndexHandlePayload,
           out _, out _, out _),
     "Session catalog decoder must reject a handle at the wrong registry index.");
+var partialOutputSessionPayload = sessionPayload.ToArray();
+BinaryPrimitives.WriteUInt64LittleEndian(
+    partialOutputSessionPayload.AsSpan(24 + ControlPayloadsV1.SessionCatalogSnapshotEntryBytes),
+    (2UL << 32) | 3UL);
+var rejectedSessionSequence = 999UL;
+var rejectedSessionGeneration = 999UL;
+IReadOnlyList<SessionCatalogEntryV1> rejectedSessions = sessionEntries;
+Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(partialOutputSessionPayload,
+          out rejectedSessionSequence, out rejectedSessionGeneration, out rejectedSessions) &&
+      rejectedSessionSequence == 0UL && rejectedSessionGeneration == 0UL &&
+      rejectedSessions.Count == 0,
+    "Rejected session catalog must leave all decoder outputs neutral.");
 var malformedSessionPayload = sessionPayload.ToArray();
 malformedSessionPayload[2] = 1;
 Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(malformedSessionPayload, out _, out _, out _),
