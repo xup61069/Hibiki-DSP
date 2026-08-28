@@ -5841,6 +5841,24 @@ int main() {
                   pending_capacity + pending_sessions.size() &&
               bounded_destruction_count.load(std::memory_order_relaxed) ==
                   pending_sessions.size());
+        std::atomic<std::uint32_t> reused_add_ref_calls{0U};
+        std::atomic<std::uint32_t> reused_release_calls{0U};
+        std::atomic<std::uint32_t> reused_destruction_count{0U};
+        std::atomic<std::uint32_t> reused_query_interface_calls{0U};
+        auto* reused_session = new RetainedAudioSessionControl(
+            reused_add_ref_calls, reused_release_calls, reused_destruction_count,
+            reused_query_interface_calls);
+        CHECK(bounded_watcher.OnSessionCreated(reused_session) == S_OK &&
+              reused_add_ref_calls.load(std::memory_order_relaxed) == 1U &&
+              reused_query_interface_calls.load(std::memory_order_relaxed) == 0U);
+        std::uint64_t reused_sequence = 0U;
+        CHECK(bounded_watcher.poll(reused_sequence) && reused_sequence == 1U);
+        bounded_watcher.unbind();
+        CHECK(reused_release_calls.load(std::memory_order_relaxed) == 1U &&
+              reused_destruction_count.load(std::memory_order_relaxed) == 0U);
+        CHECK(reused_session->Release() == 0U &&
+              reused_release_calls.load(std::memory_order_relaxed) == 2U &&
+              reused_destruction_count.load(std::memory_order_relaxed) == 1U);
     }
     {
         // The notification queue has multiple possible COM callback producers.
