@@ -97,8 +97,11 @@ Group Master ramp 與 limiter，再把同一個 interleaved block 送進 handoff
 
 `OutputFanoutPlanV1` 將同一個 graph block 複製到最多 8 個同聲道 layout 的 sink。所有 enabled
 sink 的 pointer／capacity 在第一次寫入前一次驗證；任何容量不足或 plan 無效都 fail-closed，
-不會只更新部分 sink。每個 sink 後續仍由自己的 ring、clock drift 與 SRC worker 處理；fan-out
-本身不碰 COM、裝置或 physical endpoint。
+不會只更新部分 sink。`fanout_interleaved_v1` 與 persistent runtime 共用
+`kOutputFanoutMaxInputFramesV1` 的 4096-frame 上限，並在掃描或複製前檢查
+`frames * output_channels` 的 bounded geometry；超限或無法表示的 geometry 一律不讀 input、
+不寫任何 sink。每個 sink 後續仍由自己的 ring、clock drift 與 SRC worker 處理；fan-out 本身
+不碰 COM、裝置或 physical endpoint。
 
 每個 sink 的 `sink_id` 是 1..64 bytes 的 printable label：JSON schema 與 runtime validator
 一致地拒絕 C0/C1 控制字元（含 NUL、tab、newline、CR、DEL 與 0x80–0x9F），只接受可顯示的
