@@ -304,7 +304,7 @@ bool WindowsAudioSessionRouteCoordinatorV1::make_session_catalog_snapshot(
     const std::uint64_t sequence,
     SessionCatalogSnapshotV1& snapshot) noexcept {
     snapshot = {};
-    if (!bound_ || degraded_ || sequence == 0U ||
+    if (!bound_ || degraded_ || generation_ == 0U || sequence == 0U ||
         generation_ > static_cast<std::uint64_t>((std::numeric_limits<std::uint32_t>::max)()) ||
         registry_.sessions().size() > kSessionCatalogSnapshotCapacityV1) {
         return false;

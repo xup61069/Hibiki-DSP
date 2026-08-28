@@ -6435,6 +6435,20 @@ int main() {
         volume_watcher.unbind();
     }
     {
+        // A bound coordinator has no valid catalog generation until its first
+        // refresh; it must not publish a generation-zero snapshot.
+        FakeSessionVolumeControl unrefreshed_session;
+        FakeSessionManager unrefreshed_manager(&unrefreshed_session);
+        FakeSessionDevice unrefreshed_device(&unrefreshed_manager);
+        WindowsAudioSessionRouteCoordinatorV1 unrefreshed_coordinator;
+        SessionCatalogSnapshotV1 unrefreshed_catalog{};
+        CHECK(unrefreshed_coordinator.bind(&unrefreshed_device) == S_OK &&
+              !unrefreshed_coordinator.make_session_catalog_snapshot(1U, unrefreshed_catalog) &&
+              unrefreshed_catalog.sequence == 0U && unrefreshed_catalog.generation == 0U &&
+              unrefreshed_catalog.entry_count == 0U);
+        unrefreshed_coordinator.unbind();
+    }
+    {
         // An expired session may still be returned by the Windows enumerator,
         // but it is not a valid target for volume control or handle access.
         FakeSessionVolumeControl expired_session;
