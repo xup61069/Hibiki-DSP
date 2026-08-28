@@ -28,6 +28,8 @@ public static class DoseRemainingCheck
 
         // An existing directory is not a missing queue file; opening it must
         // fail closed and preserve the already-loaded operations.
+        check(sceneQueue.Enqueue(new SceneCatalogQueueCard(false, "still-stale-scene", "", "")),
+            "The queue fixture must accept an operation before the unreadable-path check.");
         var unreadableQueuePath = Path.Combine(
             Path.GetTempPath(), $"hibiki-unreadable-scene-queue-{Guid.NewGuid():N}");
         Directory.CreateDirectory(unreadableQueuePath);
@@ -35,7 +37,8 @@ public static class DoseRemainingCheck
         {
             check(!sceneQueue.TryLoad(unreadableQueuePath, out var unreadableDropped,
                                       out var unreadableError) &&
-                  unreadableDropped == 0 && sceneQueue.Operations.Count == 0 &&
+                  unreadableDropped == 0 && sceneQueue.Operations.Count == 1 &&
+                  sceneQueue.Operations[0].SceneId == "still-stale-scene" &&
                   unreadableError.Length > 0,
                 "An unreadable existing queue path must fail closed without changing the queue.");
         }
