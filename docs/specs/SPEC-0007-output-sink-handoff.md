@@ -20,6 +20,10 @@ source_globs: ["src/hub/**output*", "src/hub/**wasapi*", "src/hub/**audio_engine
   duration prepare；預設交接 duration 為 30 ms。
 - audio-side `process` 不配置、不鎖、不呼叫 COM，使用 equal-power sin/cos 權重；完成後
   僅輸出新 sink。buffer 不足、null pointer 或未開始都回傳 failure，不寫部分結果。
+  `process` 在讀取 caller-owned input 或寫入 output 前檢查 interleaved frame geometry
+  不超過 `SIZE_MAX / channels`，並對 `processed_frames + frames` 做 fail-closed 檢查；
+  溢位請求不改變 crossfade snapshot。已驗證的 bounded overshoot 仍可在完成淡化時
+  將 progress clamp 到 `total_frames`。
 
 ## Clock 與回復
 
