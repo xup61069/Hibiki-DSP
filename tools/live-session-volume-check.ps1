@@ -123,6 +123,18 @@ function Assert-LiveSessionVolumePipeIoContract([string]$repoRoot) {
     if ($disconnectStops -ne 4) {
         throw "Live Engine session-volume wait helpers must stop after disconnect (found $disconnectStops)."
     }
+    $boundedRetryLoops = ([regex]::Matches(
+        $source,
+        'for\s*\(std::uint32_t attempt\s*=\s*0U;\s*attempt\s*<\s*80U;\s*\+\+attempt\)')).Count
+    if ($boundedRetryLoops -ne 4) {
+        throw "Live Engine session-volume wait helpers must retain bounded retries (found $boundedRetryLoops)."
+    }
+    $retryBackoffs = ([regex]::Matches(
+        $source,
+        'std::this_thread::sleep_for\(std::chrono::milliseconds\(50\)\)')).Count
+    if ($retryBackoffs -ne 4) {
+        throw "Live Engine session-volume wait helpers must retain bounded backoff (found $retryBackoffs)."
+    }
 }
 
 function Get-LiveSessionVolumePlan([string]$repoRoot, [bool]$directCoordinator) {
