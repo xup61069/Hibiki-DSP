@@ -15,8 +15,6 @@ namespace {
 
 constexpr std::size_t kMaxLoudnessFormulaPointsV1 = 64U;
 constexpr std::uint32_t kLoudnessPeqCrossfadeMs = 120U;
-constexpr std::size_t kMaxLoudnessPeqCrossfadeFramesV1 =
-    static_cast<std::size_t>(192000U) * 120U / 1000U;
 
 struct LoudnessPeqCompileResultV1 {
     PeqFilterV1 filters[kMaxRealtimePeqFiltersV1]{};
@@ -105,7 +103,10 @@ bool compile_loudness_peq_v1(const CompensationResult& compensation,
 
 }  // namespace
 
-AudioEngineModel::AudioEngineModel() : volume_bank_(std::make_unique<OutputGroupVolumeBankV1>()) {}
+AudioEngineModel::AudioEngineModel()
+    : volume_bank_(std::make_unique<OutputGroupVolumeBankV1>()),
+      loudness_crossfade_scratch_(std::make_unique<float[]>(
+          kMaxLoudnessPeqCrossfadeFramesV1 * kMaxLoudnessPeqCrossfadeChannelsV1)) {}
 
 AudioEngineModel::~AudioEngineModel() = default;
 
@@ -1194,6 +1195,7 @@ bool AudioEngineModel::apply_loudness_peq(const std::string_view output_group,
 
     const std::size_t channel_count = active_graph_.output_channels;
     if (channel_count == 0U ||
+        channel_count > kMaxLoudnessPeqCrossfadeChannelsV1 ||
         frames > std::numeric_limits<std::size_t>::max() / channel_count) {
         return false;
     }
@@ -1223,16 +1225,20 @@ bool AudioEngineModel::apply_loudness_peq(const std::string_view output_group,
         return false;
     }
 
-    std::array<float, kMaxLoudnessPeqCrossfadeFramesV1> old_samples{};
     const float* old_block = nullptr;
     if (previous_matches) {
-        std::copy_n(output_interleaved, frames * channel_count,
-                    old_samples.begin());
+        if (loudness_crossfade_scratch_ == nullptr) return false;
+        constexpr auto scratch_sample_capacity =
+            kMaxLoudnessPeqCrossfadeFramesV1 * kMaxLoudnessPeqCrossfadeChannelsV1;
+        if (frames > scratch_sample_capacity / channel_count) return false;
+        const auto sample_count = frames * channel_count;
+        std::copy_n(output_interleaved, sample_count,
+                    loudness_crossfade_scratch_.get());
         if (!previous_loudness_peq_.peq.process_interleaved(
-                old_samples.data(), frames)) {
+                loudness_crossfade_scratch_.get(), frames)) {
             return false;
         }
-        old_block = old_samples.data();
+        old_block = loudness_crossfade_scratch_.get();
     }
     if (active_matches &&
         !active_loudness_peq_.peq.process_interleaved(output_interleaved,
