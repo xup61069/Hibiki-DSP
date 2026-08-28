@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <new>
 #include <string_view>
 #include <utility>
@@ -87,10 +88,16 @@ bool fanout_interleaved_v1(const OutputFanoutPlanV1& plan,
                            const std::span<float* const> outputs,
                            const std::span<const std::size_t> output_capacities) noexcept {
     if (!validate_output_fanout_plan_v1(plan) || input_interleaved == nullptr || frames == 0U ||
+        frames > kOutputFanoutMaxInputFramesV1 ||
         outputs.size() < plan.sink_count || output_capacities.size() < plan.sink_count) {
         return false;
     }
-    const auto samples = frames * static_cast<std::size_t>(plan.output_channels);
+    const auto channel_count = static_cast<std::size_t>(plan.output_channels);
+    if (channel_count == 0U ||
+        frames > std::numeric_limits<std::size_t>::max() / channel_count) {
+        return false;
+    }
+    const auto samples = frames * channel_count;
     for (std::size_t sample = 0U; sample < samples; ++sample) {
         if (!std::isfinite(input_interleaved[sample])) {
             return false;
