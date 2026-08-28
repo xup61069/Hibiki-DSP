@@ -127,7 +127,8 @@ bool encode_session_catalog_snapshot_v1(
     std::size_t& payload_bytes) noexcept {
     payload.fill(0U);
     payload_bytes = 0U;
-    if (snapshot.sequence == 0U || snapshot.entry_count > kSessionCatalogSnapshotCapacityV1) {
+    if (snapshot.sequence == 0U || snapshot.generation == 0U ||
+        snapshot.entry_count > kSessionCatalogSnapshotCapacityV1) {
         return false;
     }
     std::array<std::uint64_t, kSessionCatalogSnapshotCapacityV1> handles{};
@@ -165,7 +166,7 @@ bool decode_session_catalog_snapshot_v1(const std::span<const std::uint8_t> payl
                           (static_cast<std::size_t>(count) *
                            kSessionCatalogSnapshotEntryBytesV1);
     if (count > kSessionCatalogSnapshotCapacityV1 || payload.size() != expected ||
-        read_u64(payload.data() + 4U) == 0U) {
+        read_u64(payload.data() + 4U) == 0U || read_u64(payload.data() + 12U) == 0U) {
         return false;
     }
     snapshot.entry_count = count;

@@ -2559,6 +2559,19 @@ int main() {
           session_response.payload.size() == session_bytes);
     CHECK(!session_store.publish(session_catalog_snapshot) && session_store.sequence() == 12U &&
           session_catalog_snapshot_reply_v1(session_response, &session_store));
+    auto zero_generation_session = session_catalog_snapshot;
+    zero_generation_session.generation = 0U;
+    std::array<std::uint8_t, kSessionCatalogSnapshotPayloadBytesV1> zero_generation_payload{};
+    std::size_t zero_generation_bytes = 0U;
+    CHECK(!encode_session_catalog_snapshot_v1(zero_generation_session, zero_generation_payload,
+                                              zero_generation_bytes) &&
+          !session_store.publish(zero_generation_session));
+    auto malformed_generation_session = session_payload;
+    std::fill(malformed_generation_session.begin() + 12,
+              malformed_generation_session.begin() + 20, static_cast<std::uint8_t>(0U));
+    CHECK(!decode_session_catalog_snapshot_v1(
+        std::span<const std::uint8_t>(malformed_generation_session.data(), session_bytes),
+        decoded_session));
     SessionVolumeCommandV1 session_volume_command{(2ULL << 32U) | 1ULL,
                                                   -622592, 1U, 12U};
     const auto session_volume_payload =
