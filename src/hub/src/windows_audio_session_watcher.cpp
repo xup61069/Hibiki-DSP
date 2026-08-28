@@ -406,6 +406,7 @@ HRESULT WindowsAudioSessionWatcher::enumerate(AudioSessionRegistry& registry) {
 
     int session_count = 0;
     result = enumerator->GetCount(&session_count);
+    if (SUCCEEDED(result) && session_count < 0) result = E_INVALIDARG;
     if (FAILED(result)) {
         enumerator->Release();
         return SUCCEEDED(first_error) ? result : first_error;
@@ -446,6 +447,7 @@ HRESULT acquire_session_volume(IAudioSessionManager2* const manager,
     }
     int session_count = 0;
     result = enumerator->GetCount(&session_count);
+    if (SUCCEEDED(result) && session_count < 0) result = E_INVALIDARG;
     if (FAILED(result)) {
         enumerator->Release();
         return result;

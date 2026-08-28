@@ -374,9 +374,11 @@ class FakeSessionEnumerator final : public IAudioSessionEnumerator {
 public:
     explicit FakeSessionEnumerator(IAudioSessionControl2* const control,
                                    IAudioSessionControl2* const secondary_control = nullptr,
-                                   const bool return_null_control_on_success = false) noexcept
+                                   const bool return_null_control_on_success = false,
+                                   const bool return_negative_count_on_success = false) noexcept
         : controls_{control, secondary_control},
-          return_null_control_on_success_(return_null_control_on_success) {
+          return_null_control_on_success_(return_null_control_on_success),
+          return_negative_count_on_success_(return_negative_count_on_success) {
         for (auto* const candidate : controls_) {
             if (candidate != nullptr) candidate->AddRef();
         }
@@ -406,6 +408,10 @@ public:
     }
     HRESULT STDMETHODCALLTYPE GetCount(int* count) override {
         if (count == nullptr) return E_POINTER;
+        if (return_negative_count_on_success_) {
+            *count = -1;
+            return S_OK;
+        }
         *count = 0;
         for (auto* const candidate : controls_) {
             if (candidate != nullptr) ++*count;
@@ -431,6 +437,7 @@ private:
     ULONG references_{1U};
     std::array<IAudioSessionControl2*, 2U> controls_{};
     bool return_null_control_on_success_{false};
+    bool return_negative_count_on_success_{false};
 };
 
 class FakeSessionManager final : public IAudioSessionManager2 {
@@ -479,7 +486,8 @@ public:
         *enumerator = nullptr;
         if (return_null_enumerator_on_success) return S_OK;
         *enumerator = new FakeSessionEnumerator(control_, secondary_control_,
-                                                return_null_session_control_on_success);
+                                                return_null_session_control_on_success,
+                                                return_negative_count_on_success);
         return *enumerator == nullptr ? E_OUTOFMEMORY : S_OK;
     }
     HRESULT STDMETHODCALLTYPE RegisterSessionNotification(
@@ -526,6 +534,7 @@ private:
 public:
     bool return_null_enumerator_on_success{false};
     bool return_null_session_control_on_success{false};
+    bool return_negative_count_on_success{false};
 };
 
 class FakeSessionDevice final : public IMMDevice {
@@ -6230,6 +6239,26 @@ int main() {
               null_session_watcher.enumerate(null_session_registry) == E_POINTER &&
               null_session_registry.sessions().empty());
         null_session_watcher.unbind();
+
+        FakeSessionVolumeControl negative_count_control;
+        FakeSessionManager negative_count_manager(&negative_count_control);
+        negative_count_manager.return_negative_count_on_success = true;
+        FakeSessionDevice negative_count_device(&negative_count_manager);
+        WindowsAudioSessionWatcher negative_count_watcher;
+        AudioSessionRegistry negative_count_registry;
+        double negative_count_db = 19.0;
+        bool negative_count_mute = true;
+        CHECK(negative_count_watcher.bind(&negative_count_device) == S_OK &&
+              negative_count_watcher.enumerate(negative_count_registry) == E_INVALIDARG &&
+              negative_count_registry.sessions().empty() &&
+              negative_count_watcher.read_session_volume(
+                  "fake-session", negative_count_db, negative_count_mute) == E_INVALIDARG &&
+              negative_count_db == 19.0 && negative_count_mute &&
+              negative_count_watcher.write_session_volume(
+                  "fake-session", -6.0, false, session_context) == E_INVALIDARG &&
+              negative_count_control.set_master_calls == 0U &&
+              negative_count_control.set_mute_calls == 0U);
+        negative_count_watcher.unbind();
     }
     {
         // A successful QueryInterface with a null output must not turn into a
