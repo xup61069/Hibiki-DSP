@@ -154,13 +154,52 @@ HRESULT WindowsVolumeBroker::write(const OutputGroupVolumeStateV1& input,
     if (endpoint_ == nullptr) {
         return AUDCLNT_E_DEVICE_INVALIDATED;
     }
-    const auto state = reconcile(input);
-    const auto level = static_cast<float>(std::clamp(state.effective_db, -144.0, 12.0));
-    HRESULT result = endpoint_->SetMasterVolumeLevel(level, &event_context);
+
+    // IAudioEndpointVolume exposes the dB and mute setters separately. Read
+    // the current pair before mutating either one so a failure in the second
+    // setter cannot leave the endpoint half-updated without a bounded
+    // recovery attempt.
+    float previous_level = -144.0F;
+    BOOL previous_mute = FALSE;
+    HRESULT result = endpoint_->GetMasterVolumeLevel(&previous_level);
     if (FAILED(result)) {
         return result;
     }
-    return endpoint_->SetMute(state.mute ? TRUE : FALSE, &event_context);
+    result = endpoint_->GetMute(&previous_mute);
+    if (FAILED(result)) {
+        return result;
+    }
+    if (!std::isfinite(previous_level)) {
+        return E_INVALIDARG;
+    }
+
+    const auto restore_and_verify = [&]() noexcept {
+        bool restored = SUCCEEDED(endpoint_->SetMasterVolumeLevel(previous_level,
+                                                                    &event_context));
+        restored = SUCCEEDED(endpoint_->SetMute(previous_mute, &event_context)) && restored;
+
+        float verified_level = -144.0F;
+        BOOL verified_mute = FALSE;
+        const auto level_result = endpoint_->GetMasterVolumeLevel(&verified_level);
+        const auto mute_result = endpoint_->GetMute(&verified_mute);
+        if (FAILED(level_result) || FAILED(mute_result) || !std::isfinite(verified_level)) {
+            return false;
+        }
+        return restored && std::fabs(verified_level - previous_level) <= 0.0001F &&
+               verified_mute == previous_mute;
+    };
+
+    const auto state = reconcile(input);
+    const auto level = static_cast<float>(std::clamp(state.effective_db, -144.0, 12.0));
+    result = endpoint_->SetMasterVolumeLevel(level, &event_context);
+    if (FAILED(result)) {
+        return restore_and_verify() ? result : E_FAIL;
+    }
+    result = endpoint_->SetMute(state.mute ? TRUE : FALSE, &event_context);
+    if (FAILED(result)) {
+        return restore_and_verify() ? result : E_FAIL;
+    }
+    return result;
 }
 
 HRESULT WindowsVolumeBroker::read_state(OutputGroupVolumeStateV1& state) noexcept {
