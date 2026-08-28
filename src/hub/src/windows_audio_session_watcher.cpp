@@ -339,7 +339,11 @@ HRESULT WindowsAudioSessionWatcher::upsert_session_control(
     if (SUCCEEDED(result)) result = control2->GetProcessId(&process_id);
     if (SUCCEEDED(result)) {
         // Display name is optional; failure must not hide a usable session.
-        control->GetDisplayName(&display_name);
+        const auto display_result = control->GetDisplayName(&display_name);
+        if (FAILED(display_result) && display_name != nullptr) {
+            CoTaskMemFree(display_name);
+            display_name = nullptr;
+        }
     }
 
     bool rule_error = false;

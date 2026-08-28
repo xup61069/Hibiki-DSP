@@ -297,7 +297,13 @@ public:
         *state = state_value;
         return S_OK;
     }
-    HRESULT STDMETHODCALLTYPE GetDisplayName(LPWSTR*) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE GetDisplayName(LPWSTR* display_name) override {
+        if (display_name == nullptr) return E_POINTER;
+        *display_name = nullptr;
+        if (!fail_display_name_with_output) return E_NOTIMPL;
+        const auto result = copy_fake_wide_string(L"ignored-failure-output", display_name);
+        return SUCCEEDED(result) ? E_FAIL : result;
+    }
     HRESULT STDMETHODCALLTYPE SetDisplayName(LPCWSTR, LPCGUID) override { return E_NOTIMPL; }
     HRESULT STDMETHODCALLTYPE GetIconPath(LPWSTR*) override { return E_NOTIMPL; }
     HRESULT STDMETHODCALLTYPE SetIconPath(LPCWSTR, LPCGUID) override { return E_NOTIMPL; }
@@ -372,6 +378,7 @@ public:
     bool return_null_session_control2_on_success{false};
     bool return_null_simple_volume_on_success{false};
     bool fail_simple_volume_query_with_output{false};
+    bool fail_display_name_with_output{false};
 
 private:
     ULONG references_{1U};
@@ -6318,6 +6325,20 @@ int main() {
               null_control2_watcher.enumerate(null_control2_registry) == E_POINTER &&
               null_control2_registry.sessions().empty());
         null_control2_watcher.unbind();
+
+        // Optional display metadata may fail after returning an allocated
+        // output; the session remains usable but the failed value is ignored.
+        FakeSessionVolumeControl failed_display_name;
+        failed_display_name.fail_display_name_with_output = true;
+        FakeSessionManager failed_display_name_manager(&failed_display_name);
+        FakeSessionDevice failed_display_name_device(&failed_display_name_manager);
+        WindowsAudioSessionWatcher failed_display_name_watcher;
+        AudioSessionRegistry failed_display_name_registry;
+        CHECK(failed_display_name_watcher.bind(&failed_display_name_device) == S_OK &&
+              failed_display_name_watcher.enumerate(failed_display_name_registry) == S_OK &&
+              failed_display_name_registry.sessions().size() == 1U &&
+              failed_display_name_registry.sessions()[0].display_name.empty());
+        failed_display_name_watcher.unbind();
 
         FakeSessionVolumeControl null_volume;
         null_volume.return_null_simple_volume_on_success = true;
