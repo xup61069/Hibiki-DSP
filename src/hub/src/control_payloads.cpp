@@ -1210,6 +1210,7 @@ encode_device_switch_payload_v1(const std::string_view endpoint_id,
                                 const std::uint64_t catalog_sequence) noexcept {
     std::array<std::uint8_t, kDeviceSwitchPayloadBytesV1> payload{};
     if (endpoint_id.empty() || endpoint_id.size() > kDeviceSwitchEndpointMaxBytesV1 ||
+        catalog_sequence == 0U ||
         !is_printable_utf8(endpoint_id)) {
         return payload;
     }
@@ -1250,12 +1251,14 @@ bool decode_device_switch_payload_v1(const std::span<const std::uint8_t> payload
         buffer_frames < 16U || buffer_frames > 4096U) {
         return false;
     }
+    const auto catalog_sequence = read_u64(payload.data() + 280U);
+    if (catalog_sequence == 0U) return false;
     command.endpoint_id_bytes = static_cast<std::uint16_t>(endpoint_bytes);
     std::copy_n(endpoint.data(), endpoint_bytes, command.endpoint_id.data());
     command.channels = channels;
     command.sample_rate = sample_rate;
     command.buffer_frames = buffer_frames;
-    command.catalog_sequence = read_u64(payload.data() + 280U);
+    command.catalog_sequence = catalog_sequence;
     return true;
 }
 
