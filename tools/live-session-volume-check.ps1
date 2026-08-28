@@ -101,6 +101,7 @@ function Assert-LiveSessionVolumePipeIoContract([string]$repoRoot) {
         'OVERLAPPED\s+overlapped\s*\{\}',
         'WaitForSingleObject\(event,\s*kIoTimeoutMs\)',
         'CancelIoEx\(handle_,\s*&overlapped\)',
+        'GetOverlappedResult\(handle_,\s*&overlapped,\s*&transferred,\s*TRUE\)',
         'CancelIoEx\(handle_,\s*nullptr\)',
         '!transfer\(true,\s*const_cast<std::uint8_t\*>\(encoded\.data\(\)\),\s*encoded\.size\(\)\)\)\s*\{\s*close\(\);\s*return\s+std::nullopt;',
         'if\s*\(!transfer\(false,\s*length\.data\(\),\s*length\.size\(\)\)\)\s*\{\s*close\(\);',

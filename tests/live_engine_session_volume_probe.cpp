@@ -220,17 +220,23 @@ private:
                                       ? WriteFile(handle_, cursor, chunk, &transferred, &overlapped)
                                       : ReadFile(handle_, cursor, chunk, &transferred, &overlapped);
             bool completed = immediate != FALSE;
+            bool pending = false;
             if (!completed && GetLastError() == ERROR_IO_PENDING) {
+                pending = true;
                 const DWORD wait_result = WaitForSingleObject(event, kIoTimeoutMs);
                 if (wait_result == WAIT_OBJECT_0) {
                     completed = GetOverlappedResult(handle_, &overlapped, &transferred, FALSE) !=
                                 FALSE;
-                } else {
-                    (void)CancelIoEx(handle_, &overlapped);
+                    pending = false;
                 }
             }
-            if (!completed || transferred == 0U) {
+            if (pending) {
+                // CancelIoEx only requests cancellation; keep the OVERLAPPED and event alive
+                // until the kernel reports completion before leaving this scope.
                 (void)CancelIoEx(handle_, &overlapped);
+                (void)GetOverlappedResult(handle_, &overlapped, &transferred, TRUE);
+            }
+            if (!completed || transferred == 0U) {
                 CloseHandle(event);
                 return false;
             }
