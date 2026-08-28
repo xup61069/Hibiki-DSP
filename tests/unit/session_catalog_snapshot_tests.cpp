@@ -153,7 +153,7 @@ int main()
         CHECK(!encode_session_catalog_snapshot_v1(snapshot, payload, payload_bytes));
 
         auto above_ceiling = make_entry(5U);
-        above_ceiling.requested_db_q16_16 = 13 * 65536;  // above +12 dB
+        above_ceiling.requested_db_q16_16 = 1 * 65536;  // above the 0 dB platform cap
         snapshot.entries[0U] = above_ceiling;
         CHECK(!encode_session_catalog_snapshot_v1(snapshot, payload, payload_bytes));
 

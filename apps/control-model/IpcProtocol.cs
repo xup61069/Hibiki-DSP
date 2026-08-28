@@ -198,6 +198,8 @@ public static class ControlPayloadsV1
     public const int SessionCatalogSnapshotMaxBytes = SessionCatalogSnapshotHeaderBytes +
                                                        (SessionCatalogSnapshotEntryBytes *
                                                         SessionCatalogSnapshotCapacity);
+    public const double SessionVolumeMinDb = -144.0;
+    public const double SessionVolumeMaxDb = 0.0;
     public const int SessionVolumeCommandBytes = 24;
     public const int SessionRouteCommandBytes = 128;
     public const int SessionRouteCommandLaneMaxBytes = 48;
@@ -255,7 +257,7 @@ public static class ControlPayloadsV1
                                                     ulong catalogSequence)
     {
         if (handle == 0UL || catalogSequence == 0UL || !double.IsFinite(requestedDb) ||
-            requestedDb < -144.0 || requestedDb > 12.0)
+            requestedDb < SessionVolumeMinDb || requestedDb > SessionVolumeMaxDb)
             throw new ArgumentOutOfRangeException(nameof(requestedDb));
         var payload = new byte[SessionVolumeCommandBytes];
         BinaryPrimitives.WriteUInt64LittleEndian(payload, handle);
@@ -282,7 +284,8 @@ public static class ControlPayloadsV1
         handle = BinaryPrimitives.ReadUInt64LittleEndian(payload);
         catalogSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[16..]);
         var q16 = BinaryPrimitives.ReadInt32LittleEndian(payload[8..]);
-        if (handle == 0UL || catalogSequence == 0UL || q16 < -144 * 65536 || q16 > 12 * 65536)
+        if (handle == 0UL || catalogSequence == 0UL ||
+            q16 < SessionVolumeMinDb * 65536 || q16 > SessionVolumeMaxDb * 65536)
             return false;
         requestedDb = q16 / 65536.0;
         mute = payload[12] != 0;
@@ -959,7 +962,8 @@ public static class ControlPayloadsV1
                 lane.Any(value => value < 0x20) || output.Any(value => value < 0x20) ||
                 !Enum.IsDefined(session.RouteState) ||
                 !double.IsFinite(session.RequestedDb) ||
-                (session.VolumeAvailable && session.RequestedDb is < -144.0 or > 12.0))
+                (session.VolumeAvailable &&
+                 session.RequestedDb is < SessionVolumeMinDb or > SessionVolumeMaxDb))
                 throw new ArgumentException("Session catalog entry is invalid.", nameof(sessions));
             var offset = SessionCatalogSnapshotHeaderBytes +
                          (index * SessionCatalogSnapshotEntryBytes);
@@ -1044,7 +1048,8 @@ public static class ControlPayloadsV1
                 output.Any(char.IsControl)) return false;
             var volumeAvailable = (flags & 1) != 0;
             var requestedDb = ReadDbQ16(entry[12..]);
-            if (volumeAvailable && (requestedDb is < -144.0 or > 12.0)) return false;
+            if (volumeAvailable &&
+                (requestedDb is < SessionVolumeMinDb or > SessionVolumeMaxDb)) return false;
             list.Add(new SessionCatalogEntryV1(handle, active != 0,
                                                 (SessionCatalogRouteStateV1)rawState,
                                                 volumeAvailable, requestedDb, muted != 0,
