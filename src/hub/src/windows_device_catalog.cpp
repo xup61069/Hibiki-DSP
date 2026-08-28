@@ -438,13 +438,7 @@ bool WindowsControlRuntimeV1::start(
                                       ? UINT64_MAX
                                       : status_store_.sequence() + 1U;
     status_snapshot_ = make_initial_status(initial_sequence);
-    SessionCatalogSnapshotV1 initial_session_catalog{};
-    const auto initial_session_sequence = session_catalog_store_.sequence() == UINT64_MAX
-                                              ? UINT64_MAX
-                                              : session_catalog_store_.sequence() + 1U;
-    initial_session_catalog.sequence = initial_session_sequence;
     if (!status_store_.publish(status_snapshot_) ||
-        !session_catalog_store_.publish(initial_session_catalog) ||
         !host_.start_with_queue(config, catalog_service_.snapshot_store(), &status_store_,
                                 &session_catalog_store_)) {
         catalog_service_.unbind();
@@ -462,6 +456,7 @@ void WindowsControlRuntimeV1::stop() noexcept {
     session_routes_.unbind();
     volume_broker_.unbind();
     catalog_service_.unbind();
+    session_catalog_store_.reset();
     worker_thread_id_ = {};
 }
 
