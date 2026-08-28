@@ -6061,8 +6061,8 @@ int main() {
     auto* session_watcher = new WindowsAudioSessionWatcher();
     std::uint64_t session_sequence = 0;
     CHECK(!session_watcher->poll(session_sequence));
-    CHECK(session_watcher->OnSessionCreated(nullptr) == S_OK);
-    CHECK(session_watcher->poll(session_sequence) && session_sequence == 1U);
+    CHECK(session_watcher->OnSessionCreated(nullptr) == S_OK &&
+          !session_watcher->poll(session_sequence));
     std::atomic<std::uint32_t> session_add_ref_calls{0U};
     std::atomic<std::uint32_t> session_release_calls{0U};
     std::atomic<std::uint32_t> session_destruction_count{0U};
@@ -6075,10 +6075,10 @@ int main() {
         session_callback_result = session_watcher->OnSessionCreated(retained_session);
     });
     CHECK(session_callback_result == S_OK &&
-          session_add_ref_calls.load(std::memory_order_relaxed) == 1U &&
+          session_add_ref_calls.load(std::memory_order_relaxed) == 0U &&
           session_query_interface_calls.load(std::memory_order_relaxed) == 0U &&
           session_callback_allocations == 0U &&
-          session_watcher->poll(session_sequence) && session_sequence == 2U);
+          !session_watcher->poll(session_sequence));
     CHECK(session_watcher->write_session_volume("missing", -12.0, false, session_context) ==
           E_UNEXPECTED);
     double session_db = 0.0;
@@ -6086,10 +6086,8 @@ int main() {
     CHECK(session_watcher->read_session_volume("missing", session_db, session_mute) ==
           E_UNEXPECTED);
     CHECK(session_watcher->Release() == 0U);
-    CHECK(session_release_calls.load(std::memory_order_relaxed) == 1U &&
-          session_destruction_count.load(std::memory_order_relaxed) == 0U);
     CHECK(retained_session->Release() == 0U &&
-          session_release_calls.load(std::memory_order_relaxed) == 2U &&
+          session_release_calls.load(std::memory_order_relaxed) == 1U &&
           session_destruction_count.load(std::memory_order_relaxed) == 1U);
     {
         // A two-step volume write must not expose a half-applied state when
@@ -6153,6 +6151,8 @@ int main() {
         // Teardown must not drain/reset the queue while a session-manager
         // callback is still retaining its control pointer.
         WindowsAudioSessionWatcher teardown_watcher;
+        FakeSessionManager teardown_manager(nullptr);
+        FakeSessionDevice teardown_device(&teardown_manager);
         std::atomic<std::uint32_t> teardown_add_ref_calls{0U};
         std::atomic<std::uint32_t> teardown_release_calls{0U};
         std::atomic<std::uint32_t> teardown_destruction_count{0U};
@@ -6170,6 +6170,7 @@ int main() {
         std::atomic<std::uint32_t> late_destruction_count{0U};
         std::atomic<std::uint32_t> late_query_interface_calls{0U};
         std::atomic<bool> late_callbacks_succeeded{true};
+        CHECK(teardown_watcher.bind(&teardown_device) == S_OK);
         auto* teardown_session = new RetainedAudioSessionControl(
             teardown_add_ref_calls, teardown_release_calls, teardown_destruction_count,
             teardown_query_interface_calls, &add_ref_entered, &allow_add_ref);
@@ -6235,6 +6236,8 @@ int main() {
     {
         constexpr std::size_t pending_capacity = 64U;
         WindowsAudioSessionWatcher bounded_watcher;
+        FakeSessionManager bounded_manager(nullptr);
+        FakeSessionDevice bounded_device(&bounded_manager);
         std::atomic<std::uint32_t> bounded_add_ref_calls{0U};
         std::atomic<std::uint32_t> bounded_release_calls{0U};
         std::atomic<std::uint32_t> bounded_destruction_count{0U};
@@ -6245,7 +6248,7 @@ int main() {
                 bounded_add_ref_calls, bounded_release_calls, bounded_destruction_count,
                 bounded_query_interface_calls);
         }
-        bool callbacks_succeeded = true;
+        bool callbacks_succeeded = bounded_watcher.bind(&bounded_device) == S_OK;
         for (auto* pending_session : pending_sessions) {
             callbacks_succeeded = callbacks_succeeded &&
                                   bounded_watcher.OnSessionCreated(pending_session) == S_OK;
@@ -6273,7 +6276,10 @@ int main() {
         auto* reused_session = new RetainedAudioSessionControl(
             reused_add_ref_calls, reused_release_calls, reused_destruction_count,
             reused_query_interface_calls);
-        CHECK(bounded_watcher.OnSessionCreated(reused_session) == S_OK &&
+        FakeSessionManager reused_manager(nullptr);
+        FakeSessionDevice reused_device(&reused_manager);
+        CHECK(bounded_watcher.bind(&reused_device) == S_OK &&
+              bounded_watcher.OnSessionCreated(reused_session) == S_OK &&
               reused_add_ref_calls.load(std::memory_order_relaxed) == 1U &&
               reused_query_interface_calls.load(std::memory_order_relaxed) == 0U);
         std::uint64_t reused_sequence = 0U;
@@ -6294,6 +6300,8 @@ int main() {
         constexpr std::size_t callback_count = producer_count * callbacks_per_producer;
         constexpr std::size_t pending_capacity = 64U;
         WindowsAudioSessionWatcher concurrent_watcher;
+        FakeSessionManager concurrent_manager(nullptr);
+        FakeSessionDevice concurrent_device(&concurrent_manager);
         std::atomic<std::uint32_t> concurrent_add_ref_calls{0U};
         std::atomic<std::uint32_t> concurrent_release_calls{0U};
         std::atomic<std::uint32_t> concurrent_destruction_count{0U};
@@ -6307,7 +6315,7 @@ int main() {
         }
         std::atomic<std::size_t> ready_producers{0U};
         std::atomic<bool> start_producers{false};
-        std::atomic<bool> callbacks_succeeded{true};
+        std::atomic<bool> callbacks_succeeded{concurrent_watcher.bind(&concurrent_device) == S_OK};
         std::array<std::thread, producer_count> producers;
         for (std::size_t producer = 0U; producer < producer_count; ++producer) {
             producers[producer] = std::thread([&, producer] {

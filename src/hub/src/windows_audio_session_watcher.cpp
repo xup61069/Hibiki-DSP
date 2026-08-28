@@ -283,6 +283,7 @@ HRESULT WindowsAudioSessionWatcher::bind(IMMDevice* const device) {
     registered_ = true;
     last_sequence_ = 0;
     sequence_.store(0U, std::memory_order_release);
+    callbacks_state_.store(0U, std::memory_order_seq_cst);
     return S_OK;
 }
 
@@ -306,9 +307,6 @@ void WindowsAudioSessionWatcher::unbind() noexcept {
     endpoint_id_.clear();
     last_sequence_ = 0;
     sequence_.store(0U, std::memory_order_release);
-    if (!destroying_.load(std::memory_order_seq_cst)) {
-        callbacks_state_.store(0U, std::memory_order_seq_cst);
-    }
 }
 
 HRESULT WindowsAudioSessionWatcher::upsert_session_control(

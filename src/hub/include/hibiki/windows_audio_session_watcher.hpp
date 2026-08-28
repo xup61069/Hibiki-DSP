@@ -86,7 +86,7 @@ private:
     // the low-bit in-flight count before draining or resetting the queue. A
     // callback that races with closure can only win the CAS before closure or
     // observe the closed state; it cannot enter after the wait sees zero.
-    std::atomic<std::uint32_t> callbacks_state_{0U};
+    std::atomic<std::uint32_t> callbacks_state_{kCallbacksBlocked};
     std::atomic<bool> destroying_{false};
     std::atomic<std::uint64_t> sequence_{0};
     std::uint64_t last_sequence_{0};
