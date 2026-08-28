@@ -260,6 +260,11 @@ public:
             return_null_session_control2_on_success) {
             return S_OK;
         }
+        if (iid == __uuidof(ISimpleAudioVolume) && fail_simple_volume_query_with_output) {
+            *object = static_cast<ISimpleAudioVolume*>(this);
+            AddRef();
+            return E_FAIL;
+        }
         if (iid == __uuidof(ISimpleAudioVolume) && return_null_simple_volume_on_success) {
             return S_OK;
         }
@@ -285,6 +290,7 @@ public:
         if (references_ > 0U) --references_;
         return references_;
     }
+    ULONG reference_count() const noexcept { return references_; }
 
     HRESULT STDMETHODCALLTYPE GetState(AudioSessionState* state) override {
         if (state == nullptr) return E_POINTER;
@@ -365,6 +371,7 @@ public:
     std::wstring session_instance_identifier{L"fake-session"};
     bool return_null_session_control2_on_success{false};
     bool return_null_simple_volume_on_success{false};
+    bool fail_simple_volume_query_with_output{false};
 
 private:
     ULONG references_{1U};
@@ -464,6 +471,7 @@ public:
         if (references_ > 0U) --references_;
         return references_;
     }
+    ULONG reference_count() const noexcept { return references_; }
     HRESULT STDMETHODCALLTYPE GetAudioSessionControl(LPCGUID, DWORD,
                                                       IAudioSessionControl** control) override {
         if (control == nullptr) return E_POINTER;
@@ -488,6 +496,7 @@ public:
         *enumerator = new FakeSessionEnumerator(control_, secondary_control_,
                                                 return_null_session_control_on_success,
                                                 return_negative_count_on_success);
+        if (return_failed_enumerator_with_output && *enumerator != nullptr) return E_FAIL;
         return *enumerator == nullptr ? E_OUTOFMEMORY : S_OK;
     }
     HRESULT STDMETHODCALLTYPE RegisterSessionNotification(
@@ -535,6 +544,7 @@ public:
     bool return_null_enumerator_on_success{false};
     bool return_null_session_control_on_success{false};
     bool return_negative_count_on_success{false};
+    bool return_failed_enumerator_with_output{false};
 };
 
 class FakeSessionDevice final : public IMMDevice {
@@ -555,7 +565,8 @@ public:
         return references_;
     }
     HRESULT STDMETHODCALLTYPE GetId(LPWSTR* identifier) override {
-        return copy_fake_wide_string(L"fake-endpoint", identifier);
+        const auto result = copy_fake_wide_string(L"fake-endpoint", identifier);
+        return fail_get_id_with_output ? E_FAIL : result;
     }
     HRESULT STDMETHODCALLTYPE GetState(DWORD* state) override {
         if (state == nullptr) return E_POINTER;
@@ -570,6 +581,11 @@ public:
         if (object == nullptr) return E_POINTER;
         *object = nullptr;
         if (iid != __uuidof(IAudioSessionManager2) || manager_ == nullptr) return E_NOINTERFACE;
+        if (fail_activation_with_output) {
+            *object = static_cast<IAudioSessionManager2*>(manager_);
+            manager_->AddRef();
+            return E_FAIL;
+        }
         if (return_null_manager_on_success) return S_OK;
         *object = static_cast<IAudioSessionManager2*>(manager_);
         manager_->AddRef();
@@ -582,6 +598,8 @@ private:
 
 public:
     bool return_null_manager_on_success{false};
+    bool fail_get_id_with_output{false};
+    bool fail_activation_with_output{false};
 };
 #endif
 
@@ -6209,6 +6227,21 @@ int main() {
         WindowsAudioSessionWatcher activation_watcher;
         CHECK(activation_watcher.bind(&activation_device) == E_POINTER &&
               activation_watcher.endpoint_id().empty());
+
+        FakeSessionManager failed_activation_manager(nullptr);
+        FakeSessionDevice failed_activation_device(&failed_activation_manager);
+        failed_activation_device.fail_activation_with_output = true;
+        WindowsAudioSessionWatcher failed_activation_watcher;
+        CHECK(failed_activation_watcher.bind(&failed_activation_device) == E_FAIL &&
+              failed_activation_watcher.endpoint_id().empty() &&
+              failed_activation_manager.reference_count() == 1U);
+
+        FakeSessionManager failed_id_manager(nullptr);
+        FakeSessionDevice failed_id_device(&failed_id_manager);
+        failed_id_device.fail_get_id_with_output = true;
+        WindowsAudioSessionWatcher failed_id_watcher;
+        CHECK(failed_id_watcher.bind(&failed_id_device) == E_FAIL &&
+              failed_id_watcher.endpoint_id().empty());
     }
     {
         // Successful enumeration calls must still validate every COM output
@@ -6239,6 +6272,18 @@ int main() {
               null_session_watcher.enumerate(null_session_registry) == E_POINTER &&
               null_session_registry.sessions().empty());
         null_session_watcher.unbind();
+
+        FakeSessionVolumeControl failed_enumerator_control;
+        FakeSessionManager failed_enumerator_manager(&failed_enumerator_control);
+        failed_enumerator_manager.return_failed_enumerator_with_output = true;
+        FakeSessionDevice failed_enumerator_device(&failed_enumerator_manager);
+        WindowsAudioSessionWatcher failed_enumerator_watcher;
+        AudioSessionRegistry failed_enumerator_registry;
+        CHECK(failed_enumerator_watcher.bind(&failed_enumerator_device) == S_OK &&
+              failed_enumerator_watcher.enumerate(failed_enumerator_registry) == E_FAIL &&
+              failed_enumerator_registry.sessions().empty() &&
+              failed_enumerator_control.reference_count() == 1U);
+        failed_enumerator_watcher.unbind();
 
         FakeSessionVolumeControl negative_count_control;
         FakeSessionManager negative_count_manager(&negative_count_control);
@@ -6289,6 +6334,27 @@ int main() {
                                                        session_context) == E_POINTER &&
               null_volume.set_master_calls == 0U && null_volume.set_mute_calls == 0U);
         null_volume_watcher.unbind();
+
+        FakeSessionVolumeControl failed_volume;
+        FakeSessionManager failed_volume_manager(&failed_volume);
+        FakeSessionDevice failed_volume_device(&failed_volume_manager);
+        WindowsAudioSessionWatcher failed_volume_watcher;
+        AudioSessionRegistry failed_volume_registry;
+        CHECK(failed_volume_watcher.bind(&failed_volume_device) == S_OK &&
+              failed_volume_watcher.enumerate(failed_volume_registry) == S_OK &&
+              failed_volume_registry.sessions().size() == 1U);
+        const auto failed_volume_references = failed_volume.reference_count();
+        failed_volume.fail_simple_volume_query_with_output = true;
+        preserved_db = -9.0;
+        preserved_mute = true;
+        CHECK(failed_volume_watcher.read_session_volume(
+                  "fake-session", preserved_db, preserved_mute) == E_FAIL &&
+              preserved_db == -9.0 && preserved_mute &&
+              failed_volume_watcher.write_session_volume(
+                  "fake-session", -6.0, false, session_context) == E_FAIL &&
+              failed_volume.set_master_calls == 0U && failed_volume.set_mute_calls == 0U &&
+              failed_volume.reference_count() == failed_volume_references);
+        failed_volume_watcher.unbind();
     }
     {
         // A valid target after another enumerated session must still be found;
