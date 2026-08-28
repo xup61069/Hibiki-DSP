@@ -132,7 +132,9 @@ preflight。這是 user-space bounded runtime，仍不等於真實硬體 sink／
 in-progress，完整寫入後才發布 stable token；reader 先宣告 hazard slot 並重新驗證 token，
 writer 不得覆寫被保護的 slot。觀察到 odd、changed token、非法 slot 或無法完成 handshake
 時一律 fail-closed。這個 bounded lifetime/reuse proof 讓 request 與 snapshot 都只能被接受為
-單一完整 generation，不依賴 relaxed 多欄位 seqlock；它仍只是 user-space coordination。
+單一完整 generation，不依賴 relaxed 多欄位 seqlock；reset／prepare 使既有 token 失效時也
+不得清除 in-flight reader hazard，直到 reader guard 完成，避免第一個 post-reset generation
+重用仍在讀取的 slot；它仍只是 user-space coordination。
 
 `AudioEngineModel::prepare_wasapi_fanout` 與 `process_output_group_to_wasapi_fanout` 將上述
 physical sink fan-out 接到 graph：graph、Group Master 與 limiter 只執行一次，之後同一個
