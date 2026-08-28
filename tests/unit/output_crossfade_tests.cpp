@@ -2,10 +2,12 @@
 
 #include "hibiki/output_crossfade.hpp"
 
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <vector>
 
 #define CHECK(expr)                                                             \
@@ -141,6 +143,39 @@ int main() {
     CHECK(overshoot.snapshot().processed_frames == kTotalFrames);
     constexpr std::size_t kClampedIndex = 500U * kStereo;
     CHECK(std::abs(blended[kClampedIndex] - 2.0F) < 1e-6F);
+
+    // ---- interleaved geometry overflow is rejected without state mutation -
+    hibiki::OutputCrossfade geometry_baseline;
+    hibiki::OutputCrossfade geometry_candidate;
+    CHECK(geometry_baseline.begin(kStereo, kRate48k, 10U));
+    CHECK(geometry_candidate.begin(kStereo, kRate48k, 10U));
+    std::array<float, kStereo> geometry_old{1.0F, -1.0F};
+    std::array<float, kStereo> geometry_new{0.5F, -0.5F};
+    std::array<float, kStereo> geometry_output{-7.0F, -7.0F};
+    const auto untouched_geometry_output = geometry_output;
+    const auto snapshot_before_reject = geometry_candidate.snapshot();
+    constexpr auto kMaxStereoFrames =
+        std::numeric_limits<std::size_t>::max() / kStereo;
+    constexpr auto kOverflowFrames = kMaxStereoFrames + 1U;
+    CHECK(kOverflowFrames > kMaxStereoFrames);
+    CHECK(!geometry_candidate.process(geometry_old.data(), geometry_new.data(),
+                                     geometry_output.data(), kOverflowFrames));
+    CHECK(geometry_output == untouched_geometry_output);
+    CHECK(geometry_candidate.snapshot().active == snapshot_before_reject.active);
+    CHECK(geometry_candidate.snapshot().channels == snapshot_before_reject.channels);
+    CHECK(geometry_candidate.snapshot().total_frames == snapshot_before_reject.total_frames);
+    CHECK(geometry_candidate.snapshot().processed_frames ==
+          snapshot_before_reject.processed_frames);
+
+    CHECK(geometry_baseline.process(geometry_old.data(), geometry_new.data(),
+                                   geometry_output.data(), 1U));
+    geometry_output.fill(-7.0F);
+    CHECK(geometry_candidate.process(geometry_old.data(), geometry_new.data(),
+                                    geometry_output.data(), 1U));
+    CHECK(geometry_output[0] == geometry_old[0]);
+    CHECK(geometry_output[1] == geometry_old[1]);
+    CHECK(geometry_candidate.snapshot().processed_frames ==
+          geometry_baseline.snapshot().processed_frames);
 
     // ---- multichannel interleaving ------------------------------------------
     hibiki::OutputCrossfade surround;
