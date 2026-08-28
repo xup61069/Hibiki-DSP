@@ -57,6 +57,7 @@ public:
 
 private:
     static constexpr std::size_t kPendingSessionCapacity = 64U;
+    static constexpr std::size_t kSessionControlCacheCapacity = 256U;
 
     struct PendingSessionSlot final {
         std::atomic<std::size_t> sequence{0U};
@@ -90,6 +91,8 @@ private:
         std::string session_instance_id;
         IAudioSessionControl* control{nullptr};
     };
+    // Worker-owned bounded FIFO cache. Entries are evicted oldest-first when
+    // Windows reports more historical sessions than the registry capacity.
     std::vector<CachedSessionControl> cached_session_controls_;
 };
 

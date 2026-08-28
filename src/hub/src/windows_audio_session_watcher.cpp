@@ -181,14 +181,18 @@ bool WindowsAudioSessionWatcher::cache_session_control(
         }
         return true;
     }
-    if (cached_session_controls_.size() >= 256U) return false;
+    CachedSessionControl cached;
     IAudioSessionControl* retained = nullptr;
     try {
-        CachedSessionControl cached;
         cached.session_instance_id = std::string(session_instance_id);
         control->AddRef();
         retained = control;
         cached.control = control;
+        if (cached_session_controls_.size() >= kSessionControlCacheCapacity) {
+            auto& oldest = cached_session_controls_.front();
+            if (oldest.control != nullptr) oldest.control->Release();
+            cached_session_controls_.erase(cached_session_controls_.begin());
+        }
         cached_session_controls_.push_back(std::move(cached));
         retained = nullptr;
         return true;
