@@ -21,6 +21,70 @@ bool valid_channels(const std::uint32_t channels) noexcept {
     });
 }
 
+constexpr std::uint64_t kPublicationWritingBit = 1U;
+constexpr std::uint64_t kPublicationSlotMask = 0x6U;
+constexpr std::uint32_t kPublicationSlotShift = 1U;
+constexpr std::uint32_t kPublicationGenerationShift = 3U;
+constexpr std::uint32_t kNoPublicationReaderSlot = 0xFFFFFFFFU;
+constexpr std::uint32_t kPublicationSlotCount = 3U;
+
+[[nodiscard]] std::uint32_t publication_slot(
+    const std::uint64_t token) noexcept {
+    return static_cast<std::uint32_t>((token & kPublicationSlotMask) >>
+                                      kPublicationSlotShift);
+}
+
+[[nodiscard]] bool try_reserve_publication(
+    std::atomic<std::uint64_t>& publication,
+    std::atomic<std::uint32_t>& reader_slot,
+    std::uint64_t& stable_token,
+    std::uint32_t& target_slot) noexcept {
+    auto current = publication.load(std::memory_order_seq_cst);
+    if ((current & kPublicationWritingBit) != 0U) { return false; }
+    const auto current_slot =
+        current == 0U ? kNoPublicationReaderSlot : publication_slot(current);
+    if (current != 0U && current_slot >= kPublicationSlotCount) {
+        return false;
+    }
+    const auto protected_slot = reader_slot.load(std::memory_order_seq_cst);
+    target_slot = kNoPublicationReaderSlot;
+    for (std::uint32_t candidate = 0U;
+         candidate < kPublicationSlotCount; ++candidate) {
+        if (candidate != current_slot && candidate != protected_slot) {
+            target_slot = candidate;
+            break;
+        }
+    }
+    if (target_slot == kNoPublicationReaderSlot) { return false; }
+
+    const auto current_generation = current >> kPublicationGenerationShift;
+    const auto max_generation =
+        std::numeric_limits<std::uint64_t>::max() >>
+        kPublicationGenerationShift;
+    const auto next_generation =
+        current_generation >= max_generation ? 1U : current_generation + 1U;
+    const auto in_progress =
+        (next_generation << kPublicationGenerationShift) |
+        (static_cast<std::uint64_t>(target_slot) << kPublicationSlotShift) |
+        kPublicationWritingBit;
+    if (!publication.compare_exchange_strong(
+            current, in_progress, std::memory_order_seq_cst,
+            std::memory_order_seq_cst)) {
+        return false;
+    }
+    stable_token = in_progress & ~kPublicationWritingBit;
+    return true;
+}
+
+struct PublicationReaderGuard final {
+    std::atomic<std::uint32_t>& reader_slot;
+
+    ~PublicationReaderGuard() {
+        reader_slot.store(kNoPublicationReaderSlot,
+                          std::memory_order_seq_cst);
+    }
+};
+
 }  // namespace
 
 bool validate_output_fanout_plan_v1(const OutputFanoutPlanV1& plan) noexcept {
@@ -141,10 +205,13 @@ bool OutputFanoutRuntimeV1::prepare(const OutputFanoutPlanV1& plan,
     applied_clock_sequences_.fill(0U);
     for (std::size_t index = 0U; index < kOutputFanoutMaxSinksV1; ++index) {
         auto& request = clock_requests_[index];
-        request.source_frames.store(0.0, std::memory_order_relaxed);
-        request.sink_frames.store(0.0, std::memory_order_relaxed);
-        request.elapsed_seconds.store(0.0, std::memory_order_relaxed);
-        request.sequence.store(0U, std::memory_order_release);
+        request.publication.store(0U, std::memory_order_seq_cst);
+        request.reader_slot.store(kNoPublicationReaderSlot,
+                                  std::memory_order_seq_cst);
+        clock_publications_[index].publication.store(
+            0U, std::memory_order_seq_cst);
+        clock_publications_[index].reader_slot.store(
+            kNoPublicationReaderSlot, std::memory_order_seq_cst);
         publish_clock_snapshot(index, sinks_[index].snapshot());
     }
     prepared_ = true;
@@ -160,17 +227,27 @@ void OutputFanoutRuntimeV1::reset() noexcept {
             sinks_[index].reset();
         }
         auto& request = clock_requests_[index];
-        request.source_frames.store(0.0, std::memory_order_relaxed);
-        request.sink_frames.store(0.0, std::memory_order_relaxed);
-        request.elapsed_seconds.store(0.0, std::memory_order_relaxed);
-        request.sequence.store(0U, std::memory_order_release);
+        request.publication.store(0U, std::memory_order_seq_cst);
+        request.reader_slot.store(kNoPublicationReaderSlot,
+                                  std::memory_order_seq_cst);
         applied_clock_sequences_[index] = 0U;
+        clock_publications_[index].publication.store(
+            0U, std::memory_order_seq_cst);
+        clock_publications_[index].reader_slot.store(
+            kNoPublicationReaderSlot, std::memory_order_seq_cst);
         publish_clock_snapshot(index, sinks_[index].snapshot());
     }
     for (std::size_t index = plan_.sink_count; index < kOutputFanoutMaxSinksV1;
          ++index) {
-        clock_requests_[index].sequence.store(0U, std::memory_order_release);
+        clock_requests_[index].publication.store(0U,
+                                                  std::memory_order_seq_cst);
+        clock_requests_[index].reader_slot.store(
+            kNoPublicationReaderSlot, std::memory_order_seq_cst);
         applied_clock_sequences_[index] = 0U;
+        clock_publications_[index].publication.store(
+            0U, std::memory_order_seq_cst);
+        clock_publications_[index].reader_slot.store(
+            kNoPublicationReaderSlot, std::memory_order_seq_cst);
         publish_clock_snapshot(index, sinks_[index].snapshot());
     }
 }
@@ -187,18 +264,17 @@ bool OutputFanoutRuntimeV1::observe_clock(const std::size_t sink_index,
     }
 
     auto& request = clock_requests_[sink_index];
-    auto sequence = request.sequence.load(std::memory_order_acquire);
-    const auto max_sequence = std::numeric_limits<std::uint64_t>::max();
-    if ((sequence & 1U) != 0U || sequence > max_sequence - 3U ||
-        !request.sequence.compare_exchange_strong(
-            sequence, sequence + 1U, std::memory_order_acq_rel,
-            std::memory_order_acquire)) {
+    std::uint64_t stable_token = 0U;
+    std::uint32_t target_slot = kNoPublicationReaderSlot;
+    if (!try_reserve_publication(request.publication, request.reader_slot,
+                                 stable_token, target_slot)) {
         return false;
     }
-    request.source_frames.store(source_frames, std::memory_order_relaxed);
-    request.sink_frames.store(sink_frames, std::memory_order_relaxed);
-    request.elapsed_seconds.store(elapsed_seconds, std::memory_order_relaxed);
-    request.sequence.store(sequence + 2U, std::memory_order_release);
+    auto& slot = request.slots[target_slot];
+    slot.source_frames.store(source_frames, std::memory_order_release);
+    slot.sink_frames.store(sink_frames, std::memory_order_release);
+    slot.elapsed_seconds.store(elapsed_seconds, std::memory_order_release);
+    request.publication.store(stable_token, std::memory_order_seq_cst);
     return true;
 }
 
@@ -209,21 +285,38 @@ bool OutputFanoutRuntimeV1::apply_pending_clock_observations() noexcept {
             continue;
         }
         auto& request = clock_requests_[index];
-        const auto before = request.sequence.load(std::memory_order_acquire);
-        if (before == 0U || (before & 1U) != 0U ||
+        const auto before = request.publication.load(std::memory_order_seq_cst);
+        if (before == 0U || (before & kPublicationWritingBit) != 0U ||
             before == applied_clock_sequences_[index]) {
             continue;
         }
-        const double source_frames =
-            request.source_frames.load(std::memory_order_relaxed);
-        const double sink_frames = request.sink_frames.load(std::memory_order_relaxed);
-        const double elapsed_seconds =
-            request.elapsed_seconds.load(std::memory_order_relaxed);
-        const auto after = request.sequence.load(std::memory_order_acquire);
-        if (before != after || (after & 1U) != 0U ||
-            !std::isfinite(source_frames) || !std::isfinite(sink_frames) ||
-            !std::isfinite(elapsed_seconds) || source_frames <= 0.0 ||
-            sink_frames <= 0.0 || elapsed_seconds <= 0.0) {
+        const auto slot_index = publication_slot(before);
+        if (slot_index >= kPublicationSlotCount) { continue; }
+
+        double source_frames = 0.0;
+        double sink_frames = 0.0;
+        double elapsed_seconds = 0.0;
+        bool stable = false;
+        {
+            request.reader_slot.store(slot_index, std::memory_order_seq_cst);
+            PublicationReaderGuard reader_guard{request.reader_slot};
+            if (request.publication.load(std::memory_order_seq_cst) != before) {
+                continue;
+            }
+            const auto& slot = request.slots[slot_index];
+            source_frames =
+                slot.source_frames.load(std::memory_order_acquire);
+            sink_frames = slot.sink_frames.load(std::memory_order_acquire);
+            elapsed_seconds =
+                slot.elapsed_seconds.load(std::memory_order_acquire);
+            const auto after = request.publication.load(std::memory_order_seq_cst);
+            stable = before == after &&
+                     (after & kPublicationWritingBit) == 0U;
+        }
+        if (!stable || !std::isfinite(source_frames) ||
+            !std::isfinite(sink_frames) || !std::isfinite(elapsed_seconds) ||
+            source_frames <= 0.0 || sink_frames <= 0.0 ||
+            elapsed_seconds <= 0.0) {
             continue;
         }
         sinks_[index].observe_clock(source_frames, sink_frames, elapsed_seconds);
@@ -237,14 +330,19 @@ void OutputFanoutRuntimeV1::publish_clock_snapshot(
     const std::size_t sink_index,
     const OutputSinkClockSnapshotV1& snapshot) noexcept {
     auto& publication = clock_publications_[sink_index];
-    const auto current = publication.sequence.load(std::memory_order_relaxed);
-    const auto begin = (current & 1U) == 0U ? current + 1U : current + 2U;
-    publication.sequence.store(begin, std::memory_order_relaxed);
-    publication.ratio.store(snapshot.ratio, std::memory_order_relaxed);
-    publication.drift_ppm.store(snapshot.drift_ppm, std::memory_order_relaxed);
-    publication.source_step.store(snapshot.source_step, std::memory_order_relaxed);
-    publication.prepared.store(snapshot.prepared, std::memory_order_relaxed);
-    publication.sequence.store(begin + 1U, std::memory_order_release);
+    std::uint64_t stable_token = 0U;
+    std::uint32_t target_slot = kNoPublicationReaderSlot;
+    if (!try_reserve_publication(publication.publication,
+                                 publication.reader_slot, stable_token,
+                                 target_slot)) {
+        return;
+    }
+    auto& slot = publication.slots[target_slot];
+    slot.ratio.store(snapshot.ratio, std::memory_order_release);
+    slot.drift_ppm.store(snapshot.drift_ppm, std::memory_order_release);
+    slot.source_step.store(snapshot.source_step, std::memory_order_release);
+    slot.prepared.store(snapshot.prepared, std::memory_order_release);
+    publication.publication.store(stable_token, std::memory_order_seq_cst);
 }
 
 bool OutputFanoutRuntimeV1::read_clock_snapshot(
@@ -252,17 +350,27 @@ bool OutputFanoutRuntimeV1::read_clock_snapshot(
     OutputSinkClockSnapshotV1& snapshot) const noexcept {
     const auto& publication = clock_publications_[sink_index];
     for (std::size_t attempt = 0U; attempt < 2U; ++attempt) {
-        const auto before = publication.sequence.load(std::memory_order_acquire);
-        if ((before & 1U) != 0U) {
+        const auto before = publication.publication.load(
+            std::memory_order_seq_cst);
+        if (before == 0U || (before & kPublicationWritingBit) != 0U) {
             continue;
         }
-        const double ratio = publication.ratio.load(std::memory_order_relaxed);
-        const double drift_ppm = publication.drift_ppm.load(std::memory_order_relaxed);
+        const auto slot_index = publication_slot(before);
+        if (slot_index >= kPublicationSlotCount) { continue; }
+        publication.reader_slot.store(slot_index, std::memory_order_seq_cst);
+        PublicationReaderGuard reader_guard{publication.reader_slot};
+        if (publication.publication.load(std::memory_order_seq_cst) != before) {
+            continue;
+        }
+        const auto& slot = publication.slots[slot_index];
+        const double ratio = slot.ratio.load(std::memory_order_acquire);
+        const double drift_ppm = slot.drift_ppm.load(std::memory_order_acquire);
         const double source_step =
-            publication.source_step.load(std::memory_order_relaxed);
-        const bool prepared = publication.prepared.load(std::memory_order_relaxed);
-        const auto after = publication.sequence.load(std::memory_order_acquire);
-        if (before == after && (after & 1U) == 0U) {
+            slot.source_step.load(std::memory_order_acquire);
+        const bool prepared = slot.prepared.load(std::memory_order_acquire);
+        const auto after = publication.publication.load(
+            std::memory_order_seq_cst);
+        if (before == after && (after & kPublicationWritingBit) == 0U) {
             snapshot = OutputSinkClockSnapshotV1{
                 ratio, drift_ppm, source_step, prepared};
             return true;

@@ -2,6 +2,7 @@
 
 #include "hibiki/output_fanout.hpp"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
@@ -455,6 +456,123 @@ int main() {
               std::isfinite(final_snapshot.sinks[0].ratio) &&
               std::isfinite(final_snapshot.sinks[0].source_step) &&
               std::abs(final_snapshot.sinks[0].ratio - 1.0) > 1.0e-12);
+    }
+
+    // The request and snapshot protocols must preserve complete
+    // generation-distinct tuples, not merely mathematically related fields.
+    // Coordinate one request with one audio process at a time so the expected
+    // complete generations are independently reproducible, while a third
+    // reader continuously samples the published snapshot concurrently.
+    {
+        const auto plan = make_valid_plan();
+        hibiki::OutputFanoutRuntimeV1 runtime;
+        CHECK(runtime.prepare(plan, 1.0));
+
+        constexpr std::size_t kTrackedGenerations = 128U;
+        std::array<hibiki::OutputSinkClockSnapshotV1,
+                   kTrackedGenerations + 1U>
+            expected{};
+        expected[0] = hibiki::OutputSinkClockSnapshotV1{
+            1.0, 0.0, 1.0, true};
+        double expected_ratio = 1.0;
+        for (std::size_t generation = 1U;
+             generation <= kTrackedGenerations; ++generation) {
+            const auto phase = static_cast<int>((generation - 1U) % 16U) - 8;
+            const double source_frames = 48000.0 + phase;
+            const double sink_frames = 48000.0 - phase;
+            const double target = std::clamp(
+                sink_frames / source_frames, 1.0 - 500.0e-6,
+                1.0 + 500.0e-6);
+            expected_ratio = std::clamp(
+                (expected_ratio * 0.99) + (target * 0.01),
+                1.0 - 500.0e-6, 1.0 + 500.0e-6);
+            expected[generation] = hibiki::OutputSinkClockSnapshotV1{
+                expected_ratio, (expected_ratio - 1.0) * 1.0e6,
+                1.0 / expected_ratio, true};
+        }
+
+        std::array<float, 256> input{};
+        input.fill(0.25F);
+        std::atomic<std::size_t> requested_generation{0U};
+        std::atomic<std::size_t> completed_generation{0U};
+        std::atomic<bool> exact_stop{false};
+        std::atomic<bool> exact_failed{false};
+
+        std::thread exact_audio([&] {
+            std::array<float, 512> output_a{};
+            std::array<float, 512> output_b{};
+            float* outputs[2] = {output_a.data(), output_b.data()};
+            const std::size_t capacities[2] = {256U, 256U};
+            std::size_t output_frames[2] = {};
+            for (std::size_t generation = 1U;
+                 generation <= kTrackedGenerations; ++generation) {
+                while (!exact_stop.load(std::memory_order_acquire) &&
+                       requested_generation.load(std::memory_order_acquire) <
+                           generation) {
+                    std::this_thread::yield();
+                }
+                if (exact_stop.load(std::memory_order_acquire)) return;
+                if (!runtime.process(
+                        input.data(), input.size() / 2U,
+                        std::span<float* const>(outputs, 2U),
+                        std::span<const std::size_t>(capacities, 2U),
+                        std::span<std::size_t>(output_frames, 2U))) {
+                    exact_failed.store(true, std::memory_order_release);
+                    exact_stop.store(true, std::memory_order_release);
+                    return;
+                }
+                completed_generation.store(generation,
+                                          std::memory_order_release);
+            }
+        });
+
+        std::thread exact_reader([&] {
+            while (!exact_stop.load(std::memory_order_acquire)) {
+                const auto snapshot = runtime.snapshot();
+                if (!snapshot.prepared || !snapshot.sinks[0].prepared) {
+                    continue;  // read_clock_snapshot failed closed mid-publish.
+                }
+                bool complete_generation = false;
+                for (const auto& candidate : expected) {
+                    if (snapshot.sinks[0].ratio == candidate.ratio &&
+                        snapshot.sinks[0].drift_ppm == candidate.drift_ppm &&
+                        snapshot.sinks[0].source_step == candidate.source_step &&
+                        snapshot.sinks[0].prepared == candidate.prepared) {
+                        complete_generation = true;
+                        break;
+                    }
+                }
+                if (!complete_generation) {
+                    exact_failed.store(true, std::memory_order_release);
+                    exact_stop.store(true, std::memory_order_release);
+                    return;
+                }
+            }
+        });
+
+        for (std::size_t generation = 1U;
+             generation <= kTrackedGenerations; ++generation) {
+            if (exact_failed.load(std::memory_order_acquire)) break;
+            const auto phase = static_cast<int>((generation - 1U) % 16U) - 8;
+            if (!runtime.observe_clock(0U, 48000.0 + phase,
+                                       48000.0 - phase, 1.0)) {
+                exact_failed.store(true, std::memory_order_release);
+                exact_stop.store(true, std::memory_order_release);
+                break;
+            }
+            requested_generation.store(generation,
+                                      std::memory_order_release);
+            while (!exact_stop.load(std::memory_order_acquire) &&
+                   !exact_failed.load(std::memory_order_acquire) &&
+                   completed_generation.load(std::memory_order_acquire) <
+                       generation) {
+                std::this_thread::yield();
+            }
+        }
+        exact_stop.store(true, std::memory_order_release);
+        exact_audio.join();
+        exact_reader.join();
+        CHECK(!exact_failed.load(std::memory_order_acquire));
     }
 
     std::fputs("output_fanout_tests passed\n", stdout);

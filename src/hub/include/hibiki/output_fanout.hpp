@@ -94,19 +94,33 @@ public:
     [[nodiscard]] OutputFanoutRuntimeSnapshotV1 snapshot() const noexcept;
 
 private:
-    struct ClockObservationRequest {
-        std::atomic<std::uint64_t> sequence{0U};
+    static constexpr std::size_t kPublicationSlotCount = 3U;
+    static constexpr std::uint32_t kNoPublicationReaderSlot = 0xFFFFFFFFU;
+
+    struct ClockObservationSlot final {
         std::atomic<double> source_frames{0.0};
         std::atomic<double> sink_frames{0.0};
         std::atomic<double> elapsed_seconds{0.0};
     };
 
-    struct ClockSnapshotPublication {
-        std::atomic<std::uint64_t> sequence{0U};
+    struct ClockObservationRequest {
+        std::array<ClockObservationSlot, kPublicationSlotCount> slots{};
+        std::atomic<std::uint64_t> publication{0U};
+        std::atomic<std::uint32_t> reader_slot{kNoPublicationReaderSlot};
+    };
+
+    struct ClockSnapshotSlot final {
         std::atomic<double> ratio{1.0};
         std::atomic<double> drift_ppm{0.0};
         std::atomic<double> source_step{1.0};
         std::atomic<bool> prepared{false};
+    };
+
+    struct ClockSnapshotPublication {
+        std::array<ClockSnapshotSlot, kPublicationSlotCount> slots{};
+        std::atomic<std::uint64_t> publication{0U};
+        mutable std::atomic<std::uint32_t> reader_slot{
+            kNoPublicationReaderSlot};
     };
 
     struct ScratchStorage {

@@ -127,6 +127,13 @@ audio-side 發佈的 coherent snapshot，不直接讀取可變 SRC state。proce
 於 prepare-time scratch；caller-owned capacity 則依每個 sink 當下 phase 與 source step 精確
 preflight。這是 user-space bounded runtime，仍不等於真實硬體 sink／clock soak 證據。
 
+每個 clock request 與 sink snapshot 都使用三個固定 slots、release/acquire payload 欄位、
+以及 generation／slot／phase publication token。writer 先以 odd token 標記目標 slot 為
+in-progress，完整寫入後才發布 stable token；reader 先宣告 hazard slot 並重新驗證 token，
+writer 不得覆寫被保護的 slot。觀察到 odd、changed token、非法 slot 或無法完成 handshake
+時一律 fail-closed。這個 bounded lifetime/reuse proof 讓 request 與 snapshot 都只能被接受為
+單一完整 generation，不依賴 relaxed 多欄位 seqlock；它仍只是 user-space coordination。
+
 `AudioEngineModel::prepare_wasapi_fanout` 與 `process_output_group_to_wasapi_fanout` 將上述
 physical sink fan-out 接到 graph：graph、Group Master 與 limiter 只執行一次，之後同一個
 interleaved block 交給每個 enabled WASAPI handoff。fan-out plan 無效、沒有 active graph、
