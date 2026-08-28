@@ -81,6 +81,7 @@ HRESULT start_silent_session(IMMDevice* const device,
     IAudioRenderClient* render = nullptr;
     HRESULT result = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
                                       reinterpret_cast<void**>(&client));
+    if (SUCCEEDED(result) && client == nullptr) result = E_POINTER;
     if (SUCCEEDED(result)) result = client->GetMixFormat(&format);
     if (SUCCEEDED(result) && format == nullptr) result = E_FAIL;
     if (SUCCEEDED(result)) {
@@ -93,6 +94,7 @@ HRESULT start_silent_session(IMMDevice* const device,
         result = client->GetService(__uuidof(IAudioRenderClient),
                                     reinterpret_cast<void**>(&render));
     }
+    if (SUCCEEDED(result) && render == nullptr) result = E_POINTER;
     if (format != nullptr) CoTaskMemFree(format);
     if (FAILED(result)) {
         if (render != nullptr) render->Release();
@@ -103,6 +105,7 @@ HRESULT start_silent_session(IMMDevice* const device,
     IAudioSessionControl* session_control = nullptr;
     result = client->GetService(__uuidof(IAudioSessionControl),
                                 reinterpret_cast<void**>(&session_control));
+    if (SUCCEEDED(result) && session_control == nullptr) result = E_POINTER;
     if (SUCCEEDED(result)) {
         GUID event_context{};
         (void)CoCreateGuid(&event_context);
@@ -126,6 +129,7 @@ HRESULT start_silent_session(IMMDevice* const device,
                 BYTE* data = nullptr;
                 const UINT32 available = buffer_frames - padding;
                 result = render->GetBuffer(available, &data);
+                if (SUCCEEDED(result) && data == nullptr) result = E_POINTER;
                 if (SUCCEEDED(result)) {
                     result = render->ReleaseBuffer(available, AUDCLNT_BUFFERFLAGS_SILENT);
                 }
@@ -606,6 +610,7 @@ int wmain() {
     do {
         HRESULT result = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
                                           IID_PPV_ARGS(&enumerator));
+        if (SUCCEEDED(result) && enumerator == nullptr) result = E_POINTER;
         if (SUCCEEDED(result)) {
             result = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
         }
