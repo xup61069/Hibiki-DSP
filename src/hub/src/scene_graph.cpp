@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <algorithm>
+#include <limits>
 #include <string_view>
 
 namespace hibiki {
@@ -16,6 +17,20 @@ namespace {
     return std::all_of(value.begin(), value.end(), [](unsigned char ch) {
         return ch >= 0x20U && ch != 0x7FU && !(ch >= 0x80U && ch <= 0x9FU);
     });
+}
+
+[[nodiscard]] bool checked_graph_output_samples(
+    const std::size_t frames,
+    const std::uint32_t output_channels,
+    std::size_t& output_samples) noexcept {
+    // Both graph input lanes and outputs are bounded to at most eight
+    // interleaved channels; protect every later frame/channel stride too.
+    if (output_channels == 0U || output_channels > 8U ||
+        frames > std::numeric_limits<std::size_t>::max() / 8U) {
+        return false;
+    }
+    output_samples = frames * static_cast<std::size_t>(output_channels);
+    return true;
 }
 
 }  // namespace
@@ -132,7 +147,10 @@ bool process_graph_filtered(const RtGraphSnapshotV1& snapshot,
         return false;
     }
 
-    const auto output_samples = frames * static_cast<std::size_t>(snapshot.output_channels);
+    std::size_t output_samples = 0U;
+    if (!checked_graph_output_samples(frames, snapshot.output_channels, output_samples)) {
+        return false;
+    }
     std::fill_n(output_interleaved, output_samples, 0.0F);
     bool matched_output_group = output_group.empty();
 
@@ -223,7 +241,10 @@ bool process_graph_filtered_f64(const RtGraphSnapshotV1& snapshot,
         return false;
     }
 
-    const auto output_samples = frames * static_cast<std::size_t>(snapshot.output_channels);
+    std::size_t output_samples = 0U;
+    if (!checked_graph_output_samples(frames, snapshot.output_channels, output_samples)) {
+        return false;
+    }
     std::fill_n(output_interleaved, output_samples, 0.0);
     bool matched_output_group = output_group.empty();
 
