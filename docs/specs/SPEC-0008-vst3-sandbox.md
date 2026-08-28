@@ -49,6 +49,8 @@ prepared 上限時整個 exchange fail-closed 進入 Degraded，不得靜默截�
 frames 上限；即使 caller-owned ring 的實體容量更大，超過上限的 exchange
 必須在讀取 sample 或前進 ring index 前拒絕。sample-count 與 ring capacity
 算術必須以不溢位的方式驗證，失敗不得改變既有 ring 內容或可用 frame 計數。
+`Vst3TapBufferV1::read` 也必須先確認 caller 的 `max_frames <= SIZE_MAX / channels`，
+再比較 capacity 或複製 snapshot；無法代表的 interleaved capacity 直接 fail-closed。
 WAV source 準備失敗時必須輸出明確錯誤，不得讓下游（例如 VST3 tap）呈現為
 「無聲音可處理」的假正常。本邊界屬 user-space engine preview evidence，不等於 driver/WaveRT、實體
 音訊 delivery 或第三方 plugin certification。

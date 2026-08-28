@@ -245,9 +245,12 @@ bool Vst3TapBufferV1::read(
         return false;
     }
 
-    const std::size_t sample_count =
-        static_cast<std::size_t>(frames) * channels;
-    if (sample_count > max_frames * channels) { return false; }
+    const auto channel_count = static_cast<std::size_t>(channels);
+    if (max_frames > std::numeric_limits<std::size_t>::max() / channel_count) {
+        return false;
+    }
+    const std::size_t sample_count = static_cast<std::size_t>(frames) * channel_count;
+    if (sample_count > max_frames * channel_count) { return false; }
 
     std::memcpy(destination, buffer_.data(), sample_count * sizeof(float));
 
