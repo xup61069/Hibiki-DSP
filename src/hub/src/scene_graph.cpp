@@ -143,6 +143,8 @@ bool process_graph_filtered(const RtGraphSnapshotV1& snapshot,
                             LaneLatencyBankV1* const latency_bank) noexcept {
     if (snapshot.schema_version != 1 || snapshot.lane_count > kMaxRtLanes ||
         snapshot.output_channels == 0 || snapshot.output_channels > 8 ||
+        (snapshot.sample_format != kGraphSampleFormatFloat32V1 &&
+         snapshot.sample_format != kGraphSampleFormatFloat64V1) ||
         output_interleaved == nullptr || inputs.size() < snapshot.lane_count) {
         return false;
     }

@@ -238,6 +238,25 @@ int main() {
         std::array<float, 4> valid_input{1.0F, 2.0F, 3.0F, 4.0F};
         const std::array<hibiki::RtLaneInputV1, 2> valid_inputs{{
             {valid_input.data(), 2U}, {valid_input.data(), 2U}}};
+
+        // Every float entry point must reject an unknown snapshot format before
+        // clearing output or advancing the latency bank. The later valid block
+        // comparison below detects any state mutation that escaped the guard.
+        RtGraphSnapshotV1 invalid_format_snapshot = snapshot;
+        invalid_format_snapshot.sample_format = 7U;
+        std::array<float, 4> invalid_format_output{};
+        invalid_format_output.fill(-5.0F);
+        CHECK(!process_graph(invalid_format_snapshot, valid_inputs,
+                             invalid_format_output.data(), 2U, &candidate_bank));
+        CHECK(std::all_of(invalid_format_output.begin(), invalid_format_output.end(),
+                          [](const float value) { return value == -5.0F; }));
+        invalid_format_output.fill(-6.0F);
+        CHECK(!process_graph_for_output_group(
+            invalid_format_snapshot, "main", valid_inputs,
+            invalid_format_output.data(), 2U, &candidate_bank));
+        CHECK(std::all_of(invalid_format_output.begin(), invalid_format_output.end(),
+                          [](const float value) { return value == -6.0F; }));
+
         std::array<float, 4> control_output{};
         std::array<float, 4> candidate_output{};
         CHECK(process_graph(snapshot, valid_inputs, control_output.data(), 2U,
