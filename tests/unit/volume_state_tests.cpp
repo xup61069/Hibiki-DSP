@@ -2,6 +2,7 @@
 
 #include "hibiki/volume_state.hpp"
 
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -252,6 +253,40 @@ int main() {
         // Buffer unchanged by invalid calls
         CHECK(buf[0] == 1.0F && buf[3] == -0.5F);
 
+        // Interleaved geometry must be rejected before the first caller-buffer
+        // access or VolumeRamp state update. Compare the next valid block with
+        // an untouched control bank after the first overflowing eight-channel
+        // request.
+        constexpr std::uint32_t kEightChannels = 8U;
+        const auto overflow_frames =
+            std::numeric_limits<std::size_t>::max() /
+                static_cast<std::size_t>(kEightChannels) +
+            1U;
+        OutputGroupVolumeBankV1 overflow_candidate;
+        OutputGroupVolumeBankV1 overflow_control;
+        CHECK(overflow_candidate.register_group("out"));
+        CHECK(overflow_control.register_group("out"));
+        const VolumeNotificationV1 target{-12.0, false, 1U};
+        CHECK(overflow_candidate.apply_windows_notification("out", target) ==
+              VolumeNotificationResult::Accepted);
+        CHECK(overflow_control.apply_windows_notification("out", target) ==
+              VolumeNotificationResult::Accepted);
+        const std::array<float, 8U> overflow_sentinels{
+            11.0F, 12.0F, 13.0F, 14.0F, 15.0F, 16.0F, 17.0F, 18.0F};
+        auto overflow_buffer = overflow_sentinels;
+        CHECK(!overflow_candidate.apply_to_interleaved("out", overflow_buffer.data(),
+                                                       overflow_frames, kEightChannels,
+                                                       48000U));
+        CHECK(overflow_buffer == overflow_sentinels);
+        std::array<float, 16U> next_candidate{};
+        std::array<float, 16U> next_control{};
+        next_candidate.fill(0.25F);
+        next_control.fill(0.25F);
+        CHECK(overflow_candidate.apply_to_interleaved("out", next_candidate.data(),
+                                                       2U, kEightChannels, 48000U));
+        CHECK(overflow_control.apply_to_interleaved("out", next_control.data(),
+                                                    2U, kEightChannels, 48000U));
+        CHECK(next_candidate == next_control);
 
         // Valid call after ramp warm-up should approximately preserve values
         CHECK(bank.apply_to_interleaved("out", buf, 2U, 2U, 48000U));
