@@ -17,6 +17,7 @@
 #include "hibiki/vst3_lane_bridge.hpp"
 #include "hibiki/control_payloads.hpp"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <atomic>
@@ -371,6 +372,10 @@ public:
     }
 
 private:
+    static constexpr std::size_t kMaxLoudnessPeqCrossfadeFramesV1 =
+        static_cast<std::size_t>(192000U) * 120U / 1000U;
+    static constexpr std::size_t kMaxLoudnessPeqCrossfadeChannelsV1 = 8U;
+
     struct IrGraphAttachmentV1 {
         bool attached{false};
         std::uint8_t output_group_bytes{0U};
@@ -431,6 +436,11 @@ private:
     };
 
     LoudnessPeqCrossfadeState loudness_crossfade_{};
+    // The previous PEQ is rendered from a complete interleaved copy. Keep
+    // this storage on the engine object so the RT path does not grow a large
+    // per-call stack frame or allocate while preserving the documented
+    // 120 ms frame bound for every supported output layout.
+    std::unique_ptr<float[]> loudness_crossfade_scratch_{};
 
     bool has_active_loudness_peq_{false};
     bool has_pending_loudness_peq_{false};
@@ -483,6 +493,10 @@ private:
     [[nodiscard]] bool apply_loudness_peq(std::string_view output_group,
                                           float* output_interleaved,
                                           std::size_t frames) noexcept;
+    [[nodiscard]] bool loudness_peq_geometry_valid(
+        std::string_view output_group,
+        float* output_interleaved,
+        std::size_t frames) const noexcept;
     [[nodiscard]] bool apply_program_aware(std::string_view output_group,
                                             float* output_interleaved,
                                             std::size_t frames) noexcept;

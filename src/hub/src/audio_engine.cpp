@@ -15,8 +15,6 @@ namespace {
 
 constexpr std::size_t kMaxLoudnessFormulaPointsV1 = 64U;
 constexpr std::uint32_t kLoudnessPeqCrossfadeMs = 120U;
-constexpr std::size_t kMaxLoudnessPeqCrossfadeFramesV1 =
-    static_cast<std::size_t>(192000U) * 120U / 1000U;
 
 struct LoudnessPeqCompileResultV1 {
     PeqFilterV1 filters[kMaxRealtimePeqFiltersV1]{};
@@ -105,7 +103,10 @@ bool compile_loudness_peq_v1(const CompensationResult& compensation,
 
 }  // namespace
 
-AudioEngineModel::AudioEngineModel() : volume_bank_(std::make_unique<OutputGroupVolumeBankV1>()) {}
+AudioEngineModel::AudioEngineModel()
+    : volume_bank_(std::make_unique<OutputGroupVolumeBankV1>()),
+      loudness_crossfade_scratch_(std::make_unique<float[]>(
+          kMaxLoudnessPeqCrossfadeFramesV1 * kMaxLoudnessPeqCrossfadeChannelsV1)) {}
 
 AudioEngineModel::~AudioEngineModel() = default;
 
@@ -718,7 +719,8 @@ OutputGroupVolumeStateV1 AudioEngineModel::volume_state(
 bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
                                float* const output_interleaved,
                                const std::size_t frames) noexcept {
-    if (!has_active_graph_ ||
+    if (!loudness_peq_geometry_valid("main", output_interleaved, frames) ||
+        !has_active_graph_ ||
         !process_graph(active_graph_, inputs, output_interleaved, frames,
                        &active_latency_bank_)) {
         return false;
@@ -745,7 +747,8 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
                                             const std::span<const RtLaneInputV1> inputs,
                                             float* const output_interleaved,
                                             const std::size_t frames) noexcept {
-    if (!has_active_graph_ ||
+    if (!loudness_peq_geometry_valid(output_group, output_interleaved, frames) ||
+        !has_active_graph_ ||
         !process_graph_for_output_group(active_graph_, output_group, inputs,
                                         output_interleaved, frames, &active_latency_bank_)) {
         return false;
@@ -775,6 +778,47 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
                    : 1.0F);
     }
     return true;
+}
+
+bool AudioEngineModel::loudness_peq_geometry_valid(
+    const std::string_view output_group,
+    float* const output_interleaved,
+    const std::size_t frames) const noexcept {
+    if ((has_active_graph_ && active_graph_.strict_direct) ||
+        (!has_active_loudness_peq_ && !loudness_crossfade_.active) ||
+        frames == 0U) {
+        return true;
+    }
+
+    const auto matches_attachment =
+        [](const LoudnessGraphAttachmentV1& attachment,
+           const std::string_view group) noexcept {
+            return attachment.attached &&
+                   attachment.output_group_bytes == group.size() &&
+                   std::equal(group.begin(), group.end(),
+                              attachment.output_group.begin());
+        };
+    const bool active_matches =
+        has_active_loudness_peq_ &&
+        matches_attachment(active_loudness_peq_, output_group);
+    const bool previous_matches =
+        loudness_crossfade_.active &&
+        matches_attachment(previous_loudness_peq_, output_group);
+    if (!active_matches && !previous_matches) return true;
+
+    if (output_interleaved == nullptr ||
+        frames > kMaxLoudnessPeqCrossfadeFramesV1) {
+        return false;
+    }
+    const auto channel_count = static_cast<std::size_t>(active_graph_.output_channels);
+    if (channel_count == 0U ||
+        channel_count > kMaxLoudnessPeqCrossfadeChannelsV1 ||
+        frames > std::numeric_limits<std::size_t>::max() / channel_count) {
+        return false;
+    }
+    constexpr auto scratch_sample_capacity =
+        kMaxLoudnessPeqCrossfadeFramesV1 * kMaxLoudnessPeqCrossfadeChannelsV1;
+    return frames <= scratch_sample_capacity / channel_count;
 }
 
 bool AudioEngineModel::process_f64(const std::span<const RtLaneInputF64V1> inputs,
@@ -1194,6 +1238,7 @@ bool AudioEngineModel::apply_loudness_peq(const std::string_view output_group,
 
     const std::size_t channel_count = active_graph_.output_channels;
     if (channel_count == 0U ||
+        channel_count > kMaxLoudnessPeqCrossfadeChannelsV1 ||
         frames > std::numeric_limits<std::size_t>::max() / channel_count) {
         return false;
     }
@@ -1223,16 +1268,20 @@ bool AudioEngineModel::apply_loudness_peq(const std::string_view output_group,
         return false;
     }
 
-    std::array<float, kMaxLoudnessPeqCrossfadeFramesV1> old_samples{};
     const float* old_block = nullptr;
     if (previous_matches) {
-        std::copy_n(output_interleaved, frames * channel_count,
-                    old_samples.begin());
+        if (loudness_crossfade_scratch_ == nullptr) return false;
+        constexpr auto scratch_sample_capacity =
+            kMaxLoudnessPeqCrossfadeFramesV1 * kMaxLoudnessPeqCrossfadeChannelsV1;
+        if (frames > scratch_sample_capacity / channel_count) return false;
+        const auto sample_count = frames * channel_count;
+        std::copy_n(output_interleaved, sample_count,
+                    loudness_crossfade_scratch_.get());
         if (!previous_loudness_peq_.peq.process_interleaved(
-                old_samples.data(), frames)) {
+                loudness_crossfade_scratch_.get(), frames)) {
             return false;
         }
-        old_block = old_samples.data();
+        old_block = loudness_crossfade_scratch_.get();
     }
     if (active_matches &&
         !active_loudness_peq_.peq.process_interleaved(output_interleaved,
