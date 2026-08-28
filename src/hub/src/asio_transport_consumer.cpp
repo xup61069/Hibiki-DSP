@@ -27,6 +27,48 @@ bool format_matches(const hibiki_asio_transport_region_v1* region,
          region->frames_per_buffer == frames_per_buffer;
 }
 
+#if defined(_WIN32)
+std::uint32_t load_sequence_acquire(volatile std::uint32_t* value) noexcept {
+  return static_cast<std::uint32_t>(InterlockedCompareExchange(
+      reinterpret_cast<volatile LONG*>(value), 0, 0));
+}
+
+void store_sequence_release(volatile std::uint32_t* value,
+                            const std::uint32_t next) noexcept {
+  InterlockedExchange(reinterpret_cast<volatile LONG*>(value), static_cast<LONG>(next));
+}
+
+bool discard_structurally_invalid_head(
+    hibiki_asio_transport_region_v1* const region,
+    const std::size_t region_bytes,
+    const std::uint32_t channels,
+    const std::uint32_t sample_rate,
+    const std::uint32_t frames_per_buffer) noexcept {
+  // The v1 C ABI has no bounded discard entry point. Once bind has validated
+  // the shared region, the sole engine consumer may release only a published
+  // slot whose metadata cannot fit the fixed v1 slot contract. No samples are
+  // read and no unbounded capacity is passed to the C ABI.
+  if (!format_matches(region, channels, sample_rate, frames_per_buffer) ||
+      region_bytes < sizeof(*region) || region->reserved != 0U) {
+    return false;
+  }
+  const auto consumer = load_sequence_acquire(&region->consumer_sequence);
+  const auto producer = load_sequence_acquire(&region->producer_sequence);
+  if (consumer == producer) return false;
+  auto* const slot = &region->slots[consumer % HIBIKI_ASIO_TRANSPORT_SLOT_COUNT_V1];
+  if (load_sequence_acquire(&slot->ready_sequence) != consumer + 1U) return false;
+
+  const bool valid_channels = slot->channels == 1U || slot->channels == 2U ||
+                              slot->channels == 6U || slot->channels == 8U;
+  if (slot->frames != 0U && slot->frames <= HIBIKI_ASIO_TRANSPORT_MAX_FRAMES_V1 &&
+      valid_channels) {
+    return false;
+  }
+  store_sequence_release(&region->consumer_sequence, consumer + 1U);
+  return true;
+}
+#endif
+
 }  // namespace
 
 AsioTransportConsumerV1::~AsioTransportConsumerV1() { unbind(); }
@@ -108,6 +150,12 @@ bool AsioTransportConsumerV1::pop(float* const interleaved,
                                   AsioTransportBlockV1& block) noexcept {
   block = {};
   if (region_ == nullptr || interleaved == nullptr || staging_storage_ == nullptr) return false;
+#if defined(_WIN32)
+  if (discard_structurally_invalid_head(region_, region_bytes_, channels_, sample_rate_,
+                                        frames_per_buffer_)) {
+    return false;
+  }
+#endif
   AsioTransportBlockV1 candidate{};
   // The C ABI only receives a frame capacity. Stage into a private buffer
   // whose size covers the full versioned channel/frame contract, then copy to

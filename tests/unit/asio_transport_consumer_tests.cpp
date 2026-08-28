@@ -132,7 +132,9 @@ int main() {
     // Slot metadata is a shared-memory field, so the engine-side consumer
     // stages the C ABI result before re-checking it. Each rejected item is
     // consumed by the bounded SPSC ring without touching caller output, and
-    // the next valid item remains usable.
+    // the next valid item remains usable. Structurally invalid heads are
+    // discarded without asking the C ABI to copy beyond the fixed staging
+    // bound.
     {
         constexpr wchar_t kMappingName[] = L"HibikiTest1663I";
         constexpr std::uint32_t kChannels = 2U;
@@ -197,6 +199,24 @@ int main() {
         region->slots[1].frames = HIBIKI_ASIO_TRANSPORT_MAX_FRAMES_V1 + 1U;
         CHECK(!consumer.pop(output, UINT32_MAX, block));
         CHECK(block.frames == 0U && block.channels == 0U && block.sample_rate == 0U);
+        CHECK(guarded_output.front() == kCanary && guarded_output.back() == kCanary);
+
+        CHECK(push());
+        CHECK(consumer.pop(output, kFrames, block));
+        CHECK(block.frames == kFrames && block.channels == kChannels &&
+              block.sample_rate == kRate);
+        CHECK(guarded_output.front() == kCanary && guarded_output.back() == kCanary);
+
+        CHECK(push());
+        region->slots[3].channels = HIBIKI_ASIO_TRANSPORT_MAX_CHANNELS_V1 + 1U;
+        CHECK(!consumer.pop(output, kFrames, block));
+        CHECK(block.frames == 0U && block.channels == 0U && block.sample_rate == 0U);
+        CHECK(guarded_output.front() == kCanary && guarded_output.back() == kCanary);
+
+        CHECK(push());
+        CHECK(consumer.pop(output, kFrames, block));
+        CHECK(block.frames == kFrames && block.channels == kChannels &&
+              block.sample_rate == kRate);
         CHECK(guarded_output.front() == kCanary && guarded_output.back() == kCanary);
 
         CHECK(UnmapViewOfFile(region) != 0);
