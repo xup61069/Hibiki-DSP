@@ -2,6 +2,7 @@
 
 #include "hibiki/scene_graph.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -24,9 +25,12 @@ namespace {
 using hibiki::compile_rt_snapshot;
 using hibiki::GraphConfigV1;
 using hibiki::kGraphSampleFormatFloat64V1;
+using hibiki::kLaneLatencyMaxFramesV1;
 using hibiki::kLaneLatencyMaxSamplesV1;
 using hibiki::kMaxRtLanes;
 using hibiki::LaneConfigV1;
+using hibiki::LaneLatencyConfigV1;
+using hibiki::LaneLatencyBankV1;
 using hibiki::process_graph;
 using hibiki::process_graph_f64;
 using hibiki::process_graph_for_output_group;
@@ -204,6 +208,50 @@ int main() {
             snapshot, "main", std::span<const hibiki::RtLaneInputF64V1>(inputs_f64),
             rendered_f64.data(), kOverflowFrames));
         CHECK(rendered_f64[0] == 9.0 && rendered_f64[1] == 9.0);
+    }
+
+    // A float graph with latency compensation has a smaller fixed scratch
+    // boundary than the size_t interleaved geometry limit. Reject an
+    // oversized request before clearing caller output, and keep a later valid
+    // block identical to an untouched control latency bank.
+    {
+        RtGraphSnapshotV1 snapshot;
+        CHECK(compile_rt_snapshot(stereo_two_lane_graph(), 7U, snapshot));
+        const std::array<LaneLatencyConfigV1, 2> latency_configs{{
+            {2U, 0U, true}, {2U, 0U, true}}};
+        LaneLatencyBankV1 control_bank;
+        LaneLatencyBankV1 candidate_bank;
+        CHECK(control_bank.prepare(latency_configs));
+        CHECK(candidate_bank.prepare(latency_configs));
+
+        constexpr std::size_t kOversizedFrames = kLaneLatencyMaxFramesV1 + 1U;
+        std::array<float, kOversizedFrames * 2U> oversized_input{};
+        const std::array<hibiki::RtLaneInputV1, 2> oversized_inputs{{
+            {oversized_input.data(), 2U}, {oversized_input.data(), 2U}}};
+        std::array<float, kOversizedFrames * 2U> oversized_output{};
+        oversized_output.fill(-7.0F);
+        CHECK(!process_graph(snapshot, oversized_inputs, oversized_output.data(),
+                             kOversizedFrames, &candidate_bank));
+        CHECK(std::all_of(oversized_output.begin(), oversized_output.end(),
+                          [](const float value) { return value == -7.0F; }));
+
+        std::array<float, 4> valid_input{1.0F, 2.0F, 3.0F, 4.0F};
+        const std::array<hibiki::RtLaneInputV1, 2> valid_inputs{{
+            {valid_input.data(), 2U}, {valid_input.data(), 2U}}};
+        std::array<float, 4> control_output{};
+        std::array<float, 4> candidate_output{};
+        CHECK(process_graph(snapshot, valid_inputs, control_output.data(), 2U,
+                            &control_bank));
+        CHECK(process_graph(snapshot, valid_inputs, candidate_output.data(), 2U,
+                            &candidate_bank));
+        CHECK(control_output == candidate_output);
+
+        oversized_output.fill(-9.0F);
+        CHECK(!process_graph_for_output_group(
+            snapshot, "main", oversized_inputs, oversized_output.data(),
+            kOversizedFrames, &candidate_bank));
+        CHECK(std::all_of(oversized_output.begin(), oversized_output.end(),
+                          [](const float value) { return value == -9.0F; }));
     }
 
     // render f32: identity map sums both lanes into the shared group; muted channels are skipped.
