@@ -26,6 +26,24 @@ public static class DoseRemainingCheck
             if (File.Exists(missingQueuePath)) File.Delete(missingQueuePath);
         }
 
+        // An existing directory is not a missing queue file; opening it must
+        // fail closed and preserve the already-loaded operations.
+        var unreadableQueuePath = Path.Combine(
+            Path.GetTempPath(), $"hibiki-unreadable-scene-queue-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(unreadableQueuePath);
+        try
+        {
+            check(!sceneQueue.TryLoad(unreadableQueuePath, out var unreadableDropped,
+                                      out var unreadableError) &&
+                  unreadableDropped == 0 && sceneQueue.Operations.Count == 0 &&
+                  unreadableError.Length > 0,
+                "An unreadable existing queue path must fail closed without changing the queue.");
+        }
+        finally
+        {
+            if (Directory.Exists(unreadableQueuePath)) Directory.Delete(unreadableQueuePath);
+        }
+
         var dose = new ListeningDoseModelV1();
         check(dose.RemainingSafeTimeText == "尚無資料",
             "A fresh dose must report no data for the remaining safe time.");
