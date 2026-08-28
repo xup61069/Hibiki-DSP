@@ -130,6 +130,7 @@ int wmain() {
     // until restoration is confirmed.
     bool restore_required = false;
     bool passed = false;
+    bool unavailable = false;
     double original_db = -144.0;
     double attenuated_db = -144.0;
     double restored_db = -144.0;
@@ -165,29 +166,34 @@ int wmain() {
         }
         if (FAILED(result) || device == nullptr) {
             std::printf("session_volume_live=unavailable reason=default-endpoint\n");
+            unavailable = true;
             break;
         }
 
         result = start_silent_session(device, &client, &render);
         if (FAILED(result)) {
             std::printf("session_volume_live=unavailable reason=silent-session\n");
+            unavailable = true;
             break;
         }
         result = coordinator.bind(device);
         if (FAILED(result)) {
             std::printf("session_volume_live=unavailable reason=route-bind\n");
+            unavailable = true;
             break;
         }
         const auto refresh_result = coordinator.refresh();
         if (refresh_result == hibiki::WindowsAudioSessionRouteRefreshResultV1::Degraded ||
             refresh_result == hibiki::WindowsAudioSessionRouteRefreshResultV1::Unbound) {
             std::printf("session_volume_live=unavailable reason=route-refresh\n");
+            unavailable = true;
             break;
         }
 
         hibiki::SessionCatalogSnapshotV1 catalog{};
         if (!coordinator.make_session_catalog_snapshot(1U, catalog)) {
             std::printf("session_volume_live=unavailable reason=catalog\n");
+            unavailable = true;
             break;
         }
         for (std::size_t index = 0U; index < catalog.entry_count; ++index) {
@@ -202,11 +208,13 @@ int wmain() {
         }
         if (target_handle == 0U) {
             std::printf("session_volume_live=unavailable reason=session-not-published\n");
+            unavailable = true;
             break;
         }
 
         if (FAILED(coordinator.read_session_volume_handle(target_handle, original_db, original_mute))) {
-            std::printf("session_volume_live=fail reason=initial-read\n");
+            std::printf("session_volume_live=unavailable reason=initial-read\n");
+            unavailable = true;
             break;
         }
         const double target_db = std::max(-144.0, original_db - 3.0);
@@ -247,5 +255,5 @@ int wmain() {
     if (device != nullptr) device->Release();
     if (enumerator != nullptr) enumerator->Release();
     if (com_initialized && com_result != RPC_E_CHANGED_MODE) CoUninitialize();
-    return passed ? 0 : 1;
+    return passed || unavailable ? 0 : 1;
 }

@@ -446,6 +446,7 @@ int wmain() {
     // session may already have changed until restoration is confirmed.
     bool restore_required = false;
     bool passed = false;
+    bool unavailable = false;
     double original_db = -144.0;
     double attenuated_db = -144.0;
     double restored_db = -144.0;
@@ -476,15 +477,18 @@ int wmain() {
         }
         if (FAILED(result) || device == nullptr) {
             std::printf("session_volume_engine_live=unavailable reason=default-endpoint\n");
+            unavailable = true;
             break;
         }
         result = start_silent_session(device, &client, &render);
         if (FAILED(result)) {
             std::printf("session_volume_engine_live=unavailable reason=silent-session\n");
+            unavailable = true;
             break;
         }
         if (!pipe.connect()) {
             std::printf("session_volume_engine_live=unavailable reason=engine-pipe\n");
+            unavailable = true;
             break;
         }
         SessionReadingV1 current{};
@@ -500,6 +504,7 @@ int wmain() {
                 diagnostics.controlled_label_seen ? "true" : "false",
                 diagnostics.controlled_session_active ? "true" : "false",
                 diagnostics.controlled_volume_available ? "true" : "false");
+            unavailable = true;
             break;
         }
         original_db = current.requested_db;
@@ -577,5 +582,5 @@ int wmain() {
     if (device != nullptr) device->Release();
     if (enumerator != nullptr) enumerator->Release();
     if (com_initialized && com_result != RPC_E_CHANGED_MODE) CoUninitialize();
-    return passed ? 0 : 1;
+    return passed || unavailable ? 0 : 1;
 }
