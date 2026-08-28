@@ -181,6 +181,11 @@ bool PersistentPolyphaseResampler::process(const float* const input,
         !std::isfinite(source_step_) || source_step_ <= 0.0 || source_step_ > 4.0) {
         return false;
     }
+    const auto channel_count = static_cast<std::size_t>(channels_);
+    const auto max_frames = std::numeric_limits<std::size_t>::max() / channel_count;
+    if (input_frames > max_frames || output_capacity_frames > max_frames) {
+        return false;
+    }
 
     const auto expected = required_output_frames(input_frames);
     if (expected > output_capacity_frames) {
@@ -277,6 +282,13 @@ std::size_t PersistentPolyphaseResampler::required_output_frames(
         !std::isfinite(source_step_) || source_step_ <= 0.0 || source_step_ > 4.0) {
         return 0U;
     }
+    const auto channel_count = static_cast<std::size_t>(channels_);
+    const auto max_frames = std::numeric_limits<std::size_t>::max() / channel_count;
+    if (input_frames > std::numeric_limits<std::size_t>::max() -
+                           (has_previous_ ? kPolyphaseHistoryFramesV1 : 0U) ||
+        input_frames > max_frames) {
+        return 0U;
+    }
     const std::size_t virtual_end = has_previous_
                                         ? kPolyphaseHistoryFramesV1 + input_frames
                                         : input_frames;
@@ -285,9 +297,15 @@ std::size_t PersistentPolyphaseResampler::required_output_frames(
     }
     const auto last_center = static_cast<double>(virtual_end) - 2.0;
     const auto available = last_center - phase_;
-    return available < 0.0
-               ? 0U
-               : static_cast<std::size_t>(std::floor(available / source_step_)) + 1U;
+    if (available < 0.0) return 0U;
+    const auto output_index = std::floor(available / source_step_);
+    if (!std::isfinite(output_index) || output_index < 0.0 ||
+        output_index >= static_cast<double>(max_frames)) {
+        return 0U;
+    }
+    const auto output_frame = static_cast<std::size_t>(output_index);
+    if (output_frame >= max_frames) return 0U;
+    return output_frame + 1U;
 }
 
 bool OutputSinkModel::prepare(const std::uint32_t channels,
