@@ -719,7 +719,8 @@ OutputGroupVolumeStateV1 AudioEngineModel::volume_state(
 bool AudioEngineModel::process(const std::span<const RtLaneInputV1> inputs,
                                float* const output_interleaved,
                                const std::size_t frames) noexcept {
-    if (!has_active_graph_ ||
+    if (!loudness_peq_geometry_valid("main", output_interleaved, frames) ||
+        !has_active_graph_ ||
         !process_graph(active_graph_, inputs, output_interleaved, frames,
                        &active_latency_bank_)) {
         return false;
@@ -746,7 +747,8 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
                                             const std::span<const RtLaneInputV1> inputs,
                                             float* const output_interleaved,
                                             const std::size_t frames) noexcept {
-    if (!has_active_graph_ ||
+    if (!loudness_peq_geometry_valid(output_group, output_interleaved, frames) ||
+        !has_active_graph_ ||
         !process_graph_for_output_group(active_graph_, output_group, inputs,
                                         output_interleaved, frames, &active_latency_bank_)) {
         return false;
@@ -776,6 +778,47 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
                    : 1.0F);
     }
     return true;
+}
+
+bool AudioEngineModel::loudness_peq_geometry_valid(
+    const std::string_view output_group,
+    float* const output_interleaved,
+    const std::size_t frames) const noexcept {
+    if ((has_active_graph_ && active_graph_.strict_direct) ||
+        (!has_active_loudness_peq_ && !loudness_crossfade_.active) ||
+        frames == 0U) {
+        return true;
+    }
+
+    const auto matches_attachment =
+        [](const LoudnessGraphAttachmentV1& attachment,
+           const std::string_view group) noexcept {
+            return attachment.attached &&
+                   attachment.output_group_bytes == group.size() &&
+                   std::equal(group.begin(), group.end(),
+                              attachment.output_group.begin());
+        };
+    const bool active_matches =
+        has_active_loudness_peq_ &&
+        matches_attachment(active_loudness_peq_, output_group);
+    const bool previous_matches =
+        loudness_crossfade_.active &&
+        matches_attachment(previous_loudness_peq_, output_group);
+    if (!active_matches && !previous_matches) return true;
+
+    if (output_interleaved == nullptr ||
+        frames > kMaxLoudnessPeqCrossfadeFramesV1) {
+        return false;
+    }
+    const auto channel_count = static_cast<std::size_t>(active_graph_.output_channels);
+    if (channel_count == 0U ||
+        channel_count > kMaxLoudnessPeqCrossfadeChannelsV1 ||
+        frames > std::numeric_limits<std::size_t>::max() / channel_count) {
+        return false;
+    }
+    constexpr auto scratch_sample_capacity =
+        kMaxLoudnessPeqCrossfadeFramesV1 * kMaxLoudnessPeqCrossfadeChannelsV1;
+    return frames <= scratch_sample_capacity / channel_count;
 }
 
 bool AudioEngineModel::process_f64(const std::span<const RtLaneInputF64V1> inputs,

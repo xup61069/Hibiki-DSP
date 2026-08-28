@@ -65,6 +65,40 @@ int run_audio_engine_loudness_geometry_tests() {
     CHECK(engine->commit_loudness_peq());
     CHECK(!engine->loudness_peq_transition_complete());
 
+    // An oversized request must be rejected before graph/latency or
+    // crossfade state can touch the caller buffer. Compare the next valid
+    // block with an untouched control engine to prove the crossfade position
+    // is unchanged as well.
+    auto control_engine = std::make_unique<hibiki::AudioEngineModel>();
+    hibiki::GraphConfigV1 control_graph;
+    control_graph.output_channels = kChannels;
+    control_graph.lanes.push_back(
+        hibiki::LaneConfigV1{"loudness-geometry", "main", kChannels, 0.0, true});
+    CHECK(control_engine->prepare_graph(control_graph, 1U));
+    CHECK(control_engine->commit_graph());
+    control_engine->set_sample_rate(192000U);
+    CHECK(control_engine->prepare_loudness_peq("main", points, 60.0, policy));
+    CHECK(control_engine->commit_loudness_peq());
+    CHECK(control_engine->prepare_loudness_peq("main", points, 60.0, changed_policy));
+    CHECK(control_engine->commit_loudness_peq());
+
+    constexpr std::size_t kOversizedFrames = kMaxCrossfadeFrames + 1U;
+    std::vector<float> oversized_input(kOversizedFrames * kChannels, 0.01F);
+    std::vector<float> oversized_output(kOversizedFrames * kChannels, -7.0F);
+    const hibiki::RtLaneInputV1 oversized_input_view{oversized_input.data(), kChannels};
+    const std::array<hibiki::RtLaneInputV1, 1> oversized_inputs{{oversized_input_view}};
+    CHECK(!engine->process_output_group("main", oversized_inputs,
+                                       oversized_output.data(), kOversizedFrames));
+    CHECK(std::all_of(oversized_output.begin(), oversized_output.end(),
+                      [](const float value) { return value == -7.0F; }));
+    CHECK(!engine->loudness_peq_transition_complete());
+
+    std::vector<float> expected(sample_count, -9.0F);
+    std::vector<float> actual(sample_count, -9.0F);
+    CHECK(control_engine->process_output_group("main", inputs, expected.data(), kBlockFrames));
+    CHECK(engine->process_output_group("main", inputs, actual.data(), kBlockFrames));
+    CHECK(actual == expected);
+
     constexpr auto block_count =
         (kMaxCrossfadeFrames + kBlockFrames - 1U) / kBlockFrames;
     for (std::size_t block = 0U; block < block_count; ++block) {

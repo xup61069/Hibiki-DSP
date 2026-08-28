@@ -493,6 +493,10 @@ private:
     [[nodiscard]] bool apply_loudness_peq(std::string_view output_group,
                                           float* output_interleaved,
                                           std::size_t frames) noexcept;
+    [[nodiscard]] bool loudness_peq_geometry_valid(
+        std::string_view output_group,
+        float* output_interleaved,
+        std::size_t frames) const noexcept;
     [[nodiscard]] bool apply_program_aware(std::string_view output_group,
                                             float* output_interleaved,
                                             std::size_t frames) noexcept;
