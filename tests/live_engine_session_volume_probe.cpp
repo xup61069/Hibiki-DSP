@@ -174,19 +174,34 @@ public:
         write_u32_le(length.data(), static_cast<std::uint32_t>(encoded.size()));
         if (!transfer(true, length.data(), length.size()) ||
             !transfer(true, const_cast<std::uint8_t*>(encoded.data()), encoded.size())) {
+            close();
             return std::nullopt;
         }
-        if (!transfer(false, length.data(), length.size())) return std::nullopt;
+        if (!transfer(false, length.data(), length.size())) {
+            close();
+            return std::nullopt;
+        }
         const auto response_bytes = read_u32_le(length.data());
         if (response_bytes < 20U || response_bytes > hibiki::kIpcMaxPayloadBytes) {
+            close();
             return std::nullopt;
         }
         std::vector<std::uint8_t> response(response_bytes);
-        if (!transfer(false, response.data(), response.size())) return std::nullopt;
+        if (!transfer(false, response.data(), response.size())) {
+            close();
+            return std::nullopt;
+        }
         hibiki::IpcDecodeError error{hibiki::IpcDecodeError::None};
         auto decoded = hibiki::decode_ipc_frame(response, error);
-        if (!decoded.has_value() || decoded->header.request_id != request_id) return std::nullopt;
+        if (!decoded.has_value() || decoded->header.request_id != request_id) {
+            close();
+            return std::nullopt;
+        }
         return decoded;
+    }
+
+    [[nodiscard]] bool connected() const noexcept {
+        return handle_ != INVALID_HANDLE_VALUE;
     }
 
 private:
@@ -315,6 +330,7 @@ bool wait_for_catalog(PipeClient& pipe,
                       CatalogDiagnosticsV1* const diagnostics = nullptr) noexcept {
     for (std::uint32_t attempt = 0U; attempt < 80U; ++attempt) {
         if (read_catalog(pipe, request_id++, reading, diagnostics)) return true;
+        if (!pipe.connected()) return false;
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
     return false;
@@ -332,6 +348,7 @@ bool wait_for_catalog_handle(PipeClient& pipe,
             reading = candidate;
             return true;
         }
+        if (!pipe.connected()) return false;
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
     return false;
@@ -369,6 +386,7 @@ bool wait_for_value(PipeClient& pipe,
             reading = candidate;
             return true;
         }
+        if (!pipe.connected()) return false;
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
     return false;
@@ -456,6 +474,7 @@ bool wait_for_route_state(PipeClient& pipe,
             reading = candidate;
             return true;
         }
+        if (!pipe.connected()) return false;
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
     return false;

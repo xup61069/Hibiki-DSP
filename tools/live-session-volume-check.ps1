@@ -101,12 +101,22 @@ function Assert-LiveSessionVolumePipeIoContract([string]$repoRoot) {
         'OVERLAPPED\s+overlapped\s*\{\}',
         'WaitForSingleObject\(event,\s*kIoTimeoutMs\)',
         'CancelIoEx\(handle_,\s*&overlapped\)',
-        'CancelIoEx\(handle_,\s*nullptr\)'
+        'CancelIoEx\(handle_,\s*nullptr\)',
+        '!transfer\(true,\s*const_cast<std::uint8_t\*>\(encoded\.data\(\)\),\s*encoded\.size\(\)\)\)\s*\{\s*close\(\);\s*return\s+std::nullopt;',
+        'if\s*\(!transfer\(false,\s*length\.data\(\),\s*length\.size\(\)\)\)\s*\{\s*close\(\);',
+        'if\s*\(response_bytes\s*<\s*20U.*?\)\s*\{\s*close\(\);',
+        'if\s*\(!transfer\(false,\s*response\.data\(\),\s*response\.size\(\)\)\)\s*\{\s*close\(\);',
+        'if\s*\(!decoded\.has_value\(\).*?\)\s*\{\s*close\(\);',
+        'bool\s+connected\(\)\s+const\s+noexcept\s*\{\s*return\s+handle_\s*!=\s*INVALID_HANDLE_VALUE;'
     )
     foreach ($pattern in $requiredPatterns) {
         if ($source -notmatch $pattern) {
             throw "Live Engine session-volume pipe I/O contract is missing: $pattern"
         }
+    }
+    $disconnectStops = ([regex]::Matches($source, 'if\s*\(!pipe\.connected\(\)\)\s*return false;')).Count
+    if ($disconnectStops -ne 4) {
+        throw "Live Engine session-volume wait helpers must stop after disconnect (found $disconnectStops)."
     }
 }
 
