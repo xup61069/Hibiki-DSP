@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#include "hibiki/driver_stream_ring_v1.h"
 #include "hibiki/driver_stream_transport_v1.h"
 
 #include <algorithm>
@@ -9,6 +10,7 @@
 #include <cstring>
 #include <limits>
 #include <string_view>
+#include <vector>
 
 #define CHECK(expr)                                                             \
     do {                                                                        \
@@ -153,6 +155,70 @@ int main() {
                 'X', HIBIKI_DRIVER_STREAM_ENDPOINT_GUID_CAPACITY_V1);
     CHECK(hibiki_driver_stream_packet_validate_v1(bad_guid_packet.data(),
                                                    driver_packet_bytes) == 0);
+
+    // Non-finite samples are rejected before packet output is mutated.
+    const float nonfinite_values[] = {
+        std::numeric_limits<float>::quiet_NaN(),
+        std::numeric_limits<float>::infinity(),
+        -std::numeric_limits<float>::infinity(),
+    };
+    for (const float nonfinite : nonfinite_values) {
+        const float nonfinite_samples[] = {0.25F, nonfinite, 0.5F, -0.5F};
+        std::array<std::uint8_t, 128> untouched_packet{};
+        untouched_packet.fill(0xA5U);
+        std::size_t untouched_bytes = 123U;
+        CHECK(hibiki_driver_stream_packet_encode_v1(
+                  untouched_packet.data(), untouched_packet.size(),
+                  HIBIKI_DRIVER_STREAM_RENDER_V1, 42U,
+                  "8b9b2a8f-09a4-4e57-9f24-5d7cbd50ce10", 2U, 48000U, 2U, 0U, 9U,
+                  nonfinite_samples, &untouched_bytes) == 0 &&
+              untouched_bytes == 0U &&
+              std::all_of(untouched_packet.begin(), untouched_packet.end(),
+                          [](std::uint8_t value) { return value == 0xA5U; }));
+    }
+
+    // The shared-memory ring revalidates a published slot before returning it.
+    std::vector<std::uint64_t> ring_storage(
+        (sizeof(hibiki_driver_stream_ring_v1) + sizeof(std::uint64_t) - 1U) /
+        sizeof(std::uint64_t));
+    auto* ring = reinterpret_cast<hibiki_driver_stream_ring_v1*>(ring_storage.data());
+    const std::size_t ring_bytes = ring_storage.size() * sizeof(std::uint64_t);
+    CHECK(hibiki_driver_stream_ring_init_v1(ring, ring_bytes, 2U, 48000U) ==
+          HIBIKI_DRIVER_STREAM_RING_OK_V1);
+    auto corrupted_packet = driver_packet;
+    const float infinity = std::numeric_limits<float>::infinity();
+    std::memcpy(corrupted_packet.data() + HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1,
+                &infinity, sizeof(infinity));
+    CHECK(hibiki_driver_stream_ring_push_v1(
+              ring, ring_bytes, corrupted_packet.data(), driver_packet_bytes) ==
+              HIBIKI_DRIVER_STREAM_RING_REJECTED_V1 &&
+          ring->producer_sequence == 0U && ring->overrun_count == 0U);
+    CHECK(hibiki_driver_stream_ring_push_v1(
+              ring, ring_bytes, driver_packet.data(), driver_packet_bytes) ==
+          HIBIKI_DRIVER_STREAM_RING_OK_V1);
+
+    auto* slot = &ring->slots[0];
+    std::memcpy(slot->packet + HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1,
+                &infinity, sizeof(infinity));
+    std::array<std::uint8_t, HIBIKI_DRIVER_STREAM_RING_SLOT_CAPACITY_BYTES_V1> popped_packet{};
+    popped_packet.fill(0xA5U);
+    std::size_t popped_bytes = 123U;
+    std::uint32_t silence = 0U;
+    CHECK(hibiki_driver_stream_ring_pop_v1(
+              ring, ring_bytes, popped_packet.data(), popped_packet.size(), &popped_bytes,
+              &silence) == HIBIKI_DRIVER_STREAM_RING_REJECTED_V1 &&
+          popped_bytes == 0U && silence == 0U && ring->consumer_sequence == 0U &&
+          std::all_of(popped_packet.begin(), popped_packet.end(),
+                      [](std::uint8_t value) { return value == 0xA5U; }));
+
+    std::memcpy(slot->packet, driver_packet.data(), driver_packet_bytes);
+    popped_bytes = 0U;
+    CHECK(hibiki_driver_stream_ring_pop_v1(
+              ring, ring_bytes, popped_packet.data(), popped_packet.size(), &popped_bytes,
+              &silence) == HIBIKI_DRIVER_STREAM_RING_OK_V1 &&
+          popped_bytes == driver_packet_bytes && silence == 0U &&
+          ring->consumer_sequence == 1U &&
+          std::memcmp(popped_packet.data(), driver_packet.data(), driver_packet_bytes) == 0);
 
     return 0;
 }

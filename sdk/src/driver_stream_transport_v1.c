@@ -2,6 +2,7 @@
 
 #include "hibiki/driver_stream_transport_v1.h"
 
+#include <math.h>
 #include <string.h>
 
 static int valid_channels(const uint32_t channels) {
@@ -31,6 +32,15 @@ static int valid_flags(const uint32_t flags) {
                       HIBIKI_DRIVER_STREAM_FLAG_SILENCE_V1)) == 0U;
 }
 
+static int finite_samples(const uint8_t* const samples, const size_t sample_count) {
+    for (size_t index = 0U; index < sample_count; ++index) {
+        float value;
+        memcpy(&value, samples + index * sizeof(value), sizeof(value));
+        if (!isfinite(value)) return 0;
+    }
+    return 1;
+}
+
 static int valid_header(const struct hibiki_driver_stream_packet_header_v1* const header,
                         const size_t packet_bytes) {
     if (header == NULL || packet_bytes < HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1 ||
@@ -44,9 +54,13 @@ static int valid_header(const struct hibiki_driver_stream_packet_header_v1* cons
         header->frames > HIBIKI_DRIVER_STREAM_MAX_FRAMES_V1 || !valid_flags(header->flags)) {
         return 0;
     }
-    const size_t sample_bytes = (size_t)header->frames * header->channels * sizeof(float);
-    return sample_bytes <= SIZE_MAX - HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1 &&
-           HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1 + sample_bytes == packet_bytes;
+    const size_t sample_count = (size_t)header->frames * header->channels;
+    const size_t sample_bytes = sample_count * sizeof(float);
+    if (sample_bytes > SIZE_MAX - HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1 ||
+        HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1 + sample_bytes != packet_bytes) {
+        return 0;
+    }
+    return 1;
 }
 
 int hibiki_driver_stream_packet_validate_v1(const uint8_t* const packet,
@@ -83,6 +97,8 @@ int hibiki_driver_stream_packet_encode_v1(
     if (sample_bytes > SIZE_MAX - HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1) return 0;
     const size_t total_bytes = HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1 + sample_bytes;
     if (packet_capacity < total_bytes || total_bytes > UINT32_MAX) return 0;
+    if (!finite_samples((const uint8_t*)interleaved_samples,
+                        (size_t)frames * channels)) return 0;
     struct hibiki_driver_stream_packet_header_v1 header;
     memset(&header, 0, sizeof(header));
     header.size_bytes = (uint32_t)total_bytes;
