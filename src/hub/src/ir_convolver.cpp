@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace hibiki {
 
@@ -47,6 +48,10 @@ bool IrConvolverV1::process_interleaved(float* const interleaved,
                                         const std::uint32_t channels) noexcept {
     if (!prepared_ || interleaved == nullptr || frames == 0U || channels == 0U || channels > 8U ||
         channels != status_.channels) {
+        return false;
+    }
+    if (frames > std::numeric_limits<std::size_t>::max() /
+                    static_cast<std::size_t>(channels)) {
         return false;
     }
     constexpr auto kHistoryMask = kMaxRealtimeIrTapsV1 - 1U;

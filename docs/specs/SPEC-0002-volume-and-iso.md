@@ -134,7 +134,9 @@ equal-loudness 係數 fit。
 
 `IrConvolverV1` 提供最多 4096 taps、mono 或逐聲道 kernel 的固定容量 direct FIR；它保存
 跨 block history，會檢查 `IrPhaseResolutionV1` 已經 valid、sample rate／聲道一致與所有
-係數 finite。`build_ir_phase_kernel_v1` 是 control-plane 的 bounded phase transform：
+係數 finite。`process_interleaved` 會在讀取 caller buffer 或更新 history 前確認
+`channels` 落在 1..8 且 `frames <= SIZE_MAX / channels`；無法代表的 interleaved geometry
+會 fail-closed，且不另訂新的 render block-size 上限。`build_ir_phase_kernel_v1` 是 control-plane 的 bounded phase transform：
 minimum-phase 使用 real-cepstrum reconstruction，mixed/linear-phase 以 source magnitude
 建立 causal integer-sample linear-phase target，再依 strength 做 phase interpolation；它
 不在 RT thread 配置或執行。轉換後的 declared delay 仍須由實際量測驗證，不能把 FFT 轉換
