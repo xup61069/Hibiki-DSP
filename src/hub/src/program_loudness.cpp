@@ -207,6 +207,10 @@ bool BassExcessDetectorV1::process(const float* const interleaved,
 }
 
 void ProgramAwareLevelControllerV1::store_telemetry() noexcept {
+    // Enter an odd seqlock state before touching the payload. Atomic payload
+    // fields avoid data races, while this marker prevents a reader from
+    // accepting a stable sequence number during an in-flight publication.
+    telemetry_write_sequence_.fetch_add(1U, std::memory_order_acq_rel);
     telemetry_doubles_[0].store(status_.measured_dbfs,
                                 std::memory_order_relaxed);
     telemetry_doubles_[1].store(status_.applied_gain_db,
@@ -218,14 +222,19 @@ void ProgramAwareLevelControllerV1::store_telemetry() noexcept {
     telemetry_enabled_.store(status_.enabled, std::memory_order_relaxed);
     telemetry_silence_gated_.store(status_.silence_gated,
                                    std::memory_order_relaxed);
+    telemetry_sequence_.fetch_add(1U, std::memory_order_relaxed);
+    // The even write sequence is the final publication marker. Marking
+    // validity only after it prevents a first reader from observing valid=true
+    // with a stale or in-flight sequence value.
+    telemetry_write_sequence_.fetch_add(1U, std::memory_order_release);
     telemetry_valid_.store(true, std::memory_order_release);
-    telemetry_sequence_.fetch_add(1U, std::memory_order_acq_rel);
 }
 
 ProgramAwareTelemetrySnapshotV1
-ProgramAwareLevelControllerV1::read_telemetry() const noexcept {
+    ProgramAwareLevelControllerV1::read_telemetry() const noexcept {
     ProgramAwareTelemetrySnapshotV1 snapshot;
-    const auto before = telemetry_sequence_.load(std::memory_order_acquire);
+    const auto before = telemetry_write_sequence_.load(std::memory_order_acquire);
+    if (before == 0U || (before & 1U) != 0U) return snapshot;
     snapshot.valid = telemetry_valid_.load(std::memory_order_acquire);
     if (!snapshot.valid) return snapshot;
     snapshot.enabled = telemetry_enabled_.load(std::memory_order_acquire);
@@ -237,21 +246,22 @@ ProgramAwareLevelControllerV1::read_telemetry() const noexcept {
         telemetry_doubles_[1].load(std::memory_order_acquire);
     const double bass_gain =
         telemetry_doubles_[2].load(std::memory_order_acquire);
-    const auto after = telemetry_sequence_.load(std::memory_order_acquire);
+    const double night_gain =
+        telemetry_doubles_[3].load(std::memory_order_acquire);
+    const auto sequence = telemetry_sequence_.load(std::memory_order_acquire);
+    const auto after = telemetry_write_sequence_.load(std::memory_order_acquire);
     // A torn read is fail-closed: the caller keeps the previous safe visual
     // frame instead of publishing a mixed-generation projection.
-    if (before != after || !std::isfinite(measured) ||
-        !std::isfinite(applied_gain) || !std::isfinite(bass_gain)) {
+    if (before != after || (after & 1U) != 0U || !std::isfinite(measured) ||
+        !std::isfinite(applied_gain) || !std::isfinite(bass_gain) ||
+        !std::isfinite(night_gain)) {
         return ProgramAwareTelemetrySnapshotV1{};
     }
     snapshot.measured_dbfs = measured;
     snapshot.applied_gain_db = applied_gain;
     snapshot.bass_correction_gain_db = bass_gain;
-    const double night_gain =
-        telemetry_doubles_[3].load(std::memory_order_acquire);
-    if (!std::isfinite(night_gain)) return ProgramAwareTelemetrySnapshotV1{};
     snapshot.night_compression_gain_db = night_gain;
-    snapshot.sequence = after;
+    snapshot.sequence = sequence;
     return snapshot;
 }
 

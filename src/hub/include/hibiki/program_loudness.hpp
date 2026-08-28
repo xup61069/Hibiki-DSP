@@ -136,7 +136,8 @@ public:
     }
     // Lock-free projection for the control worker after the audio callback's
     // current block has completed. Reads are not synchronized with an in-
-    // flight render; every field is independently finite and bounded.
+    // flight render; the sequence window covers every published field so a
+    // mixed-generation snapshot fails closed.
     [[nodiscard]] ProgramAwareTelemetrySnapshotV1 read_telemetry() const noexcept;
     [[nodiscard]] std::uint32_t sample_rate() const noexcept { return sample_rate_; }
 
@@ -187,6 +188,7 @@ private:
     mutable std::atomic<bool> telemetry_enabled_{false};
     mutable std::atomic<bool> telemetry_silence_gated_{true};
     mutable std::atomic<std::uint64_t> telemetry_sequence_{0U};
+    mutable std::atomic<std::uint64_t> telemetry_write_sequence_{0U};
 };
 
 // Fixed-capacity per-output-group program-aware level attachment. The
