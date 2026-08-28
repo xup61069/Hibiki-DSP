@@ -16,6 +16,74 @@ constexpr double kKWeightHighPassHz = 38.1358;
 constexpr double kKWeightShelfHz = 1681.974;
 constexpr double kKWeightShelfDb = 4.0;
 
+constexpr std::uint64_t kTelemetryPublicationWritingBitV1 = 1U;
+constexpr std::uint64_t kTelemetryPublicationSlotMaskV1 = 0x6U;
+constexpr std::uint32_t kTelemetryPublicationSlotShiftV1 = 1U;
+constexpr std::uint32_t kTelemetryPublicationGenerationShiftV1 = 3U;
+constexpr std::uint32_t kNoTelemetryReaderSlotV1 = 0xFFFFFFFFU;
+constexpr std::uint32_t kTelemetryPublicationSlotCountV1 = 3U;
+
+[[nodiscard]] std::uint32_t telemetry_publication_slot(
+    const std::uint64_t token) noexcept {
+    return static_cast<std::uint32_t>(
+        (token & kTelemetryPublicationSlotMaskV1) >>
+        kTelemetryPublicationSlotShiftV1);
+}
+
+[[nodiscard]] bool try_reserve_telemetry_publication(
+    std::atomic<std::uint64_t>& publication,
+    std::atomic<std::uint32_t>& reader_slot,
+    std::uint64_t& stable_token,
+    std::uint32_t& target_slot) noexcept {
+    auto current = publication.load(std::memory_order_seq_cst);
+    if ((current & kTelemetryPublicationWritingBitV1) != 0U) return false;
+    const auto current_slot = current == 0U
+                                  ? kNoTelemetryReaderSlotV1
+                                  : telemetry_publication_slot(current);
+    if (current != 0U && current_slot >= kTelemetryPublicationSlotCountV1) {
+        return false;
+    }
+    const auto protected_slot = reader_slot.load(std::memory_order_seq_cst);
+    target_slot = kNoTelemetryReaderSlotV1;
+    for (std::uint32_t candidate = 0U;
+         candidate < kTelemetryPublicationSlotCountV1; ++candidate) {
+        if (candidate != current_slot && candidate != protected_slot) {
+            target_slot = candidate;
+            break;
+        }
+    }
+    if (target_slot == kNoTelemetryReaderSlotV1) return false;
+
+    const auto current_generation =
+        current >> kTelemetryPublicationGenerationShiftV1;
+    const auto max_generation =
+        std::numeric_limits<std::uint64_t>::max() >>
+        kTelemetryPublicationGenerationShiftV1;
+    const std::uint64_t next_generation =
+        current_generation >= max_generation ? 1U : current_generation + 1U;
+    const auto in_progress =
+        (next_generation << kTelemetryPublicationGenerationShiftV1) |
+        (static_cast<std::uint64_t>(target_slot) <<
+         kTelemetryPublicationSlotShiftV1) |
+        kTelemetryPublicationWritingBitV1;
+    if (!publication.compare_exchange_strong(
+            current, in_progress, std::memory_order_seq_cst,
+            std::memory_order_seq_cst)) {
+        return false;
+    }
+    stable_token = in_progress & ~kTelemetryPublicationWritingBitV1;
+    return true;
+}
+
+struct TelemetryPublicationReaderGuard final {
+    std::atomic<std::uint32_t>& reader_slot;
+
+    ~TelemetryPublicationReaderGuard() {
+        reader_slot.store(kNoTelemetryReaderSlotV1,
+                          std::memory_order_seq_cst);
+    }
+};
+
 [[nodiscard]] bool checked_interleaved_sample_count(
     const std::size_t frames,
     const std::uint32_t channels,
@@ -207,62 +275,80 @@ bool BassExcessDetectorV1::process(const float* const interleaved,
 }
 
 void ProgramAwareLevelControllerV1::store_telemetry() noexcept {
-    // Enter an odd seqlock state before touching the payload. Atomic payload
-    // fields avoid data races, while this marker prevents a reader from
-    // accepting a stable sequence number during an in-flight publication.
-    telemetry_write_sequence_.fetch_add(1U, std::memory_order_acq_rel);
-    telemetry_doubles_[0].store(status_.measured_dbfs,
-                                std::memory_order_relaxed);
-    telemetry_doubles_[1].store(status_.applied_gain_db,
-                                std::memory_order_relaxed);
-    telemetry_doubles_[2].store(status_.bass_correction_gain_db,
-                                std::memory_order_relaxed);
-    telemetry_doubles_[3].store(status_.night_compression_gain_db,
-                                std::memory_order_relaxed);
-    telemetry_enabled_.store(status_.enabled, std::memory_order_relaxed);
-    telemetry_silence_gated_.store(status_.silence_gated,
-                                   std::memory_order_relaxed);
-    telemetry_sequence_.fetch_add(1U, std::memory_order_relaxed);
-    // The even write sequence is the final publication marker. Marking
-    // validity only after it prevents a first reader from observing valid=true
-    // with a stale or in-flight sequence value.
-    telemetry_write_sequence_.fetch_add(1U, std::memory_order_release);
-    telemetry_valid_.store(true, std::memory_order_release);
+    std::uint64_t stable_token = 0U;
+    std::uint32_t target_slot = kNoTelemetryReaderSlotV1;
+    if (!try_reserve_telemetry_publication(
+            telemetry_publication_, telemetry_reader_slot_, stable_token,
+            target_slot)) {
+        return;
+    }
+    auto& slot = telemetry_publication_slots_[target_slot];
+    slot.doubles[0].store(status_.measured_dbfs, std::memory_order_release);
+    slot.doubles[1].store(status_.applied_gain_db, std::memory_order_release);
+    slot.doubles[2].store(status_.bass_correction_gain_db,
+                          std::memory_order_release);
+    slot.doubles[3].store(status_.night_compression_gain_db,
+                          std::memory_order_release);
+    slot.enabled.store(status_.enabled, std::memory_order_release);
+    slot.silence_gated.store(status_.silence_gated,
+                             std::memory_order_release);
+    const auto current_generation =
+        stable_token >> kTelemetryPublicationGenerationShiftV1;
+    slot.sequence.store(current_generation, std::memory_order_release);
+    // Publish the stable generation only after every field in the selected
+    // slot has been written. The reader hazard keeps this slot from being
+    // reused while it is copying the complete generation.
+    telemetry_publication_.store(stable_token, std::memory_order_seq_cst);
 }
 
 ProgramAwareTelemetrySnapshotV1
     ProgramAwareLevelControllerV1::read_telemetry() const noexcept {
     ProgramAwareTelemetrySnapshotV1 snapshot;
-    const auto before = telemetry_write_sequence_.load(std::memory_order_acquire);
-    if (before == 0U || (before & 1U) != 0U) return snapshot;
-    snapshot.valid = telemetry_valid_.load(std::memory_order_acquire);
-    if (!snapshot.valid) return snapshot;
-    snapshot.enabled = telemetry_enabled_.load(std::memory_order_acquire);
-    snapshot.silence_gated =
-        telemetry_silence_gated_.load(std::memory_order_acquire);
-    const double measured =
-        telemetry_doubles_[0].load(std::memory_order_acquire);
-    const double applied_gain =
-        telemetry_doubles_[1].load(std::memory_order_acquire);
-    const double bass_gain =
-        telemetry_doubles_[2].load(std::memory_order_acquire);
-    const double night_gain =
-        telemetry_doubles_[3].load(std::memory_order_acquire);
-    const auto sequence = telemetry_sequence_.load(std::memory_order_acquire);
-    const auto after = telemetry_write_sequence_.load(std::memory_order_acquire);
-    // A torn read is fail-closed: the caller keeps the previous safe visual
-    // frame instead of publishing a mixed-generation projection.
-    if (before != after || (after & 1U) != 0U || !std::isfinite(measured) ||
-        !std::isfinite(applied_gain) || !std::isfinite(bass_gain) ||
-        !std::isfinite(night_gain)) {
-        return ProgramAwareTelemetrySnapshotV1{};
+    const auto& publication = telemetry_publication_;
+    for (std::size_t attempt = 0U; attempt < 2U; ++attempt) {
+        const auto before = publication.load(std::memory_order_seq_cst);
+        if (before == 0U ||
+            (before & kTelemetryPublicationWritingBitV1) != 0U) {
+            continue;
+        }
+        const auto slot_index = telemetry_publication_slot(before);
+        if (slot_index >= kTelemetryPublicationSlotCountV1) continue;
+
+        telemetry_reader_slot_.store(slot_index, std::memory_order_seq_cst);
+        TelemetryPublicationReaderGuard reader_guard{telemetry_reader_slot_};
+        if (publication.load(std::memory_order_seq_cst) != before) continue;
+
+        const auto& slot = telemetry_publication_slots_[slot_index];
+        const double measured = slot.doubles[0].load(std::memory_order_acquire);
+        const double applied_gain =
+            slot.doubles[1].load(std::memory_order_acquire);
+        const double bass_gain =
+            slot.doubles[2].load(std::memory_order_acquire);
+        const double night_gain =
+            slot.doubles[3].load(std::memory_order_acquire);
+        const bool enabled = slot.enabled.load(std::memory_order_acquire);
+        const bool silence_gated =
+            slot.silence_gated.load(std::memory_order_acquire);
+        const auto sequence = slot.sequence.load(std::memory_order_acquire);
+        const auto after = publication.load(std::memory_order_seq_cst);
+        if (before != after ||
+            (after & kTelemetryPublicationWritingBitV1) != 0U ||
+            !std::isfinite(measured) || !std::isfinite(applied_gain) ||
+            !std::isfinite(bass_gain) || !std::isfinite(night_gain) ||
+            sequence == 0U) {
+            continue;
+        }
+        snapshot.valid = true;
+        snapshot.enabled = enabled;
+        snapshot.silence_gated = silence_gated;
+        snapshot.measured_dbfs = measured;
+        snapshot.applied_gain_db = applied_gain;
+        snapshot.bass_correction_gain_db = bass_gain;
+        snapshot.night_compression_gain_db = night_gain;
+        snapshot.sequence = sequence;
+        return snapshot;
     }
-    snapshot.measured_dbfs = measured;
-    snapshot.applied_gain_db = applied_gain;
-    snapshot.bass_correction_gain_db = bass_gain;
-    snapshot.night_compression_gain_db = night_gain;
-    snapshot.sequence = sequence;
-    return snapshot;
+    return ProgramAwareTelemetrySnapshotV1{};
 }
 
 bool ProgramAwareLevelControllerV1::configure(const ProgramAwareLevelPolicyV1& policy,
@@ -299,7 +385,10 @@ void ProgramAwareLevelControllerV1::reset() noexcept {
     status_.enabled = policy_.enabled;
     status_.silence_gated = true;
     status_.meter_mode = policy_.meter_mode;
-    telemetry_valid_.store(false, std::memory_order_release);
+    // Clearing the publication token invalidates every previously published
+    // generation. Keep an in-flight reader hazard intact so a subsequent
+    // first publish cannot reuse a slot that the reader still holds.
+    telemetry_publication_.store(0U, std::memory_order_seq_cst);
     for (auto& bank : k_state_) {
         for (auto& state : bank) state = {};
     }
