@@ -107,12 +107,17 @@ function Assert-LiveSessionVolumePipeIoContract([string]$repoRoot) {
         'CancelIoEx\(handle_,\s*&overlapped\)',
         'GetOverlappedResult\(handle_,\s*&overlapped,\s*&transferred,\s*TRUE\)',
         'CancelIoEx\(handle_,\s*nullptr\)',
+        'if\s*\(encoded\.empty\(\)\s*\|\|\s*encoded\.size\(\)\s*>\s*hibiki::kIpcMaxPayloadBytes\)\s*\{\s*close\(\);\s*return\s+std::nullopt;',
         '!transfer\(true,\s*const_cast<std::uint8_t\*>\(encoded\.data\(\)\),\s*encoded\.size\(\)\)\)\s*\{\s*close\(\);\s*return\s+std::nullopt;',
         'if\s*\(!transfer\(false,\s*length\.data\(\),\s*length\.size\(\)\)\)\s*\{\s*close\(\);',
         'if\s*\(response_bytes\s*<\s*20U.*?\)\s*\{\s*close\(\);',
         'if\s*\(!transfer\(false,\s*response\.data\(\),\s*response\.size\(\)\)\)\s*\{\s*close\(\);',
         'if\s*\(!decoded\.has_value\(\).*?\)\s*\{\s*close\(\);',
-        'bool\s+connected\(\)\s+const\s+noexcept\s*\{\s*return\s+handle_\s*!=\s*INVALID_HANDLE_VALUE;'
+        'bool\s+connected\(\)\s+const\s+noexcept\s*\{\s*return\s+handle_\s*!=\s*INVALID_HANDLE_VALUE;',
+        'void\s+fail_closed\(\)\s+noexcept\s*\{\s*close\(\);',
+        'if\s*\(response->header\.type\s*!=\s*hibiki::IpcMessageType::SessionCatalogSnapshot\)\s*\{',
+        'if\s*\(response->header\.type\s*!=\s*hibiki::IpcMessageType::Error\)\s*pipe\.fail_closed\(\);',
+        'decode_session_catalog_snapshot_v1\(response->payload,\s*catalog\)'
     )
     foreach ($pattern in $requiredPatterns) {
         if ($source -notmatch $pattern) {
@@ -122,6 +127,10 @@ function Assert-LiveSessionVolumePipeIoContract([string]$repoRoot) {
     $disconnectStops = ([regex]::Matches($source, 'if\s*\(!pipe\.connected\(\)\)\s*return false;')).Count
     if ($disconnectStops -ne 4) {
         throw "Live Engine session-volume wait helpers must stop after disconnect (found $disconnectStops)."
+    }
+    $catalogFailClosed = ([regex]::Matches($source, 'pipe\.fail_closed\(\)')).Count
+    if ($catalogFailClosed -ne 2) {
+        throw "Live Engine session-volume catalog failures must fail closed (found $catalogFailClosed)."
     }
     $boundedRetryLoops = ([regex]::Matches(
         $source,

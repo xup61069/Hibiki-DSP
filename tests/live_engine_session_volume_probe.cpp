@@ -168,7 +168,10 @@ public:
         request.header.request_id = request_id;
         request.payload.assign(payload.begin(), payload.end());
         const auto encoded = hibiki::encode_ipc_frame(request);
-        if (encoded.empty() || encoded.size() > hibiki::kIpcMaxPayloadBytes) return std::nullopt;
+        if (encoded.empty() || encoded.size() > hibiki::kIpcMaxPayloadBytes) {
+            close();
+            return std::nullopt;
+        }
 
         std::array<std::uint8_t, 4U> length{};
         write_u32_le(length.data(), static_cast<std::uint32_t>(encoded.size()));
@@ -203,6 +206,8 @@ public:
     [[nodiscard]] bool connected() const noexcept {
         return handle_ != INVALID_HANDLE_VALUE;
     }
+
+    void fail_closed() noexcept { close(); }
 
 private:
     bool transfer(const bool writing, void* const data, const std::size_t bytes) noexcept {
@@ -286,13 +291,18 @@ bool read_catalog(PipeClient& pipe,
                   CatalogDiagnosticsV1* const diagnostics = nullptr) noexcept {
     const auto response = pipe.transact(hibiki::IpcMessageType::SessionCatalogRequest,
                                         request_id, {});
-    if (!response.has_value() ||
-        response->header.type != hibiki::IpcMessageType::SessionCatalogSnapshot) {
+    if (!response.has_value()) return false;
+    if (response->header.type != hibiki::IpcMessageType::SessionCatalogSnapshot) {
+        // A valid Error response means the service has no snapshot yet and
+        // may recover on the next bounded poll; any other type is a protocol
+        // mismatch and must not be retried on the same stream.
+        if (response->header.type != hibiki::IpcMessageType::Error) pipe.fail_closed();
         return false;
     }
     hibiki::SessionCatalogSnapshotV1 catalog{};
     if (!hibiki::decode_session_catalog_snapshot_v1(response->payload, catalog) ||
         catalog.sequence == 0U) {
+        pipe.fail_closed();
         return false;
     }
     if (diagnostics != nullptr) {
