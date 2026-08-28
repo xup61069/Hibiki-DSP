@@ -149,6 +149,31 @@ int main() {
               decoded.volume.generation == 4U);
     }
 
+    // ---- zero sequence is reserved for the empty/uninitialized state -------
+    {
+        auto snapshot = make_valid_snapshot(0U);
+        snapshot.sequence = 0U;
+        std::array<std::uint8_t, hibiki::kControlStatusSnapshotPayloadBytesV1> payload{};
+        payload.fill(0xa5U);
+        std::size_t bytes = 123U;
+        CHECK(!hibiki::encode_control_status_snapshot_v1(snapshot, payload, bytes));
+        CHECK(bytes == 0U);
+        CHECK(std::all_of(payload.begin(), payload.end(), [](const auto value) {
+            return value == 0U;
+        }));
+
+        auto valid = make_valid_snapshot(0U);
+        CHECK(hibiki::encode_control_status_snapshot_v1(valid, payload, bytes));
+        auto corrupted = payload;
+        std::fill(corrupted.begin() + 4U, corrupted.begin() + 12U,
+                  static_cast<std::uint8_t>(0U));
+        auto decoded = ControlStatusSnapshotV1{};
+        decoded.sequence = 99U;
+        CHECK(!hibiki::decode_control_status_snapshot_v1(
+            std::span<const std::uint8_t>(corrupted.data(), bytes), decoded));
+        CHECK(decoded.sequence == 0U && decoded.route_count == 0U);
+    }
+
     // ---- round-trip: single route ------------------------------------------
     {
         const auto snapshot = make_valid_snapshot(1U);
@@ -385,6 +410,11 @@ int main() {
         CHECK(!store.has_snapshot());
         CHECK(!store.reply(response));
         CHECK(store.sequence() == 0U);
+
+        auto zero = make_valid_snapshot(0U);
+        zero.sequence = 0U;
+        CHECK(!store.publish(zero));
+        CHECK(!store.has_snapshot() && store.sequence() == 0U);
 
         auto first = make_valid_snapshot(1U);
         first.sequence = 5U;

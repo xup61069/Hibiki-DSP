@@ -90,7 +90,8 @@ bool encode_control_status_snapshot_v1(
     std::size_t& payload_bytes) noexcept {
     payload.fill(0U);
     payload_bytes = 0U;
-    if (snapshot.route_count > kControlStatusSnapshotCapacityV1 ||
+    if (snapshot.sequence == 0U ||
+        snapshot.route_count > kControlStatusSnapshotCapacityV1 ||
         !valid_volume(snapshot.volume)) {
         return false;
     }
@@ -150,6 +151,7 @@ bool decode_control_status_snapshot_v1(
     const auto expected_bytes = kControlStatusSnapshotHeaderBytesV1 +
                                 (route_count * kControlStatusSnapshotEntryBytesV1);
     if (route_count > kControlStatusSnapshotCapacityV1 || payload.size() != expected_bytes ||
+        read_u64(payload.data() + 4U) == 0U ||
         payload[24U] > 1U || payload[25U] > static_cast<std::uint8_t>(VolumeOrigin::Session) ||
         payload[26U] > static_cast<std::uint8_t>(ActuatorMode::StrictDirect)) {
         return false;
