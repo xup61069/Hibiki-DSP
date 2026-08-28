@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <limits>
+#include <memory>
 #include <vector>
 
 #define CHECK(expr) \
@@ -197,6 +198,37 @@ int main() {
         CHECK(prepared.prepare(kernel, 1U, 1U, 2U, 48000U, make_resolution()));
         float stereo[2] = {0.5F, 0.5F};
         CHECK(!prepared.process_interleaved(stereo, 1U, 1U));
+
+        constexpr auto max_frames_for_eight_channels =
+            std::numeric_limits<std::size_t>::max() / 8U;
+        CHECK(max_frames_for_eight_channels * 8U <=
+              std::numeric_limits<std::size_t>::max());
+        CHECK(max_frames_for_eight_channels + 1U >
+              std::numeric_limits<std::size_t>::max() / 8U);
+        auto baseline = std::make_unique<IrConvolverV1>();
+        auto candidate = std::make_unique<IrConvolverV1>();
+        CHECK(baseline->prepare(kernel, 1U, 1U, 8U, 48000U, make_resolution()));
+        CHECK(candidate->prepare(kernel, 1U, 1U, 8U, 48000U, make_resolution()));
+        std::vector<float> warmup{0.1F, -0.2F, 0.3F, -0.4F,
+                                  0.5F, -0.6F, 0.7F, -0.8F};
+        auto baseline_warmup = warmup;
+        auto candidate_warmup = warmup;
+        CHECK(baseline->process_interleaved(baseline_warmup.data(), 1U, 8U));
+        CHECK(candidate->process_interleaved(candidate_warmup.data(), 1U, 8U));
+        std::vector<float> overflow_guard{0.125F, -0.25F, 0.5F, -0.75F,
+                                          0.875F, -1.0F, 0.25F, -0.5F};
+        CHECK(!candidate->process_interleaved(
+            overflow_guard.data(), max_frames_for_eight_channels + 1U, 8U));
+        CHECK(overflow_guard[0] == 0.125F && overflow_guard[7] == -0.5F);
+
+        std::vector<float> baseline_next{0.9F, -0.8F, 0.7F, -0.6F,
+                                         0.5F, -0.4F, 0.3F, -0.2F};
+        auto candidate_next = baseline_next;
+        CHECK(baseline->process_interleaved(baseline_next.data(), 1U, 8U));
+        CHECK(candidate->process_interleaved(candidate_next.data(), 1U, 8U));
+        for (std::size_t index = 0U; index < baseline_next.size(); ++index) {
+            CHECK(candidate_next[index] == baseline_next[index]);
+        }
     }
 
     return 0;
