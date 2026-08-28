@@ -27,7 +27,8 @@ SceneProfile identity，也不可寫入永久 preset。PID 只能作為顯示／
 `WindowsAudioSessionRouteCoordinatorV1` 提供：
 
 - `write_session_volume(id, requestedDb, mute, eventContext)`：只接受 finite、−144 至
-  +12 dB，且必須先在 registry 找到相同 session instance；成功後由 watcher 呼叫
+  0 dB（Windows `ISimpleAudioVolume` 的 scalar 上限），且必須先在 registry 找到相同
+  session instance；成功後由 watcher 呼叫
   `ISimpleAudioVolume::SetMasterVolume`／`SetMute`。
 - `read_session_volume(id, requestedDb, mute)`：同樣要求已綁定且已枚舉，成功才寫入輸出
   引數；失敗不修改 caller state。
@@ -38,7 +39,8 @@ session catalog／handle contract，不得把 raw instance ID 放進永久設定
 
 ## 失敗與安全
 
-- 未綁定 endpoint 回 `E_UNEXPECTED`；空字串、超長 ID、非有限或超出 dB 範圍回
+- 未綁定 endpoint 回 `E_UNEXPECTED`；空字串、超長 ID、非有限、低於 −144 dB 或高於
+  0 dB 回
   `E_INVALIDARG`。
 - 不在目前 registry 的 ID 回 `HRESULT_FROM_WIN32(ERROR_NOT_FOUND)`，避免對新 endpoint
   或已消失的 session 寫入。

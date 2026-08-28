@@ -219,7 +219,7 @@ public sealed partial class MainWindow
         {
             Header = "選取 App 音量 dB",
             Minimum = -60,
-            Maximum = 12,
+            Maximum = 0,
             StepFrequency = 0.5,
         };
         AutomationProperties.SetName(sessionVolumeSlider, "選取 App 音量分貝");
