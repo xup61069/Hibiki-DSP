@@ -20,6 +20,73 @@ function Assert-LiveSessionVolumeOptIn([bool]$windowsHost, [bool]$writeTest, [bo
     }
 }
 
+function Assert-LiveSessionVolumeProbeExitContract([string]$repoRoot) {
+    if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+        throw 'Live session-volume probe exit contract requires a repository root.'
+    }
+    $probePaths = @(
+        (Join-Path $repoRoot 'tests/live_session_volume_probe.cpp'),
+        (Join-Path $repoRoot 'tests/live_engine_session_volume_probe.cpp')
+    )
+    foreach ($probePath in $probePaths) {
+        if (-not (Test-Path -LiteralPath $probePath -PathType Leaf)) {
+            throw "Live session-volume probe source is missing: $probePath"
+        }
+        $lines = @(Get-Content -LiteralPath $probePath)
+        $source = $lines -join "`n"
+        if ($source -notmatch 'return\s+passed\s+\|\|\s+unavailable\s+\?\s+0\s*:\s*1;') {
+            throw "Live session-volume probe has no fail-closed unavailable exit contract: $probePath"
+        }
+
+        $writeLine = -1
+        for ($lineIndex = 0; $lineIndex -lt $lines.Count; $lineIndex++) {
+            if ($lines[$lineIndex] -match '^\s*restore_required\s*=\s*true;') {
+                $writeLine = $lineIndex
+                break
+            }
+        }
+        if ($writeLine -lt 0) {
+            throw "Live session-volume probe has no restore arming before mutation: $probePath"
+        }
+
+        for ($lineIndex = 0; $lineIndex -lt $lines.Count; $lineIndex++) {
+            if ($lines[$lineIndex] -notmatch 'session_volume(?:_engine)?_live=unavailable') {
+                continue
+            }
+            if ($lines[$lineIndex] -match 'reason=com-init') {
+                $windowEnd = [Math]::Min($lines.Count - 1, $lineIndex + 4)
+                $window = $lines[$lineIndex..$windowEnd] -join "`n"
+                if ($window -notmatch 'return\s+0;') {
+                    throw "COM initialization unavailability must exit successfully: $probePath"
+                }
+                continue
+            }
+
+            $markedUnavailable = $false
+            $reachedBreak = $false
+            $windowEnd = [Math]::Min($lines.Count - 1, $lineIndex + 24)
+            for ($nextLine = $lineIndex + 1; $nextLine -le $windowEnd; $nextLine++) {
+                if ($lines[$nextLine] -match '^\s*unavailable\s*=\s*true;') {
+                    $markedUnavailable = $true
+                }
+                if ($lines[$nextLine] -match '^\s*break;') {
+                    $reachedBreak = $true
+                    break
+                }
+            }
+            if (-not $markedUnavailable -or -not $reachedBreak) {
+                throw "Pre-write unavailability must be marked before its exit: ${probePath}:$($lineIndex + 1)"
+            }
+        }
+
+        for ($lineIndex = $writeLine + 1; $lineIndex -lt $lines.Count; $lineIndex++) {
+            if ($lines[$lineIndex] -match '^\s*unavailable\s*=\s*true;') {
+                throw "Post-write failure path must not be downgraded to unavailable: ${probePath}:$($lineIndex + 1)"
+            }
+        }
+    }
+}
+
 function Get-LiveSessionVolumePlan([string]$repoRoot, [bool]$directCoordinator) {
     if ([string]::IsNullOrWhiteSpace($repoRoot)) { throw 'Live session-volume plan requires a repository root.' }
 
@@ -177,6 +244,7 @@ if ($SelfTest) {
     }
     if (-not $writeTestCaught) { throw 'Live session-volume self-test expected WriteTest opt-in rejection.' }
     Assert-LiveSessionVolumeOptIn $true $false $true
+    Assert-LiveSessionVolumeProbeExitContract $repo
 
     $directPlan = Get-LiveSessionVolumePlan $repo $true
     Assert-LiveSessionVolumePlan $directPlan $repo $true
@@ -203,7 +271,7 @@ if ($SelfTest) {
 
     $synthetic = @{}
     Assert-LiveSessionVolumePath -Path (Join-Path $repo '.local/missing-leaf') -Root (Join-Path $repo '.local') -Kind Directory -AllowMissingLeaf -SyntheticAttributes $synthetic
-    $caseCount = 8
+    $caseCount = 10
 
     $outsideCaught = $false
     try {
