@@ -378,17 +378,21 @@ bool OutputFanoutRuntimeV1::process(
     const std::span<float* const> outputs,
     const std::span<const std::size_t> output_capacities,
     const std::span<std::size_t> output_frames) noexcept {
+    // A rejected block must not leave caller-visible frame counts from a
+    // previous successful call, including when the first enabled sink fails
+    // the capacity preflight before later sink entries are visited. Clear the
+    // metadata as soon as its span is known to cover the prepared plan so
+    // invalid input and zero/oversized frame requests cannot retain stale
+    // counts either.
+    if (output_frames.size() >= plan_.sink_count) {
+        for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
+            output_frames[index] = 0U;
+        }
+    }
     if (!prepared_ || scratch_ == nullptr || input_interleaved == nullptr || input_frames == 0U ||
         input_frames > kOutputFanoutMaxInputFramesV1 || outputs.size() < plan_.sink_count ||
         output_capacities.size() < plan_.sink_count || output_frames.size() < plan_.sink_count) {
         return false;
-    }
-
-    // A rejected block must not leave caller-visible frame counts from a
-    // previous successful call, including when the first enabled sink fails
-    // the capacity preflight before later sink entries are visited.
-    for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
-        output_frames[index] = 0U;
     }
     const auto samples = input_frames * static_cast<std::size_t>(plan_.output_channels);
     for (std::size_t sample = 0U; sample < samples; ++sample) {

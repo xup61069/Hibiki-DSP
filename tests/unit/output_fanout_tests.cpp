@@ -372,6 +372,25 @@ int main() {
               after_rollback.sinks[0].source_step == neutral.sinks[0].source_step &&
               rollback_frames[0] == 0U && rollback_frames[1] == 0U);
 
+        // Rejected input validation must clear metadata when the caller
+        // supplied a complete output_frames span.
+        const auto check_rejected_input = [&](const float* rejected_input,
+                                              const std::size_t rejected_frames) {
+            rollback_frames[0] = 17U;
+            rollback_frames[1] = 23U;
+            const bool rejected = !runtime.process(
+                rejected_input, rejected_frames,
+                std::span<float* const>(rollback_outputs, 2U),
+                std::span<const std::size_t>(no_capacity, 2U),
+                std::span<std::size_t>(rollback_frames, 2U));
+            return rejected && rollback_frames[0] == 0U &&
+                   rollback_frames[1] == 0U;
+        };
+        CHECK(check_rejected_input(nullptr, input.size() / 2U));
+        CHECK(check_rejected_input(input.data(), 0U));
+        CHECK(check_rejected_input(
+            input.data(), hibiki::kOutputFanoutMaxInputFramesV1 + 1U));
+
         std::atomic<bool> failed{false};
         std::thread audio([&runtime, &input, &failed]() {
             std::array<float, 512> output_a{};
