@@ -62,7 +62,6 @@ WindowsAudioSessionWatcher::WindowsAudioSessionWatcher() noexcept {
 }
 
 WindowsAudioSessionWatcher::~WindowsAudioSessionWatcher() {
-    destroying_.store(true, std::memory_order_seq_cst);
     unbind();
 }
 
