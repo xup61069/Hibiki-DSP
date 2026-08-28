@@ -542,6 +542,10 @@ HRESULT WindowsAudioSessionWatcher::read_session_volume(
     float scalar = 0.0F;
     BOOL muted = FALSE;
     HRESULT read_result = volume->GetMasterVolume(&scalar);
+    if (SUCCEEDED(read_result) &&
+        (!std::isfinite(scalar) || scalar < 0.0F || scalar > 1.0F)) {
+        read_result = E_FAIL;
+    }
     if (SUCCEEDED(read_result)) {
         read_result = volume->GetMute(&muted);
     }

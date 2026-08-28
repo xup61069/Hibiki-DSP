@@ -6112,6 +6112,15 @@ int main() {
               volume_control.scalar == original_scalar && volume_control.muted == original_mute &&
               volume_control.set_master_calls == set_master_before_platform_cap &&
               volume_control.set_mute_calls == set_mute_before_platform_cap);
+        for (const float invalid_scalar : {std::numeric_limits<float>::quiet_NaN(), 1.01F}) {
+            volume_control.scalar = invalid_scalar;
+            double preserved_db = 17.0;
+            bool preserved_mute = true;
+            CHECK(volume_watcher.read_session_volume("fake-session", preserved_db,
+                                                     preserved_mute) == E_FAIL &&
+                  preserved_db == 17.0 && preserved_mute);
+        }
+        volume_control.scalar = original_scalar;
         volume_control.fail_mute_calls = 1U;
         CHECK(volume_watcher.write_session_volume("fake-session", -6.0, false,
                                                   volume_context) == E_FAIL &&
