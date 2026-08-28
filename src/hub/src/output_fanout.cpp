@@ -138,6 +138,15 @@ bool OutputFanoutRuntimeV1::prepare(const OutputFanoutPlanV1& plan,
     plan_ = plan;
     sinks_ = candidates;
     scratch_ = std::move(candidate_scratch);
+    applied_clock_sequences_.fill(0U);
+    for (std::size_t index = 0U; index < kOutputFanoutMaxSinksV1; ++index) {
+        auto& request = clock_requests_[index];
+        request.source_frames.store(0.0, std::memory_order_relaxed);
+        request.sink_frames.store(0.0, std::memory_order_relaxed);
+        request.elapsed_seconds.store(0.0, std::memory_order_relaxed);
+        request.sequence.store(0U, std::memory_order_release);
+        publish_clock_snapshot(index, sinks_[index].snapshot());
+    }
     prepared_ = true;
     return true;
 }
@@ -150,6 +159,19 @@ void OutputFanoutRuntimeV1::reset() noexcept {
         if (plan_.sinks[index].enabled) {
             sinks_[index].reset();
         }
+        auto& request = clock_requests_[index];
+        request.source_frames.store(0.0, std::memory_order_relaxed);
+        request.sink_frames.store(0.0, std::memory_order_relaxed);
+        request.elapsed_seconds.store(0.0, std::memory_order_relaxed);
+        request.sequence.store(0U, std::memory_order_release);
+        applied_clock_sequences_[index] = 0U;
+        publish_clock_snapshot(index, sinks_[index].snapshot());
+    }
+    for (std::size_t index = plan_.sink_count; index < kOutputFanoutMaxSinksV1;
+         ++index) {
+        clock_requests_[index].sequence.store(0U, std::memory_order_release);
+        applied_clock_sequences_[index] = 0U;
+        publish_clock_snapshot(index, sinks_[index].snapshot());
     }
 }
 
@@ -163,8 +185,90 @@ bool OutputFanoutRuntimeV1::observe_clock(const std::size_t sink_index,
         elapsed_seconds <= 0.0) {
         return false;
     }
-    sinks_[sink_index].observe_clock(source_frames, sink_frames, elapsed_seconds);
+
+    auto& request = clock_requests_[sink_index];
+    auto sequence = request.sequence.load(std::memory_order_acquire);
+    const auto max_sequence = std::numeric_limits<std::uint64_t>::max();
+    if ((sequence & 1U) != 0U || sequence > max_sequence - 3U ||
+        !request.sequence.compare_exchange_strong(
+            sequence, sequence + 1U, std::memory_order_acq_rel,
+            std::memory_order_acquire)) {
+        return false;
+    }
+    request.source_frames.store(source_frames, std::memory_order_relaxed);
+    request.sink_frames.store(sink_frames, std::memory_order_relaxed);
+    request.elapsed_seconds.store(elapsed_seconds, std::memory_order_relaxed);
+    request.sequence.store(sequence + 2U, std::memory_order_release);
     return true;
+}
+
+bool OutputFanoutRuntimeV1::apply_pending_clock_observations() noexcept {
+    bool changed = false;
+    for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
+        if (!plan_.sinks[index].enabled) {
+            continue;
+        }
+        auto& request = clock_requests_[index];
+        const auto before = request.sequence.load(std::memory_order_acquire);
+        if (before == 0U || (before & 1U) != 0U ||
+            before == applied_clock_sequences_[index]) {
+            continue;
+        }
+        const double source_frames =
+            request.source_frames.load(std::memory_order_relaxed);
+        const double sink_frames = request.sink_frames.load(std::memory_order_relaxed);
+        const double elapsed_seconds =
+            request.elapsed_seconds.load(std::memory_order_relaxed);
+        const auto after = request.sequence.load(std::memory_order_acquire);
+        if (before != after || (after & 1U) != 0U ||
+            !std::isfinite(source_frames) || !std::isfinite(sink_frames) ||
+            !std::isfinite(elapsed_seconds) || source_frames <= 0.0 ||
+            sink_frames <= 0.0 || elapsed_seconds <= 0.0) {
+            continue;
+        }
+        sinks_[index].observe_clock(source_frames, sink_frames, elapsed_seconds);
+        applied_clock_sequences_[index] = before;
+        changed = true;
+    }
+    return changed;
+}
+
+void OutputFanoutRuntimeV1::publish_clock_snapshot(
+    const std::size_t sink_index,
+    const OutputSinkClockSnapshotV1& snapshot) noexcept {
+    auto& publication = clock_publications_[sink_index];
+    const auto current = publication.sequence.load(std::memory_order_relaxed);
+    const auto begin = (current & 1U) == 0U ? current + 1U : current + 2U;
+    publication.sequence.store(begin, std::memory_order_relaxed);
+    publication.ratio.store(snapshot.ratio, std::memory_order_relaxed);
+    publication.drift_ppm.store(snapshot.drift_ppm, std::memory_order_relaxed);
+    publication.source_step.store(snapshot.source_step, std::memory_order_relaxed);
+    publication.prepared.store(snapshot.prepared, std::memory_order_relaxed);
+    publication.sequence.store(begin + 1U, std::memory_order_release);
+}
+
+bool OutputFanoutRuntimeV1::read_clock_snapshot(
+    const std::size_t sink_index,
+    OutputSinkClockSnapshotV1& snapshot) const noexcept {
+    const auto& publication = clock_publications_[sink_index];
+    for (std::size_t attempt = 0U; attempt < 2U; ++attempt) {
+        const auto before = publication.sequence.load(std::memory_order_acquire);
+        if ((before & 1U) != 0U) {
+            continue;
+        }
+        const double ratio = publication.ratio.load(std::memory_order_relaxed);
+        const double drift_ppm = publication.drift_ppm.load(std::memory_order_relaxed);
+        const double source_step =
+            publication.source_step.load(std::memory_order_relaxed);
+        const bool prepared = publication.prepared.load(std::memory_order_relaxed);
+        const auto after = publication.sequence.load(std::memory_order_acquire);
+        if (before == after && (after & 1U) == 0U) {
+            snapshot = OutputSinkClockSnapshotV1{
+                ratio, drift_ppm, source_step, prepared};
+            return true;
+        }
+    }
+    return false;
 }
 
 bool OutputFanoutRuntimeV1::process(
@@ -184,6 +288,10 @@ bool OutputFanoutRuntimeV1::process(
             return false;
         }
     }
+
+    const auto state_before = sinks_;
+    const auto applied_sequences_before = applied_clock_sequences_;
+    const bool clock_changed = apply_pending_clock_observations();
     for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
         output_frames[index] = 0U;
         if (!plan_.sinks[index].enabled) {
@@ -191,11 +299,12 @@ bool OutputFanoutRuntimeV1::process(
         }
         const auto required_frames = sinks_[index].required_output_frames(input_frames);
         if (outputs[index] == nullptr || output_capacities[index] < required_frames) {
+            sinks_ = state_before;
+            applied_clock_sequences_ = applied_sequences_before;
             return false;
         }
     }
 
-    const auto state_before = sinks_;
     std::array<std::size_t, kOutputFanoutMaxSinksV1> rendered_frames{};
     for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
         if (plan_.sinks[index].enabled &&
@@ -203,6 +312,7 @@ bool OutputFanoutRuntimeV1::process(
                                     scratch_->blocks[index].data(),
                                     kOutputFanoutMaxResampledFramesV1, rendered_frames[index])) {
             sinks_ = state_before;
+            applied_clock_sequences_ = applied_sequences_before;
             return false;
         }
     }
@@ -211,6 +321,13 @@ bool OutputFanoutRuntimeV1::process(
             const auto sink_samples = rendered_frames[index] * plan_.output_channels;
             std::copy_n(scratch_->blocks[index].data(), sink_samples, outputs[index]);
             output_frames[index] = rendered_frames[index];
+        }
+    }
+    if (clock_changed) {
+        for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
+            if (plan_.sinks[index].enabled) {
+                publish_clock_snapshot(index, sinks_[index].snapshot());
+            }
         }
     }
     return true;
@@ -222,7 +339,7 @@ OutputFanoutRuntimeSnapshotV1 OutputFanoutRuntimeV1::snapshot() const noexcept {
     result.output_channels = plan_.output_channels;
     result.sink_count = plan_.sink_count;
     for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
-        result.sinks[index] = sinks_[index].snapshot();
+        (void)read_clock_snapshot(index, result.sinks[index]);
     }
     return result;
 }

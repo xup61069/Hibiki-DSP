@@ -117,13 +117,15 @@ sink 的 pointer／capacity 在第一次寫入前一次驗證；任何容量不�
 一致地拒絕 C0/C1 控制字元（含 NUL、tab、newline、CR、DEL 與 0x80–0x9F），只接受可顯示的
 UTF-8 名稱。這讓 UI 與 downstream consumer 不需要處理不可見字元的 edge case。
 
-`OutputFanoutRuntimeV1` 將每個 enabled sink 綁定一個 persistent `OutputSinkModel`。clock
-observation 只在 control/worker 邊界更新該 sink 的 ratio；audio-side process 先做有限值與
-容量上限 preflight，再把各 sink 的 SRC 結果寫入 prepare 階段配置的 scratch，所有 sink 成功
-後才一次發佈到 caller-owned output buffers。任何 sink 失敗會回復 SRC state，不留下部分
-輸出或部分時鐘進度；每次最多 4096 input frames、輸出上限按 0.25x source step 的固定界限
-只用於 prepare-time scratch；caller-owned capacity 則依每個 sink 當下 phase 與 source step
-精確 preflight。這是 user-space bounded runtime，仍不等於真實硬體 sink／clock soak 證據。
+`OutputFanoutRuntimeV1` 將每個 enabled sink 綁定一個 persistent `OutputSinkModel`。control
+側的 `observe_clock` 只驗證並發佈每個 sink 的 bounded latest-request；audio-side `process`
+在容量 preflight 前由唯一 owner 套用一個完整且穩定的 request。control-side `snapshot` 只讀
+audio-side 發佈的 coherent snapshot，不直接讀取可變 SRC state。process 先做有限值與容量
+上限 preflight，再把各 sink 的 SRC 結果寫入 prepare 階段配置的 scratch，所有 sink 成功後
+才一次發佈到 caller-owned output buffers。任何 sink 失敗會回復 SRC state 與該次時鐘進度，
+不留下部分輸出；每次最多 4096 input frames、輸出上限按 0.25x source step 的固定界限只用
+於 prepare-time scratch；caller-owned capacity 則依每個 sink 當下 phase 與 source step 精確
+preflight。這是 user-space bounded runtime，仍不等於真實硬體 sink／clock soak 證據。
 
 `AudioEngineModel::prepare_wasapi_fanout` 與 `process_output_group_to_wasapi_fanout` 將上述
 physical sink fan-out 接到 graph：graph、Group Master 與 limiter 只執行一次，之後同一個

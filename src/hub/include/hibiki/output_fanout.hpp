@@ -2,6 +2,7 @@
 
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include <atomic>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -79,6 +80,8 @@ public:
     [[nodiscard]] bool prepare(const OutputFanoutPlanV1& plan,
                                double source_step = 1.0) noexcept;
     void reset() noexcept;
+    // Control-side input publishes a bounded latest request. The audio-side
+    // process owner applies it before its capacity preflight.
     [[nodiscard]] bool observe_clock(std::size_t sink_index,
                                      double source_frames,
                                      double sink_frames,
@@ -91,6 +94,21 @@ public:
     [[nodiscard]] OutputFanoutRuntimeSnapshotV1 snapshot() const noexcept;
 
 private:
+    struct ClockObservationRequest {
+        std::atomic<std::uint64_t> sequence{0U};
+        std::atomic<double> source_frames{0.0};
+        std::atomic<double> sink_frames{0.0};
+        std::atomic<double> elapsed_seconds{0.0};
+    };
+
+    struct ClockSnapshotPublication {
+        std::atomic<std::uint64_t> sequence{0U};
+        std::atomic<double> ratio{1.0};
+        std::atomic<double> drift_ppm{0.0};
+        std::atomic<double> source_step{1.0};
+        std::atomic<bool> prepared{false};
+    };
+
     struct ScratchStorage {
         std::array<std::array<float,
                               kOutputFanoutMaxResampledFramesV1 * 8U>,
@@ -101,7 +119,21 @@ private:
     OutputFanoutPlanV1 plan_{};
     std::array<OutputSinkModel, kOutputFanoutMaxSinksV1> sinks_{};
     std::unique_ptr<ScratchStorage> scratch_{};
+    std::array<ClockObservationRequest, kOutputFanoutMaxSinksV1>
+        clock_requests_{};
+    std::array<ClockSnapshotPublication, kOutputFanoutMaxSinksV1>
+        clock_publications_{};
+    std::array<std::uint64_t, kOutputFanoutMaxSinksV1>
+        applied_clock_sequences_{};
     bool prepared_{false};
+
+    [[nodiscard]] bool apply_pending_clock_observations() noexcept;
+    void publish_clock_snapshot(
+        std::size_t sink_index,
+        const OutputSinkClockSnapshotV1& snapshot) noexcept;
+    [[nodiscard]] bool read_clock_snapshot(
+        std::size_t sink_index,
+        OutputSinkClockSnapshotV1& snapshot) const noexcept;
 };
 
 }  // namespace hibiki

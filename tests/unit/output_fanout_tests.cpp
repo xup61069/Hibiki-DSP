@@ -3,6 +3,7 @@
 #include "hibiki/output_fanout.hpp"
 
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -10,6 +11,7 @@
 #include <limits>
 #include <span>
 #include <string>
+#include <thread>
 #include <vector>
 
 #define CHECK(expr) \
@@ -328,6 +330,131 @@ int main() {
         CHECK(!hibiki::fanout_interleaved_v1(
             plan, input, 2U, std::span<float* const>(outputs, 2U),
             std::span<const std::size_t>(capacities, 1U)));
+    }
+
+    // persistent runtime: clock observations are published across the
+    // control/audio boundary, capacity rejection rolls back the observation,
+    // and concurrent observation/process/snapshot activity stays finite and
+    // internally coherent.
+    {
+        const auto plan = make_valid_plan();
+        hibiki::OutputFanoutRuntimeV1 runtime;
+        CHECK(runtime.prepare(plan, 1.0));
+
+        std::array<float, 256> input{};
+        input.fill(0.25F);
+        std::array<float, 512> rollback_a{};
+        std::array<float, 512> rollback_b{};
+        float* rollback_outputs[2] = {rollback_a.data(), rollback_b.data()};
+        const std::size_t no_capacity[2] = {256U, 0U};
+        std::size_t rollback_frames[2] = {99U, 99U};
+        const auto neutral = runtime.snapshot();
+        CHECK(neutral.prepared && neutral.sinks[0].prepared &&
+              neutral.sinks[0].ratio == 1.0 &&
+              neutral.sinks[0].source_step == 1.0);
+        CHECK(runtime.observe_clock(0U, 48000.0, 48012.0, 1.0));
+        CHECK(!runtime.process(
+            input.data(), input.size() / 2U,
+            std::span<float* const>(rollback_outputs, 2U),
+            std::span<const std::size_t>(no_capacity, 2U),
+            std::span<std::size_t>(rollback_frames, 2U)));
+        const auto after_rollback = runtime.snapshot();
+        CHECK(after_rollback.sinks[0].ratio == neutral.sinks[0].ratio &&
+              after_rollback.sinks[0].source_step == neutral.sinks[0].source_step &&
+              rollback_frames[0] == 0U && rollback_frames[1] == 0U);
+
+        std::atomic<bool> failed{false};
+        std::thread audio([&runtime, &input, &failed]() {
+            std::array<float, 512> output_a{};
+            std::array<float, 512> output_b{};
+            float* outputs[2] = {output_a.data(), output_b.data()};
+            const std::size_t capacities[2] = {256U, 256U};
+            std::size_t output_frames[2] = {};
+            for (std::size_t iteration = 0U; iteration < 1024U; ++iteration) {
+                if (!runtime.process(
+                        input.data(), input.size() / 2U,
+                        std::span<float* const>(outputs, 2U),
+                        std::span<const std::size_t>(capacities, 2U),
+                        std::span<std::size_t>(output_frames, 2U))) {
+                    failed.store(true, std::memory_order_release);
+                    return;
+                }
+                for (std::size_t sink = 0U; sink < 2U; ++sink) {
+                    if (output_frames[sink] == 0U ||
+                        output_frames[sink] > capacities[sink]) {
+                        failed.store(true, std::memory_order_release);
+                        return;
+                    }
+                    const auto sample_count = output_frames[sink] * 2U;
+                    const auto* output = sink == 0U ? output_a.data() : output_b.data();
+                    for (std::size_t sample = 0U; sample < sample_count; ++sample) {
+                        if (!std::isfinite(output[sample])) {
+                            failed.store(true, std::memory_order_release);
+                            return;
+                        }
+                    }
+                }
+                if ((iteration & 15U) == 0U) {
+                    std::this_thread::yield();
+                }
+            }
+        });
+        std::thread control([&runtime, &failed]() {
+            for (std::size_t iteration = 0U; iteration < 1024U; ++iteration) {
+                const double sink_frames = (iteration & 1U) == 0U ? 48012.0 : 47988.0;
+                if (!runtime.observe_clock(0U, 48000.0, sink_frames, 1.0)) {
+                    failed.store(true, std::memory_order_release);
+                    return;
+                }
+                const auto snapshot = runtime.snapshot();
+                if (!snapshot.prepared) {
+                    failed.store(true, std::memory_order_release);
+                    return;
+                }
+                for (std::size_t sink = 0U; sink < 2U; ++sink) {
+                    const auto& clock = snapshot.sinks[sink];
+                    if (!clock.prepared) {
+                        continue;
+                    }
+                    const double expected_step = 1.0 / clock.ratio;
+                    if (!std::isfinite(clock.ratio) ||
+                        !std::isfinite(clock.drift_ppm) ||
+                        !std::isfinite(clock.source_step) ||
+                        clock.ratio < 1.0 - 500.0e-6 ||
+                        clock.ratio > 1.0 + 500.0e-6 ||
+                        clock.drift_ppm < -500.0 || clock.drift_ppm > 500.0 ||
+                        clock.source_step < 0.25 || clock.source_step > 4.0 ||
+                        std::abs(clock.source_step - expected_step) > 1.0e-12 ||
+                        std::abs(clock.drift_ppm - ((clock.ratio - 1.0) * 1.0e6)) >
+                            1.0e-9) {
+                        failed.store(true, std::memory_order_release);
+                        return;
+                    }
+                }
+                if ((iteration & 15U) == 0U) {
+                    std::this_thread::yield();
+                }
+            }
+        });
+        audio.join();
+        control.join();
+        CHECK(!failed.load(std::memory_order_acquire));
+
+        std::array<float, 512> final_a{};
+        std::array<float, 512> final_b{};
+        float* final_outputs[2] = {final_a.data(), final_b.data()};
+        const std::size_t final_capacities[2] = {256U, 256U};
+        std::size_t final_frames[2] = {};
+        CHECK(runtime.process(
+            input.data(), input.size() / 2U,
+            std::span<float* const>(final_outputs, 2U),
+            std::span<const std::size_t>(final_capacities, 2U),
+            std::span<std::size_t>(final_frames, 2U)));
+        const auto final_snapshot = runtime.snapshot();
+        CHECK(final_snapshot.prepared && final_snapshot.sinks[0].prepared &&
+              std::isfinite(final_snapshot.sinks[0].ratio) &&
+              std::isfinite(final_snapshot.sinks[0].source_step) &&
+              std::abs(final_snapshot.sinks[0].ratio - 1.0) > 1.0e-12);
     }
 
     std::fputs("output_fanout_tests passed\n", stdout);
