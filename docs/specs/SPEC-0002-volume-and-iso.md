@@ -36,6 +36,10 @@ grouped target；未知 label、非零 padding、非法 UTF-8 或格式長度一
 
 Group render 完成後，非 Strict Direct Scene 會經過 `TruePeakLimiterV1` 的 −1 dBTP
 bounded guard；它以三個線性 inter-sample probes 作保守估算並採 block-coherent gain。
+`ProgramAwareLevelControllerV1` 與 `BassExcessDetectorV1` 的 caller-owned interleaved
+processing 也先驗證 `channels` 的 1..8 邊界與 `frames <= SIZE_MAX / channels`；無法代表的
+frame/channel 乘積會在 sample scan 或 controller state update 前 fail-closed。這只保護
+`size_t` arithmetic，不另訂新的 render block-size 上限。
 需要的衰減立即套用；恢復速率以 dB/ms 計算（約 +6 dB per millisecond），與引擎回呼
 區塊大小無關。避免保護電路本身在短區塊間瞬間跳回或在大區塊間恢復過慢。
 恢復是有界的線性（dB domain）爬升；在爬升完成前，實際增益可能暫時低於 unity，
