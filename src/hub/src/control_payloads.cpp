@@ -281,8 +281,8 @@ std::array<std::uint8_t, kSessionVolumeCommandPayloadBytesV1>
 encode_session_volume_command_v1(const SessionVolumeCommandV1& command) noexcept {
     std::array<std::uint8_t, kSessionVolumeCommandPayloadBytesV1> payload{};
     if (command.handle == 0U || command.catalog_sequence == 0U ||
-        command.mute > 1U || command.requested_db_q16_16 < -144 * 65536 ||
-        command.requested_db_q16_16 > 12 * 65536) {
+        command.mute > 1U ||
+        !is_valid_session_volume_db_q16_16_v1(command.requested_db_q16_16)) {
         return payload;
     }
     write_u64(payload.data(), command.handle);
@@ -304,8 +304,8 @@ bool decode_session_volume_command_v1(
     const auto raw_db = static_cast<std::int32_t>(read_u32(payload.data() + 8U));
     const auto handle = read_u64(payload.data());
     const auto sequence = read_u64(payload.data() + 16U);
-    if (handle == 0U || sequence == 0U || raw_db < -144 * 65536 ||
-        raw_db > 12 * 65536) {
+    if (handle == 0U || sequence == 0U ||
+        !is_valid_session_volume_db_q16_16_v1(raw_db)) {
         return false;
     }
     command.handle = handle;

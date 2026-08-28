@@ -644,8 +644,7 @@ bool WindowsControlRuntimeV1::enqueue_session_volume_command(
     const SessionVolumeCommandV1& request) noexcept {
     if (!running() || request.handle == 0U || request.catalog_sequence == 0U ||
         request.catalog_sequence != session_catalog_store_.sequence() || request.mute > 1U ||
-        request.requested_db_q16_16 < (-144 * 65536) ||
-        request.requested_db_q16_16 > (12 * 65536)) {
+        !is_valid_session_volume_db_q16_16_v1(request.requested_db_q16_16)) {
         return false;
     }
     return session_command_queue_.try_push_volume(request);
