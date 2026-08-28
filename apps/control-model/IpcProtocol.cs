@@ -940,7 +940,9 @@ public static class ControlPayloadsV1
         ulong generation,
         IReadOnlyList<SessionCatalogEntryV1> sessions)
     {
-        if (sequence == 0UL || sessions is null || sessions.Count > SessionCatalogSnapshotCapacity)
+        if (sequence == 0UL || generation == 0UL)
+            throw new ArgumentException("Session catalog snapshot requires nonzero sequence and generation.");
+        if (sessions is null || sessions.Count > SessionCatalogSnapshotCapacity)
             throw new ArgumentException("Session catalog snapshot exceeds the v1 limit.",
                                         nameof(sessions));
         var payload = new byte[SessionCatalogSnapshotHeaderBytes +
@@ -1004,7 +1006,7 @@ public static class ControlPayloadsV1
         if (count > SessionCatalogSnapshotCapacity || payload.Length != expected) return false;
         sequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[4..]);
         generation = BinaryPrimitives.ReadUInt64LittleEndian(payload[12..]);
-        if (sequence == 0UL) return false;
+        if (sequence == 0UL || generation == 0UL) return false;
         var list = new List<SessionCatalogEntryV1>(count);
         var seen = new HashSet<ulong>();
         for (var index = 0; index < count; index++)
