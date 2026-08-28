@@ -107,7 +107,9 @@ Group Master ramp 與 limiter，再把同一個 interleaved block 送進 handoff
 
 `OutputFanoutPlanV1` 將同一個 graph block 複製到最多 8 個同聲道 layout 的 sink。所有 enabled
 sink 的 pointer／capacity 在第一次寫入前一次驗證；任何容量不足或 plan 無效都 fail-closed，
-不會只更新部分 sink。`fanout_interleaved_v1` 與 persistent runtime 共用
+不會只更新部分 sink。對 persistent runtime，caller 若提供涵蓋全部 planned sink 的
+`output_frames` span，任何拒絕路徑也會先將每個 planned sink 的 frame count 清為 0，避免
+caller 看見上一次成功 block 的 stale metadata。`fanout_interleaved_v1` 與 persistent runtime 共用
 `kOutputFanoutMaxInputFramesV1` 的 4096-frame 上限，並在掃描或複製前檢查
 `frames * output_channels` 的 bounded geometry；超限或無法表示的 geometry 一律不讀 input、
 不寫任何 sink。每個 sink 後續仍由自己的 ring、clock drift 與 SRC worker 處理；fan-out 本身
@@ -117,13 +119,25 @@ sink 的 pointer／capacity 在第一次寫入前一次驗證；任何容量不�
 一致地拒絕 C0/C1 控制字元（含 NUL、tab、newline、CR、DEL 與 0x80–0x9F），只接受可顯示的
 UTF-8 名稱。這讓 UI 與 downstream consumer 不需要處理不可見字元的 edge case。
 
-`OutputFanoutRuntimeV1` 將每個 enabled sink 綁定一個 persistent `OutputSinkModel`。clock
-observation 只在 control/worker 邊界更新該 sink 的 ratio；audio-side process 先做有限值與
-容量上限 preflight，再把各 sink 的 SRC 結果寫入 prepare 階段配置的 scratch，所有 sink 成功
-後才一次發佈到 caller-owned output buffers。任何 sink 失敗會回復 SRC state，不留下部分
-輸出或部分時鐘進度；每次最多 4096 input frames、輸出上限按 0.25x source step 的固定界限
-只用於 prepare-time scratch；caller-owned capacity 則依每個 sink 當下 phase 與 source step
-精確 preflight。這是 user-space bounded runtime，仍不等於真實硬體 sink／clock soak 證據。
+`OutputFanoutRuntimeV1` 將每個 enabled sink 綁定一個 persistent `OutputSinkModel`。control
+側的 `observe_clock` 只驗證並發佈每個 sink 的 bounded latest-request；audio-side `process`
+在容量 preflight 前由唯一 owner 套用一個完整且穩定的 request。control-side `snapshot` 只讀
+audio-side 發佈的 coherent snapshot，不直接讀取可變 SRC state。process 先做有限值與容量
+上限 preflight，再把各 sink 的 SRC 結果寫入 prepare 階段配置的 scratch，所有 sink 成功後
+才一次發佈到 caller-owned output buffers。任何 sink 失敗會回復 SRC state 與該次時鐘進度，
+不留下部分輸出；每次最多 4096 input frames、輸出上限按 0.25x source step 的固定界限只用
+於 prepare-time scratch，並保留 persistent SRC 的 15-frame history；caller-owned capacity 則依
+每個 sink 當下 phase 與 source step 精確 preflight。這是 user-space bounded runtime，仍不等於
+真實硬體 sink／clock soak 證據。
+
+每個 clock request 與 sink snapshot 都使用三個固定 slots、release/acquire payload 欄位、
+以及 generation／slot／phase publication token。writer 先以 odd token 標記目標 slot 為
+in-progress，完整寫入後才發布 stable token；reader 先宣告 hazard slot 並重新驗證 token，
+writer 不得覆寫被保護的 slot。觀察到 odd、changed token、非法 slot 或無法完成 handshake
+時一律 fail-closed。這個 bounded lifetime/reuse proof 讓 request 與 snapshot 都只能被接受為
+單一完整 generation，不依賴 relaxed 多欄位 seqlock；reset／prepare 使既有 token 失效時也
+不得清除 in-flight reader hazard，直到 reader guard 完成，避免第一個 post-reset generation
+重用仍在讀取的 slot；它仍只是 user-space coordination。
 
 `AudioEngineModel::prepare_wasapi_fanout` 與 `process_output_group_to_wasapi_fanout` 將上述
 physical sink fan-out 接到 graph：graph、Group Master 與 limiter 只執行一次，之後同一個
