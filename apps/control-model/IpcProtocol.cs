@@ -959,6 +959,7 @@ public static class ControlPayloadsV1
             var lane = StrictUtf8.GetBytes(session.LaneId ?? string.Empty);
             var output = StrictUtf8.GetBytes(session.OutputGroup ?? string.Empty);
             if (!HasExpectedHandle(session.Handle, generation, index) || !seen.Add(session.Handle) ||
+                (!session.Active && session.VolumeAvailable) ||
                 name.Length > 64 || app.Length > 64 || lane.Length > 48 || output.Length > 48 ||
                 name.Any(value => value < 0x20) || app.Any(value => value < 0x20) ||
                 lane.Any(value => value < 0x20) || output.Any(value => value < 0x20) ||
@@ -1025,6 +1026,7 @@ public static class ControlPayloadsV1
             var laneBytes = BinaryPrimitives.ReadUInt16LittleEndian(entry[24..]);
             var outputBytes = BinaryPrimitives.ReadUInt16LittleEndian(entry[26..]);
             if (!HasExpectedHandle(handle, decodedGeneration, index) || !seen.Add(handle) || active > 1 ||
+                (active == 0 && (flags & 1) != 0) ||
                 rawState > (byte)SessionCatalogRouteStateV1.Unavailable || (flags & 0xfffe) != 0 ||
                 muted > 1 || entry[17] != 0 || entry[18] != 0 || entry[19] != 0 ||
                 nameBytes > 64 || appBytes > 64 || laneBytes > 48 || outputBytes > 48 ||

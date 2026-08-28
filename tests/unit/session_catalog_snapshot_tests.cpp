@@ -143,6 +143,10 @@ int main()
         snapshot.entries[0U] = bad_flags;
         CHECK(!encode_session_catalog_snapshot_v1(snapshot, payload, payload_bytes));
 
+        auto inactive_with_volume = make_entry((5ULL << 32U) | 1U, false, true);
+        snapshot.entries[0U] = inactive_with_volume;
+        CHECK(!encode_session_catalog_snapshot_v1(snapshot, payload, payload_bytes));
+
         auto bad_mute = make_entry((5ULL << 32U) | 1U);
         bad_mute.mute = 2U;
         snapshot.entries[0U] = bad_mute;
@@ -211,6 +215,13 @@ int main()
         CHECK(second.handle == ((7ULL << 32U) | 2U));
         CHECK(second.active == 0U);
         CHECK(second.route_state == SessionCatalogRouteStateV1::Pending);
+
+        auto inactive_with_volume = payload;
+        const auto second_entry_offset = kSessionCatalogSnapshotHeaderBytesV1 +
+                                         kSessionCatalogSnapshotEntryBytesV1;
+        inactive_with_volume[second_entry_offset + 10U] = 1U;
+        CHECK(!decode_session_catalog_snapshot_v1(
+            {inactive_with_volume.data(), payload_bytes}, snapshot));
         CHECK(second.flags == 0U);
     }
 
@@ -224,7 +235,7 @@ int main()
             snapshot.entries[index] =
                 make_entry((snapshot.generation << 32U) |
                                static_cast<std::uint64_t>(index + 1U),
-                           index % 2U == 0U);
+                           index % 2U == 0U, index % 2U == 0U);
             if (index % 3U == 0U) {
                 snapshot.entries[index].route_state = SessionCatalogRouteStateV1::Degraded;
             }

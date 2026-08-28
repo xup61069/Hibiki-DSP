@@ -64,6 +64,7 @@ bool valid_text(const char* const bytes, const std::size_t length,
 
 bool valid_entry(const SessionCatalogEntryV1& entry) noexcept {
     if (entry.handle == 0U || entry.active > 1U ||
+        (entry.active == 0U && (entry.flags & 1U) != 0U) ||
         static_cast<std::uint8_t>(entry.route_state) >
             static_cast<std::uint8_t>(SessionCatalogRouteStateV1::Unavailable) ||
         (entry.flags & ~1U) != 0U || entry.mute > 1U ||

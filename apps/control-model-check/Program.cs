@@ -295,6 +295,18 @@ catch (ArgumentException)
 }
 Check(wrongIndexHandleEncodeRejected,
     "Session catalog encoder must reject a handle at the wrong registry index.");
+var inactiveWithVolumeEncodeRejected = false;
+try
+{
+    _ = ControlPayloadsV1.EncodeSessionCatalogSnapshot(
+        12UL, 2UL, [sessionEntries[1] with { VolumeAvailable = true }]);
+}
+catch (ArgumentException)
+{
+    inactiveWithVolumeEncodeRejected = true;
+}
+Check(inactiveWithVolumeEncodeRejected,
+    "Session catalog encoder must reject volume availability for an inactive session.");
 var wrongGenerationHandlePayload = sessionPayload.ToArray();
 BinaryPrimitives.WriteUInt64LittleEndian(
     wrongGenerationHandlePayload.AsSpan(24), (3UL << 32) | 1UL);
@@ -307,6 +319,12 @@ BinaryPrimitives.WriteUInt64LittleEndian(
 Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(wrongIndexHandlePayload,
           out _, out _, out _),
     "Session catalog decoder must reject a handle at the wrong registry index.");
+var inactiveWithVolumePayload = sessionPayload.ToArray();
+BinaryPrimitives.WriteUInt16LittleEndian(
+    inactiveWithVolumePayload.AsSpan(24 + ControlPayloadsV1.SessionCatalogSnapshotEntryBytes + 10), 1);
+Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(inactiveWithVolumePayload,
+          out _, out _, out _),
+    "Session catalog decoder must reject volume availability for an inactive session.");
 var partialOutputSessionPayload = sessionPayload.ToArray();
 BinaryPrimitives.WriteUInt64LittleEndian(
     partialOutputSessionPayload.AsSpan(24 + ControlPayloadsV1.SessionCatalogSnapshotEntryBytes),
