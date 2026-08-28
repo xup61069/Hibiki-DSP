@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string_view>
 
 #include "hibiki/asio_transport_v1.h"
@@ -49,6 +50,10 @@ private:
   std::uint32_t channels_{0};
   std::uint32_t sample_rate_{0};
   std::uint32_t frames_per_buffer_{0};
+  // The C ABI has no caller-channel-capacity parameter, so pop() stages every
+  // bounded item here before validating shared slot metadata. This storage is
+  // allocated during bind and never allocated or resized on the RT path.
+  std::unique_ptr<float[]> staging_storage_{};
 };
 
 }  // namespace hibiki

@@ -415,6 +415,7 @@ int main()
         auto session_store = SessionCatalogSnapshotStoreV1{};
         auto session_snapshot = hibiki::SessionCatalogSnapshotV1{};
         session_snapshot.sequence = 33U;
+        session_snapshot.generation = 1U;
         CHECK(session_store.publish(session_snapshot));
 
         auto eq_store = EqVisualSnapshotStoreV1{};
