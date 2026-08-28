@@ -6262,6 +6262,12 @@ int main() {
         bounded_watcher.unbind();
         CHECK(bounded_release_calls.load(std::memory_order_relaxed) == pending_capacity &&
               bounded_destruction_count.load(std::memory_order_relaxed) == 0U);
+        const auto add_ref_after_unbind = bounded_add_ref_calls.load(std::memory_order_relaxed);
+        const auto sequence_after_unbind = bounded_sequence;
+        CHECK(bounded_watcher.OnSessionCreated(pending_sessions[0]) == S_OK &&
+              bounded_add_ref_calls.load(std::memory_order_relaxed) == add_ref_after_unbind &&
+              !bounded_watcher.poll(bounded_sequence) &&
+              bounded_sequence == sequence_after_unbind);
         for (auto* pending_session : pending_sessions) {
             (void)pending_session->Release();
         }
