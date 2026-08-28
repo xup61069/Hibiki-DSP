@@ -90,7 +90,7 @@ bool publish_session_catalog(SessionCatalogSnapshotStoreV1& store,
     snapshot.generation = 1U;
     snapshot.entry_count = 1U;
     auto& entry = snapshot.entries[0];
-    entry.handle = (2ULL << 32U) | 1ULL;
+    entry.handle = (1ULL << 32U) | 1ULL;
     entry.active = 1U;
     entry.route_state = SessionCatalogRouteStateV1::Ready;
     entry.flags = 1U;

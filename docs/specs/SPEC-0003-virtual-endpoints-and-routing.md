@@ -190,7 +190,10 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   被解讀為 bypass。gate 採 upper-only 2 dB hysteresis：
   envelope 在設定的 threshold 關閉，必須回升到 threshold +2 dB 才重新開啟，兩個邊界之間
   維持原狀態，因此訊號在臨界附近徘徊時不會反覆開關（chatter）。它是可測試的基本抑噪，
-  不宣稱 RNNoise、頻譜 AI、AEC 或麥克風權限處理；效果順序為 PEQ → IR → basic suppressor → level。
+  不宣稱 RNNoise、頻譜 AI、AEC 或麥克風權限處理；其 caller-owned interleaved processing
+  entry point 必須先以 checked arithmetic 驗證 `frames * channels` 可由 `size_t` 表示，
+  溢位時在 sample scan、state mutation 或 caller-buffer write 前 fail-closed；效果順序為
+  PEQ → IR → basic suppressor → level。
 - `SessionRouteGraphBuilderV1` 將 `AudioSessionRegistry` 的 active、已 bind session 轉成
   `GraphConfigV1`；`WindowsSession` gain owner 不重複套 lane makeup，`HibikiInternal` 才
   使用 per-session makeup dB。未綁定 session 忽略、重複 lane ID 或 Strict Direct 搭配 gain
