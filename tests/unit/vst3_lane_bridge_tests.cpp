@@ -324,6 +324,18 @@ int main() {
     CHECK(!tap.read("tap-group", tap_dest.data(), hibiki::kMaxVst3TapFramesV1,
                     tap_channels, tap_frames, tap_seq));
 
+    // A reset invalidates the publication without discarding a reader hazard;
+    // the next generation must still be readable after the reset completes.
+    const auto post_reset_block = make_block(kTapFrames, kStereo, 0.125F);
+    CHECK(tap.publish("tap-group", post_reset_block.data(), kTapFrames,
+                     kStereo));
+    CHECK(tap.read("tap-group", tap_dest.data(), hibiki::kMaxVst3TapFramesV1,
+                   tap_channels, tap_frames, tap_seq));
+    CHECK(tap_channels == kStereo && tap_frames == kTapFrames);
+    for (std::size_t i = 0U; i < kTapFrames * kStereo; ++i) {
+        CHECK(tap_dest[i] == 0.125F);
+    }
+
     std::fputs("all checks passed\n", stdout);
     return 0;
 }

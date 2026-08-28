@@ -357,7 +357,11 @@ bool Vst3TapBufferV1::read(
 
 void Vst3TapBufferV1::reset() noexcept {
     publication_.store(0U, std::memory_order_seq_cst);
-    reader_slot_.store(kNoReaderSlot, std::memory_order_seq_cst);
+    // Do not clear an in-flight reader hazard here. A reader that observed
+    // the previous stable token may still be copying its slot; preserving the
+    // hazard keeps the first post-reset publication from reusing that slot.
+    // The reader guard clears it when the copy finishes. If no reader is
+    // active, it is already kNoReaderSlot.
     valid_.store(false, std::memory_order_release);
 }
 
