@@ -201,14 +201,17 @@ int main() {
         input.fill(1.0F);
         std::array<float, 256> output{};
         std::size_t output_frames = 0U;
+        const auto input_frames = input.size() / kChannels;
+        const auto output_capacity_frames = output.size() / kChannels;
 
         const std::size_t required_first =
-            resampler.required_output_frames(input.size());
+            resampler.required_output_frames(input_frames);
         CHECK(required_first > 0U);
-        CHECK(!resampler.process(input.data(), input.size(), output.data(),
+        CHECK(!resampler.process(input.data(), input_frames, output.data(),
                                  required_first - 1U, output_frames));
         CHECK(output_frames == 0U);
-        CHECK(resampler.process(input.data(), input.size(), output.data(),
+        CHECK(required_first <= output_capacity_frames);
+        CHECK(resampler.process(input.data(), input_frames, output.data(),
                                 required_first, output_frames));
         CHECK(output_frames > 0U && output_frames <= required_first);
         CHECK(std::all_of(output.begin(),
@@ -223,9 +226,9 @@ int main() {
 
         for (int block = 0; block < 6; ++block) {
             const std::size_t required =
-                resampler.required_output_frames(input.size());
+                resampler.required_output_frames(input_frames);
             CHECK(required > 0U);
-            CHECK(resampler.process(input.data(), input.size(), output.data(),
+            CHECK(resampler.process(input.data(), input_frames, output.data(),
                                     required, output_frames));
             CHECK(output_frames > 0U && output_frames <= required);
         }
@@ -236,6 +239,71 @@ int main() {
             return std::abs(value - 1.0F) < 0.05F;
         });
         CHECK(converged);
+
+        constexpr auto kMaxFramesForStereo =
+            std::numeric_limits<std::size_t>::max() / kChannels;
+        constexpr auto kOverflowFrames = kMaxFramesForStereo + 1U;
+        CHECK(kOverflowFrames > kMaxFramesForStereo);
+        CHECK(resampler.required_output_frames(kOverflowFrames) == 0U);
+
+        PersistentPolyphaseResampler baseline;
+        PersistentPolyphaseResampler candidate;
+        CHECK(baseline.prepare(kChannels, 1.0));
+        CHECK(candidate.prepare(kChannels, 1.0));
+        std::array<float, 64> valid_input{};
+        for (std::size_t index = 0U; index < valid_input.size(); ++index) {
+            valid_input[index] = static_cast<float>(index % 7U) * 0.125F;
+        }
+        std::array<float, 128> baseline_output{};
+        std::array<float, 128> candidate_output{};
+        std::size_t baseline_frames = 0U;
+        std::size_t candidate_frames = 0U;
+        const auto valid_required =
+            baseline.required_output_frames(valid_input.size() / kChannels);
+        CHECK(valid_required > 0U);
+        CHECK(baseline.process(valid_input.data(), valid_input.size() / kChannels,
+                               baseline_output.data(), valid_required,
+                               baseline_frames));
+        CHECK(candidate.process(valid_input.data(), valid_input.size() / kChannels,
+                                candidate_output.data(), valid_required,
+                                candidate_frames));
+        CHECK(baseline_frames == candidate_frames);
+        const auto phase_before_invalid = candidate.phase();
+        CHECK(candidate.required_output_frames(std::numeric_limits<std::size_t>::max()) == 0U);
+
+        std::array<float, 128> untouched_output{};
+        untouched_output.fill(-7.0F);
+        const auto untouched = untouched_output;
+        std::size_t rejected_frames = 99U;
+        CHECK(!candidate.process(valid_input.data(), kOverflowFrames,
+                                 untouched_output.data(), kOverflowFrames,
+                                 rejected_frames));
+        CHECK(rejected_frames == 0U);
+        CHECK(untouched_output == untouched);
+        CHECK(candidate.phase() == phase_before_invalid);
+
+        CHECK(!candidate.process(valid_input.data(), 1U, untouched_output.data(),
+                                 kOverflowFrames, rejected_frames));
+        CHECK(rejected_frames == 0U);
+        CHECK(untouched_output == untouched);
+        CHECK(candidate.phase() == phase_before_invalid);
+
+        const auto next_required =
+            baseline.required_output_frames(valid_input.size() / kChannels);
+        CHECK(next_required > 0U);
+        CHECK(next_required <= baseline_output.size() / kChannels);
+        baseline_output.fill(0.0F);
+        candidate_output.fill(0.0F);
+        CHECK(baseline.process(valid_input.data(), valid_input.size() / kChannels,
+                               baseline_output.data(), next_required,
+                               baseline_frames));
+        CHECK(candidate.process(valid_input.data(), valid_input.size() / kChannels,
+                                candidate_output.data(), next_required,
+                                candidate_frames));
+        CHECK(baseline_frames == candidate_frames);
+        for (std::size_t index = 0U; index < baseline_frames * kChannels; ++index) {
+            CHECK(baseline_output[index] == candidate_output[index]);
+        }
     }
 
     // Output sink model: unprepared instances fail closed everywhere,
@@ -244,13 +312,16 @@ int main() {
     // restores the base step.
     {
         OutputSinkModel model;
+        constexpr std::uint32_t kChannels = 2U;
         std::array<float, 64> input{};
         input.fill(0.5F);
         std::array<float, 64> output{};
         std::size_t output_frames = 0U;
+        const auto input_frames = input.size() / kChannels;
+        const auto output_capacity_frames = output.size() / kChannels;
         CHECK(model.snapshot().prepared == false);
-        CHECK(!model.process(input.data(), input.size(), output.data(),
-                             output.size(), output_frames));
+        CHECK(!model.process(input.data(), input_frames, output.data(),
+                             output_capacity_frames, output_frames));
         CHECK(model.required_output_frames(16U) == 0U);
         model.observe_clock(48000.0, 48012.0, 1.0);
         CHECK(model.snapshot().prepared == false &&
@@ -273,12 +344,13 @@ int main() {
         CHECK(fast_ratio > 1.0 && model.snapshot().drift_ppm > 0.0 &&
               model.snapshot().source_step < 1.0);
         const std::size_t adapted_required =
-            model.required_output_frames(input.size());
+            model.required_output_frames(input_frames);
         CHECK(adapted_required > 0U);
-        CHECK(model.process(input.data(), input.size(), output.data(),
+        CHECK(adapted_required <= output_capacity_frames);
+        CHECK(model.process(input.data(), input_frames, output.data(),
                             adapted_required, output_frames));
         CHECK(output_frames > 0U && output_frames <= adapted_required);
-        CHECK(!model.process(input.data(), input.size(), output.data(),
+        CHECK(!model.process(input.data(), input_frames, output.data(),
                              adapted_required - 1U, output_frames));
 
         model.reset();
