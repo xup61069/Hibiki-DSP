@@ -2,7 +2,9 @@
 
 #include "hibiki/asio_transport_consumer.hpp"
 
+#include <algorithm>
 #include <cstring>
+#include <new>
 #include <string>
 
 #if defined(_WIN32)
@@ -62,9 +64,18 @@ bool AsioTransportConsumerV1::bind(const std::wstring_view mapping_name,
     CloseHandle(mapping);
     return false;
   }
+  auto staging_storage = std::unique_ptr<float[]>(new (std::nothrow) float[
+      static_cast<std::size_t>(HIBIKI_ASIO_TRANSPORT_MAX_CHANNELS_V1) *
+      HIBIKI_ASIO_TRANSPORT_MAX_FRAMES_V1]);
+  if (staging_storage == nullptr) {
+    UnmapViewOfFile(region);
+    CloseHandle(mapping);
+    return false;
+  }
   mapping_ = mapping;
   region_ = region;
   region_bytes_ = bytes;
+  staging_storage_ = std::move(staging_storage);
 #else
   (void)channels;
   (void)sample_rate;
@@ -89,16 +100,24 @@ void AsioTransportConsumerV1::unbind() noexcept {
   channels_ = 0;
   sample_rate_ = 0;
   frames_per_buffer_ = 0;
+  staging_storage_.reset();
 }
 
 bool AsioTransportConsumerV1::pop(float* const interleaved,
                                   const std::uint32_t output_capacity_frames,
                                   AsioTransportBlockV1& block) noexcept {
   block = {};
-  if (region_ == nullptr || interleaved == nullptr) return false;
+  if (region_ == nullptr || interleaved == nullptr || staging_storage_ == nullptr) return false;
   AsioTransportBlockV1 candidate{};
+  // The C ABI only receives a frame capacity. Stage into a private buffer
+  // whose size covers the full versioned channel/frame contract, then copy to
+  // the caller only after the shared slot metadata matches this bind.
+  const auto bounded_capacity =
+      output_capacity_frames < HIBIKI_ASIO_TRANSPORT_MAX_FRAMES_V1
+          ? output_capacity_frames
+          : static_cast<std::uint32_t>(HIBIKI_ASIO_TRANSPORT_MAX_FRAMES_V1);
   if (hibiki_asio_transport_pop_interleaved_v1(
-          region_, region_bytes_, interleaved, output_capacity_frames, &candidate.frames,
+          region_, region_bytes_, staging_storage_.get(), bounded_capacity, &candidate.frames,
           &candidate.channels, &candidate.sample_rate) == 0) {
     return false;
   }
@@ -109,6 +128,8 @@ bool AsioTransportConsumerV1::pop(float* const interleaved,
       candidate.sample_rate != sample_rate_) {
     return false;
   }
+  const auto sample_count = static_cast<std::size_t>(candidate.frames) * candidate.channels;
+  std::copy_n(staging_storage_.get(), sample_count, interleaved);
   block = candidate;
   return true;
 }

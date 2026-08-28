@@ -130,8 +130,9 @@ int main() {
 
 #if defined(_WIN32)
     // Slot metadata is a shared-memory field, so the engine-side consumer
-    // re-checks it after the C ABI pop. Each rejected item is consumed by the
-    // bounded SPSC ring and the next valid item remains usable.
+    // stages the C ABI result before re-checking it. Each rejected item is
+    // consumed by the bounded SPSC ring without touching caller output, and
+    // the next valid item remains usable.
     {
         constexpr wchar_t kMappingName[] = L"HibikiTest1663I";
         constexpr std::uint32_t kChannels = 2U;
@@ -155,28 +156,48 @@ int main() {
             return hibiki_asio_transport_push_planar_v1(
                        region, region_bytes, planar, kChannels, kFrames) != 0;
         };
-        std::array<float, kChannels * kFrames> output{};
+        constexpr float kCanary = -12345.0F;
+        std::array<float, kChannels * kFrames + 2U> guarded_output{};
+        guarded_output.front() = kCanary;
+        guarded_output.back() = kCanary;
+        auto* const output = guarded_output.data() + 1U;
         hibiki::AsioTransportBlockV1 block{99U, 99U, 99U};
 
         CHECK(push());
         region->slots[0].sample_rate = 44100U;
-        CHECK(!consumer.pop(output.data(), kFrames, block));
+        CHECK(!consumer.pop(output, kFrames, block));
         CHECK(block.frames == 0U && block.channels == 0U && block.sample_rate == 0U);
+        CHECK(guarded_output.front() == kCanary && guarded_output.back() == kCanary);
 
         CHECK(push());
         region->slots[1].channels = 1U;
-        CHECK(!consumer.pop(output.data(), kFrames, block));
+        CHECK(!consumer.pop(output, kFrames, block));
         CHECK(block.frames == 0U && block.channels == 0U && block.sample_rate == 0U);
+        CHECK(guarded_output.front() == kCanary && guarded_output.back() == kCanary);
 
         CHECK(push());
         region->slots[2].frames = 2U;
-        CHECK(!consumer.pop(output.data(), kFrames, block));
+        CHECK(!consumer.pop(output, kFrames, block));
         CHECK(block.frames == 0U && block.channels == 0U && block.sample_rate == 0U);
+        CHECK(guarded_output.front() == kCanary && guarded_output.back() == kCanary);
 
         CHECK(push());
-        CHECK(consumer.pop(output.data(), kFrames, block));
+        region->slots[3].channels = 8U;
+        CHECK(!consumer.pop(output, kFrames, block));
+        CHECK(block.frames == 0U && block.channels == 0U && block.sample_rate == 0U);
+        CHECK(guarded_output.front() == kCanary && guarded_output.back() == kCanary);
+
+        CHECK(push());
+        CHECK(consumer.pop(output, kFrames, block));
         CHECK(block.frames == kFrames && block.channels == kChannels &&
               block.sample_rate == kRate);
+        CHECK(guarded_output.front() == kCanary && guarded_output.back() == kCanary);
+
+        CHECK(push());
+        region->slots[1].frames = HIBIKI_ASIO_TRANSPORT_MAX_FRAMES_V1 + 1U;
+        CHECK(!consumer.pop(output, UINT32_MAX, block));
+        CHECK(block.frames == 0U && block.channels == 0U && block.sample_rate == 0U);
+        CHECK(guarded_output.front() == kCanary && guarded_output.back() == kCanary);
 
         CHECK(UnmapViewOfFile(region) != 0);
         CHECK(CloseHandle(mapping) != 0);
