@@ -203,6 +203,32 @@ bool test_queue_input_output_guards() {
         return false;
     }
 
+    auto rate_queue = std::make_unique<TabCaptureQueueV1>();
+    if (!expect(!rate_queue->set_expected_sample_rate(22222U),
+                "unsupported expected sample rate is rejected") ||
+        !expect(rate_queue->set_expected_sample_rate(48000U),
+                "supported expected sample rate is accepted") ||
+        !expect(rate_queue->expected_sample_rate() == 48000U,
+                "expected sample rate is observable")) {
+        return false;
+    }
+    auto mismatched_44100 = view;
+    mismatched_44100.sample_rate = 44100U;
+    auto mismatched_96000 = view;
+    mismatched_96000.sample_rate = 96000U;
+    auto mismatched_192000 = view;
+    mismatched_192000.sample_rate = 192000U;
+    if (!expect(!rate_queue->push(mismatched_44100), "44100 source is rejected") ||
+        !expect(!rate_queue->push(mismatched_96000), "96000 source is rejected") ||
+        !expect(!rate_queue->push(mismatched_192000), "192000 source is rejected") ||
+        !expect(rate_queue->sample_rate_mismatch_blocks() == 3U,
+                "rate mismatches are counted separately") ||
+        !expect(rate_queue->push(view), "matching source rate is accepted") ||
+        !expect(!rate_queue->set_expected_sample_rate(44100U),
+                "rate binding cannot change after producer activity")) {
+        return false;
+    }
+
     auto pop_queue = std::make_unique<TabCaptureQueueV1>();
     if (!expect(pop_queue->push(view), "valid pop guard fixture is queued")) return false;
     std::array<float, 4U> output{};
@@ -574,6 +600,7 @@ int main() {
         !test_serve_loop_semantics()) {
         return 1;
     }
-    std::cout << "hibiki_tab_bridge_selftest passed (packet boundaries, FIFO queue, guards, server config, websocket handshake, framing and serve-loop semantics).\n";
+    std::cout << "hibiki_tab_bridge_selftest passed (packet boundaries, FIFO queue, rate guard, "
+                 "guards, server config, websocket handshake, framing and serve-loop semantics).\n";
     return 0;
 }

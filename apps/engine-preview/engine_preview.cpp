@@ -1790,7 +1790,10 @@ int wmain(const int argc, wchar_t* const* argv) {
     bool suppressor_active = false;
     if (tab_bridge_started) {
         hibiki::TabBridgeServerConfigV1 tab_config{};
-        if (tab_noise_suppressor_requested) {
+        if (!tab_bridge.queue.set_expected_sample_rate(wasapi_output.config.sample_rate)) {
+            tab_bridge_detail =
+                "tab bridge sink sample-rate contract unavailable; tab bridge disabled.";
+        } else if (tab_noise_suppressor_requested) {
             // Basic high-pass + downward-gate; explicitly not ML denoising.
             const hibiki::BasicNoiseSuppressorPolicyV1 kTabNoisePolicy{
                 1U, true, -55.0, -24.0, 8.0, 120.0, 80.0};
@@ -2319,10 +2322,21 @@ int wmain(const int argc, wchar_t* const* argv) {
         }
         if (!tab_bridge_route_detail.empty()) {
             const auto dropped = tab_bridge.queue.dropped_blocks();
-            if (dropped > 0U) {
-                tab_bridge_route_detail =
-                    "receiving; dropped " + std::to_string(dropped) +
-                    " block(s) while the 4-slot capture queue was full.";
+            const auto mismatched = tab_bridge.queue.sample_rate_mismatch_blocks();
+            if (dropped > 0U || mismatched > 0U) {
+                tab_bridge_route_detail = "receiving";
+                if (mismatched > 0U) {
+                    tab_bridge_route_detail +=
+                        "; dropped " + std::to_string(mismatched) +
+                        " block(s) whose source rate did not match the " +
+                        std::to_string(tab_bridge.queue.expected_sample_rate()) + " Hz sink";
+                }
+                if (dropped > 0U) {
+                    tab_bridge_route_detail +=
+                        "; dropped " + std::to_string(dropped) +
+                        " block(s) while the 4-slot capture queue was full";
+                }
+                tab_bridge_route_detail += ".";
             }
         }
         if (!driver_loopback_requested && !wav_source_requested) {

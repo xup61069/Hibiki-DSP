@@ -77,6 +77,12 @@ graph／Group Master／limiter 後只提交一次到 WASAPI handoff；sink 未�
 宣稱已播放。降噪模型 provenance、權限提示與斷線重連 policy 仍必須在獨立 source component
 完成後，才能宣稱「單分頁掛降噪」。
 
+Engine Preview 在建立 listener 前把 tab queue 綁定到目前 WASAPI sink 的 sample rate。
+HIBT decoder 與 portable queue 仍接受 44100、48000、96000、192000 Hz 的合法封包；但
+若封包來源 rate 與 host sink 不同，queue 會在 ingress fail-closed 丟棄，不把來源 frame
+數當成 sink frame 數送進 graph／WASAPI。這個 v1 host boundary 暫不偷偷重採樣，並以匿名
+mismatch counter 與 Pending route detail 說明狀態；未來 bounded resampler 必須另立契約。
+
 Engine Preview 提供 opt-in 的 `--enable-tab-bridge` 模式作為上述元件的宿主：
 該旗標必須同時要求 `--enable-wasapi-output`，缺少 sink 時直接拒絕啟動。listener 只綁定
 `127.0.0.1:17842`，控制執行緒 callback 僅 enqueue 到固定 SPSC queue；tab 音訊走專屬
