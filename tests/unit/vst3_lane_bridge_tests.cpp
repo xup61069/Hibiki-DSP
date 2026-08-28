@@ -205,13 +205,14 @@ int main() {
     }
 
     // ---- concurrent tap publication/read --------------------------------------
-    // Every successful read must be one complete constant-valued block. A
+    // Every successful read must be one complete generation-distinct block. A
     // reader may reject a concurrent publication, but it must never accept a
     // mixed payload or metadata generation.
     {
         hibiki::Vst3TapBufferV1 concurrent_tap;
         const auto low_block = make_block(kTapFrames, kStereo, -0.25F);
-        const auto high_block = make_block(kTapFrames, kStereo, 0.75F);
+        constexpr std::size_t kHighFrames = kTapFrames / 2U;
+        const auto high_block = make_block(kHighFrames, 1U, 0.75F);
         std::atomic<bool> start{false};
         std::atomic<bool> stop_writer{false};
         std::atomic<bool> writer_failed{false};
@@ -222,9 +223,12 @@ int main() {
             }
             std::size_t iteration = 0U;
             while (!stop_writer.load(std::memory_order_acquire)) {
-                const auto& block = (iteration & 1U) == 0U ? low_block : high_block;
-                if (!concurrent_tap.publish("tap-group", block.data(), kTapFrames,
-                                            kStereo)) {
+                const bool low_generation = (iteration & 1U) == 0U;
+                const auto& block = low_generation ? low_block : high_block;
+                const auto frames = low_generation ? kTapFrames : kHighFrames;
+                const auto channels = low_generation ? kStereo : 1U;
+                if (!concurrent_tap.publish("tap-group", block.data(), frames,
+                                            channels)) {
                     writer_failed.store(true, std::memory_order_release);
                     break;
                 }
@@ -243,13 +247,17 @@ int main() {
                                      sequence)) {
                 continue;
             }
-            if (channels != kStereo || frames != kTapFrames || sequence == 0U) {
+            const bool low_generation =
+                channels == kStereo && frames == kTapFrames;
+            const bool high_generation = channels == 1U && frames == kHighFrames;
+            if ((!low_generation && !high_generation) || sequence == 0U) {
                 reader_failed.store(true, std::memory_order_release);
                 break;
             }
-            const auto value = concurrent_destination[0];
-            for (const auto sample : concurrent_destination) {
-                if (sample != value || (sample != -0.25F && sample != 0.75F)) {
+            const auto expected = low_generation ? -0.25F : 0.75F;
+            const auto sample_count = frames * channels;
+            for (std::size_t index = 0U; index < sample_count; ++index) {
+                if (concurrent_destination[index] != expected) {
                     reader_failed.store(true, std::memory_order_release);
                     break;
                 }

@@ -53,8 +53,11 @@ frames 上限；即使 caller-owned ring 的實體容量更大，超過上限的
 再比較 capacity 或複製 snapshot；無法代表的 interleaved capacity 直接 fail-closed。
 `Vst3TapBufferV1` 的 sample payload、group bytes、shape metadata 與 published sequence
 必須使用 atomic storage 或等價的 C++ memory-model-safe bounded protocol；sequence counter
-單獨不能使普通 C++ 物件的並行讀寫免於 data race。讀取若觀察到 odd 或 changed sequence，
-必須 fail-closed 且不得發布部分 snapshot。
+單獨不能使普通 C++ 物件的並行讀寫免於 data race。實作使用三個固定 snapshot slots、
+generation／slot／phase publication token 與 reader hazard slot：writer 先標記目標 slot
+為 in-progress，只有在完整寫入後才發布 stable token，且不得覆寫 reader 正在讀取的 slot。
+讀取若觀察到 odd、changed token 或無法完成 slot handshake，必須 fail-closed 且不得發布
+部分 snapshot；測試也必須以不同 shape 與 payload 驗證每個 accepted tuple 屬於同一完整 generation。
 WAV source 準備失敗時必須輸出明確錯誤，不得讓下游（例如 VST3 tap）呈現為
 「無聲音可處理」的假正常。本邊界屬 user-space engine preview evidence，不等於 driver/WaveRT、實體
 音訊 delivery 或第三方 plugin certification。
