@@ -97,6 +97,10 @@ function Assert-LiveSessionVolumePipeIoContract([string]$repoRoot) {
     }
     $source = Get-Content -LiteralPath $probePath -Raw
     $requiredPatterns = @(
+        'const auto deadline = std::chrono::steady_clock::now\(\)\s*\+\s*std::chrono::seconds\(5\)',
+        'while\s*\(std::chrono::steady_clock::now\(\)\s*<\s*deadline\)',
+        'WaitNamedPipeW\(kPipeName,\s*250U\)',
+        'std::this_thread::sleep_for\(std::chrono::milliseconds\(25\)\)',
         'FILE_ATTRIBUTE_NORMAL\s*\|\s*FILE_FLAG_OVERLAPPED',
         'OVERLAPPED\s+overlapped\s*\{\}',
         'WaitForSingleObject\(event,\s*kIoTimeoutMs\)',
