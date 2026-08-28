@@ -41,6 +41,10 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   （既有預設）、`1` = float64；未知值在 validate_graph、compile_rt_snapshot 與 RT
   process 入口一律 fail-closed。`process_graph_f64`／`process_graph_for_output_group_f64`
   接受 interleaved double input，以 double 累加並寫出 interleaved double output；
+  所有 graph process entry point 在初始化 caller-owned output 或計算 lane stride 前，
+  必須先以不溢位的方式驗證 `frames * channels`；graph 支援的 lane/output 聲道上限為
+  8，無法由 `size_t` 表示的 frame geometry 一律 fail-closed。這是 user-space
+  buffer-safety boundary，不新增實體 endpoint 或 driver delivery 保證。
   float32 API、snapshot 配置與 JSON fixture 行為不變。v1 f64 邊界不含 plugin latency
   bank（其 ring 為 float32）；需要 plugin 延遲補償時，呼叫端必須先在上游 double domain
   完成後再進入此路徑。此格式僅描述 user-space engine 內部累加精度，不是 WASAPI、
