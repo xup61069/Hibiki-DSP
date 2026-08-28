@@ -140,6 +140,30 @@ int main()
               hibiki::PhysicalDeviceCatalogResultV1::InvalidDescriptor);
     }
 
+    // ---- catalog validates complete printable UTF-8 metadata ------------
+    {
+        auto catalog = PhysicalDeviceCatalogV1{};
+        CHECK(catalog.upsert(make_descriptor(
+                  "endpoint-\xE5\xAE\xA2\xE5\xBB\xB3",
+                  "\xE5\x96\x87\xE5\x95\xA6 Speakers")) ==
+              hibiki::PhysicalDeviceCatalogResultV1::Accepted);
+        CHECK(catalog.size() == 1U);
+    }
+    {
+        auto catalog = PhysicalDeviceCatalogV1{};
+        CHECK(catalog.upsert(make_descriptor(
+                  "endpoint\xC3\x28", "Render Speakers")) ==
+              hibiki::PhysicalDeviceCatalogResultV1::InvalidDescriptor);
+        CHECK(catalog.size() == 0U);
+    }
+    {
+        auto catalog = PhysicalDeviceCatalogV1{};
+        CHECK(catalog.upsert(make_descriptor(
+                  "endpoint-display-malformed", "\xE2\x82")) ==
+              hibiki::PhysicalDeviceCatalogResultV1::InvalidDescriptor);
+        CHECK(catalog.size() == 0U);
+    }
+
     // ---- wire encoding fails closed on oversized declared strings --------
     {
         auto poisoned_endpoint = make_entry(
