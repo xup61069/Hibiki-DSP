@@ -98,7 +98,8 @@ bool valid_session_control_request(const std::string_view session_instance_id,
                                    const double requested_db) noexcept {
     return !session_instance_id.empty() &&
            session_instance_id.size() <= kMaxSessionControlIdentityBytesV1 &&
-           std::isfinite(requested_db) && requested_db >= -144.0 && requested_db <= 12.0;
+           std::isfinite(requested_db) && requested_db >= kSessionVolumeMinDbV1 &&
+           requested_db <= kSessionVolumeMaxDbV1;
 }
 
 bool has_session_instance(const AudioSessionRegistry& registry,

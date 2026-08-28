@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
 
 namespace hibiki {
 
@@ -97,12 +98,15 @@ bool Vst3LaneRingBridgeV1::push(
         return false;
     }
     auto& slot = lanes_[static_cast<std::size_t>(index)];
+    if (frames > kMaxVst3RingFramesV1 || slot.channels == 0U ||
+        frames > std::numeric_limits<std::size_t>::max() / slot.channels ||
+        slot.available_frames > slot.capacity_frames ||
+        frames > slot.capacity_frames - slot.available_frames) {
+        return false;
+    }
     const std::size_t sample_count = frames * slot.channels;
     for (std::size_t i = 0U; i < sample_count; ++i) {
         if (!std::isfinite(interleaved[i])) { return false; }
-    }
-    if (frames + slot.available_frames > slot.capacity_frames) {
-        return false;  // Ring full.
     }
     for (std::size_t f = 0U; f < frames; ++f) {
         const float* src = interleaved + f * slot.channels;
@@ -125,6 +129,9 @@ bool Vst3LaneRingBridgeV1::pop(
         return false;
     }
     auto& slot = lanes_[static_cast<std::size_t>(index)];
+    if (frames > kMaxVst3RingFramesV1) {
+        return false;
+    }
     if (slot.available_frames < frames) {
         return false;  // Not enough data yet.
     }

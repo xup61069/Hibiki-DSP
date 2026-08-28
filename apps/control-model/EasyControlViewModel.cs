@@ -165,7 +165,8 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         set
         {
             if (!double.IsFinite(value)) return;
-            var clamped = Math.Clamp(value, -144.0, 12.0);
+            var clamped = Math.Clamp(value, ControlPayloadsV1.SessionVolumeMinDb,
+                                     ControlPayloadsV1.SessionVolumeMaxDb);
             if (Math.Abs(clamped - _sessionVolumeDb) < 1e-9) return;
             _sessionVolumeDb = clamped;
             OnPropertyChanged();
@@ -1303,7 +1304,9 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     {
         var selected = SelectedSession;
         if (selected is null || !selected.VolumeAvailable) return;
-        _sessionVolumeDb = Math.Clamp(selected.RequestedDb, -144.0, 12.0);
+        _sessionVolumeDb = Math.Clamp(selected.RequestedDb,
+                                      ControlPayloadsV1.SessionVolumeMinDb,
+                                      ControlPayloadsV1.SessionVolumeMaxDb);
         _sessionMuted = selected.Muted;
         OnPropertyChanged(nameof(SessionVolumeDb));
         OnPropertyChanged(nameof(SessionVolumeDisplayText));
