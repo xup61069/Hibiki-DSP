@@ -140,7 +140,7 @@ public:
         ++mute_set_calls_;
         if (mute_set_calls_ == fail_mute_on_call_) return E_FAIL;
         muted_ = muted;
-        return S_OK;
+        return mute_result_;
     }
 
     HRESULT STDMETHODCALLTYPE GetMute(BOOL* muted) override {
@@ -190,6 +190,7 @@ public:
     std::uint32_t fail_mute_on_call_{0U};
     std::uint32_t fail_master_get_on_call_{0U};
     std::uint32_t fail_mute_get_on_call_{0U};
+    HRESULT mute_result_{S_OK};
 
 private:
     IAudioEndpointVolumeCallback* callback_{nullptr};
@@ -428,6 +429,24 @@ int run_broker_tests() {
         CHECK(endpoint->muted_ == TRUE);
         CHECK(endpoint->master_set_calls_ == 1U);
         CHECK(endpoint->mute_set_calls_ == 1U);
+        broker.unbind();
+        CHECK(endpoint->Release() == 0U);
+        CHECK(device->Release() == 0U);
+    }
+    // A successful second setter preserves its successful HRESULT.
+    {
+        auto* endpoint = new FakeEndpointVolume(-12.0F, FALSE);
+        endpoint->mute_result_ = S_FALSE;
+        auto* device = new FakeDevice(true, endpoint);
+        WindowsVolumeBroker broker;
+        CHECK(broker.bind(device) == S_OK);
+        OutputGroupVolumeStateV1 requested{};
+        requested.requested_db = -6.0;
+        requested.safety_ceiling_db = 0.0;
+        requested.mute = true;
+        CHECK(broker.write(requested, kEventContext) == S_FALSE);
+        CHECK(endpoint->master_db_ == -6.0F);
+        CHECK(endpoint->muted_ == TRUE);
         broker.unbind();
         CHECK(endpoint->Release() == 0U);
         CHECK(device->Release() == 0U);

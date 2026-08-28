@@ -199,7 +199,7 @@ HRESULT WindowsVolumeBroker::write(const OutputGroupVolumeStateV1& input,
     if (FAILED(result)) {
         return restore_and_verify() ? result : E_FAIL;
     }
-    return S_OK;
+    return result;
 }
 
 HRESULT WindowsVolumeBroker::read_state(OutputGroupVolumeStateV1& state) noexcept {
