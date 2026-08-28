@@ -58,6 +58,8 @@ public:
 private:
     static constexpr std::size_t kPendingSessionCapacity = 64U;
     static constexpr std::size_t kSessionControlCacheCapacity = 256U;
+    static constexpr std::uint32_t kCallbacksBlocked = 1U << 31U;
+    static constexpr std::uint32_t kCallbacksCountMask = kCallbacksBlocked - 1U;
 
     struct PendingSessionSlot final {
         std::atomic<std::size_t> sequence{0U};
@@ -66,6 +68,9 @@ private:
 
     [[nodiscard]] bool enqueue_pending_session(IAudioSessionControl* control) noexcept;
     [[nodiscard]] bool dequeue_pending_session(IAudioSessionControl*& control) noexcept;
+    [[nodiscard]] bool try_enter_callback() noexcept;
+    void leave_callback() noexcept;
+    void block_callbacks() noexcept;
     void reset_pending_sessions() noexcept;
     void release_pending_sessions() noexcept;
     void release_cached_session_controls() noexcept;
@@ -77,11 +82,11 @@ private:
                                                  IAudioSessionControl* control);
 
     std::atomic<ULONG> references_{1};
-    // Teardown blocks new callback work before unregistering. The control
-    // thread waits for callbacks already inside OnSessionCreated before it
-    // drains or resets the queue; the callback itself never waits.
-    std::atomic<std::uint32_t> callbacks_in_flight_{0U};
-    std::atomic<bool> callbacks_blocked_{false};
+    // Teardown sets the high bit to close callback admission, then waits for
+    // the low-bit in-flight count before draining or resetting the queue. A
+    // callback that races with closure can only win the CAS before closure or
+    // observe the closed state; it cannot enter after the wait sees zero.
+    std::atomic<std::uint32_t> callbacks_state_{0U};
     std::atomic<bool> destroying_{false};
     std::atomic<std::uint64_t> sequence_{0};
     std::uint64_t last_sequence_{0};

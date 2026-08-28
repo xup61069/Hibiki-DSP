@@ -120,6 +120,36 @@ bool WindowsAudioSessionWatcher::enqueue_pending_session(
     }
 }
 
+bool WindowsAudioSessionWatcher::try_enter_callback() noexcept {
+    auto state = callbacks_state_.load(std::memory_order_relaxed);
+    for (;;) {
+        if ((state & kCallbacksBlocked) != 0U || state == kCallbacksCountMask) {
+            return false;
+        }
+        if (callbacks_state_.compare_exchange_weak(
+                state, state + 1U, std::memory_order_seq_cst,
+                std::memory_order_relaxed)) {
+            return true;
+        }
+    }
+}
+
+void WindowsAudioSessionWatcher::leave_callback() noexcept {
+    (void)callbacks_state_.fetch_sub(1U, std::memory_order_seq_cst);
+}
+
+void WindowsAudioSessionWatcher::block_callbacks() noexcept {
+    auto state = callbacks_state_.load(std::memory_order_relaxed);
+    for (;;) {
+        if ((state & kCallbacksBlocked) != 0U) return;
+        if (callbacks_state_.compare_exchange_weak(
+                state, state | kCallbacksBlocked, std::memory_order_seq_cst,
+                std::memory_order_relaxed)) {
+            return;
+        }
+    }
+}
+
 bool WindowsAudioSessionWatcher::dequeue_pending_session(
     IAudioSessionControl*& control) noexcept {
     auto position = pending_dequeue_.load(std::memory_order_relaxed);
@@ -214,14 +244,10 @@ IAudioSessionControl* WindowsAudioSessionWatcher::find_cached_session_control(
 
 HRESULT STDMETHODCALLTYPE WindowsAudioSessionWatcher::OnSessionCreated(
     IAudioSessionControl* const new_session) {
-    callbacks_in_flight_.fetch_add(1U, std::memory_order_seq_cst);
-    if (callbacks_blocked_.load(std::memory_order_seq_cst)) {
-        callbacks_in_flight_.fetch_sub(1U, std::memory_order_seq_cst);
-        return S_OK;
-    }
+    if (!try_enter_callback()) return S_OK;
     if (new_session != nullptr) (void)enqueue_pending_session(new_session);
     sequence_.fetch_add(1, std::memory_order_release);
-    callbacks_in_flight_.fetch_sub(1U, std::memory_order_seq_cst);
+    leave_callback();
     return S_OK;
 }
 
@@ -261,7 +287,7 @@ HRESULT WindowsAudioSessionWatcher::bind(IMMDevice* const device) {
 }
 
 void WindowsAudioSessionWatcher::unbind() noexcept {
-    callbacks_blocked_.store(true, std::memory_order_seq_cst);
+    block_callbacks();
     if (manager_ != nullptr) {
         if (registered_) {
             manager_->UnregisterSessionNotification(this);
@@ -269,7 +295,8 @@ void WindowsAudioSessionWatcher::unbind() noexcept {
         manager_->Release();
         manager_ = nullptr;
     }
-    while (callbacks_in_flight_.load(std::memory_order_seq_cst) != 0U) {
+    while ((callbacks_state_.load(std::memory_order_seq_cst) &
+            kCallbacksCountMask) != 0U) {
         std::this_thread::yield();
     }
     release_pending_sessions();
@@ -280,7 +307,7 @@ void WindowsAudioSessionWatcher::unbind() noexcept {
     last_sequence_ = 0;
     sequence_.store(0U, std::memory_order_release);
     if (!destroying_.load(std::memory_order_seq_cst)) {
-        callbacks_blocked_.store(false, std::memory_order_seq_cst);
+        callbacks_state_.store(0U, std::memory_order_seq_cst);
     }
 }
 

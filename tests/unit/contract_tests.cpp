@@ -6163,9 +6163,19 @@ int main() {
         std::atomic<bool> unbind_started{false};
         std::atomic<bool> unbind_done{false};
         std::atomic<HRESULT> callback_result{E_FAIL};
+        std::atomic<std::uint32_t> late_callback_count{0U};
+        std::atomic<bool> late_callbacks_done{false};
+        std::atomic<std::uint32_t> late_add_ref_calls{0U};
+        std::atomic<std::uint32_t> late_release_calls{0U};
+        std::atomic<std::uint32_t> late_destruction_count{0U};
+        std::atomic<std::uint32_t> late_query_interface_calls{0U};
+        std::atomic<bool> late_callbacks_succeeded{true};
         auto* teardown_session = new RetainedAudioSessionControl(
             teardown_add_ref_calls, teardown_release_calls, teardown_destruction_count,
             teardown_query_interface_calls, &add_ref_entered, &allow_add_ref);
+        auto* late_session = new RetainedAudioSessionControl(
+            late_add_ref_calls, late_release_calls, late_destruction_count,
+            late_query_interface_calls);
         std::thread callback_thread([&] {
             callback_result.store(teardown_watcher.OnSessionCreated(teardown_session),
                                    std::memory_order_seq_cst);
@@ -6183,6 +6193,16 @@ int main() {
             std::this_thread::yield();
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::thread late_callback_thread([&] {
+            for (std::size_t index = 0U; index < 64U; ++index) {
+                if (teardown_watcher.OnSessionCreated(late_session) != S_OK) {
+                    late_callbacks_succeeded.store(false, std::memory_order_seq_cst);
+                }
+                late_callback_count.fetch_add(1U, std::memory_order_seq_cst);
+            }
+            late_callbacks_done.store(true, std::memory_order_seq_cst);
+        });
+        late_callback_thread.join();
         const bool unbind_waited_for_callback =
             !unbind_done.load(std::memory_order_seq_cst);
         allow_add_ref.store(true, std::memory_order_seq_cst);
@@ -6196,10 +6216,21 @@ int main() {
               teardown_release_calls.load(std::memory_order_relaxed) == 1U &&
               teardown_destruction_count.load(std::memory_order_relaxed) == 0U &&
               teardown_query_interface_calls.load(std::memory_order_relaxed) == 0U &&
+              late_callbacks_done.load(std::memory_order_seq_cst) &&
+              late_callbacks_succeeded.load(std::memory_order_seq_cst) &&
+              late_callback_count.load(std::memory_order_relaxed) == 64U &&
+              late_query_interface_calls.load(std::memory_order_relaxed) == 0U &&
               !teardown_watcher.poll(teardown_sequence));
         CHECK(teardown_session->Release() == 0U &&
               teardown_release_calls.load(std::memory_order_relaxed) == 2U &&
               teardown_destruction_count.load(std::memory_order_relaxed) == 1U);
+        CHECK(late_add_ref_calls.load(std::memory_order_relaxed) <= 64U &&
+              late_release_calls.load(std::memory_order_relaxed) ==
+                  late_add_ref_calls.load(std::memory_order_relaxed) &&
+              late_session->Release() == 0U &&
+              late_release_calls.load(std::memory_order_relaxed) ==
+                  late_add_ref_calls.load(std::memory_order_relaxed) + 1U &&
+              late_destruction_count.load(std::memory_order_relaxed) == 1U);
     }
     {
         constexpr std::size_t pending_capacity = 64U;
