@@ -43,6 +43,9 @@ frame/channel 乘積會在 sample scan 或 controller state update 前 fail-clos
 `limit_in_place` 先驗證 interleaved geometry：`channels` 必須落在 1..8，且
 `frames <= SIZE_MAX / channels`；無法代表的 frame/channel 乘積會在掃描或寫回 caller
 buffer 前 fail-closed。這只保護 `size_t` arithmetic，不另訂新的 render block-size 上限。
+`OutputGroupVolumeBankV1::apply_to_interleaved` 也先驗證相同的 interleaved geometry；無法
+代表的 `frames * channels` 會在讀寫 caller buffer 或推進 output-group `VolumeRamp` 前
+fail-closed。這只保護 `size_t` arithmetic，不另訂新的 render block-size 上限。
 需要的衰減立即套用；恢復速率以 dB/ms 計算（約 +6 dB per millisecond），與引擎回呼
 區塊大小無關。避免保護電路本身在短區塊間瞬間跳回或在大區塊間恢復過慢。
 恢復是有界的線性（dB domain）爬升；在爬升完成前，實際增益可能暫時低於 unity，

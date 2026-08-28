@@ -204,6 +204,8 @@ bool OutputGroupVolumeBankV1::apply_to_interleaved(const std::string_view output
                                                    const std::uint32_t channels,
                                                    std::uint32_t sample_rate) const noexcept {
     if (interleaved == nullptr || frames == 0U || channels == 0U || channels > 8U) return false;
+    const auto channel_count = static_cast<std::size_t>(channels);
+    if (frames > std::numeric_limits<std::size_t>::max() / channel_count) return false;
     const auto* const slot = find_slot(output_group);
     if (slot == nullptr) return false;
 
