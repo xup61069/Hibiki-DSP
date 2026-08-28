@@ -51,6 +51,35 @@ float residual_after(const std::size_t blocks,
 }  // namespace
 
 int main() {
+    // Interleaved sample-count arithmetic must fail closed before any
+    // caller-owned buffer or DSP state is touched.
+    {
+        constexpr std::size_t kOverflowFrames =
+            std::numeric_limits<std::size_t>::max() / 2U + 1U;
+        VirtualMicDspV1 dsp;
+        CHECK(dsp.prepare(VirtualMicDspPolicyV1{}, 2U, 48000U));
+        std::array<float, 2> input{0.25F, 0.5F};
+        std::array<float, 2> output{7.0F, 7.0F};
+        CHECK(!dsp.process(input.data(), nullptr, output.data(),
+                           kOverflowFrames));
+        CHECK(output[0] == 7.0F && output[1] == 7.0F);
+
+        VirtualMicRouteModel route;
+        CHECK(route.prepare(VirtualMicConfigV1{2U, 48000U, true}));
+        std::array<float, 2> reference{0.75F, 1.0F};
+        output = {7.0F, 7.0F};
+        CHECK(!route.process_capture(input.data(), output.data(),
+                                      kOverflowFrames));
+        CHECK(output[0] == 7.0F && output[1] == 7.0F);
+        CHECK(!route.process_capture_with_reference(
+            input.data(), reference.data(), output.data(), kOverflowFrames));
+        CHECK(output[0] == 7.0F && output[1] == 7.0F);
+        reference = {7.0F, 7.0F};
+        CHECK(!route.process_echo_reference(input.data(), reference.data(),
+                                            kOverflowFrames));
+        CHECK(reference[0] == 7.0F && reference[1] == 7.0F);
+    }
+
     // prepare: channel/sample-rate/filter bounds and policy validation are
     // fail-closed; the boundary values themselves stay accepted.
     {

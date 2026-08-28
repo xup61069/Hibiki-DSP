@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace hibiki {
 namespace {
@@ -35,6 +36,10 @@ float TruePeakLimiterV1::limit_in_place(float* const interleaved,
                                         const std::uint32_t sample_rate) noexcept {
     if (interleaved == nullptr || frames == 0U || channels == 0U || channels > 8U ||
         !std::isfinite(ceiling_dbtp) || sample_rate < 8000U || sample_rate > 192000U) {
+        return 1.0F;
+    }
+    if (frames > std::numeric_limits<std::size_t>::max() /
+                    static_cast<std::size_t>(channels)) {
         return 1.0F;
     }
     const auto ceiling = static_cast<float>(std::pow(10.0, std::clamp(ceiling_dbtp, -144.0, 0.0) / 20.0));

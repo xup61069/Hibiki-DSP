@@ -44,6 +44,29 @@ int main() {
         // Invalid calls must not mutate the buffer.
         CHECK(buffer[0] == 0.5F);
         CHECK(buffer[3] == -0.25F);
+        // The eight-channel boundary is valid for one frame, while the
+        // largest frame count whose interleaved product fits in size_t is
+        // immediately followed by an unrepresentable request. The latter
+        // must fail before touching caller storage or limiter state.
+        constexpr auto max_frames_for_eight_channels =
+            std::numeric_limits<std::size_t>::max() / 8U;
+        CHECK(max_frames_for_eight_channels * 8U <=
+              std::numeric_limits<std::size_t>::max());
+        CHECK(max_frames_for_eight_channels + 1U >
+              std::numeric_limits<std::size_t>::max() / 8U);
+        float eight_channel_boundary[8] = {0.0F, 0.0F, 0.0F, 0.0F,
+                                           0.0F, 0.0F, 0.0F, 0.0F};
+        CHECK(limiter.limit_in_place(eight_channel_boundary, 1U, 8U,
+                                     -1.0, 48000U) == 1.0F);
+        const auto applied_before_overflow = limiter.applied_gain_for_test();
+        float overflow_guard[8] = {0.125F, -0.25F, 0.5F, -0.75F,
+                                   0.875F, -1.0F, 0.25F, -0.5F};
+        const auto overflow_gain = limiter.limit_in_place(
+            overflow_guard, max_frames_for_eight_channels + 1U, 8U,
+            -1.0, 48000U);
+        CHECK(overflow_gain == 1.0F);
+        CHECK(limiter.applied_gain_for_test() == applied_before_overflow);
+        CHECK(overflow_guard[0] == 0.125F && overflow_guard[7] == -0.5F);
         // Valid boundary sample rates.
         CHECK(limiter.limit_in_place(buffer, 2U, 2U, -1.0, 8000U) == 1.0F);
         CHECK(limiter.limit_in_place(buffer, 2U, 2U, -1.0, 192000U) == 1.0F);

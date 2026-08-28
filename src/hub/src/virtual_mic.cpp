@@ -4,8 +4,26 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace hibiki {
+
+namespace {
+
+[[nodiscard]] bool checked_interleaved_sample_count(
+    const std::size_t frames,
+    const std::uint32_t channels,
+    std::size_t& samples) noexcept {
+  if (channels == 0U) return false;
+  const auto channel_count = static_cast<std::size_t>(channels);
+  if (frames > std::numeric_limits<std::size_t>::max() / channel_count) {
+    return false;
+  }
+  samples = frames * channel_count;
+  return true;
+}
+
+}  // namespace
 
 bool VirtualMicDspV1::prepare(const VirtualMicDspPolicyV1& policy,
                               const std::uint32_t channels,
@@ -49,7 +67,8 @@ bool VirtualMicDspV1::process(const float* const capture,
                               float* const output,
                               const std::size_t frames) noexcept {
   if (!prepared_ || capture == nullptr || output == nullptr || frames == 0U) return false;
-  const std::size_t samples = frames * static_cast<std::size_t>(channels_);
+  std::size_t samples = 0U;
+  if (!checked_interleaved_sample_count(frames, channels_, samples)) return false;
   for (std::size_t index = 0U; index < samples; ++index) {
     if (!std::isfinite(capture[index]) ||
         (reference != nullptr && !std::isfinite(reference[index]))) {
@@ -200,7 +219,8 @@ bool VirtualMicRouteModel::process_capture(const float* const input,
                                            float* const output,
                                            const std::size_t frames) const noexcept {
   if (!snapshot_.prepared || input == nullptr || output == nullptr || frames == 0U) return false;
-  const auto samples = frames * static_cast<std::size_t>(snapshot_.channels);
+  std::size_t samples = 0U;
+  if (!checked_interleaved_sample_count(frames, snapshot_.channels, samples)) return false;
   if (privacy_muted_) {
     std::fill_n(output, samples, 0.0F);
   } else {
@@ -215,7 +235,8 @@ bool VirtualMicRouteModel::process_capture_with_reference(
     float* const output,
     const std::size_t frames) const noexcept {
   if (!snapshot_.prepared || input == nullptr || output == nullptr || frames == 0U) return false;
-  const std::size_t samples = frames * static_cast<std::size_t>(snapshot_.channels);
+  std::size_t samples = 0U;
+  if (!checked_interleaved_sample_count(frames, snapshot_.channels, samples)) return false;
   if (privacy_muted_) {
     std::fill_n(output, samples, 0.0F);
     return true;
@@ -231,7 +252,9 @@ bool VirtualMicRouteModel::process_echo_reference(const float* const render,
       reference == nullptr || frames == 0U) {
     return false;
   }
-  std::copy_n(render, frames * static_cast<std::size_t>(snapshot_.channels), reference);
+  std::size_t samples = 0U;
+  if (!checked_interleaved_sample_count(frames, snapshot_.channels, samples)) return false;
+  std::copy_n(render, samples, reference);
   return true;
 }
 
