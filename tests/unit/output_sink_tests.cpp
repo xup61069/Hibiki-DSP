@@ -133,6 +133,27 @@ int main() {
         CHECK(!linear_resample_interleaved(input, 4U, output, 2U, 1U, -1.0));
         CHECK(!linear_resample_interleaved(input, 4U, output, 2U, 1U, kNaN));
 
+        constexpr auto max_frames_for_eight_channels =
+            std::numeric_limits<std::size_t>::max() / 8U;
+        CHECK(max_frames_for_eight_channels * 8U <=
+              std::numeric_limits<std::size_t>::max());
+        CHECK(max_frames_for_eight_channels + 1U >
+              std::numeric_limits<std::size_t>::max() / 8U);
+        const std::array<float, 8> one_frame{0.0F, 1.0F, 2.0F, 3.0F,
+                                             4.0F, 5.0F, 6.0F, 7.0F};
+        const std::array<float, 8> untouched_output{10.0F, 11.0F, 12.0F, 13.0F,
+                                                    14.0F, 15.0F, 16.0F, 17.0F};
+        auto input_overflow_output = untouched_output;
+        CHECK(!linear_resample_interleaved(
+            one_frame.data(), max_frames_for_eight_channels + 1U,
+            input_overflow_output.data(), 1U, 8U, 1.0));
+        CHECK(input_overflow_output == untouched_output);
+        auto output_overflow_output = untouched_output;
+        CHECK(!linear_resample_interleaved(
+            one_frame.data(), 1U, output_overflow_output.data(),
+            max_frames_for_eight_channels + 1U, 8U, 1.0));
+        CHECK(output_overflow_output == untouched_output);
+
         CHECK(linear_resample_interleaved(input, 4U, output, 4U, 1U, 1.0));
         CHECK(output[0] == 0.0F && output[1] == 1.0F && output[2] == 2.0F &&
               output[3] == 3.0F);

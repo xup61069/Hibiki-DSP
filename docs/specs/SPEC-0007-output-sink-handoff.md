@@ -28,7 +28,9 @@ source_globs: ["src/hub/**output*", "src/hub/**wasapi*", "src/hub/**audio_engine
   8 phase × 16 tap polyphase FIR bank，支援 2/6/8 聲道與既有 0.25x..4.0x source-step
   envelope；跨 block 攜帶 fractional phase 與 15-frame history，ratio 變更不重置 stream。
   prepare/process 邊界維持 no-allocation、no-mutex、no COM；invalid channels/step 或
-  capacity 不足都 fail-closed。
+  capacity 不足都 fail-closed。Stateless `linear_resample_interleaved` 另在讀取或寫入
+  caller-owned interleaved buffer 前檢查 input/output frames 均不超過
+  `SIZE_MAX / channels`；無法表示的 geometry 直接回傳 failure，不留下部分輸出。
 - USB/HDMI/Bluetooth 拔插或 Audio Service invalidation 由 `DeviceRecoveryCoordinator`
   進入 safe-start；不得回到 0 dB、100% 或未驗證的舊 endpoint。
 - `WindowsWasapiSinkWorkerV1` 將 COM/WASAPI 完整限制在單一 dedicated sink worker apartment：
