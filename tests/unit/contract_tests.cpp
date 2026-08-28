@@ -237,6 +237,278 @@ private:
     std::atomic<bool>* add_ref_entered_;
     std::atomic<bool>* allow_add_ref_;
 };
+
+HRESULT copy_fake_wide_string(const wchar_t* const source, LPWSTR* const target) {
+    if (source == nullptr || target == nullptr) return E_INVALIDARG;
+    *target = nullptr;
+    std::size_t length = 0U;
+    while (source[length] != L'\0') ++length;
+    auto* const copy = static_cast<LPWSTR>(CoTaskMemAlloc((length + 1U) * sizeof(wchar_t)));
+    if (copy == nullptr) return E_OUTOFMEMORY;
+    std::memcpy(copy, source, (length + 1U) * sizeof(wchar_t));
+    *target = copy;
+    return S_OK;
+}
+
+class FakeSessionVolumeControl final : public IAudioSessionControl2,
+                                       public ISimpleAudioVolume {
+public:
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
+        if (object == nullptr) return E_POINTER;
+        *object = nullptr;
+        if (iid == IID_IUnknown || iid == __uuidof(IAudioSessionControl) ||
+            iid == __uuidof(IAudioSessionControl2)) {
+            *object = static_cast<IAudioSessionControl2*>(this);
+        } else if (iid == __uuidof(ISimpleAudioVolume)) {
+            *object = static_cast<ISimpleAudioVolume*>(this);
+        } else {
+            return E_NOINTERFACE;
+        }
+        AddRef();
+        return S_OK;
+    }
+
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++references_; }
+
+    ULONG STDMETHODCALLTYPE Release() override {
+        if (references_ > 0U) --references_;
+        return references_;
+    }
+
+    HRESULT STDMETHODCALLTYPE GetState(AudioSessionState* state) override {
+        if (state == nullptr) return E_POINTER;
+        *state = AudioSessionStateActive;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE GetDisplayName(LPWSTR*) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE SetDisplayName(LPCWSTR, LPCGUID) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE GetIconPath(LPWSTR*) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE SetIconPath(LPCWSTR, LPCGUID) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE GetGroupingParam(GUID*) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE SetGroupingParam(LPCGUID, LPCGUID) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE RegisterAudioSessionNotification(IAudioSessionEvents*) override {
+        return E_NOTIMPL;
+    }
+    HRESULT STDMETHODCALLTYPE UnregisterAudioSessionNotification(IAudioSessionEvents*) override {
+        return E_NOTIMPL;
+    }
+    HRESULT STDMETHODCALLTYPE GetSessionIdentifier(LPWSTR* identifier) override {
+        return copy_fake_wide_string(L"fake-app", identifier);
+    }
+    HRESULT STDMETHODCALLTYPE GetSessionInstanceIdentifier(LPWSTR* identifier) override {
+        return copy_fake_wide_string(L"fake-session", identifier);
+    }
+    HRESULT STDMETHODCALLTYPE GetProcessId(DWORD* process_id) override {
+        if (process_id == nullptr) return E_POINTER;
+        *process_id = 42U;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE IsSystemSoundsSession() override { return S_FALSE; }
+    HRESULT STDMETHODCALLTYPE SetDuckingPreference(BOOL) override { return E_NOTIMPL; }
+
+    HRESULT STDMETHODCALLTYPE GetMasterVolume(float* level) override {
+        if (level == nullptr) return E_POINTER;
+        if (FAILED(get_master_result)) return get_master_result;
+        *level = scalar;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE SetMasterVolume(float level, LPCGUID) override {
+        ++set_master_calls;
+        if (fail_master_calls > 0U) {
+            --fail_master_calls;
+            return E_FAIL;
+        }
+        scalar = level;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE GetMute(BOOL* value) override {
+        if (value == nullptr) return E_POINTER;
+        if (FAILED(get_mute_result)) return get_mute_result;
+        *value = muted;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE SetMute(BOOL value, LPCGUID) override {
+        ++set_mute_calls;
+        if (fail_mute_calls > 0U) {
+            --fail_mute_calls;
+            if (fail_master_after_mute_failure) fail_master_calls = 1U;
+            return E_FAIL;
+        }
+        muted = value;
+        return S_OK;
+    }
+
+    float scalar{0.5F};
+    BOOL muted{FALSE};
+    HRESULT get_master_result{S_OK};
+    HRESULT get_mute_result{S_OK};
+    std::uint32_t fail_master_calls{0U};
+    std::uint32_t fail_mute_calls{0U};
+    bool fail_master_after_mute_failure{false};
+    std::uint32_t set_master_calls{0U};
+    std::uint32_t set_mute_calls{0U};
+
+private:
+    ULONG references_{1U};
+};
+
+class FakeSessionEnumerator final : public IAudioSessionEnumerator {
+public:
+    explicit FakeSessionEnumerator(IAudioSessionControl2* const control) noexcept
+        : control_(control) {
+        if (control_ != nullptr) control_->AddRef();
+    }
+
+    ~FakeSessionEnumerator() {
+        if (control_ != nullptr) control_->Release();
+    }
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
+        if (object == nullptr) return E_POINTER;
+        *object = nullptr;
+        if (iid != IID_IUnknown && iid != __uuidof(IAudioSessionEnumerator)) {
+            return E_NOINTERFACE;
+        }
+        *object = static_cast<IAudioSessionEnumerator*>(this);
+        AddRef();
+        return S_OK;
+    }
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++references_; }
+    ULONG STDMETHODCALLTYPE Release() override {
+        const auto remaining = --references_;
+        if (remaining == 0U) delete this;
+        return remaining;
+    }
+    HRESULT STDMETHODCALLTYPE GetCount(int* count) override {
+        if (count == nullptr) return E_POINTER;
+        *count = control_ == nullptr ? 0 : 1;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE GetSession(int index, IAudioSessionControl** control) override {
+        if (control == nullptr) return E_POINTER;
+        *control = nullptr;
+        if (index != 0 || control_ == nullptr) return E_INVALIDARG;
+        *control = static_cast<IAudioSessionControl*>(control_);
+        control_->AddRef();
+        return S_OK;
+    }
+
+private:
+    ULONG references_{1U};
+    IAudioSessionControl2* control_;
+};
+
+class FakeSessionManager final : public IAudioSessionManager2 {
+public:
+    explicit FakeSessionManager(IAudioSessionControl2* const control) noexcept : control_(control) {}
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
+        if (object == nullptr) return E_POINTER;
+        *object = nullptr;
+        if (iid != IID_IUnknown && iid != __uuidof(IAudioSessionManager2)) return E_NOINTERFACE;
+        *object = static_cast<IAudioSessionManager2*>(this);
+        AddRef();
+        return S_OK;
+    }
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++references_; }
+    ULONG STDMETHODCALLTYPE Release() override {
+        if (references_ > 0U) --references_;
+        return references_;
+    }
+    HRESULT STDMETHODCALLTYPE GetAudioSessionControl(LPCGUID, DWORD,
+                                                      IAudioSessionControl** control) override {
+        if (control == nullptr) return E_POINTER;
+        *control = nullptr;
+        if (control_ == nullptr) return E_FAIL;
+        *control = static_cast<IAudioSessionControl*>(control_);
+        control_->AddRef();
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE GetSimpleAudioVolume(LPCGUID, DWORD,
+                                                   ISimpleAudioVolume** volume) override {
+        if (volume == nullptr) return E_POINTER;
+        *volume = nullptr;
+        if (control_ == nullptr) return E_FAIL;
+        return control_->QueryInterface(__uuidof(ISimpleAudioVolume),
+                                        reinterpret_cast<void**>(volume));
+    }
+    HRESULT STDMETHODCALLTYPE GetSessionEnumerator(IAudioSessionEnumerator** enumerator) override {
+        if (enumerator == nullptr) return E_POINTER;
+        *enumerator = new FakeSessionEnumerator(control_);
+        return *enumerator == nullptr ? E_OUTOFMEMORY : S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE RegisterSessionNotification(
+        IAudioSessionNotification* notification) override {
+        if (notification == nullptr) return E_POINTER;
+        if (notification_ != nullptr) return E_FAIL;
+        notification_ = notification;
+        notification_->AddRef();
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE UnregisterSessionNotification(
+        IAudioSessionNotification* notification) override {
+        if (notification == nullptr || notification_ != notification) return E_INVALIDARG;
+        notification_->Release();
+        notification_ = nullptr;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE RegisterDuckNotification(
+        LPCWSTR, IAudioVolumeDuckNotification*) override {
+        return E_NOTIMPL;
+    }
+    HRESULT STDMETHODCALLTYPE UnregisterDuckNotification(
+        IAudioVolumeDuckNotification*) override {
+        return E_NOTIMPL;
+    }
+
+private:
+    ULONG references_{1U};
+    IAudioSessionControl2* control_;
+    IAudioSessionNotification* notification_{nullptr};
+};
+
+class FakeSessionDevice final : public IMMDevice {
+public:
+    explicit FakeSessionDevice(FakeSessionManager* const manager) noexcept : manager_(manager) {}
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
+        if (object == nullptr) return E_POINTER;
+        *object = nullptr;
+        if (iid != IID_IUnknown && iid != __uuidof(IMMDevice)) return E_NOINTERFACE;
+        *object = static_cast<IMMDevice*>(this);
+        AddRef();
+        return S_OK;
+    }
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++references_; }
+    ULONG STDMETHODCALLTYPE Release() override {
+        if (references_ > 0U) --references_;
+        return references_;
+    }
+    HRESULT STDMETHODCALLTYPE GetId(LPWSTR* identifier) override {
+        return copy_fake_wide_string(L"fake-endpoint", identifier);
+    }
+    HRESULT STDMETHODCALLTYPE GetState(DWORD* state) override {
+        if (state == nullptr) return E_POINTER;
+        *state = DEVICE_STATE_ACTIVE;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE OpenPropertyStore(DWORD, IPropertyStore** store) override {
+        if (store != nullptr) *store = nullptr;
+        return E_NOTIMPL;
+    }
+    HRESULT STDMETHODCALLTYPE Activate(REFIID iid, DWORD, PROPVARIANT*, void** object) override {
+        if (object == nullptr) return E_POINTER;
+        *object = nullptr;
+        if (iid != __uuidof(IAudioSessionManager2) || manager_ == nullptr) return E_NOINTERFACE;
+        *object = static_cast<IAudioSessionManager2*>(manager_);
+        manager_->AddRef();
+        return S_OK;
+    }
+
+private:
+    ULONG references_{1U};
+    FakeSessionManager* manager_;
+};
 #endif
 
 bool accept_control_command(const hibiki::ControlCommandV1& command, void* context) noexcept {
@@ -5819,6 +6091,42 @@ int main() {
     CHECK(retained_session->Release() == 0U &&
           session_release_calls.load(std::memory_order_relaxed) == 2U &&
           session_destruction_count.load(std::memory_order_relaxed) == 1U);
+    {
+        // A two-step volume write must not expose a half-applied state when
+        // the second setter fails; rollback failure remains an explicit error.
+        FakeSessionVolumeControl volume_control;
+        FakeSessionManager session_manager(&volume_control);
+        FakeSessionDevice session_device(&session_manager);
+        WindowsAudioSessionWatcher volume_watcher;
+        AudioSessionRegistry volume_registry;
+        GUID volume_context{};
+        CHECK(volume_watcher.bind(&session_device) == S_OK &&
+              volume_watcher.enumerate(volume_registry) == S_OK &&
+              volume_registry.sessions().size() == 1U);
+        const float original_scalar = volume_control.scalar;
+        const BOOL original_mute = volume_control.muted;
+        volume_control.fail_mute_calls = 1U;
+        CHECK(volume_watcher.write_session_volume("fake-session", -6.0, false,
+                                                  volume_context) == E_FAIL &&
+              std::abs(volume_control.scalar - original_scalar) <= 1e-5F &&
+              volume_control.muted == original_mute &&
+              volume_control.set_master_calls == 2U &&
+              volume_control.set_mute_calls == 2U);
+        const auto set_master_before_read_failure = volume_control.set_master_calls;
+        const auto set_mute_before_read_failure = volume_control.set_mute_calls;
+        volume_control.get_mute_result = E_FAIL;
+        CHECK(volume_watcher.write_session_volume("fake-session", -12.0, true,
+                                                  volume_context) == E_FAIL &&
+              volume_control.set_master_calls == set_master_before_read_failure &&
+              volume_control.set_mute_calls == set_mute_before_read_failure);
+        volume_control.get_mute_result = S_OK;
+        volume_control.fail_mute_calls = 1U;
+        volume_control.fail_master_after_mute_failure = true;
+        CHECK(volume_watcher.write_session_volume("fake-session", -3.0, true,
+                                                  volume_context) == E_FAIL &&
+              volume_control.muted == original_mute);
+        volume_watcher.unbind();
+    }
     {
         // Teardown must not drain/reset the queue while a session-manager
         // callback is still retaining its control pointer.

@@ -452,6 +452,24 @@ HRESULT acquire_session_volume(IAudioSessionManager2* const manager,
     return result;
 }
 
+bool restore_session_volume(ISimpleAudioVolume* const volume,
+                            const float scalar,
+                            const BOOL muted,
+                            const GUID& event_context) noexcept {
+    if (volume == nullptr || FAILED(volume->SetMasterVolume(scalar, &event_context)) ||
+        FAILED(volume->SetMute(muted, &event_context))) {
+        return false;
+    }
+    float verified_scalar = 0.0F;
+    BOOL verified_mute = FALSE;
+    if (FAILED(volume->GetMasterVolume(&verified_scalar)) ||
+        FAILED(volume->GetMute(&verified_mute))) {
+        return false;
+    }
+    return std::isfinite(verified_scalar) &&
+           std::abs(verified_scalar - scalar) <= 1e-5F && verified_mute == muted;
+}
+
 }  // namespace
 
 HRESULT WindowsAudioSessionWatcher::write_session_volume(
@@ -477,10 +495,23 @@ HRESULT WindowsAudioSessionWatcher::write_session_volume(
         result = acquire_session_volume(manager_, endpoint_id_, session_instance_id, &volume);
     }
     if (SUCCEEDED(result)) {
-        result = volume->SetMasterVolume(scalar, &event_context);
-    }
-    if (SUCCEEDED(result)) {
-        result = volume->SetMute(mute ? TRUE : FALSE, &event_context);
+        float previous_scalar = 0.0F;
+        BOOL previous_mute = FALSE;
+        bool write_started = false;
+        // ISimpleAudioVolume has separate setters. Snapshot both values so a
+        // partial setter failure can be rolled back and verified before the
+        // failure is returned to the caller.
+        result = volume->GetMasterVolume(&previous_scalar);
+        if (SUCCEEDED(result)) result = volume->GetMute(&previous_mute);
+        if (SUCCEEDED(result)) {
+            write_started = true;
+            result = volume->SetMasterVolume(scalar, &event_context);
+        }
+        if (SUCCEEDED(result)) result = volume->SetMute(mute ? TRUE : FALSE, &event_context);
+        if (write_started && FAILED(result) &&
+            !restore_session_volume(volume, previous_scalar, previous_mute, event_context)) {
+            result = E_FAIL;
+        }
     }
     if (volume != nullptr) {
         volume->Release();
