@@ -102,10 +102,12 @@ bool valid_session_control_request(const std::string_view session_instance_id,
            requested_db <= kSessionVolumeMaxDbV1;
 }
 
-bool has_session_instance(const AudioSessionRegistry& registry,
-                          const std::string_view session_instance_id) noexcept {
+bool has_active_session_instance(const AudioSessionRegistry& registry,
+                                 const std::string_view session_instance_id) noexcept {
     for (const auto& session : registry.sessions()) {
-        if (session.identity.session_instance_id == session_instance_id) return true;
+        if (session.active && session.identity.session_instance_id == session_instance_id) {
+            return true;
+        }
     }
     return false;
 }
@@ -121,7 +123,7 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::write_session_volume(
     if (!valid_session_control_request(session_instance_id, requested_db)) {
         return E_INVALIDARG;
     }
-    if (!has_session_instance(registry_, session_instance_id)) {
+    if (!has_active_session_instance(registry_, session_instance_id)) {
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     }
     return watcher_.write_session_volume(session_instance_id, requested_db, mute, event_context);
@@ -136,7 +138,7 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::read_session_volume(
         session_instance_id.size() > kMaxSessionControlIdentityBytesV1) {
         return E_INVALIDARG;
     }
-    if (!has_session_instance(registry_, session_instance_id)) {
+    if (!has_active_session_instance(registry_, session_instance_id)) {
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     }
     return watcher_.read_session_volume(session_instance_id, requested_db, mute);

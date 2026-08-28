@@ -288,7 +288,7 @@ public:
 
     HRESULT STDMETHODCALLTYPE GetState(AudioSessionState* state) override {
         if (state == nullptr) return E_POINTER;
-        *state = AudioSessionStateActive;
+        *state = state_value;
         return S_OK;
     }
     HRESULT STDMETHODCALLTYPE GetDisplayName(LPWSTR*) override { return E_NOTIMPL; }
@@ -351,6 +351,7 @@ public:
 
     float scalar{0.5F};
     BOOL muted{FALSE};
+    AudioSessionState state_value{AudioSessionStateActive};
     HRESULT get_master_result{S_OK};
     HRESULT get_mute_result{S_OK};
     std::uint32_t fail_master_calls{0U};
@@ -6337,6 +6338,36 @@ int main() {
                                                   volume_context) == E_FAIL &&
               volume_control.muted == original_mute);
         volume_watcher.unbind();
+    }
+    {
+        // An expired session may still be returned by the Windows enumerator,
+        // but it is not a valid target for volume control or handle access.
+        FakeSessionVolumeControl expired_session;
+        expired_session.state_value = AudioSessionStateExpired;
+        FakeSessionManager expired_manager(&expired_session);
+        FakeSessionDevice expired_device(&expired_manager);
+        WindowsAudioSessionRouteCoordinatorV1 expired_coordinator;
+        const HRESULT session_not_found = HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        double expired_db = 23.0;
+        bool expired_mute = true;
+        CHECK(expired_coordinator.bind(&expired_device) == S_OK &&
+              expired_coordinator.refresh() ==
+                  WindowsAudioSessionRouteRefreshResultV1::NoRoutes &&
+              expired_coordinator.snapshot().session_count == 1U &&
+              expired_coordinator.snapshot().active_count == 0U &&
+              expired_coordinator.read_session_volume("fake-session", expired_db,
+                                                      expired_mute) == session_not_found &&
+              expired_db == 23.0 && expired_mute &&
+              expired_coordinator.write_session_volume("fake-session", -6.0, false,
+                                                       session_context) == session_not_found &&
+              expired_session.set_master_calls == 0U && expired_session.set_mute_calls == 0U &&
+              expired_coordinator.read_session_volume_handle(
+                  (1ULL << 32U) | 1U, expired_db, expired_mute) == session_not_found &&
+              expired_db == 23.0 && expired_mute &&
+              expired_coordinator.write_session_volume_handle(
+                  (1ULL << 32U) | 1U, -6.0, false, session_context) == session_not_found &&
+              expired_session.set_master_calls == 0U && expired_session.set_mute_calls == 0U);
+        expired_coordinator.unbind();
     }
     {
         // Teardown must not drain/reset the queue while a session-manager
