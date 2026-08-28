@@ -126,8 +126,9 @@ audio-side 發佈的 coherent snapshot，不直接讀取可變 SRC state。proce
 上限 preflight，再把各 sink 的 SRC 結果寫入 prepare 階段配置的 scratch，所有 sink 成功後
 才一次發佈到 caller-owned output buffers。任何 sink 失敗會回復 SRC state 與該次時鐘進度，
 不留下部分輸出；每次最多 4096 input frames、輸出上限按 0.25x source step 的固定界限只用
-於 prepare-time scratch；caller-owned capacity 則依每個 sink 當下 phase 與 source step 精確
-preflight。這是 user-space bounded runtime，仍不等於真實硬體 sink／clock soak 證據。
+於 prepare-time scratch，並保留 persistent SRC 的 15-frame history；caller-owned capacity 則依
+每個 sink 當下 phase 與 source step 精確 preflight。這是 user-space bounded runtime，仍不等於
+真實硬體 sink／clock soak 證據。
 
 每個 clock request 與 sink snapshot 都使用三個固定 slots、release/acquire payload 欄位、
 以及 generation／slot／phase publication token。writer 先以 odd token 標記目標 slot 為

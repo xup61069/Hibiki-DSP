@@ -17,8 +17,10 @@ namespace hibiki {
 constexpr std::size_t kOutputFanoutMaxSinksV1 = 8U;
 constexpr std::size_t kOutputFanoutMaxIdBytesV1 = 64U;
 constexpr std::size_t kOutputFanoutMaxInputFramesV1 = 4096U;
+// Reserve the persistent SRC's documented 15-frame history in addition to
+// the 4x output-rate envelope and its inclusive endpoint.
 constexpr std::size_t kOutputFanoutMaxResampledFramesV1 =
-    (kOutputFanoutMaxInputFramesV1 * 4U) + 1U;
+    ((kOutputFanoutMaxInputFramesV1 + 15U) * 4U) + 1U;
 
 struct OutputFanoutSinkConfigV1 {
     std::string sink_id;

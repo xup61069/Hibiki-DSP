@@ -221,6 +221,40 @@ int main() {
             CHECK(out_b[i] == 1.0F);
         }
     }
+    // persistent runtime: the maximum bounded block remains processable at
+    // the minimum source step after history has crossed a block boundary.
+    {
+        const auto plan = make_valid_plan();
+        hibiki::OutputFanoutRuntimeV1 runtime;
+        CHECK(runtime.prepare(plan, 0.25));
+        const auto input_samples = hibiki::kOutputFanoutMaxInputFramesV1 * 2U;
+        const std::vector<float> input(input_samples, 0.25F);
+        const auto output_samples =
+            hibiki::kOutputFanoutMaxResampledFramesV1 * 2U;
+        const auto no_history_bound =
+            (hibiki::kOutputFanoutMaxInputFramesV1 * 4U) + 1U;
+        std::vector<float> output_a(output_samples, 0.0F);
+        std::vector<float> output_b(output_samples, 0.0F);
+        float* outputs[2] = {output_a.data(), output_b.data()};
+        const std::size_t capacities[2] = {
+            hibiki::kOutputFanoutMaxResampledFramesV1,
+            hibiki::kOutputFanoutMaxResampledFramesV1};
+        std::size_t output_frames[2] = {};
+        for (std::size_t block = 0U; block < 2U; ++block) {
+            CHECK(runtime.process(
+                input.data(), hibiki::kOutputFanoutMaxInputFramesV1,
+                std::span<float* const>(outputs, 2U),
+                std::span<const std::size_t>(capacities, 2U),
+                std::span<std::size_t>(output_frames, 2U)));
+            CHECK(output_frames[0] > 0U &&
+                  output_frames[0] <= hibiki::kOutputFanoutMaxResampledFramesV1 &&
+                  output_frames[1] == output_frames[0]);
+            if (block == 1U) {
+                CHECK(output_frames[0] > no_history_bound);
+            }
+        }
+    }
+
     // fanout: the standalone helper accepts the same bounded maximum as the
     // persistent runtime and copies a full maximum-size block.
     {
