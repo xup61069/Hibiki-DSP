@@ -8,6 +8,11 @@
 
 #include "hibiki/asio_transport_v1.h"
 
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 #define CHECK(expr)                                                             \
     do {                                                                        \
         if (!(expr)) {                                                          \
@@ -122,6 +127,61 @@ int main() {
         std::array<float, 128> buffer{};
         CHECK(!consumer.pop(buffer.data(), 64U, block));
     }
+
+#if defined(_WIN32)
+    // Slot metadata is a shared-memory field, so the engine-side consumer
+    // re-checks it after the C ABI pop. Each rejected item is consumed by the
+    // bounded SPSC ring and the next valid item remains usable.
+    {
+        constexpr wchar_t kMappingName[] = L"HibikiTest1663I";
+        constexpr std::uint32_t kChannels = 2U;
+        constexpr std::uint32_t kRate = 48000U;
+        constexpr std::uint32_t kFrames = 4U;
+        hibiki::AsioTransportConsumerV1 consumer;
+        CHECK(consumer.bind(kMappingName, kChannels, kRate, kFrames));
+
+        const auto region_bytes = hibiki_asio_transport_region_size_v1();
+        const auto mapping = OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE, FALSE,
+                                              kMappingName);
+        CHECK(mapping != nullptr);
+        auto* region = static_cast<hibiki_asio_transport_region_v1*>(
+            MapViewOfFile(mapping, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, region_bytes));
+        CHECK(region != nullptr);
+
+        const float left[kFrames] = {1.0F, -1.0F, 0.5F, -0.5F};
+        const float right[kFrames] = {0.25F, -0.25F, 0.75F, -0.75F};
+        const float* planar[kChannels] = {left, right};
+        const auto push = [&]() {
+            return hibiki_asio_transport_push_planar_v1(
+                       region, region_bytes, planar, kChannels, kFrames) != 0;
+        };
+        std::array<float, kChannels * kFrames> output{};
+        hibiki::AsioTransportBlockV1 block{99U, 99U, 99U};
+
+        CHECK(push());
+        region->slots[0].sample_rate = 44100U;
+        CHECK(!consumer.pop(output.data(), kFrames, block));
+        CHECK(block.frames == 0U && block.channels == 0U && block.sample_rate == 0U);
+
+        CHECK(push());
+        region->slots[1].channels = 1U;
+        CHECK(!consumer.pop(output.data(), kFrames, block));
+        CHECK(block.frames == 0U && block.channels == 0U && block.sample_rate == 0U);
+
+        CHECK(push());
+        region->slots[2].frames = 2U;
+        CHECK(!consumer.pop(output.data(), kFrames, block));
+        CHECK(block.frames == 0U && block.channels == 0U && block.sample_rate == 0U);
+
+        CHECK(push());
+        CHECK(consumer.pop(output.data(), kFrames, block));
+        CHECK(block.frames == kFrames && block.channels == kChannels &&
+              block.sample_rate == kRate);
+
+        CHECK(UnmapViewOfFile(region) != 0);
+        CHECK(CloseHandle(mapping) != 0);
+    }
+#endif
 
     return 0;
 }

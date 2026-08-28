@@ -96,9 +96,21 @@ bool AsioTransportConsumerV1::pop(float* const interleaved,
                                   AsioTransportBlockV1& block) noexcept {
   block = {};
   if (region_ == nullptr || interleaved == nullptr) return false;
-  return hibiki_asio_transport_pop_interleaved_v1(region_, region_bytes_, interleaved,
-                                                  output_capacity_frames, &block.frames,
-                                                  &block.channels, &block.sample_rate) != 0;
+  AsioTransportBlockV1 candidate{};
+  if (hibiki_asio_transport_pop_interleaved_v1(
+          region_, region_bytes_, interleaved, output_capacity_frames, &candidate.frames,
+          &candidate.channels, &candidate.sample_rate) == 0) {
+    return false;
+  }
+  // The C ABI validates the shared region header, but slot metadata is copied
+  // from shared memory. Re-check it against this consumer's bind contract so
+  // an inconsistent slot cannot enter an engine lane.
+  if (candidate.frames != frames_per_buffer_ || candidate.channels != channels_ ||
+      candidate.sample_rate != sample_rate_) {
+    return false;
+  }
+  block = candidate;
+  return true;
 }
 
 std::uint32_t AsioTransportConsumerV1::dropped_blocks() const noexcept {
