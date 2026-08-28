@@ -87,7 +87,7 @@ float VolumeRampProcessorV1::next_gain() noexcept {
 
 VolumeNotificationResult apply_windows_notification(
     OutputGroupVolumeStateV1& state, const VolumeNotificationV1& notification) noexcept {
-    if (!std::isfinite(notification.requested_db) ||
+    if (notification.generation == 0U || !std::isfinite(notification.requested_db) ||
         notification.requested_db < -144.0 || notification.requested_db > 12.0) {
         return VolumeNotificationResult::Invalid;
     }
