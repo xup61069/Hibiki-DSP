@@ -77,6 +77,12 @@ private:
                                                  IAudioSessionControl* control);
 
     std::atomic<ULONG> references_{1};
+    // Teardown blocks new callback work before unregistering. The control
+    // thread waits for callbacks already inside OnSessionCreated before it
+    // drains or resets the queue; the callback itself never waits.
+    std::atomic<std::uint32_t> callbacks_in_flight_{0U};
+    std::atomic<bool> callbacks_blocked_{false};
+    std::atomic<bool> destroying_{false};
     std::atomic<std::uint64_t> sequence_{0};
     std::uint64_t last_sequence_{0};
     IAudioSessionManager2* manager_{nullptr};

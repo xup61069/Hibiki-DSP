@@ -172,11 +172,15 @@ public:
     RetainedAudioSessionControl(std::atomic<std::uint32_t>& add_ref_calls,
                                 std::atomic<std::uint32_t>& release_calls,
                                 std::atomic<std::uint32_t>& destruction_count,
-                                std::atomic<std::uint32_t>& query_interface_calls) noexcept
+                                std::atomic<std::uint32_t>& query_interface_calls,
+                                std::atomic<bool>* add_ref_entered = nullptr,
+                                std::atomic<bool>* allow_add_ref = nullptr) noexcept
         : add_ref_calls_(add_ref_calls),
           release_calls_(release_calls),
           destruction_count_(destruction_count),
-          query_interface_calls_(query_interface_calls) {}
+          query_interface_calls_(query_interface_calls),
+          add_ref_entered_(add_ref_entered),
+          allow_add_ref_(allow_add_ref) {}
 
     ~RetainedAudioSessionControl() { ++destruction_count_; }
 
@@ -193,6 +197,12 @@ public:
     }
 
     ULONG STDMETHODCALLTYPE AddRef() override {
+        if (add_ref_entered_ != nullptr && allow_add_ref_ != nullptr) {
+            add_ref_entered_->store(true, std::memory_order_seq_cst);
+            while (!allow_add_ref_->load(std::memory_order_seq_cst)) {
+                std::this_thread::yield();
+            }
+        }
         ++add_ref_calls_;
         return references_.fetch_add(1U, std::memory_order_relaxed) + 1U;
     }
@@ -224,6 +234,8 @@ private:
     std::atomic<std::uint32_t>& release_calls_;
     std::atomic<std::uint32_t>& destruction_count_;
     std::atomic<std::uint32_t>& query_interface_calls_;
+    std::atomic<bool>* add_ref_entered_;
+    std::atomic<bool>* allow_add_ref_;
 };
 #endif
 
@@ -5807,6 +5819,58 @@ int main() {
     CHECK(retained_session->Release() == 0U &&
           session_release_calls.load(std::memory_order_relaxed) == 2U &&
           session_destruction_count.load(std::memory_order_relaxed) == 1U);
+    {
+        // Teardown must not drain/reset the queue while a session-manager
+        // callback is still retaining its control pointer.
+        WindowsAudioSessionWatcher teardown_watcher;
+        std::atomic<std::uint32_t> teardown_add_ref_calls{0U};
+        std::atomic<std::uint32_t> teardown_release_calls{0U};
+        std::atomic<std::uint32_t> teardown_destruction_count{0U};
+        std::atomic<std::uint32_t> teardown_query_interface_calls{0U};
+        std::atomic<bool> add_ref_entered{false};
+        std::atomic<bool> allow_add_ref{false};
+        std::atomic<bool> callback_done{false};
+        std::atomic<bool> unbind_started{false};
+        std::atomic<bool> unbind_done{false};
+        std::atomic<HRESULT> callback_result{E_FAIL};
+        auto* teardown_session = new RetainedAudioSessionControl(
+            teardown_add_ref_calls, teardown_release_calls, teardown_destruction_count,
+            teardown_query_interface_calls, &add_ref_entered, &allow_add_ref);
+        std::thread callback_thread([&] {
+            callback_result.store(teardown_watcher.OnSessionCreated(teardown_session),
+                                   std::memory_order_seq_cst);
+            callback_done.store(true, std::memory_order_seq_cst);
+        });
+        while (!add_ref_entered.load(std::memory_order_seq_cst)) {
+            std::this_thread::yield();
+        }
+        std::thread unbind_thread([&] {
+            unbind_started.store(true, std::memory_order_seq_cst);
+            teardown_watcher.unbind();
+            unbind_done.store(true, std::memory_order_seq_cst);
+        });
+        while (!unbind_started.load(std::memory_order_seq_cst)) {
+            std::this_thread::yield();
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        const bool unbind_waited_for_callback =
+            !unbind_done.load(std::memory_order_seq_cst);
+        allow_add_ref.store(true, std::memory_order_seq_cst);
+        callback_thread.join();
+        unbind_thread.join();
+        std::uint64_t teardown_sequence = 0U;
+        CHECK(unbind_waited_for_callback && callback_done.load(std::memory_order_seq_cst) &&
+              unbind_done.load(std::memory_order_seq_cst) &&
+              callback_result.load(std::memory_order_seq_cst) == S_OK &&
+              teardown_add_ref_calls.load(std::memory_order_relaxed) == 1U &&
+              teardown_release_calls.load(std::memory_order_relaxed) == 1U &&
+              teardown_destruction_count.load(std::memory_order_relaxed) == 0U &&
+              teardown_query_interface_calls.load(std::memory_order_relaxed) == 0U &&
+              !teardown_watcher.poll(teardown_sequence));
+        CHECK(teardown_session->Release() == 0U &&
+              teardown_release_calls.load(std::memory_order_relaxed) == 2U &&
+              teardown_destruction_count.load(std::memory_order_relaxed) == 1U);
+    }
     {
         constexpr std::size_t pending_capacity = 64U;
         WindowsAudioSessionWatcher bounded_watcher;

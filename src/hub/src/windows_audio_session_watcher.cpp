@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 
 namespace hibiki {
@@ -61,6 +62,7 @@ WindowsAudioSessionWatcher::WindowsAudioSessionWatcher() noexcept {
 }
 
 WindowsAudioSessionWatcher::~WindowsAudioSessionWatcher() {
+    destroying_.store(true, std::memory_order_seq_cst);
     unbind();
 }
 
@@ -212,8 +214,14 @@ IAudioSessionControl* WindowsAudioSessionWatcher::find_cached_session_control(
 
 HRESULT STDMETHODCALLTYPE WindowsAudioSessionWatcher::OnSessionCreated(
     IAudioSessionControl* const new_session) {
+    callbacks_in_flight_.fetch_add(1U, std::memory_order_seq_cst);
+    if (callbacks_blocked_.load(std::memory_order_seq_cst)) {
+        callbacks_in_flight_.fetch_sub(1U, std::memory_order_seq_cst);
+        return S_OK;
+    }
     if (new_session != nullptr) (void)enqueue_pending_session(new_session);
     sequence_.fetch_add(1, std::memory_order_release);
+    callbacks_in_flight_.fetch_sub(1U, std::memory_order_seq_cst);
     return S_OK;
 }
 
@@ -253,12 +261,16 @@ HRESULT WindowsAudioSessionWatcher::bind(IMMDevice* const device) {
 }
 
 void WindowsAudioSessionWatcher::unbind() noexcept {
+    callbacks_blocked_.store(true, std::memory_order_seq_cst);
     if (manager_ != nullptr) {
         if (registered_) {
             manager_->UnregisterSessionNotification(this);
         }
         manager_->Release();
         manager_ = nullptr;
+    }
+    while (callbacks_in_flight_.load(std::memory_order_seq_cst) != 0U) {
+        std::this_thread::yield();
     }
     release_pending_sessions();
     release_cached_session_controls();
@@ -267,6 +279,9 @@ void WindowsAudioSessionWatcher::unbind() noexcept {
     endpoint_id_.clear();
     last_sequence_ = 0;
     sequence_.store(0U, std::memory_order_release);
+    if (!destroying_.load(std::memory_order_seq_cst)) {
+        callbacks_blocked_.store(false, std::memory_order_seq_cst);
+    }
 }
 
 HRESULT WindowsAudioSessionWatcher::upsert_session_control(
