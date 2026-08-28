@@ -191,9 +191,13 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::bind_session_route_handle(
         handle_index == 0U || handle_index > registry_.sessions().size()) {
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     }
+    const auto& selected_session = registry_.sessions()[handle_index - 1U];
+    if (!selected_session.active) {
+        return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+    }
     try {
         AudioSessionRegistry candidate_registry = registry_;
-        const auto identity = candidate_registry.sessions()[handle_index - 1U].identity;
+        const auto identity = selected_session.identity;
         if (!candidate_registry.bind(identity, std::string(lane_id), std::string(output_group))) {
             return E_INVALIDARG;
         }

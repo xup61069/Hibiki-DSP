@@ -6512,6 +6512,9 @@ int main() {
               expired_db == 23.0 && expired_mute &&
               expired_coordinator.write_session_volume_handle(
                   (1ULL << 32U) | 1U, -6.0, false, session_context) == session_not_found &&
+              expired_coordinator.bind_session_route_handle(
+                  (1ULL << 32U) | 1U, "game", "surround") == session_not_found &&
+              expired_coordinator.snapshot().generation == 1U &&
               expired_session.set_master_calls == 0U && expired_session.set_mute_calls == 0U);
         expired_coordinator.unbind();
     }
