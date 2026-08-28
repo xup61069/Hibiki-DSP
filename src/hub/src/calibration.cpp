@@ -5,7 +5,12 @@
 namespace hibiki {
 
 bool validate_acoustic_anchor(const AcousticAnchorV1& anchor) noexcept {
-    return anchor.schema_version == 1 && std::isfinite(anchor.test_signal_dbfs) &&
+    const auto valid_device_class =
+        anchor.device_class == AcousticDeviceClass::Speaker ||
+        anchor.device_class == AcousticDeviceClass::HeadphoneCoupler ||
+        anchor.device_class == AcousticDeviceClass::HeadphoneEstimated;
+    return anchor.schema_version == 1 && valid_device_class &&
+           std::isfinite(anchor.test_signal_dbfs) &&
            std::isfinite(anchor.endpoint_gain_db) &&
            anchor.endpoint_gain_db >= -144.0 && anchor.endpoint_gain_db <= 12.0 &&
            std::isfinite(anchor.measured_1k_spl_db) &&
