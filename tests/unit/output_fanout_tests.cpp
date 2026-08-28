@@ -218,6 +218,41 @@ int main() {
             CHECK(out_b[i] == 1.0F);
         }
     }
+    // fanout: the standalone helper accepts the same bounded maximum as the
+    // persistent runtime and copies a full maximum-size block.
+    {
+        const auto plan = make_valid_plan();
+        const auto samples = hibiki::kOutputFanoutMaxInputFramesV1 * 2U;
+        const std::vector<float> input(samples, 0.25F);
+        std::vector<float> out_a(samples, 0.0F);
+        std::vector<float> out_b(samples, 0.0F);
+        float* outputs[kMaxSinks] = {out_a.data(), out_b.data()};
+        const std::size_t capacities[kMaxSinks] = {
+            hibiki::kOutputFanoutMaxInputFramesV1,
+            hibiki::kOutputFanoutMaxInputFramesV1};
+        CHECK(hibiki::fanout_interleaved_v1(
+            plan, input.data(), hibiki::kOutputFanoutMaxInputFramesV1,
+            std::span<float* const>(outputs, 2U),
+            std::span<const std::size_t>(capacities, 2U)));
+        CHECK(out_a == input);
+        CHECK(out_b == input);
+    }
+    // fanout: an oversized standalone block is rejected before any read or
+    // destination write, preserving all-or-nothing behavior.
+    {
+        const auto plan = make_valid_plan();
+        const float input[2] = {0.25F, -0.25F};
+        float out_a[2] = {7.0F, 7.0F};
+        float out_b[2] = {9.0F, 9.0F};
+        float* outputs[kMaxSinks] = {out_a, out_b};
+        const std::size_t capacities[kMaxSinks] = {2U, 2U};
+        CHECK(!hibiki::fanout_interleaved_v1(
+            plan, input, hibiki::kOutputFanoutMaxInputFramesV1 + 1U,
+            std::span<float* const>(outputs, 2U),
+            std::span<const std::size_t>(capacities, 2U)));
+        CHECK(out_a[0] == 7.0F && out_a[1] == 7.0F &&
+              out_b[0] == 9.0F && out_b[1] == 9.0F);
+    }
     // fanout: null enabled-sink pointer rejected without partial writes.
     {
         const auto plan = make_valid_plan();

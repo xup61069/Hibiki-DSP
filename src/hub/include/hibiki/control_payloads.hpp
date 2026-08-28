@@ -35,6 +35,17 @@ constexpr std::size_t kDeviceCatalogSnapshotPayloadBytesV1 =
     kDeviceCatalogSnapshotHeaderBytesV1 +
     (kDeviceCatalogSnapshotEntryBytesV1 * kDeviceCatalogSnapshotCapacityV1);
 constexpr std::size_t kSessionVolumeCommandPayloadBytesV1 = 24U;
+constexpr double kSessionVolumeMinDbV1 = -144.0;
+constexpr double kSessionVolumeMaxDbV1 = 0.0;
+constexpr std::int32_t kSessionVolumeMinDbQ16_16V1 = -144 * 65536;
+constexpr std::int32_t kSessionVolumeMaxDbQ16_16V1 = 0;
+
+[[nodiscard]] constexpr bool is_valid_session_volume_db_q16_16_v1(
+    const std::int32_t requested_db_q16_16) noexcept {
+    return requested_db_q16_16 >= kSessionVolumeMinDbQ16_16V1 &&
+           requested_db_q16_16 <= kSessionVolumeMaxDbQ16_16V1;
+}
+
 constexpr std::size_t kSessionRouteCommandPayloadBytesV1 = 128U;
 constexpr std::size_t kSessionRouteCommandLaneMaxBytesV1 = 48U;
 constexpr std::size_t kSessionRouteCommandOutputMaxBytesV1 = 48U;

@@ -268,6 +268,24 @@ Check(ControlPayloadsV1.TryDecodeSessionVolumeCommand(sessionVolumeBytes,
       sessionVolumeHandle == sessionEntries[0].Handle && Math.Abs(sessionVolumeDb + 9.5) < 1e-6 &&
       sessionVolumeMute && sessionVolumeSequence == 12UL,
     "Session volume command did not round-trip.");
+var sessionVolumeCeilingBytes = ControlPayloadsV1.EncodeSessionVolumeCommand(
+    sessionEntries[0].Handle, ControlPayloadsV1.SessionVolumeMaxDb, false, 12UL);
+Check(ControlPayloadsV1.TryDecodeSessionVolumeCommand(sessionVolumeCeilingBytes,
+          out _, out var sessionVolumeCeilingDb, out _, out _) &&
+      sessionVolumeCeilingDb == ControlPayloadsV1.SessionVolumeMaxDb,
+    "Session volume command must accept the Windows 0 dB ceiling.");
+var rejectedPositiveSessionVolume = false;
+try
+{
+    _ = ControlPayloadsV1.EncodeSessionVolumeCommand(
+        sessionEntries[0].Handle, 0.5, false, 12UL);
+}
+catch (ArgumentOutOfRangeException)
+{
+    rejectedPositiveSessionVolume = true;
+}
+Check(rejectedPositiveSessionVolume,
+    "Session volume command must reject values above the Windows 0 dB ceiling.");
 var malformedSessionVolume = sessionVolumeBytes.ToArray();
 malformedSessionVolume[13] = 1;
 Check(!ControlPayloadsV1.TryDecodeSessionVolumeCommand(malformedSessionVolume,
@@ -572,6 +590,9 @@ Check(ControlPayloadsV1.TryDecodeSessionVolumeCommand(selectedSessionVolume.Payl
           out _, out var selectedSessionDb, out var selectedSessionMute, out _) &&
       Math.Abs(selectedSessionDb + 6.0) < 1e-6 && selectedSessionMute,
     "ViewModel selected App volume controls did not preserve dB/mute.");
+viewModel.SessionVolumeDb = 3.0;
+Check(viewModel.SessionVolumeDb == ControlPayloadsV1.SessionVolumeMaxDb,
+    "ViewModel App volume must clamp to the Windows 0 dB ceiling.");
 Check(!await viewModel.ApplySelectedSessionVolumeAsync(),
     "Disconnected selected App volume must fail closed.");
 var staleHandle = sessionEntries[0].Handle + 100UL;

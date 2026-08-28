@@ -29,12 +29,12 @@ Chrome tabCapture、vendor ASIO 攔截或對所有 exclusive stream 生效。實
 | offset | bytes | 欄位 |
 | --- | ---: | --- |
 | 0 | 8 | generation-scoped `handle` |
-| 8 | 4 | requested dB Q16.16，−144…+12 |
+| 8 | 4 | requested dB Q16.16，−144…0 |
 | 12 | 1 | mute，0/1 |
 | 13 | 3 | reserved，必須為零 |
 | 16 | 8 | `catalog_sequence` |
 
-decoder 先驗證完整長度、reserved bytes、有限 dB、非零 handle／sequence；失敗不得部分
+decoder 先驗證完整長度、reserved bytes、有限且在 −144…0 dB 的 dB 值、非零 handle／sequence；失敗不得部分
 寫入 `ControlCommandV1`。pipe handler 只負責驗證與送入 control queue，EngineControlWorker
 再呼叫明確的 `SessionVolumeHandlerFnV1`。Windows runtime handler 只把命令送入固定容量的
 `SessionCommandQueueV1`；`Applied` 表示已入列，不表示 COM readback 已完成。沒有 handler、

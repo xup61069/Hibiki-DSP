@@ -470,7 +470,7 @@
                                     <TextBlock Text="{Binding SelectedSessionDisplayText}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     <TextBlock Text="{Binding SessionVolumeDisplayText}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     <TextBlock Text="{Binding SelectedRouteRuleSummary}" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.Name="目前 App 路由預設預覽" />
- <Slider Header="App 音量（dB）" Minimum="-60" Maximum="6" StepFrequency="0.5" Value="{Binding SessionVolumeDb, Mode=TwoWay}" Style="{StaticResource HibikiSliderStyle}" AutomationProperties.Name="App 工作階段音量" />
+ <Slider Header="App 音量（dB）" Minimum="-60" Maximum="0" StepFrequency="0.5" Value="{Binding SessionVolumeDb, Mode=TwoWay}" Style="{StaticResource HibikiSliderStyle}" AutomationProperties.Name="App 工作階段音量" />
                                     <CheckBox Content="App 靜音" IsChecked="{Binding SessionMuted, Mode=TwoWay}" IsEnabled="{Binding HasSelectedSession}" AutomationProperties.Name="App 工作階段靜音" />
                                 <Button Content="套用選取 App 音量" Click="OnApplySessionVolumeClick" IsEnabled="{Binding HasSelectedSession}" MinHeight="32" HorizontalAlignment="Left" AutomationProperties.Name="套用選取 App 音量" AutomationProperties.HelpText="將音量變更寫入選取的 App 工作階段" ToolTipService.ToolTip="將音量變更寫入選取的 App 工作階段" />
                                     <TextBox Header="Lane ID" Text="{Binding SessionRouteLaneId, Mode=TwoWay}" AutomationProperties.Name="App Lane ID" />
