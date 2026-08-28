@@ -80,6 +80,15 @@ bool valid_entry(const SessionCatalogEntryV1& entry) noexcept {
     return true;
 }
 
+bool valid_handle_for_snapshot(const std::uint64_t handle,
+                               const std::uint64_t generation,
+                               const std::size_t index) noexcept {
+    const auto handle_generation = handle >> 32U;
+    const auto handle_index = static_cast<std::uint32_t>(handle & 0xffffffffULL);
+    return handle != 0U && handle_generation == generation &&
+           handle_index == static_cast<std::uint32_t>(index + 1U);
+}
+
 void encode_entry(const SessionCatalogEntryV1& entry, std::uint8_t* const bytes) noexcept {
     write_u64(bytes, entry.handle);
     bytes[8] = entry.active;
@@ -128,13 +137,14 @@ bool encode_session_catalog_snapshot_v1(
     payload.fill(0U);
     payload_bytes = 0U;
     if (snapshot.sequence == 0U || snapshot.generation == 0U ||
+        snapshot.generation > static_cast<std::uint64_t>((std::numeric_limits<std::uint32_t>::max)()) ||
         snapshot.entry_count > kSessionCatalogSnapshotCapacityV1) {
         return false;
     }
     std::array<std::uint64_t, kSessionCatalogSnapshotCapacityV1> handles{};
     for (std::size_t index = 0U; index < snapshot.entry_count; ++index) {
         const auto& entry = snapshot.entries[index];
-        if (!valid_entry(entry) ||
+        if (!valid_entry(entry) || !valid_handle_for_snapshot(entry.handle, snapshot.generation, index) ||
             std::find(handles.begin(), handles.begin() + static_cast<std::ptrdiff_t>(index),
                       entry.handle) != handles.begin() + static_cast<std::ptrdiff_t>(index)) {
             return false;
@@ -166,7 +176,9 @@ bool decode_session_catalog_snapshot_v1(const std::span<const std::uint8_t> payl
                           (static_cast<std::size_t>(count) *
                            kSessionCatalogSnapshotEntryBytesV1);
     if (count > kSessionCatalogSnapshotCapacityV1 || payload.size() != expected ||
-        read_u64(payload.data() + 4U) == 0U || read_u64(payload.data() + 12U) == 0U) {
+        read_u64(payload.data() + 4U) == 0U || read_u64(payload.data() + 12U) == 0U ||
+        read_u64(payload.data() + 12U) >
+            static_cast<std::uint64_t>((std::numeric_limits<std::uint32_t>::max)())) {
         return false;
     }
     snapshot.entry_count = count;
@@ -176,6 +188,11 @@ bool decode_session_catalog_snapshot_v1(const std::span<const std::uint8_t> payl
         if (!decode_entry(payload.data() + kSessionCatalogSnapshotHeaderBytesV1 +
                               (index * kSessionCatalogSnapshotEntryBytesV1),
                           snapshot.entries[index])) {
+            snapshot = {};
+            return false;
+        }
+        if (!valid_handle_for_snapshot(snapshot.entries[index].handle, snapshot.generation,
+                                       index)) {
             snapshot = {};
             return false;
         }

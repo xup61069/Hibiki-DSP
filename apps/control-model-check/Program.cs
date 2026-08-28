@@ -271,6 +271,42 @@ Array.Clear(zeroGenerationSessionPayload, 12, 8);
 Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(zeroGenerationSessionPayload,
           out _, out _, out _),
     "Session catalog decoder must reject generation zero.");
+var wrongGenerationHandleEncodeRejected = false;
+try
+{
+    _ = ControlPayloadsV1.EncodeSessionCatalogSnapshot(
+        12UL, 2UL, [sessionEntries[0] with { Handle = (3UL << 32) | 1UL }]);
+}
+catch (ArgumentException)
+{
+    wrongGenerationHandleEncodeRejected = true;
+}
+Check(wrongGenerationHandleEncodeRejected,
+    "Session catalog encoder must reject a handle from another generation.");
+var wrongIndexHandleEncodeRejected = false;
+try
+{
+    _ = ControlPayloadsV1.EncodeSessionCatalogSnapshot(
+        12UL, 2UL, [sessionEntries[0] with { Handle = (2UL << 32) | 2UL }]);
+}
+catch (ArgumentException)
+{
+    wrongIndexHandleEncodeRejected = true;
+}
+Check(wrongIndexHandleEncodeRejected,
+    "Session catalog encoder must reject a handle at the wrong registry index.");
+var wrongGenerationHandlePayload = sessionPayload.ToArray();
+BinaryPrimitives.WriteUInt64LittleEndian(
+    wrongGenerationHandlePayload.AsSpan(24), (3UL << 32) | 1UL);
+Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(wrongGenerationHandlePayload,
+          out _, out _, out _),
+    "Session catalog decoder must reject a handle from another generation.");
+var wrongIndexHandlePayload = sessionPayload.ToArray();
+BinaryPrimitives.WriteUInt64LittleEndian(
+    wrongIndexHandlePayload.AsSpan(24), (2UL << 32) | 3UL);
+Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(wrongIndexHandlePayload,
+          out _, out _, out _),
+    "Session catalog decoder must reject a handle at the wrong registry index.");
 var malformedSessionPayload = sessionPayload.ToArray();
 malformedSessionPayload[2] = 1;
 Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(malformedSessionPayload, out _, out _, out _),

@@ -80,8 +80,8 @@ void set_bounded_text48(std::array<char, 48U>& field, std::uint16_t& length,
     snapshot.sequence = sequence;
     snapshot.generation = generation;
     snapshot.entry_count = 2U;
-    snapshot.entries[0U] = make_entry(0x01020304U);
-    snapshot.entries[1U] = make_entry(0x11121314U);
+    snapshot.entries[0U] = make_entry((generation << 32U) | 1U);
+    snapshot.entries[1U] = make_entry((generation << 32U) | 2U);
     snapshot.entries[1U].active = 0U;
     snapshot.entries[1U].route_state = SessionCatalogRouteStateV1::Pending;
     snapshot.entries[1U].flags = 0U;
@@ -100,7 +100,7 @@ int main()
         auto zero_sequence = hibiki::SessionCatalogSnapshotV1{};
         zero_sequence.generation = 1U;
         zero_sequence.entry_count = 1U;
-        zero_sequence.entries[0U] = make_entry(1U);
+        zero_sequence.entries[0U] = make_entry((1ULL << 32U) | 1U);
         CHECK(!encode_session_catalog_snapshot_v1(zero_sequence, payload, payload_bytes));
         CHECK(payload_bytes == 0U);
 
@@ -112,9 +112,10 @@ int main()
 
         auto duplicate = hibiki::SessionCatalogSnapshotV1{};
         duplicate.sequence = 9U;
+        duplicate.generation = 9U;
         duplicate.entry_count = 2U;
-        duplicate.entries[0U] = make_entry(77U);
-        duplicate.entries[1U] = make_entry(77U);
+        duplicate.entries[0U] = make_entry((9ULL << 32U) | 1U);
+        duplicate.entries[1U] = make_entry((9ULL << 32U) | 1U);
         CHECK(!encode_session_catalog_snapshot_v1(duplicate, payload, payload_bytes));
         CHECK(payload_bytes == 0U);
     }
@@ -125,47 +126,56 @@ int main()
         auto payload_bytes = std::size_t{999U};
         auto snapshot = hibiki::SessionCatalogSnapshotV1{};
         snapshot.sequence = 3U;
+        snapshot.generation = 5U;
 
         auto zero_handle = make_entry(0U);
         snapshot.entry_count = 1U;
         snapshot.entries[0U] = zero_handle;
         CHECK(!encode_session_catalog_snapshot_v1(snapshot, payload, payload_bytes));
 
-        auto bad_active = make_entry(5U);
+        auto bad_active = make_entry((5ULL << 32U) | 1U);
         bad_active.active = 2U;
         snapshot.entries[0U] = bad_active;
         CHECK(!encode_session_catalog_snapshot_v1(snapshot, payload, payload_bytes));
 
-        auto bad_flags = make_entry(5U);
+        auto bad_flags = make_entry((5ULL << 32U) | 1U);
         bad_flags.flags = 0x0002U;  // only bit 0 is defined
         snapshot.entries[0U] = bad_flags;
         CHECK(!encode_session_catalog_snapshot_v1(snapshot, payload, payload_bytes));
 
-        auto bad_mute = make_entry(5U);
+        auto bad_mute = make_entry((5ULL << 32U) | 1U);
         bad_mute.mute = 2U;
         snapshot.entries[0U] = bad_mute;
         CHECK(!encode_session_catalog_snapshot_v1(snapshot, payload, payload_bytes));
 
-        auto volume_out_of_range = make_entry(5U);
+        auto volume_out_of_range = make_entry((5ULL << 32U) | 1U);
         volume_out_of_range.flags = 1U;  // bit 0 set: requested_db must be in range
         volume_out_of_range.requested_db_q16_16 = -200 * 65536;  // below -144 dB
         snapshot.entries[0U] = volume_out_of_range;
         CHECK(!encode_session_catalog_snapshot_v1(snapshot, payload, payload_bytes));
 
-        auto above_ceiling = make_entry(5U);
+        auto above_ceiling = make_entry((5ULL << 32U) | 1U);
         above_ceiling.requested_db_q16_16 = 1 * 65536;  // above the 0 dB platform cap
         snapshot.entries[0U] = above_ceiling;
         CHECK(!encode_session_catalog_snapshot_v1(snapshot, payload, payload_bytes));
 
-        auto control_character_name = make_entry(5U);
+        auto control_character_name = make_entry((5ULL << 32U) | 1U);
         control_character_name.name[0U] = '\t';
         snapshot.entries[0U] = control_character_name;
         CHECK(!encode_session_catalog_snapshot_v1(snapshot, payload, payload_bytes));
 
-        auto bad_route_state = make_entry(5U);
+        auto bad_route_state = make_entry((5ULL << 32U) | 1U);
         bad_route_state.route_state =
             static_cast<SessionCatalogRouteStateV1>(4U);  // beyond Unavailable
         snapshot.entries[0U] = bad_route_state;
+        CHECK(!encode_session_catalog_snapshot_v1(snapshot, payload, payload_bytes));
+
+        auto wrong_generation_handle = make_entry((6ULL << 32U) | 1U);
+        snapshot.entries[0U] = wrong_generation_handle;
+        CHECK(!encode_session_catalog_snapshot_v1(snapshot, payload, payload_bytes));
+
+        auto wrong_index_handle = make_entry((5ULL << 32U) | 2U);
+        snapshot.entries[0U] = wrong_index_handle;
         CHECK(!encode_session_catalog_snapshot_v1(snapshot, payload, payload_bytes));
     }
 
@@ -186,7 +196,7 @@ int main()
         CHECK(snapshot.entry_count == 2U);
 
         const auto& first = snapshot.entries[0U];
-        CHECK(first.handle == 0x01020304U);
+        CHECK(first.handle == ((7ULL << 32U) | 1U));
         CHECK(first.active == 1U);
         CHECK(first.route_state == SessionCatalogRouteStateV1::Ready);
         CHECK((first.flags & 1U) != 0U);
@@ -198,7 +208,7 @@ int main()
         CHECK(std::string_view(first.output.data(), first.output_bytes) == "main");
 
         const auto& second = snapshot.entries[1U];
-        CHECK(second.handle == 0x11121314U);
+        CHECK(second.handle == ((7ULL << 32U) | 2U));
         CHECK(second.active == 0U);
         CHECK(second.route_state == SessionCatalogRouteStateV1::Pending);
         CHECK(second.flags == 0U);
@@ -212,7 +222,9 @@ int main()
         snapshot.entry_count = kSessionCatalogSnapshotCapacityV1;
         for (std::size_t index = 0U; index < kSessionCatalogSnapshotCapacityV1; ++index) {
             snapshot.entries[index] =
-                make_entry(static_cast<std::uint64_t>(index + 1U), index % 2U == 0U);
+                make_entry((snapshot.generation << 32U) |
+                               static_cast<std::uint64_t>(index + 1U),
+                           index % 2U == 0U);
             if (index % 3U == 0U) {
                 snapshot.entries[index].route_state = SessionCatalogRouteStateV1::Degraded;
             }
@@ -225,7 +237,8 @@ int main()
         CHECK(decode_session_catalog_snapshot_v1({payload.data(), payload_bytes}, decoded));
         CHECK(decoded.entry_count == kSessionCatalogSnapshotCapacityV1);
         for (std::size_t index = 0U; index < kSessionCatalogSnapshotCapacityV1; ++index) {
-            CHECK(decoded.entries[index].handle == static_cast<std::uint64_t>(index + 1U));
+            CHECK(decoded.entries[index].handle ==
+                  ((3ULL << 32U) | static_cast<std::uint64_t>(index + 1U)));
         }
     }
 
@@ -285,6 +298,18 @@ int main()
         }
         CHECK(!decode_session_catalog_snapshot_v1(
             {duplicated.data(), payload_bytes}, snapshot));
+
+        // Handle generation must match the header generation.
+        auto wrong_generation_handle = payload;
+        wrong_generation_handle[kSessionCatalogSnapshotHeaderBytesV1 + 7U] = 6U;
+        CHECK(!decode_session_catalog_snapshot_v1(
+            {wrong_generation_handle.data(), payload_bytes}, snapshot));
+
+        // Handle index must match the entry's registry position.
+        auto wrong_index_handle = payload;
+        wrong_index_handle[kSessionCatalogSnapshotHeaderBytesV1] = 3U;
+        CHECK(!decode_session_catalog_snapshot_v1(
+            {wrong_index_handle.data(), payload_bytes}, snapshot));
     }
 
     // ---- store enforces strictly increasing sequences --------------------

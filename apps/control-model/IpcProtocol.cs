@@ -940,7 +940,7 @@ public static class ControlPayloadsV1
         ulong generation,
         IReadOnlyList<SessionCatalogEntryV1> sessions)
     {
-        if (sequence == 0UL || generation == 0UL)
+        if (sequence == 0UL || generation == 0UL || generation > uint.MaxValue)
             throw new ArgumentException("Session catalog snapshot requires nonzero sequence and generation.");
         if (sessions is null || sessions.Count > SessionCatalogSnapshotCapacity)
             throw new ArgumentException("Session catalog snapshot exceeds the v1 limit.",
@@ -958,7 +958,7 @@ public static class ControlPayloadsV1
             var app = StrictUtf8.GetBytes(session.AppId ?? string.Empty);
             var lane = StrictUtf8.GetBytes(session.LaneId ?? string.Empty);
             var output = StrictUtf8.GetBytes(session.OutputGroup ?? string.Empty);
-            if (session.Handle == 0UL || !seen.Add(session.Handle) ||
+            if (!HasExpectedHandle(session.Handle, generation, index) || !seen.Add(session.Handle) ||
                 name.Length > 64 || app.Length > 64 || lane.Length > 48 || output.Length > 48 ||
                 name.Any(value => value < 0x20) || app.Any(value => value < 0x20) ||
                 lane.Any(value => value < 0x20) || output.Any(value => value < 0x20) ||
@@ -1006,7 +1006,7 @@ public static class ControlPayloadsV1
         if (count > SessionCatalogSnapshotCapacity || payload.Length != expected) return false;
         sequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[4..]);
         generation = BinaryPrimitives.ReadUInt64LittleEndian(payload[12..]);
-        if (sequence == 0UL || generation == 0UL) return false;
+        if (sequence == 0UL || generation == 0UL || generation > uint.MaxValue) return false;
         var list = new List<SessionCatalogEntryV1>(count);
         var seen = new HashSet<ulong>();
         for (var index = 0; index < count; index++)
@@ -1023,7 +1023,7 @@ public static class ControlPayloadsV1
             var appBytes = BinaryPrimitives.ReadUInt16LittleEndian(entry[22..]);
             var laneBytes = BinaryPrimitives.ReadUInt16LittleEndian(entry[24..]);
             var outputBytes = BinaryPrimitives.ReadUInt16LittleEndian(entry[26..]);
-            if (handle == 0UL || !seen.Add(handle) || active > 1 ||
+            if (!HasExpectedHandle(handle, generation, index) || !seen.Add(handle) || active > 1 ||
                 rawState > (byte)SessionCatalogRouteStateV1.Unavailable || (flags & 0xfffe) != 0 ||
                 muted > 1 || entry[17] != 0 || entry[18] != 0 || entry[19] != 0 ||
                 nameBytes > 64 || appBytes > 64 || laneBytes > 48 || outputBytes > 48 ||
@@ -1265,6 +1265,10 @@ public static class ControlPayloadsV1
 
     private static double ReadDbQ16(ReadOnlySpan<byte> source) =>
         BinaryPrimitives.ReadInt32LittleEndian(source) / 65536.0;
+
+    private static bool HasExpectedHandle(ulong handle, ulong generation, int index) =>
+        handle != 0UL && (handle >> 32) == generation &&
+        (uint)handle == (uint)(index + 1);
 
     private static bool IsZero(ReadOnlySpan<byte> source, int used, int capacity)
     {
