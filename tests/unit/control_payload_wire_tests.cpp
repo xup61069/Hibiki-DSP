@@ -206,11 +206,17 @@ int main()
               decoded.requested_db_q16_16 == command.requested_db_q16_16 &&
               decoded.mute == 1U && decoded.catalog_sequence == 21U);
 
-        command.requested_db_q16_16 = 12 * 65536;
+        command.requested_db_q16_16 = hibiki::kSessionVolumeMaxDbQ16_16V1;
         command.mute = 0U;
         const auto maximum = hibiki::encode_session_volume_command_v1(command);
         CHECK(hibiki::decode_session_volume_command_v1(maximum, decoded));
-        CHECK(decoded.requested_db_q16_16 == 12 * 65536 && decoded.mute == 0U);
+        CHECK(decoded.requested_db_q16_16 == hibiki::kSessionVolumeMaxDbQ16_16V1 &&
+              decoded.mute == 0U);
+        CHECK(hibiki::is_valid_session_volume_db_q16_16_v1(
+                  hibiki::kSessionVolumeMinDbQ16_16V1) &&
+              hibiki::is_valid_session_volume_db_q16_16_v1(
+                  hibiki::kSessionVolumeMaxDbQ16_16V1) &&
+              !hibiki::is_valid_session_volume_db_q16_16_v1(1));
 
         auto invalid = command;
         invalid.handle = 0U;
@@ -224,7 +230,7 @@ int main()
         invalid = command;
         invalid.requested_db_q16_16 = -145 * 65536;
         CHECK(all_zero(hibiki::encode_session_volume_command_v1(invalid)));
-        invalid.requested_db_q16_16 = 13 * 65536;
+        invalid.requested_db_q16_16 = 1 * 65536;
         CHECK(all_zero(hibiki::encode_session_volume_command_v1(invalid)));
 
         auto malformed = maximum;
@@ -235,6 +241,9 @@ int main()
         CHECK(!hibiki::decode_session_volume_command_v1(malformed, decoded));
         malformed = maximum;
         malformed[12U] = 2U;
+        CHECK(!hibiki::decode_session_volume_command_v1(malformed, decoded));
+        malformed = maximum;
+        write_u32_le(malformed, 8U, 1U * 65536U);
         CHECK(!hibiki::decode_session_volume_command_v1(malformed, decoded));
         for (std::size_t index = 13U; index <= 15U; ++index) {
             malformed = maximum;
