@@ -268,6 +268,7 @@ HRESULT WindowsAudioSessionWatcher::bind(IMMDevice* const device) {
 
     result = device->Activate(__uuidof(IAudioSessionManager2), CLSCTX_ALL, nullptr,
                               reinterpret_cast<void**>(&manager_));
+    if (SUCCEEDED(result) && manager_ == nullptr) result = E_POINTER;
     if (FAILED(result)) {
         endpoint_id_.clear();
         return result;
@@ -326,6 +327,7 @@ HRESULT WindowsAudioSessionWatcher::upsert_session_control(
 
     HRESULT result = control->QueryInterface(__uuidof(IAudioSessionControl2),
                                              reinterpret_cast<void**>(&control2));
+    if (SUCCEEDED(result) && control2 == nullptr) result = E_POINTER;
     if (SUCCEEDED(result)) result = control->GetState(&state);
     if (SUCCEEDED(result)) result = control2->GetSessionInstanceIdentifier(&instance_id);
     if (SUCCEEDED(result)) result = control2->GetSessionIdentifier(&session_id);
@@ -397,6 +399,7 @@ HRESULT WindowsAudioSessionWatcher::enumerate(AudioSessionRegistry& registry) {
 
     IAudioSessionEnumerator* enumerator = nullptr;
     HRESULT result = manager_->GetSessionEnumerator(&enumerator);
+    if (SUCCEEDED(result) && enumerator == nullptr) result = E_POINTER;
     if (FAILED(result)) {
         return SUCCEEDED(first_error) ? result : first_error;
     }
@@ -412,6 +415,7 @@ HRESULT WindowsAudioSessionWatcher::enumerate(AudioSessionRegistry& registry) {
         IAudioSessionControl* control = nullptr;
 
         result = enumerator->GetSession(index, &control);
+        if (SUCCEEDED(result) && control == nullptr) result = E_POINTER;
         if (SUCCEEDED(result)) {
             result = upsert_session_control(registry, control);
         }
@@ -436,6 +440,7 @@ HRESULT acquire_session_volume(IAudioSessionManager2* const manager,
     *volume = nullptr;
     IAudioSessionEnumerator* enumerator = nullptr;
     HRESULT result = manager->GetSessionEnumerator(&enumerator);
+    if (SUCCEEDED(result) && enumerator == nullptr) result = E_POINTER;
     if (FAILED(result)) {
         return result;
     }
@@ -450,16 +455,28 @@ HRESULT acquire_session_volume(IAudioSessionManager2* const manager,
         IAudioSessionControl* control = nullptr;
         IAudioSessionControl2* control2 = nullptr;
         LPWSTR instance_id = nullptr;
-        if (SUCCEEDED(enumerator->GetSession(index, &control)) &&
-            SUCCEEDED(control->QueryInterface(__uuidof(IAudioSessionControl2),
-                                               reinterpret_cast<void**>(&control2))) &&
-            SUCCEEDED(control2->GetSessionInstanceIdentifier(&instance_id))) {
+        HRESULT session_result = enumerator->GetSession(index, &control);
+        if (SUCCEEDED(session_result) && control == nullptr) session_result = E_POINTER;
+        if (SUCCEEDED(session_result)) {
+            session_result = control->QueryInterface(
+                __uuidof(IAudioSessionControl2), reinterpret_cast<void**>(&control2));
+        }
+        if (SUCCEEDED(session_result) && control2 == nullptr) session_result = E_POINTER;
+        if (SUCCEEDED(session_result)) {
+            session_result = control2->GetSessionInstanceIdentifier(&instance_id);
+        }
+        if (SUCCEEDED(session_result)) {
             const auto instance = take_wide_string(instance_id);
             instance_id = nullptr;
-            if (instance == session_instance_id &&
-                SUCCEEDED(control->QueryInterface(__uuidof(ISimpleAudioVolume),
-                                                   reinterpret_cast<void**>(volume)))) {
-                result = S_OK;
+            if (instance == session_instance_id) {
+                result = control->QueryInterface(
+                    __uuidof(ISimpleAudioVolume), reinterpret_cast<void**>(volume));
+                if (SUCCEEDED(result) && *volume == nullptr) result = E_POINTER;
+                session_result = result;
+            } else {
+                // A successful metadata read for a different session is not
+                // a match; keep searching instead of treating it as success.
+                session_result = E_INVALIDARG;
             }
         }
         if (instance_id != nullptr) {
@@ -471,7 +488,7 @@ HRESULT acquire_session_volume(IAudioSessionManager2* const manager,
         if (control != nullptr) {
             control->Release();
         }
-        if (SUCCEEDED(result)) {
+        if (SUCCEEDED(result) && SUCCEEDED(session_result)) {
             break;
         }
     }
@@ -518,10 +535,12 @@ HRESULT WindowsAudioSessionWatcher::write_session_volume(
         cached != nullptr) {
         result = cached->QueryInterface(__uuidof(ISimpleAudioVolume),
                                         reinterpret_cast<void**>(&volume));
+        if (SUCCEEDED(result) && volume == nullptr) result = E_POINTER;
     }
     if (FAILED(result)) {
         result = acquire_session_volume(manager_, endpoint_id_, session_instance_id, &volume);
     }
+    if (SUCCEEDED(result) && volume == nullptr) result = E_POINTER;
     if (SUCCEEDED(result)) {
         float previous_scalar = 0.0F;
         BOOL previous_mute = FALSE;
@@ -565,10 +584,12 @@ HRESULT WindowsAudioSessionWatcher::read_session_volume(
         cached != nullptr) {
         result = cached->QueryInterface(__uuidof(ISimpleAudioVolume),
                                         reinterpret_cast<void**>(&volume));
+        if (SUCCEEDED(result) && volume == nullptr) result = E_POINTER;
     }
     if (FAILED(result)) {
         result = acquire_session_volume(manager_, endpoint_id_, session_instance_id, &volume);
     }
+    if (SUCCEEDED(result) && volume == nullptr) result = E_POINTER;
     if (FAILED(result)) {
         return result;
     }

@@ -256,6 +256,13 @@ public:
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
         if (object == nullptr) return E_POINTER;
         *object = nullptr;
+        if (iid == __uuidof(IAudioSessionControl2) &&
+            return_null_session_control2_on_success) {
+            return S_OK;
+        }
+        if (iid == __uuidof(ISimpleAudioVolume) && return_null_simple_volume_on_success) {
+            return S_OK;
+        }
         if (iid == IID_IUnknown || iid == __uuidof(IAudioSessionControl) ||
             iid == __uuidof(IAudioSessionControl2)) {
             *object = static_cast<IAudioSessionControl2*>(this);
@@ -297,10 +304,10 @@ public:
         return E_NOTIMPL;
     }
     HRESULT STDMETHODCALLTYPE GetSessionIdentifier(LPWSTR* identifier) override {
-        return copy_fake_wide_string(L"fake-app", identifier);
+        return copy_fake_wide_string(session_identifier.c_str(), identifier);
     }
     HRESULT STDMETHODCALLTYPE GetSessionInstanceIdentifier(LPWSTR* identifier) override {
-        return copy_fake_wide_string(L"fake-session", identifier);
+        return copy_fake_wide_string(session_instance_identifier.c_str(), identifier);
     }
     HRESULT STDMETHODCALLTYPE GetProcessId(DWORD* process_id) override {
         if (process_id == nullptr) return E_POINTER;
@@ -353,6 +360,10 @@ public:
     std::uint32_t set_mute_calls{0U};
     std::uint32_t add_ref_calls{0U};
     std::uint32_t release_calls{0U};
+    std::wstring session_identifier{L"fake-app"};
+    std::wstring session_instance_identifier{L"fake-session"};
+    bool return_null_session_control2_on_success{false};
+    bool return_null_simple_volume_on_success{false};
 
 private:
     ULONG references_{1U};
@@ -360,13 +371,20 @@ private:
 
 class FakeSessionEnumerator final : public IAudioSessionEnumerator {
 public:
-    explicit FakeSessionEnumerator(IAudioSessionControl2* const control) noexcept
-        : control_(control) {
-        if (control_ != nullptr) control_->AddRef();
+    explicit FakeSessionEnumerator(IAudioSessionControl2* const control,
+                                   IAudioSessionControl2* const secondary_control = nullptr,
+                                   const bool return_null_control_on_success = false) noexcept
+        : controls_{control, secondary_control},
+          return_null_control_on_success_(return_null_control_on_success) {
+        for (auto* const candidate : controls_) {
+            if (candidate != nullptr) candidate->AddRef();
+        }
     }
 
     ~FakeSessionEnumerator() {
-        if (control_ != nullptr) control_->Release();
+        for (auto* const candidate : controls_) {
+            if (candidate != nullptr) candidate->Release();
+        }
     }
 
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
@@ -387,29 +405,41 @@ public:
     }
     HRESULT STDMETHODCALLTYPE GetCount(int* count) override {
         if (count == nullptr) return E_POINTER;
-        *count = control_ == nullptr ? 0 : 1;
+        *count = 0;
+        for (auto* const candidate : controls_) {
+            if (candidate != nullptr) ++*count;
+        }
         return S_OK;
     }
     HRESULT STDMETHODCALLTYPE GetSession(int index, IAudioSessionControl** control) override {
         if (control == nullptr) return E_POINTER;
         *control = nullptr;
-        if (index != 0 || control_ == nullptr) return E_INVALIDARG;
-        *control = static_cast<IAudioSessionControl*>(control_);
-        control_->AddRef();
-        return S_OK;
+        if (index < 0) return E_INVALIDARG;
+        for (auto* const candidate : controls_) {
+            if (candidate == nullptr) continue;
+            if (index-- != 0) continue;
+            if (return_null_control_on_success_) return S_OK;
+            *control = static_cast<IAudioSessionControl*>(candidate);
+            candidate->AddRef();
+            return S_OK;
+        }
+        return E_INVALIDARG;
     }
 
 private:
     ULONG references_{1U};
-    IAudioSessionControl2* control_;
+    std::array<IAudioSessionControl2*, 2U> controls_{};
+    bool return_null_control_on_success_{false};
 };
 
 class FakeSessionManager final : public IAudioSessionManager2 {
 public:
     explicit FakeSessionManager(IAudioSessionControl2* const control,
                                 const bool notify_on_register = false,
-                                const bool fail_registration = false) noexcept
+                                const bool fail_registration = false,
+                                IAudioSessionControl2* const secondary_control = nullptr) noexcept
         : control_(control),
+          secondary_control_(secondary_control),
           notify_on_register_(notify_on_register),
           fail_registration_(fail_registration) {}
 
@@ -445,7 +475,10 @@ public:
     }
     HRESULT STDMETHODCALLTYPE GetSessionEnumerator(IAudioSessionEnumerator** enumerator) override {
         if (enumerator == nullptr) return E_POINTER;
-        *enumerator = new FakeSessionEnumerator(control_);
+        *enumerator = nullptr;
+        if (return_null_enumerator_on_success) return S_OK;
+        *enumerator = new FakeSessionEnumerator(control_, secondary_control_,
+                                                return_null_session_control_on_success);
         return *enumerator == nullptr ? E_OUTOFMEMORY : S_OK;
     }
     HRESULT STDMETHODCALLTYPE RegisterSessionNotification(
@@ -484,9 +517,14 @@ public:
 private:
     ULONG references_{1U};
     IAudioSessionControl2* control_;
+    IAudioSessionControl2* secondary_control_;
     IAudioSessionNotification* notification_{nullptr};
     bool notify_on_register_{false};
     bool fail_registration_{false};
+
+public:
+    bool return_null_enumerator_on_success{false};
+    bool return_null_session_control_on_success{false};
 };
 
 class FakeSessionDevice final : public IMMDevice {
@@ -522,6 +560,7 @@ public:
         if (object == nullptr) return E_POINTER;
         *object = nullptr;
         if (iid != __uuidof(IAudioSessionManager2) || manager_ == nullptr) return E_NOINTERFACE;
+        if (return_null_manager_on_success) return S_OK;
         *object = static_cast<IAudioSessionManager2*>(manager_);
         manager_->AddRef();
         return S_OK;
@@ -530,6 +569,9 @@ public:
 private:
     ULONG references_{1U};
     FakeSessionManager* manager_;
+
+public:
+    bool return_null_manager_on_success{false};
 };
 #endif
 
@@ -6147,6 +6189,96 @@ int main() {
               !failed_registration_watcher.poll(failed_registration_sequence) &&
               failed_registration_watcher.OnSessionCreated(&failed_registration_control) == S_OK &&
               !failed_registration_watcher.poll(failed_registration_sequence));
+    }
+    {
+        // A successful COM activation with no manager output is malformed and
+        // must fail closed before the watcher dereferences it.
+        FakeSessionManager activation_manager(nullptr);
+        FakeSessionDevice activation_device(&activation_manager);
+        activation_device.return_null_manager_on_success = true;
+        WindowsAudioSessionWatcher activation_watcher;
+        CHECK(activation_watcher.bind(&activation_device) == E_POINTER &&
+              activation_watcher.endpoint_id().empty());
+    }
+    {
+        // Successful enumeration calls must still validate every COM output
+        // pointer before using it, including the enumerator and each session.
+        FakeSessionVolumeControl null_enumerator_control;
+        FakeSessionManager null_enumerator_manager(&null_enumerator_control);
+        null_enumerator_manager.return_null_enumerator_on_success = true;
+        FakeSessionDevice null_enumerator_device(&null_enumerator_manager);
+        WindowsAudioSessionWatcher null_enumerator_watcher;
+        AudioSessionRegistry null_enumerator_registry;
+        CHECK(null_enumerator_watcher.bind(&null_enumerator_device) == S_OK &&
+              null_enumerator_watcher.enumerate(null_enumerator_registry) == E_POINTER &&
+              null_enumerator_registry.sessions().empty());
+        double preserved_db = 17.0;
+        bool preserved_mute = true;
+        CHECK(null_enumerator_watcher.read_session_volume("fake-session", preserved_db,
+                                                          preserved_mute) == E_POINTER &&
+              preserved_db == 17.0 && preserved_mute);
+        null_enumerator_watcher.unbind();
+
+        FakeSessionVolumeControl null_session_control;
+        FakeSessionManager null_session_manager(&null_session_control);
+        null_session_manager.return_null_session_control_on_success = true;
+        FakeSessionDevice null_session_device(&null_session_manager);
+        WindowsAudioSessionWatcher null_session_watcher;
+        AudioSessionRegistry null_session_registry;
+        CHECK(null_session_watcher.bind(&null_session_device) == S_OK &&
+              null_session_watcher.enumerate(null_session_registry) == E_POINTER &&
+              null_session_registry.sessions().empty());
+        null_session_watcher.unbind();
+    }
+    {
+        // A successful QueryInterface with a null output must not turn into a
+        // null volume dereference or a false successful read.
+        FakeSessionVolumeControl null_control2;
+        null_control2.return_null_session_control2_on_success = true;
+        FakeSessionManager null_control2_manager(&null_control2);
+        FakeSessionDevice null_control2_device(&null_control2_manager);
+        WindowsAudioSessionWatcher null_control2_watcher;
+        AudioSessionRegistry null_control2_registry;
+        CHECK(null_control2_watcher.bind(&null_control2_device) == S_OK &&
+              null_control2_watcher.enumerate(null_control2_registry) == E_POINTER &&
+              null_control2_registry.sessions().empty());
+        null_control2_watcher.unbind();
+
+        FakeSessionVolumeControl null_volume;
+        null_volume.return_null_simple_volume_on_success = true;
+        FakeSessionManager null_volume_manager(&null_volume);
+        FakeSessionDevice null_volume_device(&null_volume_manager);
+        WindowsAudioSessionWatcher null_volume_watcher;
+        double preserved_db = -9.0;
+        bool preserved_mute = true;
+        CHECK(null_volume_watcher.bind(&null_volume_device) == S_OK &&
+              null_volume_watcher.read_session_volume("fake-session", preserved_db,
+                                                      preserved_mute) == E_POINTER &&
+              preserved_db == -9.0 && preserved_mute &&
+              null_volume_watcher.write_session_volume("fake-session", -6.0, false,
+                                                       session_context) == E_POINTER &&
+              null_volume.set_master_calls == 0U && null_volume.set_mute_calls == 0U);
+        null_volume_watcher.unbind();
+    }
+    {
+        // A valid target after another enumerated session must still be found;
+        // a successful read of the first non-target is not a match.
+        FakeSessionVolumeControl first_session;
+        FakeSessionVolumeControl second_session;
+        second_session.session_identifier = L"second-app";
+        second_session.session_instance_identifier = L"second-session";
+        second_session.scalar = 0.25F;
+        second_session.muted = TRUE;
+        FakeSessionManager multi_session_manager(&first_session, false, false, &second_session);
+        FakeSessionDevice multi_session_device(&multi_session_manager);
+        WindowsAudioSessionWatcher multi_session_watcher;
+        double second_db = 99.0;
+        bool second_mute = false;
+        CHECK(multi_session_watcher.bind(&multi_session_device) == S_OK &&
+              multi_session_watcher.read_session_volume("second-session", second_db,
+                                                        second_mute) == S_OK &&
+              std::abs(second_db - (-12.041199826559248)) <= 1e-5 && second_mute);
+        multi_session_watcher.unbind();
     }
     {
         // A two-step volume write must not expose a half-applied state when
