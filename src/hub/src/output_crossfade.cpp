@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace hibiki {
 
@@ -30,6 +31,12 @@ bool OutputCrossfade::process(const float* const old_interleaved,
                               const std::size_t frames) noexcept {
     if (!snapshot_.active || old_interleaved == nullptr || new_interleaved == nullptr ||
         output_interleaved == nullptr || frames == 0U) {
+        return false;
+    }
+    const auto channel_count = static_cast<std::size_t>(snapshot_.channels);
+    if (channel_count == 0U ||
+        frames > std::numeric_limits<std::size_t>::max() / channel_count ||
+        frames > std::numeric_limits<std::size_t>::max() - snapshot_.processed_frames) {
         return false;
     }
     constexpr double half_pi = 1.57079632679489661923;
