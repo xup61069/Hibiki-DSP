@@ -3,6 +3,7 @@
 #include "hibiki/exporters.hpp"
 #include "hibiki/peq_dsp.hpp"
 
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -205,6 +206,42 @@ int main() {
         std::vector<float> ok(8U, 0.25F);
         CHECK(!processor.process_interleaved(nullptr, 1U));
         CHECK(!processor.process_interleaved(ok.data(), 0U));
+
+        constexpr std::uint32_t kEightChannels = 8U;
+        constexpr auto kMaxFramesForEightChannels =
+            std::numeric_limits<std::size_t>::max() / kEightChannels;
+        CHECK(kMaxFramesForEightChannels * kEightChannels <=
+              std::numeric_limits<std::size_t>::max());
+        CHECK(kMaxFramesForEightChannels + 1U >
+              std::numeric_limits<std::size_t>::max() / kEightChannels);
+
+        const PeqFilterV1 stateful_filter{1000.0, 6.0, 1.0};
+        Processor baseline;
+        Processor candidate;
+        CHECK(baseline.prepare(std::span(&stateful_filter, 1U), 48000U,
+                               kEightChannels));
+        CHECK(candidate.prepare(std::span(&stateful_filter, 1U), 48000U,
+                                kEightChannels));
+
+        const std::array<float, kEightChannels> warmup_input{
+            0.25F, -0.5F, 0.75F, -0.125F, 0.5F, -0.25F, 0.125F, -0.875F};
+        auto baseline_warmup = warmup_input;
+        auto candidate_warmup = warmup_input;
+        CHECK(baseline.process_interleaved(baseline_warmup.data(), 1U));
+        CHECK(candidate.process_interleaved(candidate_warmup.data(), 1U));
+
+        std::array<float, kEightChannels> overflow_guard{1.0F, 2.0F, 3.0F, 4.0F,
+                                                         5.0F, 6.0F, 7.0F, 8.0F};
+        const auto untouched = overflow_guard;
+        CHECK(!candidate.process_interleaved(
+            overflow_guard.data(), kMaxFramesForEightChannels + 1U));
+        CHECK(overflow_guard == untouched);
+
+        auto baseline_next = warmup_input;
+        auto candidate_next = warmup_input;
+        CHECK(baseline.process_interleaved(baseline_next.data(), 1U));
+        CHECK(candidate.process_interleaved(candidate_next.data(), 1U));
+        CHECK(candidate_next == baseline_next);
     }
 
     // ---- non-finite sanitization -------------------------------------------
