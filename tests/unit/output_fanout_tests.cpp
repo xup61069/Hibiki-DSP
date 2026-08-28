@@ -353,6 +353,14 @@ int main() {
         CHECK(neutral.prepared && neutral.sinks[0].prepared &&
               neutral.sinks[0].ratio == 1.0 &&
               neutral.sinks[0].source_step == 1.0);
+        std::size_t first_sink_frames[2] = {99U, 99U};
+        const std::size_t first_sink_no_capacity[2] = {0U, 256U};
+        CHECK(!runtime.process(
+            input.data(), input.size() / 2U,
+            std::span<float* const>(rollback_outputs, 2U),
+            std::span<const std::size_t>(first_sink_no_capacity, 2U),
+            std::span<std::size_t>(first_sink_frames, 2U)));
+        CHECK(first_sink_frames[0] == 0U && first_sink_frames[1] == 0U);
         CHECK(runtime.observe_clock(0U, 48000.0, 48012.0, 1.0));
         CHECK(!runtime.process(
             input.data(), input.size() / 2U,

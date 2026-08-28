@@ -383,6 +383,13 @@ bool OutputFanoutRuntimeV1::process(
         output_capacities.size() < plan_.sink_count || output_frames.size() < plan_.sink_count) {
         return false;
     }
+
+    // A rejected block must not leave caller-visible frame counts from a
+    // previous successful call, including when the first enabled sink fails
+    // the capacity preflight before later sink entries are visited.
+    for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
+        output_frames[index] = 0U;
+    }
     const auto samples = input_frames * static_cast<std::size_t>(plan_.output_channels);
     for (std::size_t sample = 0U; sample < samples; ++sample) {
         if (!std::isfinite(input_interleaved[sample])) {
@@ -394,7 +401,6 @@ bool OutputFanoutRuntimeV1::process(
     const auto applied_sequences_before = applied_clock_sequences_;
     const bool clock_changed = apply_pending_clock_observations();
     for (std::size_t index = 0U; index < plan_.sink_count; ++index) {
-        output_frames[index] = 0U;
         if (!plan_.sinks[index].enabled) {
             continue;
         }
