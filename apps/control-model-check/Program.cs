@@ -256,6 +256,87 @@ Check(ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(sessionPayload,
       sessionSequence == 12UL && sessionGeneration == 2UL && decodedSessions.Count == 2 &&
       decodedSessions[0].DisplayName == "DJMAX" && decodedSessions[1].RouteStateLabel == "目前不可用",
     "Session catalog snapshot did not round-trip.");
+var zeroGenerationEncodeRejected = false;
+try
+{
+    _ = ControlPayloadsV1.EncodeSessionCatalogSnapshot(12UL, 0UL, sessionEntries);
+}
+catch (ArgumentException)
+{
+    zeroGenerationEncodeRejected = true;
+}
+Check(zeroGenerationEncodeRejected, "Session catalog encoder must reject generation zero.");
+var zeroGenerationSessionPayload = sessionPayload.ToArray();
+Array.Clear(zeroGenerationSessionPayload, 12, 8);
+Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(zeroGenerationSessionPayload,
+          out _, out _, out _),
+    "Session catalog decoder must reject generation zero.");
+var wrongGenerationHandleEncodeRejected = false;
+try
+{
+    _ = ControlPayloadsV1.EncodeSessionCatalogSnapshot(
+        12UL, 2UL, [sessionEntries[0] with { Handle = (3UL << 32) | 1UL }]);
+}
+catch (ArgumentException)
+{
+    wrongGenerationHandleEncodeRejected = true;
+}
+Check(wrongGenerationHandleEncodeRejected,
+    "Session catalog encoder must reject a handle from another generation.");
+var wrongIndexHandleEncodeRejected = false;
+try
+{
+    _ = ControlPayloadsV1.EncodeSessionCatalogSnapshot(
+        12UL, 2UL, [sessionEntries[0] with { Handle = (2UL << 32) | 2UL }]);
+}
+catch (ArgumentException)
+{
+    wrongIndexHandleEncodeRejected = true;
+}
+Check(wrongIndexHandleEncodeRejected,
+    "Session catalog encoder must reject a handle at the wrong registry index.");
+var inactiveWithVolumeEncodeRejected = false;
+try
+{
+    _ = ControlPayloadsV1.EncodeSessionCatalogSnapshot(
+        12UL, 2UL, [sessionEntries[1] with { VolumeAvailable = true }]);
+}
+catch (ArgumentException)
+{
+    inactiveWithVolumeEncodeRejected = true;
+}
+Check(inactiveWithVolumeEncodeRejected,
+    "Session catalog encoder must reject volume availability for an inactive session.");
+var wrongGenerationHandlePayload = sessionPayload.ToArray();
+BinaryPrimitives.WriteUInt64LittleEndian(
+    wrongGenerationHandlePayload.AsSpan(24), (3UL << 32) | 1UL);
+Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(wrongGenerationHandlePayload,
+          out _, out _, out _),
+    "Session catalog decoder must reject a handle from another generation.");
+var wrongIndexHandlePayload = sessionPayload.ToArray();
+BinaryPrimitives.WriteUInt64LittleEndian(
+    wrongIndexHandlePayload.AsSpan(24), (2UL << 32) | 3UL);
+Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(wrongIndexHandlePayload,
+          out _, out _, out _),
+    "Session catalog decoder must reject a handle at the wrong registry index.");
+var inactiveWithVolumePayload = sessionPayload.ToArray();
+BinaryPrimitives.WriteUInt16LittleEndian(
+    inactiveWithVolumePayload.AsSpan(24 + ControlPayloadsV1.SessionCatalogSnapshotEntryBytes + 10), 1);
+Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(inactiveWithVolumePayload,
+          out _, out _, out _),
+    "Session catalog decoder must reject volume availability for an inactive session.");
+var partialOutputSessionPayload = sessionPayload.ToArray();
+BinaryPrimitives.WriteUInt64LittleEndian(
+    partialOutputSessionPayload.AsSpan(24 + ControlPayloadsV1.SessionCatalogSnapshotEntryBytes),
+    (2UL << 32) | 3UL);
+var rejectedSessionSequence = 999UL;
+var rejectedSessionGeneration = 999UL;
+IReadOnlyList<SessionCatalogEntryV1> rejectedSessions = sessionEntries;
+Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(partialOutputSessionPayload,
+          out rejectedSessionSequence, out rejectedSessionGeneration, out rejectedSessions) &&
+      rejectedSessionSequence == 0UL && rejectedSessionGeneration == 0UL &&
+      rejectedSessions.Count == 0,
+    "Rejected session catalog must leave all decoder outputs neutral.");
 var malformedSessionPayload = sessionPayload.ToArray();
 malformedSessionPayload[2] = 1;
 Check(!ControlPayloadsV1.TryDecodeSessionCatalogSnapshot(malformedSessionPayload, out _, out _, out _),
@@ -562,6 +643,11 @@ Check(viewModel.ApplySessionCatalogSnapshot(sessionFrame, out _) &&
       viewModel.SessionCatalog[0].AccessibleSummary.Contains("DJMAX") &&
       viewModel.SessionCatalog[1].VolumeAvailable == false,
     "ViewModel did not atomically apply the App session catalog.");
+var zeroGenerationSessionFrame = new IpcEnvelopeV1(
+    ControlMessageType.SessionCatalogSnapshot, 0UL, zeroGenerationSessionPayload);
+Check(!viewModel.ApplySessionCatalogSnapshot(zeroGenerationSessionFrame, out _) &&
+      viewModel.SessionCatalogSequence == 12UL && viewModel.SessionCatalog.Count == 2,
+    "Zero-generation App catalog must preserve the previous visible catalog.");
 var staleSession = new IpcEnvelopeV1(
     ControlMessageType.SessionCatalogSnapshot, 0UL,
     ControlPayloadsV1.EncodeSessionCatalogSnapshot(11UL, 2UL, [sessionEntries[0]]));
