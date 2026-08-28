@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 
 namespace {
 
@@ -269,14 +270,61 @@ bool case_null_arguments() {
     return ok;
 }
 
-bool case_fixture_nonfinite_rejected() {
-    fill_block(6.0f);
-    if (!fixtures_finite(kChannels, kFrames)) return false;
-    const float saved = g_planar[3][17U];
-    g_planar[3][17U] = static_cast<float>(std::nan(""));
-    const bool caught = !fixtures_finite(kChannels, kFrames);
-    g_planar[3][17U] = saved;
-    return caught && fixtures_finite(kChannels, kFrames);
+bool case_push_rejects_nonfinite() {
+    struct nonfinite_case {
+        float value;
+        uint32_t channel;
+        uint32_t frame;
+    };
+    const nonfinite_case cases[] = {
+        {static_cast<float>(std::nan("")), 3U, 17U},
+        {std::numeric_limits<float>::infinity(), 0U, 0U},
+        {-std::numeric_limits<float>::infinity(), kChannels - 1U, kFrames - 1U},
+    };
+
+    for (const nonfinite_case& test_case : cases) {
+        if (!init_default()) return false;
+        fill_block(6.0f);
+        if (!fixtures_finite(kChannels, kFrames)) return false;
+        const float saved = g_planar[test_case.channel][test_case.frame];
+        g_planar[test_case.channel][test_case.frame] = test_case.value;
+
+        struct hibiki_asio_transport_region_v1* r = region();
+        struct hibiki_asio_transport_slot_v1* slot = &r->slots[0];
+        slot->ready_sequence = 0xA5A5A5A5U;
+        slot->frames = 77U;
+        slot->channels = 4U;
+        slot->sample_rate = 44100U;
+        const uint32_t sample_index = test_case.frame * kChannels + test_case.channel;
+        const uint32_t sentinel_index = sample_index == 0U ? 1U : 0U;
+        slot->samples[sentinel_index] = 12.5F;
+        slot->samples[sample_index] = -9.5F;
+
+        bool ok = hibiki_asio_transport_push_planar_v1(
+                      r, sizeof(g_region_bytes), g_planar_ptrs, kChannels, kFrames) == 0;
+        ok = ok && r->producer_sequence == 0U && r->consumer_sequence == 0U &&
+             r->dropped_blocks == 0U && slot->ready_sequence == 0xA5A5A5A5U &&
+             slot->frames == 77U && slot->channels == 4U && slot->sample_rate == 44100U &&
+             slot->samples[sentinel_index] == 12.5F && slot->samples[sample_index] == -9.5F;
+
+        g_planar[test_case.channel][test_case.frame] = saved;
+        if (!ok || hibiki_asio_transport_push_planar_v1(r, sizeof(g_region_bytes),
+                                                        g_planar_ptrs, kChannels, kFrames) != 1) {
+            return false;
+        }
+
+        uint32_t out_frames = 0U;
+        uint32_t out_channels = 0U;
+        uint32_t out_rate = 0U;
+        std::memset(g_interleaved, 0, sizeof(g_interleaved));
+        if (hibiki_asio_transport_pop_interleaved_v1(
+                r, sizeof(g_region_bytes), g_interleaved, kFrames, &out_frames, &out_channels,
+                &out_rate) != 1 || out_frames != kFrames || out_channels != kChannels ||
+            out_rate != kRate || g_interleaved[sample_index] != saved) {
+            return false;
+        }
+    }
+    return true;
 }
 
 // Fabricate one occupied slot as a long-running ring would have left it.
@@ -385,7 +433,7 @@ int main() {
     check("pop_capacity_overflow_nonconsuming", case_capacity_overflow_nonconsuming());
     check("empty_pop_zeroes_outputs", case_empty_pop_zeroes_outputs());
     check("null_arguments_fail_closed", case_null_arguments());
-    check("fixture_layer_rejects_nonfinite", case_fixture_nonfinite_rejected());
+    check("push_rejects_nonfinite", case_push_rejects_nonfinite());
     check("wraparound_push_pop_fifo", case_wraparound_push_pop_fifo());
     check("wraparound_overflow_accounting", case_wraparound_overflow_accounting());
 
