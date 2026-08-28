@@ -64,6 +64,9 @@ public:
     SessionCatalogSnapshotStoreV1() noexcept = default;
 
     [[nodiscard]] bool publish(const SessionCatalogSnapshotV1& snapshot) noexcept;
+    // Clears the committed snapshot during runtime teardown/startup so a
+    // subsequent request fails closed until a new route refresh publishes one.
+    void reset() noexcept;
     [[nodiscard]] bool reply(IpcFrameV1& response) const noexcept;
     [[nodiscard]] bool has_snapshot() const noexcept;
     [[nodiscard]] std::uint64_t sequence() const noexcept;

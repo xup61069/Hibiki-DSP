@@ -2825,6 +2825,9 @@ int main() {
           session_response.header.type == IpcMessageType::SessionCatalogSnapshot &&
           session_response.header.request_id == 779U &&
           session_response.payload.size() == session_bytes);
+    session_store.reset();
+    CHECK(!session_store.has_snapshot() && session_store.sequence() == 0U &&
+          !session_store.reply(session_response));
 
     auto scene_catalog = std::make_unique<SceneCatalogV1>();
     auto custom_defaults = make_easy_scene(EasySceneKind::Movie, "custom-output");

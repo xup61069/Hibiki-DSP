@@ -208,6 +208,13 @@ bool SessionCatalogSnapshotStoreV1::publish(
     }
 }
 
+void SessionCatalogSnapshotStoreV1::reset() noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    payload_.fill(0U);
+    payload_bytes_ = 0U;
+    sequence_ = 0U;
+}
+
 bool SessionCatalogSnapshotStoreV1::reply(IpcFrameV1& response) const noexcept {
     try {
         std::lock_guard<std::mutex> lock(mutex_);
