@@ -119,7 +119,7 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::write_session_volume(
     const double requested_db,
     const bool mute,
     const GUID& event_context) noexcept {
-    if (!bound_) return E_UNEXPECTED;
+    if (!bound_ || degraded_) return E_UNEXPECTED;
     if (!valid_session_control_request(session_instance_id, requested_db)) {
         return E_INVALIDARG;
     }
@@ -133,7 +133,7 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::read_session_volume(
     const std::string_view session_instance_id,
     double& requested_db,
     bool& mute) noexcept {
-    if (!bound_) return E_UNEXPECTED;
+    if (!bound_ || degraded_) return E_UNEXPECTED;
     if (session_instance_id.empty() ||
         session_instance_id.size() > kMaxSessionControlIdentityBytesV1) {
         return E_INVALIDARG;
@@ -149,7 +149,7 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::write_session_volume_handle(
     const double requested_db,
     const bool mute,
     const GUID& event_context) noexcept {
-    if (!bound_) return E_UNEXPECTED;
+    if (!bound_ || degraded_) return E_UNEXPECTED;
     const auto handle_generation = handle >> 32U;
     const auto handle_index = static_cast<std::uint32_t>(handle & 0xffffffffULL);
     if (handle == 0U || handle_generation == 0U || handle_generation != generation_ ||
@@ -164,7 +164,7 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::read_session_volume_handle(
     const std::uint64_t handle,
     double& requested_db,
     bool& mute) noexcept {
-    if (!bound_) return E_UNEXPECTED;
+    if (!bound_ || degraded_) return E_UNEXPECTED;
     const auto handle_generation = handle >> 32U;
     const auto handle_index = static_cast<std::uint32_t>(handle & 0xffffffffULL);
     if (handle == 0U || handle_generation == 0U || handle_generation != generation_ ||
@@ -179,7 +179,7 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::bind_session_route_handle(
     const std::uint64_t handle,
     const std::string_view lane_id,
     const std::string_view output_group) noexcept {
-    if (!bound_) return E_UNEXPECTED;
+    if (!bound_ || degraded_) return E_UNEXPECTED;
     if (lane_id.empty() || lane_id.size() > kSessionRouteCommandLaneMaxBytesV1 ||
         output_group.empty() || output_group.size() > kSessionRouteCommandOutputMaxBytesV1 ||
         !is_printable_utf8_v1(lane_id) || !is_printable_utf8_v1(output_group)) {

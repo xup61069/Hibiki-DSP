@@ -6536,6 +6536,44 @@ int main() {
         stale_handle_coordinator.unbind();
     }
     {
+        // A failed refresh invalidates the previous control snapshot. Cached
+        // session controls must not keep volume or route operations alive
+        // while the coordinator is degraded.
+        FakeSessionVolumeControl degraded_session;
+        FakeSessionManager degraded_manager(&degraded_session);
+        FakeSessionDevice degraded_device(&degraded_manager);
+        WindowsAudioSessionRouteCoordinatorV1 degraded_coordinator;
+        const HRESULT unexpected = E_UNEXPECTED;
+        const auto degraded_handle = (1ULL << 32U) | 1U;
+        double degraded_db = 17.0;
+        bool degraded_mute = true;
+        const auto set_master_before_degraded = degraded_session.set_master_calls;
+        const auto set_mute_before_degraded = degraded_session.set_mute_calls;
+        CHECK(degraded_coordinator.bind(&degraded_device) == S_OK &&
+              degraded_coordinator.refresh() ==
+                  WindowsAudioSessionRouteRefreshResultV1::NoRoutes &&
+              degraded_coordinator.snapshot().generation == 1U);
+        degraded_manager.return_failed_enumerator_with_output = true;
+        CHECK(degraded_coordinator.refresh() ==
+                  WindowsAudioSessionRouteRefreshResultV1::Degraded &&
+              degraded_coordinator.snapshot().degraded &&
+              degraded_coordinator.read_session_volume("fake-session", degraded_db,
+                                                      degraded_mute) == unexpected &&
+              degraded_db == 17.0 && degraded_mute &&
+              degraded_coordinator.write_session_volume("fake-session", -6.0, false,
+                                                       session_context) == unexpected &&
+              degraded_coordinator.read_session_volume_handle(
+                  degraded_handle, degraded_db, degraded_mute) == unexpected &&
+              degraded_db == 17.0 && degraded_mute &&
+              degraded_coordinator.write_session_volume_handle(
+                  degraded_handle, -6.0, false, session_context) == unexpected &&
+              degraded_coordinator.bind_session_route_handle(
+                  degraded_handle, "game", "surround") == unexpected &&
+              degraded_session.set_master_calls == set_master_before_degraded &&
+              degraded_session.set_mute_calls == set_mute_before_degraded);
+        degraded_coordinator.unbind();
+    }
+    {
         // Teardown must not drain/reset the queue while a session-manager
         // callback is still retaining its control pointer.
         WindowsAudioSessionWatcher teardown_watcher;
