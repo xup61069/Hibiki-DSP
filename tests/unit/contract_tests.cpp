@@ -171,14 +171,17 @@ class RetainedAudioSessionControl final : public IAudioSessionControl {
 public:
     RetainedAudioSessionControl(std::atomic<std::uint32_t>& add_ref_calls,
                                 std::atomic<std::uint32_t>& release_calls,
-                                std::atomic<std::uint32_t>& destruction_count) noexcept
+                                std::atomic<std::uint32_t>& destruction_count,
+                                std::atomic<std::uint32_t>& query_interface_calls) noexcept
         : add_ref_calls_(add_ref_calls),
           release_calls_(release_calls),
-          destruction_count_(destruction_count) {}
+          destruction_count_(destruction_count),
+          query_interface_calls_(query_interface_calls) {}
 
     ~RetainedAudioSessionControl() { ++destruction_count_; }
 
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
+        ++query_interface_calls_;
         if (object == nullptr) return E_POINTER;
         *object = nullptr;
         if (iid == IID_IUnknown || iid == __uuidof(IAudioSessionControl)) {
@@ -220,6 +223,7 @@ private:
     std::atomic<std::uint32_t>& add_ref_calls_;
     std::atomic<std::uint32_t>& release_calls_;
     std::atomic<std::uint32_t>& destruction_count_;
+    std::atomic<std::uint32_t>& query_interface_calls_;
 };
 #endif
 
@@ -5778,10 +5782,18 @@ int main() {
     std::atomic<std::uint32_t> session_add_ref_calls{0U};
     std::atomic<std::uint32_t> session_release_calls{0U};
     std::atomic<std::uint32_t> session_destruction_count{0U};
+    std::atomic<std::uint32_t> session_query_interface_calls{0U};
     auto* retained_session = new RetainedAudioSessionControl(
-        session_add_ref_calls, session_release_calls, session_destruction_count);
-    CHECK(session_watcher->OnSessionCreated(retained_session) == S_OK &&
+        session_add_ref_calls, session_release_calls, session_destruction_count,
+        session_query_interface_calls);
+    HRESULT session_callback_result = E_FAIL;
+    const auto session_callback_allocations = rt_noalloc_probe::allocations_during([&] {
+        session_callback_result = session_watcher->OnSessionCreated(retained_session);
+    });
+    CHECK(session_callback_result == S_OK &&
           session_add_ref_calls.load(std::memory_order_relaxed) == 1U &&
+          session_query_interface_calls.load(std::memory_order_relaxed) == 0U &&
+          session_callback_allocations == 0U &&
           session_watcher->poll(session_sequence) && session_sequence == 2U);
     CHECK(session_watcher->write_session_volume("missing", -12.0, false, session_context) ==
           E_UNEXPECTED);
@@ -5801,10 +5813,12 @@ int main() {
         std::atomic<std::uint32_t> bounded_add_ref_calls{0U};
         std::atomic<std::uint32_t> bounded_release_calls{0U};
         std::atomic<std::uint32_t> bounded_destruction_count{0U};
+        std::atomic<std::uint32_t> bounded_query_interface_calls{0U};
         std::array<RetainedAudioSessionControl*, pending_capacity + 1U> pending_sessions{};
         for (auto& pending_session : pending_sessions) {
             pending_session = new RetainedAudioSessionControl(
-                bounded_add_ref_calls, bounded_release_calls, bounded_destruction_count);
+                bounded_add_ref_calls, bounded_release_calls, bounded_destruction_count,
+                bounded_query_interface_calls);
         }
         bool callbacks_succeeded = true;
         for (auto* pending_session : pending_sessions) {
@@ -5814,6 +5828,7 @@ int main() {
         std::uint64_t bounded_sequence = 0U;
         CHECK(callbacks_succeeded &&
               bounded_add_ref_calls.load(std::memory_order_relaxed) == pending_capacity &&
+              bounded_query_interface_calls.load(std::memory_order_relaxed) == 0U &&
               bounded_watcher.poll(bounded_sequence) &&
               bounded_sequence == pending_sessions.size());
         bounded_watcher.unbind();
@@ -5839,11 +5854,13 @@ int main() {
         std::atomic<std::uint32_t> concurrent_add_ref_calls{0U};
         std::atomic<std::uint32_t> concurrent_release_calls{0U};
         std::atomic<std::uint32_t> concurrent_destruction_count{0U};
+        std::atomic<std::uint32_t> concurrent_query_interface_calls{0U};
         std::array<RetainedAudioSessionControl*, callback_count> concurrent_sessions{};
         for (auto& session : concurrent_sessions) {
             session = new RetainedAudioSessionControl(concurrent_add_ref_calls,
                                                        concurrent_release_calls,
-                                                       concurrent_destruction_count);
+                                                       concurrent_destruction_count,
+                                                       concurrent_query_interface_calls);
         }
         std::atomic<std::size_t> ready_producers{0U};
         std::atomic<bool> start_producers{false};
@@ -5872,6 +5889,7 @@ int main() {
         std::uint64_t concurrent_sequence = 0U;
         CHECK(callbacks_succeeded.load(std::memory_order_acquire) &&
               concurrent_add_ref_calls.load(std::memory_order_relaxed) == pending_capacity &&
+              concurrent_query_interface_calls.load(std::memory_order_relaxed) == 0U &&
               concurrent_watcher.poll(concurrent_sequence) &&
               concurrent_sequence == callback_count);
         concurrent_watcher.unbind();
