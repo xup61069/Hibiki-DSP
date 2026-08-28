@@ -37,8 +37,8 @@ VST3 plugin 不得在 Hibiki RT thread 或主 UI process 內直接執行。contr
 ## Engine Preview VST3 lane 邊界
 
 Engine Preview 提供 opt-in `--enable-vst3-lane`，把既有 sandbox worker 接進 RT 音訊路徑：
-主輸出 graph 的 pre-VST3 tap 由 control loop 讀取（seqlock sequence 去重，同一 snapshot 不會
-重複送進 worker），worker 處理後的 Float32 block push 回 lane ring，由 RT graph 的
+主輸出 graph 的 pre-VST3 tap 由 control loop 讀取（atomic payload／metadata 加上 sequence
+去重，同一 snapshot 不會重複送進 worker），worker 處理後的 Float32 block push 回 lane ring，由 RT graph 的
 apply_vst3_lanes 在 render 時 pop。此模式必須同時給 --vst3-module-path 與
 --vst3-class-id，缺一即 fail-closed 拒絕啟動；--vst3-worker-path 可覆蓋預設的本地
 SDK worker 位置。lane 狀態透過 control status snapshot 的 route slot vst3-lane 曝光：
@@ -51,6 +51,10 @@ frames 上限；即使 caller-owned ring 的實體容量更大，超過上限的
 算術必須以不溢位的方式驗證，失敗不得改變既有 ring 內容或可用 frame 計數。
 `Vst3TapBufferV1::read` 也必須先確認 caller 的 `max_frames <= SIZE_MAX / channels`，
 再比較 capacity 或複製 snapshot；無法代表的 interleaved capacity 直接 fail-closed。
+`Vst3TapBufferV1` 的 sample payload、group bytes、shape metadata 與 published sequence
+必須使用 atomic storage 或等價的 C++ memory-model-safe bounded protocol；sequence counter
+單獨不能使普通 C++ 物件的並行讀寫免於 data race。讀取若觀察到 odd 或 changed sequence，
+必須 fail-closed 且不得發布部分 snapshot。
 WAV source 準備失敗時必須輸出明確錯誤，不得讓下游（例如 VST3 tap）呈現為
 「無聲音可處理」的假正常。本邊界屬 user-space engine preview evidence，不等於 driver/WaveRT、實體
 音訊 delivery 或第三方 plugin certification。

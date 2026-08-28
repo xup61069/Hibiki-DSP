@@ -2,11 +2,14 @@
 
 #include "hibiki/vst3_lane_bridge.hpp"
 
+#include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <limits>
+#include <thread>
 #include <vector>
 
 #define CHECK(expr)                                                             \
@@ -199,6 +202,64 @@ int main() {
     CHECK(tap_seq > 0U);
     for (std::size_t i = 0; i < kTapFrames * kStereo; ++i) {
         CHECK(tap_dest[i] == 0.5F);
+    }
+
+    // ---- concurrent tap publication/read --------------------------------------
+    // Every successful read must be one complete constant-valued block. A
+    // reader may reject a concurrent publication, but it must never accept a
+    // mixed payload or metadata generation.
+    {
+        hibiki::Vst3TapBufferV1 concurrent_tap;
+        const auto low_block = make_block(kTapFrames, kStereo, -0.25F);
+        const auto high_block = make_block(kTapFrames, kStereo, 0.75F);
+        std::atomic<bool> start{false};
+        std::atomic<bool> stop_writer{false};
+        std::atomic<bool> writer_failed{false};
+        std::atomic<bool> reader_failed{false};
+        std::thread writer([&] {
+            while (!start.load(std::memory_order_acquire)) {
+                std::this_thread::yield();
+            }
+            std::size_t iteration = 0U;
+            while (!stop_writer.load(std::memory_order_acquire)) {
+                const auto& block = (iteration & 1U) == 0U ? low_block : high_block;
+                if (!concurrent_tap.publish("tap-group", block.data(), kTapFrames,
+                                            kStereo)) {
+                    writer_failed.store(true, std::memory_order_release);
+                    break;
+                }
+                ++iteration;
+            }
+        });
+        start.store(true, std::memory_order_release);
+
+        std::array<float, kTapFrames * kStereo> concurrent_destination{};
+        for (std::size_t iteration = 0U; iteration < 20000U; ++iteration) {
+            std::uint32_t channels = 0U;
+            std::size_t frames = 0U;
+            std::uint64_t sequence = 0U;
+            if (!concurrent_tap.read("tap-group", concurrent_destination.data(),
+                                     hibiki::kMaxVst3TapFramesV1, channels, frames,
+                                     sequence)) {
+                continue;
+            }
+            if (channels != kStereo || frames != kTapFrames || sequence == 0U) {
+                reader_failed.store(true, std::memory_order_release);
+                break;
+            }
+            const auto value = concurrent_destination[0];
+            for (const auto sample : concurrent_destination) {
+                if (sample != value || (sample != -0.25F && sample != 0.75F)) {
+                    reader_failed.store(true, std::memory_order_release);
+                    break;
+                }
+            }
+            if (reader_failed.load(std::memory_order_acquire)) break;
+        }
+        stop_writer.store(true, std::memory_order_release);
+        writer.join();
+        CHECK(!writer_failed.load(std::memory_order_acquire));
+        CHECK(!reader_failed.load(std::memory_order_acquire));
     }
 
     // A caller capacity whose interleaved product wraps must fail before the

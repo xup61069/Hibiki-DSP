@@ -121,12 +121,15 @@ private:
     static constexpr std::size_t kCapacitySamples =
         kMaxVst3TapFramesV1 * kMaxVst3TapChannelsV1;
 
-    mutable std::array<float, kCapacitySamples> buffer_{};
-    mutable std::array<char, kMaxOutputGroupBytesV1> group_{};
-    mutable std::uint8_t group_bytes_{0U};
-    mutable std::uint32_t channels_{0U};
-    mutable std::size_t frames_{0U};
-    mutable std::uint64_t sequence_{0U};
+    // Every field read by the control thread is atomic. An atomic sequence
+    // alone cannot make concurrent accesses to ordinary C++ payload objects
+    // data-race-free, even when a changed sequence is rejected afterwards.
+    mutable std::array<std::atomic<std::uint32_t>, kCapacitySamples> buffer_{};
+    mutable std::array<std::atomic<std::uint32_t>, kMaxOutputGroupBytesV1> group_{};
+    mutable std::atomic<std::uint32_t> group_bytes_{0U};
+    mutable std::atomic<std::uint32_t> channels_{0U};
+    mutable std::atomic<std::uint64_t> frames_{0U};
+    mutable std::atomic<std::uint64_t> sequence_{0U};
     mutable std::atomic<std::uint64_t> write_seq_{0U};
     mutable std::atomic<bool> valid_{false};
     mutable std::atomic<std::uint64_t> publish_attempts_{0U};

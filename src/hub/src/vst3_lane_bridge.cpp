@@ -1,6 +1,7 @@
 #include "hibiki/vst3_lane_bridge.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -193,13 +194,20 @@ bool Vst3TapBufferV1::publish(
     const std::uint64_t seq =
         write_seq_.fetch_add(1U, std::memory_order_relaxed) + 1U;
 
-    std::memcpy(buffer_.data(), interleaved,
-                sample_count * sizeof(float));
-    std::memcpy(group_.data(), output_group.data(), output_group.size());
-    group_bytes_ = static_cast<std::uint8_t>(output_group.size());
-    channels_ = channels;
-    frames_ = frames;
-    sequence_ = seq;
+    for (std::size_t index = 0U; index < sample_count; ++index) {
+        buffer_[index].store(std::bit_cast<std::uint32_t>(interleaved[index]),
+                             std::memory_order_relaxed);
+    }
+    for (std::size_t index = 0U; index < output_group.size(); ++index) {
+        group_[index].store(static_cast<std::uint32_t>(
+                                static_cast<unsigned char>(output_group[index])),
+                            std::memory_order_relaxed);
+    }
+    group_bytes_.store(static_cast<std::uint32_t>(output_group.size()),
+                       std::memory_order_relaxed);
+    channels_.store(channels, std::memory_order_relaxed);
+    frames_.store(static_cast<std::uint64_t>(frames), std::memory_order_relaxed);
+    sequence_.store(seq, std::memory_order_relaxed);
 
     // Release: publish with release ordering so readers see complete data.
     publish_successes_.fetch_add(1U, std::memory_order_relaxed);
@@ -228,15 +236,21 @@ bool Vst3TapBufferV1::read(
         write_seq_.load(std::memory_order_acquire);
 
     // Read all scalar fields first.
-    const auto group_bytes = group_bytes_;
-    const auto channels = channels_;
-    const auto frames = frames_;
-    const auto seq = sequence_;
+    const auto group_bytes = group_bytes_.load(std::memory_order_relaxed);
+    const auto channels = channels_.load(std::memory_order_relaxed);
+    const auto frames = frames_.load(std::memory_order_relaxed);
+    const auto seq = sequence_.load(std::memory_order_relaxed);
 
     // Verify group matches.
-    if (group_bytes != output_group.size() ||
-        std::memcmp(group_.data(), output_group.data(), group_bytes) != 0) {
+    if (group_bytes != output_group.size() || group_bytes > kMaxOutputGroupBytesV1) {
         return false;
+    }
+    for (std::size_t index = 0U; index < group_bytes; ++index) {
+        if (group_[index].load(std::memory_order_relaxed) !=
+            static_cast<std::uint32_t>(
+                static_cast<unsigned char>(output_group[index]))) {
+            return false;
+        }
     }
 
     // Check capacity and shape.
@@ -252,7 +266,10 @@ bool Vst3TapBufferV1::read(
     const std::size_t sample_count = static_cast<std::size_t>(frames) * channel_count;
     if (sample_count > max_frames * channel_count) { return false; }
 
-    std::memcpy(destination, buffer_.data(), sample_count * sizeof(float));
+    for (std::size_t index = 0U; index < sample_count; ++index) {
+        destination[index] = std::bit_cast<float>(
+            buffer_[index].load(std::memory_order_relaxed));
+    }
 
     // Post-read validation: require the sequence to be unchanged and even.
     // An odd sequence means we raced an in-flight publish; a changed even
