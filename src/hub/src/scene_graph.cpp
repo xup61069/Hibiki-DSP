@@ -33,6 +33,17 @@ namespace {
     return true;
 }
 
+template <typename Sample>
+[[nodiscard]] bool finite_interleaved_samples(const Sample* const interleaved,
+                                              const std::size_t frames,
+                                              const std::uint32_t channels) noexcept {
+    const auto sample_count = frames * static_cast<std::size_t>(channels);
+    for (std::size_t index = 0U; index < sample_count; ++index) {
+        if (!std::isfinite(interleaved[index])) return false;
+    }
+    return true;
+}
+
 }  // namespace
 
 bool validate_graph(const GraphConfigV1& graph) noexcept {
@@ -161,6 +172,27 @@ bool process_graph_filtered(const RtGraphSnapshotV1& snapshot,
     if (latency_bank != nullptr && frames > kLaneLatencyMaxFramesV1) {
         return false;
     }
+
+    // Validate every lane that this render will consume before clearing the
+    // caller output or advancing a latency bank. Disabled/malformed lanes
+    // retain their existing skip semantics; a valid participating lane must
+    // not be allowed to poison the graph with NaN or infinity.
+    for (std::size_t lane_index = 0U; lane_index < snapshot.lane_count; ++lane_index) {
+        const auto& lane = snapshot.lanes[lane_index];
+        const bool is_target_group = output_group.empty() ||
+            (lane.output_group_bytes == output_group.size() &&
+             std::equal(output_group.begin(), output_group.end(), lane.output_group.begin()));
+        if (!lane.enabled || (!is_target_group && latency_bank == nullptr)) continue;
+        const auto& input = inputs[lane_index];
+        if (input.interleaved == nullptr || input.channel_count != lane.input_channels ||
+            input.channel_count == 0U || input.channel_count > 8U) {
+            continue;
+        }
+        if (!finite_interleaved_samples(input.interleaved, frames, input.channel_count)) {
+            return false;
+        }
+    }
+
     std::fill_n(output_interleaved, output_samples, 0.0F);
     bool matched_output_group = output_group.empty();
 
@@ -255,6 +287,25 @@ bool process_graph_filtered_f64(const RtGraphSnapshotV1& snapshot,
     if (!checked_graph_output_samples(frames, snapshot.output_channels, output_samples)) {
         return false;
     }
+
+    // The f64 entry points have no latency bank to perform this validation on;
+    // preflight their participating lane inputs before touching caller output.
+    for (std::size_t lane_index = 0U; lane_index < snapshot.lane_count; ++lane_index) {
+        const auto& lane = snapshot.lanes[lane_index];
+        const bool is_target_group = output_group.empty() ||
+            (lane.output_group_bytes == output_group.size() &&
+             std::equal(output_group.begin(), output_group.end(), lane.output_group.begin()));
+        if (!lane.enabled || !is_target_group) continue;
+        const auto& input = inputs[lane_index];
+        if (input.interleaved == nullptr || input.channel_count != lane.input_channels ||
+            input.channel_count == 0U || input.channel_count > 8U) {
+            continue;
+        }
+        if (!finite_interleaved_samples(input.interleaved, frames, input.channel_count)) {
+            return false;
+        }
+    }
+
     std::fill_n(output_interleaved, output_samples, 0.0);
     bool matched_output_group = output_group.empty();
 
