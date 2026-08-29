@@ -86,6 +86,20 @@ int main() {
             }
         }
     }
+    // ---- finite extreme interpolation and zero-gain sanitation ------------
+    {
+        TruePeakLimiterV1 limiter;
+        const auto max_float = std::numeric_limits<float>::max();
+        std::vector<float> samples{max_float, -max_float};
+        const auto gain =
+            limiter.limit_in_place(samples.data(), samples.size(), 1U, -144.0, 48000U);
+        CHECK(gain == 0.0F);
+        CHECK(limiter.applied_gain_for_test() == 0.0F);
+        for (const auto sample : samples) {
+            CHECK(std::isfinite(sample));
+            CHECK(sample == 0.0F);
+        }
+    }
     // ---- ceiling clamping to [-144, 0] dBTP ---------------------------------
     {
         TruePeakLimiterV1 limiter;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "hibiki/scene_catalog.hpp"
+#include "hibiki/control_payloads.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -41,7 +42,9 @@ bool validate_scene_definition_v1(const SceneDefinitionV1& definition) noexcept 
         !validate_graph(definition.graph) || !validate_policy(definition.loudness) ||
         !valid_scene_id(definition.scene.id) ||
         !valid_text(definition.scene.name, kMaxSceneNameBytesV1) ||
+        !is_printable_utf8_v1(definition.scene.name) ||
         definition.scene.output_group.size() > kMaxOutputGroupBytes ||
+        !is_printable_utf8_v1(definition.scene.output_group) ||
         (definition.scene.latency_mode == LatencyMode::StrictDirect) !=
             definition.graph.strict_direct) {
         return false;

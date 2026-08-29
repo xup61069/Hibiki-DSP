@@ -64,6 +64,11 @@ bool contains_non_ascii_space(std::string_view value) noexcept {
     return false;
 }
 
+bool valid_gain_owner(const SessionGainOwner owner) noexcept {
+    return owner == SessionGainOwner::WindowsSession ||
+           owner == SessionGainOwner::HibikiInternal;
+}
+
 }  // namespace
 
 bool SessionRouteRuleStoreV1::valid(const SessionRouteRuleV1& rule) noexcept {
@@ -71,7 +76,8 @@ bool SessionRouteRuleStoreV1::valid(const SessionRouteRuleV1& rule) noexcept {
         (!rule.app_id.empty() && contains_non_ascii_space(rule.app_id)) ||
         (!rule.display_name_contains.empty() &&
          contains_non_ascii_space(rule.display_name_contains));
-    return rule.schema_version == 1U && !rule.rule_id.empty() &&
+    return rule.schema_version == 1U && valid_gain_owner(rule.gain_owner) &&
+           !rule.rule_id.empty() &&
            rule.rule_id.size() <= kSessionRouteRuleMaxIdBytesV1 &&
            valid_rule_id_format(rule.rule_id) &&
            is_printable_utf8_v1(rule.rule_id) &&
