@@ -182,8 +182,7 @@ bool Vst3TapBufferV1::publish(
     const std::size_t frames,
     const std::uint32_t channels) noexcept {
     publish_attempts_.fetch_add(1U, std::memory_order_relaxed);
-    if (output_group.empty() ||
-        output_group.size() > kMaxOutputGroupBytesV1 ||
+    if (!valid_output_group(output_group) ||
         interleaved == nullptr || frames == 0U ||
         frames > kMaxVst3TapFramesV1 ||
         channels == 0U || channels > kMaxVst3TapChannelsV1) {
@@ -280,7 +279,10 @@ bool Vst3TapBufferV1::read(
     std::uint32_t& channels_out,
     std::size_t& frames_out,
     std::uint64_t& sequence_out) const noexcept {
-    if (destination == nullptr || max_frames == 0U) { return false; }
+    if (!valid_output_group(output_group) || destination == nullptr ||
+        max_frames == 0U) {
+        return false;
+    }
 
     const bool is_valid = valid_.load(std::memory_order_acquire);
     if (!is_valid) { return false; }

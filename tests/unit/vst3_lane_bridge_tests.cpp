@@ -352,6 +352,11 @@ int main() {
                        hibiki::kMaxVst3TapFramesV1 + 1U, kStereo));
     CHECK(!tap.publish("tap-group", tap_block.data(), kTapFrames, 0U));
     CHECK(!tap.publish("tap-group", tap_block.data(), kTapFrames, 9U));
+    for (const auto group : malformed_groups) {
+        CHECK(!tap.publish(group, tap_block.data(), kTapFrames, kStereo));
+        CHECK(!tap.read(group, tap_dest.data(), hibiki::kMaxVst3TapFramesV1,
+                        tap_channels, tap_frames, tap_seq));
+    }
 
     // ---- tap NaN/Inf rejection --------------------------------------------------------
     auto tap_poison = tap_block;
