@@ -143,12 +143,22 @@ bool process_graph_filtered(const RtGraphSnapshotV1& snapshot,
                             LaneLatencyBankV1* const latency_bank) noexcept {
     if (snapshot.schema_version != 1 || snapshot.lane_count > kMaxRtLanes ||
         snapshot.output_channels == 0 || snapshot.output_channels > 8 ||
+        (snapshot.sample_format != kGraphSampleFormatFloat32V1 &&
+         snapshot.sample_format != kGraphSampleFormatFloat64V1) ||
         output_interleaved == nullptr || inputs.size() < snapshot.lane_count) {
         return false;
     }
 
     std::size_t output_samples = 0U;
     if (!checked_graph_output_samples(frames, snapshot.output_channels, output_samples)) {
+        return false;
+    }
+    // The float graph's optional latency bank owns fixed scratch storage for
+    // at most kLaneLatencyMaxFramesV1 frames. Reject an oversized block here,
+    // before clearing caller output or invoking the first lane, so the public
+    // graph boundary remains all-or-nothing when latency compensation is in
+    // use.
+    if (latency_bank != nullptr && frames > kLaneLatencyMaxFramesV1) {
         return false;
     }
     std::fill_n(output_interleaved, output_samples, 0.0F);
