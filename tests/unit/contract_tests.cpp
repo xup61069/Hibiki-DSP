@@ -65,6 +65,7 @@ extern "C" {
 #include "hibiki/peq_dsp.hpp"
 #include "hibiki/ir_convolver.hpp"
 #include "hibiki/noise_suppressor.hpp"
+#include "hibiki/offline_wav_source.hpp"
 #include "hibiki/virtual_mic.hpp"
 #include "hibiki/true_peak_limiter.hpp"
 #if defined(_WIN32)
@@ -1653,6 +1654,28 @@ int main() {
     CHECK(persistent_src.prepare(kPolyphaseChannelsV1, 1.0));
     CHECK(persistent_src.process(first_block, 4U, resampled, 32U, output_frames));
     CHECK(output_frames > 0U && persistent_src.phase() == first_phase);
+    {
+        std::array<float, 512U> multi_block_source{};
+        for (std::size_t frame = 0U; frame < 128U; ++frame) {
+            multi_block_source[frame * 2U] = 0.1F;
+            multi_block_source[frame * 2U + 1U] = 0.2F;
+            multi_block_source[(frame + 128U) * 2U] = -0.3F;
+            multi_block_source[(frame + 128U) * 2U + 1U] = -0.4F;
+        }
+        RtLaneInputV1 block_lane{};
+        CHECK(hibiki::make_offline_wav_lane_v1(multi_block_source.data(), 2U, 0U, block_lane) &&
+              block_lane.interleaved == multi_block_source.data() &&
+              block_lane.channel_count == 2U && block_lane.interleaved[0] == 0.1F &&
+              block_lane.interleaved[1] == 0.2F);
+        CHECK(hibiki::make_offline_wav_lane_v1(multi_block_source.data(), 2U, 128U, block_lane) &&
+              block_lane.interleaved == multi_block_source.data() + 256U &&
+              block_lane.interleaved[0] == -0.3F && block_lane.interleaved[1] == -0.4F);
+        CHECK(block_lane.interleaved != multi_block_source.data());
+        CHECK(!hibiki::make_offline_wav_lane_v1(nullptr, 2U, 0U, block_lane) &&
+              block_lane.interleaved == nullptr && block_lane.channel_count == 0U);
+        CHECK(!hibiki::make_offline_wav_lane_v1(multi_block_source.data(), 0U, 0U, block_lane) &&
+              block_lane.interleaved == nullptr && block_lane.channel_count == 0U);
+    }
     {
         constexpr std::size_t kSourceFrames = 32U;
         constexpr std::size_t kNominalFrames = 35U;
