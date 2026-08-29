@@ -109,6 +109,40 @@ int main() {
     CHECK(!active.process_interleaved(nullptr, 100U));
     CHECK(!active.process_interleaved(block.data(), 0U));
 
+    // Interleaved geometry must be checked before the first caller-buffer read
+    // or state update. Use the first overflowing eight-channel frame count
+    // without allocating a correspondingly huge buffer, then compare the next
+    // valid block with an untouched control instance.
+    constexpr std::uint32_t kEightChannels = 8U;
+    const auto overflow_frames =
+        std::numeric_limits<std::size_t>::max() /
+            static_cast<std::size_t>(kEightChannels) +
+        1U;
+    hibiki::BasicNoiseSuppressorV1 overflow_candidate;
+    hibiki::BasicNoiseSuppressorV1 overflow_control;
+    CHECK(overflow_candidate.configure(enabled, 48000U, kEightChannels));
+    CHECK(overflow_control.configure(enabled, 48000U, kEightChannels));
+    std::array<float, 16U> warmup{};
+    for (std::size_t index = 0U; index < warmup.size(); ++index) {
+        warmup[index] = 0.25F + static_cast<float>(index) * 0.01F;
+    }
+    auto control_warmup = warmup;
+    CHECK(overflow_candidate.process_interleaved(warmup.data(), 2U));
+    CHECK(overflow_control.process_interleaved(control_warmup.data(), 2U));
+    const std::array<float, 8U> overflow_sentinels{
+        11.0F, 12.0F, 13.0F, 14.0F, 15.0F, 16.0F, 17.0F, 18.0F};
+    auto overflow_buffer = overflow_sentinels;
+    CHECK(!overflow_candidate.process_interleaved(overflow_buffer.data(),
+                                                  overflow_frames));
+    CHECK(overflow_buffer == overflow_sentinels);
+    std::array<float, 16U> next_candidate{};
+    std::array<float, 16U> next_control{};
+    next_candidate.fill(0.125F);
+    next_control.fill(0.125F);
+    CHECK(overflow_candidate.process_interleaved(next_candidate.data(), 2U));
+    CHECK(overflow_control.process_interleaved(next_control.data(), 2U));
+    CHECK(next_candidate == next_control);
+
     // ---- policy boundaries -------------------------------------------------
     auto boundary = make_gate_policy();
     boundary.threshold_dbfs = 0.0;

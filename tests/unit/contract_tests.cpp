@@ -166,6 +166,448 @@ bool acknowledge_ipc_request(const hibiki::IpcFrameV1& request,
     response.payload.clear();
     return true;
 }
+
+class RetainedAudioSessionControl final : public IAudioSessionControl {
+public:
+    RetainedAudioSessionControl(std::atomic<std::uint32_t>& add_ref_calls,
+                                std::atomic<std::uint32_t>& release_calls,
+                                std::atomic<std::uint32_t>& destruction_count,
+                                std::atomic<std::uint32_t>& query_interface_calls,
+                                std::atomic<bool>* add_ref_entered = nullptr,
+                                std::atomic<bool>* allow_add_ref = nullptr) noexcept
+        : add_ref_calls_(add_ref_calls),
+          release_calls_(release_calls),
+          destruction_count_(destruction_count),
+          query_interface_calls_(query_interface_calls),
+          add_ref_entered_(add_ref_entered),
+          allow_add_ref_(allow_add_ref) {}
+
+    ~RetainedAudioSessionControl() { ++destruction_count_; }
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
+        ++query_interface_calls_;
+        if (object == nullptr) return E_POINTER;
+        *object = nullptr;
+        if (iid == IID_IUnknown || iid == __uuidof(IAudioSessionControl)) {
+            *object = static_cast<IAudioSessionControl*>(this);
+            AddRef();
+            return S_OK;
+        }
+        return E_NOINTERFACE;
+    }
+
+    ULONG STDMETHODCALLTYPE AddRef() override {
+        if (add_ref_entered_ != nullptr && allow_add_ref_ != nullptr) {
+            add_ref_entered_->store(true, std::memory_order_seq_cst);
+            while (!allow_add_ref_->load(std::memory_order_seq_cst)) {
+                std::this_thread::yield();
+            }
+        }
+        ++add_ref_calls_;
+        return references_.fetch_add(1U, std::memory_order_relaxed) + 1U;
+    }
+
+    ULONG STDMETHODCALLTYPE Release() override {
+        ++release_calls_;
+        const auto remaining = references_.fetch_sub(1U, std::memory_order_acq_rel) - 1U;
+        if (remaining == 0U) delete this;
+        return remaining;
+    }
+
+    HRESULT STDMETHODCALLTYPE GetState(AudioSessionState*) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE GetDisplayName(LPWSTR*) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE SetDisplayName(LPCWSTR, LPCGUID) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE GetIconPath(LPWSTR*) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE SetIconPath(LPCWSTR, LPCGUID) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE GetGroupingParam(GUID*) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE SetGroupingParam(LPCGUID, LPCGUID) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE RegisterAudioSessionNotification(IAudioSessionEvents*) override {
+        return E_NOTIMPL;
+    }
+    HRESULT STDMETHODCALLTYPE UnregisterAudioSessionNotification(IAudioSessionEvents*) override {
+        return E_NOTIMPL;
+    }
+
+private:
+    std::atomic<ULONG> references_{1U};
+    std::atomic<std::uint32_t>& add_ref_calls_;
+    std::atomic<std::uint32_t>& release_calls_;
+    std::atomic<std::uint32_t>& destruction_count_;
+    std::atomic<std::uint32_t>& query_interface_calls_;
+    std::atomic<bool>* add_ref_entered_;
+    std::atomic<bool>* allow_add_ref_;
+};
+
+HRESULT copy_fake_wide_string(const wchar_t* const source, LPWSTR* const target) {
+    if (source == nullptr || target == nullptr) return E_INVALIDARG;
+    *target = nullptr;
+    std::size_t length = 0U;
+    while (source[length] != L'\0') ++length;
+    auto* const copy = static_cast<LPWSTR>(CoTaskMemAlloc((length + 1U) * sizeof(wchar_t)));
+    if (copy == nullptr) return E_OUTOFMEMORY;
+    std::memcpy(copy, source, (length + 1U) * sizeof(wchar_t));
+    *target = copy;
+    return S_OK;
+}
+
+class FakeSessionVolumeControl final : public IAudioSessionControl2,
+                                       public ISimpleAudioVolume {
+public:
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
+        if (object == nullptr) return E_POINTER;
+        *object = nullptr;
+        if (iid == __uuidof(IAudioSessionControl2) &&
+            return_null_session_control2_on_success) {
+            return S_OK;
+        }
+        if (iid == __uuidof(ISimpleAudioVolume) && fail_simple_volume_query_with_output) {
+            *object = static_cast<ISimpleAudioVolume*>(this);
+            AddRef();
+            return E_FAIL;
+        }
+        if (iid == __uuidof(ISimpleAudioVolume) && return_null_simple_volume_on_success) {
+            return S_OK;
+        }
+        if (iid == IID_IUnknown || iid == __uuidof(IAudioSessionControl) ||
+            iid == __uuidof(IAudioSessionControl2)) {
+            *object = static_cast<IAudioSessionControl2*>(this);
+        } else if (iid == __uuidof(ISimpleAudioVolume)) {
+            *object = static_cast<ISimpleAudioVolume*>(this);
+        } else {
+            return E_NOINTERFACE;
+        }
+        AddRef();
+        return S_OK;
+    }
+
+    ULONG STDMETHODCALLTYPE AddRef() override {
+        ++add_ref_calls;
+        return ++references_;
+    }
+
+    ULONG STDMETHODCALLTYPE Release() override {
+        ++release_calls;
+        if (references_ > 0U) --references_;
+        return references_;
+    }
+    ULONG reference_count() const noexcept { return references_; }
+
+    HRESULT STDMETHODCALLTYPE GetState(AudioSessionState* state) override {
+        if (state == nullptr) return E_POINTER;
+        *state = state_value;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE GetDisplayName(LPWSTR* display_name) override {
+        if (display_name == nullptr) return E_POINTER;
+        *display_name = nullptr;
+        if (!fail_display_name_with_output) return E_NOTIMPL;
+        const auto result = copy_fake_wide_string(L"ignored-failure-output", display_name);
+        return SUCCEEDED(result) ? E_FAIL : result;
+    }
+    HRESULT STDMETHODCALLTYPE SetDisplayName(LPCWSTR, LPCGUID) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE GetIconPath(LPWSTR*) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE SetIconPath(LPCWSTR, LPCGUID) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE GetGroupingParam(GUID*) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE SetGroupingParam(LPCGUID, LPCGUID) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE RegisterAudioSessionNotification(IAudioSessionEvents*) override {
+        return E_NOTIMPL;
+    }
+    HRESULT STDMETHODCALLTYPE UnregisterAudioSessionNotification(IAudioSessionEvents*) override {
+        return E_NOTIMPL;
+    }
+    HRESULT STDMETHODCALLTYPE GetSessionIdentifier(LPWSTR* identifier) override {
+        return copy_fake_wide_string(session_identifier.c_str(), identifier);
+    }
+    HRESULT STDMETHODCALLTYPE GetSessionInstanceIdentifier(LPWSTR* identifier) override {
+        return copy_fake_wide_string(session_instance_identifier.c_str(), identifier);
+    }
+    HRESULT STDMETHODCALLTYPE GetProcessId(DWORD* process_id) override {
+        if (process_id == nullptr) return E_POINTER;
+        *process_id = 42U;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE IsSystemSoundsSession() override { return S_FALSE; }
+    HRESULT STDMETHODCALLTYPE SetDuckingPreference(BOOL) override { return E_NOTIMPL; }
+
+    HRESULT STDMETHODCALLTYPE GetMasterVolume(float* level) override {
+        if (level == nullptr) return E_POINTER;
+        if (FAILED(get_master_result)) return get_master_result;
+        *level = scalar;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE SetMasterVolume(float level, LPCGUID) override {
+        ++set_master_calls;
+        if (fail_master_calls > 0U) {
+            --fail_master_calls;
+            return E_FAIL;
+        }
+        scalar = level;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE GetMute(BOOL* value) override {
+        if (value == nullptr) return E_POINTER;
+        if (FAILED(get_mute_result)) return get_mute_result;
+        *value = muted;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE SetMute(BOOL value, LPCGUID) override {
+        ++set_mute_calls;
+        if (fail_mute_calls > 0U) {
+            --fail_mute_calls;
+            if (fail_master_after_mute_failure) fail_master_calls = 1U;
+            return E_FAIL;
+        }
+        muted = value;
+        return S_OK;
+    }
+
+    float scalar{0.5F};
+    BOOL muted{FALSE};
+    AudioSessionState state_value{AudioSessionStateActive};
+    HRESULT get_master_result{S_OK};
+    HRESULT get_mute_result{S_OK};
+    std::uint32_t fail_master_calls{0U};
+    std::uint32_t fail_mute_calls{0U};
+    bool fail_master_after_mute_failure{false};
+    std::uint32_t set_master_calls{0U};
+    std::uint32_t set_mute_calls{0U};
+    std::uint32_t add_ref_calls{0U};
+    std::uint32_t release_calls{0U};
+    std::wstring session_identifier{L"fake-app"};
+    std::wstring session_instance_identifier{L"fake-session"};
+    bool return_null_session_control2_on_success{false};
+    bool return_null_simple_volume_on_success{false};
+    bool fail_simple_volume_query_with_output{false};
+    bool fail_display_name_with_output{false};
+
+private:
+    ULONG references_{1U};
+};
+
+class FakeSessionEnumerator final : public IAudioSessionEnumerator {
+public:
+    explicit FakeSessionEnumerator(IAudioSessionControl2* const control,
+                                   IAudioSessionControl2* const secondary_control = nullptr,
+                                   const bool return_null_control_on_success = false,
+                                   const bool return_negative_count_on_success = false) noexcept
+        : controls_{control, secondary_control},
+          return_null_control_on_success_(return_null_control_on_success),
+          return_negative_count_on_success_(return_negative_count_on_success) {
+        for (auto* const candidate : controls_) {
+            if (candidate != nullptr) candidate->AddRef();
+        }
+    }
+
+    ~FakeSessionEnumerator() {
+        for (auto* const candidate : controls_) {
+            if (candidate != nullptr) candidate->Release();
+        }
+    }
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
+        if (object == nullptr) return E_POINTER;
+        *object = nullptr;
+        if (iid != IID_IUnknown && iid != __uuidof(IAudioSessionEnumerator)) {
+            return E_NOINTERFACE;
+        }
+        *object = static_cast<IAudioSessionEnumerator*>(this);
+        AddRef();
+        return S_OK;
+    }
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++references_; }
+    ULONG STDMETHODCALLTYPE Release() override {
+        const auto remaining = --references_;
+        if (remaining == 0U) delete this;
+        return remaining;
+    }
+    HRESULT STDMETHODCALLTYPE GetCount(int* count) override {
+        if (count == nullptr) return E_POINTER;
+        if (return_negative_count_on_success_) {
+            *count = -1;
+            return S_OK;
+        }
+        *count = 0;
+        for (auto* const candidate : controls_) {
+            if (candidate != nullptr) ++*count;
+        }
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE GetSession(int index, IAudioSessionControl** control) override {
+        if (control == nullptr) return E_POINTER;
+        *control = nullptr;
+        if (index < 0) return E_INVALIDARG;
+        for (auto* const candidate : controls_) {
+            if (candidate == nullptr) continue;
+            if (index-- != 0) continue;
+            if (return_null_control_on_success_) return S_OK;
+            *control = static_cast<IAudioSessionControl*>(candidate);
+            candidate->AddRef();
+            return S_OK;
+        }
+        return E_INVALIDARG;
+    }
+
+private:
+    ULONG references_{1U};
+    std::array<IAudioSessionControl2*, 2U> controls_{};
+    bool return_null_control_on_success_{false};
+    bool return_negative_count_on_success_{false};
+};
+
+class FakeSessionManager final : public IAudioSessionManager2 {
+public:
+    explicit FakeSessionManager(IAudioSessionControl2* const control,
+                                const bool notify_on_register = false,
+                                const bool fail_registration = false,
+                                IAudioSessionControl2* const secondary_control = nullptr) noexcept
+        : control_(control),
+          secondary_control_(secondary_control),
+          notify_on_register_(notify_on_register),
+          fail_registration_(fail_registration) {}
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
+        if (object == nullptr) return E_POINTER;
+        *object = nullptr;
+        if (iid != IID_IUnknown && iid != __uuidof(IAudioSessionManager2)) return E_NOINTERFACE;
+        *object = static_cast<IAudioSessionManager2*>(this);
+        AddRef();
+        return S_OK;
+    }
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++references_; }
+    ULONG STDMETHODCALLTYPE Release() override {
+        if (references_ > 0U) --references_;
+        return references_;
+    }
+    ULONG reference_count() const noexcept { return references_; }
+    HRESULT STDMETHODCALLTYPE GetAudioSessionControl(LPCGUID, DWORD,
+                                                      IAudioSessionControl** control) override {
+        if (control == nullptr) return E_POINTER;
+        *control = nullptr;
+        if (control_ == nullptr) return E_FAIL;
+        *control = static_cast<IAudioSessionControl*>(control_);
+        control_->AddRef();
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE GetSimpleAudioVolume(LPCGUID, DWORD,
+                                                   ISimpleAudioVolume** volume) override {
+        if (volume == nullptr) return E_POINTER;
+        *volume = nullptr;
+        if (control_ == nullptr) return E_FAIL;
+        return control_->QueryInterface(__uuidof(ISimpleAudioVolume),
+                                        reinterpret_cast<void**>(volume));
+    }
+    HRESULT STDMETHODCALLTYPE GetSessionEnumerator(IAudioSessionEnumerator** enumerator) override {
+        if (enumerator == nullptr) return E_POINTER;
+        *enumerator = nullptr;
+        if (return_null_enumerator_on_success) return S_OK;
+        *enumerator = new FakeSessionEnumerator(control_, secondary_control_,
+                                                return_null_session_control_on_success,
+                                                return_negative_count_on_success);
+        if (return_failed_enumerator_with_output && *enumerator != nullptr) return E_FAIL;
+        return *enumerator == nullptr ? E_OUTOFMEMORY : S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE RegisterSessionNotification(
+        IAudioSessionNotification* notification) override {
+        if (notification == nullptr) return E_POINTER;
+        if (notification_ != nullptr) return E_FAIL;
+        notification_ = notification;
+        notification_->AddRef();
+        if (notify_on_register_ && control_ != nullptr) {
+            (void)notification_->OnSessionCreated(
+                static_cast<IAudioSessionControl*>(control_));
+        }
+        if (fail_registration_) {
+            notification_->Release();
+            notification_ = nullptr;
+            return E_FAIL;
+        }
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE UnregisterSessionNotification(
+        IAudioSessionNotification* notification) override {
+        if (notification == nullptr || notification_ != notification) return E_INVALIDARG;
+        notification_->Release();
+        notification_ = nullptr;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE RegisterDuckNotification(
+        LPCWSTR, IAudioVolumeDuckNotification*) override {
+        return E_NOTIMPL;
+    }
+    HRESULT STDMETHODCALLTYPE UnregisterDuckNotification(
+        IAudioVolumeDuckNotification*) override {
+        return E_NOTIMPL;
+    }
+
+private:
+    ULONG references_{1U};
+    IAudioSessionControl2* control_;
+    IAudioSessionControl2* secondary_control_;
+    IAudioSessionNotification* notification_{nullptr};
+    bool notify_on_register_{false};
+    bool fail_registration_{false};
+
+public:
+    bool return_null_enumerator_on_success{false};
+    bool return_null_session_control_on_success{false};
+    bool return_negative_count_on_success{false};
+    bool return_failed_enumerator_with_output{false};
+};
+
+class FakeSessionDevice final : public IMMDevice {
+public:
+    explicit FakeSessionDevice(FakeSessionManager* const manager) noexcept : manager_(manager) {}
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
+        if (object == nullptr) return E_POINTER;
+        *object = nullptr;
+        if (iid != IID_IUnknown && iid != __uuidof(IMMDevice)) return E_NOINTERFACE;
+        *object = static_cast<IMMDevice*>(this);
+        AddRef();
+        return S_OK;
+    }
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++references_; }
+    ULONG STDMETHODCALLTYPE Release() override {
+        if (references_ > 0U) --references_;
+        return references_;
+    }
+    HRESULT STDMETHODCALLTYPE GetId(LPWSTR* identifier) override {
+        const auto result = copy_fake_wide_string(L"fake-endpoint", identifier);
+        return fail_get_id_with_output ? E_FAIL : result;
+    }
+    HRESULT STDMETHODCALLTYPE GetState(DWORD* state) override {
+        if (state == nullptr) return E_POINTER;
+        *state = DEVICE_STATE_ACTIVE;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE OpenPropertyStore(DWORD, IPropertyStore** store) override {
+        if (store != nullptr) *store = nullptr;
+        return E_NOTIMPL;
+    }
+    HRESULT STDMETHODCALLTYPE Activate(REFIID iid, DWORD, PROPVARIANT*, void** object) override {
+        if (object == nullptr) return E_POINTER;
+        *object = nullptr;
+        if (iid != __uuidof(IAudioSessionManager2) || manager_ == nullptr) return E_NOINTERFACE;
+        if (fail_activation_with_output) {
+            *object = static_cast<IAudioSessionManager2*>(manager_);
+            manager_->AddRef();
+            return E_FAIL;
+        }
+        if (return_null_manager_on_success) return S_OK;
+        *object = static_cast<IAudioSessionManager2*>(manager_);
+        manager_->AddRef();
+        return S_OK;
+    }
+
+private:
+    ULONG references_{1U};
+    FakeSessionManager* manager_;
+
+public:
+    bool return_null_manager_on_success{false};
+    bool fail_get_id_with_output{false};
+    bool fail_activation_with_output{false};
+};
 #endif
 
 bool accept_control_command(const hibiki::ControlCommandV1& command, void* context) noexcept {
@@ -1245,6 +1687,15 @@ int main() {
         CHECK(isolated_fanout.prepare(clock_fanout_plan, 1.0));
         CHECK(isolated_fanout.observe_clock(1U, 48000.0, 47952.0, 1.0));
         CHECK(!isolated_fanout.observe_clock(2U, 48000.0, 47952.0, 1.0));
+        std::array<float, 64> isolated_clock_a{};
+        std::array<float, 64> isolated_clock_b{};
+        std::array<float*, 3> isolated_clock_outputs{
+            {isolated_clock_a.data(), isolated_clock_b.data(), nullptr}};
+        const std::array<std::size_t, 3> isolated_clock_capacities{{32U, 32U, 0U}};
+        std::array<std::size_t, 3> isolated_clock_frames{};
+        CHECK(isolated_fanout.process(
+            first_block, 2U, isolated_clock_outputs, isolated_clock_capacities,
+            isolated_clock_frames));
         CHECK(isolated_fanout.snapshot().sinks[0].ratio == 1.0 &&
               isolated_fanout.snapshot().sinks[0].drift_ppm == 0.0);
         CHECK(isolated_fanout.snapshot().sinks[1].ratio < 1.0 &&
@@ -1351,6 +1802,8 @@ int main() {
           runtime_frames[0] == 1U && runtime_frames[1] == 1U && runtime_frames[2] == 0U &&
           runtime_a[0] == fanout_input[0] && runtime_b[1] == fanout_input[1]);
     CHECK(fanout_runtime.observe_clock(0U, 48000.0, 48012.0, 1.0));
+    CHECK(fanout_runtime.process(fanout_input, 2U, runtime_outputs, runtime_capacities,
+                                 runtime_frames));
     CHECK(fanout_runtime.snapshot().sinks[0].drift_ppm > 0.0);
     const std::array<std::size_t, 3> runtime_short_capacities{{16U, 0U, 16U}};
     CHECK(!fanout_runtime.process(fanout_input, 2U, runtime_outputs,
@@ -2117,6 +2570,19 @@ int main() {
           session_response.payload.size() == session_bytes);
     CHECK(!session_store.publish(session_catalog_snapshot) && session_store.sequence() == 12U &&
           session_catalog_snapshot_reply_v1(session_response, &session_store));
+    auto zero_generation_session = session_catalog_snapshot;
+    zero_generation_session.generation = 0U;
+    std::array<std::uint8_t, kSessionCatalogSnapshotPayloadBytesV1> zero_generation_payload{};
+    std::size_t zero_generation_bytes = 0U;
+    CHECK(!encode_session_catalog_snapshot_v1(zero_generation_session, zero_generation_payload,
+                                              zero_generation_bytes) &&
+          !session_store.publish(zero_generation_session));
+    auto malformed_generation_session = session_payload;
+    std::fill(malformed_generation_session.begin() + 12,
+              malformed_generation_session.begin() + 20, static_cast<std::uint8_t>(0U));
+    CHECK(!decode_session_catalog_snapshot_v1(
+        std::span<const std::uint8_t>(malformed_generation_session.data(), session_bytes),
+        decoded_session));
     SessionVolumeCommandV1 session_volume_command{(2ULL << 32U) | 1ULL,
                                                   -622592, 1U, 12U};
     const auto session_volume_payload =
@@ -2383,6 +2849,9 @@ int main() {
           session_response.header.type == IpcMessageType::SessionCatalogSnapshot &&
           session_response.header.request_id == 779U &&
           session_response.payload.size() == session_bytes);
+    session_store.reset();
+    CHECK(!session_store.has_snapshot() && session_store.sequence() == 0U &&
+          !session_store.reply(session_response));
 
     auto scene_catalog = std::make_unique<SceneCatalogV1>();
     auto custom_defaults = make_easy_scene(EasySceneKind::Movie, "custom-output");
@@ -2719,6 +3188,10 @@ int main() {
                 GetLastError() == ERROR_PIPE_BUSY) {
                 (void)WaitNamedPipeW(between_pipe.c_str(), 100U);
             }
+            // start() returns before the worker necessarily creates its first
+            // pipe instance; yield so ERROR_FILE_NOT_FOUND cannot exhaust the
+            // bounded client attempts before the worker is scheduled.
+            Sleep(10U);
         }
         CHECK(between_client != INVALID_HANDLE_VALUE);
         DisconnectNamedPipe(between_client);
@@ -5306,6 +5779,10 @@ int main() {
           engine_fanout_frames[0] == 1U && engine_fanout_frames[1] == 1U &&
           engine_fanout_frames[2] == 0U && engine_fanout_a[0] == engine_fanout_b[0]);
     CHECK(engine.observe_output_fanout_clock(0U, 48000.0, 48012.0, 1.0));
+    CHECK(engine.process_output_group_fanout(
+              "main", std::span<const RtLaneInputV1>(&engine_input_view, 1),
+              engine_output.data(), 2U, engine_fanout_outputs, engine_fanout_capacities,
+              engine_fanout_frames));
     CHECK(engine.output_fanout_snapshot().sinks[0].drift_ppm > 0.0);
     CHECK(engine.apply_windows_volume(VolumeNotificationV1{-6.0206, true, 2}) ==
           VolumeNotificationResult::Accepted);
@@ -5718,8 +6195,24 @@ int main() {
     auto* session_watcher = new WindowsAudioSessionWatcher();
     std::uint64_t session_sequence = 0;
     CHECK(!session_watcher->poll(session_sequence));
-    CHECK(session_watcher->OnSessionCreated(nullptr) == S_OK);
-    CHECK(session_watcher->poll(session_sequence) && session_sequence == 1U);
+    CHECK(session_watcher->OnSessionCreated(nullptr) == S_OK &&
+          !session_watcher->poll(session_sequence));
+    std::atomic<std::uint32_t> session_add_ref_calls{0U};
+    std::atomic<std::uint32_t> session_release_calls{0U};
+    std::atomic<std::uint32_t> session_destruction_count{0U};
+    std::atomic<std::uint32_t> session_query_interface_calls{0U};
+    auto* retained_session = new RetainedAudioSessionControl(
+        session_add_ref_calls, session_release_calls, session_destruction_count,
+        session_query_interface_calls);
+    HRESULT session_callback_result = E_FAIL;
+    const auto session_callback_allocations = rt_noalloc_probe::allocations_during([&] {
+        session_callback_result = session_watcher->OnSessionCreated(retained_session);
+    });
+    CHECK(session_callback_result == S_OK &&
+          session_add_ref_calls.load(std::memory_order_relaxed) == 0U &&
+          session_query_interface_calls.load(std::memory_order_relaxed) == 0U &&
+          session_callback_allocations == 0U &&
+          !session_watcher->poll(session_sequence));
     CHECK(session_watcher->write_session_volume("missing", -12.0, false, session_context) ==
           E_UNEXPECTED);
     double session_db = 0.0;
@@ -5727,6 +6220,603 @@ int main() {
     CHECK(session_watcher->read_session_volume("missing", session_db, session_mute) ==
           E_UNEXPECTED);
     CHECK(session_watcher->Release() == 0U);
+    CHECK(retained_session->Release() == 0U &&
+          session_release_calls.load(std::memory_order_relaxed) == 1U &&
+          session_destruction_count.load(std::memory_order_relaxed) == 1U);
+    {
+        // Registration may synchronously publish a notification before the
+        // RegisterSessionNotification call returns. The watcher must retain
+        // that callback and preserve its sequence for the worker refresh.
+        FakeSessionVolumeControl registration_volume_control;
+        FakeSessionManager registration_manager(&registration_volume_control, true);
+        FakeSessionDevice registration_device(&registration_manager);
+        WindowsAudioSessionWatcher registration_watcher;
+        AudioSessionRegistry registration_registry;
+        std::uint64_t registration_sequence = 0U;
+        CHECK(registration_watcher.bind(&registration_device) == S_OK &&
+              registration_watcher.poll(registration_sequence) &&
+              registration_sequence == 1U &&
+              registration_watcher.enumerate(registration_registry) == S_OK &&
+              registration_registry.sessions().size() == 1U);
+        registration_watcher.unbind();
+    }
+    {
+        // If registration reports failure after delivering a callback, the
+        // retained control must still be drained and callback admission must
+        // remain closed for the failed binding.
+        FakeSessionVolumeControl failed_registration_control;
+        FakeSessionManager failed_registration_manager(&failed_registration_control, true, true);
+        FakeSessionDevice failed_registration_device(&failed_registration_manager);
+        WindowsAudioSessionWatcher failed_registration_watcher;
+        std::uint64_t failed_registration_sequence = 0U;
+        CHECK(failed_registration_watcher.bind(&failed_registration_device) == E_FAIL &&
+              failed_registration_control.add_ref_calls == 1U &&
+              failed_registration_control.release_calls == 1U &&
+              !failed_registration_watcher.poll(failed_registration_sequence) &&
+              failed_registration_watcher.OnSessionCreated(&failed_registration_control) == S_OK &&
+              !failed_registration_watcher.poll(failed_registration_sequence));
+    }
+    {
+        // A successful COM activation with no manager output is malformed and
+        // must fail closed before the watcher dereferences it.
+        FakeSessionManager activation_manager(nullptr);
+        FakeSessionDevice activation_device(&activation_manager);
+        activation_device.return_null_manager_on_success = true;
+        WindowsAudioSessionWatcher activation_watcher;
+        CHECK(activation_watcher.bind(&activation_device) == E_POINTER &&
+              activation_watcher.endpoint_id().empty());
+
+        FakeSessionManager failed_activation_manager(nullptr);
+        FakeSessionDevice failed_activation_device(&failed_activation_manager);
+        failed_activation_device.fail_activation_with_output = true;
+        WindowsAudioSessionWatcher failed_activation_watcher;
+        CHECK(failed_activation_watcher.bind(&failed_activation_device) == E_FAIL &&
+              failed_activation_watcher.endpoint_id().empty() &&
+              failed_activation_manager.reference_count() == 1U);
+
+        FakeSessionManager failed_id_manager(nullptr);
+        FakeSessionDevice failed_id_device(&failed_id_manager);
+        failed_id_device.fail_get_id_with_output = true;
+        WindowsAudioSessionWatcher failed_id_watcher;
+        CHECK(failed_id_watcher.bind(&failed_id_device) == E_FAIL &&
+              failed_id_watcher.endpoint_id().empty());
+    }
+    {
+        // Successful enumeration calls must still validate every COM output
+        // pointer before using it, including the enumerator and each session.
+        FakeSessionVolumeControl null_enumerator_control;
+        FakeSessionManager null_enumerator_manager(&null_enumerator_control);
+        null_enumerator_manager.return_null_enumerator_on_success = true;
+        FakeSessionDevice null_enumerator_device(&null_enumerator_manager);
+        WindowsAudioSessionWatcher null_enumerator_watcher;
+        AudioSessionRegistry null_enumerator_registry;
+        CHECK(null_enumerator_watcher.bind(&null_enumerator_device) == S_OK &&
+              null_enumerator_watcher.enumerate(null_enumerator_registry) == E_POINTER &&
+              null_enumerator_registry.sessions().empty());
+        double preserved_db = 17.0;
+        bool preserved_mute = true;
+        CHECK(null_enumerator_watcher.read_session_volume("fake-session", preserved_db,
+                                                          preserved_mute) == E_POINTER &&
+              preserved_db == 17.0 && preserved_mute);
+        null_enumerator_watcher.unbind();
+
+        FakeSessionVolumeControl null_session_control;
+        FakeSessionManager null_session_manager(&null_session_control);
+        null_session_manager.return_null_session_control_on_success = true;
+        FakeSessionDevice null_session_device(&null_session_manager);
+        WindowsAudioSessionWatcher null_session_watcher;
+        AudioSessionRegistry null_session_registry;
+        CHECK(null_session_watcher.bind(&null_session_device) == S_OK &&
+              null_session_watcher.enumerate(null_session_registry) == E_POINTER &&
+              null_session_registry.sessions().empty());
+        null_session_watcher.unbind();
+
+        FakeSessionVolumeControl failed_enumerator_control;
+        FakeSessionManager failed_enumerator_manager(&failed_enumerator_control);
+        failed_enumerator_manager.return_failed_enumerator_with_output = true;
+        FakeSessionDevice failed_enumerator_device(&failed_enumerator_manager);
+        WindowsAudioSessionWatcher failed_enumerator_watcher;
+        AudioSessionRegistry failed_enumerator_registry;
+        CHECK(failed_enumerator_watcher.bind(&failed_enumerator_device) == S_OK &&
+              failed_enumerator_watcher.enumerate(failed_enumerator_registry) == E_FAIL &&
+              failed_enumerator_registry.sessions().empty() &&
+              failed_enumerator_control.reference_count() == 1U);
+        failed_enumerator_watcher.unbind();
+
+        FakeSessionVolumeControl negative_count_control;
+        FakeSessionManager negative_count_manager(&negative_count_control);
+        negative_count_manager.return_negative_count_on_success = true;
+        FakeSessionDevice negative_count_device(&negative_count_manager);
+        WindowsAudioSessionWatcher negative_count_watcher;
+        AudioSessionRegistry negative_count_registry;
+        double negative_count_db = 19.0;
+        bool negative_count_mute = true;
+        CHECK(negative_count_watcher.bind(&negative_count_device) == S_OK &&
+              negative_count_watcher.enumerate(negative_count_registry) == E_INVALIDARG &&
+              negative_count_registry.sessions().empty() &&
+              negative_count_watcher.read_session_volume(
+                  "fake-session", negative_count_db, negative_count_mute) == E_INVALIDARG &&
+              negative_count_db == 19.0 && negative_count_mute &&
+              negative_count_watcher.write_session_volume(
+                  "fake-session", -6.0, false, session_context) == E_INVALIDARG &&
+              negative_count_control.set_master_calls == 0U &&
+              negative_count_control.set_mute_calls == 0U);
+        negative_count_watcher.unbind();
+    }
+    {
+        // A successful QueryInterface with a null output must not turn into a
+        // null volume dereference or a false successful read.
+        FakeSessionVolumeControl null_control2;
+        null_control2.return_null_session_control2_on_success = true;
+        FakeSessionManager null_control2_manager(&null_control2);
+        FakeSessionDevice null_control2_device(&null_control2_manager);
+        WindowsAudioSessionWatcher null_control2_watcher;
+        AudioSessionRegistry null_control2_registry;
+        CHECK(null_control2_watcher.bind(&null_control2_device) == S_OK &&
+              null_control2_watcher.enumerate(null_control2_registry) == E_POINTER &&
+              null_control2_registry.sessions().empty());
+        null_control2_watcher.unbind();
+
+        // Optional display metadata may fail after returning an allocated
+        // output; the session remains usable but the failed value is ignored.
+        FakeSessionVolumeControl failed_display_name;
+        failed_display_name.fail_display_name_with_output = true;
+        FakeSessionManager failed_display_name_manager(&failed_display_name);
+        FakeSessionDevice failed_display_name_device(&failed_display_name_manager);
+        WindowsAudioSessionWatcher failed_display_name_watcher;
+        AudioSessionRegistry failed_display_name_registry;
+        CHECK(failed_display_name_watcher.bind(&failed_display_name_device) == S_OK &&
+              failed_display_name_watcher.enumerate(failed_display_name_registry) == S_OK &&
+              failed_display_name_registry.sessions().size() == 1U &&
+              failed_display_name_registry.sessions()[0].display_name.empty());
+        failed_display_name_watcher.unbind();
+
+        FakeSessionVolumeControl null_volume;
+        null_volume.return_null_simple_volume_on_success = true;
+        FakeSessionManager null_volume_manager(&null_volume);
+        FakeSessionDevice null_volume_device(&null_volume_manager);
+        WindowsAudioSessionWatcher null_volume_watcher;
+        double preserved_db = -9.0;
+        bool preserved_mute = true;
+        CHECK(null_volume_watcher.bind(&null_volume_device) == S_OK &&
+              null_volume_watcher.read_session_volume("fake-session", preserved_db,
+                                                      preserved_mute) == E_POINTER &&
+              preserved_db == -9.0 && preserved_mute &&
+              null_volume_watcher.write_session_volume("fake-session", -6.0, false,
+                                                       session_context) == E_POINTER &&
+              null_volume.set_master_calls == 0U && null_volume.set_mute_calls == 0U);
+        null_volume_watcher.unbind();
+
+        FakeSessionVolumeControl failed_volume;
+        FakeSessionManager failed_volume_manager(&failed_volume);
+        FakeSessionDevice failed_volume_device(&failed_volume_manager);
+        WindowsAudioSessionWatcher failed_volume_watcher;
+        AudioSessionRegistry failed_volume_registry;
+        CHECK(failed_volume_watcher.bind(&failed_volume_device) == S_OK &&
+              failed_volume_watcher.enumerate(failed_volume_registry) == S_OK &&
+              failed_volume_registry.sessions().size() == 1U);
+        const auto failed_volume_references = failed_volume.reference_count();
+        failed_volume.fail_simple_volume_query_with_output = true;
+        preserved_db = -9.0;
+        preserved_mute = true;
+        CHECK(failed_volume_watcher.read_session_volume(
+                  "fake-session", preserved_db, preserved_mute) == E_FAIL &&
+              preserved_db == -9.0 && preserved_mute &&
+              failed_volume_watcher.write_session_volume(
+                  "fake-session", -6.0, false, session_context) == E_FAIL &&
+              failed_volume.set_master_calls == 0U && failed_volume.set_mute_calls == 0U &&
+              failed_volume.reference_count() == failed_volume_references);
+        failed_volume_watcher.unbind();
+    }
+    {
+        // A valid target after another enumerated session must still be found;
+        // a successful read of the first non-target is not a match.
+        FakeSessionVolumeControl first_session;
+        FakeSessionVolumeControl second_session;
+        second_session.session_identifier = L"second-app";
+        second_session.session_instance_identifier = L"second-session";
+        second_session.scalar = 0.25F;
+        second_session.muted = TRUE;
+        FakeSessionManager multi_session_manager(&first_session, false, false, &second_session);
+        FakeSessionDevice multi_session_device(&multi_session_manager);
+        WindowsAudioSessionWatcher multi_session_watcher;
+        double second_db = 99.0;
+        bool second_mute = false;
+        CHECK(multi_session_watcher.bind(&multi_session_device) == S_OK &&
+              multi_session_watcher.read_session_volume("second-session", second_db,
+                                                        second_mute) == S_OK &&
+              std::abs(second_db - (-12.041199826559248)) <= 1e-5 && second_mute);
+        multi_session_watcher.unbind();
+    }
+    {
+        // A two-step volume write must not expose a half-applied state when
+        // the second setter fails; rollback failure remains an explicit error.
+        FakeSessionVolumeControl volume_control;
+        FakeSessionManager session_manager(&volume_control);
+        FakeSessionDevice session_device(&session_manager);
+        WindowsAudioSessionWatcher volume_watcher;
+        AudioSessionRegistry volume_registry;
+        GUID volume_context{};
+        CHECK(volume_watcher.bind(&session_device) == S_OK &&
+              volume_watcher.enumerate(volume_registry) == S_OK &&
+              volume_registry.sessions().size() == 1U);
+        const float original_scalar = volume_control.scalar;
+        const BOOL original_mute = volume_control.muted;
+        const auto set_master_before_platform_cap = volume_control.set_master_calls;
+        const auto set_mute_before_platform_cap = volume_control.set_mute_calls;
+        CHECK(volume_watcher.write_session_volume("fake-session", 12.0, true,
+                                                  volume_context) == E_INVALIDARG &&
+              volume_control.scalar == original_scalar && volume_control.muted == original_mute &&
+              volume_control.set_master_calls == set_master_before_platform_cap &&
+              volume_control.set_mute_calls == set_mute_before_platform_cap);
+        for (const float invalid_scalar : {std::numeric_limits<float>::quiet_NaN(), 1.01F}) {
+            volume_control.scalar = invalid_scalar;
+            double preserved_db = 17.0;
+            bool preserved_mute = true;
+            const auto set_master_before_invalid_write = volume_control.set_master_calls;
+            const auto set_mute_before_invalid_write = volume_control.set_mute_calls;
+            CHECK(volume_watcher.read_session_volume("fake-session", preserved_db,
+                                                     preserved_mute) == E_FAIL &&
+                  preserved_db == 17.0 && preserved_mute);
+            CHECK(volume_watcher.write_session_volume("fake-session", -6.0, false,
+                                                      volume_context) == E_FAIL &&
+                  volume_control.set_master_calls == set_master_before_invalid_write &&
+                  volume_control.set_mute_calls == set_mute_before_invalid_write);
+        }
+        volume_control.scalar = original_scalar;
+        volume_control.fail_mute_calls = 1U;
+        CHECK(volume_watcher.write_session_volume("fake-session", -6.0, false,
+                                                  volume_context) == E_FAIL &&
+              std::abs(volume_control.scalar - original_scalar) <= 1e-5F &&
+              volume_control.muted == original_mute &&
+              volume_control.set_master_calls == 2U &&
+              volume_control.set_mute_calls == 2U);
+        const auto set_master_before_read_failure = volume_control.set_master_calls;
+        const auto set_mute_before_read_failure = volume_control.set_mute_calls;
+        volume_control.get_mute_result = E_FAIL;
+        CHECK(volume_watcher.write_session_volume("fake-session", -12.0, true,
+                                                  volume_context) == E_FAIL &&
+              volume_control.set_master_calls == set_master_before_read_failure &&
+              volume_control.set_mute_calls == set_mute_before_read_failure);
+        volume_control.get_mute_result = S_OK;
+        volume_control.fail_mute_calls = 1U;
+        volume_control.fail_master_after_mute_failure = true;
+        CHECK(volume_watcher.write_session_volume("fake-session", -3.0, true,
+                                                  volume_context) == E_FAIL &&
+              volume_control.muted == original_mute);
+        volume_watcher.unbind();
+    }
+    {
+        // A bound coordinator has no valid catalog generation until its first
+        // refresh; it must not publish a generation-zero snapshot.
+        FakeSessionVolumeControl unrefreshed_session;
+        FakeSessionManager unrefreshed_manager(&unrefreshed_session);
+        FakeSessionDevice unrefreshed_device(&unrefreshed_manager);
+        WindowsAudioSessionRouteCoordinatorV1 unrefreshed_coordinator;
+        SessionCatalogSnapshotV1 unrefreshed_catalog{};
+        CHECK(unrefreshed_coordinator.bind(&unrefreshed_device) == S_OK &&
+              !unrefreshed_coordinator.make_session_catalog_snapshot(1U, unrefreshed_catalog) &&
+              unrefreshed_catalog.sequence == 0U && unrefreshed_catalog.generation == 0U &&
+              unrefreshed_catalog.entry_count == 0U);
+        unrefreshed_coordinator.unbind();
+    }
+    {
+        // An expired session may still be returned by the Windows enumerator,
+        // but it is not a valid target for volume control or handle access.
+        FakeSessionVolumeControl expired_session;
+        expired_session.state_value = AudioSessionStateExpired;
+        FakeSessionManager expired_manager(&expired_session);
+        FakeSessionDevice expired_device(&expired_manager);
+        WindowsAudioSessionRouteCoordinatorV1 expired_coordinator;
+        const HRESULT session_not_found = HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        double expired_db = 23.0;
+        bool expired_mute = true;
+        CHECK(expired_coordinator.bind(&expired_device) == S_OK &&
+              expired_coordinator.refresh() ==
+                  WindowsAudioSessionRouteRefreshResultV1::NoRoutes &&
+              expired_coordinator.snapshot().session_count == 1U &&
+              expired_coordinator.snapshot().active_count == 0U &&
+              expired_coordinator.read_session_volume("fake-session", expired_db,
+                                                      expired_mute) == session_not_found &&
+              expired_db == 23.0 && expired_mute &&
+              expired_coordinator.write_session_volume("fake-session", -6.0, false,
+                                                       session_context) == session_not_found &&
+              expired_session.set_master_calls == 0U && expired_session.set_mute_calls == 0U &&
+              expired_coordinator.read_session_volume_handle(
+                  (1ULL << 32U) | 1U, expired_db, expired_mute) == session_not_found &&
+              expired_db == 23.0 && expired_mute &&
+              expired_coordinator.write_session_volume_handle(
+                  (1ULL << 32U) | 1U, -6.0, false, session_context) == session_not_found &&
+              expired_coordinator.bind_session_route_handle(
+                  (1ULL << 32U) | 1U, "game", "surround") == session_not_found &&
+              expired_coordinator.snapshot().generation == 1U &&
+              expired_session.set_master_calls == 0U && expired_session.set_mute_calls == 0U);
+        expired_coordinator.unbind();
+    }
+    {
+        // A refresh creates a new handle generation. An old index must not be
+        // reused for volume or route control after that refresh.
+        FakeSessionVolumeControl stale_handle_session;
+        FakeSessionManager stale_handle_manager(&stale_handle_session);
+        FakeSessionDevice stale_handle_device(&stale_handle_manager);
+        WindowsAudioSessionRouteCoordinatorV1 stale_handle_coordinator;
+        const HRESULT session_not_found = HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        const auto first_handle = (1ULL << 32U) | 1U;
+        double preserved_db = 17.0;
+        bool preserved_mute = true;
+        GUID stale_handle_context{};
+        CHECK(stale_handle_coordinator.bind(&stale_handle_device) == S_OK &&
+              stale_handle_coordinator.refresh() ==
+                  WindowsAudioSessionRouteRefreshResultV1::NoRoutes &&
+              stale_handle_coordinator.snapshot().generation == 1U &&
+              stale_handle_coordinator.read_session_volume_handle(
+                  first_handle, preserved_db, preserved_mute) == S_OK &&
+              stale_handle_coordinator.refresh() ==
+                  WindowsAudioSessionRouteRefreshResultV1::NoRoutes &&
+              stale_handle_coordinator.snapshot().generation == 2U);
+        preserved_db = 17.0;
+        preserved_mute = true;
+        const auto set_master_before_stale = stale_handle_session.set_master_calls;
+        const auto set_mute_before_stale = stale_handle_session.set_mute_calls;
+        CHECK(stale_handle_coordinator.read_session_volume_handle(
+                  first_handle, preserved_db, preserved_mute) == session_not_found &&
+              preserved_db == 17.0 && preserved_mute &&
+              stale_handle_coordinator.write_session_volume_handle(
+                  first_handle, -6.0, false, stale_handle_context) == session_not_found &&
+              stale_handle_coordinator.bind_session_route_handle(
+                  first_handle, "game", "surround") == session_not_found &&
+              stale_handle_session.set_master_calls == set_master_before_stale &&
+              stale_handle_session.set_mute_calls == set_mute_before_stale);
+        stale_handle_coordinator.unbind();
+    }
+    {
+        // A failed refresh invalidates the previous control snapshot. Cached
+        // session controls must not keep volume or route operations alive
+        // while the coordinator is degraded.
+        FakeSessionVolumeControl degraded_session;
+        FakeSessionManager degraded_manager(&degraded_session);
+        FakeSessionDevice degraded_device(&degraded_manager);
+        WindowsAudioSessionRouteCoordinatorV1 degraded_coordinator;
+        const HRESULT unexpected = E_UNEXPECTED;
+        const auto degraded_handle = (1ULL << 32U) | 1U;
+        double degraded_db = 17.0;
+        bool degraded_mute = true;
+        const auto set_master_before_degraded = degraded_session.set_master_calls;
+        const auto set_mute_before_degraded = degraded_session.set_mute_calls;
+        CHECK(degraded_coordinator.bind(&degraded_device) == S_OK &&
+              degraded_coordinator.refresh() ==
+                  WindowsAudioSessionRouteRefreshResultV1::NoRoutes &&
+              degraded_coordinator.snapshot().generation == 1U);
+        degraded_manager.return_failed_enumerator_with_output = true;
+        CHECK(degraded_coordinator.refresh() ==
+                  WindowsAudioSessionRouteRefreshResultV1::Degraded &&
+              degraded_coordinator.snapshot().degraded &&
+              degraded_coordinator.read_session_volume("fake-session", degraded_db,
+                                                      degraded_mute) == unexpected &&
+              degraded_db == 17.0 && degraded_mute &&
+              degraded_coordinator.write_session_volume("fake-session", -6.0, false,
+                                                       session_context) == unexpected &&
+              degraded_coordinator.read_session_volume_handle(
+                  degraded_handle, degraded_db, degraded_mute) == unexpected &&
+              degraded_db == 17.0 && degraded_mute &&
+              degraded_coordinator.write_session_volume_handle(
+                  degraded_handle, -6.0, false, session_context) == unexpected &&
+              degraded_coordinator.bind_session_route_handle(
+                  degraded_handle, "game", "surround") == unexpected &&
+              degraded_session.set_master_calls == set_master_before_degraded &&
+              degraded_session.set_mute_calls == set_mute_before_degraded);
+        degraded_coordinator.unbind();
+    }
+    {
+        // Teardown must not drain/reset the queue while a session-manager
+        // callback is still retaining its control pointer.
+        WindowsAudioSessionWatcher teardown_watcher;
+        FakeSessionManager teardown_manager(nullptr);
+        FakeSessionDevice teardown_device(&teardown_manager);
+        std::atomic<std::uint32_t> teardown_add_ref_calls{0U};
+        std::atomic<std::uint32_t> teardown_release_calls{0U};
+        std::atomic<std::uint32_t> teardown_destruction_count{0U};
+        std::atomic<std::uint32_t> teardown_query_interface_calls{0U};
+        std::atomic<bool> add_ref_entered{false};
+        std::atomic<bool> allow_add_ref{false};
+        std::atomic<bool> callback_done{false};
+        std::atomic<bool> unbind_started{false};
+        std::atomic<bool> unbind_done{false};
+        std::atomic<HRESULT> callback_result{E_FAIL};
+        std::atomic<std::uint32_t> late_callback_count{0U};
+        std::atomic<bool> late_callbacks_done{false};
+        std::atomic<std::uint32_t> late_add_ref_calls{0U};
+        std::atomic<std::uint32_t> late_release_calls{0U};
+        std::atomic<std::uint32_t> late_destruction_count{0U};
+        std::atomic<std::uint32_t> late_query_interface_calls{0U};
+        std::atomic<bool> late_callbacks_succeeded{true};
+        CHECK(teardown_watcher.bind(&teardown_device) == S_OK);
+        auto* teardown_session = new RetainedAudioSessionControl(
+            teardown_add_ref_calls, teardown_release_calls, teardown_destruction_count,
+            teardown_query_interface_calls, &add_ref_entered, &allow_add_ref);
+        auto* late_session = new RetainedAudioSessionControl(
+            late_add_ref_calls, late_release_calls, late_destruction_count,
+            late_query_interface_calls);
+        std::thread callback_thread([&] {
+            callback_result.store(teardown_watcher.OnSessionCreated(teardown_session),
+                                   std::memory_order_seq_cst);
+            callback_done.store(true, std::memory_order_seq_cst);
+        });
+        while (!add_ref_entered.load(std::memory_order_seq_cst)) {
+            std::this_thread::yield();
+        }
+        std::thread unbind_thread([&] {
+            unbind_started.store(true, std::memory_order_seq_cst);
+            teardown_watcher.unbind();
+            unbind_done.store(true, std::memory_order_seq_cst);
+        });
+        while (!unbind_started.load(std::memory_order_seq_cst)) {
+            std::this_thread::yield();
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::thread late_callback_thread([&] {
+            for (std::size_t index = 0U; index < 64U; ++index) {
+                if (teardown_watcher.OnSessionCreated(late_session) != S_OK) {
+                    late_callbacks_succeeded.store(false, std::memory_order_seq_cst);
+                }
+                late_callback_count.fetch_add(1U, std::memory_order_seq_cst);
+            }
+            late_callbacks_done.store(true, std::memory_order_seq_cst);
+        });
+        late_callback_thread.join();
+        const bool unbind_waited_for_callback =
+            !unbind_done.load(std::memory_order_seq_cst);
+        allow_add_ref.store(true, std::memory_order_seq_cst);
+        callback_thread.join();
+        unbind_thread.join();
+        std::uint64_t teardown_sequence = 0U;
+        CHECK(unbind_waited_for_callback && callback_done.load(std::memory_order_seq_cst) &&
+              unbind_done.load(std::memory_order_seq_cst) &&
+              callback_result.load(std::memory_order_seq_cst) == S_OK &&
+              teardown_add_ref_calls.load(std::memory_order_relaxed) == 1U &&
+              teardown_release_calls.load(std::memory_order_relaxed) == 1U &&
+              teardown_destruction_count.load(std::memory_order_relaxed) == 0U &&
+              teardown_query_interface_calls.load(std::memory_order_relaxed) == 0U &&
+              late_callbacks_done.load(std::memory_order_seq_cst) &&
+              late_callbacks_succeeded.load(std::memory_order_seq_cst) &&
+              late_callback_count.load(std::memory_order_relaxed) == 64U &&
+              late_query_interface_calls.load(std::memory_order_relaxed) == 0U &&
+              !teardown_watcher.poll(teardown_sequence));
+        CHECK(teardown_session->Release() == 0U &&
+              teardown_release_calls.load(std::memory_order_relaxed) == 2U &&
+              teardown_destruction_count.load(std::memory_order_relaxed) == 1U);
+        CHECK(late_add_ref_calls.load(std::memory_order_relaxed) <= 64U &&
+              late_release_calls.load(std::memory_order_relaxed) ==
+                  late_add_ref_calls.load(std::memory_order_relaxed) &&
+              late_session->Release() == 0U &&
+              late_release_calls.load(std::memory_order_relaxed) ==
+                  late_add_ref_calls.load(std::memory_order_relaxed) + 1U &&
+              late_destruction_count.load(std::memory_order_relaxed) == 1U);
+    }
+    {
+        constexpr std::size_t pending_capacity = 64U;
+        WindowsAudioSessionWatcher bounded_watcher;
+        FakeSessionManager bounded_manager(nullptr);
+        FakeSessionDevice bounded_device(&bounded_manager);
+        std::atomic<std::uint32_t> bounded_add_ref_calls{0U};
+        std::atomic<std::uint32_t> bounded_release_calls{0U};
+        std::atomic<std::uint32_t> bounded_destruction_count{0U};
+        std::atomic<std::uint32_t> bounded_query_interface_calls{0U};
+        std::array<RetainedAudioSessionControl*, pending_capacity + 1U> pending_sessions{};
+        for (auto& pending_session : pending_sessions) {
+            pending_session = new RetainedAudioSessionControl(
+                bounded_add_ref_calls, bounded_release_calls, bounded_destruction_count,
+                bounded_query_interface_calls);
+        }
+        bool callbacks_succeeded = bounded_watcher.bind(&bounded_device) == S_OK;
+        for (auto* pending_session : pending_sessions) {
+            callbacks_succeeded = callbacks_succeeded &&
+                                  bounded_watcher.OnSessionCreated(pending_session) == S_OK;
+        }
+        std::uint64_t bounded_sequence = 0U;
+        CHECK(callbacks_succeeded &&
+              bounded_add_ref_calls.load(std::memory_order_relaxed) == pending_capacity &&
+              bounded_query_interface_calls.load(std::memory_order_relaxed) == 0U &&
+              bounded_watcher.poll(bounded_sequence) &&
+              bounded_sequence == pending_sessions.size());
+        bounded_watcher.unbind();
+        CHECK(bounded_release_calls.load(std::memory_order_relaxed) == pending_capacity &&
+              bounded_destruction_count.load(std::memory_order_relaxed) == 0U);
+        const auto add_ref_after_unbind = bounded_add_ref_calls.load(std::memory_order_relaxed);
+        const auto sequence_after_unbind = bounded_sequence;
+        CHECK(bounded_watcher.OnSessionCreated(pending_sessions[0]) == S_OK &&
+              bounded_add_ref_calls.load(std::memory_order_relaxed) == add_ref_after_unbind &&
+              !bounded_watcher.poll(bounded_sequence) &&
+              bounded_sequence == sequence_after_unbind);
+        for (auto* pending_session : pending_sessions) {
+            (void)pending_session->Release();
+        }
+        CHECK(bounded_release_calls.load(std::memory_order_relaxed) ==
+                  pending_capacity + pending_sessions.size() &&
+              bounded_destruction_count.load(std::memory_order_relaxed) ==
+                  pending_sessions.size());
+        std::atomic<std::uint32_t> reused_add_ref_calls{0U};
+        std::atomic<std::uint32_t> reused_release_calls{0U};
+        std::atomic<std::uint32_t> reused_destruction_count{0U};
+        std::atomic<std::uint32_t> reused_query_interface_calls{0U};
+        auto* reused_session = new RetainedAudioSessionControl(
+            reused_add_ref_calls, reused_release_calls, reused_destruction_count,
+            reused_query_interface_calls);
+        FakeSessionManager reused_manager(nullptr);
+        FakeSessionDevice reused_device(&reused_manager);
+        CHECK(bounded_watcher.bind(&reused_device) == S_OK &&
+              bounded_watcher.OnSessionCreated(reused_session) == S_OK &&
+              reused_add_ref_calls.load(std::memory_order_relaxed) == 1U &&
+              reused_query_interface_calls.load(std::memory_order_relaxed) == 0U);
+        std::uint64_t reused_sequence = 0U;
+        CHECK(bounded_watcher.poll(reused_sequence) && reused_sequence == 1U);
+        bounded_watcher.unbind();
+        CHECK(reused_release_calls.load(std::memory_order_relaxed) == 1U &&
+              reused_destruction_count.load(std::memory_order_relaxed) == 0U);
+        CHECK(reused_session->Release() == 0U &&
+              reused_release_calls.load(std::memory_order_relaxed) == 2U &&
+              reused_destruction_count.load(std::memory_order_relaxed) == 1U);
+    }
+    {
+        // The notification queue has multiple possible COM callback producers.
+        // Exercise concurrent enqueue and verify that the bounded ownership
+        // contract remains exact when no worker is consuming yet.
+        constexpr std::size_t producer_count = 4U;
+        constexpr std::size_t callbacks_per_producer = 32U;
+        constexpr std::size_t callback_count = producer_count * callbacks_per_producer;
+        constexpr std::size_t pending_capacity = 64U;
+        WindowsAudioSessionWatcher concurrent_watcher;
+        FakeSessionManager concurrent_manager(nullptr);
+        FakeSessionDevice concurrent_device(&concurrent_manager);
+        std::atomic<std::uint32_t> concurrent_add_ref_calls{0U};
+        std::atomic<std::uint32_t> concurrent_release_calls{0U};
+        std::atomic<std::uint32_t> concurrent_destruction_count{0U};
+        std::atomic<std::uint32_t> concurrent_query_interface_calls{0U};
+        std::array<RetainedAudioSessionControl*, callback_count> concurrent_sessions{};
+        for (auto& session : concurrent_sessions) {
+            session = new RetainedAudioSessionControl(concurrent_add_ref_calls,
+                                                       concurrent_release_calls,
+                                                       concurrent_destruction_count,
+                                                       concurrent_query_interface_calls);
+        }
+        std::atomic<std::size_t> ready_producers{0U};
+        std::atomic<bool> start_producers{false};
+        std::atomic<bool> callbacks_succeeded{concurrent_watcher.bind(&concurrent_device) == S_OK};
+        std::array<std::thread, producer_count> producers;
+        for (std::size_t producer = 0U; producer < producer_count; ++producer) {
+            producers[producer] = std::thread([&, producer] {
+                ready_producers.fetch_add(1U, std::memory_order_release);
+                while (!start_producers.load(std::memory_order_acquire)) {
+                    std::this_thread::yield();
+                }
+                const auto first = producer * callbacks_per_producer;
+                for (std::size_t index = 0U; index < callbacks_per_producer; ++index) {
+                    if (concurrent_watcher.OnSessionCreated(concurrent_sessions[first + index]) !=
+                        S_OK) {
+                        callbacks_succeeded.store(false, std::memory_order_release);
+                    }
+                }
+            });
+        }
+        while (ready_producers.load(std::memory_order_acquire) != producer_count) {
+            std::this_thread::yield();
+        }
+        start_producers.store(true, std::memory_order_release);
+        for (auto& producer : producers) producer.join();
+        std::uint64_t concurrent_sequence = 0U;
+        CHECK(callbacks_succeeded.load(std::memory_order_acquire) &&
+              concurrent_add_ref_calls.load(std::memory_order_relaxed) == pending_capacity &&
+              concurrent_query_interface_calls.load(std::memory_order_relaxed) == 0U &&
+              concurrent_watcher.poll(concurrent_sequence) &&
+              concurrent_sequence == callback_count);
+        concurrent_watcher.unbind();
+        CHECK(concurrent_release_calls.load(std::memory_order_relaxed) == pending_capacity &&
+              concurrent_destruction_count.load(std::memory_order_relaxed) == 0U);
+        for (auto* session : concurrent_sessions) (void)session->Release();
+        CHECK(concurrent_release_calls.load(std::memory_order_relaxed) ==
+                  pending_capacity + callback_count &&
+              concurrent_destruction_count.load(std::memory_order_relaxed) == callback_count);
+    }
     WindowsAudioSessionRouteCoordinatorV1 session_route_coordinator;
     GraphConfigV1 session_route_graph;
     ProcessLoopbackPlanV1 session_process_plan;

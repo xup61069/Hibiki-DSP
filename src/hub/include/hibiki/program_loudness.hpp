@@ -135,8 +135,9 @@ public:
         return status_;
     }
     // Lock-free projection for the control worker after the audio callback's
-    // current block has completed. Reads are not synchronized with an in-
-    // flight render; every field is independently finite and bounded.
+    // current block has completed. A bounded three-slot generation publication
+    // and reader hazard protect every returned field from mixed-generation
+    // reuse; an in-flight or changed publication fails closed.
     [[nodiscard]] ProgramAwareTelemetrySnapshotV1 read_telemetry() const noexcept;
     [[nodiscard]] std::uint32_t sample_rate() const noexcept { return sample_rate_; }
 
@@ -181,12 +182,23 @@ private:
     Biquad bass_shelf_{};
     std::array<BiquadState, 8U> bass_shelf_state_{};
 
-    mutable std::array<std::atomic<double>, kTelemetryDoubleCountV2>
-        telemetry_doubles_{};
-    mutable std::atomic<bool> telemetry_valid_{false};
-    mutable std::atomic<bool> telemetry_enabled_{false};
-    mutable std::atomic<bool> telemetry_silence_gated_{true};
-    mutable std::atomic<std::uint64_t> telemetry_sequence_{0U};
+    static constexpr std::size_t kTelemetryPublicationSlotCountV1 = 3U;
+    static constexpr std::uint32_t kNoTelemetryReaderSlotV1 = 0xFFFFFFFFU;
+
+    struct TelemetryPublicationSlotV1 final {
+        std::array<std::atomic<double>, kTelemetryDoubleCountV2>
+            doubles{};
+        std::atomic<bool> enabled{false};
+        std::atomic<bool> silence_gated{true};
+        std::atomic<std::uint64_t> sequence{0U};
+    };
+
+    std::array<TelemetryPublicationSlotV1,
+               kTelemetryPublicationSlotCountV1>
+        telemetry_publication_slots_{};
+    mutable std::atomic<std::uint64_t> telemetry_publication_{0U};
+    mutable std::atomic<std::uint32_t> telemetry_reader_slot_{
+        kNoTelemetryReaderSlotV1};
 };
 
 // Fixed-capacity per-output-group program-aware level attachment. The

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "hibiki/output_handoff.hpp"
+#include "hibiki/windows_wasapi_handoff.hpp"
 
 #include <cmath>
 #include <cstdint>
@@ -21,6 +22,32 @@ namespace {
 using hibiki::DeviceTargetV1;
 using hibiki::OutputHandoffCoordinatorV1;
 using hibiki::OutputHandoffStateV1;
+using hibiki::detail::WasapiHandoffSubmissionHooksV1;
+using hibiki::detail::WasapiHandoffSubmissionResultV1;
+using hibiki::detail::submit_wasapi_handoff_fade_block_v1;
+
+struct FakeWasapiWorker {
+    bool accept_submit{true};
+    bool running{true};
+    std::uint32_t submit_calls{0U};
+    std::uint32_t stop_calls{0U};
+};
+
+bool fake_submit(void* const context,
+                 const float*,
+                 const std::uint32_t,
+                 const std::uint32_t,
+                 const float) noexcept {
+    auto& worker = *static_cast<FakeWasapiWorker*>(context);
+    ++worker.submit_calls;
+    return worker.running && worker.accept_submit;
+}
+
+void fake_stop(void* const context) noexcept {
+    auto& worker = *static_cast<FakeWasapiWorker*>(context);
+    ++worker.stop_calls;
+    worker.running = false;
+}
 
 DeviceTargetV1 valid_target(const char* endpoint = "hibiki-main") {
     return DeviceTargetV1{endpoint, 2U, 48000U, 128U};
@@ -32,6 +59,58 @@ constexpr std::size_t kTotalFrames = 1440U;  // exactly 48000 * 30 ms
 }  // namespace
 
 int main() {
+    // The production fade path and this deterministic seam share the same
+    // candidate-stop decision. Active rejection stops the accepted candidate
+    // before the class process() maps the result to Degraded; no commit result
+    // can be produced from WasapiHandoffSubmissionResultV1::ActiveRejected.
+    {
+        FakeWasapiWorker candidate;
+        FakeWasapiWorker active{false};
+        float silence[2] = {};
+        const auto result = submit_wasapi_handoff_fade_block_v1(
+            WasapiHandoffSubmissionHooksV1{&candidate, fake_submit, fake_stop, &active,
+                                           fake_submit},
+            silence, 1U, 2U, 0.8F, 0.6F);
+        CHECK(result == WasapiHandoffSubmissionResultV1::ActiveRejected);
+        CHECK(candidate.submit_calls == 1U);
+        CHECK(candidate.stop_calls == 1U);
+        CHECK(!candidate.running);
+        CHECK(active.submit_calls == 1U);
+    }
+
+    // Candidate rejection also stops the candidate and never submits to the
+    // active worker through the fade branch; the caller may then use its
+    // separate unscaled rollback fallback.
+    {
+        FakeWasapiWorker candidate{false};
+        FakeWasapiWorker active;
+        float silence[2] = {};
+        const auto result = submit_wasapi_handoff_fade_block_v1(
+            WasapiHandoffSubmissionHooksV1{&candidate, fake_submit, fake_stop, &active,
+                                           fake_submit},
+            silence, 1U, 2U, 0.8F, 0.6F);
+        CHECK(result == WasapiHandoffSubmissionResultV1::CandidateRejected);
+        CHECK(candidate.submit_calls == 1U);
+        CHECK(candidate.stop_calls == 1U);
+        CHECK(!candidate.running);
+        CHECK(active.submit_calls == 0U);
+    }
+
+    // A complete fade block leaves both workers running and is accepted.
+    {
+        FakeWasapiWorker candidate;
+        FakeWasapiWorker active;
+        float silence[2] = {};
+        const auto result = submit_wasapi_handoff_fade_block_v1(
+            WasapiHandoffSubmissionHooksV1{&candidate, fake_submit, fake_stop, &active,
+                                           fake_submit},
+            silence, 1U, 2U, 0.8F, 0.6F);
+        CHECK(result == WasapiHandoffSubmissionResultV1::Accepted);
+        CHECK(candidate.stop_calls == 0U);
+        CHECK(candidate.running);
+        CHECK(active.submit_calls == 1U);
+    }
+
     // Happy path: begin -> prepare -> process to fade completion -> commit.
     {
         OutputHandoffCoordinatorV1 coordinator;
