@@ -18,6 +18,7 @@
 #include "hibiki/windows_volume_broker.hpp"
 #include "hibiki/windows_volume_link.hpp"
 #include "hibiki/wav_ir.hpp"
+#include "hibiki/wav_source_progress.hpp"
 #include "hibiki/plugin_host.hpp"
 #include "hibiki/vst3_sandbox.hpp"
 
@@ -587,7 +588,9 @@ bool render_wav_file_source(WavFileSourceState& source,
     const auto source_channels =
         source.data.channels == 1U ? 2U : static_cast<std::uint32_t>(source.data.channels);
     const auto total_frames = source.data.frames();
+    if (total_frames == 0U) return false;
     const auto start_frame = source.next_frame;
+    std::size_t loop_wrap_count = 0U;
     for (std::uint32_t frame = 0U; frame < source.block_frames; ++frame) {
         if (source.next_frame >= total_frames) {
             if (!source.loop) {
@@ -605,6 +608,7 @@ bool render_wav_file_source(WavFileSourceState& source,
                 break;
             }
             source.next_frame = 0U;
+            ++loop_wrap_count;
         }
         else if (frame > 0U && source.next_frame == 0U) {
             // Loop wrap: the frame position restarted, so the rest of this
@@ -627,7 +631,14 @@ bool render_wav_file_source(WavFileSourceState& source,
         }
         ++source.next_frame;
     }
-    source.frames_rendered += source.next_frame - start_frame;
+    const auto progressed_frames = hibiki::wav_source_progress_delta_v1(
+        start_frame, source.next_frame, total_frames, loop_wrap_count);
+    const auto max_frames = (std::numeric_limits<std::uint64_t>::max)();
+    if (progressed_frames > max_frames - source.frames_rendered) {
+        source.frames_rendered = max_frames;
+    } else {
+        source.frames_rendered += progressed_frames;
+    }
     const auto delivered = engine.process_output_group_to_wasapi(
         "main", std::span<const hibiki::RtLaneInputV1>(source.lanes),
         source.output_block.data(), source.block_frames);
