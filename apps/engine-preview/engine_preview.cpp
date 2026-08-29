@@ -1790,40 +1790,45 @@ int wmain(const int argc, wchar_t* const* argv) {
     bool suppressor_active = false;
     if (tab_bridge_started) {
         hibiki::TabBridgeServerConfigV1 tab_config{};
-        if (tab_noise_suppressor_requested) {
-            // Basic high-pass + downward-gate; explicitly not ML denoising.
-            const hibiki::BasicNoiseSuppressorPolicyV1 kTabNoisePolicy{
-                1U, true, -55.0, -24.0, 8.0, 120.0, 80.0};
-            if (tab_bridge.noise_suppressor.configure(
-                    kTabNoisePolicy, wasapi_output.config.sample_rate, 2U)) {
-                tab_bridge.effects = {nullptr, nullptr,
-                                      &tab_bridge.noise_suppressor, nullptr};
-                suppressor_active = true;
-            }
-        }
-        if (tab_bridge.server.start(tab_config, hibiki::enqueue_tab_capture_packet_v1,
-                                    &tab_bridge.queue)) {
-            tab_bridge.listening = true;
-            tab_bridge.input_buffer.resize(
-                static_cast<std::size_t>(kTabBridgeMaxFrames) * 2U);
-            tab_bridge.output_buffer.resize(
-                static_cast<std::size_t>(kTabBridgeMaxFrames) *
-                static_cast<std::size_t>(kTestToneMaxOutputChannels));
-            tab_bridge.lane_inputs.assign(1U, hibiki::RtLaneInputV1{});
-            if (suppressor_active) {
-                tab_bridge_route_detail =
-                    "loopback listener bound; basic suppressor active (stereo).";
-            } else {
-                tab_bridge_route_detail =
-                    "loopback listener bound; waiting for browser capture.";
-            }
-            if (tab_bass_correction_active) {
-                tab_bridge_route_detail +=
-                    " adaptive bass correction armed; curve follows telemetry.";
-            }
-            tab_bridge_detail = tab_bridge_route_detail;
+        if (!tab_bridge.queue.set_expected_sample_rate(wasapi_output.config.sample_rate)) {
+            tab_bridge_detail =
+                "tab bridge sink sample-rate contract unavailable; tab bridge disabled.";
         } else {
-            tab_bridge_detail = "loopback listener bind failed; tab bridge disabled.";
+            if (tab_noise_suppressor_requested) {
+                // Basic high-pass + downward-gate; explicitly not ML denoising.
+                const hibiki::BasicNoiseSuppressorPolicyV1 kTabNoisePolicy{
+                    1U, true, -55.0, -24.0, 8.0, 120.0, 80.0};
+                if (tab_bridge.noise_suppressor.configure(
+                        kTabNoisePolicy, wasapi_output.config.sample_rate, 2U)) {
+                    tab_bridge.effects = {nullptr, nullptr,
+                                          &tab_bridge.noise_suppressor, nullptr};
+                    suppressor_active = true;
+                }
+            }
+            if (tab_bridge.server.start(tab_config, hibiki::enqueue_tab_capture_packet_v1,
+                                        &tab_bridge.queue)) {
+                tab_bridge.listening = true;
+                tab_bridge.input_buffer.resize(
+                    static_cast<std::size_t>(kTabBridgeMaxFrames) * 2U);
+                tab_bridge.output_buffer.resize(
+                    static_cast<std::size_t>(kTabBridgeMaxFrames) *
+                    static_cast<std::size_t>(kTestToneMaxOutputChannels));
+                tab_bridge.lane_inputs.assign(1U, hibiki::RtLaneInputV1{});
+                if (suppressor_active) {
+                    tab_bridge_route_detail =
+                        "loopback listener bound; basic suppressor active (stereo).";
+                } else {
+                    tab_bridge_route_detail =
+                        "loopback listener bound; waiting for browser capture.";
+                }
+                if (tab_bass_correction_active) {
+                    tab_bridge_route_detail +=
+                        " adaptive bass correction armed; curve follows telemetry.";
+                }
+                tab_bridge_detail = tab_bridge_route_detail;
+            } else {
+                tab_bridge_detail = "loopback listener bind failed; tab bridge disabled.";
+            }
         }
     }
     const auto initial_wasapi_snapshot = engine.wasapi_output_snapshot();
@@ -2319,10 +2324,21 @@ int wmain(const int argc, wchar_t* const* argv) {
         }
         if (!tab_bridge_route_detail.empty()) {
             const auto dropped = tab_bridge.queue.dropped_blocks();
-            if (dropped > 0U) {
-                tab_bridge_route_detail =
-                    "receiving; dropped " + std::to_string(dropped) +
-                    " block(s) while the 4-slot capture queue was full.";
+            const auto mismatched = tab_bridge.queue.sample_rate_mismatch_blocks();
+            if (dropped > 0U || mismatched > 0U) {
+                tab_bridge_route_detail = "receiving";
+                if (mismatched > 0U) {
+                    tab_bridge_route_detail +=
+                        "; dropped " + std::to_string(mismatched) +
+                        " block(s) whose source rate did not match the " +
+                        std::to_string(tab_bridge.queue.expected_sample_rate()) + " Hz sink";
+                }
+                if (dropped > 0U) {
+                    tab_bridge_route_detail +=
+                        "; dropped " + std::to_string(dropped) +
+                        " block(s) while the 4-slot capture queue was full";
+                }
+                tab_bridge_route_detail += ".";
             }
         }
         if (!driver_loopback_requested && !wav_source_requested) {
@@ -2338,7 +2354,10 @@ int wmain(const int argc, wchar_t* const* argv) {
                                     "receiving user-gesture tab capture; rendered through WASAPI sink."),
                           hibiki::ControlRouteHealthStateV1::Ready, 0U);
             } else {
-                set_route(status.routes[6U], "browser-tab", "瀏覽器分頁", tab_bridge_detail,
+                set_route(status.routes[6U], "browser-tab", "瀏覽器分頁",
+                          !tab_bridge_route_detail.empty()
+                              ? std::string_view(tab_bridge_route_detail)
+                              : std::string_view(tab_bridge_detail),
                           hibiki::ControlRouteHealthStateV1::Pending, 0U);
             }
             if (!same_route(previous_tab_route, status.routes[6U])) status_changed = true;

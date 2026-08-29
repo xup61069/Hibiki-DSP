@@ -73,6 +73,11 @@ public:
                            std::uint32_t output_capacity_frames,
                            TabCaptureBlockV1& block) noexcept;
     [[nodiscard]] std::uint32_t dropped_blocks() const noexcept;
+    // A host may bind the queue before starting its WebSocket producer. A
+    // zero rate clears the constraint for portable callers without a sink.
+    [[nodiscard]] bool set_expected_sample_rate(std::uint32_t sample_rate) noexcept;
+    [[nodiscard]] std::uint32_t expected_sample_rate() const noexcept;
+    [[nodiscard]] std::uint32_t sample_rate_mismatch_blocks() const noexcept;
 
 private:
     static constexpr std::uint32_t kSlotCount = 4U;
@@ -88,6 +93,8 @@ private:
     std::atomic<std::uint32_t> producer_sequence_{0U};
     std::atomic<std::uint32_t> consumer_sequence_{0U};
     std::atomic<std::uint32_t> dropped_blocks_{0U};
+    std::atomic<std::uint32_t> expected_sample_rate_{0U};
+    std::atomic<std::uint32_t> sample_rate_mismatch_blocks_{0U};
     std::array<Slot, kSlotCount> slots_{};
 };
 

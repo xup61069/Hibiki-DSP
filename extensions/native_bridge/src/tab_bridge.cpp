@@ -105,6 +105,11 @@ bool TabCaptureQueueV1::push(const TabCapturePacketViewV1& view) noexcept {
         view.sample_count != static_cast<std::size_t>(view.channels) * view.frames) {
         return false;
     }
+    const auto expected_rate = expected_sample_rate_.load(std::memory_order_acquire);
+    if (expected_rate != 0U && view.sample_rate != expected_rate) {
+        sample_rate_mismatch_blocks_.fetch_add(1U, std::memory_order_relaxed);
+        return false;
+    }
     const auto producer = producer_sequence_.load(std::memory_order_relaxed);
     const auto consumer = consumer_sequence_.load(std::memory_order_acquire);
     if (producer - consumer >= kSlotCount) {
@@ -150,6 +155,24 @@ bool TabCaptureQueueV1::pop(float* const interleaved,
 
 std::uint32_t TabCaptureQueueV1::dropped_blocks() const noexcept {
     return dropped_blocks_.load(std::memory_order_relaxed);
+}
+
+bool TabCaptureQueueV1::set_expected_sample_rate(const std::uint32_t sample_rate) noexcept {
+    if (sample_rate != 0U && !supported_rate(sample_rate)) return false;
+    if (producer_sequence_.load(std::memory_order_acquire) != 0U ||
+        consumer_sequence_.load(std::memory_order_acquire) != 0U) {
+        return false;
+    }
+    expected_sample_rate_.store(sample_rate, std::memory_order_release);
+    return true;
+}
+
+std::uint32_t TabCaptureQueueV1::expected_sample_rate() const noexcept {
+    return expected_sample_rate_.load(std::memory_order_acquire);
+}
+
+std::uint32_t TabCaptureQueueV1::sample_rate_mismatch_blocks() const noexcept {
+    return sample_rate_mismatch_blocks_.load(std::memory_order_relaxed);
 }
 
 static bool process_tab_capture_lane_impl(
