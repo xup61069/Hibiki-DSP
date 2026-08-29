@@ -101,6 +101,34 @@ int main()
         CHECK(!hibiki::validate_scene_definition_v1(definition));
     }
 
+    // ---- validate: scene text is printable UTF-8 ----------------------------
+    {
+        auto definition = valid_scene("catalog.unicode");
+        definition.scene.name = "\xE5\xAE\xA2\xE5\xBB\xB3";
+        definition.scene.output_group = "\xE4\xB8\xbb";
+        CHECK(hibiki::validate_scene_definition_v1(definition));
+    }
+    {
+        auto definition = valid_scene("catalog.name-control");
+        definition.scene.name = "Name\n";
+        CHECK(!hibiki::validate_scene_definition_v1(definition));
+    }
+    {
+        auto definition = valid_scene("catalog.name-malformed");
+        definition.scene.name = "Name\xC3\x28";
+        CHECK(!hibiki::validate_scene_definition_v1(definition));
+    }
+    {
+        auto definition = valid_scene("catalog.group-control");
+        definition.scene.output_group = "main\t";
+        CHECK(!hibiki::validate_scene_definition_v1(definition));
+    }
+    {
+        auto definition = valid_scene("catalog.group-malformed");
+        definition.scene.output_group = "\xE2\x82";
+        CHECK(!hibiki::validate_scene_definition_v1(definition));
+    }
+
     // ---- validate: latency mode and strict_direct must agree -----------------
     {
         auto definition = valid_scene("catalog.sample");
@@ -138,6 +166,11 @@ int main()
         CHECK(updated != nullptr && updated->scene.name == "Alpha v2");
 
         CHECK(catalog.upsert(valid_scene("")) == SceneCatalogResultV1::Invalid);
+        CHECK(catalog.size() == 1U);
+
+        auto invalid_group = valid_scene("catalog.invalid-group");
+        invalid_group.scene.output_group = "main\x7F";
+        CHECK(catalog.upsert(invalid_group) == SceneCatalogResultV1::Invalid);
         CHECK(catalog.size() == 1U);
 
         CHECK(catalog.remove("catalog.missing") ==
