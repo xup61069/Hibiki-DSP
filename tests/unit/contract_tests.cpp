@@ -82,6 +82,7 @@ extern "C" {
 #include "hibiki/windows_wasapi_output.hpp"
 #include "hibiki/windows_wasapi_handoff.hpp"
 #include "hibiki/windows_wasapi_fanout.hpp"
+#include "hibiki/wasapi_source_status.hpp"
 #endif
 
 #include <cmath>
@@ -6885,6 +6886,37 @@ int main() {
     CHECK(!wasapi_worker->submit_scaled(nullptr, 128U, 2U, 0.5F));
     WindowsWasapiSinkHandoffV1 wasapi_handoff;
     CHECK(wasapi_handoff.state() == WasapiSinkHandoffStateV1::Unbound);
+    {
+        WasapiSinkHandoffSnapshotV1 source_snapshot{};
+        source_snapshot.state = WasapiSinkHandoffStateV1::Synced;
+        source_snapshot.primary.running = true;
+        source_snapshot.primary.endpoint_ready = true;
+        source_snapshot.primary.rendered_blocks = 1U;
+        CHECK(hibiki::wasapi_source_sink_ready_v1(source_snapshot) &&
+              !hibiki::wasapi_source_sink_degraded_v1(source_snapshot));
+        source_snapshot.primary.degraded = true;
+        CHECK(!hibiki::wasapi_source_sink_ready_v1(source_snapshot) &&
+              hibiki::wasapi_source_sink_degraded_v1(source_snapshot));
+        source_snapshot.primary.degraded = false;
+        source_snapshot.primary.running = false;
+        CHECK(!hibiki::wasapi_source_sink_ready_v1(source_snapshot) &&
+              !hibiki::wasapi_source_sink_degraded_v1(source_snapshot));
+        source_snapshot.primary.running = true;
+        source_snapshot.primary.endpoint_ready = false;
+        CHECK(!hibiki::wasapi_source_sink_ready_v1(source_snapshot));
+        source_snapshot.primary.endpoint_ready = true;
+        source_snapshot.state = WasapiSinkHandoffStateV1::Degraded;
+        CHECK(!hibiki::wasapi_source_sink_ready_v1(source_snapshot) &&
+              hibiki::wasapi_source_sink_degraded_v1(source_snapshot));
+        source_snapshot.state = WasapiSinkHandoffStateV1::Synced;
+        source_snapshot.active_slot = 1U;
+        source_snapshot.secondary.running = true;
+        source_snapshot.secondary.endpoint_ready = true;
+        CHECK(hibiki::wasapi_source_sink_ready_v1(source_snapshot));
+        source_snapshot.active_slot = 2U;
+        CHECK(!hibiki::wasapi_source_sink_ready_v1(source_snapshot) &&
+              hibiki::wasapi_source_sink_degraded_v1(source_snapshot));
+    }
     CHECK(!wasapi_handoff.process(nullptr, 128U, 2U));
     CHECK(!wasapi_handoff.begin(WasapiOutputConfigV1{L"", 2U, 48000U, 20U}, 128U, 30U));
     CHECK(!wasapi_handoff.start_initial(WasapiOutputConfigV1{L"", 3U, 48000U, 20U}, 128U));

@@ -59,6 +59,13 @@ unsigned frame subtraction 產生下溢。此為 user-space 狀態診斷，不�
 才是 `Pending`，成功 render 後才是 `Ready`。這些狀態只描述 Engine Preview 的 user-space
 生命週期，不代表 physical audio delivery。
 
+Process Loopback、Driver Stream Loopback、browser-tab 與 WAV source route 只有在目前
+WASAPI handoff 為 `Synced`，且 active sink worker 同時回報 running、endpoint-ready 且未
+degraded 時，才可把成功 render 的 source 顯示為 `Ready`。handoff 或 active worker 進入
+`Degraded` 時，source route 也必須 fail-closed 為 `Degraded`；worker 停止或尚未
+endpoint-ready 則保留 `Pending`。`rendered_blocks` 等累積計數只作診斷總量，不作目前
+sink liveness 證據。
+
 只有同時傳入 `--enable-wasapi-output --enable-test-tone` 時，Engine Preview 才會建立最小 `main`
 graph，並在 control thread 以 bounded 440 Hz、約 -20 dBFS sine block 經 graph、limiter 與 WASAPI
 handoff 送出。sink snapshot 的 `rendered_blocks` 大於零後，`main-output` detail 會顯示
