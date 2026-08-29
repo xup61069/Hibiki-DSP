@@ -1,4 +1,5 @@
 #include "hibiki/vst3_lane_bridge.hpp"
+#include "hibiki/control_payloads.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -8,15 +9,23 @@
 
 namespace hibiki {
 
+namespace {
+
+[[nodiscard]] bool valid_output_group(const std::string_view output_group) noexcept {
+    return !output_group.empty() &&
+           output_group.size() <= kMaxOutputGroupBytesV1 &&
+           output_group.find('\0') == std::string_view::npos &&
+           is_printable_utf8_v1(output_group);
+}
+
+}  // namespace
+
 Vst3TapBufferV1::Vst3TapBufferV1()
     : slots_(std::make_unique<SnapshotSlot[]>(kSnapshotSlotCount)) {}
 
 int Vst3LaneRingBridgeV1::find_slot(
     const std::string_view output_group) const noexcept {
-    if (output_group.empty() ||
-        output_group.size() > kMaxOutputGroupBytesV1) {
-        return -1;
-    }
+    if (!valid_output_group(output_group)) return -1;
     for (std::size_t i = 0U; i < lanes_.size(); ++i) {
         const auto& slot = lanes_[i];
         if (slot.used &&
@@ -33,10 +42,8 @@ bool Vst3LaneRingBridgeV1::prepare_lane(
     const std::string_view output_group,
     const std::uint32_t channels,
     const std::span<float> ring_storage) noexcept {
-    if (output_group.empty() ||
-        output_group.size() > kMaxOutputGroupBytesV1 ||
-        output_group.find('\0') != std::string_view::npos ||
-        channels == 0U || channels > 8U || ring_storage.empty()) {
+    if (!valid_output_group(output_group) || channels == 0U ||
+        channels > 8U || ring_storage.empty()) {
         return false;
     }
 

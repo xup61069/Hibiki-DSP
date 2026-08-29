@@ -77,6 +77,24 @@ int main() {
     CHECK(!bridge.prepare_lane("", kStereo, storage));
     const std::string_view too_long("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", hibiki::kMaxOutputGroupBytesV1 + 1);
     CHECK(!bridge.prepare_lane(too_long, kStereo, storage));
+    const std::array<std::string_view, 7> malformed_groups{{
+        std::string_view("\x80", 1U),
+        std::string_view("\xC0\x80", 2U),
+        std::string_view("\xED\xA0\x80", 3U),
+        std::string_view("\xF4\x90\x80\x80", 4U),
+        std::string_view("\x01", 1U),
+        std::string_view("\x7F", 1U),
+        std::string_view("\xC2\x80", 2U),
+    }};
+    for (const auto group : malformed_groups) {
+        CHECK(!bridge.prepare_lane(group, kStereo, storage));
+        CHECK(!bridge.has_lane(group));
+    }
+    const std::string_view valid_multibyte_group("\xE4\xB8\xBB\xE5\x87\xBA", 6U);
+    CHECK(bridge.prepare_lane(valid_multibyte_group, kStereo, storage));
+    CHECK(bridge.has_lane(valid_multibyte_group));
+    CHECK(bridge.clear_lane(valid_multibyte_group));
+    CHECK(!bridge.has_lane(valid_multibyte_group));
     CHECK(!bridge.prepare_lane("main", 0U, storage));
     CHECK(!bridge.prepare_lane("main", 9U, storage));
     CHECK(!bridge.prepare_lane("main", kStereo, {}));
