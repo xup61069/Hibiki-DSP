@@ -82,6 +82,13 @@ static int finite_planar(const float* const* const channel_buffers,
     return 1;
 }
 
+static int finite_interleaved(const float* const samples, const size_t sample_count) {
+    for (size_t sample = 0U; sample < sample_count; ++sample) {
+        if (!isfinite(samples[sample])) return 0;
+    }
+    return 1;
+}
+
 int hibiki_asio_transport_push_planar_v1(
     struct hibiki_asio_transport_region_v1* const region,
     const size_t region_bytes,
@@ -138,11 +145,13 @@ int hibiki_asio_transport_pop_interleaved_v1(
     struct hibiki_asio_transport_slot_v1* const slot =
         &region->slots[consumer % HIBIKI_ASIO_TRANSPORT_SLOT_COUNT_V1];
     if (load_acquire(&slot->ready_sequence) != consumer + 1U ||
-        slot->frames > output_capacity_frames || slot->channels == 0U || slot->channels > 8U) {
+        slot->frames > output_capacity_frames || slot->frames > HIBIKI_ASIO_TRANSPORT_MAX_FRAMES_V1 ||
+        slot->channels == 0U || slot->channels > HIBIKI_ASIO_TRANSPORT_MAX_CHANNELS_V1) {
         return 0;
     }
-    const uint32_t samples = slot->frames * slot->channels;
-    memcpy(interleaved, slot->samples, (size_t)samples * sizeof(float));
+    const size_t samples = (size_t)slot->frames * slot->channels;
+    if (!finite_interleaved(slot->samples, samples)) return 0;
+    memcpy(interleaved, slot->samples, samples * sizeof(float));
     *output_frames = slot->frames;
     *output_channels = slot->channels;
     *output_sample_rate = slot->sample_rate;
