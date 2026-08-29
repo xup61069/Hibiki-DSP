@@ -5,9 +5,10 @@
 
 #include "hibiki/audio_engine.hpp"
 
+#include <atomic>
+#include <array>
 #include <cstddef>
 #include <cstdint>
-#include <array>
 #include <span>
 
 namespace hibiki {
@@ -79,8 +80,7 @@ public:
   [[nodiscard]] bool prepare(const VirtualMicConfigV1& config) noexcept;
   void reset() noexcept;
   void set_privacy_mute(bool muted) noexcept {
-    privacy_muted_ = muted;
-    snapshot_.privacy_muted = muted;
+    privacy_muted_.store(muted, std::memory_order_release);
   }
 
   [[nodiscard]] bool process_capture(const float* input,
@@ -93,11 +93,15 @@ public:
   [[nodiscard]] bool process_echo_reference(const float* render,
                                             float* reference,
                                             std::size_t frames) const noexcept;
-  [[nodiscard]] const VirtualMicSnapshotV1& snapshot() const noexcept { return snapshot_; }
+  [[nodiscard]] VirtualMicSnapshotV1 snapshot() const noexcept {
+    VirtualMicSnapshotV1 result = snapshot_;
+    result.privacy_muted = privacy_muted_.load(std::memory_order_acquire);
+    return result;
+  }
 
 private:
   VirtualMicSnapshotV1 snapshot_{};
-  bool privacy_muted_{true};
+  std::atomic<bool> privacy_muted_{true};
   mutable VirtualMicDspV1 dsp_{};
 };
 
