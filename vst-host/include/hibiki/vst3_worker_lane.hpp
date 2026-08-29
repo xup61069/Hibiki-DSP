@@ -23,6 +23,13 @@ struct Vst3WorkerLaneConfigV1 {
 [[nodiscard]] bool validate_vst3_worker_lane_config_v1(
     const Vst3WorkerLaneConfigV1& config) noexcept;
 
+// A worker block occupies [block_start, block_start + frames). The exclusive
+// end must remain representable so a successful exchange can advance the
+// contiguous worker timeline without wrapping.
+[[nodiscard]] bool vst3_worker_block_range_fits_v1(
+    std::uint64_t block_start,
+    std::uint32_t frames) noexcept;
+
 enum class Vst3WorkerLaneStateV1 : std::uint8_t {
     Detached,
     Prepared,
