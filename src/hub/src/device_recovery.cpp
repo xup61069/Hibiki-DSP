@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <utility>
 
 namespace hibiki {
@@ -95,7 +96,11 @@ OutputGroupVolumeStateV1 DeviceRecoveryCoordinator::safe_restart_state(
                              ? std::min(state.requested_db, bounded_safe_start)
                              : bounded_safe_start;
     state.mute = true;
-    ++state.generation;
+    // Zero is reserved for an uninitialized freshness token; saturate when
+    // no larger nonzero generation can be represented.
+    if (state.generation < (std::numeric_limits<std::uint64_t>::max)()) {
+        ++state.generation;
+    }
     return reconcile(state);
 }
 
