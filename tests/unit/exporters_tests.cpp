@@ -209,6 +209,23 @@ int main() {
         CHECK(hibiki::export_wav_f32_ir(samples, huge_rate, 8U).empty());
     }
 
+    // WAV IR: a synthetic span beyond the RIFF body limit fails before any
+    // allocation or payload access; no multi-gigabyte buffer is required.
+    {
+        constexpr auto max_riff_body_data =
+            (static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()) - 36U) /
+            sizeof(float) * sizeof(float);
+        static_assert(max_riff_body_data + 36U <=
+                      std::numeric_limits<std::uint32_t>::max());
+        static_assert(max_riff_body_data + sizeof(float) + 36U >
+                      std::numeric_limits<std::uint32_t>::max());
+        const float placeholder = 0.0F;
+        const auto oversized_samples = std::span<const float>(
+            &placeholder,
+            static_cast<std::size_t>(max_riff_body_data / sizeof(float) + 1U));
+        CHECK(hibiki::export_wav_f32_ir(oversized_samples, 48000U, 1U).empty());
+    }
+
     // WAV IR: exact RIFF layout for a stereo buffer and round-trip decode.
     {
         const std::vector<float> samples{0.25F, -0.5F, 1.0F, -1.0F};

@@ -2,7 +2,9 @@
 
 #include "hibiki/asio_transport_consumer.hpp"
 
+#include <algorithm>
 #include <cstring>
+#include <new>
 #include <string>
 
 #if defined(_WIN32)
@@ -24,6 +26,48 @@ bool format_matches(const hibiki_asio_transport_region_v1* region,
          region->channels == channels && region->sample_rate == sample_rate &&
          region->frames_per_buffer == frames_per_buffer;
 }
+
+#if defined(_WIN32)
+std::uint32_t load_sequence_acquire(volatile std::uint32_t* value) noexcept {
+  return static_cast<std::uint32_t>(InterlockedCompareExchange(
+      reinterpret_cast<volatile LONG*>(value), 0, 0));
+}
+
+void store_sequence_release(volatile std::uint32_t* value,
+                            const std::uint32_t next) noexcept {
+  InterlockedExchange(reinterpret_cast<volatile LONG*>(value), static_cast<LONG>(next));
+}
+
+bool discard_structurally_invalid_head(
+    hibiki_asio_transport_region_v1* const region,
+    const std::size_t region_bytes,
+    const std::uint32_t channels,
+    const std::uint32_t sample_rate,
+    const std::uint32_t frames_per_buffer) noexcept {
+  // The v1 C ABI has no bounded discard entry point. Once bind has validated
+  // the shared region, the sole engine consumer may release only a published
+  // slot whose metadata cannot fit the fixed v1 slot contract. No samples are
+  // read and no unbounded capacity is passed to the C ABI.
+  if (!format_matches(region, channels, sample_rate, frames_per_buffer) ||
+      region_bytes < sizeof(*region) || region->reserved != 0U) {
+    return false;
+  }
+  const auto consumer = load_sequence_acquire(&region->consumer_sequence);
+  const auto producer = load_sequence_acquire(&region->producer_sequence);
+  if (consumer == producer) return false;
+  auto* const slot = &region->slots[consumer % HIBIKI_ASIO_TRANSPORT_SLOT_COUNT_V1];
+  if (load_sequence_acquire(&slot->ready_sequence) != consumer + 1U) return false;
+
+  const bool valid_channels = slot->channels == 1U || slot->channels == 2U ||
+                              slot->channels == 6U || slot->channels == 8U;
+  if (slot->frames != 0U && slot->frames <= HIBIKI_ASIO_TRANSPORT_MAX_FRAMES_V1 &&
+      valid_channels) {
+    return false;
+  }
+  store_sequence_release(&region->consumer_sequence, consumer + 1U);
+  return true;
+}
+#endif
 
 }  // namespace
 
@@ -62,9 +106,18 @@ bool AsioTransportConsumerV1::bind(const std::wstring_view mapping_name,
     CloseHandle(mapping);
     return false;
   }
+  auto staging_storage = std::unique_ptr<float[]>(new (std::nothrow) float[
+      static_cast<std::size_t>(HIBIKI_ASIO_TRANSPORT_MAX_CHANNELS_V1) *
+      HIBIKI_ASIO_TRANSPORT_MAX_FRAMES_V1]);
+  if (staging_storage == nullptr) {
+    UnmapViewOfFile(region);
+    CloseHandle(mapping);
+    return false;
+  }
   mapping_ = mapping;
   region_ = region;
   region_bytes_ = bytes;
+  staging_storage_ = std::move(staging_storage);
 #else
   (void)channels;
   (void)sample_rate;
@@ -89,16 +142,44 @@ void AsioTransportConsumerV1::unbind() noexcept {
   channels_ = 0;
   sample_rate_ = 0;
   frames_per_buffer_ = 0;
+  staging_storage_.reset();
 }
 
 bool AsioTransportConsumerV1::pop(float* const interleaved,
                                   const std::uint32_t output_capacity_frames,
                                   AsioTransportBlockV1& block) noexcept {
   block = {};
-  if (region_ == nullptr || interleaved == nullptr) return false;
-  return hibiki_asio_transport_pop_interleaved_v1(region_, region_bytes_, interleaved,
-                                                  output_capacity_frames, &block.frames,
-                                                  &block.channels, &block.sample_rate) != 0;
+  if (region_ == nullptr || interleaved == nullptr || staging_storage_ == nullptr) return false;
+#if defined(_WIN32)
+  if (discard_structurally_invalid_head(region_, region_bytes_, channels_, sample_rate_,
+                                        frames_per_buffer_)) {
+    return false;
+  }
+#endif
+  AsioTransportBlockV1 candidate{};
+  // The C ABI only receives a frame capacity. Stage into a private buffer
+  // whose size covers the full versioned channel/frame contract, then copy to
+  // the caller only after the shared slot metadata matches this bind.
+  const auto bounded_capacity =
+      output_capacity_frames < HIBIKI_ASIO_TRANSPORT_MAX_FRAMES_V1
+          ? output_capacity_frames
+          : static_cast<std::uint32_t>(HIBIKI_ASIO_TRANSPORT_MAX_FRAMES_V1);
+  if (hibiki_asio_transport_pop_interleaved_v1(
+          region_, region_bytes_, staging_storage_.get(), bounded_capacity, &candidate.frames,
+          &candidate.channels, &candidate.sample_rate) == 0) {
+    return false;
+  }
+  // The C ABI validates the shared region header, but slot metadata is copied
+  // from shared memory. Re-check it against this consumer's bind contract so
+  // an inconsistent slot cannot enter an engine lane.
+  if (candidate.frames != frames_per_buffer_ || candidate.channels != channels_ ||
+      candidate.sample_rate != sample_rate_) {
+    return false;
+  }
+  const auto sample_count = static_cast<std::size_t>(candidate.frames) * candidate.channels;
+  std::copy_n(staging_storage_.get(), sample_count, interleaved);
+  block = candidate;
+  return true;
 }
 
 std::uint32_t AsioTransportConsumerV1::dropped_blocks() const noexcept {
