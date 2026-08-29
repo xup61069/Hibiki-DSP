@@ -1,5 +1,7 @@
 #include "hibiki/equal_loudness.hpp"
 
+#include "hibiki/control_payloads.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -53,8 +55,12 @@ bool validate_policy(const EqualLoudnessPolicyV1& policy) noexcept {
         policy.measured_f3_hz < 0.0 || policy.measured_f3_hz > 20000.0) {
         return false;
     }
+    if (policy.anchor_id.size() > 64U ||
+        (!policy.anchor_id.empty() && !is_printable_utf8_v1(policy.anchor_id))) {
+        return false;
+    }
     if (policy.mode == EqualLoudnessMode::Calibrated &&
-        (policy.anchor_id.empty() || policy.anchor_id.size() > 64U)) {
+        policy.anchor_id.empty()) {
         return false;
     }
     if (policy.mode == EqualLoudnessMode::Calibrated &&
