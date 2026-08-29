@@ -41,6 +41,8 @@ enum class WasapiOutputFailureV1 : std::uint8_t {
   Other,
 };
 
+struct WindowsWasapiOutputV1TestAccess;
+
 // WASAPI shared-mode endpoint owned by one dedicated sink worker (not the
 // Hibiki graph RT thread). That worker must initialize COM and perform bind,
 // start, render and unbind on the same apartment; the control plane schedules
@@ -70,6 +72,8 @@ public:
   [[nodiscard]] WasapiOutputFailureV1 failure() const noexcept { return failure_; }
 
 private:
+  friend struct WindowsWasapiOutputV1TestAccess;
+
   void release_resources() noexcept;
 
 #if defined(_WIN32)
