@@ -54,6 +54,11 @@ WAV source route 的 `frames=` 進度只計算實際複製進目前 bounded bloc
 loop wrap 從檔案尾端回到 frame zero 時仍增加正確的 copied-frame 數，不得以 reset 後的
 unsigned frame subtraction 產生下溢。此為 user-space 狀態診斷，不代表 physical delivery。
 
+明確要求的 WAV source 若檔案、sink、格式或 graph setup 失敗，route health 為
+`Unavailable` 且 `requires-user-action` 為 true；已完成 setup 但尚未成功 render 第一個 block
+才是 `Pending`，成功 render 後才是 `Ready`。這些狀態只描述 Engine Preview 的 user-space
+生命週期，不代表 physical audio delivery。
+
 只有同時傳入 `--enable-wasapi-output --enable-test-tone` 時，Engine Preview 才會建立最小 `main`
 graph，並在 control thread 以 bounded 440 Hz、約 -20 dBFS sine block 經 graph、limiter 與 WASAPI
 handoff 送出。sink snapshot 的 `rendered_blocks` 大於零後，`main-output` detail 會顯示

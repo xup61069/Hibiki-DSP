@@ -19,6 +19,7 @@
 #include "hibiki/windows_volume_link.hpp"
 #include "hibiki/wav_ir.hpp"
 #include "hibiki/wav_source_progress.hpp"
+#include "hibiki/wav_source_status.hpp"
 #include "hibiki/plugin_host.hpp"
 #include "hibiki/vst3_sandbox.hpp"
 
@@ -82,7 +83,6 @@ struct WasapiOutputState final {
     bool active{false};
     bool test_tone_enabled{false};
     bool driver_loopback_enabled{false};
-    bool wav_source_enabled{false};
 };
 
 constexpr std::uint32_t kTabBridgeMaxFrames = 4096U;
@@ -571,7 +571,6 @@ bool prepare_wav_file_source(WavFileSourceState& source,
         source.block_frames = output.block_frames;
         source.prepared = true;
         source.active = true;
-        output.wav_source_enabled = true;
         return true;
     } catch (...) {
         engine.rollback_graph();
@@ -1334,14 +1333,15 @@ hibiki::ControlStatusSnapshotV1 make_initial_status(
     const bool driver_loopback_enabled,
     const bool driver_loopback_ready,
     const std::string_view driver_loopback_detail,
-    const bool wav_source_enabled, const std::string_view wav_source_detail,
+    const bool wav_source_requested, const bool wav_source_ready,
+    const std::string_view wav_source_detail,
     const bool tab_bridge_enabled, const std::string_view tab_bridge_detail,
     const bool vst3_lane_enabled) noexcept {
     hibiki::ControlStatusSnapshotV1 snapshot{};
     snapshot.sequence = 1U;
     snapshot.volume = volume;
     snapshot.route_count = vst3_lane_enabled ? 8U
-        : (wav_source_enabled || driver_loopback_enabled || tab_bridge_enabled)
+        : (wav_source_requested || driver_loopback_enabled || tab_bridge_enabled)
                               ? 7U
                               : 6U;
     set_route(snapshot.routes[0U], "engine-control", "引擎控制面",
@@ -1373,10 +1373,11 @@ hibiki::ControlStatusSnapshotV1 make_initial_status(
     // The last status slot is the explicit audio-source slot: exactly one of
     // the mutually exclusive sources fills it, so the initial snapshot must
     // already name the requested mode instead of publishing a wrong route id.
-    if (wav_source_enabled) {
+    if (wav_source_requested) {
         set_route(snapshot.routes[6U], "wav-source", "WAV 檔案音源",
                   wav_source_detail,
-                  hibiki::ControlRouteHealthStateV1::Pending, 0U);
+                  hibiki::wav_source_route_state_v1(true, wav_source_ready, false),
+                  wav_source_ready ? 0U : 1U);
     } else if (driver_loopback_enabled) {
         set_route(snapshot.routes[6U], "driver-loopback", "Driver Stream Loopback",
                   driver_loopback_detail,
@@ -1946,7 +1947,7 @@ int wmain(const int argc, wchar_t* const* argv) {
                                       wasapi_output.driver_loopback_enabled,
                                       driver_loopback_ready,
                                       driver_loopback_detail,
-                                      wasapi_output.wav_source_enabled, wav_source_detail,
+                                      wav_source_requested, wav_source_ready, wav_source_detail,
                                       tab_bridge.listening, tab_bridge_detail,
                                       vst3_lane_requested);
     if (!status_store.publish(status)) return 4;
@@ -2407,8 +2408,7 @@ int wmain(const int argc, wchar_t* const* argv) {
             const auto previous_wav_route = status.routes[6U];
             set_route(status.routes[6U], "wav-source", "WAV 檔案音源",
                       wav_source_detail,
-                      wav_ready ? hibiki::ControlRouteHealthStateV1::Ready
-                                : hibiki::ControlRouteHealthStateV1::Pending,
+                      hibiki::wav_source_route_state_v1(true, wav_source.prepared, wav_ready),
                       wav_source.prepared ? 0U : 1U);
             if (!same_route(previous_wav_route, status.routes[6U])) status_changed = true;
         }
