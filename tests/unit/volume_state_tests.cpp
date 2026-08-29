@@ -128,6 +128,12 @@ int main() {
 
     // ---- apply_windows_notification free function ------------------------------------------
     {
+        OutputGroupVolumeStateV1 empty{};
+        CHECK(apply_windows_notification(empty, VolumeNotificationV1{-12.0, false, 0U}) ==
+              VolumeNotificationResult::Invalid);
+        CHECK(empty.requested_db == -60.0 && empty.effective_db == -60.0 &&
+              empty.generation == 0U && !empty.mute && empty.origin == VolumeOrigin::Windows);
+
         OutputGroupVolumeStateV1 state{};
         state.generation = 5U;
         state.safety_ceiling_db = -6.0;
@@ -209,11 +215,16 @@ int main() {
         OutputGroupVolumeBankV1 bank;
         (void)bank.register_group("spk");
 
-        VolumeNotificationV1 n{-20.0, false, 1U};
+        VolumeNotificationV1 n{-20.0, false, 5U};
         CHECK(bank.apply_windows_notification("spk", n) == VolumeNotificationResult::Accepted);
 
-        // Stale
         n.generation = 0U;
+        CHECK(bank.apply_windows_notification("spk", n) == VolumeNotificationResult::Invalid);
+        CHECK(bank.state("spk").generation == 5U &&
+              bank.state("spk").requested_db == -20.0);
+
+        // Stale
+        n.generation = 4U;
         CHECK(bank.apply_windows_notification("spk", n) == VolumeNotificationResult::StaleGeneration);
 
         // Unregistered group
@@ -223,7 +234,7 @@ int main() {
         // State reflects update
         const auto s = bank.state("spk");
         CHECK(s.requested_db == -20.0);
-        CHECK(s.generation == 1U);
+        CHECK(s.generation == 5U);
     }
 
     // ---- Bank apply_to_interleaved ------------------------------------------------------------
