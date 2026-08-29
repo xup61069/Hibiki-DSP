@@ -21,6 +21,11 @@ namespace hibiki {
 struct WindowsVolumeNotificationSnapshotV1 {
     std::uint64_t sequence{0};
     std::uint64_t generation{0};
+    // The callback receives fMasterVolume as a normalized 0..1 scalar. It is
+    // kept separately so it cannot be mistaken for the canonical dB field.
+    float master_scalar{0.0F};
+    bool master_scalar_valid{false};
+    // Populated by WindowsVolumeBroker::poll() from GetMasterVolumeLevel().
     double requested_db{-144.0};
     bool mute{false};
     std::uint32_t channel_count{0};
@@ -50,7 +55,7 @@ private:
 
     std::atomic<ULONG> references_{1};
     std::atomic<std::uint64_t> sequence_{0};
-    std::atomic<float> master_db_{-144.0F};
+    std::atomic<float> master_scalar_{0.0F};
     std::atomic<std::uint32_t> mute_{0};
     std::atomic<std::uint32_t> channel_count_{0};
     std::array<std::atomic<float>, 8> channel_scalars_{};

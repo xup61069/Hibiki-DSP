@@ -31,7 +31,7 @@ const IID kUnknownInterfaceId{0x5b2d4d31, 0x1a2b, 0x4c7d, {0x00, 0x11, 0x22, 0x3
 
 AUDIO_VOLUME_NOTIFICATION_DATA* make_notification(void* buffer,
                                                   std::size_t buffer_bytes,
-                                                  float master_db,
+                                                  float master_scalar,
                                                   bool muted,
                                                   std::uint32_t channels) {
     if (buffer_bytes < sizeof(AUDIO_VOLUME_NOTIFICATION_DATA) +
@@ -41,7 +41,7 @@ AUDIO_VOLUME_NOTIFICATION_DATA* make_notification(void* buffer,
     auto* data = static_cast<AUDIO_VOLUME_NOTIFICATION_DATA*>(buffer);
     data->guidEventContext = kEventContext;
     data->bMuted = muted ? TRUE : FALSE;
-    data->fMasterVolume = master_db;
+    data->fMasterVolume = master_scalar;
     data->nChannels = channels;
     for (std::uint32_t index = 0; index < channels; ++index) {
         data->afChannelVolumes[index] = 0.25F + static_cast<float>(index) * 0.01F;
@@ -180,6 +180,26 @@ public:
         return S_OK;
     }
 
+    HRESULT notify(float master_scalar, BOOL muted = FALSE) noexcept {
+        struct NotificationWithEightChannels {
+            GUID guidEventContext;
+            BOOL bMuted;
+            float fMasterVolume;
+            UINT nChannels;
+            float afChannelVolumes[8];
+        } notification{};
+        notification.guidEventContext = kEventContext;
+        notification.bMuted = muted;
+        notification.fMasterVolume = master_scalar;
+        notification.nChannels = 2U;
+        notification.afChannelVolumes[0] = 0.5F;
+        notification.afChannelVolumes[1] = 0.25F;
+        return callback_ == nullptr
+                   ? E_UNEXPECTED
+                   : callback_->OnNotify(
+                         reinterpret_cast<AUDIO_VOLUME_NOTIFICATION_DATA*>(&notification));
+    }
+
     float master_db_;
     BOOL muted_;
     std::uint32_t master_set_calls_{0U};
@@ -300,19 +320,36 @@ int run_callback_tests() {
         CHECK(snapshot.sequence == 0U);
         CHECK(callback->Release() == 0U);
     }
-    // A valid notification copies master level, mute, channels, and context bytes.
+    // The callback rejects values outside the documented normalized scalar
+    // range instead of allowing them to cross a unit boundary.
     {
         auto* callback = new WindowsVolumeCallback();
         std::array<unsigned char, sizeof(AUDIO_VOLUME_NOTIFICATION_DATA) + sizeof(float) * 16>
             buffer{};
         auto* notification =
-            make_notification(buffer.data(), buffer.size(), -6.5F, true, 2U);
+            make_notification(buffer.data(), buffer.size(), -0.1F, false, 1U);
+        CHECK(notification != nullptr);
+        CHECK(callback->OnNotify(notification) == E_INVALIDARG);
+        WindowsVolumeNotificationSnapshotV1 snapshot;
+        CHECK(callback->read(snapshot));
+        CHECK(snapshot.sequence == 0U && !snapshot.master_scalar_valid);
+        CHECK(callback->Release() == 0U);
+    }
+    // A valid notification copies master scalar, mute, channels, and context bytes.
+    {
+        auto* callback = new WindowsVolumeCallback();
+        std::array<unsigned char, sizeof(AUDIO_VOLUME_NOTIFICATION_DATA) + sizeof(float) * 16>
+            buffer{};
+        auto* notification =
+            make_notification(buffer.data(), buffer.size(), 0.5F, true, 2U);
         CHECK(notification != nullptr);
         CHECK(callback->OnNotify(notification) == S_OK);
         WindowsVolumeNotificationSnapshotV1 snapshot;
         CHECK(callback->read(snapshot));
         CHECK(snapshot.sequence == 2U);
-        CHECK(snapshot.requested_db == static_cast<double>(-6.5F));
+        CHECK(snapshot.master_scalar == 0.5F);
+        CHECK(snapshot.master_scalar_valid);
+        CHECK(snapshot.requested_db == -144.0);
         CHECK(snapshot.mute);
         CHECK(snapshot.channel_count == 2U);
         CHECK(snapshot.channel_scalars[0] == 0.25F);
@@ -328,7 +365,7 @@ int run_callback_tests() {
         std::array<unsigned char, sizeof(AUDIO_VOLUME_NOTIFICATION_DATA) + sizeof(float) * 16>
             buffer{};
         auto* notification =
-            make_notification(buffer.data(), buffer.size(), -1.0F, false, 12U);
+            make_notification(buffer.data(), buffer.size(), 1.0F, false, 12U);
         CHECK(notification != nullptr);
         CHECK(callback->OnNotify(notification) == S_OK);
         WindowsVolumeNotificationSnapshotV1 snapshot;
@@ -345,14 +382,16 @@ int run_callback_tests() {
             first_buffer{};
         std::array<unsigned char, sizeof(AUDIO_VOLUME_NOTIFICATION_DATA) + sizeof(float) * 16>
             second_buffer{};
-        auto* first = make_notification(first_buffer.data(), first_buffer.size(), -3.0F, false, 1U);
-        auto* second = make_notification(second_buffer.data(), second_buffer.size(), -24.0F, true, 1U);
+        auto* first = make_notification(first_buffer.data(), first_buffer.size(), 0.25F, false, 1U);
+        auto* second = make_notification(second_buffer.data(), second_buffer.size(), 1.0F, true, 1U);
         CHECK(callback->OnNotify(first) == S_OK);
         CHECK(callback->OnNotify(second) == S_OK);
         WindowsVolumeNotificationSnapshotV1 snapshot;
         CHECK(callback->read(snapshot));
         CHECK(snapshot.sequence == 4U);
-        CHECK(snapshot.requested_db == static_cast<double>(-24.0F));
+        CHECK(snapshot.master_scalar == 1.0F);
+        CHECK(snapshot.master_scalar_valid);
+        CHECK(snapshot.requested_db == -144.0);
         CHECK(snapshot.mute);
         CHECK(callback->Release() == 0U);
     }
@@ -413,6 +452,45 @@ int run_broker_tests() {
         CHECK(!broker.is_bound());
         CHECK(broker.bind_if_changed(device) == E_NOINTERFACE);
         device->Release();
+    }
+    // Broker polling resolves the callback scalar through the endpoint dB
+    // readback, preserves the notification metadata, and retries a failed
+    // read without consuming the callback sequence.
+    {
+        auto* endpoint = new FakeEndpointVolume(-37.0F, FALSE);
+        auto* device = new FakeDevice(true, endpoint);
+        WindowsVolumeBroker broker;
+        CHECK(broker.bind(device) == S_OK);
+        CHECK(endpoint->notify(0.0F, FALSE) == S_OK);
+        CHECK(broker.poll(snapshot));
+        CHECK(snapshot.master_scalar == 0.0F && snapshot.master_scalar_valid);
+        CHECK(snapshot.requested_db == -37.0);
+        CHECK(snapshot.sequence == 2U && snapshot.generation == 1U);
+        CHECK(endpoint->master_get_calls_ == 1U);
+
+        endpoint->master_db_ = -12.0F;
+        CHECK(endpoint->notify(0.5F, TRUE) == S_OK);
+        CHECK(broker.poll(snapshot));
+        CHECK(snapshot.master_scalar == 0.5F && snapshot.requested_db == -12.0 &&
+              snapshot.mute && snapshot.sequence == 4U && snapshot.generation == 2U);
+        CHECK(endpoint->master_get_calls_ == 2U);
+
+        endpoint->master_db_ = -6.0F;
+        endpoint->fail_master_get_on_call_ = 3U;
+        CHECK(endpoint->notify(1.0F, FALSE) == S_OK);
+        const auto previous_snapshot = snapshot;
+        CHECK(!broker.poll(snapshot));
+        CHECK(snapshot.sequence == previous_snapshot.sequence &&
+              snapshot.generation == previous_snapshot.generation &&
+              snapshot.requested_db == previous_snapshot.requested_db);
+        endpoint->fail_master_get_on_call_ = 0U;
+        CHECK(broker.poll(snapshot));
+        CHECK(snapshot.master_scalar == 1.0F && snapshot.requested_db == -6.0 &&
+              !snapshot.mute && snapshot.sequence == 6U && snapshot.generation == 3U);
+        CHECK(endpoint->master_get_calls_ == 4U);
+        broker.unbind();
+        CHECK(endpoint->Release() == 0U);
+        CHECK(device->Release() == 0U);
     }
     // A successful canonical dB/mute write applies both setters.
     {

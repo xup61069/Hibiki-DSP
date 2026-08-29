@@ -6089,7 +6089,7 @@ int main() {
     } notification{};
     notification.guidEventContext.Data1 = 0x12345678U;
     notification.bMuted = FALSE;
-    notification.fMasterVolume = -12.0F;
+    notification.fMasterVolume = 0.5F;
     notification.nChannels = 2U;
     notification.afChannelVolumes[0] = 0.5F;
     notification.afChannelVolumes[1] = 0.25F;
@@ -6098,7 +6098,8 @@ int main() {
           S_OK);
     WindowsVolumeNotificationSnapshotV1 callback_snapshot;
     CHECK(callback->read(callback_snapshot));
-    CHECK(std::abs(callback_snapshot.requested_db + 12.0) < 1e-6 &&
+    CHECK(callback_snapshot.master_scalar == 0.5F && callback_snapshot.master_scalar_valid &&
+          callback_snapshot.requested_db == -144.0 &&
           callback_snapshot.channel_count == 2U &&
           callback_snapshot.channel_scalars[1] == 0.25F &&
           callback_snapshot.event_context.Data1 == 0x12345678U);

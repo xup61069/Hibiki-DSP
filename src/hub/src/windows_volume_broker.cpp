@@ -48,8 +48,12 @@ HRESULT STDMETHODCALLTYPE WindowsVolumeCallback::OnNotify(
     if (notification == nullptr) {
         return E_INVALIDARG;
     }
+    if (!std::isfinite(notification->fMasterVolume) ||
+        notification->fMasterVolume < 0.0F || notification->fMasterVolume > 1.0F) {
+        return E_INVALIDARG;
+    }
     sequence_.fetch_add(1, std::memory_order_acq_rel); // odd = writer in progress
-    master_db_.store(notification->fMasterVolume, std::memory_order_relaxed);
+    master_scalar_.store(notification->fMasterVolume, std::memory_order_relaxed);
     mute_.store(notification->bMuted != FALSE ? 1U : 0U, std::memory_order_relaxed);
     const auto count = std::min<std::uint32_t>(notification->nChannels, 8U);
     channel_count_.store(count, std::memory_order_relaxed);
@@ -73,7 +77,8 @@ bool WindowsVolumeCallback::read(WindowsVolumeNotificationSnapshotV1& snapshot) 
         }
         WindowsVolumeNotificationSnapshotV1 copy;
         copy.sequence = first;
-        copy.requested_db = static_cast<double>(master_db_.load(std::memory_order_relaxed));
+        copy.master_scalar = master_scalar_.load(std::memory_order_relaxed);
+        copy.master_scalar_valid = first != 0U;
         copy.mute = mute_.load(std::memory_order_relaxed) != 0U;
         copy.channel_count = channel_count_.load(std::memory_order_relaxed);
         for (std::uint32_t index = 0; index < copy.channel_count && index < 8U; ++index) {
@@ -232,6 +237,16 @@ bool WindowsVolumeBroker::poll(WindowsVolumeNotificationSnapshotV1& snapshot) no
     if (!callback_->read(next) || next.sequence == 0 || next.sequence == last_callback_sequence_) {
         return false;
     }
+    // fMasterVolume in the callback is a normalized scalar, not dB. Resolve
+    // the canonical dB value on the owning control/COM thread before exposing
+    // the snapshot to the volume link. A failed or invalid read leaves the
+    // callback sequence unconsumed so the notification can be retried.
+    float level = -144.0F;
+    const auto level_result = endpoint_->GetMasterVolumeLevel(&level);
+    if (FAILED(level_result) || !std::isfinite(level) || level < -144.0F || level > 12.0F) {
+        return false;
+    }
+    next.requested_db = static_cast<double>(level);
     last_callback_sequence_ = next.sequence;
     next.generation = ++generation_;
     snapshot = next;
