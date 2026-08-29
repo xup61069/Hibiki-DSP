@@ -6,6 +6,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <string_view>
 
@@ -72,13 +73,16 @@ private:
     std::array<LaneSlot, kMaxVst3LaneGroupsV1> lanes_{};
 };
 
-// Lock-free single-slot snapshot of the pre-VST3 audio block. The RT
-// callback writes the latest block and bumps the sequence; the control
-// thread reads it for worker processing. Torn reads are fail-closed (the
-// caller keeps the previous safe state). This is bounded processing
-// telemetry, not content analysis or physical audio evidence.
+// Lock-free fixed-slot snapshot of the pre-VST3 audio block. The RT callback
+// publishes the latest complete slot; the control thread protects the slot
+// it is reading so the writer never overwrites an in-flight snapshot. Torn
+// reads are fail-closed (the caller keeps the previous safe state). This is
+// bounded processing telemetry, not content analysis or physical audio
+// evidence.
 class Vst3TapBufferV1 final {
 public:
+    Vst3TapBufferV1();
+
     [[nodiscard]] bool publish(const std::string_view output_group,
                                const float* interleaved,
                                std::size_t frames,
@@ -120,14 +124,30 @@ public:
 private:
     static constexpr std::size_t kCapacitySamples =
         kMaxVst3TapFramesV1 * kMaxVst3TapChannelsV1;
+    static constexpr std::size_t kSnapshotSlotCount = 3U;
+    static constexpr std::uint32_t kNoReaderSlot = 0xFFFFFFFFU;
 
-    mutable std::array<float, kCapacitySamples> buffer_{};
-    mutable std::array<char, kMaxOutputGroupBytesV1> group_{};
-    mutable std::uint8_t group_bytes_{0U};
-    mutable std::uint32_t channels_{0U};
-    mutable std::size_t frames_{0U};
-    mutable std::uint64_t sequence_{0U};
-    mutable std::atomic<std::uint64_t> write_seq_{0U};
+    struct SnapshotSlot final {
+        std::array<std::atomic<std::uint32_t>, kCapacitySamples> buffer{};
+        std::array<std::atomic<std::uint32_t>, kMaxOutputGroupBytesV1> group{};
+        std::atomic<std::uint32_t> group_bytes{0U};
+        std::atomic<std::uint32_t> channels{0U};
+        std::atomic<std::uint64_t> frames{0U};
+        std::atomic<std::uint64_t> sequence{0U};
+    };
+
+    // Every field read by the control thread is atomic. publication_ packs a
+    // monotonically increasing generation, a slot index, and a low writing
+    // bit. The writer marks the next slot as in-progress before changing it,
+    // then publishes the stable token only after all release stores complete.
+    // reader_slot_ is a bounded hazard slot: a writer may only reuse a slot
+    // that is neither published nor protected by the reader. This prevents a
+    // reader from sampling a slot while a later publication overwrites it.
+    // Allocate the fixed slots when the bridge object is constructed, outside
+    // the RT callback. publish()/read() never allocate or free storage.
+    std::unique_ptr<SnapshotSlot[]> slots_;
+    mutable std::atomic<std::uint64_t> publication_{0U};
+    mutable std::atomic<std::uint32_t> reader_slot_{kNoReaderSlot};
     mutable std::atomic<bool> valid_{false};
     mutable std::atomic<std::uint64_t> publish_attempts_{0U};
     mutable std::atomic<std::uint64_t> publish_successes_{0U};

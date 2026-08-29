@@ -133,13 +133,13 @@ bool VirtualMicRouteModel::prepare(const VirtualMicConfigV1& config) noexcept {
   if (!dsp_.prepare(config.dsp_policy, config.channels, config.sample_rate)) return false;
   snapshot_ = VirtualMicSnapshotV1{true, true, config.echo_reference_enabled,
                                    config.channels, config.sample_rate};
-  privacy_muted_ = true;
+  privacy_muted_.store(true, std::memory_order_release);
   return true;
 }
 
 void VirtualMicRouteModel::reset() noexcept {
   snapshot_ = {};
-  privacy_muted_ = true;
+  privacy_muted_.store(true, std::memory_order_release);
   dsp_.reset();
 }
 
@@ -158,7 +158,7 @@ static bool process_virtual_mic_lane_impl(
     const float* const echo_reference_interleaved,
     const std::uint32_t echo_reference_capacity_frames,
     const bool to_wasapi) noexcept {
-  const auto& snapshot = route.snapshot();
+  const auto snapshot = route.snapshot();
   if (!snapshot.prepared || input_interleaved == nullptr || capture_interleaved == nullptr ||
       output_interleaved == nullptr || frames == 0U || frames > input_capacity_frames ||
       frames > capture_capacity_frames || frames > output_capacity_frames ||
@@ -221,7 +221,8 @@ bool VirtualMicRouteModel::process_capture(const float* const input,
   if (!snapshot_.prepared || input == nullptr || output == nullptr || frames == 0U) return false;
   std::size_t samples = 0U;
   if (!checked_interleaved_sample_count(frames, snapshot_.channels, samples)) return false;
-  if (privacy_muted_) {
+  const bool privacy_muted = privacy_muted_.load(std::memory_order_acquire);
+  if (privacy_muted) {
     std::fill_n(output, samples, 0.0F);
   } else {
     if (!dsp_.process(input, nullptr, output, frames)) return false;
@@ -237,7 +238,8 @@ bool VirtualMicRouteModel::process_capture_with_reference(
   if (!snapshot_.prepared || input == nullptr || output == nullptr || frames == 0U) return false;
   std::size_t samples = 0U;
   if (!checked_interleaved_sample_count(frames, snapshot_.channels, samples)) return false;
-  if (privacy_muted_) {
+  const bool privacy_muted = privacy_muted_.load(std::memory_order_acquire);
+  if (privacy_muted) {
     std::fill_n(output, samples, 0.0F);
     return true;
   }
