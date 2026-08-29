@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "hibiki/audio_engine.hpp"
+#include "hibiki/vst3_exchange_progress.hpp"
 #include "hibiki/vst3_lane_bridge.hpp"
+#include "hibiki/vst3_route_status.hpp"
 
 #include <array>
 #include <atomic>
@@ -43,6 +45,32 @@ int main() {
     std::vector<float> sink(kStereo * kRingFrames, 0.0F);
     CHECK(!bridge.pop("main", sink.data(), 1U));
     CHECK(!bridge.clear_lane("main"));
+
+    // ---- full-ring push failure does not commit exchange progress ---------
+    hibiki::Vst3LaneRingBridgeV1 full_bridge;
+    std::vector<float> full_storage(
+        hibiki::kMaxVst3RingFramesV1 * kStereo, 0.0F);
+    CHECK(full_bridge.prepare_lane("main", kStereo, full_storage));
+    const auto full_block = make_block(kRingFrames, kStereo, 0.5F);
+    for (std::size_t block = 0U;
+         block < hibiki::kMaxVst3RingFramesV1 / kRingFrames; ++block) {
+        CHECK(full_bridge.push("main", full_block.data(), kRingFrames));
+    }
+    hibiki::Vst3ExchangeProgressV1 rejected_progress{1024U, 8U, 41U};
+    CHECK(!full_bridge.push("main", full_block.data(), kRingFrames));
+    CHECK(!hibiki::commit_vst3_exchange_progress_v1(
+        false, kRingFrames, 42U, rejected_progress));
+    CHECK(rejected_progress.block_start == 1024U &&
+          rejected_progress.processed_blocks == 8U &&
+          rejected_progress.tap_sequence == 41U);
+    CHECK(hibiki::vst3_route_state_v1(
+              true, false, false, rejected_progress.processed_blocks, 1U) ==
+          hibiki::ControlRouteHealthStateV1::Degraded);
+    CHECK(hibiki::commit_vst3_exchange_progress_v1(
+        true, kRingFrames, 42U, rejected_progress));
+    CHECK(rejected_progress.block_start == 1024U + kRingFrames &&
+          rejected_progress.processed_blocks == 9U &&
+          rejected_progress.tap_sequence == 42U);
 
     // ---- prepare_lane boundary rejection ------------------------------------
     std::vector<float> storage(kStereo * kRingFrames, 0.0F);
