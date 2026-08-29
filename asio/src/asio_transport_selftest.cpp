@@ -327,6 +327,55 @@ bool case_push_rejects_nonfinite() {
     return true;
 }
 
+bool case_pop_rejects_nonfinite_slot() {
+    struct nonfinite_case {
+        float value;
+        uint32_t sample_index;
+    };
+    const nonfinite_case cases[] = {
+        {static_cast<float>(std::nan("")), 3U * kChannels + 1U},
+        {std::numeric_limits<float>::infinity(), 0U},
+        {-std::numeric_limits<float>::infinity(), kFrames * kChannels - 1U},
+    };
+
+    for (const nonfinite_case& test_case : cases) {
+        if (!init_default()) return false;
+        fill_block(7.0f);
+        if (!fixtures_finite(kChannels, kFrames)) return false;
+        if (hibiki_asio_transport_push_planar_v1(region(), sizeof(g_region_bytes), g_planar_ptrs,
+                                                 kChannels, kFrames) != 1) {
+            return false;
+        }
+
+        struct hibiki_asio_transport_region_v1* r = region();
+        struct hibiki_asio_transport_slot_v1* slot = &r->slots[0];
+        const float saved = slot->samples[test_case.sample_index];
+        slot->samples[test_case.sample_index] = test_case.value;
+        for (float& sample : g_interleaved) sample = 17.0F;
+        uint32_t out_frames = 99U;
+        uint32_t out_channels = 99U;
+        uint32_t out_rate = 99U;
+        bool ok = hibiki_asio_transport_pop_interleaved_v1(
+                      r, sizeof(g_region_bytes), g_interleaved, kFrames, &out_frames,
+                      &out_channels, &out_rate) == 0;
+        ok = ok && out_frames == 0U && out_channels == 0U && out_rate == 0U;
+        ok = ok && r->producer_sequence == 1U && r->consumer_sequence == 0U &&
+             slot->ready_sequence == 1U;
+        ok = ok && g_interleaved[0] == 17.0F && g_interleaved[kFrames * kChannels - 1U] == 17.0F;
+        if (!ok) return false;
+
+        slot->samples[test_case.sample_index] = saved;
+        if (hibiki_asio_transport_pop_interleaved_v1(
+                r, sizeof(g_region_bytes), g_interleaved, kFrames, &out_frames, &out_channels,
+                &out_rate) != 1 || out_frames != kFrames || out_channels != kChannels ||
+            out_rate != kRate || r->consumer_sequence != 1U ||
+            g_interleaved[test_case.sample_index] != saved) {
+            return false;
+        }
+    }
+    return true;
+}
+
 // Fabricate one occupied slot as a long-running ring would have left it.
 void stamp_slot(const uint32_t sequence, const float tag) {
     struct hibiki_asio_transport_region_v1* r = region();
@@ -434,6 +483,7 @@ int main() {
     check("empty_pop_zeroes_outputs", case_empty_pop_zeroes_outputs());
     check("null_arguments_fail_closed", case_null_arguments());
     check("push_rejects_nonfinite", case_push_rejects_nonfinite());
+    check("pop_rejects_nonfinite_slot", case_pop_rejects_nonfinite_slot());
     check("wraparound_push_pop_fifo", case_wraparound_push_pop_fifo());
     check("wraparound_overflow_accounting", case_wraparound_overflow_accounting());
 
@@ -441,6 +491,6 @@ int main() {
         std::printf("asio transport selftest FAILED: %d case(s)\n", g_failures);
         return 1;
     }
-    std::printf("asio transport selftest passed (14 cases)\n");
+    std::printf("asio transport selftest passed (15 cases)\n");
     return 0;
 }
