@@ -240,14 +240,7 @@ bool WindowsProcessLoopbackSourceV1::read(float* const interleaved,
         return false;
     }
     if (packet_frames == 0U) return true;
-    if (packet_frames > capacity_frames) {
-        if (SUCCEEDED(capture_client_->ReleaseBuffer(packet_frames))) {
-            dropped_frames_ += packet_frames;
-        } else {
-            set_degraded(E_INVALIDARG);
-        }
-        return false;
-    }
+
     BYTE* data = nullptr;
     UINT32 frames = 0U;
     DWORD flags = 0U;
@@ -256,9 +249,25 @@ bool WindowsProcessLoopbackSourceV1::read(float* const interleaved,
         set_degraded(result);
         return false;
     }
-    if (frames > capacity_frames || frames > packet_frames || data == nullptr) {
-        (void)capture_client_->ReleaseBuffer(frames);
-        set_degraded(E_INVALIDARG);
+
+    // WASAPI requires GetBuffer before every ReleaseBuffer. Even when the
+    // caller's block is too small, acquire the packet first and release the
+    // number of frames actually returned by GetBuffer.
+    const bool malformed_packet = frames == 0U || frames > packet_frames;
+    if (packet_frames > capacity_frames) {
+        result = capture_client_->ReleaseBuffer(frames);
+        if (FAILED(result)) {
+            set_degraded(result);
+        } else if (malformed_packet) {
+            set_degraded(E_INVALIDARG);
+        } else {
+            dropped_frames_ += frames;
+        }
+        return false;
+    }
+    if (malformed_packet || frames > capacity_frames || data == nullptr) {
+        result = capture_client_->ReleaseBuffer(frames);
+        set_degraded(FAILED(result) ? result : E_INVALIDARG);
         return false;
     }
     const auto sample_count = static_cast<std::size_t>(frames) * channels_;

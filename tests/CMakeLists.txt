@@ -163,6 +163,7 @@ add_test(NAME hibiki_true_peak_limiter_tests COMMAND hibiki_true_peak_limiter_te
 
 add_executable(hibiki_equal_loudness_tests
   unit/equal_loudness_tests.cpp
+  unit/audio_engine_loudness_geometry_tests.cpp
 )
 
 target_link_libraries(hibiki_equal_loudness_tests PRIVATE hibiki_hub)

@@ -102,10 +102,12 @@ bool valid_session_control_request(const std::string_view session_instance_id,
            requested_db <= kSessionVolumeMaxDbV1;
 }
 
-bool has_session_instance(const AudioSessionRegistry& registry,
-                          const std::string_view session_instance_id) noexcept {
+bool has_active_session_instance(const AudioSessionRegistry& registry,
+                                 const std::string_view session_instance_id) noexcept {
     for (const auto& session : registry.sessions()) {
-        if (session.identity.session_instance_id == session_instance_id) return true;
+        if (session.active && session.identity.session_instance_id == session_instance_id) {
+            return true;
+        }
     }
     return false;
 }
@@ -117,11 +119,11 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::write_session_volume(
     const double requested_db,
     const bool mute,
     const GUID& event_context) noexcept {
-    if (!bound_) return E_UNEXPECTED;
+    if (!bound_ || degraded_) return E_UNEXPECTED;
     if (!valid_session_control_request(session_instance_id, requested_db)) {
         return E_INVALIDARG;
     }
-    if (!has_session_instance(registry_, session_instance_id)) {
+    if (!has_active_session_instance(registry_, session_instance_id)) {
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     }
     return watcher_.write_session_volume(session_instance_id, requested_db, mute, event_context);
@@ -131,12 +133,12 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::read_session_volume(
     const std::string_view session_instance_id,
     double& requested_db,
     bool& mute) noexcept {
-    if (!bound_) return E_UNEXPECTED;
+    if (!bound_ || degraded_) return E_UNEXPECTED;
     if (session_instance_id.empty() ||
         session_instance_id.size() > kMaxSessionControlIdentityBytesV1) {
         return E_INVALIDARG;
     }
-    if (!has_session_instance(registry_, session_instance_id)) {
+    if (!has_active_session_instance(registry_, session_instance_id)) {
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     }
     return watcher_.read_session_volume(session_instance_id, requested_db, mute);
@@ -147,12 +149,10 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::write_session_volume_handle(
     const double requested_db,
     const bool mute,
     const GUID& event_context) noexcept {
-    if (!bound_) return E_UNEXPECTED;
+    if (!bound_ || degraded_) return E_UNEXPECTED;
     const auto handle_generation = handle >> 32U;
     const auto handle_index = static_cast<std::uint32_t>(handle & 0xffffffffULL);
-    // Accept stale-but-not-future generations: a client may have captured a
-    // handle one refresh ago while our poll cycle bumped the generation.
-    if (handle == 0U || handle_generation == 0U || handle_generation > generation_ ||
+    if (handle == 0U || handle_generation == 0U || handle_generation != generation_ ||
         handle_index == 0U || handle_index > registry_.sessions().size()) {
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     }
@@ -164,10 +164,10 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::read_session_volume_handle(
     const std::uint64_t handle,
     double& requested_db,
     bool& mute) noexcept {
-    if (!bound_) return E_UNEXPECTED;
+    if (!bound_ || degraded_) return E_UNEXPECTED;
     const auto handle_generation = handle >> 32U;
     const auto handle_index = static_cast<std::uint32_t>(handle & 0xffffffffULL);
-    if (handle == 0U || handle_generation == 0U || handle_generation > generation_ ||
+    if (handle == 0U || handle_generation == 0U || handle_generation != generation_ ||
         handle_index == 0U || handle_index > registry_.sessions().size()) {
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     }
@@ -179,7 +179,7 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::bind_session_route_handle(
     const std::uint64_t handle,
     const std::string_view lane_id,
     const std::string_view output_group) noexcept {
-    if (!bound_) return E_UNEXPECTED;
+    if (!bound_ || degraded_) return E_UNEXPECTED;
     if (lane_id.empty() || lane_id.size() > kSessionRouteCommandLaneMaxBytesV1 ||
         output_group.empty() || output_group.size() > kSessionRouteCommandOutputMaxBytesV1 ||
         !is_printable_utf8_v1(lane_id) || !is_printable_utf8_v1(output_group)) {
@@ -187,16 +187,17 @@ HRESULT WindowsAudioSessionRouteCoordinatorV1::bind_session_route_handle(
     }
     const auto handle_generation = handle >> 32U;
     const auto handle_index = static_cast<std::uint32_t>(handle & 0xffffffffULL);
-    // Accept stale generations: the client may have read a catalog one poll
-    // cycle ago. The index bounds-check against the live registry prevents
-    // out-of-range access; identity matching below guards correctness.
-    if (handle == 0U || handle_generation == 0U || handle_generation > generation_ ||
+    if (handle == 0U || handle_generation == 0U || handle_generation != generation_ ||
         handle_index == 0U || handle_index > registry_.sessions().size()) {
+        return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+    }
+    const auto& selected_session = registry_.sessions()[handle_index - 1U];
+    if (!selected_session.active) {
         return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
     }
     try {
         AudioSessionRegistry candidate_registry = registry_;
-        const auto identity = candidate_registry.sessions()[handle_index - 1U].identity;
+        const auto identity = selected_session.identity;
         if (!candidate_registry.bind(identity, std::string(lane_id), std::string(output_group))) {
             return E_INVALIDARG;
         }
@@ -307,7 +308,7 @@ bool WindowsAudioSessionRouteCoordinatorV1::make_session_catalog_snapshot(
     const std::uint64_t sequence,
     SessionCatalogSnapshotV1& snapshot) noexcept {
     snapshot = {};
-    if (!bound_ || degraded_ || sequence == 0U ||
+    if (!bound_ || degraded_ || generation_ == 0U || sequence == 0U ||
         generation_ > static_cast<std::uint64_t>((std::numeric_limits<std::uint32_t>::max)()) ||
         registry_.sessions().size() > kSessionCatalogSnapshotCapacityV1) {
         return false;
