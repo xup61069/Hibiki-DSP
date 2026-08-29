@@ -47,6 +47,9 @@ exchange 失敗時 Degraded。Ready 只在目前 host 可 process、worker lane 
 Ready 且至少一個 block 已成功提交時成立；歷史 processed-block counter 不得掩蓋
 後續 quarantine。worker lane session 必須以 sink 的實際 block frames 準備；tap block 超過
 prepared 上限時整個 exchange fail-closed 進入 Degraded，不得靜默截斷或丟棄。
+control loop 只有在 `push_vst3_lane()` 明確成功後才可提交 worker timeline、processed-block
+counter 與 tap sequence；ring full 或 lane unavailable 的 rejected block 不得被計入，該次
+exchange 必須 quarantine 並沿用 Degraded 狀態。
 `Vst3LaneRingBridgeV1` 的 push/pop 也共享一般 Process block 的 1–4096
 frames 上限；即使 caller-owned ring 的實體容量更大，超過上限的 exchange
 必須在讀取 sample 或前進 ring index 前拒絕。sample-count 與 ring capacity

@@ -26,6 +26,7 @@
 #include "hibiki/wasapi_source_status.hpp"
 #include "hibiki/plugin_host.hpp"
 #include "hibiki/vst3_route_status.hpp"
+#include "hibiki/vst3_exchange_progress.hpp"
 #include "hibiki/vst3_sandbox.hpp"
 
 #include <Windows.h>
@@ -2219,12 +2220,25 @@ int wmain(const int argc, wchar_t* const* argv) {
                         std::span<const float>(vst3_lane.tap_buffer.data(), sample_count),
                         std::span<float>(vst3_lane.worker_output.data(), sample_count));
                     if (result == hibiki::Vst3WorkerExchangeResultV1::ok) {
-                        vst3_lane.block_start += tap_frames;
                         // Push processed audio into the ring for RT consumption.
-                        (void)engine.push_vst3_lane("main", vst3_lane.worker_output.data(),
-                                                    tap_frames);
-                        ++vst3_lane.processed_blocks;
-                        vst3_lane.tap_sequence = tap_sequence;
+                        const bool lane_pushed = engine.push_vst3_lane(
+                            "main", vst3_lane.worker_output.data(), tap_frames);
+                        hibiki::Vst3ExchangeProgressV1 progress{
+                            vst3_lane.block_start, vst3_lane.processed_blocks,
+                            vst3_lane.tap_sequence};
+                        if (hibiki::commit_vst3_exchange_progress_v1(
+                                lane_pushed, tap_frames, tap_sequence, progress)) {
+                            vst3_lane.block_start = progress.block_start;
+                            vst3_lane.processed_blocks = progress.processed_blocks;
+                            vst3_lane.tap_sequence = progress.tap_sequence;
+                        } else {
+                            ++vst3_lane.failed_blocks;
+                            vst3_lane.host.report_crash();
+                            vst3_lane.requested = false;
+                            std::fwprintf(
+                                stderr,
+                                L"error: vst3 processed block could not be committed to the lane ring.\n");
+                        }
                     } else {
                         ++vst3_lane.failed_blocks;
                     }
