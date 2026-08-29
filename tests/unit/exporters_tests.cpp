@@ -202,6 +202,14 @@ int main() {
         CHECK(hibiki::export_wav_f32_ir(samples, 48000U, 9U).empty());
     }
 
+    // WAV IR: incomplete interleaved frames fail closed for multichannel input.
+    {
+        const std::vector<float> ragged_stereo{0.0F, 1.0F, 2.0F};
+        const std::vector<float> ragged_surround{0.0F, 1.0F, 2.0F, 3.0F, 4.0F};
+        CHECK(hibiki::export_wav_f32_ir(ragged_stereo, 48000U, 2U).empty());
+        CHECK(hibiki::export_wav_f32_ir(ragged_surround, 48000U, 4U).empty());
+    }
+
     // WAV IR: byte rate overflow at u32 boundary fails closed.
     {
         const std::vector<float> samples{0.0F};
