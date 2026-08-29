@@ -137,6 +137,9 @@ APO、CamillaDSP YAML 與 REW filter list；不內嵌 equal-loudness 授權表�
 校正檔 compiler baseline，不是房間聲學 optimizer。calibration response 的
 `measured_db`／`target_db` 在 schema、C++ runtime 與 C# control model 一致限制在
 -144..+12 dB，超出範圍的頻響點在進入編譯與增益計算前即被拒絕。
+C# 的 calibration response 與 PEQ preset loader 也在 top-level 及 nested object
+套用 `JsonUnmappedMemberHandling.Disallow`，未知 properties 與 schema 的
+`additionalProperties: false` 保持一致；這是本機檔案契約驗證，不代表資料已完成聲學量測。
 編譯後可交給同一組 exporter。
 同一 exporter 也能把 caller-supplied interleaved impulse samples 寫成 32-bit
 IEEE-float WAV IR；它只負責檔案格式，不替任何未授權量測資料背書。
