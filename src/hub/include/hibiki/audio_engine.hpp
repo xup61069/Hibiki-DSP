@@ -339,7 +339,9 @@ public:
         std::string_view output_group,
         const float* interleaved,
         std::size_t frames) noexcept;
-    [[nodiscard]] EngineTransactionState transaction_state() const noexcept { return state_; }
+    [[nodiscard]] EngineTransactionState transaction_state() const noexcept {
+        return state_.load(std::memory_order_acquire);
+    }
     [[nodiscard]] bool has_active_graph() const noexcept { return has_active_graph_; }
     [[nodiscard]] const RtGraphSnapshotV1& active_graph() const noexcept { return active_graph_; }
     // Control-plane diagnostic accessor for the VST3 lane tap bridge.
@@ -472,7 +474,7 @@ private:
     bool has_active_vst3_lanes_{false};
     bool has_pending_vst3_lanes_{false};
     std::string_view pending_vst3_lane_clear_target_{};
-    EngineTransactionState state_{EngineTransactionState::Ready};
+    std::atomic<EngineTransactionState> state_{EngineTransactionState::Ready};
     bool has_active_graph_{false};
     bool has_pending_graph_{false};
     AsioTransportConsumerV1 asio_transport_{};

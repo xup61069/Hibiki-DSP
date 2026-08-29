@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include "hibiki/audio_engine.hpp"
 #include "hibiki/vst3_lane_bridge.hpp"
 
 #include <array>
@@ -334,6 +335,89 @@ int main() {
     CHECK(tap_channels == kStereo && tap_frames == kTapFrames);
     for (std::size_t i = 0U; i < kTapFrames * kStereo; ++i) {
         CHECK(tap_dest[i] == 0.125F);
+    }
+
+    // ---- engine exchange fail-closed integration ----------------------------
+    hibiki::AudioEngineModel engine;
+    hibiki::GraphConfigV1 engine_graph;
+    engine_graph.lanes.push_back(
+        hibiki::LaneConfigV1{"vst3-engine-test", "main", kStereo, 0.0, true});
+    CHECK(engine.prepare_graph(engine_graph, 1U));
+    CHECK(engine.commit_graph());
+    CHECK(engine.transaction_state() == hibiki::EngineTransactionState::Ready);
+
+    std::vector<float> engine_ring(
+        hibiki::kMaxVst3RingFramesV1 * kStereo, 0.0F);
+    CHECK(engine.prepare_vst3_lane("main", kStereo,
+                                   std::span<float>(engine_ring)));
+    CHECK(engine.commit_vst3_lane());
+    CHECK(engine.vst3_lane_active("main"));
+
+    std::vector<float> engine_silence(kRingFrames * kStereo, 0.0F);
+    const std::array<hibiki::RtLaneInputV1, 1U> engine_inputs{{
+        {engine_silence.data(), kStereo},
+    }};
+    auto engine_block = make_block(kRingFrames, kStereo, 0.25F);
+    for (std::size_t frame = 0U; frame < kRingFrames; ++frame) {
+        engine_block[frame * kStereo + 1U] = -0.25F;
+    }
+    CHECK(engine.push_vst3_lane("main", engine_block.data(), kRingFrames));
+
+    std::vector<float> engine_output(kRingFrames * kStereo, -9.0F);
+    CHECK(engine.process_output_group("main", engine_inputs,
+                                      engine_output.data(), kRingFrames));
+    for (std::size_t frame = 0U; frame < kRingFrames; ++frame) {
+        const auto left = engine_output[frame * kStereo];
+        const auto right = engine_output[frame * kStereo + 1U];
+        CHECK(std::isfinite(left) && std::isfinite(right));
+        CHECK(left > 0.0F && right < 0.0F && left == -right);
+    }
+
+    std::vector<float> engine_tap(
+        hibiki::kMaxVst3TapFramesV1 * hibiki::kMaxVst3TapChannelsV1, 0.0F);
+    std::uint32_t engine_tap_channels = 0U;
+    std::size_t engine_tap_frames = 0U;
+    std::uint64_t engine_tap_sequence = 0U;
+    CHECK(engine.read_vst3_tap(
+        "main", engine_tap.data(), hibiki::kMaxVst3TapFramesV1,
+        engine_tap_channels, engine_tap_frames, engine_tap_sequence));
+    CHECK(engine_tap_channels == kStereo &&
+          engine_tap_frames == kRingFrames && engine_tap_sequence != 0U);
+    const auto engine_sequence_before_oversized = engine_tap_sequence;
+    const auto engine_attempts_before_oversized =
+        engine.vst3_tap_publish_attempts();
+
+    constexpr auto kEngineOversizedFrames = hibiki::kMaxVst3RingFramesV1 + 1U;
+    std::vector<float> oversized_output(kEngineOversizedFrames * kStereo, -7.0F);
+    CHECK(!engine.process_output_group("main", engine_inputs,
+                                       oversized_output.data(), kEngineOversizedFrames));
+    CHECK(engine.transaction_state() == hibiki::EngineTransactionState::Degraded);
+    for (const auto value : oversized_output) CHECK(value == -7.0F);
+    CHECK(engine.vst3_tap_publish_attempts() == engine_attempts_before_oversized);
+
+    engine_tap_channels = 0U;
+    engine_tap_frames = 0U;
+    engine_tap_sequence = 0U;
+    CHECK(engine.read_vst3_tap(
+        "main", engine_tap.data(), hibiki::kMaxVst3TapFramesV1,
+        engine_tap_channels, engine_tap_frames, engine_tap_sequence));
+    CHECK(engine_tap_channels == kStereo &&
+          engine_tap_frames == kRingFrames &&
+          engine_tap_sequence == engine_sequence_before_oversized);
+    CHECK(engine.vst3_lane_active("main"));
+
+    // A rejected oversized exchange leaves the active lane usable for the
+    // next prepared block; the normal ring-underrun passthrough contract is
+    // unchanged because this block is available.
+    CHECK(engine.push_vst3_lane("main", engine_block.data(), kRingFrames));
+    engine_output.assign(kRingFrames * kStereo, -8.0F);
+    CHECK(engine.process_output_group("main", engine_inputs,
+                                      engine_output.data(), kRingFrames));
+    for (std::size_t frame = 0U; frame < kRingFrames; ++frame) {
+        const auto left = engine_output[frame * kStereo];
+        const auto right = engine_output[frame * kStereo + 1U];
+        CHECK(std::isfinite(left) && std::isfinite(right));
+        CHECK(left > 0.0F && right < 0.0F && left == -right);
     }
 
     std::fputs("all checks passed\n", stdout);

@@ -21,6 +21,19 @@ struct LoudnessPeqCompileResultV1 {
     std::size_t filter_count{0U};
 };
 
+[[nodiscard]] bool vst3_render_shape_valid(
+    const Vst3LaneRingBridgeV1& lanes,
+    const std::string_view output_group,
+    const std::size_t frames,
+    const std::uint32_t output_channels) noexcept {
+    if (!lanes.has_lane(output_group)) return true;
+    const auto channels = lanes.channel_count(output_group);
+    return frames != 0U && frames <= kMaxVst3RingFramesV1 &&
+           channels != 0U && channels <= kMaxVst3TapChannelsV1 &&
+           channels == output_channels &&
+           frames <= std::numeric_limits<std::size_t>::max() / channels;
+}
+
 // Deterministic control-plane conversion from normalized compensation points
 // to at most 16 peaking filters. Points must be sorted by frequency and every
 // retained point keeps its already policy-limited gain. Q follows neighboring
@@ -114,7 +127,7 @@ bool AudioEngineModel::prepare_graph(const GraphConfigV1& graph,
                                      const std::uint64_t revision) noexcept {
     RtGraphSnapshotV1 candidate;
     if (!compile_rt_snapshot(graph, revision, candidate)) {
-        state_ = EngineTransactionState::Degraded;
+        state_.store(EngineTransactionState::Degraded, std::memory_order_release);
         has_pending_graph_ = false;
         pending_latency_bank_ = LaneLatencyBankV1{};
         return false;
@@ -129,7 +142,7 @@ bool AudioEngineModel::prepare_graph(const GraphConfigV1& graph,
     LaneLatencyBankV1 prepared_latency_bank;
     if (!prepared_latency_bank.prepare(
             std::span<const LaneLatencyConfigV1>(latency_configs.data(), candidate.lane_count))) {
-        state_ = EngineTransactionState::Degraded;
+        state_.store(EngineTransactionState::Degraded, std::memory_order_release);
         has_pending_graph_ = false;
         pending_latency_bank_ = LaneLatencyBankV1{};
         return false;
@@ -138,7 +151,7 @@ bool AudioEngineModel::prepare_graph(const GraphConfigV1& graph,
         const auto& lane = candidate.lanes[index];
         if (volume_bank_ == nullptr || !volume_bank_->register_group(std::string_view(
                 lane.output_group.data(), lane.output_group_bytes))) {
-            state_ = EngineTransactionState::Degraded;
+            state_.store(EngineTransactionState::Degraded, std::memory_order_release);
             has_pending_graph_ = false;
             pending_latency_bank_ = LaneLatencyBankV1{};
             return false;
@@ -147,7 +160,7 @@ bool AudioEngineModel::prepare_graph(const GraphConfigV1& graph,
     pending_graph_ = candidate;
     pending_latency_bank_ = std::move(prepared_latency_bank);
     has_pending_graph_ = true;
-    state_ = EngineTransactionState::Prepared;
+    state_.store(EngineTransactionState::Prepared, std::memory_order_release);
     return true;
 }
 
@@ -163,14 +176,16 @@ bool AudioEngineModel::commit_graph() noexcept {
     active_latency_bank_ = std::move(pending_latency_bank_);
     has_active_graph_ = true;
     has_pending_graph_ = false;
-    state_ = EngineTransactionState::Ready;
+    state_.store(EngineTransactionState::Ready, std::memory_order_release);
     return true;
 }
 
 void AudioEngineModel::rollback_graph() noexcept {
     has_pending_graph_ = false;
     pending_latency_bank_ = LaneLatencyBankV1{};
-    state_ = has_active_graph_ ? EngineTransactionState::Ready : EngineTransactionState::Degraded;
+    state_.store(has_active_graph_ ? EngineTransactionState::Ready
+                                   : EngineTransactionState::Degraded,
+                 std::memory_order_release);
 }
 
 bool AudioEngineModel::prepare_ir(const std::string_view output_group,
@@ -747,8 +762,16 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
                                             const std::span<const RtLaneInputV1> inputs,
                                             float* const output_interleaved,
                                             const std::size_t frames) noexcept {
+    if (!has_active_graph_) return false;
+    // Preflight the active VST3 lane before graph/latency processing. A block
+    // the tap or ring cannot represent is a degraded exchange, not a
+    // successful graph render with passthrough output.
+    if (!vst3_render_shape_valid(active_vst3_lanes_, output_group, frames,
+                                 active_graph_.output_channels)) {
+        state_.store(EngineTransactionState::Degraded, std::memory_order_release);
+        return false;
+    }
     if (!loudness_peq_geometry_valid(output_group, output_interleaved, frames) ||
-        !has_active_graph_ ||
         !process_graph_for_output_group(active_graph_, output_group, inputs,
                                         output_interleaved, frames, &active_latency_bank_)) {
         return false;
@@ -760,11 +783,16 @@ bool AudioEngineModel::process_output_group(const std::string_view output_group,
     // The tap is control-plane telemetry for VST3 lane workers. When no
     // lane is active the sandbox never reads it, so skip the isfinite scan
     // and copies entirely instead of paying the cost every RT block.
-    if (has_active_vst3_lanes_) {
-        (void)vst3_tap_.publish(output_group, output_interleaved,
-                                frames, active_graph_.output_channels);
+    if (has_active_vst3_lanes_ && active_vst3_lanes_.has_lane(output_group) &&
+        !vst3_tap_.publish(output_group, output_interleaved,
+                           frames, active_graph_.output_channels)) {
+        state_.store(EngineTransactionState::Degraded, std::memory_order_release);
+        return false;
     }
-    if (!apply_vst3_lanes(output_group, output_interleaved, frames)) return false;
+    if (!apply_vst3_lanes(output_group, output_interleaved, frames)) {
+        state_.store(EngineTransactionState::Degraded, std::memory_order_release);
+        return false;
+    }
     if (!apply_group_master(output_group, output_interleaved, frames)) return false;
     if (!active_graph_.strict_direct) {
         auto* const group_limiter =
@@ -1440,9 +1468,11 @@ bool AudioEngineModel::apply_vst3_lanes(
     // Pop the processed block from the ring into a temporary buffer and
     // overwrite the output. If insufficient data, passthrough (do not block).
     const auto channels = active_vst3_lanes_.channel_count(output_group);
-    if (channels == 0U ||
-        frames * channels > kMaxVst3RingFramesV1 * 8U) {
-        return true;
+    if (channels == 0U || channels > kMaxVst3TapChannelsV1 ||
+        channels != active_graph_.output_channels ||
+        frames > kMaxVst3RingFramesV1 ||
+        frames > std::numeric_limits<std::size_t>::max() / channels) {
+        return false;
     }
     std::array<float, kMaxVst3RingFramesV1 * 8U> temp{};
     if (!active_vst3_lanes_.pop(output_group, temp.data(), frames)) {
