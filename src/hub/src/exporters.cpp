@@ -93,20 +93,39 @@ void write_u32(std::vector<std::uint8_t>& output, const std::uint32_t value) {
 std::vector<std::uint8_t> export_wav_f32_ir(const std::span<const float> interleaved_samples,
                                            const std::uint32_t sample_rate,
                                            const std::uint16_t channels) {
-    if (interleaved_samples.empty() || sample_rate == 0 || channels == 0 || channels > 8 ||
-        interleaved_samples.size() > (std::numeric_limits<std::uint32_t>::max() / sizeof(float))) {
+    constexpr std::uint64_t kRiffBodyBytes = 36U;
+    constexpr std::uint64_t kWavHeaderBytes = 44U;
+    constexpr std::uint64_t kFloatBytes = sizeof(float);
+    constexpr auto kMaxU32 = std::numeric_limits<std::uint32_t>::max();
+
+    if (interleaved_samples.empty() || sample_rate == 0 || channels == 0 || channels > 8) {
         return {};
     }
-    const auto data_bytes = static_cast<std::uint32_t>(interleaved_samples.size() * sizeof(float));
-    const auto riff_bytes = 36U + data_bytes;
+
+    // Keep all byte-count additions widened until each serialized field and
+    // the vector reserve size have been proven representable.
+    if (interleaved_samples.size() > std::numeric_limits<std::uint64_t>::max() ||
+        static_cast<std::uint64_t>(interleaved_samples.size()) >
+            (std::numeric_limits<std::uint64_t>::max() - kWavHeaderBytes) / kFloatBytes) {
+        return {};
+    }
+    const auto data_bytes_wide = static_cast<std::uint64_t>(interleaved_samples.size()) * kFloatBytes;
+    const auto riff_bytes_wide = kRiffBodyBytes + data_bytes_wide;
+    const auto output_bytes_wide = kWavHeaderBytes + data_bytes_wide;
+    if (data_bytes_wide > kMaxU32 || riff_bytes_wide > kMaxU32 ||
+        output_bytes_wide > std::numeric_limits<std::size_t>::max()) {
+        return {};
+    }
+    const auto data_bytes = static_cast<std::uint32_t>(data_bytes_wide);
+    const auto riff_bytes = static_cast<std::uint32_t>(riff_bytes_wide);
     const auto byte_rate_wide = static_cast<std::uint64_t>(sample_rate) * channels * sizeof(float);
-    if (byte_rate_wide > std::numeric_limits<std::uint32_t>::max()) {
+    if (byte_rate_wide > kMaxU32) {
         return {};
     }
     const auto byte_rate = static_cast<std::uint32_t>(byte_rate_wide);
     const auto block_align = static_cast<std::uint16_t>(channels * sizeof(float));
     std::vector<std::uint8_t> output;
-    output.reserve(44U + data_bytes);
+    output.reserve(static_cast<std::size_t>(output_bytes_wide));
     const auto append_tag = [&output](const char* tag) {
         output.insert(output.end(), tag, tag + 4);
     };
