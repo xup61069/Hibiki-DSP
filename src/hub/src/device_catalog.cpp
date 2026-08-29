@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "hibiki/device_catalog.hpp"
+#include "hibiki/control_payloads.hpp"
 
 #include <algorithm>
 
@@ -8,11 +9,7 @@ namespace hibiki {
 namespace {
 
 bool printable_utf8_bytes(const std::string& value, const std::size_t max_bytes) noexcept {
-    if (value.empty() || value.size() > max_bytes) return false;
-    for (const unsigned char byte : value) {
-        if (byte < 0x20U || byte == 0x7fU) return false;
-    }
-    return true;
+    return !value.empty() && value.size() <= max_bytes && is_printable_utf8_v1(value);
 }
 
 bool valid_flow(const PhysicalDeviceFlowV1 flow) noexcept {

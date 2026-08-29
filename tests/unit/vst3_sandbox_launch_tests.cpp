@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "hibiki/vst3_sandbox.hpp"
+#include "hibiki/vst3_worker_lane.hpp"
 
 #include <cmath>
 #include <cstdint>
@@ -142,6 +143,16 @@ int main() {
         launch.vst3_sample_rate = 48000.0;
         launch.vst3_channels = invalid_channels;
         CHECK(!validate_vst3_sandbox_launch_v1(launch));
+    }
+
+    // ---- worker block timeline must not wrap -------------------------------
+    {
+        constexpr std::uint64_t kMax = (std::numeric_limits<std::uint64_t>::max)();
+        CHECK(vst3_worker_block_range_fits_v1(kMax - 1U, 1U));
+        CHECK(vst3_worker_block_range_fits_v1(kMax - 4095U, 4095U));
+        CHECK(!vst3_worker_block_range_fits_v1(kMax - 4095U, 4096U));
+        CHECK(!vst3_worker_block_range_fits_v1(kMax, 1U));
+        CHECK(!vst3_worker_block_range_fits_v1(0U, 0U));
     }
 
     return 0;

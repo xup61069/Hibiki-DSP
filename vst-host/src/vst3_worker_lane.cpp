@@ -3,6 +3,7 @@
 #include "hibiki/vst3_worker_lane.hpp"
 
 #include <cmath>
+#include <limits>
 
 namespace hibiki {
 namespace {
@@ -21,6 +22,14 @@ bool validate_vst3_worker_lane_config_v1(
            config.reported_latency_samples <= kLatencyGraphMaxSamplesV1 &&
            config.max_block_frames > 0U &&
            config.max_block_frames <= kVst3WorkerMaxFramesV1;
+}
+
+bool vst3_worker_block_range_fits_v1(
+    const std::uint64_t block_start,
+    const std::uint32_t frames) noexcept {
+    return frames != 0U &&
+           static_cast<std::uint64_t>(frames) <=
+               (std::numeric_limits<std::uint64_t>::max)() - block_start;
 }
 
 bool Vst3WorkerLaneSessionV1::prepare(
@@ -68,7 +77,8 @@ Vst3WorkerExchangeResultV1 Vst3WorkerLaneSessionV1::process_block(
     if (state_ != Vst3WorkerLaneStateV1::Ready || sandbox_ == nullptr) {
         return Vst3WorkerExchangeResultV1::not_connected;
     }
-    if (frames == 0U || frames > config_.max_block_frames ||
+    if (!vst3_worker_block_range_fits_v1(block_start, frames) ||
+        frames > config_.max_block_frames ||
         (has_processed_block_ && block_start != next_block_start_)) {
         state_ = Vst3WorkerLaneStateV1::Degraded;
         return Vst3WorkerExchangeResultV1::invalid_argument;
@@ -81,10 +91,6 @@ Vst3WorkerExchangeResultV1 Vst3WorkerLaneSessionV1::process_block(
         return result;
     }
     next_block_start_ = block_start + static_cast<std::uint64_t>(frames);
-    if (next_block_start_ < block_start) {
-        state_ = Vst3WorkerLaneStateV1::Degraded;
-        return Vst3WorkerExchangeResultV1::invalid_argument;
-    }
     has_processed_block_ = true;
     return Vst3WorkerExchangeResultV1::ok;
 }

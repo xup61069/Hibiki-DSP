@@ -7,6 +7,46 @@ public static class DoseRemainingCheck
 {
     public static void Run(Action<bool, string> check)
     {
+        // A missing persisted queue is an empty queue even when the loader is
+        // reused after previously holding operations.
+        var sceneQueue = new CustomSceneSyncQueueV1();
+        check(sceneQueue.Enqueue(new SceneCatalogQueueCard(false, "stale-scene", "", "")),
+            "The queue fixture must accept a valid removal operation.");
+        var missingQueuePath = Path.Combine(
+            Path.GetTempPath(), $"hibiki-missing-scene-queue-{Guid.NewGuid():N}.json");
+        try
+        {
+            check(sceneQueue.TryLoad(missingQueuePath, out var droppedOperations, out var queueError) &&
+                  droppedOperations == 0 && sceneQueue.Operations.Count == 0 &&
+                  queueError.Length == 0,
+                "Loading a missing scene queue must clear stale operations and report an empty queue.");
+        }
+        finally
+        {
+            if (File.Exists(missingQueuePath)) File.Delete(missingQueuePath);
+        }
+
+        // An existing directory is not a missing queue file; opening it must
+        // fail closed and preserve the already-loaded operations.
+        check(sceneQueue.Enqueue(new SceneCatalogQueueCard(false, "still-stale-scene", "", "")),
+            "The queue fixture must accept an operation before the unreadable-path check.");
+        var unreadableQueuePath = Path.Combine(
+            Path.GetTempPath(), $"hibiki-unreadable-scene-queue-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(unreadableQueuePath);
+        try
+        {
+            check(!sceneQueue.TryLoad(unreadableQueuePath, out var unreadableDropped,
+                                      out var unreadableError) &&
+                  unreadableDropped == 0 && sceneQueue.Operations.Count == 1 &&
+                  sceneQueue.Operations[0].SceneId == "still-stale-scene" &&
+                  unreadableError.Length > 0,
+                "An unreadable existing queue path must fail closed without changing the queue.");
+        }
+        finally
+        {
+            if (Directory.Exists(unreadableQueuePath)) Directory.Delete(unreadableQueuePath);
+        }
+
         var dose = new ListeningDoseModelV1();
         check(dose.RemainingSafeTimeText == "尚無資料",
             "A fresh dose must report no data for the remaining safe time.");
