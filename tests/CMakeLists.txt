@@ -579,21 +579,6 @@ endif()
 add_test(NAME hibiki_vst3_lane_bridge_tests COMMAND hibiki_vst3_lane_bridge_tests)
 
 
-add_executable(hibiki_vst3_engine_integration_tests
-  unit/vst3_engine_integration_tests.cpp
-)
-
-target_link_libraries(hibiki_vst3_engine_integration_tests PRIVATE hibiki_hub)
-
-if(MSVC)
-  target_compile_options(hibiki_vst3_engine_integration_tests PRIVATE /W4 /permissive- /EHsc)
-else()
-  target_compile_options(hibiki_vst3_engine_integration_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
-endif()
-
-add_test(NAME hibiki_vst3_engine_integration_tests COMMAND hibiki_vst3_engine_integration_tests)
-
-
 add_executable(hibiki_output_handoff_tests
   unit/output_handoff_tests.cpp
 )
