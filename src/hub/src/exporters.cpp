@@ -101,6 +101,9 @@ std::vector<std::uint8_t> export_wav_f32_ir(const std::span<const float> interle
     if (interleaved_samples.empty() || sample_rate == 0 || channels == 0 || channels > 8) {
         return {};
     }
+    if (interleaved_samples.size() % channels != 0) {
+        return {};
+    }
 
     // Keep all byte-count additions widened until each serialized field and
     // the vector reserve size have been proven representable.
