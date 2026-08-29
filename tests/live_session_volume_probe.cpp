@@ -44,6 +44,7 @@ HRESULT start_silent_session(IMMDevice* const device,
     IAudioRenderClient* render = nullptr;
     HRESULT result = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
                                       reinterpret_cast<void**>(&client));
+    if (SUCCEEDED(result) && client == nullptr) result = E_POINTER;
     if (SUCCEEDED(result)) result = client->GetMixFormat(&format);
     if (SUCCEEDED(result) && format == nullptr) result = E_FAIL;
     if (SUCCEEDED(result)) {
@@ -56,6 +57,7 @@ HRESULT start_silent_session(IMMDevice* const device,
         result = client->GetService(__uuidof(IAudioRenderClient),
                                     reinterpret_cast<void**>(&render));
     }
+    if (SUCCEEDED(result) && render == nullptr) result = E_POINTER;
     if (format != nullptr) CoTaskMemFree(format);
     if (FAILED(result)) {
         if (render != nullptr) render->Release();
@@ -66,6 +68,7 @@ HRESULT start_silent_session(IMMDevice* const device,
     IAudioSessionControl* session_control = nullptr;
     result = client->GetService(__uuidof(IAudioSessionControl),
                                 reinterpret_cast<void**>(&session_control));
+    if (SUCCEEDED(result) && session_control == nullptr) result = E_POINTER;
     if (SUCCEEDED(result)) {
         GUID event_context{};
         (void)CoCreateGuid(&event_context);
@@ -91,6 +94,7 @@ HRESULT start_silent_session(IMMDevice* const device,
                 BYTE* data = nullptr;
                 const UINT32 available = buffer_frames - padding;
                 result = render->GetBuffer(available, &data);
+                if (SUCCEEDED(result) && data == nullptr) result = E_POINTER;
                 if (SUCCEEDED(result)) {
                     result = render->ReleaseBuffer(available, AUDCLNT_BUFFERFLAGS_SILENT);
                 }
@@ -125,8 +129,12 @@ int wmain() {
     IAudioClient* client = nullptr;
     IAudioRenderClient* render = nullptr;
     hibiki::WindowsAudioSessionRouteCoordinatorV1 coordinator;
-    bool changed = false;
+    // Arm cleanup before issuing the write. A successful write can lose its
+    // later readback, so cleanup must assume the temporary session changed
+    // until restoration is confirmed.
+    bool restore_required = false;
     bool passed = false;
+    bool unavailable = false;
     double original_db = -144.0;
     double attenuated_db = -144.0;
     double restored_db = -144.0;
@@ -134,7 +142,7 @@ int wmain() {
     std::uint64_t target_handle = 0U;
 
     auto restore = [&]() noexcept -> bool {
-        if (!changed) return true;
+        if (!restore_required) return true;
         GUID event_context{};
         (void)CoCreateGuid(&event_context);
         const HRESULT write_result = coordinator.write_session_volume_handle(
@@ -147,41 +155,50 @@ int wmain() {
             return false;
         }
         restored_db = read_db;
-        changed = false;
-        return close_db(read_db, original_db) && read_mute == original_mute;
+        if (!close_db(read_db, original_db) || read_mute != original_mute) {
+            return false;
+        }
+        restore_required = false;
+        return true;
     };
 
     do {
         HRESULT result = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
                                           IID_PPV_ARGS(&enumerator));
+        if (SUCCEEDED(result) && enumerator == nullptr) result = E_POINTER;
         if (SUCCEEDED(result)) {
             result = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
         }
         if (FAILED(result) || device == nullptr) {
             std::printf("session_volume_live=unavailable reason=default-endpoint\n");
+            unavailable = true;
             break;
         }
 
         result = start_silent_session(device, &client, &render);
         if (FAILED(result)) {
             std::printf("session_volume_live=unavailable reason=silent-session\n");
+            unavailable = true;
             break;
         }
         result = coordinator.bind(device);
         if (FAILED(result)) {
             std::printf("session_volume_live=unavailable reason=route-bind\n");
+            unavailable = true;
             break;
         }
         const auto refresh_result = coordinator.refresh();
         if (refresh_result == hibiki::WindowsAudioSessionRouteRefreshResultV1::Degraded ||
             refresh_result == hibiki::WindowsAudioSessionRouteRefreshResultV1::Unbound) {
             std::printf("session_volume_live=unavailable reason=route-refresh\n");
+            unavailable = true;
             break;
         }
 
         hibiki::SessionCatalogSnapshotV1 catalog{};
         if (!coordinator.make_session_catalog_snapshot(1U, catalog)) {
             std::printf("session_volume_live=unavailable reason=catalog\n");
+            unavailable = true;
             break;
         }
         for (std::size_t index = 0U; index < catalog.entry_count; ++index) {
@@ -196,22 +213,24 @@ int wmain() {
         }
         if (target_handle == 0U) {
             std::printf("session_volume_live=unavailable reason=session-not-published\n");
+            unavailable = true;
             break;
         }
 
         if (FAILED(coordinator.read_session_volume_handle(target_handle, original_db, original_mute))) {
-            std::printf("session_volume_live=fail reason=initial-read\n");
+            std::printf("session_volume_live=unavailable reason=initial-read\n");
+            unavailable = true;
             break;
         }
         const double target_db = std::max(-144.0, original_db - 3.0);
         GUID event_context{};
         (void)CoCreateGuid(&event_context);
+        restore_required = true;
         if (FAILED(coordinator.write_session_volume_handle(
                 target_handle, target_db, original_mute, event_context))) {
             std::printf("session_volume_live=fail reason=attenuation-write\n");
             break;
         }
-        changed = true;
         std::this_thread::sleep_for(std::chrono::milliseconds(120));
         bool attenuated_mute = false;
         if (FAILED(coordinator.read_session_volume_handle(
@@ -241,5 +260,5 @@ int wmain() {
     if (device != nullptr) device->Release();
     if (enumerator != nullptr) enumerator->Release();
     if (com_initialized && com_result != RPC_E_CHANGED_MODE) CoUninitialize();
-    return passed ? 0 : 1;
+    return passed || unavailable ? 0 : 1;
 }

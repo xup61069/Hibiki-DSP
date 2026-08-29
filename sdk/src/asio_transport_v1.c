@@ -2,6 +2,7 @@
 
 #include "hibiki/asio_transport_v1.h"
 
+#include <math.h>
 #include <string.h>
 
 #if defined(_WIN32)
@@ -70,6 +71,17 @@ static int valid_region(const struct hibiki_asio_transport_region_v1* const regi
            valid_format(region->channels, region->sample_rate, region->frames_per_buffer);
 }
 
+static int finite_planar(const float* const* const channel_buffers,
+                         const uint32_t channels,
+                         const uint32_t frames) {
+    for (uint32_t channel = 0U; channel < channels; ++channel) {
+        for (uint32_t frame = 0U; frame < frames; ++frame) {
+            if (!isfinite(channel_buffers[channel][frame])) return 0;
+        }
+    }
+    return 1;
+}
+
 int hibiki_asio_transport_push_planar_v1(
     struct hibiki_asio_transport_region_v1* const region,
     const size_t region_bytes,
@@ -83,6 +95,7 @@ int hibiki_asio_transport_push_planar_v1(
     for (uint32_t channel = 0U; channel < channels; ++channel) {
         if (channel_buffers[channel] == NULL) return 0;
     }
+    if (!finite_planar(channel_buffers, channels, frames)) return 0;
     const uint32_t producer = load_acquire(&region->producer_sequence);
     const uint32_t consumer = load_acquire(&region->consumer_sequence);
     if ((uint32_t)(producer - consumer) >= HIBIKI_ASIO_TRANSPORT_SLOT_COUNT_V1) {
