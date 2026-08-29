@@ -54,6 +54,10 @@ WAV source route 的 `frames=` 進度只計算實際複製進目前 bounded bloc
 loop wrap 從檔案尾端回到 frame zero 時仍增加正確的 copied-frame 數，不得以 reset 後的
 unsigned frame subtraction 產生下溢。此為 user-space 狀態診斷，不代表 physical delivery。
 
+device-free offline WAV render 以 128-frame bounded block 處理完整 decoded source；每個 block
+的 lane view 必須從目前 source-frame offset 開始，mono 擴展後亦同。output cursor 與 input
+cursor 必須同步前進，不得把第一個 block 的 pointer 重複傳給後續 graph calls。
+
 WAV source 進入重採樣路徑時，只有在 bounded polyphase conversion 產生足夠且全部為 finite
 的輸出後，才可將精確的 `nominal * channel_count` samples commit 回 decoded source；
 更新 sample rate metadata 前不得只 resize destination 而遺留原始 prefix 或 zero tail。

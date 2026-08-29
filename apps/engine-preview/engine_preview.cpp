@@ -6,6 +6,7 @@
 #include "hibiki/driver_stream_ring_v1.h"
 #include "hibiki/engine_control.hpp"
 #include "hibiki/noise_suppressor.hpp"
+#include "hibiki/offline_wav_source.hpp"
 #include "hibiki/output_sink.hpp"
 #include "hibiki/scene_presets.hpp"
 #include "hibiki/session_catalog.hpp"
@@ -723,13 +724,17 @@ bool render_wav_offline(const std::filesystem::path& input_path,
             channels == 1U
                 ? lane_block.data()
                 : decoded_data.interleaved_samples.data();
-        const hibiki::RtLaneInputV1 lane{
-            lane_data, static_cast<std::uint16_t>(kOfflineRenderOutputChannelsV1)};
+        hibiki::RtLaneInputV1 lane{};
         constexpr std::size_t kBlock = 128U;  // matches kWavSource block cadence
         std::size_t offset = 0U;
         while (offset < decoded_data.frames()) {
             const auto frames = (std::min)(static_cast<std::size_t>(kBlock),
                                            decoded_data.frames() - offset);
+            if (!hibiki::make_offline_wav_lane_v1(
+                    lane_data, kOfflineRenderOutputChannelsV1, offset, lane)) {
+                error_detail = "offline source lane offset is outside the bounded pointer range";
+                return false;
+            }
             float* out_base = rendered.data() +
                               offset * kOfflineRenderOutputChannelsV1;
             if (!engine.process_output_group(
