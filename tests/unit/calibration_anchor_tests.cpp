@@ -40,6 +40,8 @@ int main() {
     {
         auto anchor = make_valid_anchor();
         CHECK(validate_acoustic_anchor(anchor));
+        anchor.device_class = static_cast<AcousticDeviceClass>(0xFFU);
+        CHECK(!validate_acoustic_anchor(anchor));
         anchor.schema_version = 2;
         CHECK(!validate_acoustic_anchor(anchor));
         anchor.schema_version = 0;
@@ -150,6 +152,13 @@ int main() {
         const auto invalid_schema = estimate_phon(anchor, -20.0, 0.0);
         CHECK(invalid_schema.phon == 0.0 && invalid_schema.uncertainty_db == 0.0 &&
               !invalid_schema.calibrated);
+
+        anchor.schema_version = 1;
+        anchor.device_class = static_cast<AcousticDeviceClass>(0xFFU);
+        const auto invalid_device_class = estimate_phon(anchor, -20.0, 0.0);
+        CHECK(invalid_device_class.phon == 0.0 &&
+              invalid_device_class.uncertainty_db == 0.0 &&
+              !invalid_device_class.calibrated);
     }
 
     // ---- estimate_phon: linear model ----------------------------------------
