@@ -35,6 +35,7 @@
 #include "hibiki/driver_stream_bridge.hpp"
 #include "hibiki/session_catalog.hpp"
 #include "hibiki/session_command_queue.hpp"
+#include "hibiki/tab_bridge_status.hpp"
 #include "hibiki/wav_source_progress.hpp"
 #include "hibiki/wav_source_status.hpp"
 
@@ -738,6 +739,9 @@ hibiki::Vst3PluginStateResultV1 migrate_oversized_plugin_state(
 }
 
 int main() {
+    CHECK(!hibiki::tab_bridge_start_allowed_v1(true, false) &&
+          hibiki::tab_bridge_start_allowed_v1(true, true) &&
+          hibiki::tab_bridge_start_allowed_v1(false, false));
     CHECK(hibiki::wav_source_route_state_v1(false, false, false) ==
               hibiki::ControlRouteHealthStateV1::Unavailable &&
           hibiki::wav_source_route_state_v1(true, false, false) ==
