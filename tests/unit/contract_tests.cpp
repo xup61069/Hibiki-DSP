@@ -4215,9 +4215,25 @@ int main() {
     enqueue_tab_capture_packet_v1(tab_view, tab_queue.get());
     float tab_output[8]{};
     TabCaptureBlockV1 tab_block{};
-    CHECK(tab_queue->pop(tab_output, 2U, tab_block));
+    CHECK(tab_queue->pop(tab_output, 4U, tab_block));
     CHECK(tab_block.frames == 2U && tab_block.channels == 2U &&
           std::abs(tab_output[2] - 0.5F) < 1e-6F);
+    std::vector<float> maximum_tab_samples(hibiki::kTabCaptureMaxSamplesV1, 0.5F);
+    const TabCapturePacketViewV1 maximum_tab_view{
+        hibiki::kTabCaptureMaxChannelsV1, hibiki::kTabCaptureMaxFramesV1, 48000U,
+        reinterpret_cast<const std::uint8_t*>(maximum_tab_samples.data()),
+        maximum_tab_samples.size()};
+    auto maximum_tab_queue = std::make_unique<TabCaptureQueueV1>();
+    std::vector<float> maximum_tab_output(hibiki::kTabCaptureMaxSamplesV1, 0.0F);
+    CHECK(maximum_tab_queue->push(maximum_tab_view));
+    CHECK(!maximum_tab_queue->pop(maximum_tab_output.data(),
+                                  maximum_tab_output.size() - 1U, tab_block) &&
+          tab_block.frames == 0U && tab_block.channels == 0U);
+    CHECK(maximum_tab_queue->pop(maximum_tab_output.data(), maximum_tab_output.size(),
+                                 tab_block) &&
+          tab_block.frames == hibiki::kTabCaptureMaxFramesV1 &&
+          tab_block.channels == hibiki::kTabCaptureMaxChannelsV1 &&
+          maximum_tab_output[0] == 0.5F);
     auto full_tab_queue = std::make_unique<TabCaptureQueueV1>();
     CHECK(full_tab_queue->push(tab_view));
     CHECK(full_tab_queue->push(tab_view));
@@ -6092,7 +6108,7 @@ int main() {
     CHECK(tab_noise.configure(
         BasicNoiseSuppressorPolicyV1{1, true, -45.0, -24.0, 8.0, 120.0, 80.0}, 48000U, 2U));
     TabLaneEffectsV1 tab_effects{&tab_peq, tab_ir.get(), &tab_noise, &tab_program_level};
-    CHECK(process_tab_capture_lane_v1(engine, 0, *tab_queue, tab_lane_input, 2U,
+    CHECK(process_tab_capture_lane_v1(engine, 0, *tab_queue, tab_lane_input, 4U,
                                       tab_lane_inputs, tab_lane_output, 2U, tab_lane_block,
                                       &tab_effects));
     CHECK(tab_lane_block.frames == 2U && tab_lane_block.channels == 2U &&
@@ -6105,12 +6121,11 @@ int main() {
     CHECK(tab_wasapi_queue->push(tab_wasapi_view));
     TabCaptureBlockV1 tab_wasapi_block{};
     CHECK(!process_tab_capture_lane_to_wasapi_v1(
-        engine, 0U, *tab_wasapi_queue, tab_lane_input, 2U, tab_lane_inputs, tab_lane_output, 2U,
+        engine, 0U, *tab_wasapi_queue, tab_lane_input, 4U, tab_lane_inputs, tab_lane_output, 2U,
         tab_wasapi_block, &tab_effects));
     CHECK(tab_wasapi_block.frames == 0U && tab_wasapi_block.channels == 0U);
-    // A browser render quantum must pass the same frame-capacity contract as
-    // WASAPI: channel count is not frame capacity, while oversized blocks remain
-    // fail-closed.
+    // A browser render quantum must pass the sample-capacity contract at the
+    // copy boundary; output capacity remains expressed in frames.
     auto quantum_tab_queue = std::make_unique<TabCaptureQueueV1>();
     const TabCapturePacketViewV1 quantum_tab_view{
         2U, 128U, 48000U, reinterpret_cast<const std::uint8_t*>(quantum_tab_samples),
@@ -6120,14 +6135,14 @@ int main() {
     std::array<float, 8 * 4096U> quantum_tab_output{};
     TabCaptureBlockV1 quantum_tab_block{};
     CHECK(!process_tab_capture_lane_v1(
-        engine, 0U, *quantum_tab_queue, quantum_tab_input.data(), 128U, tab_lane_inputs,
-        quantum_tab_output.data(), 8U, quantum_tab_block));
+        engine, 0U, *quantum_tab_queue, quantum_tab_input.data(), quantum_tab_input.size(),
+        tab_lane_inputs, quantum_tab_output.data(), 8U, quantum_tab_block));
     CHECK(quantum_tab_block.frames == 0U && quantum_tab_block.channels == 0U);
 
     CHECK(quantum_tab_queue->push(quantum_tab_view));
     CHECK(process_tab_capture_lane_v1(
-        engine, 0U, *quantum_tab_queue, quantum_tab_input.data(), 128U, tab_lane_inputs,
-        quantum_tab_output.data(), 4096U, quantum_tab_block));
+        engine, 0U, *quantum_tab_queue, quantum_tab_input.data(), quantum_tab_input.size(),
+        tab_lane_inputs, quantum_tab_output.data(), 4096U, quantum_tab_block));
     CHECK(quantum_tab_block.frames == 128U && quantum_tab_block.channels == 2U);
     VirtualMicRouteModel lane_mic;
     CHECK(lane_mic.prepare(VirtualMicConfigV1{2U, 48000U, true}));

@@ -136,21 +136,21 @@ bool test_queue_boundaries() {
     }
     std::array<float, 4U> output{};
     hibiki::TabCaptureBlockV1 block{};
-    if (!expect(queue->pop(output.data(), 2U, block), "queue pops first fixture") ||
+    if (!expect(queue->pop(output.data(), 4U, block), "queue pops first fixture") ||
         !expect(block.frames == 2U && block.channels == 2U && output[0] == 0.25F,
                 "first queue item remains first") ||
-        !expect(queue->pop(output.data(), 2U, block) && output[0] == 0.75F,
+        !expect(queue->pop(output.data(), 4U, block) && output[0] == 0.75F,
                 "queue preserves FIFO order") ||
-        !expect(!queue->pop(output.data(), 2U, block) && block.frames == 0U,
+        !expect(!queue->pop(output.data(), 4U, block) && block.frames == 0U,
                 "empty queue fails closed")) {
         return false;
     }
 
     auto capacity_queue = std::make_unique<TabCaptureQueueV1>();
     if (!expect(capacity_queue->push(first_view), "capacity fixture is queued") ||
-        !expect(!capacity_queue->pop(output.data(), 1U, block),
-                "insufficient output capacity fails closed") ||
-        !expect(capacity_queue->pop(output.data(), 2U, block) && output[0] == 0.25F,
+        !expect(!capacity_queue->pop(output.data(), 3U, block),
+                "insufficient sample capacity fails closed") ||
+        !expect(capacity_queue->pop(output.data(), 4U, block) && output[0] == 0.25F,
                 "capacity rejection does not consume")) {
         return false;
     }
@@ -165,9 +165,9 @@ bool test_queue_boundaries() {
     }
     std::array<float, 4U> drain{};
     for (std::size_t index = 0U; index < 4U; ++index) {
-        if (!expect(full_queue->pop(drain.data(), 2U, block), "full queue drains")) return false;
+        if (!expect(full_queue->pop(drain.data(), 4U, block), "full queue drains")) return false;
     }
-    return expect(!full_queue->pop(drain.data(), 2U, block), "drained queue is empty");
+    return expect(!full_queue->pop(drain.data(), 4U, block), "drained queue is empty");
 }
 
 bool test_queue_input_output_guards() {
@@ -238,11 +238,41 @@ bool test_queue_input_output_guards() {
         !expect(!pop_queue->pop(output.data(), 0U, block) && block.frames == 0U,
                 "zero output capacity is rejected without a block") ||
         !expect(!pop_queue->pop(output.data(), 1U, block) && block.frames == 0U,
-                "insufficient output capacity is rejected without a block") ||
-        !expect(pop_queue->pop(output.data(), 2U, block) && block.frames == 2U &&
+                "insufficient sample capacity is rejected without a block") ||
+        !expect(pop_queue->pop(output.data(), 4U, block) && block.frames == 2U &&
                     output[0] == 0.25F,
                 "valid pop remains available after rejected guards") ||
-        !expect(!pop_queue->pop(output.data(), 2U, block), "guard queue is empty after valid pop")) {
+        !expect(!pop_queue->pop(output.data(), 4U, block), "guard queue is empty after valid pop")) {
+        return false;
+    }
+
+    auto maximum_packet = make_packet(hibiki::kTabCaptureMaxChannelsV1,
+                                      hibiki::kTabCaptureMaxFramesV1, 48000U, 0.5F);
+    TabCapturePacketViewV1 maximum_view{};
+    if (!expect(hibiki::decode_tab_capture_packet_v1(maximum_packet, maximum_view, error),
+                "maximum channel fixture decodes")) {
+        return false;
+    }
+    auto maximum_queue = std::make_unique<TabCaptureQueueV1>();
+    std::vector<float> undersized_output(
+        2U * hibiki::kTabCaptureMaxFramesV1 + 2U, 12345.0F);
+    std::array<float, hibiki::kTabCaptureMaxSamplesV1> maximum_output{};
+    if (!expect(maximum_queue->push(maximum_view), "maximum channel fixture queues") ||
+        !expect(!maximum_queue->pop(undersized_output.data(),
+                                    2U * hibiki::kTabCaptureMaxFramesV1, block) &&
+                    block.frames == 0U,
+                "insufficient sample capacity fails closed") ||
+        !expect(undersized_output.front() == 12345.0F &&
+                    undersized_output[2U * hibiki::kTabCaptureMaxFramesV1] == 12345.0F &&
+                    undersized_output.back() == 12345.0F,
+                "rejected maximum block does not touch caller storage") ||
+        !expect(maximum_queue->pop(maximum_output.data(), maximum_output.size(), block) &&
+                    block.frames == hibiki::kTabCaptureMaxFramesV1 &&
+                    block.channels == hibiki::kTabCaptureMaxChannelsV1 &&
+                    maximum_output[0] == 0.5F,
+                "maximum channel shape stays within sample capacity") ||
+        !expect(!maximum_queue->pop(maximum_output.data(), maximum_output.size(), block),
+                "maximum capacity fixture is consumed exactly once")) {
         return false;
     }
     return true;
