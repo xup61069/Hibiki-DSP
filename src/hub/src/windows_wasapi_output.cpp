@@ -276,9 +276,18 @@ bool WindowsWasapiOutputV1::render(const float* const interleaved,
   }
   BYTE* destination = nullptr;
   const auto get_buffer_result = as_render(render_client_)->GetBuffer(frames, &destination);
-  if (FAILED(get_buffer_result) || destination == nullptr) {
-    failure_ = FAILED(get_buffer_result) ? classify_failure(get_buffer_result)
-                                         : WasapiOutputFailureV1::Other;
+  if (FAILED(get_buffer_result)) {
+    // A failed acquisition does not own a render buffer. Releasing it here
+    // would violate the WASAPI GetBuffer/ReleaseBuffer pairing contract.
+    failure_ = classify_failure(get_buffer_result);
+    return false;
+  }
+  if (destination == nullptr) {
+    // GetBuffer succeeded, so the acquisition must still be balanced even
+    // though the COM boundary returned an unusable destination pointer.
+    const auto release_result = as_render(render_client_)->ReleaseBuffer(frames, 0U);
+    failure_ = FAILED(release_result) ? classify_failure(release_result)
+                                      : WasapiOutputFailureV1::Other;
     return false;
   }
   if (encoding_ == WasapiSampleEncodingV1::Float32) {
