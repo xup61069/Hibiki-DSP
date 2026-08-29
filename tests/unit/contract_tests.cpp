@@ -37,6 +37,7 @@
 #include "hibiki/session_command_queue.hpp"
 #include "hibiki/tab_bridge_status.hpp"
 #include "hibiki/wav_source_progress.hpp"
+#include "hibiki/wav_source_resample.hpp"
 #include "hibiki/wav_source_status.hpp"
 
 extern "C" {
@@ -1652,6 +1653,62 @@ int main() {
     CHECK(persistent_src.prepare(kPolyphaseChannelsV1, 1.0));
     CHECK(persistent_src.process(first_block, 4U, resampled, 32U, output_frames));
     CHECK(output_frames > 0U && persistent_src.phase() == first_phase);
+    {
+        constexpr std::size_t kSourceFrames = 32U;
+        constexpr std::size_t kNominalFrames = 35U;
+        std::array<float, kSourceFrames> source_samples{};
+        for (std::size_t frame = 0U; frame < source_samples.size(); ++frame) {
+            source_samples[frame] = 0.1F + static_cast<float>(frame) * 0.003F;
+        }
+        PersistentPolyphaseResampler source_resampler;
+        CHECK(source_resampler.prepare(1U, 44100.0 / 48000.0));
+        std::array<float, 512U> converted_samples{};
+        std::size_t converted_frames = 0U;
+        CHECK(source_resampler.process(source_samples.data(), source_samples.size(),
+                                       converted_samples.data(), converted_samples.size(),
+                                       converted_frames));
+        std::array<float, kSourceFrames> flush_samples{};
+        std::array<float, 64U> flush_output{};
+        std::size_t flushes = 0U;
+        while (converted_frames < kNominalFrames && flushes < 8U) {
+            std::size_t flushed_frames = 0U;
+            CHECK(source_resampler.process(flush_samples.data(), flush_samples.size(),
+                                           flush_output.data(), flush_output.size(), flushed_frames));
+            if (flushed_frames == 0U) break;
+            CHECK(converted_frames + flushed_frames <= converted_samples.size());
+            std::copy_n(flush_output.data(), flushed_frames,
+                        converted_samples.data() + converted_frames);
+            converted_frames += flushed_frames;
+            ++flushes;
+        }
+        CHECK(converted_frames >= kNominalFrames);
+        std::array<float, kNominalFrames> committed_samples{};
+        CHECK(hibiki::commit_resampled_wav_samples_v1(
+            std::span<const float>(converted_samples.data(), converted_frames),
+            kNominalFrames, 1U,
+            std::span<float>(committed_samples.data(), committed_samples.size())));
+        CHECK(std::equal(committed_samples.begin(), committed_samples.end(),
+                         converted_samples.begin()));
+        bool matches_original_prefix = true;
+        for (std::size_t frame = 0U; frame < source_samples.size(); ++frame) {
+            if (committed_samples[frame] != source_samples[frame]) {
+                matches_original_prefix = false;
+                break;
+            }
+        }
+        CHECK(!matches_original_prefix);
+        converted_samples[0] = std::numeric_limits<float>::quiet_NaN();
+        const auto committed_before_rejection = committed_samples;
+        CHECK(!hibiki::commit_resampled_wav_samples_v1(
+                  std::span<const float>(converted_samples.data(), converted_frames),
+                  kNominalFrames, 1U,
+                  std::span<float>(committed_samples.data(), committed_samples.size())) &&
+              committed_samples == committed_before_rejection);
+        CHECK(!hibiki::commit_resampled_wav_samples_v1(
+            std::span<const float>(converted_samples.data(), kNominalFrames - 1U),
+            kNominalFrames, 1U,
+            std::span<float>(committed_samples.data(), committed_samples.size())));
+    }
     OutputSinkModel sink_model;
     CHECK(sink_model.prepare(1, 1.0));
     sink_model.observe_clock(48000.0, 48012.0, 1.0);

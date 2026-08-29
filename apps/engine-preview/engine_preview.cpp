@@ -20,6 +20,7 @@
 #include "hibiki/windows_volume_link.hpp"
 #include "hibiki/wav_ir.hpp"
 #include "hibiki/wav_source_progress.hpp"
+#include "hibiki/wav_source_resample.hpp"
 #include "hibiki/wav_source_status.hpp"
 #include "hibiki/wasapi_source_status.hpp"
 #include "hibiki/plugin_host.hpp"
@@ -504,6 +505,13 @@ bool decode_wav_for_sink_rate(const std::filesystem::path& path,
         }
         if (produced < nominal) return false;
         decoded_out.interleaved_samples.resize(nominal * channel_count);
+        if (!hibiki::commit_resampled_wav_samples_v1(
+                std::span<const float>(converted.data(), converted.size()), nominal,
+                decoded_out.channels,
+                std::span<float>(decoded_out.interleaved_samples.data(),
+                                 decoded_out.interleaved_samples.size()))) {
+            return false;
+        }
         decoded_out.sample_rate = sink_rate;
         resampled = true;
         return true;

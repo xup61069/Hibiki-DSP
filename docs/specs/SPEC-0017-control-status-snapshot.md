@@ -54,6 +54,12 @@ WAV source route 的 `frames=` 進度只計算實際複製進目前 bounded bloc
 loop wrap 從檔案尾端回到 frame zero 時仍增加正確的 copied-frame 數，不得以 reset 後的
 unsigned frame subtraction 產生下溢。此為 user-space 狀態診斷，不代表 physical delivery。
 
+WAV source 進入重採樣路徑時，只有在 bounded polyphase conversion 產生足夠且全部為 finite
+的輸出後，才可將精確的 `nominal * channel_count` samples commit 回 decoded source；
+更新 sample rate metadata 前不得只 resize destination 而遺留原始 prefix 或 zero tail。
+這份已 commit 的 sample buffer 同時供 live WASAPI source 與 device-free offline render 使用，
+same-rate source 不經過此轉換。
+
 明確要求的 WAV source 若檔案、sink、格式或 graph setup 失敗，route health 為
 `Unavailable` 且 `requires-user-action` 為 true；已完成 setup 但尚未成功 render 第一個 block
 才是 `Pending`，成功 render 後才是 `Ready`。這些狀態只描述 Engine Preview 的 user-space
