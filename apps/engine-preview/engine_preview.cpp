@@ -21,6 +21,7 @@
 #include "hibiki/wav_ir.hpp"
 #include "hibiki/wav_source_progress.hpp"
 #include "hibiki/wav_source_status.hpp"
+#include "hibiki/wasapi_source_status.hpp"
 #include "hibiki/plugin_host.hpp"
 #include "hibiki/vst3_sandbox.hpp"
 
@@ -2221,13 +2222,19 @@ int wmain(const int argc, wchar_t* const* argv) {
         if (!same_route(previous_main_output_route, status.routes[1U])) status_changed = true;
         if (wasapi_output.driver_loopback_enabled) {
             const bool loopback_ready = driver_loopback.rendered_blocks > 0U &&
-                                        has_rendered_blocks(wasapi_snapshot);
+                                        hibiki::wasapi_source_sink_ready_v1(wasapi_snapshot);
+            const bool loopback_sink_degraded =
+                hibiki::wasapi_source_sink_degraded_v1(wasapi_snapshot);
             const auto failures = driver_loopback.encode_failures +
                                   driver_loopback.push_failures +
                                   driver_loopback.pop_failures +
                                   driver_loopback.deliver_failures;
             std::string detail;
-            if (loopback_ready) {
+            if (loopback_sink_degraded) {
+                detail = "driver-stream loopback blocked; WASAPI sink degraded; packets=" +
+                         std::to_string(driver_loopback.rendered_blocks) +
+                         "; delivery fails closed.";
+            } else if (loopback_ready) {
                 detail = "driver-stream loopback rendering; packets=" +
                          std::to_string(driver_loopback.rendered_blocks);
                 detail += "; sink=" +
@@ -2276,15 +2283,21 @@ int wmain(const int argc, wchar_t* const* argv) {
                     ? hibiki::ControlRouteHealthStateV1::Pending
                     : hibiki::ControlRouteHealthStateV1::Unavailable;
         const auto wasapi_snapshot_now = engine.wasapi_output_snapshot();
-        const bool wasapi_actually_rendering = has_rendered_blocks(wasapi_snapshot_now);
+        const bool wasapi_source_sink_ready =
+            hibiki::wasapi_source_sink_ready_v1(wasapi_snapshot_now);
+        const bool wasapi_source_sink_degraded =
+            hibiki::wasapi_source_sink_degraded_v1(wasapi_snapshot_now);
+        const bool process_sink_degraded =
+            process_delivery_requested && wasapi_source_sink_degraded;
         const auto process_route_state = session_snapshot.degraded
             ? hibiki::ControlRouteHealthStateV1::Degraded
-            : session_route_ready && session_snapshot.routed_count > 0U &&
-                  process_delivery.rendered_blocks > 0U && wasapi_actually_rendering
-                ? hibiki::ControlRouteHealthStateV1::Ready
-                : session_route_ready && session_snapshot.routed_count > 0U
-                    ? hibiki::ControlRouteHealthStateV1::Pending
-                    : hibiki::ControlRouteHealthStateV1::Unavailable;
+            : session_route_ready && session_snapshot.routed_count > 0U
+                ? process_sink_degraded
+                    ? hibiki::ControlRouteHealthStateV1::Degraded
+                    : process_delivery.rendered_blocks > 0U && wasapi_source_sink_ready
+                        ? hibiki::ControlRouteHealthStateV1::Ready
+                        : hibiki::ControlRouteHealthStateV1::Pending
+                : hibiki::ControlRouteHealthStateV1::Unavailable;
         const auto session_detail = !session_routing_requested
             ? std::string_view("session routing disabled; Preview will not enumerate Apps.")
             : !session_routing.bound
@@ -2299,6 +2312,9 @@ int wmain(const int argc, wchar_t* const* argv) {
         } else if (!process_delivery_requested) {
             process_detail_buffer =
                 "process-tree source remains worker-owned; physical delivery unverified.";
+        } else if (process_sink_degraded) {
+            process_detail_buffer =
+                "per-App capture running but WASAPI sink is degraded; delivery fails closed.";
         } else if (process_route_state == hibiki::ControlRouteHealthStateV1::Ready) {
             process_detail_buffer =
                 "per-App delivery active: " +
@@ -2329,13 +2345,15 @@ int wmain(const int argc, wchar_t* const* argv) {
         if (driver_loopback_requested) {
             const auto previous_loopback_route = status.routes[6U];
             const bool loopback_ready = driver_loopback.rendered_blocks > 0U &&
-                                        has_rendered_blocks(wasapi_snapshot);
+                                        wasapi_source_sink_ready;
             set_route(status.routes[6U], "driver-loopback", "Driver Stream Loopback",
                       driver_loopback_detail,
-                      loopback_ready ? hibiki::ControlRouteHealthStateV1::Ready
-                                     : (wasapi_output.driver_loopback_enabled
-                                            ? hibiki::ControlRouteHealthStateV1::Pending
-                                            : hibiki::ControlRouteHealthStateV1::Degraded),
+                      wasapi_source_sink_degraded
+                          ? hibiki::ControlRouteHealthStateV1::Degraded
+                          : loopback_ready ? hibiki::ControlRouteHealthStateV1::Ready
+                                            : (wasapi_output.driver_loopback_enabled
+                                                   ? hibiki::ControlRouteHealthStateV1::Pending
+                                                   : hibiki::ControlRouteHealthStateV1::Degraded),
                       wasapi_output.driver_loopback_enabled ? 0U : 1U);
             if (!same_route(previous_loopback_route, status.routes[6U])) {
                 status_changed = true;
@@ -2364,8 +2382,12 @@ int wmain(const int argc, wchar_t* const* argv) {
             if (!tab_bridge.listening) {
                 set_route(status.routes[6U], "browser-tab", "瀏覽器分頁", tab_bridge_detail,
                           hibiki::ControlRouteHealthStateV1::Unavailable, 1U);
+            } else if (wasapi_source_sink_degraded) {
+                set_route(status.routes[6U], "browser-tab", "瀏覽器分頁",
+                          "tab capture received, but WASAPI sink is degraded; delivery fails closed.",
+                          hibiki::ControlRouteHealthStateV1::Degraded, 0U);
             } else if (tab_bridge.received_blocks > 0U &&
-                       has_rendered_blocks(wasapi_snapshot)) {
+                       wasapi_source_sink_ready) {
                 set_route(status.routes[6U], "browser-tab", "瀏覽器分頁",
                           !tab_bridge_route_detail.empty()
                               ? std::string_view(tab_bridge_route_detail)
@@ -2383,7 +2405,7 @@ int wmain(const int argc, wchar_t* const* argv) {
         }
         if (wav_source_requested) {
             const bool wav_ready = wav_source.rendered_blocks > 0U &&
-                                   has_rendered_blocks(wasapi_snapshot);
+                                   wasapi_source_sink_ready;
             std::string detail;
             if (wav_source.eof && !wav_source.loop) {
                 detail = "wav file source finished; blocks=" +
@@ -2415,7 +2437,9 @@ int wmain(const int argc, wchar_t* const* argv) {
             const auto previous_wav_route = status.routes[6U];
             set_route(status.routes[6U], "wav-source", "WAV 檔案音源",
                       wav_source_detail,
-                      hibiki::wav_source_route_state_v1(true, wav_source.prepared, wav_ready),
+                      wasapi_source_sink_degraded && wav_source.prepared
+                          ? hibiki::ControlRouteHealthStateV1::Degraded
+                          : hibiki::wav_source_route_state_v1(true, wav_source.prepared, wav_ready),
                       wav_source.prepared ? 0U : 1U);
             if (!same_route(previous_wav_route, status.routes[6U])) status_changed = true;
         }
