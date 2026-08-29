@@ -64,6 +64,11 @@ bounded guard，RT lookup 不配置；一個 sink 的峰值觸發保護後，另
 Windows build 現在提供 `WindowsVolumeBroker`：control thread 可 bind/unbind
 `IAudioEndpointVolume`、write canonical dB/mute with caller GUID、read-back 實際量化值，
 並以 lock-free atomic snapshot 接收 callback；callback 本身不配置、不等待、不呼叫 COM。
+其中 `AUDIO_VOLUME_NOTIFICATION_DATA::fMasterVolume` 是 0..1 的 normalized scalar，
+不是 dB；callback snapshot 以 `master_scalar` 保留它，不能填入 `requested_db`。
+`WindowsVolumeBroker::poll` 必須在 owning control/COM thread 呼叫
+`GetMasterVolumeLevel`，以該 dB read-back 填入 `requested_db`；讀取失敗、非有限或超出
+canonical -144..12 dB 範圍時 fail closed，且不得先消耗 callback sequence。
 `WindowsControlRuntimeV1` 會在 control/COM worker 綁定目前 eRender/eConsole default endpoint，
 提供 `refresh_default_volume`、`read_volume`、`write_volume` 與 non-blocking `poll_volume`；
 另提供 `refresh_default_volume_if_changed`：它以 endpoint ID 比對，未切換時保留既有
