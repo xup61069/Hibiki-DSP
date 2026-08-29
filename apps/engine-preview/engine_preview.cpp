@@ -12,6 +12,7 @@
 #include "hibiki/session_command_queue.hpp"
 #include "hibiki/session_route_rules.hpp"
 #include "hibiki/tab_bridge.hpp"
+#include "hibiki/tab_bridge_status.hpp"
 #include "hibiki/windows_audio_session_route.hpp"
 #include "hibiki/windows_device_catalog.hpp"
 #include "hibiki/windows_process_loopback_lane.hpp"
@@ -1802,6 +1803,7 @@ int wmain(const int argc, wchar_t* const* argv) {
     bool suppressor_active = false;
     if (tab_bridge_started) {
         hibiki::TabBridgeServerConfigV1 tab_config{};
+        bool suppressor_configured = !tab_noise_suppressor_requested;
         if (!tab_bridge.queue.set_expected_sample_rate(wasapi_output.config.sample_rate)) {
             tab_bridge_detail =
                 "tab bridge sink sample-rate contract unavailable; tab bridge disabled.";
@@ -1815,9 +1817,12 @@ int wmain(const int argc, wchar_t* const* argv) {
                     tab_bridge.effects = {nullptr, nullptr,
                                           &tab_bridge.noise_suppressor, nullptr};
                     suppressor_active = true;
+                    suppressor_configured = true;
                 }
             }
-            if (tab_bridge.server.start(tab_config, hibiki::enqueue_tab_capture_packet_v1,
+            if (hibiki::tab_bridge_start_allowed_v1(
+                    tab_noise_suppressor_requested, suppressor_configured) &&
+                tab_bridge.server.start(tab_config, hibiki::enqueue_tab_capture_packet_v1,
                                         &tab_bridge.queue)) {
                 tab_bridge.listening = true;
                 tab_bridge.input_buffer.resize(
@@ -1839,7 +1844,9 @@ int wmain(const int argc, wchar_t* const* argv) {
                 }
                 tab_bridge_detail = tab_bridge_route_detail;
             } else {
-                tab_bridge_detail = "loopback listener bind failed; tab bridge disabled.";
+                tab_bridge_detail = tab_noise_suppressor_requested && !suppressor_configured
+                    ? "tab noise suppressor setup failed; tab bridge disabled."
+                    : "loopback listener bind failed; tab bridge disabled.";
             }
         }
     }

@@ -99,6 +99,11 @@ sample rate、stereo（2 聲道）初始化；非 stereo 區塊會被 fail-close
 未設定的 effect 接到 lane。此功能是基本降噪，不是 ML/spectral denoising；不得宣稱
 AI denoising 或 RNNoise。未加此旗標時，預設行為與先前完全相同。
 
+若 `BasicNoiseSuppressorV1` 設定失敗，Engine Preview 必須在 listener bind 前停止 tab bridge，
+並以 `tab noise suppressor setup failed; tab bridge disabled.` 的 user-space route detail
+回報 `Unavailable`／需要使用者處理；不得以普通的「等待 browser capture」狀態接受未經抑制的
+封包。這只證明啟動 fail-closed 與狀態投影，不代表降噪品質或 physical audio delivery。
+
 Engine Preview 另提供 opt-in 的 `--enable-tab-bass-correction` 旗標：啟用時必須同時
 傳入 `--enable-tab-bridge --enable-wasapi-output`，否則 host 在建立 listener 或音訊
 路徑前 fail-closed 拒絕啟動。此旗標把只含 bounded bass correction 的
