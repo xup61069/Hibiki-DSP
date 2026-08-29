@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "hibiki/scene_safety.hpp"
+#include "hibiki/contracts.hpp"
 
 #include <cmath>
 #include <cstdint>
@@ -41,6 +42,20 @@ OutputGroupVolumeStateV1 make_state(const double requested_db,
 }  // namespace
 
 int main() {
+    // validate_scene: non-finite limiter targets fail at the shared boundary.
+    {
+        auto scene = make_scene();
+        scene.id = "safety";
+        scene.name = "Safety";
+        scene.output_group = "main";
+        CHECK(hibiki::validate_scene(scene));
+        scene.limiter_dbtp = std::numeric_limits<double>::quiet_NaN();
+        CHECK(!hibiki::validate_scene(scene));
+        scene.limiter_dbtp = std::numeric_limits<double>::infinity();
+        CHECK(!hibiki::validate_scene(scene));
+        scene.limiter_dbtp = -std::numeric_limits<double>::infinity();
+        CHECK(!hibiki::validate_scene(scene));
+    }
     // begin: rejects wrong schema version.
     {
         SceneSafetyController controller;
