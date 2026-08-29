@@ -118,16 +118,17 @@ public sealed class CustomSceneSyncQueueV1
         try
         {
             var fullPath = Path.GetFullPath(filePath);
-            var info = new FileInfo(fullPath);
-            if (!info.Exists) return true;
-            if (info.Length < 1 || info.Length > MaxFileBytes)
+            using var stream = new FileStream(
+                fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (stream.Length < 1 || stream.Length > MaxFileBytes)
             {
                 error = "場景同步佇列檔案不存在或超過大小上限";
                 return false;
             }
 
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
             var document = JsonSerializer.Deserialize<QueueDocument>(
-                File.ReadAllText(fullPath, Encoding.UTF8));
+                reader.ReadToEnd());
             if (document is null || document.SchemaVersion != SchemaVersion ||
                 document.DroppedOperations < 0 ||
                 document.Operations is null ||
@@ -162,6 +163,16 @@ public sealed class CustomSceneSyncQueueV1
             Clear();
             _operations.AddRange(candidate);
             droppedCount = document.DroppedOperations;
+            return true;
+        }
+        catch (FileNotFoundException)
+        {
+            Clear();
+            return true;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            Clear();
             return true;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or
