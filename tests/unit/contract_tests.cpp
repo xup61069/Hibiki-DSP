@@ -19,6 +19,7 @@
 #include "hibiki/latency_compensation.hpp"
 #include "hibiki/latency_graph_commit.hpp"
 #include "hibiki/vst3_worker_lane.hpp"
+#include "hibiki/vst3_route_status.hpp"
 #include "hibiki/vst3_scene_state.hpp"
 #include "hibiki/tab_bridge.hpp"
 #include "hibiki/asio_transport_v1.h"
@@ -3710,8 +3711,20 @@ int main() {
               Vst3BusLayoutResultV1::SidechainOutput);
 
     PluginHostModel plugin;
+    CHECK(hibiki::vst3_route_state_v1(false, false, false, 0U, 0U) ==
+              ControlRouteHealthStateV1::Pending);
+    CHECK(hibiki::vst3_route_state_v1(false, false, false, 0U, 1U) ==
+              ControlRouteHealthStateV1::Degraded);
+    CHECK(hibiki::vst3_route_state_v1(true, true, true, 0U, 0U) ==
+              ControlRouteHealthStateV1::Pending);
+    CHECK(hibiki::vst3_route_state_v1(true, true, true, 1U, 0U) ==
+              ControlRouteHealthStateV1::Ready);
+    CHECK(hibiki::vst3_route_state_v1(true, false, false, 1U, 1U) ==
+              ControlRouteHealthStateV1::Degraded);
     CHECK(!plugin.start(PluginDescriptorV1{"untrusted", 2, 2, 64, false, 250, true, 41U}));
     CHECK(plugin.state() == PluginHostState::Quarantined);
+    CHECK(hibiki::vst3_route_state_v1(true, plugin.can_process(), false, 0U, 1U) ==
+              ControlRouteHealthStateV1::Degraded);
     CHECK(!plugin.start(PluginDescriptorV1{"missing-token", 2, 2, 64, true, 250, true, 0U}));
     CHECK(plugin.state() == PluginHostState::Quarantined);
     CHECK(plugin.start(PluginDescriptorV1{"builtin-test", 2, 2, 64, true, 250, true, 42U}));
@@ -3819,6 +3832,8 @@ int main() {
     CHECK(scene_state.remove("movie", "scene-movie-state") && scene_state.binding_count() == 0U);
     plugin.report_crash();
     CHECK(!plugin.process_passthrough(plugin_input, plugin_output, 2));
+    CHECK(hibiki::vst3_route_state_v1(true, plugin.can_process(), false, 1U, 1U) ==
+              ControlRouteHealthStateV1::Degraded);
 
     Vst3SandboxProcess sandbox;
     const auto initial_sandbox_diagnostic = sandbox.diagnostic();

@@ -42,8 +42,10 @@ Engine Preview 提供 opt-in `--enable-vst3-lane`，把既有 sandbox worker 接
 apply_vst3_lanes 在 render 時 pop。此模式必須同時給 --vst3-module-path 與
 --vst3-class-id，缺一即 fail-closed 拒絕啟動；--vst3-worker-path 可覆蓋預設的本地
 SDK worker 位置。lane 狀態透過 control status snapshot 的 route slot vst3-lane 曝光：
-armed（Pending）→ rendering with processed-block counter（Ready）→ setup 失敗時
-Degraded。worker lane session 必須以 sink 的實際 block frames 準備；tap block 超過
+armed（Pending）→ rendering with processed-block counter（Ready）→ setup 或 worker
+exchange 失敗時 Degraded。Ready 只在目前 host 可 process、worker lane session 處於
+Ready 且至少一個 block 已成功提交時成立；歷史 processed-block counter 不得掩蓋
+後續 quarantine。worker lane session 必須以 sink 的實際 block frames 準備；tap block 超過
 prepared 上限時整個 exchange fail-closed 進入 Degraded，不得靜默截斷或丟棄。
 `Vst3LaneRingBridgeV1` 的 push/pop 也共享一般 Process block 的 1–4096
 frames 上限；即使 caller-owned ring 的實體容量更大，超過上限的 exchange

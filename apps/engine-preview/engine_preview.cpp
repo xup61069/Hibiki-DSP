@@ -25,6 +25,7 @@
 #include "hibiki/wav_source_status.hpp"
 #include "hibiki/wasapi_source_status.hpp"
 #include "hibiki/plugin_host.hpp"
+#include "hibiki/vst3_route_status.hpp"
 #include "hibiki/vst3_sandbox.hpp"
 
 #include <Windows.h>
@@ -2137,32 +2138,50 @@ int wmain(const int argc, wchar_t* const* argv) {
                 launch.vst3_channels = vst3_lane.channels;
                 if (hibiki::validate_vst3_sandbox_launch_v1(launch) &&
                     vst3_lane.sandbox.launch(launch)) {
-                    (void)vst3_lane.host.start(hibiki::PluginDescriptorV1{
+                    vst3_lane.launched = true;
+                    const bool host_started = vst3_lane.host.start(hibiki::PluginDescriptorV1{
                         "preview-lane", vst3_lane.channels,
                         vst3_lane.channels, 0U, true, 250U, true, 1U});
-                    if (vst3_lane.host.prepare_worker_session(
+                    const bool session_prepared = host_started &&
+                        vst3_lane.host.prepare_worker_session(
                             vst3_lane.sandbox, vst3_lane.sample_rate,
-                            static_cast<std::uint32_t>(vst3_lane.block_frames))) {
+                            static_cast<std::uint32_t>(vst3_lane.block_frames));
+                    if (session_prepared) {
                         const bool worker_connected = vst3_lane.sandbox.wait_for_worker(1000U);
                         if (!worker_connected) {
                             std::fwprintf(
                                 stderr,
                                 L"error: vst3 worker did not connect within 1s.\n");
                             ++vst3_lane.failed_blocks;
+                            vst3_lane.host.report_crash();
                         } else {
                             const auto hs = vst3_lane.host.handshake_worker(vst3_lane.request_id++);
                             if (hs != hibiki::Vst3WorkerExchangeResultV1::ok) {
+                                ++vst3_lane.failed_blocks;
                                 std::fwprintf(
                                     stderr,
                                     L"error: vst3 worker handshake failed result=%d.\n",
                                     static_cast<int>(hs));
                             }
                         }
-                        vst3_lane.launched = true;
-                        // Prepare the lane ring so apply_vst3_lanes can pop.
-                        (void)engine.prepare_vst3_lane("main", vst3_lane.channels,
-                                                       std::span<float>(vst3_lane.ring_storage));
-                        (void)engine.commit_vst3_lane();
+                        if (vst3_lane.host.can_process()) {
+                            // Prepare the lane ring so apply_vst3_lanes can pop.
+                            const bool lane_prepared = engine.prepare_vst3_lane(
+                                "main", vst3_lane.channels,
+                                std::span<float>(vst3_lane.ring_storage));
+                            const bool lane_committed = lane_prepared &&
+                                                        engine.commit_vst3_lane();
+                            if (!lane_committed) {
+                                ++vst3_lane.failed_blocks;
+                                vst3_lane.host.report_crash();
+                            }
+                        }
+                    } else {
+                        ++vst3_lane.failed_blocks;
+                        vst3_lane.host.report_crash();
+                    }
+                    if (!vst3_lane.host.can_process()) {
+                        vst3_lane.requested = false;  // Setup/quarantine is terminal for this run.
                     }
                 } else {
                     ++vst3_lane.failed_blocks;
@@ -2459,11 +2478,23 @@ int wmain(const int argc, wchar_t* const* argv) {
         if (vst3_lane_requested) {
             static thread_local std::string vst3_detail_buffer;
             const auto previous_vst3_route = status.routes[7U];
-            if (!vst3_lane.launched && vst3_lane.failed_blocks > 0U) {
+            const bool host_processable = vst3_lane.host.can_process();
+            const bool worker_ready =
+                vst3_lane.host.worker_lane_state() == hibiki::Vst3WorkerLaneStateV1::Ready;
+            const auto vst3_route_state = hibiki::vst3_route_state_v1(
+                vst3_lane.launched, host_processable, worker_ready,
+                vst3_lane.processed_blocks, vst3_lane.failed_blocks);
+            if (vst3_route_state == hibiki::ControlRouteHealthStateV1::Degraded) {
+                vst3_detail_buffer =
+                    "vst3 lane degraded; current worker setup or exchange is not processable.";
+                if (vst3_lane.host.state() == hibiki::PluginHostState::Quarantined ||
+                    vst3_lane.host.worker_lane_state() ==
+                        hibiki::Vst3WorkerLaneStateV1::Degraded) {
+                    vst3_detail_buffer += " worker is quarantined.";
+                }
                 set_route(status.routes[7U], "vst3-lane", "VST3 Lane",
-                          "vst3 lane unavailable; worker or plugin setup failed.",
-                          hibiki::ControlRouteHealthStateV1::Degraded, 1U);
-            } else if (vst3_lane.processed_blocks > 0U) {
+                          std::string_view(vst3_detail_buffer), vst3_route_state, 1U);
+            } else if (vst3_route_state == hibiki::ControlRouteHealthStateV1::Ready) {
                 vst3_detail_buffer =
                     "vst3 lane rendering; blocks=" +
                     std::to_string(vst3_lane.processed_blocks);
@@ -2473,11 +2504,11 @@ int wmain(const int argc, wchar_t* const* argv) {
                 }
                 set_route(status.routes[7U], "vst3-lane", "VST3 Lane",
                           std::string_view(vst3_detail_buffer),
-                          hibiki::ControlRouteHealthStateV1::Ready, 0U);
+                          vst3_route_state, 0U);
             } else {
                 set_route(status.routes[7U], "vst3-lane", "VST3 Lane",
                           "vst3 lane armed; waiting for first processed block.",
-                          hibiki::ControlRouteHealthStateV1::Pending, 0U);
+                          vst3_route_state, 0U);
             }
             if (!same_route(previous_vst3_route, status.routes[7U])) status_changed = true;
         }
