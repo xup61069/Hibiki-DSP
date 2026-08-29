@@ -454,6 +454,8 @@ int main()
         CHECK(all_zero(encode_device(std::string(261U, 'e'))));
         CHECK(all_zero(hibiki::encode_device_switch_payload_v1(
             std::string_view("e\x01", 2U), 2U, 48000U, 128U, 23U)));
+        CHECK(all_zero(hibiki::encode_device_switch_payload_v1(
+            "e", 2U, 48000U, 128U, 0U)));
         auto malformed = payload;
         malformed[2U + 15U] = 1U;
         CHECK(!hibiki::decode_device_switch_payload_v1(malformed, decoded));
@@ -478,6 +480,17 @@ int main()
             write_u32_le(malformed, 272U, frames);
             CHECK(!hibiki::decode_device_switch_payload_v1(malformed, decoded));
         }
+        malformed = payload;
+        write_u64_le(malformed, 280U, 0U);
+        decoded.endpoint_id_bytes = 1U;
+        decoded.channels = 2U;
+        decoded.sample_rate = 48000U;
+        decoded.buffer_frames = 128U;
+        decoded.catalog_sequence = 23U;
+        CHECK(!hibiki::decode_device_switch_payload_v1(malformed, decoded));
+        CHECK(decoded.endpoint_id_bytes == 0U && decoded.channels == 0U &&
+              decoded.sample_rate == 0U && decoded.buffer_frames == 0U &&
+              decoded.catalog_sequence == 0U);
         malformed = payload;
         malformed[2U] = 0x01U;
         CHECK(!hibiki::decode_device_switch_payload_v1(malformed, decoded));
