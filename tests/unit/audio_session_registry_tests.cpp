@@ -51,6 +51,31 @@ int main() {
         CHECK(registry.sessions().empty());
     }
 
+    // Unknown gain owners are rejected without creating or mutating a session.
+    {
+        AudioSessionRegistry registry;
+        auto unknown = make_session("ep", "unknown");
+        unknown.gain_owner = static_cast<SessionGainOwner>(0xFFU);
+        CHECK(!registry.upsert(unknown));
+        CHECK(registry.sessions().empty());
+
+        auto existing = make_session("ep", "existing");
+        existing.display_name = "original";
+        existing.gain_owner = SessionGainOwner::HibikiInternal;
+        CHECK(registry.upsert(existing));
+        const AudioSessionIdentityV1 identity{"ep", "existing", 100U};
+        auto refresh = existing;
+        refresh.display_name = "must-not-apply";
+        refresh.gain_owner = static_cast<SessionGainOwner>(0xFFU);
+        CHECK(!registry.upsert(refresh));
+        CHECK(registry.find(identity)->display_name == "original" &&
+              registry.find(identity)->gain_owner == SessionGainOwner::HibikiInternal);
+        CHECK(!registry.set_gain_owner(identity, static_cast<SessionGainOwner>(0xFFU)));
+        CHECK(registry.find(identity)->gain_owner == SessionGainOwner::HibikiInternal);
+        CHECK(registry.set_gain_owner(identity, SessionGainOwner::WindowsSession));
+        CHECK(registry.find(identity)->gain_owner == SessionGainOwner::WindowsSession);
+    }
+
     // upsert keeps existing lane binding when refreshing the same session.
     {
         AudioSessionRegistry registry;
