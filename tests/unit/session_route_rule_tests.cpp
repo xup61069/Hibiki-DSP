@@ -56,6 +56,32 @@ int main() {
         CHECK(store.upsert(rule) == SessionRouteRuleResultV1::invalid_argument);
         CHECK(store.size() == 0U);
     }
+    // upsert: unknown gain owners are rejected without consuming or replacing a slot.
+    {
+        SessionRouteRuleStoreV1 store;
+        auto unknown = make_rule("unknown-owner");
+        unknown.gain_owner = static_cast<SessionGainOwner>(0xFFU);
+        CHECK(store.upsert(unknown) == SessionRouteRuleResultV1::invalid_argument);
+        CHECK(store.size() == 0U);
+
+        auto existing = make_rule("existing-owner");
+        existing.gain_owner = SessionGainOwner::HibikiInternal;
+        existing.makeup_gain_db = -6.0;
+        CHECK(store.upsert(existing) == SessionRouteRuleResultV1::applied);
+        auto replacement = existing;
+        replacement.gain_owner = static_cast<SessionGainOwner>(0xFFU);
+        replacement.makeup_gain_db = 4.0;
+        CHECK(store.upsert(replacement) == SessionRouteRuleResultV1::invalid_argument);
+        CHECK(store.size() == 1U);
+        auto descriptor = make_descriptor();
+        CHECK(store.apply(descriptor) == SessionRouteRuleResultV1::applied);
+        CHECK(descriptor.gain_owner == SessionGainOwner::HibikiInternal &&
+              descriptor.makeup_gain_db == -6.0);
+
+        auto windows_rule = make_rule("windows-owner");
+        windows_rule.gain_owner = SessionGainOwner::WindowsSession;
+        CHECK(store.upsert(windows_rule) == SessionRouteRuleResultV1::applied);
+    }
     // upsert: rejects invalid rule id characters and leading separators.
     {
         SessionRouteRuleStoreV1 store;

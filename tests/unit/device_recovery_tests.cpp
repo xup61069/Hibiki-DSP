@@ -156,6 +156,29 @@ int main() {
         CHECK(restarted.effective_db <= -48.0);
         CHECK(restarted.generation == before_generation + 1U);
     }
+    // safe restart: generation saturates at the largest nonzero freshness
+    // token instead of wrapping to the reserved zero value.
+    {
+        DeviceRecoveryCoordinator recovery;
+        OutputGroupVolumeStateV1 volume;
+        volume.requested_db = 0.0;
+        volume.generation = (std::numeric_limits<std::uint64_t>::max)() - 1U;
+        const auto restarted = recovery.safe_restart_state(volume, -48.0);
+        CHECK(restarted.generation == (std::numeric_limits<std::uint64_t>::max)());
+        CHECK(restarted.mute);
+        CHECK(restarted.requested_db == -48.0);
+    }
+    {
+        DeviceRecoveryCoordinator recovery;
+        OutputGroupVolumeStateV1 volume;
+        volume.requested_db = 0.0;
+        volume.generation = (std::numeric_limits<std::uint64_t>::max)();
+        const auto restarted = recovery.safe_restart_state(volume, -48.0);
+        CHECK(restarted.generation == (std::numeric_limits<std::uint64_t>::max)());
+        CHECK(restarted.generation != 0U);
+        CHECK(restarted.mute);
+        CHECK(restarted.requested_db == -48.0);
+    }
     // safe restart: non-finite safe_start falls back to -60 dB.
     {
         DeviceRecoveryCoordinator recovery;

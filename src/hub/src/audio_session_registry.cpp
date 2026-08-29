@@ -14,6 +14,11 @@ constexpr std::size_t kMaxIdentityLength = 512;
 constexpr std::size_t kMaxLabelLength = 256;
 constexpr std::size_t kMaxOutputGroupLength = 64;
 
+bool valid_gain_owner(const SessionGainOwner owner) noexcept {
+    return owner == SessionGainOwner::WindowsSession ||
+           owner == SessionGainOwner::HibikiInternal;
+}
+
 }  // namespace
 
 bool AudioSessionRegistry::same_identity(const AudioSessionIdentityV1& left,
@@ -23,7 +28,8 @@ bool AudioSessionRegistry::same_identity(const AudioSessionIdentityV1& left,
 }
 
 bool AudioSessionRegistry::valid(const AudioSessionDescriptorV1& descriptor) noexcept {
-    return descriptor.schema_version == 1 && !descriptor.identity.endpoint_id.empty() &&
+    return descriptor.schema_version == 1 && valid_gain_owner(descriptor.gain_owner) &&
+           !descriptor.identity.endpoint_id.empty() &&
            descriptor.identity.endpoint_id.size() <= kMaxIdentityLength &&
            is_printable_utf8_v1(descriptor.identity.endpoint_id) &&
            !descriptor.identity.session_instance_id.empty() &&
@@ -95,6 +101,7 @@ bool AudioSessionRegistry::bind(const AudioSessionIdentityV1& identity,
 
 bool AudioSessionRegistry::set_gain_owner(const AudioSessionIdentityV1& identity,
                                           const SessionGainOwner owner) noexcept {
+    if (!valid_gain_owner(owner)) return false;
     auto* session = find(identity);
     if (session == nullptr) {
         return false;
