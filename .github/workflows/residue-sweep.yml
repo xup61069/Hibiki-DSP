@@ -26,4 +26,6 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./tools/clean-closed-issue-residue.ps1 -Limit 100 -State closed
+        # Limit 0 means fetch every paginated closed Issue; a positive limit
+        # remains available for bounded dry-runs and fails closed on exhaustion.
+        run: ./tools/clean-closed-issue-residue.ps1 -Limit 0 -State closed
