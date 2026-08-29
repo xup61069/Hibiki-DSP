@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "hibiki/output_sink.hpp"
+#include "hibiki/windows_wasapi_output.hpp"
 
 #include <array>
 #include <cmath>
@@ -9,6 +10,13 @@
 #include <cstdio>
 #include <limits>
 #include <span>
+
+#if defined(_WIN32)
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <audioclient.h>
+#endif
 
 #define CHECK(expr) \
     do { \
@@ -29,6 +37,111 @@ using hibiki::PersistentPolyphaseResampler;
 constexpr double kNaN = std::numeric_limits<double>::quiet_NaN();
 
 }  // namespace
+
+#if defined(_WIN32)
+namespace hibiki {
+
+struct WindowsWasapiOutputV1TestAccess {
+    static void attach(WindowsWasapiOutputV1& output,
+                       IAudioClient* client,
+                       IAudioRenderClient* render_client) noexcept {
+        output.client_ = client;
+        output.render_client_ = render_client;
+        output.channels_ = 2U;
+        output.sample_rate_ = 48000U;
+        output.buffer_frames_ = 128U;
+        output.encoding_ = WasapiSampleEncodingV1::Float32;
+        output.failure_ = WasapiOutputFailureV1::None;
+        output.bytes_per_sample_ = sizeof(float);
+        output.started_ = true;
+    }
+
+    static void detach(WindowsWasapiOutputV1& output) noexcept {
+        output.started_ = false;
+        output.client_ = nullptr;
+        output.render_client_ = nullptr;
+    }
+};
+
+}  // namespace hibiki
+
+namespace {
+
+class FakeAudioClient final : public IAudioClient {
+public:
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID, void** object) override {
+        if (object != nullptr) *object = nullptr;
+        return E_NOINTERFACE;
+    }
+    ULONG STDMETHODCALLTYPE AddRef() override { return 1U; }
+    ULONG STDMETHODCALLTYPE Release() override { return 1U; }
+    HRESULT STDMETHODCALLTYPE Initialize(AUDCLNT_SHAREMODE, DWORD, REFERENCE_TIME,
+                                         REFERENCE_TIME, const WAVEFORMATEX*,
+                                         LPCGUID) override {
+        return E_NOTIMPL;
+    }
+    HRESULT STDMETHODCALLTYPE GetBufferSize(UINT32* frames) override {
+        if (frames != nullptr) *frames = 128U;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE GetStreamLatency(REFERENCE_TIME* latency) override {
+        if (latency != nullptr) *latency = 0;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE GetCurrentPadding(UINT32* padding) override {
+        if (padding != nullptr) *padding = 0U;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE IsFormatSupported(AUDCLNT_SHAREMODE, const WAVEFORMATEX*,
+                                                WAVEFORMATEX**) override {
+        return E_NOTIMPL;
+    }
+    HRESULT STDMETHODCALLTYPE GetMixFormat(WAVEFORMATEX**) override { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE GetDevicePeriod(REFERENCE_TIME*, REFERENCE_TIME*) override {
+        return E_NOTIMPL;
+    }
+    HRESULT STDMETHODCALLTYPE Start() override { return S_OK; }
+    HRESULT STDMETHODCALLTYPE Stop() override { return S_OK; }
+    HRESULT STDMETHODCALLTYPE Reset() override { return S_OK; }
+    HRESULT STDMETHODCALLTYPE SetEventHandle(HANDLE) override { return S_OK; }
+    HRESULT STDMETHODCALLTYPE GetService(REFIID, void** object) override {
+        if (object != nullptr) *object = nullptr;
+        return E_NOINTERFACE;
+    }
+};
+
+class FakeAudioRenderClient final : public IAudioRenderClient {
+public:
+    HRESULT get_buffer_result{S_OK};
+    HRESULT release_result{S_OK};
+    BYTE* destination{nullptr};
+    UINT32 requested_frames{0U};
+    UINT32 released_frames{0U};
+    DWORD released_flags{0U};
+    std::uint32_t release_calls{0U};
+    std::array<BYTE, 256> storage{};
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID, void** object) override {
+        if (object != nullptr) *object = nullptr;
+        return E_NOINTERFACE;
+    }
+    ULONG STDMETHODCALLTYPE AddRef() override { return 1U; }
+    ULONG STDMETHODCALLTYPE Release() override { return 1U; }
+    HRESULT STDMETHODCALLTYPE GetBuffer(UINT32 frames, BYTE** data) override {
+        requested_frames = frames;
+        if (data != nullptr) *data = destination;
+        return get_buffer_result;
+    }
+    HRESULT STDMETHODCALLTYPE ReleaseBuffer(UINT32 frames, DWORD flags) override {
+        ++release_calls;
+        released_frames = frames;
+        released_flags = flags;
+        return release_result;
+    }
+};
+
+}  // namespace
+#endif
 
 int main() {
     // Ring buffer: constructor validation is fail-closed for degenerate
@@ -358,6 +471,56 @@ int main() {
               model.snapshot().drift_ppm == 0.0 &&
               model.snapshot().source_step == 1.0);
     }
+
+#if defined(_WIN32)
+    // WASAPI render-buffer lifecycle: a successful GetBuffer with a null
+    // destination still owns an acquisition and must release it exactly once;
+    // a failed GetBuffer owns nothing and must not release it. A valid buffer
+    // retains the ordinary one-release path.
+    {
+        FakeAudioClient client;
+        FakeAudioRenderClient render_client;
+        hibiki::WindowsWasapiOutputV1 output;
+        hibiki::WindowsWasapiOutputV1TestAccess::attach(output, &client, &render_client);
+        const std::array<float, 4> input{0.25F, -0.25F, 0.5F, -0.5F};
+
+        render_client.get_buffer_result = S_OK;
+        render_client.destination = nullptr;
+        CHECK(!output.render(input.data(), 2U));
+        CHECK(render_client.requested_frames == 2U && render_client.release_calls == 1U &&
+              render_client.released_frames == 2U && render_client.released_flags == 0U &&
+              output.failure() == hibiki::WasapiOutputFailureV1::Other);
+        hibiki::WindowsWasapiOutputV1TestAccess::detach(output);
+    }
+    {
+        FakeAudioClient client;
+        FakeAudioRenderClient render_client;
+        hibiki::WindowsWasapiOutputV1 output;
+        hibiki::WindowsWasapiOutputV1TestAccess::attach(output, &client, &render_client);
+        const std::array<float, 4> input{0.25F, -0.25F, 0.5F, -0.5F};
+
+        render_client.get_buffer_result = E_FAIL;
+        render_client.destination = nullptr;
+        CHECK(!output.render(input.data(), 2U));
+        CHECK(render_client.release_calls == 0U &&
+              output.failure() == hibiki::WasapiOutputFailureV1::Other);
+        hibiki::WindowsWasapiOutputV1TestAccess::detach(output);
+    }
+    {
+        FakeAudioClient client;
+        FakeAudioRenderClient render_client;
+        hibiki::WindowsWasapiOutputV1 output;
+        hibiki::WindowsWasapiOutputV1TestAccess::attach(output, &client, &render_client);
+        const std::array<float, 4> input{0.25F, -0.25F, 0.5F, -0.5F};
+
+        render_client.get_buffer_result = S_OK;
+        render_client.destination = render_client.storage.data();
+        CHECK(output.render(input.data(), 2U));
+        CHECK(render_client.release_calls == 1U && render_client.released_frames == 2U &&
+              render_client.released_flags == 0U && output.failure() == hibiki::WasapiOutputFailureV1::None);
+        hibiki::WindowsWasapiOutputV1TestAccess::detach(output);
+    }
+#endif
 
     return 0;
 }
