@@ -210,6 +210,18 @@ int main() {
         CHECK(hibiki::export_wav_f32_ir(ragged_surround, 48000U, 4U).empty());
     }
 
+    // WAV IR: non-finite samples fail closed before serialization.
+    {
+        const auto nan = std::numeric_limits<float>::quiet_NaN();
+        const auto infinity = std::numeric_limits<float>::infinity();
+        const std::vector<float> with_nan{0.0F, nan};
+        const std::vector<float> with_positive_infinity{0.0F, infinity};
+        const std::vector<float> with_negative_infinity{0.0F, -infinity};
+        CHECK(hibiki::export_wav_f32_ir(with_nan, 48000U, 1U).empty());
+        CHECK(hibiki::export_wav_f32_ir(with_positive_infinity, 48000U, 1U).empty());
+        CHECK(hibiki::export_wav_f32_ir(with_negative_infinity, 48000U, 1U).empty());
+    }
+
     // WAV IR: byte rate overflow at u32 boundary fails closed.
     {
         const std::vector<float> samples{0.0F};
