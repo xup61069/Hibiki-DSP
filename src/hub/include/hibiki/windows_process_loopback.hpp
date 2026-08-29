@@ -61,6 +61,10 @@ public:
     [[nodiscard]] WindowsProcessLoopbackSnapshotV1 snapshot() const noexcept;
 
 private:
+#if defined(HIBIKI_PROCESS_LOOPBACK_TEST_SEAM)
+    friend struct WindowsProcessLoopbackSourceTestAccessV1;
+#endif
+
     void set_degraded(HRESULT error) noexcept;
 
     IAudioClient* audio_client_{nullptr};

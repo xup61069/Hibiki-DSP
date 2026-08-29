@@ -1,11 +1,15 @@
 #include "hibiki/vst3_lane_bridge.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstring>
 #include <limits>
 
 namespace hibiki {
+
+Vst3TapBufferV1::Vst3TapBufferV1()
+    : slots_(std::make_unique<SnapshotSlot[]>(kSnapshotSlotCount)) {}
 
 int Vst3LaneRingBridgeV1::find_slot(
     const std::string_view output_group) const noexcept {
@@ -188,23 +192,77 @@ bool Vst3TapBufferV1::publish(
         }
     }
 
-    // Acquire sequence: even = stable, odd = mid-write. We increment to
-    // odd, write data, then increment to even (seqlock-style).
-    const std::uint64_t seq =
-        write_seq_.fetch_add(1U, std::memory_order_relaxed) + 1U;
+    constexpr std::uint64_t kWritingBit = 1U;
+    constexpr std::uint64_t kSlotMask = 0x6U;
+    constexpr std::uint32_t kSlotShift = 1U;
+    constexpr std::uint32_t kGenerationShift = 3U;
 
-    std::memcpy(buffer_.data(), interleaved,
-                sample_count * sizeof(float));
-    std::memcpy(group_.data(), output_group.data(), output_group.size());
-    group_bytes_ = static_cast<std::uint8_t>(output_group.size());
-    channels_ = channels;
-    frames_ = frames;
-    sequence_ = seq;
+    // A three-slot publication keeps the active snapshot immutable while the
+    // control reader holds its hazard slot. The sequence token is
+    // generation|slot|phase: an odd token is an in-progress publication and
+    // an even token is a complete snapshot. Seq_cst is intentional for the
+    // short publication/hazard handshake; it closes the window where a
+    // reader announces its slot just as a writer is selecting a reuse slot.
+    const std::uint64_t current_token =
+        publication_.load(std::memory_order_seq_cst);
+    if ((current_token & kWritingBit) != 0U) { return false; }
 
-    // Release: publish with release ordering so readers see complete data.
+    const auto current_slot =
+        current_token == 0U
+            ? kNoReaderSlot
+            : static_cast<std::uint32_t>((current_token & kSlotMask) >>
+                                          kSlotShift);
+    const auto reader_slot = reader_slot_.load(std::memory_order_seq_cst);
+    std::uint32_t target_slot = kNoReaderSlot;
+    for (std::uint32_t candidate = 0U;
+         candidate < static_cast<std::uint32_t>(kSnapshotSlotCount);
+         ++candidate) {
+        if (candidate != current_slot && candidate != reader_slot) {
+            target_slot = candidate;
+            break;
+        }
+    }
+    if (target_slot == kNoReaderSlot) { return false; }
+
+    const auto current_generation = current_token >> kGenerationShift;
+    const auto max_generation =
+        std::numeric_limits<std::uint64_t>::max() >> kGenerationShift;
+    const auto next_generation =
+        current_generation >= max_generation ? 1U : current_generation + 1U;
+    const auto in_progress_token =
+        (next_generation << kGenerationShift) |
+        (static_cast<std::uint64_t>(target_slot) << kSlotShift) | kWritingBit;
+    const auto stable_token = in_progress_token & ~kWritingBit;
+
+    // Mark the target slot in-flight before touching its payload. A reader
+    // that already selected that slot will observe this token at its second
+    // validation load and reject the copy.
+    publication_.store(in_progress_token, std::memory_order_seq_cst);
+
+    for (std::size_t index = 0U; index < sample_count; ++index) {
+        slots_[target_slot].buffer[index].store(
+            std::bit_cast<std::uint32_t>(interleaved[index]),
+            std::memory_order_release);
+    }
+    for (std::size_t index = 0U; index < output_group.size(); ++index) {
+        slots_[target_slot].group[index].store(
+            static_cast<std::uint32_t>(
+                static_cast<unsigned char>(output_group[index])),
+            std::memory_order_release);
+    }
+    slots_[target_slot].group_bytes.store(
+        static_cast<std::uint32_t>(output_group.size()),
+        std::memory_order_release);
+    slots_[target_slot].channels.store(channels, std::memory_order_release);
+    slots_[target_slot].frames.store(static_cast<std::uint64_t>(frames),
+                                     std::memory_order_release);
+    slots_[target_slot].sequence.store(next_generation,
+                                        std::memory_order_release);
+
+    // Publish only after every field in the selected slot is complete.
     publish_successes_.fetch_add(1U, std::memory_order_relaxed);
+    publication_.store(stable_token, std::memory_order_seq_cst);
     valid_.store(true, std::memory_order_release);
-    write_seq_.fetch_add(1U, std::memory_order_release);
     return true;
 }
 
@@ -217,26 +275,52 @@ bool Vst3TapBufferV1::read(
     std::uint64_t& sequence_out) const noexcept {
     if (destination == nullptr || max_frames == 0U) { return false; }
 
-    // Acquire fence: see a consistent snapshot or reject.
     const bool is_valid = valid_.load(std::memory_order_acquire);
     if (!is_valid) { return false; }
 
-    // Pre-read sequence: paired with the post-read load below so a writer
-    // that completes a full publish while we copy is detected (the classic
-    // seqlock retry check; this reader is fail-closed instead of retrying).
-    const std::uint64_t pre_seq =
-        write_seq_.load(std::memory_order_acquire);
+    constexpr std::uint64_t kWritingBit = 1U;
+    constexpr std::uint64_t kSlotMask = 0x6U;
+    constexpr std::uint32_t kSlotShift = 1U;
+    const auto pre_token = publication_.load(std::memory_order_seq_cst);
+    if (pre_token == 0U || (pre_token & kWritingBit) != 0U) {
+        return false;
+    }
+    const auto slot = static_cast<std::uint32_t>(
+        (pre_token & kSlotMask) >> kSlotShift);
+    if (slot >= kSnapshotSlotCount) { return false; }
+
+    // Announce the slot before the second token check. The writer either sees
+    // this hazard and chooses another slot, or its in-progress token makes the
+    // second check fail before any payload is read.
+    reader_slot_.store(slot, std::memory_order_seq_cst);
+    struct ReaderSlotGuard final {
+        std::atomic<std::uint32_t>& slot;
+        ~ReaderSlotGuard() {
+            slot.store(Vst3TapBufferV1::kNoReaderSlot,
+                       std::memory_order_seq_cst);
+        }
+    } reader_guard{reader_slot_};
+    if (publication_.load(std::memory_order_seq_cst) != pre_token) {
+        return false;
+    }
 
     // Read all scalar fields first.
-    const auto group_bytes = group_bytes_;
-    const auto channels = channels_;
-    const auto frames = frames_;
-    const auto seq = sequence_;
+    const auto group_bytes =
+        slots_[slot].group_bytes.load(std::memory_order_acquire);
+    const auto channels = slots_[slot].channels.load(std::memory_order_acquire);
+    const auto frames = slots_[slot].frames.load(std::memory_order_acquire);
+    const auto seq = slots_[slot].sequence.load(std::memory_order_acquire);
 
     // Verify group matches.
-    if (group_bytes != output_group.size() ||
-        std::memcmp(group_.data(), output_group.data(), group_bytes) != 0) {
+    if (group_bytes != output_group.size() || group_bytes > kMaxOutputGroupBytesV1) {
         return false;
+    }
+    for (std::size_t index = 0U; index < group_bytes; ++index) {
+        if (slots_[slot].group[index].load(std::memory_order_acquire) !=
+            static_cast<std::uint32_t>(
+                static_cast<unsigned char>(output_group[index]))) {
+            return false;
+        }
     }
 
     // Check capacity and shape.
@@ -252,16 +336,18 @@ bool Vst3TapBufferV1::read(
     const std::size_t sample_count = static_cast<std::size_t>(frames) * channel_count;
     if (sample_count > max_frames * channel_count) { return false; }
 
-    std::memcpy(destination, buffer_.data(), sample_count * sizeof(float));
+    for (std::size_t index = 0U; index < sample_count; ++index) {
+        destination[index] = std::bit_cast<float>(
+            slots_[slot].buffer[index].load(std::memory_order_acquire));
+    }
 
-    // Post-read validation: require the sequence to be unchanged and even.
-    // An odd sequence means we raced an in-flight publish; a changed even
-    // value means the writer completed a whole publish round during our
-    // memcpy. Either way the samples may be torn: fail-closed rather than
-    // returning partial audio.
-    const std::uint64_t post_seq =
-        write_seq_.load(std::memory_order_acquire);
-    if (pre_seq != post_seq || (post_seq & 1U) != 0U) { return false; }
+    // Post-read validation: the protected slot and complete publication token
+    // must still be the same. Any in-flight or later generation is rejected.
+    const std::uint64_t post_token =
+        publication_.load(std::memory_order_seq_cst);
+    if (pre_token != post_token || (post_token & kWritingBit) != 0U) {
+        return false;
+    }
 
     channels_out = channels;
     frames_out = frames;
@@ -270,14 +356,22 @@ bool Vst3TapBufferV1::read(
 }
 
 void Vst3TapBufferV1::reset() noexcept {
+    publication_.store(0U, std::memory_order_seq_cst);
+    // Do not clear an in-flight reader hazard here. A reader that observed
+    // the previous stable token may still be copying its slot; preserving the
+    // hazard keeps the first post-reset publication from reusing that slot.
+    // The reader guard clears it when the copy finishes. If no reader is
+    // active, it is already kNoReaderSlot.
     valid_.store(false, std::memory_order_release);
 }
 
 void Vst3TapBufferV1::force_sequence_odd_for_tests() noexcept {
-    // Simulate a reader that sampled pre_seq even and then observed an
-    // in-flight publish (odd) at the post-read check.
-    write_seq_.store(write_seq_.load(std::memory_order_acquire) + 1U,
-                     std::memory_order_release);
+    // Simulate a reader that observes an in-flight publication. reset() is
+    // the only supported way to clear this test-only state.
+    const auto token = publication_.load(std::memory_order_seq_cst);
+    if (token != 0U) {
+        publication_.store(token | 1U, std::memory_order_seq_cst);
+    }
 }
 
 }  // namespace hibiki

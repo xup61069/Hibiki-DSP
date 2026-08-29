@@ -49,9 +49,159 @@ AUDIO_VOLUME_NOTIFICATION_DATA* make_notification(void* buffer,
     return data;
 }
 
+class FakeEndpointVolume final : public IAudioEndpointVolume {
+public:
+    explicit FakeEndpointVolume(float master_db = -12.0F, BOOL muted = FALSE) noexcept
+        : master_db_(master_db), muted_(muted) {}
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
+        if (object == nullptr) return E_POINTER;
+        *object = nullptr;
+        if (iid == IID_IUnknown || iid == __uuidof(IAudioEndpointVolume)) {
+            *object = static_cast<IAudioEndpointVolume*>(this);
+            AddRef();
+            return S_OK;
+        }
+        return E_NOINTERFACE;
+    }
+
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++references_; }
+
+    ULONG STDMETHODCALLTYPE Release() override {
+        const auto remaining = --references_;
+        if (remaining == 0U) delete this;
+        return remaining;
+    }
+
+    HRESULT STDMETHODCALLTYPE RegisterControlChangeNotify(
+        IAudioEndpointVolumeCallback* callback) override {
+        callback_ = callback;
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE UnregisterControlChangeNotify(
+        IAudioEndpointVolumeCallback* callback) override {
+        if (callback_ == callback) callback_ = nullptr;
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE GetChannelCount(UINT* channel_count) override {
+        if (channel_count == nullptr) return E_POINTER;
+        *channel_count = 2U;
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE SetMasterVolumeLevel(float level, LPCGUID) override {
+        ++master_set_calls_;
+        if (master_set_calls_ == fail_master_on_call_) return E_FAIL;
+        master_db_ = level;
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE SetMasterVolumeLevelScalar(float, LPCGUID) override {
+        return E_NOTIMPL;
+    }
+
+    HRESULT STDMETHODCALLTYPE GetMasterVolumeLevel(float* level) override {
+        if (level == nullptr) return E_POINTER;
+        ++master_get_calls_;
+        if (master_get_calls_ == fail_master_get_on_call_) return E_FAIL;
+        *level = master_db_;
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE GetMasterVolumeLevelScalar(float* level) override {
+        if (level == nullptr) return E_POINTER;
+        *level = 0.5F;
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE SetChannelVolumeLevel(UINT, float, LPCGUID) override {
+        return E_NOTIMPL;
+    }
+
+    HRESULT STDMETHODCALLTYPE SetChannelVolumeLevelScalar(UINT, float, LPCGUID) override {
+        return E_NOTIMPL;
+    }
+
+    HRESULT STDMETHODCALLTYPE GetChannelVolumeLevel(UINT, float* level) override {
+        if (level == nullptr) return E_POINTER;
+        *level = master_db_;
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE GetChannelVolumeLevelScalar(UINT, float* level) override {
+        if (level == nullptr) return E_POINTER;
+        *level = 0.5F;
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE SetMute(BOOL muted, LPCGUID) override {
+        ++mute_set_calls_;
+        if (mute_set_calls_ == fail_mute_on_call_) return E_FAIL;
+        muted_ = muted;
+        return mute_result_;
+    }
+
+    HRESULT STDMETHODCALLTYPE GetMute(BOOL* muted) override {
+        if (muted == nullptr) return E_POINTER;
+        ++mute_get_calls_;
+        if (mute_get_calls_ == fail_mute_get_on_call_) return E_FAIL;
+        *muted = muted_;
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE GetVolumeStepInfo(UINT* step, UINT* step_count) override {
+        if (step == nullptr || step_count == nullptr) return E_POINTER;
+        *step = 0U;
+        *step_count = 100U;
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE VolumeStepUp(LPCGUID) override { return E_NOTIMPL; }
+
+    HRESULT STDMETHODCALLTYPE VolumeStepDown(LPCGUID) override { return E_NOTIMPL; }
+
+    HRESULT STDMETHODCALLTYPE QueryHardwareSupport(DWORD* support_mask) override {
+        if (support_mask == nullptr) return E_POINTER;
+        *support_mask = 0U;
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE GetVolumeRange(float* minimum_db,
+                                              float* maximum_db,
+                                              float* increment_db) override {
+        if (minimum_db == nullptr || maximum_db == nullptr || increment_db == nullptr) {
+            return E_POINTER;
+        }
+        *minimum_db = -144.0F;
+        *maximum_db = 12.0F;
+        *increment_db = 0.5F;
+        return S_OK;
+    }
+
+    float master_db_;
+    BOOL muted_;
+    std::uint32_t master_set_calls_{0U};
+    std::uint32_t mute_set_calls_{0U};
+    std::uint32_t master_get_calls_{0U};
+    std::uint32_t mute_get_calls_{0U};
+    std::uint32_t fail_master_on_call_{0U};
+    std::uint32_t fail_mute_on_call_{0U};
+    std::uint32_t fail_master_get_on_call_{0U};
+    std::uint32_t fail_mute_get_on_call_{0U};
+    HRESULT mute_result_{S_OK};
+
+private:
+    IAudioEndpointVolumeCallback* callback_{nullptr};
+    ULONG references_{1U};
+};
+
 class FakeDevice final : public IMMDevice {
 public:
-    explicit FakeDevice(bool provide_id = true) noexcept : provide_id_(provide_id) {}
+    explicit FakeDevice(bool provide_id = true,
+                        IAudioEndpointVolume* endpoint = nullptr) noexcept
+        : provide_id_(provide_id), endpoint_(endpoint) {}
 
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** object) override {
         if (object == nullptr) {
@@ -109,18 +259,23 @@ public:
         return E_NOTIMPL;
     }
 
-    HRESULT STDMETHODCALLTYPE Activate(REFIID /*interface_id*/,
+    HRESULT STDMETHODCALLTYPE Activate(REFIID interface_id,
                                       DWORD /*class_context*/,
                                       PROPVARIANT* /*activation_parameters*/,
                                       void** interface_pointer) override {
-        if (interface_pointer != nullptr) {
-            *interface_pointer = nullptr;
+        if (interface_pointer == nullptr) return E_POINTER;
+        *interface_pointer = nullptr;
+        if (endpoint_ != nullptr && interface_id == __uuidof(IAudioEndpointVolume)) {
+            endpoint_->AddRef();
+            *interface_pointer = endpoint_;
+            return S_OK;
         }
         return E_NOINTERFACE;
     }
 
 private:
     bool provide_id_;
+    IAudioEndpointVolume* endpoint_;
     ULONG references_{1U};
 };
 
@@ -258,6 +413,124 @@ int run_broker_tests() {
         CHECK(!broker.is_bound());
         CHECK(broker.bind_if_changed(device) == E_NOINTERFACE);
         device->Release();
+    }
+    // A successful canonical dB/mute write applies both setters.
+    {
+        auto* endpoint = new FakeEndpointVolume(-12.0F, FALSE);
+        auto* device = new FakeDevice(true, endpoint);
+        WindowsVolumeBroker broker;
+        CHECK(broker.bind(device) == S_OK);
+        OutputGroupVolumeStateV1 requested{};
+        requested.requested_db = -6.0;
+        requested.safety_ceiling_db = 0.0;
+        requested.mute = true;
+        CHECK(broker.write(requested, kEventContext) == S_OK);
+        CHECK(endpoint->master_db_ == -6.0F);
+        CHECK(endpoint->muted_ == TRUE);
+        CHECK(endpoint->master_set_calls_ == 1U);
+        CHECK(endpoint->mute_set_calls_ == 1U);
+        broker.unbind();
+        CHECK(endpoint->Release() == 0U);
+        CHECK(device->Release() == 0U);
+    }
+    // A successful second setter preserves its successful HRESULT.
+    {
+        auto* endpoint = new FakeEndpointVolume(-12.0F, FALSE);
+        endpoint->mute_result_ = S_FALSE;
+        auto* device = new FakeDevice(true, endpoint);
+        WindowsVolumeBroker broker;
+        CHECK(broker.bind(device) == S_OK);
+        OutputGroupVolumeStateV1 requested{};
+        requested.requested_db = -6.0;
+        requested.safety_ceiling_db = 0.0;
+        requested.mute = true;
+        CHECK(broker.write(requested, kEventContext) == S_FALSE);
+        CHECK(endpoint->master_db_ == -6.0F);
+        CHECK(endpoint->muted_ == TRUE);
+        broker.unbind();
+        CHECK(endpoint->Release() == 0U);
+        CHECK(device->Release() == 0U);
+    }
+    // A first-setter failure restores the complete pre-write pair and never
+    // reports success.
+    {
+        auto* endpoint = new FakeEndpointVolume(-12.0F, FALSE);
+        endpoint->fail_master_on_call_ = 1U;
+        auto* device = new FakeDevice(true, endpoint);
+        WindowsVolumeBroker broker;
+        CHECK(broker.bind(device) == S_OK);
+        OutputGroupVolumeStateV1 requested{};
+        requested.requested_db = -3.0;
+        requested.safety_ceiling_db = 0.0;
+        requested.mute = true;
+        CHECK(FAILED(broker.write(requested, kEventContext)));
+        CHECK(endpoint->master_db_ == -12.0F);
+        CHECK(endpoint->muted_ == FALSE);
+        CHECK(endpoint->master_set_calls_ == 2U);
+        CHECK(endpoint->mute_set_calls_ == 1U);
+        broker.unbind();
+        CHECK(endpoint->Release() == 0U);
+        CHECK(device->Release() == 0U);
+    }
+    // A second-setter failure rolls back the first setter and the mute pair.
+    {
+        auto* endpoint = new FakeEndpointVolume(-12.0F, FALSE);
+        endpoint->fail_mute_on_call_ = 1U;
+        auto* device = new FakeDevice(true, endpoint);
+        WindowsVolumeBroker broker;
+        CHECK(broker.bind(device) == S_OK);
+        OutputGroupVolumeStateV1 requested{};
+        requested.requested_db = -3.0;
+        requested.safety_ceiling_db = 0.0;
+        requested.mute = true;
+        CHECK(FAILED(broker.write(requested, kEventContext)));
+        CHECK(endpoint->master_db_ == -12.0F);
+        CHECK(endpoint->muted_ == FALSE);
+        CHECK(endpoint->master_set_calls_ == 2U);
+        CHECK(endpoint->mute_set_calls_ == 2U);
+        broker.unbind();
+        CHECK(endpoint->Release() == 0U);
+        CHECK(device->Release() == 0U);
+    }
+    // Rollback setter failure is surfaced as fail-closed and cannot be
+    // mistaken for a successful endpoint update.
+    {
+        auto* endpoint = new FakeEndpointVolume(-12.0F, FALSE);
+        endpoint->fail_mute_on_call_ = 1U;
+        endpoint->fail_master_on_call_ = 2U;
+        auto* device = new FakeDevice(true, endpoint);
+        WindowsVolumeBroker broker;
+        CHECK(broker.bind(device) == S_OK);
+        OutputGroupVolumeStateV1 requested{};
+        requested.requested_db = -3.0;
+        requested.safety_ceiling_db = 0.0;
+        requested.mute = true;
+        CHECK(FAILED(broker.write(requested, kEventContext)));
+        CHECK(endpoint->master_db_ == -3.0F);
+        CHECK(endpoint->muted_ == FALSE);
+        broker.unbind();
+        CHECK(endpoint->Release() == 0U);
+        CHECK(device->Release() == 0U);
+    }
+    // Read-back failure after otherwise successful rollback remains
+    // fail-closed.
+    {
+        auto* endpoint = new FakeEndpointVolume(-12.0F, FALSE);
+        endpoint->fail_mute_on_call_ = 1U;
+        endpoint->fail_master_get_on_call_ = 2U;
+        auto* device = new FakeDevice(true, endpoint);
+        WindowsVolumeBroker broker;
+        CHECK(broker.bind(device) == S_OK);
+        OutputGroupVolumeStateV1 requested{};
+        requested.requested_db = -3.0;
+        requested.safety_ceiling_db = 0.0;
+        requested.mute = true;
+        CHECK(FAILED(broker.write(requested, kEventContext)));
+        CHECK(endpoint->master_db_ == -12.0F);
+        CHECK(endpoint->muted_ == FALSE);
+        broker.unbind();
+        CHECK(endpoint->Release() == 0U);
+        CHECK(device->Release() == 0U);
     }
     return 0;
 }

@@ -1165,10 +1165,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
                 true, scene.Id, scene.Name, _session.ActiveOutputGroup ?? "main",
                 scene.IrReference, scene.LoudnessLiveUpdate)))
         {
-            _session.CustomScenes.Remove(scene.Id);
-            if (previous is not null) _session.CustomScenes.Upsert(previous);
-            OnPropertyChanged(nameof(Scenes));
-            OnPropertyChanged(nameof(CustomSceneCards));
+            RestoreCustomSceneMirror(previous, scene.Id);
             return false;
         }
         CustomSceneId = string.Empty;
@@ -1185,10 +1182,16 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
                 cancellationToken).ConfigureAwait(true);
             if (!sent)
             {
-                EnqueueSceneCatalogOp(new PendingSceneCatalogOp(
+                var pendingOperation = new PendingSceneCatalogOp(
                     true, scene.Id, scene.Name, _session.ActiveOutputGroup ?? "main",
-                    scene.IrReference, scene.LoudnessLiveUpdate));
-                StatusText = $"已加入自訂場景：{scene.Name}；同步未完成，連線恢復後自動重試";
+                    scene.IrReference, scene.LoudnessLiveUpdate);
+                if (!TryPersistOfflineSceneOp(pendingOperation))
+                {
+                    RestoreCustomSceneMirror(previous, scene.Id);
+                    return false;
+                }
+                ReportSceneCatalogStatus(
+                    $"已加入自訂場景：{scene.Name}；同步未完成，連線恢復後自動重試");
                 return false;
             }
             StatusText = $"已加入自訂場景：{scene.Name}；引擎已同步";
@@ -2080,6 +2083,25 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         return false;
     }
 
+    // Queue persistence happens after the card mirror save. Restore both the
+    // in-memory view and its durable card file when that second transaction
+    // cannot be committed; otherwise a restart would resurrect the failed
+    // local edit even though this ViewModel rolled it back visibly.
+    private void RestoreCustomSceneMirror(SceneCard? previous, string sceneId,
+                                          bool restoreSelection = false,
+                                          SceneCard? previousSelection = null)
+    {
+        if (previous is null) _session.CustomScenes.Remove(sceneId);
+        else _session.CustomScenes.Upsert(previous);
+        if (restoreSelection) _selectedScene = previousSelection;
+        OnPropertyChanged(nameof(Scenes));
+        OnPropertyChanged(nameof(CustomSceneCards));
+        OnPropertyChanged(nameof(SelectedScene));
+        OnPropertyChanged(nameof(SelectedSceneId));
+        if (!SaveCustomScenes(out var restoreError))
+            StatusText += $"；卡片回復保存失敗：{restoreError}";
+    }
+
     public bool LoadPendingSceneCatalogOps(out string error)
     {
         var queue = new CustomSceneSyncQueueV1();
@@ -2224,7 +2246,18 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             var sent = await SendSceneCatalogCommandAsync(
                 _commands.RemoveSceneCatalog(previous.Id), cancellationToken)
                 .ConfigureAwait(true);
-            if (!sent) return false;
+            if (!sent)
+            {
+                if (!TryPersistOfflineSceneOp(new PendingSceneCatalogOp(
+                        false, previous.Id, "", "")))
+                {
+                    RestoreCustomSceneMirror(previous, previous.Id, true, previousSelection);
+                    return false;
+                }
+                ReportSceneCatalogStatus(
+                    $"已移除自訂場景：{previous.Name}；同步未完成，連線恢復後自動重試");
+                return false;
+            }
             StatusText = $"已移除自訂場景：{previous.Name}；引擎已同步";
         }
         else
@@ -2232,12 +2265,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             if (!TryPersistOfflineSceneOp(new PendingSceneCatalogOp(
                     false, previous.Id, "", "")))
             {
-                _session.CustomScenes.Upsert(previous);
-                _selectedScene = previousSelection;
-                OnPropertyChanged(nameof(Scenes));
-                OnPropertyChanged(nameof(CustomSceneCards));
-                OnPropertyChanged(nameof(SelectedScene));
-                OnPropertyChanged(nameof(SelectedSceneId));
+                RestoreCustomSceneMirror(previous, previous.Id, true, previousSelection);
                 return false;
             }
             ReportSceneCatalogStatus(

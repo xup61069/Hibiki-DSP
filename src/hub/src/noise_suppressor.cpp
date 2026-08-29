@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace hibiki {
 namespace {
@@ -77,6 +78,11 @@ void BasicNoiseSuppressorV1::reset() noexcept {
 bool BasicNoiseSuppressorV1::process_interleaved(float* const interleaved,
                                                  const std::size_t frames) noexcept {
     if (!configured_ || interleaved == nullptr || frames == 0U) return false;
+    const auto channel_count = static_cast<std::size_t>(channels_);
+    if (channel_count == 0U ||
+        frames > std::numeric_limits<std::size_t>::max() / channel_count) {
+        return false;
+    }
     for (std::size_t frame = 0U; frame < frames; ++frame) {
         for (std::uint32_t channel = 0U; channel < channels_; ++channel) {
             const auto index = frame * channels_ + channel;
