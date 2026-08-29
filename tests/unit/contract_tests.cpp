@@ -36,6 +36,7 @@
 #include "hibiki/session_catalog.hpp"
 #include "hibiki/session_command_queue.hpp"
 #include "hibiki/wav_source_progress.hpp"
+#include "hibiki/wav_source_status.hpp"
 
 extern "C" {
 #include "hibiki/driver_control_v1.h"
@@ -737,6 +738,14 @@ hibiki::Vst3PluginStateResultV1 migrate_oversized_plugin_state(
 }
 
 int main() {
+    CHECK(hibiki::wav_source_route_state_v1(false, false, false) ==
+              hibiki::ControlRouteHealthStateV1::Unavailable &&
+          hibiki::wav_source_route_state_v1(true, false, false) ==
+              hibiki::ControlRouteHealthStateV1::Unavailable &&
+          hibiki::wav_source_route_state_v1(true, true, false) ==
+              hibiki::ControlRouteHealthStateV1::Pending &&
+          hibiki::wav_source_route_state_v1(true, true, true) ==
+              hibiki::ControlRouteHealthStateV1::Ready);
     // WAV source progress remains correct across a loop reset and never uses
     // an unsigned subtraction between the end and the wrapped position.
     CHECK(hibiki::wav_source_progress_delta_v1(0U, 128U, 239U, 0U) == 128U &&
