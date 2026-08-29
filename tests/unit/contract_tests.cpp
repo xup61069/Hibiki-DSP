@@ -35,6 +35,7 @@
 #include "hibiki/driver_stream_bridge.hpp"
 #include "hibiki/session_catalog.hpp"
 #include "hibiki/session_command_queue.hpp"
+#include "hibiki/wav_source_progress.hpp"
 
 extern "C" {
 #include "hibiki/driver_control_v1.h"
@@ -736,6 +737,14 @@ hibiki::Vst3PluginStateResultV1 migrate_oversized_plugin_state(
 }
 
 int main() {
+    // WAV source progress remains correct across a loop reset and never uses
+    // an unsigned subtraction between the end and the wrapped position.
+    CHECK(hibiki::wav_source_progress_delta_v1(0U, 128U, 239U, 0U) == 128U &&
+          hibiki::wav_source_progress_delta_v1(238U, 127U, 239U, 1U) == 128U &&
+          hibiki::wav_source_progress_delta_v1(239U, 1U, 239U, 1U) == 1U &&
+          hibiki::wav_source_progress_delta_v1(0U, 1U, 1U, 4095U) == 4096U &&
+          hibiki::wav_source_progress_delta_v1(0U, 0U, 0U, 0U) == 0U &&
+          hibiki::wav_source_progress_delta_v1(240U, 0U, 239U, 1U) == 0U);
     using namespace hibiki;
 
     SceneProfileV1 scene;
