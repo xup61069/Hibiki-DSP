@@ -17,6 +17,11 @@
 
 namespace hibiki {
 
+constexpr std::uint32_t kTabCaptureMaxChannelsV1 = 8U;
+constexpr std::uint32_t kTabCaptureMaxFramesV1 = 4096U;
+constexpr std::size_t kTabCaptureMaxSamplesV1 =
+    static_cast<std::size_t>(kTabCaptureMaxChannelsV1) * kTabCaptureMaxFramesV1;
+
 enum class TabPacketError : std::uint8_t {
     None,
     Truncated,
@@ -70,7 +75,7 @@ public:
 
     [[nodiscard]] bool push(const TabCapturePacketViewV1& view) noexcept;
     [[nodiscard]] bool pop(float* interleaved,
-                           std::uint32_t output_capacity_frames,
+                           std::size_t output_capacity_samples,
                            TabCaptureBlockV1& block) noexcept;
     [[nodiscard]] std::uint32_t dropped_blocks() const noexcept;
     // A host may bind the queue before starting its WebSocket producer. A
@@ -81,7 +86,7 @@ public:
 
 private:
     static constexpr std::uint32_t kSlotCount = 4U;
-    static constexpr std::uint32_t kMaxSamples = 8U * 4096U;
+    static constexpr std::size_t kMaxSamples = kTabCaptureMaxSamplesV1;
     struct Slot {
         std::atomic<std::uint32_t> ready_sequence{0U};
         std::uint32_t frames{0U};
@@ -100,13 +105,14 @@ private:
 
 // Bridges one queued browser block into the same immutable engine graph used
 // by ASIO and other external lanes. The adapter owns no audio storage: the
-// caller supplies scratch/input and output buffers.
+// caller supplies scratch/input and output buffers. The input capacity is in
+// interleaved samples so the copy boundary can prove frames * channels fits.
 [[nodiscard]] bool process_tab_capture_lane_v1(
     AudioEngineModel& engine,
     std::size_t lane_index,
     TabCaptureQueueV1& queue,
     float* input_interleaved,
-    std::uint32_t input_capacity_frames,
+    std::size_t input_capacity_samples,
     std::span<RtLaneInputV1> lane_inputs,
     float* output_interleaved,
     std::uint32_t output_capacity_frames,
@@ -121,7 +127,7 @@ private:
     std::size_t lane_index,
     TabCaptureQueueV1& queue,
     float* input_interleaved,
-    std::uint32_t input_capacity_frames,
+    std::size_t input_capacity_samples,
     std::span<RtLaneInputV1> lane_inputs,
     float* output_interleaved,
     std::uint32_t output_capacity_frames,

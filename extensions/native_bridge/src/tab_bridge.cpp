@@ -4,14 +4,16 @@
 
 #include "hibiki/ws_transport.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
 
 namespace hibiki {
 namespace {
 
 constexpr std::size_t kHeaderBytes = 16U;
-constexpr std::size_t kMaxFrames = 4096U;
+constexpr std::size_t kMaxFrames = kTabCaptureMaxFramesV1;
 
 std::uint16_t read_u16(const std::uint8_t* bytes) noexcept {
     return static_cast<std::uint16_t>(bytes[0]) |
@@ -100,7 +102,7 @@ bool decode_tab_capture_packet_v1(const std::span<const std::uint8_t> packet,
 
 bool TabCaptureQueueV1::push(const TabCapturePacketViewV1& view) noexcept {
     if (!supported_channels(view.channels) || !supported_rate(view.sample_rate) ||
-        view.frames == 0U || view.frames > 4096U ||
+        view.frames == 0U || view.frames > kTabCaptureMaxFramesV1 ||
         view.sample_rate == 0U || view.samples_bytes == nullptr ||
         view.sample_count != static_cast<std::size_t>(view.channels) * view.frames) {
         return false;
@@ -131,7 +133,7 @@ bool TabCaptureQueueV1::push(const TabCapturePacketViewV1& view) noexcept {
 }
 
 bool TabCaptureQueueV1::pop(float* const interleaved,
-                            const std::uint32_t output_capacity_frames,
+                            const std::size_t output_capacity_samples,
                             TabCaptureBlockV1& block) noexcept {
     block = {};
     if (interleaved == nullptr) return false;
@@ -140,11 +142,14 @@ bool TabCaptureQueueV1::pop(float* const interleaved,
     if (consumer == producer) return false;
     auto& slot = slots_[consumer % kSlotCount];
     if (slot.ready_sequence.load(std::memory_order_acquire) != consumer + 1U ||
-        slot.frames == 0U || slot.frames > output_capacity_frames || slot.channels == 0U ||
-        slot.channels > 8U) {
+        slot.frames == 0U || slot.frames > kTabCaptureMaxFramesV1 ||
+        slot.channels == 0U || slot.channels > kTabCaptureMaxChannelsV1 ||
+        static_cast<std::size_t>(slot.channels) >
+            (std::numeric_limits<std::size_t>::max)() / slot.frames) {
         return false;
     }
     const auto sample_count = static_cast<std::size_t>(slot.frames) * slot.channels;
+    if (sample_count > output_capacity_samples) return false;
     std::copy_n(slot.samples.data(), sample_count, interleaved);
     block.frames = slot.frames;
     block.channels = slot.channels;
@@ -180,7 +185,7 @@ static bool process_tab_capture_lane_impl(
     const std::size_t lane_index,
     TabCaptureQueueV1& queue,
     float* const input_interleaved,
-    const std::uint32_t input_capacity_frames,
+    const std::size_t input_capacity_samples,
     const std::span<RtLaneInputV1> lane_inputs,
     float* const output_interleaved,
     const std::uint32_t output_capacity_frames,
@@ -189,10 +194,10 @@ static bool process_tab_capture_lane_impl(
     const bool to_wasapi) noexcept {
     block = {};
     if (input_interleaved == nullptr || output_interleaved == nullptr ||
-        input_capacity_frames == 0U || output_capacity_frames == 0U) {
+        input_capacity_samples == 0U || output_capacity_frames == 0U) {
         return false;
     }
-    if (!queue.pop(input_interleaved, input_capacity_frames, block) ||
+    if (!queue.pop(input_interleaved, input_capacity_samples, block) ||
         block.frames == 0U || block.frames > output_capacity_frames) {
         block = {};
         return false;
@@ -246,14 +251,14 @@ bool process_tab_capture_lane_v1(
     const std::size_t lane_index,
     TabCaptureQueueV1& queue,
     float* const input_interleaved,
-    const std::uint32_t input_capacity_frames,
+    const std::size_t input_capacity_samples,
     const std::span<RtLaneInputV1> lane_inputs,
     float* const output_interleaved,
     const std::uint32_t output_capacity_frames,
     TabCaptureBlockV1& block,
     TabLaneEffectsV1* const effects) noexcept {
     return process_tab_capture_lane_impl(engine, lane_index, queue, input_interleaved,
-                                         input_capacity_frames, lane_inputs, output_interleaved,
+                                         input_capacity_samples, lane_inputs, output_interleaved,
                                          output_capacity_frames, block, effects, false);
 }
 
@@ -262,14 +267,14 @@ bool process_tab_capture_lane_to_wasapi_v1(
     const std::size_t lane_index,
     TabCaptureQueueV1& queue,
     float* const input_interleaved,
-    const std::uint32_t input_capacity_frames,
+    const std::size_t input_capacity_samples,
     const std::span<RtLaneInputV1> lane_inputs,
     float* const output_interleaved,
     const std::uint32_t output_capacity_frames,
     TabCaptureBlockV1& block,
     TabLaneEffectsV1* const effects) noexcept {
     return process_tab_capture_lane_impl(engine, lane_index, queue, input_interleaved,
-                                         input_capacity_frames, lane_inputs, output_interleaved,
+                                         input_capacity_samples, lane_inputs, output_interleaved,
                                          output_capacity_frames, block, effects, true);
 }
 

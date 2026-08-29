@@ -1842,7 +1842,7 @@ int wmain(const int argc, wchar_t* const* argv) {
                                         &tab_bridge.queue)) {
                 tab_bridge.listening = true;
                 tab_bridge.input_buffer.resize(
-                    static_cast<std::size_t>(kTabBridgeMaxFrames) * 2U);
+                    hibiki::kTabCaptureMaxSamplesV1);
                 tab_bridge.output_buffer.resize(
                     static_cast<std::size_t>(kTabBridgeMaxFrames) *
                     static_cast<std::size_t>(kTestToneMaxOutputChannels));
@@ -2109,7 +2109,7 @@ int wmain(const int argc, wchar_t* const* argv) {
             hibiki::TabCaptureBlockV1 block{};
             const bool delivered = hibiki::process_tab_capture_lane_to_wasapi_v1(
                 engine, 0U, tab_bridge.queue,
-                tab_bridge.input_buffer.data(), kTabBridgeMaxFrames,
+                tab_bridge.input_buffer.data(), tab_bridge.input_buffer.size(),
                 std::span<hibiki::RtLaneInputV1>(tab_bridge.lane_inputs),
                 tab_bridge.output_buffer.data(), kTabBridgeMaxFrames,
                 block, tab_noise_suppressor_requested ? &tab_bridge.effects : nullptr);
