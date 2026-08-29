@@ -47,6 +47,8 @@ std::vector<EqualLoudnessContourPoint> contour_with_anchor(
 
 }  // namespace
 
+int run_audio_engine_loudness_geometry_tests();
+
 int main() {
     // ---- validate_policy ---------------------------------------------------
     {
@@ -226,6 +228,9 @@ int main() {
         CHECK(out_of_range.points[0].limited);
         CHECK(out_of_range.points[0].gain_db == 0.0);
     }
+
+    CHECK(run_audio_engine_loudness_geometry_tests() == 0);
+
     {
         // Structural rejections keep an empty result with a diagnostic.
         const std::vector<double> frequencies{1000.0};

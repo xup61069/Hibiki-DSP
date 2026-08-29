@@ -20,6 +20,140 @@ function Assert-LiveSessionVolumeOptIn([bool]$windowsHost, [bool]$writeTest, [bo
     }
 }
 
+function Assert-LiveSessionVolumeProbeExitContract([string]$repoRoot) {
+    if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+        throw 'Live session-volume probe exit contract requires a repository root.'
+    }
+    $probePaths = @(
+        (Join-Path $repoRoot 'tests/live_session_volume_probe.cpp'),
+        (Join-Path $repoRoot 'tests/live_engine_session_volume_probe.cpp')
+    )
+    foreach ($probePath in $probePaths) {
+        if (-not (Test-Path -LiteralPath $probePath -PathType Leaf)) {
+            throw "Live session-volume probe source is missing: $probePath"
+        }
+        $lines = @(Get-Content -LiteralPath $probePath)
+        $source = $lines -join "`n"
+        if ($source -notmatch 'return\s+passed\s+\|\|\s+unavailable\s+\?\s+0\s*:\s*1;') {
+            throw "Live session-volume probe has no fail-closed unavailable exit contract: $probePath"
+        }
+
+        $writeLine = -1
+        for ($lineIndex = 0; $lineIndex -lt $lines.Count; $lineIndex++) {
+            if ($lines[$lineIndex] -match '^\s*restore_required\s*=\s*true;') {
+                $writeLine = $lineIndex
+                break
+            }
+        }
+        if ($writeLine -lt 0) {
+            throw "Live session-volume probe has no restore arming before mutation: $probePath"
+        }
+
+        for ($lineIndex = 0; $lineIndex -lt $lines.Count; $lineIndex++) {
+            if ($lines[$lineIndex] -notmatch 'session_volume(?:_engine)?_live=unavailable') {
+                continue
+            }
+            if ($lines[$lineIndex] -match 'reason=com-init') {
+                $windowEnd = [Math]::Min($lines.Count - 1, $lineIndex + 4)
+                $window = $lines[$lineIndex..$windowEnd] -join "`n"
+                if ($window -notmatch 'return\s+0;') {
+                    throw "COM initialization unavailability must exit successfully: $probePath"
+                }
+                continue
+            }
+
+            $markedUnavailable = $false
+            $reachedBreak = $false
+            $windowEnd = [Math]::Min($lines.Count - 1, $lineIndex + 24)
+            for ($nextLine = $lineIndex + 1; $nextLine -le $windowEnd; $nextLine++) {
+                if ($lines[$nextLine] -match '^\s*unavailable\s*=\s*true;') {
+                    $markedUnavailable = $true
+                }
+                if ($lines[$nextLine] -match '^\s*break;') {
+                    $reachedBreak = $true
+                    break
+                }
+            }
+            if (-not $markedUnavailable -or -not $reachedBreak) {
+                throw "Pre-write unavailability must be marked before its exit: ${probePath}:$($lineIndex + 1)"
+            }
+        }
+
+        for ($lineIndex = $writeLine + 1; $lineIndex -lt $lines.Count; $lineIndex++) {
+            if ($lines[$lineIndex] -match '^\s*unavailable\s*=\s*true;') {
+                throw "Post-write failure path must not be downgraded to unavailable: ${probePath}:$($lineIndex + 1)"
+            }
+        }
+    }
+}
+
+function Assert-LiveSessionVolumePipeIoContract([string]$repoRoot) {
+    if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+        throw 'Live session-volume pipe I/O contract requires a repository root.'
+    }
+    $probePath = Join-Path $repoRoot 'tests/live_engine_session_volume_probe.cpp'
+    if (-not (Test-Path -LiteralPath $probePath -PathType Leaf)) {
+        throw "Live Engine session-volume probe source is missing: $probePath"
+    }
+    $source = Get-Content -LiteralPath $probePath -Raw
+    $requiredPatterns = @(
+        'const auto deadline = std::chrono::steady_clock::now\(\)\s*\+\s*std::chrono::seconds\(5\)',
+        'while\s*\(std::chrono::steady_clock::now\(\)\s*<\s*deadline\)',
+        'WaitNamedPipeW\(kPipeName,\s*250U\)',
+        'std::this_thread::sleep_for\(std::chrono::milliseconds\(25\)\)',
+        'FILE_ATTRIBUTE_NORMAL\s*\|\s*FILE_FLAG_OVERLAPPED',
+        'OVERLAPPED\s+overlapped\s*\{\}',
+        'WaitForSingleObject\(event,\s*kIoTimeoutMs\)',
+        'CancelIoEx\(handle_,\s*&overlapped\)',
+        'GetOverlappedResult\(handle_,\s*&overlapped,\s*&transferred,\s*TRUE\)',
+        'CancelIoEx\(handle_,\s*nullptr\)',
+        'if\s*\(encoded\.empty\(\)\s*\|\|\s*encoded\.size\(\)\s*>\s*hibiki::kIpcMaxPayloadBytes\)\s*\{\s*close\(\);\s*return\s+std::nullopt;',
+        '!transfer\(true,\s*const_cast<std::uint8_t\*>\(encoded\.data\(\)\),\s*encoded\.size\(\)\)\)\s*\{\s*close\(\);\s*return\s+std::nullopt;',
+        'if\s*\(!transfer\(false,\s*length\.data\(\),\s*length\.size\(\)\)\)\s*\{\s*close\(\);',
+        'if\s*\(response_bytes\s*<\s*20U.*?\)\s*\{\s*close\(\);',
+        'if\s*\(!transfer\(false,\s*response\.data\(\),\s*response\.size\(\)\)\)\s*\{\s*close\(\);',
+        'if\s*\(!decoded\.has_value\(\).*?\)\s*\{\s*close\(\);',
+        'bool\s+connected\(\)\s+const\s+noexcept\s*\{\s*return\s+handle_\s*!=\s*INVALID_HANDLE_VALUE;',
+        'void\s+fail_closed\(\)\s+noexcept\s*\{\s*close\(\);',
+        'StringFromGUID2\(',
+        'hibiki-live-probe-',
+        'if\s*\(response->header\.type\s*!=\s*hibiki::IpcMessageType::SessionCatalogSnapshot\)\s*\{',
+        'if\s*\(response->header\.type\s*!=\s*hibiki::IpcMessageType::Error\)\s*pipe\.fail_closed\(\);',
+        'decode_session_catalog_snapshot_v1\(response->payload,\s*catalog\)',
+        'auto\s+clear_route_rule\s*=\s*\[&\]\(\)\s*noexcept',
+        'if\s*\(!clear_route_rule\(\)\)\s*passed\s*=\s*false;'
+    )
+    foreach ($pattern in $requiredPatterns) {
+        if ($source -notmatch $pattern) {
+            throw "Live Engine session-volume pipe I/O contract is missing: $pattern"
+        }
+    }
+    $disconnectStops = ([regex]::Matches($source, 'if\s*\(!pipe\.connected\(\)\)\s*return false;')).Count
+    if ($disconnectStops -ne 4) {
+        throw "Live Engine session-volume wait helpers must stop after disconnect (found $disconnectStops)."
+    }
+    $catalogFailClosed = ([regex]::Matches($source, 'pipe\.fail_closed\(\)')).Count
+    if ($catalogFailClosed -ne 2) {
+        throw "Live Engine session-volume catalog failures must fail closed (found $catalogFailClosed)."
+    }
+    $routeRuleArms = ([regex]::Matches($source, 'route_rule_required\s*=\s*true;')).Count
+    if ($routeRuleArms -ne 1) {
+        throw "Live Engine session-volume route-rule cleanup must arm before upsert (found $routeRuleArms)."
+    }
+    $boundedRetryLoops = ([regex]::Matches(
+        $source,
+        'for\s*\(std::uint32_t attempt\s*=\s*0U;\s*attempt\s*<\s*80U;\s*\+\+attempt\)')).Count
+    if ($boundedRetryLoops -ne 4) {
+        throw "Live Engine session-volume wait helpers must retain bounded retries (found $boundedRetryLoops)."
+    }
+    $retryBackoffs = ([regex]::Matches(
+        $source,
+        'std::this_thread::sleep_for\(std::chrono::milliseconds\(50\)\)')).Count
+    if ($retryBackoffs -ne 4) {
+        throw "Live Engine session-volume wait helpers must retain bounded backoff (found $retryBackoffs)."
+    }
+}
+
 function Get-LiveSessionVolumePlan([string]$repoRoot, [bool]$directCoordinator) {
     if ([string]::IsNullOrWhiteSpace($repoRoot)) { throw 'Live session-volume plan requires a repository root.' }
 
@@ -177,6 +311,8 @@ if ($SelfTest) {
     }
     if (-not $writeTestCaught) { throw 'Live session-volume self-test expected WriteTest opt-in rejection.' }
     Assert-LiveSessionVolumeOptIn $true $false $true
+    Assert-LiveSessionVolumeProbeExitContract $repo
+    Assert-LiveSessionVolumePipeIoContract $repo
 
     $directPlan = Get-LiveSessionVolumePlan $repo $true
     Assert-LiveSessionVolumePlan $directPlan $repo $true
@@ -203,7 +339,7 @@ if ($SelfTest) {
 
     $synthetic = @{}
     Assert-LiveSessionVolumePath -Path (Join-Path $repo '.local/missing-leaf') -Root (Join-Path $repo '.local') -Kind Directory -AllowMissingLeaf -SyntheticAttributes $synthetic
-    $caseCount = 8
+    $caseCount = 10
 
     $outsideCaught = $false
     try {

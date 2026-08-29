@@ -3,12 +3,15 @@
 #include "hibiki/program_loudness.hpp"
 
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <limits>
 #include <string>
+#include <thread>
 #include <vector>
 
 #define CHECK(expr) \
@@ -684,6 +687,106 @@ int main() {
         controller.reset();
         snapshot = controller.read_telemetry();
         CHECK(!snapshot.valid);
+    }
+
+    // ---- concurrent telemetry publication keeps one generation ---------------
+    {
+        constexpr std::uint32_t kSampleRate = 48000U;
+        constexpr std::size_t kFrames = 480U;
+        constexpr std::size_t kConcurrentBlocks = 256U;
+
+        auto policy = base_policy();
+        policy.analysis_window_ms = 100.0;
+        policy.max_rate_db_per_second = 60.0;
+        policy.night_compression_enabled = true;
+        policy.night_compression_knee_db = 6.0;
+        policy.night_compression_max_reduction_db = 9.0;
+
+        std::vector<float> high_block(kFrames, 0.0F);
+        std::vector<float> low_block(kFrames, 0.0F);
+        for (std::size_t frame = 0U; frame < kFrames; ++frame) {
+            const auto sample = static_cast<float>(sine_sample(
+                frame, 1000.0, kSampleRate));
+            high_block[frame] = (frame < 24U ? 0.95F : 0.01F) * sample;
+            low_block[frame] = 0.05F * sample;
+        }
+
+        // Build the exact set of valid generations once, then replay the same
+        // blocks on the concurrent writer. The reader can validate a returned
+        // sequence against the complete expected tuple without touching the
+        // writer-owned controller status from the reader thread.
+        ProgramAwareLevelControllerV1 expected_controller;
+        CHECK(expected_controller.configure(policy, kSampleRate));
+        std::vector<hibiki::ProgramAwareLevelStatusV1> expected_statuses;
+        expected_statuses.reserve(kConcurrentBlocks);
+        std::vector<float> expected_work(kFrames, 0.0F);
+        for (std::size_t block = 0U; block < kConcurrentBlocks; ++block) {
+            expected_work = (block & 1U) == 0U ? high_block : low_block;
+            CHECK(expected_controller.process_interleaved(
+                expected_work.data(), kFrames, 1U));
+            expected_statuses.push_back(expected_controller.status());
+        }
+
+        ProgramAwareLevelControllerV1 concurrent_controller;
+        CHECK(concurrent_controller.configure(policy, kSampleRate));
+        std::atomic<bool> start{false};
+        std::atomic<bool> writer_done{false};
+        std::atomic<bool> writer_failed{false};
+        std::atomic<bool> reader_failed{false};
+        std::thread writer([&] {
+            while (!start.load(std::memory_order_acquire)) {
+                std::this_thread::yield();
+            }
+            std::vector<float> work(kFrames, 0.0F);
+            for (std::size_t block = 0U; block < kConcurrentBlocks; ++block) {
+                work = (block & 1U) == 0U ? high_block : low_block;
+                if (!concurrent_controller.process_interleaved(
+                        work.data(), kFrames, 1U)) {
+                    writer_failed.store(true, std::memory_order_release);
+                    break;
+                }
+                std::this_thread::yield();
+            }
+            writer_done.store(true, std::memory_order_release);
+        });
+        start.store(true, std::memory_order_release);
+
+        const auto matches_expected = [](const hibiki::ProgramAwareTelemetrySnapshotV1& actual,
+                                         const hibiki::ProgramAwareLevelStatusV1& expected,
+                                         const std::uint64_t sequence) noexcept {
+            return actual.valid == expected.valid &&
+                   actual.enabled == expected.enabled &&
+                   actual.silence_gated == expected.silence_gated &&
+                   actual.measured_dbfs == expected.measured_dbfs &&
+                   actual.applied_gain_db == expected.applied_gain_db &&
+                   actual.bass_correction_gain_db == expected.bass_correction_gain_db &&
+                   actual.night_compression_gain_db == expected.night_compression_gain_db &&
+                   actual.sequence == sequence;
+        };
+
+        while (!writer_done.load(std::memory_order_acquire)) {
+            const auto snapshot = concurrent_controller.read_telemetry();
+            if (!snapshot.valid) {
+                std::this_thread::yield();
+                continue;
+            }
+            if (snapshot.sequence == 0U ||
+                snapshot.sequence > expected_statuses.size() ||
+                !matches_expected(snapshot,
+                                  expected_statuses[snapshot.sequence - 1U],
+                                  snapshot.sequence)) {
+                reader_failed.store(true, std::memory_order_release);
+                break;
+            }
+        }
+        writer.join();
+        CHECK(!writer_failed.load(std::memory_order_acquire));
+        CHECK(!reader_failed.load(std::memory_order_acquire));
+        const auto final_snapshot = concurrent_controller.read_telemetry();
+        CHECK(final_snapshot.valid);
+        CHECK(matches_expected(final_snapshot,
+                                expected_statuses.back(),
+                                kConcurrentBlocks));
     }
 
     // ---- program-aware level bank -----------------------------------------------

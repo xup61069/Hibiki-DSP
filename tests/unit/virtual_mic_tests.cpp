@@ -3,11 +3,13 @@
 #include "hibiki/virtual_mic.hpp"
 
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <limits>
+#include <thread>
 
 #define CHECK(expr) \
     do { \
@@ -270,6 +272,100 @@ int main() {
             input.data(), reference.data(), capture.data(), kRouteFrames));
         CHECK(no_reference_model.process_capture_with_reference(
             input.data(), nullptr, capture.data(), kRouteFrames));
+    }
+
+    // Privacy mute publication is race-free across the control toggle, both
+    // capture entry points, and a concurrent value snapshot. Each capture
+    // block must observe one complete privacy decision: silence or the finite
+    // input block, never a partially changed output.
+    {
+        constexpr std::size_t kFrames = 32U;
+        constexpr std::size_t kSamples = kFrames * 2U;
+        VirtualMicRouteModel model;
+        VirtualMicConfigV1 config{};
+        config.channels = 2U;
+        config.sample_rate = 48000U;
+        config.echo_reference_enabled = true;
+        CHECK(model.prepare(config));
+
+        std::array<float, kSamples> input{};
+        std::array<float, kSamples> reference{};
+        for (std::size_t index = 0U; index < kSamples; ++index) {
+            input[index] = (index & 1U) == 0U ? 0.25F : -0.5F;
+            reference[index] = 0.125F;
+        }
+        std::array<float, kSamples> output{};
+        std::atomic<bool> start{false};
+        std::atomic<bool> capture_done{false};
+        std::atomic<bool> toggle_done{false};
+        std::atomic<bool> failed{false};
+
+        std::thread capture([&] {
+            while (!start.load(std::memory_order_acquire)) {
+                std::this_thread::yield();
+            }
+            for (std::size_t iteration = 0U; iteration < 512U; ++iteration) {
+                output.fill(9.0F);
+                const bool processed = (iteration & 1U) == 0U
+                                           ? model.process_capture(input.data(), output.data(), kFrames)
+                                           : model.process_capture_with_reference(
+                                                 input.data(), reference.data(), output.data(), kFrames);
+                if (!processed) {
+                    failed.store(true, std::memory_order_release);
+                    break;
+                }
+                bool muted_block = true;
+                bool input_block = true;
+                for (std::size_t index = 0U; index < kSamples; ++index) {
+                    if (!std::isfinite(output[index])) {
+                        failed.store(true, std::memory_order_release);
+                        break;
+                    }
+                    muted_block = muted_block && output[index] == 0.0F;
+                    input_block = input_block && output[index] == input[index];
+                }
+                if (failed.load(std::memory_order_acquire) || (!muted_block && !input_block)) {
+                    failed.store(true, std::memory_order_release);
+                    break;
+                }
+            }
+            capture_done.store(true, std::memory_order_release);
+        });
+
+        std::thread toggler([&] {
+            while (!start.load(std::memory_order_acquire)) {
+                std::this_thread::yield();
+            }
+            for (std::size_t iteration = 0U; iteration < 512U; ++iteration) {
+                model.set_privacy_mute((iteration & 1U) == 0U);
+                std::this_thread::yield();
+            }
+            model.set_privacy_mute(true);
+            toggle_done.store(true, std::memory_order_release);
+        });
+
+        std::thread reader([&] {
+            while (!start.load(std::memory_order_acquire)) {
+                std::this_thread::yield();
+            }
+            do {
+                const auto snapshot = model.snapshot();
+                if (!snapshot.prepared || !snapshot.echo_reference_enabled ||
+                    snapshot.channels != 2U || snapshot.sample_rate != 48000U) {
+                    failed.store(true, std::memory_order_release);
+                    break;
+                }
+                std::this_thread::yield();
+            } while (!capture_done.load(std::memory_order_acquire) ||
+                     !toggle_done.load(std::memory_order_acquire));
+        });
+
+        start.store(true, std::memory_order_release);
+        capture.join();
+        toggler.join();
+        reader.join();
+        CHECK(!failed.load(std::memory_order_acquire));
+        CHECK(model.snapshot().privacy_muted);
     }
 
     return 0;

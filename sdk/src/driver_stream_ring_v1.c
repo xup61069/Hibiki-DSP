@@ -2,6 +2,7 @@
 
 #include "hibiki/driver_stream_ring_v1.h"
 
+#include <math.h>
 #include <string.h>
 
 #if defined(_WIN32)
@@ -61,6 +62,19 @@ static int valid_ring(const struct hibiki_driver_stream_ring_v1* const ring,
     return 1;
 }
 
+static int finite_packet_samples(const uint8_t* const packet) {
+    struct hibiki_driver_stream_packet_header_v1 header;
+    memcpy(&header, packet, sizeof(header));
+    const size_t sample_count = (size_t)header.frames * header.channels;
+    const uint8_t* const payload = packet + HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1;
+    for (size_t index = 0U; index < sample_count; ++index) {
+        float value;
+        memcpy(&value, payload + index * sizeof(value), sizeof(value));
+        if (!isfinite(value)) return 0;
+    }
+    return 1;
+}
+
 size_t hibiki_driver_stream_ring_region_size_v1(void) {
     return sizeof(struct hibiki_driver_stream_ring_v1);
 }
@@ -95,7 +109,8 @@ int hibiki_driver_stream_ring_push_v1(
     }
     if (packet == NULL || packet_bytes <= HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1 ||
         packet_bytes > HIBIKI_DRIVER_STREAM_RING_SLOT_CAPACITY_BYTES_V1 ||
-        !hibiki_driver_stream_packet_validate_v1(packet, packet_bytes)) {
+        !hibiki_driver_stream_packet_validate_v1(packet, packet_bytes) ||
+        !finite_packet_samples(packet)) {
         return HIBIKI_DRIVER_STREAM_RING_REJECTED_V1;
     }
 
@@ -148,7 +163,9 @@ int hibiki_driver_stream_ring_pop_v1(
     if (load_acquire(&slot->ready_sequence) != consumer + 1U ||
         slot->reserved[0] != 0U || slot->reserved[1] != 0U ||
         slot->packet_bytes <= HIBIKI_DRIVER_STREAM_HEADER_BYTES_V1 ||
-        slot->packet_bytes > HIBIKI_DRIVER_STREAM_RING_SLOT_CAPACITY_BYTES_V1) {
+        slot->packet_bytes > HIBIKI_DRIVER_STREAM_RING_SLOT_CAPACITY_BYTES_V1 ||
+        !hibiki_driver_stream_packet_validate_v1(slot->packet, slot->packet_bytes) ||
+        !finite_packet_samples(slot->packet)) {
         return HIBIKI_DRIVER_STREAM_RING_REJECTED_V1;
     }
     if (storage_capacity < slot->packet_bytes) {

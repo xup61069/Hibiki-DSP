@@ -27,6 +27,42 @@ struct WasapiSinkHandoffSnapshotV1 {
     WasapiSinkWorkerSnapshotV1 secondary{};
 };
 
+namespace detail {
+
+// Internal handoff/test seam. This is not a wire or public control-plane API;
+// production code supplies adapters for WindowsWasapiSinkWorkerV1 and unit
+// tests supply deterministic fake-worker callbacks.
+using WasapiHandoffSubmitFnV1 = bool (*)(void* context,
+                                         const float* interleaved,
+                                         std::uint32_t frames,
+                                         std::uint32_t channels,
+                                         float gain) noexcept;
+using WasapiHandoffStopFnV1 = void (*)(void* context) noexcept;
+
+struct WasapiHandoffSubmissionHooksV1 {
+    void* candidate_context{nullptr};
+    WasapiHandoffSubmitFnV1 candidate_submit{nullptr};
+    WasapiHandoffStopFnV1 candidate_stop{nullptr};
+    void* active_context{nullptr};
+    WasapiHandoffSubmitFnV1 active_submit{nullptr};
+};
+
+enum class WasapiHandoffSubmissionResultV1 : std::uint8_t {
+    CandidateRejected,
+    ActiveRejected,
+    Accepted,
+};
+
+[[nodiscard]] WasapiHandoffSubmissionResultV1 submit_wasapi_handoff_fade_block_v1(
+    const WasapiHandoffSubmissionHooksV1& hooks,
+    const float* interleaved,
+    std::uint32_t frames,
+    std::uint32_t channels,
+    float old_gain,
+    float new_gain) noexcept;
+
+}  // namespace detail
+
 // Owns two sink workers so a candidate endpoint can warm up before the active
 // endpoint is faded out. The graph caller submits each block once; this class
 // applies equal-power gains at the bounded worker queue boundary and commits
