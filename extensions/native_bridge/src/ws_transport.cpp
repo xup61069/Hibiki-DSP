@@ -29,26 +29,6 @@ bool contains_header_token(std::string_view value, const std::string_view token)
     return false;
 }
 
-std::string_view find_header_value(const std::string_view request,
-                                   const std::string_view lower_headers,
-                                   const std::string_view header_name) {
-    auto line_start = lower_headers.find("\r\n");
-    if (line_start == std::string_view::npos) return {};
-    line_start += 2U;
-    while (line_start < lower_headers.size()) {
-        const auto line_end = lower_headers.find("\r\n", line_start);
-        const auto end = line_end == std::string_view::npos ? lower_headers.size() : line_end;
-        const auto separator = lower_headers.find(':', line_start);
-        if (separator != std::string_view::npos && separator < end &&
-            lower_headers.substr(line_start, separator - line_start) == header_name) {
-            return trim_ows(request.substr(separator + 1U, end - separator - 1U));
-        }
-        if (line_end == std::string_view::npos) return {};
-        line_start = line_end + 2U;
-    }
-    return {};
-}
-
 bool find_single_header_value(const std::string_view request,
                               const std::string_view lower_headers,
                               const std::string_view header_name,
@@ -218,9 +198,10 @@ bool parse_websocket_handshake(const std::string_view request, std::string& resp
         !has_header_token(lower, "connection", "upgrade")) {
         return false;
     }
-    const auto key = find_header_value(request, lower, "sec-websocket-key");
+    std::string_view key;
     std::string_view version;
-    if (key.empty() ||
+    if (!find_single_header_value(request, lower, "sec-websocket-key", key) ||
+        key.empty() ||
         !find_single_header_value(request, lower, "sec-websocket-version", version) ||
         version != "13") {
         return false;

@@ -160,6 +160,22 @@ bool test_request_line_and_version_semantics() {
         "Sec-WebSocket-Version: 13\r\n"
         "Sec-WebSocket-Version: 13\r\n"
         "\r\n";
+    constexpr std::string_view kConflictingDuplicateKey =
+        "GET /v1/tab HTTP/1.1\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "Sec-WebSocket-Key: MDEyMzQ1Njc4OWFiY2RlZg==\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
+        "\r\n";
+    constexpr std::string_view kRepeatedDuplicateKey =
+        "GET /v1/tab HTTP/1.1\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
+        "\r\n";
     return expect_rejected_handshake(kPostRequest, "non-GET request is rejected") &&
            expect_rejected_handshake(kHttp10Request, "HTTP/1.0 request is rejected") &&
            expect_rejected_handshake(kMissingVersion, "missing WebSocket version is rejected") &&
@@ -167,7 +183,11 @@ bool test_request_line_and_version_semantics() {
            expect_rejected_handshake(kConflictingDuplicateVersion,
                                      "conflicting duplicate WebSocket versions are rejected") &&
            expect_rejected_handshake(kRepeatedDuplicateVersion,
-                                     "repeated duplicate WebSocket versions are rejected");
+                                     "repeated duplicate WebSocket versions are rejected") &&
+           expect_rejected_handshake(kConflictingDuplicateKey,
+                                     "conflicting duplicate WebSocket keys are rejected") &&
+           expect_rejected_handshake(kRepeatedDuplicateKey,
+                                     "repeated duplicate WebSocket keys are rejected");
 }
 
 }  // namespace
