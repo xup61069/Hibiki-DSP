@@ -54,7 +54,7 @@ int main() {
             std::string("endpoint\xF4\x90\x80\x80", 12U),
             std::string("endpoint\x01", 9U),
             std::string("endpoint\x7F", 9U),
-            std::string("endpoint\x85", 9U),
+            std::string("endpoint\xC2\x85", 10U),
             embedded_nul,
         };
         for (const auto& endpoint_id : invalid_ids) {
