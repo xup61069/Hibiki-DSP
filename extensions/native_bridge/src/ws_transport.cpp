@@ -406,6 +406,10 @@ bool next_ws_binary_message(const WsStreamRead& reader,
         kind = WsMessageKind::Ping;
         return true;
     }
+    if (frame.opcode == 0xAU) {
+        kind = WsMessageKind::Pong;
+        return true;
+    }
     if (frame.opcode != 0x2U) return false;
     binary_payload = std::move(frame.payload);
     kind = WsMessageKind::Binary;
