@@ -1874,8 +1874,12 @@ static async Task RunSceneCatalogCheckServerAsync(
     BitConverter.GetBytes(invalidGainDb).CopyTo(badEq,
         ControlPayloadsV1.EqVisualSnapshotHeaderBytes +
         (3 * ControlPayloadsV1.EqVisualSnapshotPointBytes) + 8);
-    Check(!ControlPayloadsV1.TryDecodeEqVisualSnapshot(badEq, out _, out _, out _),
-        "An out-of-range gain point must fail closed.");
+    Check(!ControlPayloadsV1.TryDecodeEqVisualSnapshot(
+              badEq, out var rejectedEqSequence, out var rejectedEqSource,
+              out var rejectedEqPoints) &&
+          rejectedEqSequence == 0UL && rejectedEqSource == EqVisualSourceV1.None &&
+          rejectedEqPoints.Count == 0,
+        "An out-of-range final point must leave every rejected EQ visual output neutral.");
 
     var factory = new ControlCommandFactoryV1();
     var eqRequest = factory.RequestEqVisualSnapshot();

@@ -2505,10 +2505,18 @@ int main() {
           decoded_eq.sequence == 7U && decoded_eq.source == 1U &&
           decoded_eq.points[0].frequency_hz == 31.0 &&
           decoded_eq.points[3].gain_db == 1.5);
+    const auto eq_snapshot_is_neutral = [](const EqVisualSnapshotV1& snapshot) {
+        if (snapshot.sequence != 0U || snapshot.source != 0U) return false;
+        for (const auto& point : snapshot.points) {
+            if (point.frequency_hz != 0.0 || point.gain_db != 0.0) return false;
+        }
+        return true;
+    };
     auto malformed_eq = eq_payload;
     malformed_eq[9U] = 0U;
     CHECK(!decode_eq_visual_snapshot_v1(
         std::span<const std::uint8_t>(malformed_eq.data(), eq_bytes), decoded_eq));
+    CHECK(eq_snapshot_is_neutral(decoded_eq));
     malformed_eq = eq_payload;
     // Duplicate the first point's frequency so decoding must reject a
     // non-increasing curve instead of merely producing another valid one.
@@ -2519,6 +2527,7 @@ int main() {
     }
     CHECK(!decode_eq_visual_snapshot_v1(
         std::span<const std::uint8_t>(malformed_eq.data(), eq_bytes), decoded_eq));
+    CHECK(eq_snapshot_is_neutral(decoded_eq));
     malformed_eq = eq_payload;
     // Write +30.0 dB directly: the prior XOR only produced a tiny negative
     // value that remained inside the legal gain range.
@@ -2528,10 +2537,13 @@ int main() {
                 &invalid_gain, sizeof(invalid_gain));
     CHECK(!decode_eq_visual_snapshot_v1(
         std::span<const std::uint8_t>(malformed_eq.data(), eq_bytes), decoded_eq));
+    CHECK(eq_snapshot_is_neutral(decoded_eq));
     CHECK(!decode_eq_visual_snapshot_v1(
         std::span<const std::uint8_t>(eq_payload.data(), eq_bytes - 1U), decoded_eq));
+    CHECK(eq_snapshot_is_neutral(decoded_eq));
     CHECK(!decode_eq_visual_snapshot_v1(
         std::span<const std::uint8_t>(eq_payload.data(), eq_bytes + 1U), decoded_eq));
+    CHECK(eq_snapshot_is_neutral(decoded_eq));
     IpcFrameV1 eq_frame;
     eq_frame.header.type = IpcMessageType::EqVisualSnapshotRequest;
     CHECK(decode_control_command_v1(eq_frame, decoded_command) &&

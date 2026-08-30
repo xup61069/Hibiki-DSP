@@ -233,6 +233,9 @@ UI 必須保留上一個安全畫面。
 閘門開啟時不得重複發布。RT 供給 lock-free telemetry projection，control read
 撕裂或非有限值時 fail-closed。這仍是控制面視覺回饋，不是內容分析、BS.1770
 metering、equal-loudness conformance 或實體音訊 evidence。
+EQ visual decoder 必須完整驗證整個 frame 才交付輸出；任何拒絕都讓 C++
+`EqVisualSnapshotV1` 全部 value-initialize，並讓 C# sequence 為零、source 為
+`None`、points 為空，不得暴露已通過前段驗證的部分曲線。
 
 Scene attachment 的聲道數在 graph transaction 準備時解析。若 transaction 已有 pending
 graph，等響度 PEQ 與 multi-channel IR 必須以該 pending graph 的 output channels 編譯；
