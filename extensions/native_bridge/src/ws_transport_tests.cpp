@@ -2,6 +2,7 @@
 
 #include "hibiki/ws_transport.hpp"
 
+#include <array>
 #include <cstddef>
 #include <iostream>
 #include <string>
@@ -231,13 +232,34 @@ bool test_request_line_and_version_semantics() {
                                      "non-canonical WebSocket key padding bits are rejected");
 }
 
+bool test_control_frame_opcode_validation() {
+    constexpr std::array<std::uint8_t, 1> kPayload{'x'};
+    std::string output;
+    const auto writer = [&output](const std::span<const std::uint8_t> bytes) {
+        output.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+        return true;
+    };
+    if (!expect(hibiki::send_ws_control_frame(writer, 0xAU, kPayload) &&
+                    output == std::string{"\x8a\x01x", 3U},
+                "valid Pong frame is written")) {
+        return false;
+    }
+    output.clear();
+    return expect(!hibiki::send_ws_control_frame(writer, 0x2U, kPayload) && output.empty(),
+                  "binary opcode is rejected without writing") &&
+           expect(!hibiki::send_ws_control_frame(writer, 0xBU, kPayload) && output.empty(),
+                  "reserved control opcode is rejected without writing") &&
+           expect(!hibiki::send_ws_control_frame(writer, 0x88U, kPayload) && output.empty(),
+                  "high-bit opcode is rejected without writing");
+}
+
 }  // namespace
 
 int main() {
     if (!test_handshake_size_boundary() || !test_upgrade_header_semantics() ||
-        !test_request_line_and_version_semantics()) {
+        !test_request_line_and_version_semantics() || !test_control_frame_opcode_validation()) {
         return 1;
     }
-    std::cout << "hibiki_ws_transport_tests passed (handshake size, upgrade and request semantics).\n";
+    std::cout << "hibiki_ws_transport_tests passed (handshake, request and control-frame semantics).\n";
     return 0;
 }
