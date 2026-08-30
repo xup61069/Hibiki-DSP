@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 #define CHECK(expr) \
     do { \
@@ -40,6 +41,46 @@ int main() {
         bad.endpoint_id.clear();
         CHECK(transaction.begin(bad) == false);
         CHECK(transaction.state() == DeviceSwitchState::Unbound);
+    }
+    // begin: endpoint identity uses the same bounded printable UTF-8 contract
+    // as DeviceSwitch wire/schema validation.
+    {
+        const std::string embedded_nul("endpoint\0suffix", 15U);
+        const std::vector<std::string> invalid_ids{
+            std::string(261U, 'x'),
+            std::string("endpoint\x80", 9U),
+            std::string("endpoint\xC0\xAF", 10U),
+            std::string("endpoint\xED\xA0\x80", 11U),
+            std::string("endpoint\xF4\x90\x80\x80", 12U),
+            std::string("endpoint\x01", 9U),
+            std::string("endpoint\x7F", 9U),
+            std::string("endpoint\xC2\x85", 10U),
+            embedded_nul,
+        };
+        for (const auto& endpoint_id : invalid_ids) {
+            DeviceSwitchTransaction transaction;
+            CHECK(!transaction.begin(make_target(endpoint_id)));
+            CHECK(transaction.state() == DeviceSwitchState::Unbound);
+            CHECK(transaction.active_target().endpoint_id.empty());
+        }
+
+        DeviceSwitchTransaction transaction;
+        const std::string valid_multibyte("\xE5\x96\x87\xE5\x8F\xAD", 6U);
+        CHECK(transaction.begin(make_target(valid_multibyte)));
+        CHECK(transaction.state() == DeviceSwitchState::Binding);
+        transaction.rollback();
+
+        const auto valid_boundary = make_target(std::string(260U, 'x'));
+        CHECK(transaction.begin(valid_boundary));
+        CHECK(transaction.prepare_complete());
+        CHECK(transaction.commit());
+        const auto active_before_invalid = transaction.active_target();
+        CHECK(!transaction.begin(make_target(std::string(261U, 'x'))));
+        CHECK(transaction.state() == DeviceSwitchState::Synced);
+        CHECK(transaction.active_target().endpoint_id == active_before_invalid.endpoint_id);
+        CHECK(transaction.active_target().channels == active_before_invalid.channels);
+        CHECK(transaction.active_target().sample_rate == active_before_invalid.sample_rate);
+        CHECK(transaction.active_target().buffer_frames == active_before_invalid.buffer_frames);
     }
     // begin: rejects unsupported channel counts.
     {
