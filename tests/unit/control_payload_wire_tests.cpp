@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <span>
 #include <string>
 #include <string_view>
@@ -154,6 +155,20 @@ int main()
         malformed = maximum;
         write_u32_le(malformed, 0U, static_cast<std::uint32_t>(13 * 65536));
         CHECK(!hibiki::decode_volume_notification_payload_v1(malformed, decoded));
+        malformed = payload;
+        write_u64_le(malformed, 8U, 0U);
+        decoded.requested_db = 12.0;
+        decoded.mute = true;
+        decoded.generation = 99U;
+        CHECK(!hibiki::decode_volume_notification_payload_v1(malformed, decoded));
+        CHECK(decoded.requested_db == -60.0 && !decoded.mute && decoded.generation == 0U);
+        for (const auto requested_db : {std::numeric_limits<double>::quiet_NaN(),
+                                        std::numeric_limits<double>::infinity(),
+                                        -145.0, 13.0}) {
+            notification.requested_db = requested_db;
+            notification.generation = 1U;
+            CHECK(all_zero(hibiki::encode_volume_notification_payload_v1(notification)));
+        }
         CHECK(!hibiki::decode_volume_notification_payload_v1(
             std::span<const std::uint8_t>(payload.data(), payload.size() - 1U), decoded));
     }
@@ -201,6 +216,19 @@ int main()
         malformed[17U] = 0x01U;
         CHECK(!hibiki::decode_grouped_volume_notification_payload_v1(
             malformed, decoded, target));
+        malformed = payload;
+        write_u64_le(malformed, 8U, 0U);
+        decoded.requested_db = 12.0;
+        decoded.mute = true;
+        decoded.generation = 99U;
+        target.output_group_bytes = 4U;
+        CHECK(!hibiki::decode_grouped_volume_notification_payload_v1(
+            malformed, decoded, target));
+        CHECK(decoded.requested_db == -60.0 && !decoded.mute && decoded.generation == 0U &&
+              target.output_group_bytes == 0U);
+        notification.generation = 0U;
+        CHECK(all_zero(hibiki::encode_grouped_volume_notification_payload_v1(
+            "main", notification)));
     }
 
     // ---- session volume command: identity, Q16.16 and reserved bytes -----

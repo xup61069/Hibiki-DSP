@@ -204,6 +204,23 @@ Check(volumeCommand.Type == ControlMessageType.VolumeNotification &&
           out var commandDb, out var commandMute, out var commandGeneration) &&
       Math.Abs(commandDb + 6.020599365234375) < 1e-6 && commandMute && commandGeneration == 9UL,
     "Control volume payload did not round-trip with the v1 contract.");
+var zeroVolumeEncodeRejected = false;
+try
+{
+    _ = ControlPayloadsV1.EncodeVolumeNotification(-6.0, false, 0UL);
+}
+catch (ArgumentOutOfRangeException)
+{
+    zeroVolumeEncodeRejected = true;
+}
+Check(zeroVolumeEncodeRejected, "Control volume encoder must reject generation zero.");
+var zeroVolumePayload = volumeCommand.Payload.ToArray();
+Array.Clear(zeroVolumePayload, 8, 8);
+Check(!ControlPayloadsV1.TryDecodeVolumeNotification(
+          zeroVolumePayload, out var rejectedVolumeDb, out var rejectedVolumeMute,
+          out var rejectedVolumeGeneration) &&
+      rejectedVolumeDb == 0.0 && !rejectedVolumeMute && rejectedVolumeGeneration == 0UL,
+    "Control volume decoder must reject generation zero with neutral outputs.");
 var groupedVolumeCommand = commandFactory.SetVolume(-9.0, false, 10UL, "movie");
 Check(ControlPayloadsV1.TryDecodeGroupedVolumeNotification(groupedVolumeCommand.Payload.Span,
           out var groupedOutput, out var groupedDb, out var groupedMute, out var groupedGeneration) &&
@@ -217,6 +234,25 @@ Check(ControlPayloadsV1.TryDecodeControlStatusSnapshot(statusPayload,
       statusSequence == 7UL && statusVolume.IsSafetyCapped && statusRoutes.Count == 4 &&
       statusRoutes.Any(route => route.Id == "browser-tab" && route.RequiresUserAction),
     "Control status snapshot did not round-trip with route and volume state.");
+var zeroStatusEncodeRejected = false;
+try
+{
+    _ = ControlPayloadsV1.EncodeControlStatusSnapshot(
+        0UL, cappedVolume, RouteHealthCatalogV1.Defaults);
+}
+catch (ArgumentException)
+{
+    zeroStatusEncodeRejected = true;
+}
+Check(zeroStatusEncodeRejected, "Control status encoder must reject sequence zero.");
+var zeroStatusPayload = statusPayload.ToArray();
+Array.Clear(zeroStatusPayload, 4, 8);
+Check(!ControlPayloadsV1.TryDecodeControlStatusSnapshot(
+          zeroStatusPayload, out var rejectedStatusSequence, out var rejectedStatusVolume,
+          out var rejectedStatusRoutes) &&
+      rejectedStatusSequence == 0UL && rejectedStatusVolume == VolumeSafetyStateV1.Initial() &&
+      rejectedStatusRoutes.Count == 0,
+    "Control status decoder must reject sequence zero with neutral outputs.");
 var catalogRequest = commandFactory.RequestDeviceCatalog();
 Check(catalogRequest.Type == ControlMessageType.DeviceCatalogRequest &&
       catalogRequest.Payload.IsEmpty,
@@ -599,6 +635,32 @@ foreach (var blockedEndpoint in (string[])["\u0007bell", "\u007f", "\u0085next-l
     Check(encodeRejected,
         $"DeviceSwitch endpoint {((int)blockedEndpoint[0]):X2} encode must fail closed.");
 }
+var zeroSwitchEncodeRejected = false;
+try
+{
+    _ = ControlPayloadsV1.EncodeDeviceSwitch("endpoint-a", 2, 48000, 128, 0UL);
+}
+catch (ArgumentException)
+{
+    zeroSwitchEncodeRejected = true;
+}
+Check(zeroSwitchEncodeRejected, "Device switch encoder must reject catalog sequence zero.");
+var malformedSwitch = ControlPayloadsV1.EncodeDeviceSwitch("endpoint-a", 2, 48000, 128, 12UL);
+BinaryPrimitives.WriteUInt32LittleEndian(malformedSwitch.AsSpan(264), uint.MaxValue);
+Check(!ControlPayloadsV1.TryDecodeDeviceSwitch(
+          malformedSwitch, out var rejectedSwitchEndpoint, out var rejectedSwitchChannels,
+          out var rejectedSwitchRate, out var rejectedSwitchFrames, out var rejectedSwitchSequence) &&
+      rejectedSwitchEndpoint == string.Empty && rejectedSwitchChannels == 0 &&
+      rejectedSwitchRate == 0 && rejectedSwitchFrames == 0 && rejectedSwitchSequence == 0UL,
+    "Device switch decoder must fail closed on an overflowing uint32 field.");
+malformedSwitch = ControlPayloadsV1.EncodeDeviceSwitch("endpoint-a", 2, 48000, 128, 12UL);
+Array.Clear(malformedSwitch, 280, 8);
+Check(!ControlPayloadsV1.TryDecodeDeviceSwitch(
+          malformedSwitch, out rejectedSwitchEndpoint, out rejectedSwitchChannels,
+          out rejectedSwitchRate, out rejectedSwitchFrames, out rejectedSwitchSequence) &&
+      rejectedSwitchEndpoint == string.Empty && rejectedSwitchChannels == 0 &&
+      rejectedSwitchRate == 0 && rejectedSwitchFrames == 0 && rejectedSwitchSequence == 0UL,
+    "Device switch decoder must reject catalog sequence zero with neutral outputs.");
 var snapshotSpeaker = speakers with { IsDefault = false };
 var snapshotMicrophone = new PhysicalDeviceCard("endpoint-mic", "麥克風",
     PhysicalDeviceFlowV1.Capture, PhysicalDeviceAvailabilityV1.Active, 2, 48000, 128, true, 11UL);
@@ -612,6 +674,22 @@ var snapshotFrame = new IpcEnvelopeV1(ControlMessageType.DeviceCatalogSnapshot, 
 Check(viewModel.ApplyPhysicalDeviceSnapshot(snapshotFrame, out _) &&
       viewModel.PhysicalDevices.Count == 2 && viewModel.PhysicalDevices[1].IsDefault,
     "ViewModel did not atomically apply the device catalog snapshot.");
+var zeroCatalogEncodeRejected = false;
+try
+{
+    _ = ControlPayloadsV1.EncodeDeviceCatalogSnapshot([snapshotSpeaker], 0UL);
+}
+catch (ArgumentException)
+{
+    zeroCatalogEncodeRejected = true;
+}
+Check(zeroCatalogEncodeRejected, "Device catalog encoder must reject sequence zero.");
+var malformedCatalog = snapshotBytes.ToArray();
+Array.Clear(malformedCatalog, 4, 8);
+Check(!ControlPayloadsV1.TryDecodeDeviceCatalogSnapshot(
+          malformedCatalog, out var rejectedCatalogSequence, out var rejectedCatalogDevices) &&
+      rejectedCatalogSequence == 0UL && rejectedCatalogDevices.Count == 0,
+    "Device catalog decoder must reject sequence zero with neutral outputs.");
 var pickerRefreshViewModel = new EasyControlViewModel { SelectedOutputGroup = "main" };
 Check(pickerRefreshViewModel.ApplyPhysicalDeviceSnapshot(snapshotFrame, out _) &&
       pickerRefreshViewModel.PhysicalDevices.Count == 2,
@@ -768,6 +846,14 @@ Check(!viewModel.ApplyControlStatusSnapshot(
           new IpcEnvelopeV1(ControlMessageType.ControlStatusSnapshot, 0UL, malformedStatus),
           out _) && viewModel.StatusSequence == 7UL,
     "Malformed control status snapshot must preserve prior state.");
+var zeroStatusFrame = statusPayload.ToArray();
+Array.Clear(zeroStatusFrame, 4, 8);
+var statusVolumeBeforeZero = viewModel.VolumeState;
+Check(!viewModel.ApplyControlStatusSnapshot(
+          new IpcEnvelopeV1(ControlMessageType.ControlStatusSnapshot, 0UL, zeroStatusFrame),
+          out _) && viewModel.StatusSequence == 7UL &&
+      viewModel.VolumeState == statusVolumeBeforeZero,
+    "Zero-sequence control status must preserve the previous visible state.");
 Check(!viewModel.ApplyVolumeSafetyState(cappedVolume with { Generation = 3UL }, out var staleVolumeError) &&
       staleVolumeError.Contains("過期"),
     "Stale volume safety state must be rejected.");

@@ -64,6 +64,10 @@ bounded guard，RT lookup 不配置；一個 sink 的峰值觸發保護後，另
 目前 user-space contract 已提供 `apply_windows_notification`：只接受有限 dB 範圍與不倒退
 的 generation，接受後將 origin 設為 Windows 並重新套用 safety。真正的
 `IAudioEndpointVolume`／driver callback 仍待 SPEC-0003 的 Windows driver work。
+固定 16-byte volume-notification codec 與 grouped volume codec 也在 wire boundary
+拒絕零 generation、非有限 dB 與超出 -144..12 dB 的值；無效 encode 回傳 zeroed
+failure payload，decode 不會暴露部分更新。C# 與 C++ codec 必須維持這個非零 freshness
+規則的一致性；這是 user-space control-plane validation，不代表 driver 或實體音訊已套用。
 Windows build 現在提供 `WindowsVolumeBroker`：control thread 可 bind/unbind
 `IAudioEndpointVolume`、write canonical dB/mute with caller GUID、read-back 實際量化值，
 並以 lock-free atomic snapshot 接收 callback；`OnNotify` 先取得唯一的 bounded sequence claim，

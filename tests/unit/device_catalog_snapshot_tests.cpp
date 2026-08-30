@@ -193,6 +193,11 @@ int main()
         CHECK(!hibiki::encode_device_catalog_snapshot_v1(
             entries_display, 7U, payload, payload_bytes));
         CHECK(payload_bytes == 0U);
+
+        payload_bytes = std::size_t{999U};
+        CHECK(!hibiki::encode_device_catalog_snapshot_v1(
+            entries_endpoint, 0U, payload, payload_bytes));
+        CHECK(payload_bytes == 0U);
     }
 
     // ---- descriptor fields survive the publisher round-trip ---------------
@@ -254,6 +259,15 @@ int main()
         CHECK(decoded_capture.sample_rate == 44100U);
         CHECK(decoded_capture.buffer_frames == 256U);
         CHECK(decoded_capture.last_sequence == 17U);
+
+        auto zero_sequence = payload;
+        std::fill(zero_sequence.begin() + 4U, zero_sequence.begin() + 12U,
+                  std::uint8_t{0U});
+        snapshot.entry_count = 2U;
+        snapshot.catalog_sequence = 42U;
+        CHECK(!hibiki::decode_device_catalog_snapshot_v1(
+            {zero_sequence.data(), payload_bytes}, snapshot));
+        CHECK(snapshot.entry_count == 0U && snapshot.catalog_sequence == 0U);
     }
 
     // ---- store enforces a non-zero strictly increasing sequence -----------

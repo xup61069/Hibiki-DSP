@@ -44,6 +44,8 @@ WinUI／engine 的 `DeviceSwitch` request 使用 `schemas/device-switch-request-
 才產生 request，engine 未回 ACK 前不顯示已同步。
 `endpoint_id` 維持非空且最長 260 字元的契約；持久化 schema 和實體目錄／DeviceSwitch wire
 encoder 一樣拒絕 C0/C1 控制字元與 DEL，讓外部驗證在進入 transport 前就 fail-closed。
+DeviceCatalogSnapshot 與 DeviceSwitch 的 `catalog_sequence` 必須非零；零值保留給
+未初始化或沒有 freshness 的狀態，C++／C# encode、decode 與 JSON schema 使用同一規則。
 UI 可送出空 payload 的 `DeviceCatalogRequest` 取得當前快照；control service 只有在註冊
 snapshot provider 時才回傳 `DeviceCatalogSnapshot`，否則回 Error，避免把空目錄誤報為成功。
 正式 WinUI 殼層提供「重新掃描裝置」入口，只呼叫 ViewModel 的 bounded IPC refresh；UI 不
@@ -51,7 +53,7 @@ snapshot provider 時才回傳 `DeviceCatalogSnapshot`，否則回 Error，避�
 保留上一份 picker 狀態；成功時只以最新 Active render 數量更新狀態文字。
 引擎提供的 `DeviceCatalogSnapshot` v1 使用固定 16-byte header 與每筆 416-byte wire entry
 （最多 32 筆），由 control worker 產生；C# 端必須驗證 reserved bytes、UTF-8、格式、重複
-身份、default 互斥與 catalog sequence，通過後才以 atomic replace 更新 picker。快照過期或
+身份、default 互斥與非零 catalog sequence，通過後才以 atomic replace 更新 picker。快照過期或
 格式錯誤時保留上一份目錄，不得清空或捏造裝置。
 `WindowsPhysicalDeviceCatalogWorker` 在刷新時先建立 candidate catalog，再一次產生 snapshot
 並提交 catalog／sequence；任一 flow、ID、friendly name、mix format、device period 或
