@@ -951,6 +951,7 @@ bool decode_session_route_rule_command_v1(
     const std::span<const std::uint8_t> payload,
     SessionRouteRuleCommandV1& command) noexcept {
     command = {};
+    SessionRouteRuleCommandV1 decoded{};
     if (payload.size() != kSessionRouteRuleCommandPayloadBytesV1 ||
         payload[15U] != 0U || payload[29U] != 0U || payload[30U] != 0U ||
         payload[31U] != 0U) {
@@ -982,42 +983,48 @@ bool decode_session_route_rule_command_v1(
         std::copy_n(text.data(), text.size(), target.data());
         return true;
     };
-    if (!copy_text(payload.data() + 32U, payload[24U], command.rule_id) ||
-        !copy_text(payload.data() + 96U, payload[25U], command.app_id) ||
-        !copy_text(payload.data() + 224U, payload[26U], command.display_name) ||
-        !copy_text(payload.data() + 352U, payload[27U], command.lane) ||
-        !copy_text(payload.data() + 416U, payload[28U], command.output_group)) {
+    if (!copy_text(payload.data() + 32U, payload[24U], decoded.rule_id) ||
+        !copy_text(payload.data() + 96U, payload[25U], decoded.app_id) ||
+        !copy_text(payload.data() + 224U, payload[26U], decoded.display_name) ||
+        !copy_text(payload.data() + 352U, payload[27U], decoded.lane) ||
+        !copy_text(payload.data() + 416U, payload[28U], decoded.output_group)) {
         return false;
     }
-    command.schema_version = 1U;
-    command.priority = static_cast<std::int32_t>(read_u32(payload.data() + 4U));
-    command.makeup_gain_q16_16 = static_cast<std::int32_t>(read_u32(payload.data() + 8U));
-    if (command.makeup_gain_q16_16 < (-144 * 65536) ||
-        command.makeup_gain_q16_16 > (12 * 65536)) {
+    decoded.schema_version = 1U;
+    decoded.priority = static_cast<std::int32_t>(read_u32(payload.data() + 4U));
+    decoded.makeup_gain_q16_16 = static_cast<std::int32_t>(read_u32(payload.data() + 8U));
+    if (decoded.makeup_gain_q16_16 < (-144 * 65536) ||
+        decoded.makeup_gain_q16_16 > (12 * 65536)) {
         return false;
     }
-    command.operation = operation;
-    command.enabled = payload[13U];
-    command.gain_owner = owner;
-    command.catalog_sequence = read_u64(payload.data() + 16U);
-    command.rule_id_bytes = payload[24U];
-    command.app_id_bytes = payload[25U];
-    command.display_name_bytes = payload[26U];
-    command.lane_bytes = payload[27U];
-    command.output_group_bytes = payload[28U];
+    decoded.operation = operation;
+    decoded.enabled = payload[13U];
+    decoded.gain_owner = owner;
+    decoded.catalog_sequence = read_u64(payload.data() + 16U);
+    decoded.rule_id_bytes = payload[24U];
+    decoded.app_id_bytes = payload[25U];
+    decoded.display_name_bytes = payload[26U];
+    decoded.lane_bytes = payload[27U];
+    decoded.output_group_bytes = payload[28U];
     if (operation == SessionRouteRuleOperationV1::Upsert) {
-        return command.rule_id_bytes != 0U &&
-               (command.app_id_bytes != 0U || command.display_name_bytes != 0U) &&
-               command.lane_bytes != 0U && command.output_group_bytes != 0U;
+        if (decoded.rule_id_bytes == 0U ||
+            (decoded.app_id_bytes == 0U && decoded.display_name_bytes == 0U) ||
+            decoded.lane_bytes == 0U || decoded.output_group_bytes == 0U) {
+            return false;
+        }
+    } else if (operation == SessionRouteRuleOperationV1::Remove) {
+        if (decoded.rule_id_bytes == 0U || decoded.app_id_bytes != 0U ||
+            decoded.display_name_bytes != 0U || decoded.lane_bytes != 0U ||
+            decoded.output_group_bytes != 0U) {
+            return false;
+        }
+    } else if (decoded.rule_id_bytes != 0U || decoded.app_id_bytes != 0U ||
+               decoded.display_name_bytes != 0U || decoded.lane_bytes != 0U ||
+               decoded.output_group_bytes != 0U) {
+        return false;
     }
-    if (operation == SessionRouteRuleOperationV1::Remove) {
-        return command.rule_id_bytes != 0U && command.app_id_bytes == 0U &&
-               command.display_name_bytes == 0U && command.lane_bytes == 0U &&
-               command.output_group_bytes == 0U;
-    }
-    return command.rule_id_bytes == 0U && command.app_id_bytes == 0U &&
-           command.display_name_bytes == 0U && command.lane_bytes == 0U &&
-           command.output_group_bytes == 0U;
+    command = decoded;
+    return true;
 }
 
 // ---- Calibration PEQ prepare command (bounded v1 wire format) ----
@@ -1090,6 +1097,7 @@ bool decode_calibration_peq_prepare_command_v1(
     const std::span<const std::uint8_t> payload,
     CalibrationPeqPrepareCommandV1& command) noexcept {
     command = {};
+    CalibrationPeqPrepareCommandV1 decoded{};
     if (payload.size() != kCalibrationPeqCommandPayloadBytesV1) return false;
     const auto schema_version = read_u32(payload.data());
     if (schema_version != 1U) return false;
@@ -1121,9 +1129,9 @@ bool decode_calibration_peq_prepare_command_v1(
             !std::isfinite(q_value) || q_value < 0.05 || q_value > 20.0) {
             return false;
         }
-        command.filters[index].frequency_hz = freq;
-        command.filters[index].gain_db = gain;
-        command.filters[index].q = q_value;
+        decoded.filters[index].frequency_hz = freq;
+        decoded.filters[index].gain_db = gain;
+        decoded.filters[index].q = q_value;
     }
     for (std::size_t index = filter_count;
          index < kCalibrationPeqMaxFiltersV1; ++index) {
@@ -1134,11 +1142,12 @@ bool decode_calibration_peq_prepare_command_v1(
             return false;
         }
     }
-    command.schema_version = schema_version;
-    command.filter_count = filter_count;
-    command.output_group_bytes = output_group_bytes;
-    command.clear_existing = clear_existing;
-    std::copy_n(output_group.data(), output_group.size(), command.output_group.data());
+    decoded.schema_version = schema_version;
+    decoded.filter_count = filter_count;
+    decoded.output_group_bytes = output_group_bytes;
+    decoded.clear_existing = clear_existing;
+    std::copy_n(output_group.data(), output_group.size(), decoded.output_group.data());
+    command = decoded;
     return true;
 }
 
@@ -1439,8 +1448,10 @@ bool decode_device_catalog_snapshot_v1(
 bool decode_control_command_v1(const IpcFrameV1& frame,
                                ControlCommandV1& command) noexcept {
     command = {};
-    command.type = frame.header.type;
-    command.request_id = frame.header.request_id;
+    ControlCommandV1 decoded{};
+    decoded.type = frame.header.type;
+    decoded.request_id = frame.header.request_id;
+    bool accepted = false;
     switch (frame.header.type) {
         case IpcMessageType::Hello:
         case IpcMessageType::GraphCommit:
@@ -1449,31 +1460,43 @@ bool decode_control_command_v1(const IpcFrameV1& frame,
         case IpcMessageType::ControlStatusRequest:
         case IpcMessageType::SessionCatalogRequest:
         case IpcMessageType::EqVisualSnapshotRequest:
-            return frame.payload.empty();
+            accepted = frame.payload.empty();
+            break;
         case IpcMessageType::VolumeNotification:
             if (frame.payload.size() == kVolumeNotificationPayloadBytesV1) {
-                return decode_volume_notification_payload_v1(frame.payload, command.volume);
+                accepted = decode_volume_notification_payload_v1(frame.payload, decoded.volume);
+            } else {
+                decoded.has_volume_target = decode_grouped_volume_notification_payload_v1(
+                    frame.payload, decoded.volume, decoded.volume_target);
+                accepted = decoded.has_volume_target;
             }
-            command.has_volume_target = decode_grouped_volume_notification_payload_v1(
-                frame.payload, command.volume, command.volume_target);
-            return command.has_volume_target;
+            break;
         case IpcMessageType::SessionVolumeCommand:
-            return decode_session_volume_command_v1(frame.payload, command.session_volume);
+            accepted = decode_session_volume_command_v1(frame.payload, decoded.session_volume);
+            break;
         case IpcMessageType::SessionRouteCommand:
-            return decode_session_route_command_v1(frame.payload, command.session_route);
+            accepted = decode_session_route_command_v1(frame.payload, decoded.session_route);
+            break;
         case IpcMessageType::SessionRouteRuleCommand:
-            return decode_session_route_rule_command_v1(frame.payload, command.session_route_rule);
+            accepted = decode_session_route_rule_command_v1(frame.payload,
+                                                             decoded.session_route_rule);
+            break;
         case IpcMessageType::IrPrepareCommand:
-            return decode_ir_prepare_command_v1(frame.payload, command.ir_prepare);
+            accepted = decode_ir_prepare_command_v1(frame.payload, decoded.ir_prepare);
+            break;
         case IpcMessageType::SceneApply:
-            return decode_scene_apply_payload_v1(frame.payload, command.scene);
+            accepted = decode_scene_apply_payload_v1(frame.payload, decoded.scene);
+            break;
         case IpcMessageType::SceneCatalogCommand:
-            return decode_scene_catalog_command_v1(frame.payload, command.scene_catalog);
+            accepted = decode_scene_catalog_command_v1(frame.payload, decoded.scene_catalog);
+            break;
         case IpcMessageType::CalibrationPeqPrepare:
-            return decode_calibration_peq_prepare_command_v1(
-                frame.payload, command.calibration_peq);
+            accepted = decode_calibration_peq_prepare_command_v1(
+                frame.payload, decoded.calibration_peq);
+            break;
         case IpcMessageType::DeviceSwitch:
-            return decode_device_switch_payload_v1(frame.payload, command.device_switch);
+            accepted = decode_device_switch_payload_v1(frame.payload, decoded.device_switch);
+            break;
         case IpcMessageType::GraphPrepare:
         case IpcMessageType::Ack:
         case IpcMessageType::Error:
@@ -1482,7 +1505,9 @@ bool decode_control_command_v1(const IpcFrameV1& frame,
         case IpcMessageType::EqVisualSnapshot:
             return false;
     }
-    return false;
+    if (!accepted) return false;
+    command = decoded;
+    return true;
 }
 
 IpcFrameV1 make_ack_frame_v1(const IpcFrameV1& request) noexcept {

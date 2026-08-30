@@ -66,6 +66,9 @@ NUL-padding 的 printable UTF-8 output group；`[80..463]` 為 16 個 24-byte fi
 
 每個 filter 必須符合 10–22000 Hz、-24..+24 dB、Q 0.05–20.0；schema version、reserved bytes、
 group padding、有限值與上述範圍任一不符時，decoder 必須拒絕整個 payload，不產生部分命令。
+拒絕時 C++ `CalibrationPeqPrepareCommandV1` 保持 value-initialized（schema version 1、filter
+count／group length 皆為 0，文字與 filter 全為 neutral），包括已讀取有效 filter 後才發現未使用
+entry 非零的情況。
 這個固定容量命令只代表 control plane 已接受／入列；UI 不得在收到 Ack 時宣稱音訊已完成套用。
 真正的 prepare／commit 由 engine control worker 執行，audio-side 的處理順序為既有 IR、等響度
 PEQ、calibration PEQ、Group Master、limiter；Strict Direct 仍不套用這條 calibration PEQ 路徑。
