@@ -256,6 +256,10 @@ bool read_ws_client_frame(const WsStreamRead& reader,
         return false;
     }
     frame.opcode = static_cast<std::uint8_t>(header[0] & 0x0fU);
+    if ((frame.opcode & 0x08U) != 0U && (header[0] & 0x80U) == 0U) {
+        error = WsFrameError::FragmentedControlFrame;
+        return false;
+    }
     const bool masked = (header[1] & 0x80U) != 0U;
     if (!masked) {
         error = WsFrameError::UnmaskedClientFrame;

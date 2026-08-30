@@ -254,6 +254,39 @@ bool test_control_frame_opcode_validation() {
                   "high-bit opcode is rejected without writing");
 }
 
+bool test_fragmented_control_frame_rejection() {
+    const auto rejects_without_reading_mask_or_reply = [](const std::uint8_t opcode) {
+        const std::vector<std::uint8_t> stream{opcode, 0x81U, 0U, 0U, 0U, 0U, 'x'};
+        std::size_t cursor{0U};
+        std::size_t reads{0U};
+        const auto reader = [&stream, &cursor, &reads](const std::span<std::uint8_t> bytes) {
+            ++reads;
+            if (cursor + bytes.size() > stream.size()) return false;
+            std::copy_n(stream.data() + cursor, bytes.size(), bytes.data());
+            cursor += bytes.size();
+            return true;
+        };
+        std::string output;
+        const auto writer = [&output](const std::span<const std::uint8_t> bytes) {
+            output.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+            return true;
+        };
+        hibiki::WsMessageKind kind{hibiki::WsMessageKind::Binary};
+        std::vector<std::uint8_t> payload;
+        return !hibiki::next_ws_binary_message(reader, writer, 64U, kind, payload) &&
+               reads == 1U && cursor == 2U && output.empty();
+    };
+
+    return expect(rejects_without_reading_mask_or_reply(0x8U),
+                  "fragmented Close is rejected before a reply") &&
+           expect(rejects_without_reading_mask_or_reply(0x9U),
+                  "fragmented Ping is rejected before a Pong reply") &&
+           expect(rejects_without_reading_mask_or_reply(0xAU),
+                  "fragmented Pong is rejected without a reply") &&
+           expect(rejects_without_reading_mask_or_reply(0xBU),
+                  "fragmented reserved control opcode is rejected without a reply");
+}
+
 bool test_close_payload_validation() {
     const std::vector<std::uint8_t> stream{0x88U, 0x81U, 0U, 0U, 0U, 0U, 'x'};
     std::size_t offset = 0U;
@@ -422,6 +455,7 @@ bool test_unsolicited_pong_continues_stream() {
 int main() {
     if (!test_handshake_size_boundary() || !test_upgrade_header_semantics() ||
         !test_request_line_and_version_semantics() || !test_control_frame_opcode_validation() ||
+        !test_fragmented_control_frame_rejection() ||
         !test_close_payload_validation() || !test_close_status_validation() ||
         !test_close_reason_utf8_validation() || !test_unsolicited_pong_continues_stream()) {
         return 1;
