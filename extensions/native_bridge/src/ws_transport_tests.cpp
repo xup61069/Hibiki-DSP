@@ -62,6 +62,21 @@ bool expect_rejected_handshake(const std::string_view request, const char* const
            expect(response == "unchanged", "rejected handshake preserves response");
 }
 
+std::string handshake_with_key(const std::string_view key) {
+    std::string request{
+        "GET /v1/tab HTTP/1.1\r\n"
+        "Host: 127.0.0.1:17842\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Key: "};
+    request += key;
+    request +=
+        "\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
+        "\r\n";
+    return request;
+}
+
 bool test_upgrade_header_semantics() {
     constexpr std::string_view kMissingUpgrade =
         "GET /v1/tab HTTP/1.1\r\n"
@@ -205,7 +220,15 @@ bool test_request_line_and_version_semantics() {
            expect_rejected_handshake(kConflictingDuplicateKey,
                                      "conflicting duplicate WebSocket keys are rejected") &&
            expect_rejected_handshake(kRepeatedDuplicateKey,
-                                     "repeated duplicate WebSocket keys are rejected");
+                                     "repeated duplicate WebSocket keys are rejected") &&
+           expect_rejected_handshake(handshake_with_key("*GhlIHNhbXBsZSBub25jZQ=="),
+                                     "non-Base64 WebSocket key is rejected") &&
+           expect_rejected_handshake(handshake_with_key("YQ=="),
+                                     "non-16-byte WebSocket key is rejected") &&
+           expect_rejected_handshake(handshake_with_key("dGhlIHNhbXBsZSBub25jZQ=A"),
+                                     "incorrect WebSocket key padding is rejected") &&
+           expect_rejected_handshake(handshake_with_key("dGhlIHNhbXBsZSBub25jZR=="),
+                                     "non-canonical WebSocket key padding bits are rejected");
 }
 
 }  // namespace
