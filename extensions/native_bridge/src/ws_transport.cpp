@@ -11,6 +11,65 @@ namespace {
 
 constexpr char kWebSocketGuid[] = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
+std::string_view trim_ows(std::string_view value) {
+    const auto first = value.find_first_not_of(" \t");
+    if (first == std::string_view::npos) return {};
+    const auto last = value.find_last_not_of(" \t");
+    return value.substr(first, last - first + 1U);
+}
+
+bool contains_header_token(std::string_view value, const std::string_view token) {
+    while (!value.empty()) {
+        const auto delimiter = value.find(',');
+        const auto candidate = trim_ows(value.substr(0U, delimiter));
+        if (candidate == token) return true;
+        if (delimiter == std::string_view::npos) return false;
+        value.remove_prefix(delimiter + 1U);
+    }
+    return false;
+}
+
+std::string_view find_header_value(const std::string_view request,
+                                   const std::string_view lower_headers,
+                                   const std::string_view header_name) {
+    auto line_start = lower_headers.find("\r\n");
+    if (line_start == std::string_view::npos) return {};
+    line_start += 2U;
+    while (line_start < lower_headers.size()) {
+        const auto line_end = lower_headers.find("\r\n", line_start);
+        const auto end = line_end == std::string_view::npos ? lower_headers.size() : line_end;
+        const auto separator = lower_headers.find(':', line_start);
+        if (separator != std::string_view::npos && separator < end &&
+            lower_headers.substr(line_start, separator - line_start) == header_name) {
+            return trim_ows(request.substr(separator + 1U, end - separator - 1U));
+        }
+        if (line_end == std::string_view::npos) return {};
+        line_start = line_end + 2U;
+    }
+    return {};
+}
+
+bool has_header_token(const std::string_view lower_headers,
+                      const std::string_view header_name,
+                      const std::string_view token) {
+    auto line_start = lower_headers.find("\r\n");
+    if (line_start == std::string_view::npos) return false;
+    line_start += 2U;
+    while (line_start < lower_headers.size()) {
+        const auto line_end = lower_headers.find("\r\n", line_start);
+        const auto end = line_end == std::string_view::npos ? lower_headers.size() : line_end;
+        const auto separator = lower_headers.find(':', line_start);
+        if (separator != std::string_view::npos && separator < end &&
+            lower_headers.substr(line_start, separator - line_start) == header_name &&
+            contains_header_token(lower_headers.substr(separator + 1U, end - separator - 1U), token)) {
+            return true;
+        }
+        if (line_end == std::string_view::npos) return false;
+        line_start = line_end + 2U;
+    }
+    return false;
+}
+
 std::string base64(const std::uint8_t* bytes, const std::size_t size) {
     constexpr char alphabet[] =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -120,17 +179,12 @@ bool parse_websocket_handshake(const std::string_view request, std::string& resp
     std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char character) {
         return static_cast<char>(std::tolower(character));
     });
-    constexpr std::string_view kKeyHeader = "sec-websocket-key:";
-    const auto key_position = lower.find(kKeyHeader);
-    if (key_position == std::string_view::npos) return false;
-    const auto value_start = key_position + kKeyHeader.size();
-    const auto line_end = request.find("\r\n", value_start);
-    if (line_end == std::string_view::npos) return false;
-    auto key = request.substr(value_start, line_end - value_start);
-    const auto first = key.find_first_not_of(" \t");
-    const auto last = key.find_last_not_of(" \t");
-    if (first == std::string_view::npos || last == std::string_view::npos) return false;
-    key = key.substr(first, last - first + 1U);
+    if (!has_header_token(lower, "upgrade", "websocket") ||
+        !has_header_token(lower, "connection", "upgrade")) {
+        return false;
+    }
+    const auto key = find_header_value(request, lower, "sec-websocket-key");
+    if (key.empty()) return false;
     std::string accept;
     if (!websocket_compute_accept(key, accept)) return false;
     response.clear();
