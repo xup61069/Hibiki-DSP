@@ -1054,6 +1054,37 @@ Check(wizardPreview.Count == 2 &&
                               row.GainText.EndsWith(" dB", StringComparison.Ordinal) &&
                               row.QText.StartsWith("Q ", StringComparison.Ordinal)),
     "Wizard preview rows must expose one formatted PEQ filter per compiled band.");
+
+var mixedWizardPath = Path.Combine(Path.GetTempPath(), $"hibiki-wizard-mixed-{Guid.NewGuid():N}.csv");
+File.WriteAllText(mixedWizardPath,
+    "NaN, -2.5\n20, Infinity\n20, -2.5\n1000, 0.25\n8000, -1.75\n-Infinity, 0\n");
+var mixedWizardVm = new EasyControlViewModel();
+try
+{
+    Check(mixedWizardVm.ImportWizardMeasurement(mixedWizardPath) &&
+          mixedWizardVm.WizardImportedPointCount == 3 &&
+          mixedWizardVm.CompileWizardCorrection() && mixedWizardVm.WizardHasResult,
+        "Wizard file import must skip non-finite rows and compile the remaining finite measurements.");
+}
+finally
+{
+    if (File.Exists(mixedWizardPath)) File.Delete(mixedWizardPath);
+}
+
+var invalidWizardPath = Path.Combine(Path.GetTempPath(), $"hibiki-wizard-invalid-{Guid.NewGuid():N}.csv");
+File.WriteAllText(invalidWizardPath, "NaN, Infinity\n-Infinity, -Infinity\n");
+try
+{
+    Check(!mixedWizardVm.ImportWizardMeasurement(invalidWizardPath) &&
+          !mixedWizardVm.WizardHasMeasurement && mixedWizardVm.WizardImportedPointCount == 0 &&
+          !mixedWizardVm.WizardHasResult && mixedWizardVm.WizardPreviewFilters.Count == 0 &&
+          mixedWizardVm.WizardExportedPath.Length == 0,
+        "Wizard import must reject an all-non-finite file and clear stale measurement/result state.");
+}
+finally
+{
+    if (File.Exists(invalidWizardPath)) File.Delete(invalidWizardPath);
+}
 wizardVm.WizardChannelCount = 4;
 Check(wizardVm.WizardChannelCount == 2,
     "Wizard channel count must reject unsupported values and keep the previous count.");

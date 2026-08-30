@@ -39,6 +39,13 @@ bool OutputCrossfade::process(const float* const old_interleaved,
         frames > std::numeric_limits<std::size_t>::max() - snapshot_.processed_frames) {
         return false;
     }
+    const auto sample_count = frames * channel_count;
+    for (std::size_t index = 0U; index < sample_count; ++index) {
+        if (!std::isfinite(old_interleaved[index]) ||
+            !std::isfinite(new_interleaved[index])) {
+            return false;
+        }
+    }
     constexpr double half_pi = 1.57079632679489661923;
     for (std::size_t frame = 0; frame < frames; ++frame) {
         const auto absolute = snapshot_.processed_frames + frame;
