@@ -49,8 +49,10 @@ fail-closed；合法 multi-byte printable ID 保持可用。
 - `WindowsWasapiSinkWorkerV1` 將 COM/WASAPI 完整限制在單一 dedicated sink worker apartment：
   graph/ASIO/TabCapture producer 只呼叫 bounded SPSC `submit`，worker 在 endpoint event 後
   pop block，空 queue 補 silence，並透過 `OutputSinkModel` 的 persistent SRC 處理已排程的
-  clock observation。`observe_clock` 只寫入 atomic latest-request，實際 SRC 更新在 worker
-  套用；graph RT 不呼叫 COM、等待或配置。caller 一律提供 Float32，worker render boundary
+  clock observation。`observe_clock` 以 odd/even publication token 發佈完整的 atomic
+  latest-request；重疊 writer 直接丟棄 request，worker 只在前後 token 相同且 stable 時套用
+  source/sink/elapsed 完整 tuple。實際 SRC 更新在 worker 套用；graph RT 不呼叫 COM、等待或
+  配置。caller 一律提供 Float32，worker render boundary
   依 endpoint mix format 無配置地寫入 Float32、PCM16、PCM24 或 PCM32。
 - `WindowsWasapiOutputV1` 在 bind 時取得 `IAudioClock`，worker 以 device position 與 QPC
   delta 產生每 sink 的 source/sink frame observation，再由 `OutputSinkModel` 更新 SRC；

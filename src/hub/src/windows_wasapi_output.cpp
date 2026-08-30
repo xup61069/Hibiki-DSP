@@ -431,10 +431,37 @@ void WindowsWasapiSinkWorkerV1::observe_clock(const double source_frames,
       elapsed_seconds <= 0.0) {
     return;
   }
+
+  auto claimed_sequence = clock_request_sequence_.load(std::memory_order_relaxed);
+  if ((claimed_sequence & 1U) != 0U ||
+      !clock_request_sequence_.compare_exchange_strong(
+          claimed_sequence, claimed_sequence + 1U, std::memory_order_acq_rel,
+          std::memory_order_relaxed)) {
+    return;
+  }
   clock_source_frames_.store(source_frames, std::memory_order_relaxed);
   clock_sink_frames_.store(sink_frames, std::memory_order_relaxed);
   clock_elapsed_seconds_.store(elapsed_seconds, std::memory_order_relaxed);
-  clock_request_sequence_.fetch_add(1U, std::memory_order_release);
+  clock_request_sequence_.store(claimed_sequence + 2U, std::memory_order_release);
+}
+
+bool WindowsWasapiSinkWorkerV1::take_clock_request(
+    std::uint64_t& applied_sequence, double& source_frames, double& sink_frames,
+    double& elapsed_seconds) noexcept {
+  const auto before = clock_request_sequence_.load(std::memory_order_acquire);
+  if (before == applied_sequence || (before & 1U) != 0U) return false;
+
+  const auto source = clock_source_frames_.load(std::memory_order_relaxed);
+  const auto sink = clock_sink_frames_.load(std::memory_order_relaxed);
+  const auto elapsed = clock_elapsed_seconds_.load(std::memory_order_relaxed);
+  const auto after = clock_request_sequence_.load(std::memory_order_acquire);
+  if (before != after || (after & 1U) != 0U) return false;
+
+  source_frames = source;
+  sink_frames = sink;
+  elapsed_seconds = elapsed;
+  applied_sequence = after;
+  return true;
 }
 
 bool WindowsWasapiSinkWorkerV1::submit(const float* const interleaved,
@@ -539,13 +566,13 @@ void WindowsWasapiSinkWorkerV1::run(WasapiOutputConfigV1 config,
   const bool have_qpc_frequency = QueryPerformanceFrequency(&qpc_frequency) != FALSE &&
                                   qpc_frequency.QuadPart > 0;
   while (!stop_requested_.load(std::memory_order_acquire)) {
-    const auto requested_clock_sequence =
-        clock_request_sequence_.load(std::memory_order_acquire);
-    if (requested_clock_sequence != applied_clock_sequence) {
-      sink_model_.observe_clock(clock_source_frames_.load(std::memory_order_relaxed),
-                                clock_sink_frames_.load(std::memory_order_relaxed),
-                                clock_elapsed_seconds_.load(std::memory_order_relaxed));
-      applied_clock_sequence = requested_clock_sequence;
+    double requested_source_frames = 0.0;
+    double requested_sink_frames = 0.0;
+    double requested_elapsed_seconds = 0.0;
+    if (take_clock_request(applied_clock_sequence, requested_source_frames,
+                           requested_sink_frames, requested_elapsed_seconds)) {
+      sink_model_.observe_clock(requested_source_frames, requested_sink_frames,
+                                requested_elapsed_seconds);
       source_step_.store(sink_model_.snapshot().source_step, std::memory_order_release);
       drift_ppm_.store(sink_model_.snapshot().drift_ppm, std::memory_order_release);
     }

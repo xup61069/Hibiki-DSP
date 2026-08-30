@@ -4,12 +4,14 @@
 #include "hibiki/windows_wasapi_output.hpp"
 
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <limits>
 #include <span>
+#include <thread>
 
 #if defined(_WIN32)
 #define NOMINMAX
@@ -60,6 +62,17 @@ struct WindowsWasapiOutputV1TestAccess {
         output.started_ = false;
         output.client_ = nullptr;
         output.render_client_ = nullptr;
+    }
+};
+
+struct WindowsWasapiSinkWorkerV1TestAccess {
+    static bool take_clock_request(WindowsWasapiSinkWorkerV1& worker,
+                                   std::uint64_t& applied_sequence,
+                                   double& source_frames,
+                                   double& sink_frames,
+                                   double& elapsed_seconds) noexcept {
+        return worker.take_clock_request(applied_sequence, source_frames, sink_frames,
+                                         elapsed_seconds);
     }
 };
 
@@ -521,6 +534,78 @@ int main() {
     }
 
 #if defined(_WIN32)
+    // WASAPI clock observations are a three-field request. The worker accepts
+    // only complete stable tuples, including when control-side writers overlap.
+    {
+        constexpr double kFirstSourceFrames = 48000.0;
+        constexpr double kFirstSinkFrames = 48024.0;
+        constexpr double kFirstElapsedSeconds = 1.0;
+        constexpr double kSecondSourceFrames = 96000.0;
+        constexpr double kSecondSinkFrames = 95952.0;
+        constexpr double kSecondElapsedSeconds = 2.0;
+
+        hibiki::WindowsWasapiSinkWorkerV1 worker;
+        std::uint64_t applied_sequence = 0U;
+        double source_frames = 0.0;
+        double sink_frames = 0.0;
+        double elapsed_seconds = 0.0;
+        worker.observe_clock(kFirstSourceFrames, kFirstSinkFrames, kFirstElapsedSeconds);
+        CHECK(hibiki::WindowsWasapiSinkWorkerV1TestAccess::take_clock_request(
+                  worker, applied_sequence, source_frames, sink_frames, elapsed_seconds) &&
+              source_frames == kFirstSourceFrames && sink_frames == kFirstSinkFrames &&
+              elapsed_seconds == kFirstElapsedSeconds);
+
+        std::atomic<bool> start{false};
+        std::atomic<bool> writers_done{false};
+        std::atomic<bool> failed{false};
+        auto writer = [&start, &worker](const double source, const double sink,
+                                        const double elapsed) {
+            while (!start.load(std::memory_order_acquire)) {
+                std::this_thread::yield();
+            }
+            for (std::size_t iteration = 0U; iteration < 8192U; ++iteration) {
+                worker.observe_clock(source, sink, elapsed);
+            }
+        };
+        auto is_known_tuple = [&](const double source, const double sink, const double elapsed) {
+            return (source == kFirstSourceFrames && sink == kFirstSinkFrames &&
+                    elapsed == kFirstElapsedSeconds) ||
+                   (source == kSecondSourceFrames && sink == kSecondSinkFrames &&
+                    elapsed == kSecondElapsedSeconds);
+        };
+        std::thread first_writer(writer, kFirstSourceFrames, kFirstSinkFrames,
+                                 kFirstElapsedSeconds);
+        std::thread second_writer(writer, kSecondSourceFrames, kSecondSinkFrames,
+                                  kSecondElapsedSeconds);
+        std::thread reader([&] {
+            while (!start.load(std::memory_order_acquire)) {
+                std::this_thread::yield();
+            }
+            while (!writers_done.load(std::memory_order_acquire)) {
+                if (hibiki::WindowsWasapiSinkWorkerV1TestAccess::take_clock_request(
+                        worker, applied_sequence, source_frames, sink_frames, elapsed_seconds) &&
+                    !is_known_tuple(source_frames, sink_frames, elapsed_seconds)) {
+                    failed.store(true, std::memory_order_release);
+                    return;
+                }
+            }
+            for (std::size_t iteration = 0U; iteration < 1024U; ++iteration) {
+                if (hibiki::WindowsWasapiSinkWorkerV1TestAccess::take_clock_request(
+                        worker, applied_sequence, source_frames, sink_frames, elapsed_seconds) &&
+                    !is_known_tuple(source_frames, sink_frames, elapsed_seconds)) {
+                    failed.store(true, std::memory_order_release);
+                    return;
+                }
+            }
+        });
+        start.store(true, std::memory_order_release);
+        first_writer.join();
+        second_writer.join();
+        writers_done.store(true, std::memory_order_release);
+        reader.join();
+        CHECK(!failed.load(std::memory_order_acquire));
+    }
+
     // WASAPI render-buffer lifecycle: a successful GetBuffer with a null
     // destination still owns an acquisition and must release it exactly once;
     // a failed GetBuffer owns nothing and must not release it. A valid buffer
