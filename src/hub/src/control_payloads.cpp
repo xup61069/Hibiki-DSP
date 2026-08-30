@@ -1162,19 +1162,29 @@ bool decode_grouped_volume_notification_payload_v1(
     GroupedVolumeNotificationPayloadV1& target) noexcept {
     notification = {};
     target = {};
+    VolumeNotificationV1 decoded_notification{};
+    GroupedVolumeNotificationPayloadV1 decoded_target{};
     if (payload.size() != kGroupedVolumeNotificationPayloadBytesV1 || payload[16] == 0U ||
-        payload[16] > target.output_group.size() ||
+        payload[16] > decoded_target.output_group.size() ||
         !decode_volume_notification_payload_v1(payload.first(kVolumeNotificationPayloadBytesV1),
-                                               notification)) {
+                                               decoded_notification)) {
         return false;
     }
-    target.output_group_bytes = payload[16];
-    std::copy_n(payload.data() + 17U, target.output_group_bytes, target.output_group.data());
-    for (std::size_t index = target.output_group_bytes; index < target.output_group.size(); ++index) {
+    decoded_target.output_group_bytes = payload[16];
+    std::copy_n(payload.data() + 17U, decoded_target.output_group_bytes,
+                decoded_target.output_group.data());
+    for (std::size_t index = decoded_target.output_group_bytes;
+         index < decoded_target.output_group.size(); ++index) {
         if (payload[17U + index] != 0U) return false;
     }
-    return is_printable_utf8(
-        std::string_view(target.output_group.data(), target.output_group_bytes));
+    if (!is_printable_utf8(
+            std::string_view(decoded_target.output_group.data(),
+                             decoded_target.output_group_bytes))) {
+        return false;
+    }
+    notification = decoded_notification;
+    target = decoded_target;
+    return true;
 }
 
 bool encode_scene_apply_payload_v1(

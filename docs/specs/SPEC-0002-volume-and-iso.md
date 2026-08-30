@@ -33,6 +33,8 @@ Movie、Surround 或其他 sink。舊的 `apply_windows_volume(notification)` �
 volume header + 31-byte UTF-8 output-group label）。C++ 與 C# 兩端都必須接受 legacy、產生
 grouped target；未知 label、非零 padding、非法 UTF-8 或格式長度一律拒絕。UI 選定的 group
 會使用 grouped target，避免滑桿看似控制 Surround 卻實際回寫 Main。
+拒絕時 C++ 的 volume／grouped-target 與 C# 的 output-group／dB／mute／generation 全部維持
+預設 neutral 值，不得暴露已通過前段驗證的部分資料。
 
 Group render 完成後，非 Strict Direct Scene 會經過 `TruePeakLimiterV1` 的 −1 dBTP
 bounded guard；它以三個線性 inter-sample probes 作保守估算並採 block-coherent gain。

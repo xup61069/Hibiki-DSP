@@ -504,21 +504,30 @@ public static class ControlPayloadsV1
         requestedDb = 0.0;
         mute = false;
         generation = 0UL;
+        var decodedOutputGroup = string.Empty;
+        var decodedRequestedDb = 0.0;
+        var decodedMute = false;
+        var decodedGeneration = 0UL;
         if (payload.Length != GroupedVolumeNotificationBytes || payload[16] is < 1 or > 31 ||
-            !TryDecodeVolumeNotification(payload[..VolumeNotificationBytes], out requestedDb,
-                                          out mute, out generation))
+            !TryDecodeVolumeNotification(payload[..VolumeNotificationBytes], out decodedRequestedDb,
+                                          out decodedMute, out decodedGeneration))
             return false;
         for (var index = 17 + payload[16]; index < GroupedVolumeNotificationBytes; index++)
             if (payload[index] != 0) return false;
         try
         {
-            outputGroup = StrictUtf8.GetString(payload.Slice(17, payload[16]));
-            return !string.IsNullOrWhiteSpace(outputGroup);
+            decodedOutputGroup = StrictUtf8.GetString(payload.Slice(17, payload[16]));
+            if (decodedOutputGroup.Any(char.IsControl)) return false;
         }
         catch (ArgumentException)
         {
             return false;
         }
+        outputGroup = decodedOutputGroup;
+        requestedDb = decodedRequestedDb;
+        mute = decodedMute;
+        generation = decodedGeneration;
+        return true;
     }
 
     public static byte[] EncodeSceneApply(string sceneId, string outputGroup)

@@ -204,18 +204,40 @@ int main()
         CHECK(all_zero(hibiki::encode_grouped_volume_notification_payload_v1(
             std::string_view("ma\x01n", 4U), notification)));
 
+        const auto grouped_outputs_are_neutral = [&decoded, &target]() noexcept {
+            return decoded.requested_db == -60.0 && !decoded.mute && decoded.generation == 0U &&
+                   target.output_group_bytes == 0U &&
+                   std::all_of(target.output_group.begin(), target.output_group.end(),
+                               [](const char byte) { return byte == '\0'; });
+        };
         auto malformed = payload;
         malformed[17U + 4U] = 1U;
         CHECK(!hibiki::decode_grouped_volume_notification_payload_v1(
             malformed, decoded, target));
+        CHECK(grouped_outputs_are_neutral());
+        malformed = payload;
+        malformed[16U] = 2U;
+        malformed[17U] = 0xC3U;
+        malformed[18U] = 0x28U;
+        std::fill(malformed.begin() + 19U, malformed.end(), 0U);
+        decoded.requested_db = 12.0;
+        decoded.mute = true;
+        decoded.generation = 99U;
+        target.output_group_bytes = 4U;
+        std::fill(target.output_group.begin(), target.output_group.end(), 'x');
+        CHECK(!hibiki::decode_grouped_volume_notification_payload_v1(
+            malformed, decoded, target));
+        CHECK(grouped_outputs_are_neutral());
         malformed = payload;
         malformed[16U] = 32U;
         CHECK(!hibiki::decode_grouped_volume_notification_payload_v1(
             malformed, decoded, target));
+        CHECK(grouped_outputs_are_neutral());
         malformed = payload;
         malformed[17U] = 0x01U;
         CHECK(!hibiki::decode_grouped_volume_notification_payload_v1(
             malformed, decoded, target));
+        CHECK(grouped_outputs_are_neutral());
         malformed = payload;
         write_u64_le(malformed, 8U, 0U);
         decoded.requested_db = 12.0;
@@ -224,8 +246,7 @@ int main()
         target.output_group_bytes = 4U;
         CHECK(!hibiki::decode_grouped_volume_notification_payload_v1(
             malformed, decoded, target));
-        CHECK(decoded.requested_db == -60.0 && !decoded.mute && decoded.generation == 0U &&
-              target.output_group_bytes == 0U);
+        CHECK(grouped_outputs_are_neutral());
         notification.generation = 0U;
         CHECK(all_zero(hibiki::encode_grouped_volume_notification_payload_v1(
             "main", notification)));
