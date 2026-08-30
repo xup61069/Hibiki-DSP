@@ -85,6 +85,27 @@ using hibiki::PhysicalDeviceDescriptorV1;
         entries, catalog_sequence, payload, payload_bytes);
 }
 
+[[nodiscard]] bool is_neutral_snapshot(
+    const hibiki::DeviceCatalogSnapshotV1& snapshot) noexcept
+{
+    const auto neutral = DeviceCatalogSnapshotEntryV1{};
+    if (snapshot.entry_count != 0U || snapshot.catalog_sequence != 0U) return false;
+    return std::all_of(snapshot.entries.begin(), snapshot.entries.end(),
+                       [&neutral](const DeviceCatalogSnapshotEntryV1& entry) {
+                           return entry.endpoint_id_bytes == neutral.endpoint_id_bytes &&
+                                  entry.endpoint_id == neutral.endpoint_id &&
+                                  entry.display_name_bytes == neutral.display_name_bytes &&
+                                  entry.display_name == neutral.display_name &&
+                                  entry.flow == neutral.flow &&
+                                  entry.availability == neutral.availability &&
+                                  entry.flags == neutral.flags &&
+                                  entry.channels == neutral.channels &&
+                                  entry.sample_rate == neutral.sample_rate &&
+                                  entry.buffer_frames == neutral.buffer_frames &&
+                                  entry.last_sequence == neutral.last_sequence;
+                       });
+}
+
 }  // namespace
 
 int main()
@@ -268,6 +289,15 @@ int main()
         CHECK(!hibiki::decode_device_catalog_snapshot_v1(
             {zero_sequence.data(), payload_bytes}, snapshot));
         CHECK(snapshot.entry_count == 0U && snapshot.catalog_sequence == 0U);
+
+        auto malformed_later_entry = payload;
+        const auto second_entry_offset = hibiki::kDeviceCatalogSnapshotHeaderBytesV1 +
+                                         hibiki::kDeviceCatalogSnapshotEntryBytesV1;
+        malformed_later_entry[second_entry_offset + 268U + decoded_capture.display_name_bytes] =
+            1U;
+        CHECK(!hibiki::decode_device_catalog_snapshot_v1(
+            {malformed_later_entry.data(), payload_bytes}, snapshot));
+        CHECK(is_neutral_snapshot(snapshot));
     }
 
     // ---- store enforces a non-zero strictly increasing sequence -----------
