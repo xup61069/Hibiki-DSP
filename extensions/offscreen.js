@@ -191,7 +191,9 @@ async function startCapture(message) {
     destination = context.createMediaStreamDestination();
     source.connect(packetizer).connect(destination);
     connectBridge();
-    packetizer.port.onmessage = (event) => {
+    const capturePacketizer = packetizer;
+    capturePacketizer.port.onmessage = (event) => {
+      if (packetizer !== capturePacketizer || !capturing) return;
       lastPacketActivityAtMs = Date.now();
       if (bridge?.readyState === WebSocket.OPEN && event.data instanceof ArrayBuffer) {
         bridge.send(event.data);

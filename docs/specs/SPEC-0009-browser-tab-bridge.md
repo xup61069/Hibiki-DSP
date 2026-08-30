@@ -32,7 +32,9 @@ capture 狀態後才恢復控制項。被擷取分頁關閉或導航導致 sourc
 offscreen 必須立即釋放整個 capture graph（stream、AudioContext、WebSocket）並廣播
 新的 capture-state，popup 不得繼續顯示「Capturing」。新的 Start 必須先完整 teardown
 先前 capture graph；track ended callback 必須綁定其來源 stream，且只可 teardown 仍是 active
-的 stream，不能讓舊 stream 的晚到 callback 結束 replacement capture。手動 Stop 仍是唯一主動
+的 stream，不能讓舊 stream 的晚到 callback 結束 replacement capture。packetizer callback 也必須
+綁定建立它的 node，且只可在該 node 仍是 active graph 時送包或更新計數，不能把舊佇列封包送進
+replacement bridge。手動 Stop 仍是唯一主動
 `track.stop()` 擁有者，ended 監聽器只負責自然結束路徑，不得重複 teardown。
 popup 重新可見時必須再次查詢真實 capture 狀態；此 visibility refresh 只更新狀態，
 不得清除既有錯誤訊息。`tools/extension-check.ps1` 驗證 visible-only refresh 邊界，
