@@ -305,6 +305,9 @@ Engine Preview 會在 Ack 前完成 user-space graph attachment commit；graph c
 的實際 latency 取代預估值，且不能把 preview Ack 寫成實體 sink 已播放。UI 顯示
 「0 ms 額外緩衝」「最高 80/160 ms」等可驗證文字，不使用「零延遲完美相位」宣稱。
 Scene 若省略 `ir_phase` 欄位，向後相容地採用 `minimum-phase/strength=0`。
+`IrPrepareCommand` decoder 必須完整驗證 mode、expectation、padding 與 path 才交付輸出；
+任何拒絕都讓 C++ 保持 `IrPrepareCommandV1{}`，並讓 C# path 為空、mode 為 `Bypass`、
+strength／expected sample rate／channels 為零，不得暴露部分 prepare configuration。
 
 公開 repository 不得包含 equal-loudness 授權文件、掃圖、完整受限表格或未核准 golden data。正式係數加入
 GPL source 前必須由人類 reviewer 完成法務 gate。

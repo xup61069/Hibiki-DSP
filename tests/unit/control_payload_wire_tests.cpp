@@ -456,7 +456,22 @@ int main()
         CHECK(all_zero(hibiki::encode_ir_prepare_command_v1(
             make_ir(0U, 0, 48000U, 2U, std::string_view("a\x01", 2U)))));
 
+        const auto ir_prepare_output_is_neutral = [&decoded]() noexcept {
+            const auto neutral = IrPrepareCommandV1{};
+            return decoded.schema_version == neutral.schema_version &&
+                   decoded.mode == neutral.mode &&
+                   decoded.strength_q16_16 == neutral.strength_q16_16 &&
+                   decoded.expected_sample_rate == neutral.expected_sample_rate &&
+                   decoded.expected_channels == neutral.expected_channels &&
+                   decoded.path_bytes == neutral.path_bytes &&
+                   std::all_of(decoded.path.begin(), decoded.path.end(),
+                               [](const char byte) { return byte == '\0'; });
+        };
         auto malformed = one_byte;
+        malformed[24U] = 0x01U;
+        CHECK(!hibiki::decode_ir_prepare_command_v1(malformed, decoded));
+        CHECK(ir_prepare_output_is_neutral());
+        malformed = one_byte;
         malformed[24U + 1U] = 1U;
         CHECK(!hibiki::decode_ir_prepare_command_v1(malformed, decoded));
         malformed = one_byte;

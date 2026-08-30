@@ -728,25 +728,31 @@ public static class ControlPayloadsV1
             if (payload[index] != 0) return false;
         var pathBytes = BinaryPrimitives.ReadUInt16LittleEndian(payload[20..]);
         var q16 = BinaryPrimitives.ReadInt32LittleEndian(payload[8..]);
-        expectedSampleRate = BinaryPrimitives.ReadUInt32LittleEndian(payload[12..]);
-        expectedChannels = BinaryPrimitives.ReadUInt32LittleEndian(payload[16..]);
+        var decodedMode = (IrPhaseMode)payload[4];
+        var decodedExpectedSampleRate = BinaryPrimitives.ReadUInt32LittleEndian(payload[12..]);
+        var decodedExpectedChannels = BinaryPrimitives.ReadUInt32LittleEndian(payload[16..]);
         if (pathBytes is < 1 or > IrPreparePathMaxBytes || q16 is < 0 or > 65536 ||
-            ((IrPhaseMode)payload[4] == IrPhaseMode.Bypass && q16 != 0) ||
-            (expectedSampleRate != 0U && expectedSampleRate is < 8000U or > 192000U) ||
-            expectedChannels > 8U || !IsZero(payload.Slice(24, IrPreparePathMaxBytes), pathBytes,
-                                               IrPreparePathMaxBytes))
+            (decodedMode == IrPhaseMode.Bypass && q16 != 0) ||
+            (decodedExpectedSampleRate != 0U &&
+             decodedExpectedSampleRate is < 8000U or > 192000U) ||
+            decodedExpectedChannels > 8U ||
+            !IsZero(payload.Slice(24, IrPreparePathMaxBytes), pathBytes, IrPreparePathMaxBytes))
             return false;
+        var decodedPath = string.Empty;
         try
         {
-            path = StrictUtf8.GetString(payload.Slice(24, pathBytes));
-            if (path.Any(char.IsControl)) return false;
+            decodedPath = StrictUtf8.GetString(payload.Slice(24, pathBytes));
+            if (decodedPath.Any(char.IsControl)) return false;
         }
         catch (ArgumentException)
         {
             return false;
         }
-        mode = (IrPhaseMode)payload[4];
+        path = decodedPath;
+        mode = decodedMode;
         strength = q16 / 65536.0;
+        expectedSampleRate = decodedExpectedSampleRate;
+        expectedChannels = decodedExpectedChannels;
         return true;
     }
 
