@@ -219,7 +219,7 @@ int main()
         malformed[16U] = 2U;
         malformed[17U] = 0xC3U;
         malformed[18U] = 0x28U;
-        std::fill(malformed.begin() + 19U, malformed.end(), 0U);
+        std::fill(malformed.begin() + 19U, malformed.end(), std::uint8_t{0U});
         decoded.requested_db = 12.0;
         decoded.mute = true;
         decoded.generation = 99U;
