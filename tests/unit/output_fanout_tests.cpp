@@ -132,6 +132,12 @@ int main() {
         plan.sinks[0].sink_id[0] = static_cast<char>(0x85);
         CHECK(!hibiki::validate_output_fanout_plan_v1(plan));
     }
+    // validate: malformed UTF-8 sink_id rejected before it enters the plan.
+    {
+        auto plan = make_valid_plan();
+        plan.sinks[0].sink_id[0] = static_cast<char>(0xFF);
+        CHECK(!hibiki::validate_output_fanout_plan_v1(plan));
+    }
     // validate: duplicate sink IDs rejected.
     {
         auto plan = make_valid_plan();
@@ -160,6 +166,17 @@ int main() {
         CHECK(std::string(plan.sinks[1].sink_id.data(), plan.sinks[1].id_bytes) == "Headphones");
         CHECK(!plan.sinks[1].enabled);
         CHECK(hibiki::validate_output_fanout_plan_v1(plan));
+    }
+    // prepare: printable multi-byte UTF-8 is preserved, while malformed input rejects.
+    {
+        OutputFanoutPlanV1 plan{};
+        const std::vector<OutputFanoutSinkConfigV1> valid_utf8{
+            OutputFanoutSinkConfigV1{"\xE5\x8F\xB0", 2U, true}};
+        CHECK(hibiki::prepare_output_fanout_plan_v1(valid_utf8, 2U, 1U, plan));
+        CHECK(std::string(plan.sinks[0].sink_id.data(), plan.sinks[0].id_bytes) == "\xE5\x8F\xB0");
+        const std::vector<OutputFanoutSinkConfigV1> malformed_utf8{
+            OutputFanoutSinkConfigV1{std::string(1U, static_cast<char>(0xFF)), 2U, true}};
+        CHECK(!hibiki::prepare_output_fanout_plan_v1(malformed_utf8, 2U, 1U, plan));
     }
     // prepare: empty config span rejected.
     {

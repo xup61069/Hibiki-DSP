@@ -14,6 +14,10 @@ source_globs: ["src/hub/**output*", "src/hub/**wasapi*", "src/hub/**audio_engine
 每個 physical sink 由獨立 ring/SRC pipeline 處理。新 sink 必須先完成 format、clock
 與 buffer prepare，再進入交叉淡化；切換失敗時保留舊 sink，不重啟全域 graph。
 
+`OutputFanoutPlanV1` 的每個 bounded sink ID 使用與 schema 相同的 printable UTF-8 boundary：
+控制字元、overlong、surrogate、truncated 或其他 malformed UTF-8 均在 prepare/validate 時
+fail-closed；合法 multi-byte printable ID 保持可用。
+
 ## Crossfade
 
 - `OutputCrossfade` 由 control plane 以 2/6/8 聲道、44.1/48/96/192 kHz 與 1–200 ms
