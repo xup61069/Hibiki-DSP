@@ -94,6 +94,26 @@ int main() {
         graph.lanes[0].output_group = "main";
         CHECK(validate_graph(graph));
 
+        const std::array<std::string, 6> malformed_labels{{
+            std::string(1, static_cast<char>(0xFF)),  // standalone non-ASCII byte
+            std::string("\x80", 1U),                 // standalone continuation
+            std::string("\xC0\xAF", 2U),            // overlong slash
+            std::string("\xED\xA0\x80", 3U),        // surrogate
+            std::string("\xF4\x90\x80\x80", 4U),    // above U+10FFFF
+            std::string("\xE5\x8F", 2U),             // truncated three-byte sequence
+        }};
+        for (const auto& malformed_label : malformed_labels) {
+            graph.lanes[0].id = malformed_label;
+            CHECK(!validate_graph(graph));
+            graph.lanes[0].id = "music";
+            graph.lanes[0].output_group = malformed_label;
+            CHECK(!validate_graph(graph));
+            graph.lanes[0].output_group = "main";
+        }
+        graph.lanes[0].id = "\xE9\x9F\xB3";
+        graph.lanes[0].output_group = "\xE5\x8F\xB0";
+        CHECK(validate_graph(graph));
+
         GraphConfigV1 duplicate = stereo_two_lane_graph();
         duplicate.lanes[1].id = "music";
         CHECK(!validate_graph(duplicate));
@@ -125,6 +145,39 @@ int main() {
         bad_map.lanes[0].channel_count = 8U;
         bad_map.lanes[0].channel_map = {0, 1, 2, 3, 4, 5, 6, 7};
         CHECK(!validate_graph(bad_map));  // destination 6/7 out of range for stereo output
+    }
+
+    // validate: lane and output-group labels use strict printable UTF-8.
+    {
+        const std::string printable_lane("music\xE2\x98\x83", 8U);
+        const std::string printable_group("main\xF0\x9F\x8E\xB5", 8U);
+        GraphConfigV1 valid = stereo_two_lane_graph();
+        valid.lanes[0].id = printable_lane;
+        valid.lanes[0].output_group = printable_group;
+        CHECK(validate_graph(valid));
+        RtGraphSnapshotV1 snapshot{};
+        CHECK(compile_rt_snapshot(valid, 11U, snapshot));
+        CHECK(snapshot.lanes[0].output_group_bytes == printable_group.size());
+        CHECK(std::equal(printable_group.begin(), printable_group.end(),
+                         snapshot.lanes[0].output_group.begin()));
+
+        GraphConfigV1 malformed_lane = stereo_two_lane_graph();
+        malformed_lane.lanes[0].id = std::string("music\xFF", 6U);
+        CHECK(!validate_graph(malformed_lane));
+        CHECK(!compile_rt_snapshot(malformed_lane, 12U, snapshot));
+
+        GraphConfigV1 malformed_group = stereo_two_lane_graph();
+        malformed_group.lanes[0].output_group = std::string("main\xFF", 5U);
+        CHECK(!validate_graph(malformed_group));
+        CHECK(!compile_rt_snapshot(malformed_group, 13U, snapshot));
+
+        for (const auto& invalid : {std::string("music\x01", 6U),
+                                    std::string("music\x80", 6U),
+                                    std::string("music\x7F", 6U)}) {
+            GraphConfigV1 invalid_label = stereo_two_lane_graph();
+            invalid_label.lanes[0].id = invalid;
+            CHECK(!validate_graph(invalid_label));
+        }
     }
 
     // validate: strict_direct forbids matrices, makeup gain and plugin latency; matrix gains are bounded.
