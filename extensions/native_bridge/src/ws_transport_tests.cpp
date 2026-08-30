@@ -67,36 +67,41 @@ bool test_upgrade_header_semantics() {
         "GET /v1/tab HTTP/1.1\r\n"
         "Connection: Upgrade\r\n"
         "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
         "\r\n";
     constexpr std::string_view kMissingConnection =
         "GET /v1/tab HTTP/1.1\r\n"
         "Upgrade: websocket\r\n"
         "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
         "\r\n";
     constexpr std::string_view kLookalikeUpgrade =
         "GET /v1/tab HTTP/1.1\r\n"
         "X-Upgrade: websocket\r\n"
         "Connection: Upgrade\r\n"
         "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
         "\r\n";
     constexpr std::string_view kLookalikeKey =
         "GET /v1/tab HTTP/1.1\r\n"
         "Upgrade: websocket\r\n"
         "Connection: Upgrade\r\n"
         "X-Value: sec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
         "\r\n";
     constexpr std::string_view kNonTokenConnection =
         "GET /v1/tab HTTP/1.1\r\n"
         "Upgrade: websocket\r\n"
         "Connection: keep-alive, xupgrade\r\n"
         "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
         "\r\n";
     constexpr std::string_view kTokenListRequest =
         "GET /v1/tab HTTP/1.1\r\n"
         "Upgrade: WebSocket\r\n"
         "Connection: keep-alive, Upgrade\r\n"
         "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
-        "Sec-WebSocket-Version: 13\r\n"
+        "sEc-WeBsOcKeT-VeRsIoN: \t13 \r\n"
         "\r\n";
     if (!expect_rejected_handshake(kMissingUpgrade, "missing Upgrade header is rejected") ||
         !expect_rejected_handshake(kMissingConnection, "missing Connection header is rejected") ||
