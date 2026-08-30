@@ -303,6 +303,14 @@ bool read_ws_client_frame(const WsStreamRead& reader,
     return true;
 }
 
+bool has_valid_ws_close_status(const std::span<const std::uint8_t> payload) {
+    if (payload.size() < 2U) return true;
+    const auto status = static_cast<std::uint16_t>(
+        (static_cast<std::uint16_t>(payload[0]) << 8U) | static_cast<std::uint16_t>(payload[1]));
+    return status >= 1000U && status <= 4999U && status != 1004U && status != 1005U &&
+           status != 1006U && status != 1015U;
+}
+
 bool send_ws_control_frame(const WsStreamWrite& writer,
                            const std::uint8_t opcode,
                            const std::span<const std::uint8_t> payload) {
@@ -325,7 +333,7 @@ bool next_ws_binary_message(const WsStreamRead& reader,
     WsFrameError error{WsFrameError::None};
     if (!read_ws_client_frame(reader, max_payload, frame, error)) return false;
     if (frame.opcode == 0x8U) {
-        if (frame.payload.size() == 1U) return false;
+        if (frame.payload.size() == 1U || !has_valid_ws_close_status(frame.payload)) return false;
         if (!send_ws_control_frame(writer, 0x8U, {})) return false;
         kind = WsMessageKind::Close;
         return true;
