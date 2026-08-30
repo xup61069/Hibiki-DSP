@@ -95,6 +95,36 @@ int main() {
         bad_f3.measured_f3_hz = -5.0;
         CHECK(!hibiki::validate_policy(bad_f3));
 
+        // An optional anchor ID still has to obey the shared printable UTF-8
+        // contract in every mode, not only when calibrated mode consumes it.
+        auto valid_ascii_anchor = base;
+        valid_ascii_anchor.anchor_id = "living-room";
+        CHECK(hibiki::validate_policy(valid_ascii_anchor));
+
+        auto valid_multibyte_anchor = base;
+        valid_multibyte_anchor.anchor_id = "\xE5\xAE\x89\xE5\x85\xA8";
+        CHECK(hibiki::validate_policy(valid_multibyte_anchor));
+
+        auto control_anchor = base;
+        control_anchor.anchor_id = "anchor\n";
+        CHECK(!hibiki::validate_policy(control_anchor));
+        control_anchor.anchor_id = std::string("anchor") + static_cast<char>(0x7F);
+        CHECK(!hibiki::validate_policy(control_anchor));
+        control_anchor.anchor_id = std::string("anchor") + "\xC2\x9F";
+        CHECK(!hibiki::validate_policy(control_anchor));
+        control_anchor.anchor_id = std::string("anchor") + static_cast<char>(0x80);
+        CHECK(!hibiki::validate_policy(control_anchor));
+        control_anchor.anchor_id = "anchor\xE2\x82";
+        CHECK(!hibiki::validate_policy(control_anchor));
+        control_anchor.anchor_id = std::string("anchor") + std::string("\0hidden", 7U);
+        CHECK(!hibiki::validate_policy(control_anchor));
+
+        auto boundary_anchor = base;
+        boundary_anchor.anchor_id = std::string(64, 'a');
+        CHECK(hibiki::validate_policy(boundary_anchor));
+        boundary_anchor.anchor_id = std::string(65, 'a');
+        CHECK(!hibiki::validate_policy(boundary_anchor));
+
         // Calibrated mode requires a non-empty anchor and the calibrated
         // standard string; Relative mode rejects calibrated=true.
         auto calibrated_empty_anchor = base;
