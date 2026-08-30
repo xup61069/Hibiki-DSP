@@ -11,29 +11,26 @@ points at them instead of restating them so it cannot drift.
 3. `docs/AI_HANDOFF.md` and `docs/ai/MULTI_AGENT.md` — the multi-contributor protocol.
 4. `docs/specs/INDEX.md` and `docs/adr/` for the area you intend to touch.
 
-## Claiming work
+## Delivering work
 
-- Read-only reconnaissance needs no claim. Writes require explicit maintainer/orchestrator
-  assignment, one GitHub Issue, one non-`main` branch named `codex/<issue>-<slug>`, one handoff
-  block and one draft PR. A maintainer's direct request is assignment; agents do not self-select backlog.
-- Use a dedicated worktree whenever another writer is active, the branch is occupied, or occupancy
-  is uncertain; it remains recommended for a single writer. Live ownership initially comes from the
-  Issue assignee, lifecycle label and handoff block. Open the draft PR after the first WIP/reviewable
-  commit instead of creating an empty claim commit.
-  Declare `scope_globs` and `shared_paths` in the Issue body handoff block before
-  editing anything, and stay inside that scope.
-- Never push to `main`, never force-push published branches, and never modify another lane's
-  branch or worktree.
+- A fix or implementation request means implement it, run matching verification, and integrate it.
+  Issues, branches, PRs, and CI are coordination records, not completion or stopping points.
+- Unless the maintainer explicitly asks for backlog planning, do not create candidate, TBD,
+  pre-claim, or queued Issues. Create one fully specified execution Issue only when its writer will
+  start immediately. Before writing, complete its handoff, serialized claim, non-`main` branch,
+  exclusive `scope_globs`, and ownership checks.
+- Use a dedicated worktree when another writer is active, the branch is occupied, or occupancy is
+  uncertain. Never modify another writer's branch/worktree or force-push a published branch.
+- Open one draft PR after the first reproducible WIP/reviewable push, then keep working through
+  acceptance, fresh exact-head green checks, ready state, and merge. Pause only for a concrete
+  safety, permission, scope, or external blocker and record it in the handoff. Integrators drain
+  safe green PRs before finding or scheduling more work.
 
-## Before requesting review
+## Verification
 
-- Baseline counters are measured live by `tools/docs-check.ps1`; slices never edit a counter
-  file (`build/baseline-counters.json` is retired since #197).
-- Run the always-run checks listed in `AGENTS.md` (scoped handoff-check, docs-check,
-  source-policy and `git diff --check`); add doctor/build/verify/workflow and subsystem gates
-  only when your scope or acceptance triggers them.
-- GitHub Actions must finish green before review is requested; queued or in-progress runs do
-  not count as passing.
+Run the always-run and scope-triggered checks in `AGENTS.md`. Queued, in-progress, stale-head, or
+branch-only checks do not prove the integrated result. Baseline counters are measured live by
+`tools/docs-check.ps1`; contributors do not maintain a counter file.
 
 ## Evidence honesty
 

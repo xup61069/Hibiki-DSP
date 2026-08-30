@@ -101,6 +101,10 @@ jobs:
           if (-not $issue -or [int]$issue.number -ne $issueNumber) { throw "Issue #$issueNumber not found." }
           Test-AdmissionIssueEligibility -IssueData $issue
           $owner = Get-AdmissionOwner -Body ([string]$issue.body) -IssueNumber $issueNumber
+          $handoffBranch = Get-HandoffScalar -Body ([string]$issue.body) -Key 'branch'
+          if (-not [string]::Equals($branch, $handoffBranch, [System.StringComparison]::Ordinal)) {
+            throw "Dispatched branch '$branch' does not exactly match Issue #$issueNumber handoff branch '$handoffBranch'."
+          }
 
           Invoke-RequiredPowerShell -Arguments @(
             '-NoProfile', '-File', 'tools/handoff-check.ps1',

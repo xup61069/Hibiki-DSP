@@ -3,6 +3,11 @@ name: handoff-audit
 on:
   issues:
     types: [opened, edited, reopened, closed, assigned, unassigned, labeled, unlabeled]
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, converted_to_draft, closed]
+  workflow_run:
+    workflows: [verify, CodeQL]
+    types: [completed]
   schedule:
     - cron: '17 1 * * *'
   workflow_dispatch:
@@ -14,6 +19,10 @@ concurrency:
 permissions:
   contents: read
   issues: read
+  pull-requests: read
+  checks: read
+  actions: read
+  statuses: read
 
 jobs:
   audit:
@@ -23,7 +32,11 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          # Audit only trusted default-branch policy. In particular,
+          # pull_request_target must never execute a contributor's PR code.
+          ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
+          persist-credentials: false
 
       # GitHub issue-event mutations (label/assignee) propagate eventually.
       # Rapid claim-admission sequences fire labeled+assigned back-to-back; the
@@ -31,6 +44,7 @@ jobs:
       # final mutation is visible via API. Wait here so the last surviving run
       # audits settled state instead of producing false positives.
       - name: Wait for issue-event consistency
+        if: github.event_name == 'issues' || github.event_name == 'pull_request_target'
         shell: pwsh
         run: Start-Sleep -Seconds 20
 
@@ -39,3 +53,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: ./tools/handoff-check.ps1
+
+      - name: Audit delivery lifecycle
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./tools/delivery-audit.ps1

@@ -7,56 +7,33 @@
 
 所有 `tools/*.ps1` gates 必須用 PowerShell 7（`pwsh`）執行：腳本為 UTF-8（無 BOM）
 並使用 .NET Core API，Windows 內建的 PowerShell 5.1 會把中文解成亂碼且缺少必要
-方法，直接跑必失敗。沒有 `pwsh` 先 `winget install --id Microsoft.PowerShell`；
+方法，直接跑必失敗。缺少 `pwsh` 時記錄具體 permission／external blocker；未經 maintainer
+明確授權不得安裝系統套件。
 本機被 Execution Policy 擋下時加 `-ExecutionPolicy Bypass`。多個 gate 另提供
 `-SelfTest`（例：`tools/docs-check.ps1 -SelfTest`），可在不碰機器、不寫檔的前提下
 驗證 gate 自身邏輯。
 
-1. 只先讀 root `AGENTS.md` 與本檔。不要在還不知道 Issue／角色前預載
-   `docs/AI_HANDOFF.md`、`docs/state/BASELINE.md`、`docs/PROJECT_MAP.md` 或完整
-   `docs/ai/MULTI_AGENT.md`；它們是後續依問題查閱的全域資料，不是每個視窗的固定 prompt。
-2. 執行 `git fetch --all --prune`；Issue／PR 清單只取 bounded metadata（例如 `--limit 30`），
-   Issue body 留給第 7 步的 context pack 載入一次，不要先全文輸出再由 pack 重播。唯讀偵察可
-   繼續；寫入必須有 maintainer／orchestrator 明確指派，不得自行挑選 backlog。人類 maintainer
-   對目前 session 的直接要求算指派，active orchestrator 可在確認 `scope_globs` 不重疊後建立或
-   正式 claim Issue。
-3. 寫入一律使用非 `main` branch。有其他 writer、branch 已被 worktree 佔用或 occupancy 不確定
-   時，在 repository 外建立獨立 clone/worktree；確認只有單一 writer 時仍建議隔離。大型 checkout
-   不得把完整 worktree inventory 輸出到 prompt；只查目標 branch：
-   `git worktree list --porcelain | rg -B2 -A1 --fixed-strings "branch refs/heads/<branch>"`。禁止在別的
-   session 工作樹執行 `checkout`、`switch`、branch rename、reset、clean 或 rebase。
-4. Orchestrator（人類或被指定的 active session）在 GitHub Issue body 補齊 handoff block（owner、branch、base commit、
-   `scope_globs`、shared paths、dependencies）、指派 assignee。正式寫入需要 `claimed` lifecycle
-   label（進行中）或 `in-review` 待審；`claim-pending` 是非授權的 admission 標記，不授予寫入。
-   worker 從指派 base 的最新遠端 HEAD 建立 branch，
-   並依第 3 步決定 workspace isolation 後即可開始。首次可審閱的 commit push 後就開 draft PR，
-   不要建立空的認領 commit。
-5. 確認 branch、HEAD、working tree 與 dependency lock，再執行
-   `pwsh -File tools/handoff-check.ps1 -Issue <issue>`。有 scope 或文件衝突時停止寫入，交由
-   integration coordinator 切分或排序。
-6. 需要 build、toolchain 或 target-machine evidence 時才執行
-   `pwsh -File tools/doctor.ps1 -CheckOnly` 與 `pwsh -File tools/probe-environment.ps1`；
-   文件／流程小改不必為了形式探測機器，任何環境資料只寫入 `.local/`。
-7. 先取得有上限的最小任務包：
-   `pwsh -File tools/context-pack.ps1 -Issue <issue> -NoSource`。預設只輸出一次 Issue body、其引用的
-   Spec／ADR 與該 Issue evidence，不重播已讀過的核心規則或全域快照；完整序列化輸出受 48,000
-   字元與 12,000 conservative estimated-token 雙上限約束，過大時會在任何 pack 內容輸出前拒絕。
-   只有明確的 repository-wide 稽核才使用 `-IncludeRepositoryState`，並由操作者同時明確指定
-   `-MaxCharacters` 與 `-MaxEstimatedTokens`。
-8. 依 handoff 與 pack 只讀當前 slice 需要的 source、tests 與 evidence，再執行 handoff 的
-   baseline smoke test；結果不一致時先標記 stale/conflict。需要 source pack 時移除 `-NoSource`，
-   但不得為了繞過上限載入無關檔案。Foundation integration Issue 也不會取消預設上限或自動載入
-   全域歷史，其他工作更不得用 foundation Issue 取代自己的 handoff block。
-9. 修改中定期把可建置的 WIP commit push 到自己的 branch，並同步 handoff block 的已完成內容、
-   限制與下一個安全動作；不得靠未 push 的工作樹或聊天紀錄交接。
-10. 修改後執行 AGENTS.md 第三層的核心檢查（scoped handoff-check、docs-check、source-policy、
-   `git diff --check`），再依觸發條件加跑條件式 gates：需要 build evidence 才跑 doctor；
-   C/C++、CMake、schema、contract 或 tests 跑 verify；workflow/release policy 跑
-   source-only-ci-check；UI、engine、extensions、installer、distribution 與 driver 各跑表列 gate。
-   live-* probes 一律是明確 opt-in：預設只輸出匿名資料且不改變機器狀態；帶 `-WriteTest`
-   的變體會短暫改變本機音量並在結束前恢復。任何 live probe 的結果都只能算 user-space
-   evidence，不得宣稱 driver/WaveRT 或實體音訊 delivery 已完成；專案不需要 HLK 與任何簽章；
-   各 probe 的詳細邊界說明見各工具腳本開頭註解。
+1. 只先讀 root `AGENTS.md` 與本檔；Spec、ADR、source、tests、evidence 與全域快照按任務需要載入。
+2. 先判斷要求：修正／實作要求必須直接推進到實作、匹配驗證與整合；只有 maintainer 明確要求
+   read-only audit 時才只報告。Issue、branch、PR 與 CI 是記錄，不是成果或停止點。
+3. 執行 `git fetch --all --prune` 與 `pwsh -File tools/delivery-audit.ps1 -BeforeExplore`；先 drain gate
+   指出的既有可交付工作，再取 bounded Issue／PR metadata。除非 maintainer 明確要求規劃
+   backlog，不得建立 candidate、TBD、pre-claim 或排隊 Issue。只有 writer 會立即開始時，才建立
+   一張 objective、acceptance、owner、branch、base、scope、dependencies 與 verification 都完整的
+   execution Issue，再經序列化 claim admission 取得 `claimed`；`claim-pending` 不授予寫入權。
+4. 寫入使用非 `main` branch。確認 handoff、HEAD、dependency 與獨占 `scope_globs`，再跑
+   `pwsh -File tools/handoff-check.ps1 -Issue <issue>`。有其他 writer、branch occupancy 或不確定狀態
+   時使用獨立 worktree；不得操作別人的 worktree 或 branch。
+5. 用 `pwsh -File tools/context-pack.ps1 -Issue <issue> -NoSource` 載入一次有界任務包，再按 scope
+   讀取所需 source／tests／evidence 並實作。只有明確 repository-wide audit 才使用
+   `-IncludeRepositoryState` 並同時指定兩種上限；需要 build／target evidence 才跑環境 probe，
+   私人資料只寫入 `.local/`。
+6. 首次可重建的 WIP/reviewable push 後開一張 draft PR，不做空認領 commit。持續推進到 acceptance、
+   fresh exact-head checks 全綠、ready 與 merge；只有具體 safety、permission、scope 或 external
+   blocker 才暫停並寫回 handoff。Integrator 先 drain 可安全合併的 green PR，再安排新工作；合併後
+   readback target／`main` 與 Issue closed，並依 `MULTI_AGENT.md` 做安全 clean close。
+7. 每個寫入切片跑 `AGENTS.md` 的 always-run（含 delivery audit）與範圍相符的 conditional gates。live probe 永遠需
+   明確 opt-in；結果只算 user-space evidence，不得冒充 driver/WaveRT、實體音訊或 release 證據。
 
 ## Driver 建置邊界
 
@@ -80,9 +57,6 @@ Issue body handoff block。兩份權威文件衝突時停止修改，建立 `DOC
 branch，確認前一個 AI 停止寫入後才把 owner 交給下一個 AI。真實裝置資料與 calibration
 留在 `.local/`，只提交 schema 和匿名 fixture。
 
-同一視窗若已發生第二次上下文壓縮，或下一步已切換到另一個里程碑，先完成上述 durable checkpoint
-再開新視窗接續；新視窗只載入核心入口、active Issue 與其最小 pack，不重播舊聊天或整份全域歷史。
-
 ## 目前能力與缺口去哪裡看
 
 - main 已合併、可重跑的能力與限制：`docs/state/BASELINE.md`。
@@ -93,5 +67,5 @@ branch，確認前一個 AI 停止寫入後才把 owner 交給下一個 AI。真
 ## 開 Codex 視窗與看進度
 
 建議一個視窗只負責一個可驗證成果；不同視窗並行時不得共用 write scope。給 maintainer 的回報
-先講產品變化、使用者影響、確認方式與剩餘缺口，Git 操作只留必要的短版紀錄。五種主要視窗角色、
+先講產品變化、使用者影響、確認方式與剩餘缺口，Git 操作只留必要的短版紀錄。三種主要視窗角色、
 可直接貼上的 `/goal` 啟動詞與長任務停止條件見 [Codex Goals](ai/CODEX_GOALS.md)。

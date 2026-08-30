@@ -303,17 +303,30 @@ function Get-TbdHandoffFields {
   $match = [regex]::Match($normalizedBody, '(?ms)^[ \t]*<!-- hibiki:handoff-v1[ \t]*\n(?<body>.*?)\n[ \t]*-->[ \t]*$')
   if (-not $match.Success) { return @() }
   $fields = [System.Collections.Generic.List[string]]::new()
-  foreach ($key in @('issue', 'branch')) {
-    $line = [regex]::Match($match.Groups['body'].Value, "(?im)^\s*$key\s*:\s*(?<value>[^\r\n]+)$")
+  foreach ($rawLine in @($match.Groups['body'].Value -split "\r?\n")) {
+    $line = [regex]::Match($rawLine, '^\s*(?<key>[A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(?<value>.*)$')
     if (-not $line.Success) { continue }
+    $key = $line.Groups['key'].Value
     $value = $line.Groups['value'].Value.Trim()
-    if (($value.StartsWith('"') -and $value.EndsWith('"') -and $value.Length -ge 2) -or
-        ($value.StartsWith("'") -and $value.EndsWith("'") -and $value.Length -ge 2)) {
-      $value = $value.Substring(1, $value.Length - 2)
+    $hasTbd = [regex]::IsMatch($value, '(?i)(?<![A-Za-z0-9_])TBD(?![A-Za-z0-9_])')
+    $hasUnassignedOwner = $key -ieq 'owner' -and $value.Trim('"', "'") -ieq 'unassigned'
+    if (($hasTbd -or $hasUnassignedOwner) -and -not $fields.Contains($key)) {
+      [void]$fields.Add($key)
     }
-    if ($value.Contains('TBD')) { [void]$fields.Add($key) }
   }
   return @($fields)
+}
+
+function Assert-NoUnresolvedHandoff {
+  param(
+    [Parameter(Mandatory)] [string]$Body,
+    [Parameter(Mandatory)] [int]$IssueNumber,
+    [Parameter(Mandatory)] [string]$Path
+  )
+  $unresolved = @(Get-TbdHandoffFields -Body $Body)
+  if ($unresolved.Count -gt 0) {
+    throw "Open Issue #$IssueNumber handoff contains unresolved placeholder field(s): $($unresolved -join ', ') ($Path)"
+  }
 }
 
 function Get-HandoffScalar {
@@ -633,18 +646,26 @@ if ($SelfTest) {
     'issue: TBD',
     'branch: codex/TBD-placeholder',
     'target_branch: main',
+    'base_commit: TBD',
+    'owner: unassigned',
     '-->'
   )
   $tbdDraftBody = "# Objective`n`n" + ($tbdBlockLines -join "`n")
   $tbdFields = @(Get-TbdHandoffFields -Body $tbdDraftBody)
-  if ($tbdFields.Count -ne 2 -or $tbdFields -notcontains 'issue' -or $tbdFields -notcontains 'branch') {
-    throw "handoff-check self-test failed: TBD draft fields were not detected."
+  if ($tbdFields.Count -ne 4 -or $tbdFields -notcontains 'issue' -or $tbdFields -notcontains 'branch' -or
+      $tbdFields -notcontains 'base_commit' -or $tbdFields -notcontains 'owner') {
+    throw "handoff-check self-test failed: unresolved handoff fields were not detected."
   }
+  $caseCount++
+  Assert-Throws {
+    Assert-NoUnresolvedHandoff -Body $tbdDraftBody -IssueNumber 100 -Path 'selftest/tbd-open'
+  } 'open TBD handoff rejection'
   $caseCount++
   $crlfTbdBody = ($tbdDraftBody -replace "`n", "`r`n")
   $crlfTbdFields = @(Get-TbdHandoffFields -Body $crlfTbdBody)
-  if ($crlfTbdFields.Count -ne 2 -or $crlfTbdFields -notcontains "issue" -or $crlfTbdFields -notcontains "branch") {
-    throw "handoff-check self-test failed: CRLF TBD draft fields were not detected."
+  if ($crlfTbdFields.Count -ne 4 -or $crlfTbdFields -notcontains 'issue' -or $crlfTbdFields -notcontains 'branch' -or
+      $crlfTbdFields -notcontains 'base_commit' -or $crlfTbdFields -notcontains 'owner') {
+    throw "handoff-check self-test failed: CRLF unresolved handoff fields were not detected."
   }
   $caseCount++
   if (@(Get-TbdHandoffFields -Body $mock.body).Count -ne 0) {
@@ -798,7 +819,7 @@ if ($SelfTest) {
   } 'claimed readback zero owners'
 
   if ($caseCount -lt 5) { throw "handoff-check self-test failed: expected at least 5 passing cases, saw $caseCount." }
-  Write-Output "handoff-check self-test passed (issue-block parsing, TBD draft skip, state/labels, owner mismatch, glob overlap, safe paths and arrays)."
+  Write-Output "handoff-check self-test passed (issue-block parsing, open TBD rejection, state/labels, owner mismatch, glob overlap, safe paths and arrays)."
   exit 0
 }
 
@@ -964,22 +985,12 @@ if ($withHandoff.Count -eq 0) {
 $seenBranches = @{}
 $seenScopes = [System.Collections.Generic.List[object]]::new()
 $checked = @()
-$skippedTbdDrafts = [System.Collections.Generic.List[string]]::new()
 foreach ($issueData in $withHandoff) {
   $issueNumber = $issueData.number
   if ($Issue -ge 0 -and $issueNumber -ne $Issue) { continue }
   $path = "issue/$issueNumber"
 
-  $tbdFields = @(Get-TbdHandoffFields -Body $issueData.body)
-  if ($tbdFields.Count -gt 0) {
-    $labelNamesForSkip = @($issueData.labels | ForEach-Object { $_.name })
-    $hasLifecycleLabel = @($labelNamesForSkip | Where-Object { $_ -in @('claim-pending', 'claimed', 'in-review') }).Count -gt 0
-    if ($hasLifecycleLabel) {
-      throw "Issue #$issueNumber has lifecycle label but still contains TBD in handoff block; fail closed. ($path)"
-    }
-    [void]$skippedTbdDrafts.Add("$path ($($tbdFields -join ', '))")
-    continue
-  }
+  Assert-NoUnresolvedHandoff -Body $issueData.body -IssueNumber $issueNumber -Path $path
 
   $block = Get-BodyBlock -Body $issueData.body -Path $path
   $frontMatter = Get-FrontMatter $block $path
@@ -1074,19 +1085,7 @@ foreach ($issueData in $withHandoff) {
   $checked += "#$issueNumber@$branch"
 }
 
-if ($skippedTbdDrafts.Count -gt 0) {
-  $warningEntries = @($skippedTbdDrafts | Select-Object -First 8)
-  if ($skippedTbdDrafts.Count -gt $warningEntries.Count) {
-    $warningEntries += "(+ $($skippedTbdDrafts.Count - $warningEntries.Count) more)"
-  }
-  Write-Warning ("Skipping pre-claim draft handoff(s): " + ($warningEntries -join ', '))
-}
-
-$issueWasSkipped = $false
-if ($Issue -ge 0) {
-  $issueWasSkipped = @($skippedTbdDrafts | Where-Object { $_.StartsWith("issue/$Issue ") }).Count -gt 0
-}
-if ($Issue -ge 0 -and -not ($checked | Where-Object { $_.StartsWith("#$Issue@") }) -and -not $issueWasSkipped) {
+if ($Issue -ge 0 -and -not ($checked | Where-Object { $_.StartsWith("#$Issue@") })) {
   throw "No active handoff block exists for Issue $Issue (or it is closed)."
 }
 
