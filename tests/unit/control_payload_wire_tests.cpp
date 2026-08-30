@@ -111,6 +111,17 @@ encode_device(const std::string_view endpoint,
 
 int main()
 {
+    // ---- shared printable UTF-8: special lead-byte boundaries -----------
+    {
+        CHECK(!hibiki::is_printable_utf8_v1(std::string_view("\xED\x40\x80", 3U)));
+        CHECK(hibiki::is_printable_utf8_v1(std::string_view("\xED\x9F\xBF", 3U)));
+        CHECK(!hibiki::is_printable_utf8_v1(std::string_view("\xED\xA0\x80", 3U)));
+
+        CHECK(!hibiki::is_printable_utf8_v1(std::string_view("\xF4\x40\x80\x80", 4U)));
+        CHECK(hibiki::is_printable_utf8_v1(std::string_view("\xF4\x8F\xBF\xBF", 4U)));
+        CHECK(!hibiki::is_printable_utf8_v1(std::string_view("\xF4\x90\x80\x80", 4U)));
+    }
+
     // ---- volume notification: dB, mute, generation and reserved bytes ---
     {
         auto notification = VolumeNotificationV1{};
