@@ -3,9 +3,11 @@
 #include "hibiki/windows_device_watcher.hpp"
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <cstdio>
 #include <string>
+#include <thread>
 
 #define CHECK(expr) \
     do { \
@@ -27,6 +29,17 @@ std::wstring id_from(const wchar_t* text) {
 
 std::wstring snapshot_id(const WindowsDeviceChangeSnapshotV1& snapshot) {
     return std::wstring(snapshot.endpoint_id.data());
+}
+
+bool is_complete_concurrent_tuple(const WindowsDeviceChangeSnapshotV1& snapshot,
+                                  const std::wstring& added_id,
+                                  const std::wstring& default_id) {
+    return (snapshot.kind == WindowsDeviceChangeKind::Added &&
+            snapshot.flow == eAll && snapshot.role == eConsole &&
+            snapshot.state == DEVICE_STATE_ACTIVE && snapshot_id(snapshot) == added_id) ||
+           (snapshot.kind == WindowsDeviceChangeKind::DefaultChanged &&
+            snapshot.flow == eCapture && snapshot.role == eCommunications &&
+            snapshot.state == DEVICE_STATE_ACTIVE && snapshot_id(snapshot) == default_id);
 }
 
 }  // namespace
@@ -164,6 +177,55 @@ int main() {
         CHECK(id_from(snapshot.endpoint_id.data()) == second);
         // The second event must be visible without another publish.
         CHECK(!watcher->poll(snapshot));
+        CHECK(watcher->Release() == 0U);
+    }
+    // concurrent callbacks: every accepted snapshot is one complete known tuple.
+    {
+        auto* watcher = new WindowsDeviceWatcher();
+        const std::wstring added_id(259U, L'a');
+        const std::wstring default_id(259U, L'd');
+        std::atomic<bool> start{false};
+        std::atomic<bool> callback_failed{false};
+        std::atomic<std::uint32_t> completed{0U};
+        constexpr std::uint32_t kPublishesPerWriter = 512U;
+        std::thread added_writer([&] {
+            while (!start.load(std::memory_order_acquire)) {}
+            for (std::uint32_t index = 0U; index < kPublishesPerWriter; ++index) {
+                if (watcher->OnDeviceAdded(added_id.c_str()) != S_OK) {
+                    callback_failed.store(true, std::memory_order_relaxed);
+                }
+            }
+            completed.fetch_add(1U, std::memory_order_release);
+        });
+        std::thread default_writer([&] {
+            while (!start.load(std::memory_order_acquire)) {}
+            for (std::uint32_t index = 0U; index < kPublishesPerWriter; ++index) {
+                if (watcher->OnDefaultDeviceChanged(eCapture, eCommunications,
+                                                    default_id.c_str()) != S_OK) {
+                    callback_failed.store(true, std::memory_order_relaxed);
+                }
+            }
+            completed.fetch_add(1U, std::memory_order_release);
+        });
+        start.store(true, std::memory_order_release);
+        std::uint32_t accepted = 0U;
+        WindowsDeviceChangeSnapshotV1 snapshot;
+        while (completed.load(std::memory_order_acquire) != 2U) {
+            if (watcher->poll(snapshot)) {
+                CHECK(is_complete_concurrent_tuple(snapshot, added_id, default_id));
+                ++accepted;
+            }
+        }
+        added_writer.join();
+        default_writer.join();
+        CHECK(!callback_failed.load(std::memory_order_relaxed));
+        for (std::uint32_t attempt = 0U; attempt < 4U; ++attempt) {
+            if (watcher->poll(snapshot)) {
+                CHECK(is_complete_concurrent_tuple(snapshot, added_id, default_id));
+                ++accepted;
+            }
+        }
+        CHECK(accepted > 0U);
         CHECK(watcher->Release() == 0U);
     }
     // QueryInterface: IUnknown and IMMNotificationClient succeed and AddRef.
