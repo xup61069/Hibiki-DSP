@@ -52,7 +52,13 @@ HRESULT STDMETHODCALLTYPE WindowsVolumeCallback::OnNotify(
         notification->fMasterVolume < 0.0F || notification->fMasterVolume > 1.0F) {
         return E_INVALIDARG;
     }
-    sequence_.fetch_add(1, std::memory_order_acq_rel); // odd = writer in progress
+    auto claimed_sequence = sequence_.load(std::memory_order_relaxed);
+    if ((claimed_sequence & 1U) != 0U ||
+        !sequence_.compare_exchange_strong(claimed_sequence, claimed_sequence + 1U,
+                                           std::memory_order_acq_rel,
+                                           std::memory_order_relaxed)) {
+        return S_OK;
+    }
     master_scalar_.store(notification->fMasterVolume, std::memory_order_relaxed);
     mute_.store(notification->bMuted != FALSE ? 1U : 0U, std::memory_order_relaxed);
     const auto count = std::min<std::uint32_t>(notification->nChannels, 8U);
@@ -65,7 +71,7 @@ HRESULT STDMETHODCALLTYPE WindowsVolumeCallback::OnNotify(
     for (std::size_t index = 0; index < sizeof(GUID); ++index) {
         context_bytes_[index].store(context[index], std::memory_order_relaxed);
     }
-    sequence_.fetch_add(1, std::memory_order_release); // even = stable snapshot
+    sequence_.store(claimed_sequence + 2U, std::memory_order_release);
     return S_OK;
 }
 

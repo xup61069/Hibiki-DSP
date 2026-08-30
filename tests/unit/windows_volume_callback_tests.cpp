@@ -7,9 +7,11 @@
 #include <windows.h>
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <thread>
 
 #define CHECK(expr) \
     do { \
@@ -28,6 +30,26 @@ using hibiki::WindowsVolumeNotificationSnapshotV1;
 
 constexpr GUID kEventContext{0x12345678, 0x9abc, 0x4def, {0x81, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef}};
 const IID kUnknownInterfaceId{0x5b2d4d31, 0x1a2b, 0x4c7d, {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77}};
+constexpr GUID kConcurrentFirstContext{0x13572468, 0xabcd, 0x4321,
+                                        {0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80}};
+constexpr GUID kConcurrentSecondContext{0x24681357, 0xdcba, 0x1234,
+                                         {0x80, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10}};
+
+bool guid_equals(const GUID& left, const GUID& right) {
+    return std::memcmp(&left, &right, sizeof(GUID)) == 0;
+}
+
+bool is_complete_concurrent_tuple(const WindowsVolumeNotificationSnapshotV1& snapshot) {
+    return (snapshot.master_scalar == 0.125F && !snapshot.mute &&
+            snapshot.channel_count == 2U && snapshot.channel_scalars[0] == 0.11F &&
+            snapshot.channel_scalars[1] == 0.12F &&
+            guid_equals(snapshot.event_context, kConcurrentFirstContext)) ||
+           (snapshot.master_scalar == 0.875F && snapshot.mute &&
+            snapshot.channel_count == 4U && snapshot.channel_scalars[0] == 0.71F &&
+            snapshot.channel_scalars[1] == 0.72F && snapshot.channel_scalars[2] == 0.73F &&
+            snapshot.channel_scalars[3] == 0.74F &&
+            guid_equals(snapshot.event_context, kConcurrentSecondContext));
+}
 
 AUDIO_VOLUME_NOTIFICATION_DATA* make_notification(void* buffer,
                                                   std::size_t buffer_bytes,
@@ -393,6 +415,67 @@ int run_callback_tests() {
         CHECK(snapshot.master_scalar_valid);
         CHECK(snapshot.requested_db == -144.0);
         CHECK(snapshot.mute);
+        CHECK(callback->Release() == 0U);
+    }
+    // concurrent callbacks: every accepted snapshot is one complete known tuple.
+    {
+        auto* callback = new WindowsVolumeCallback();
+        std::array<unsigned char, sizeof(AUDIO_VOLUME_NOTIFICATION_DATA) + sizeof(float) * 8>
+            first_buffer{};
+        std::array<unsigned char, sizeof(AUDIO_VOLUME_NOTIFICATION_DATA) + sizeof(float) * 8>
+            second_buffer{};
+        auto* first = make_notification(first_buffer.data(), first_buffer.size(), 0.125F, false, 2U);
+        auto* second = make_notification(second_buffer.data(), second_buffer.size(), 0.875F, true, 4U);
+        CHECK(first != nullptr && second != nullptr);
+        first->guidEventContext = kConcurrentFirstContext;
+        first->afChannelVolumes[0] = 0.11F;
+        first->afChannelVolumes[1] = 0.12F;
+        second->guidEventContext = kConcurrentSecondContext;
+        second->afChannelVolumes[0] = 0.71F;
+        second->afChannelVolumes[1] = 0.72F;
+        second->afChannelVolumes[2] = 0.73F;
+        second->afChannelVolumes[3] = 0.74F;
+        std::atomic<bool> start{false};
+        std::atomic<bool> callback_failed{false};
+        std::atomic<std::uint32_t> completed{0U};
+        constexpr std::uint32_t kPublishesPerWriter = 512U;
+        std::thread first_writer([&] {
+            while (!start.load(std::memory_order_acquire)) {}
+            for (std::uint32_t index = 0U; index < kPublishesPerWriter; ++index) {
+                if (callback->OnNotify(first) != S_OK) {
+                    callback_failed.store(true, std::memory_order_relaxed);
+                }
+            }
+            completed.fetch_add(1U, std::memory_order_release);
+        });
+        std::thread second_writer([&] {
+            while (!start.load(std::memory_order_acquire)) {}
+            for (std::uint32_t index = 0U; index < kPublishesPerWriter; ++index) {
+                if (callback->OnNotify(second) != S_OK) {
+                    callback_failed.store(true, std::memory_order_relaxed);
+                }
+            }
+            completed.fetch_add(1U, std::memory_order_release);
+        });
+        start.store(true, std::memory_order_release);
+        std::uint32_t accepted = 0U;
+        WindowsVolumeNotificationSnapshotV1 snapshot;
+        while (completed.load(std::memory_order_acquire) != 2U) {
+            if (callback->read(snapshot)) {
+                CHECK(snapshot.sequence == 0U || is_complete_concurrent_tuple(snapshot));
+                if (snapshot.sequence != 0U) ++accepted;
+            }
+        }
+        first_writer.join();
+        second_writer.join();
+        CHECK(!callback_failed.load(std::memory_order_relaxed));
+        for (std::uint32_t attempt = 0U; attempt < 4U; ++attempt) {
+            if (callback->read(snapshot)) {
+                CHECK(is_complete_concurrent_tuple(snapshot));
+                ++accepted;
+            }
+        }
+        CHECK(accepted > 0U);
         CHECK(callback->Release() == 0U);
     }
     // QueryInterface honours null out-pointers, known ids, and rejection.
