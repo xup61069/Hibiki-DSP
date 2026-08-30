@@ -2755,11 +2755,47 @@ int main() {
                            decoded_session_route_rule.rule_id_bytes) == "quiet-game" &&
           std::string_view(decoded_session_route_rule.output_group.data(),
                            decoded_session_route_rule.output_group_bytes) == "surround");
+    const auto session_route_rule_output_is_neutral = [&decoded_session_route_rule]() noexcept {
+        const auto neutral = SessionRouteRuleCommandV1{};
+        return decoded_session_route_rule.schema_version == neutral.schema_version &&
+               decoded_session_route_rule.priority == neutral.priority &&
+               decoded_session_route_rule.makeup_gain_q16_16 == neutral.makeup_gain_q16_16 &&
+               decoded_session_route_rule.operation == neutral.operation &&
+               decoded_session_route_rule.enabled == neutral.enabled &&
+               decoded_session_route_rule.gain_owner == neutral.gain_owner &&
+               decoded_session_route_rule.catalog_sequence == neutral.catalog_sequence &&
+               decoded_session_route_rule.rule_id_bytes == neutral.rule_id_bytes &&
+               decoded_session_route_rule.app_id_bytes == neutral.app_id_bytes &&
+               decoded_session_route_rule.display_name_bytes == neutral.display_name_bytes &&
+               decoded_session_route_rule.lane_bytes == neutral.lane_bytes &&
+               decoded_session_route_rule.output_group_bytes == neutral.output_group_bytes &&
+               std::all_of(decoded_session_route_rule.rule_id.begin(),
+                           decoded_session_route_rule.rule_id.end(),
+                           [](const char value) { return value == '\0'; }) &&
+               std::all_of(decoded_session_route_rule.app_id.begin(),
+                           decoded_session_route_rule.app_id.end(),
+                           [](const char value) { return value == '\0'; }) &&
+               std::all_of(decoded_session_route_rule.display_name.begin(),
+                           decoded_session_route_rule.display_name.end(),
+                           [](const char value) { return value == '\0'; }) &&
+               std::all_of(decoded_session_route_rule.lane.begin(),
+                           decoded_session_route_rule.lane.end(),
+                           [](const char value) { return value == '\0'; }) &&
+               std::all_of(decoded_session_route_rule.output_group.begin(),
+                           decoded_session_route_rule.output_group.end(),
+                           [](const char value) { return value == '\0'; });
+    };
     const auto decoded_upsert_session_route_rule = decoded_session_route_rule;
     auto malformed_session_route_rule = session_route_rule_payload;
     malformed_session_route_rule[29U] = 1U;
     CHECK(!decode_session_route_rule_command_v1(malformed_session_route_rule,
                                                 decoded_session_route_rule));
+    CHECK(session_route_rule_output_is_neutral());
+    auto late_malformed_session_route_rule = session_route_rule_payload;
+    late_malformed_session_route_rule[11U] = 0x7fU;
+    CHECK(!decode_session_route_rule_command_v1(late_malformed_session_route_rule,
+                                                decoded_session_route_rule));
+    CHECK(session_route_rule_output_is_neutral());
     session_route_rule_command.operation = SessionRouteRuleOperationV1::Remove;
     session_route_rule_command.app_id_bytes = 0U;
     session_route_rule_command.display_name_bytes = 0U;
@@ -2823,6 +2859,15 @@ int main() {
     CHECK(decode_control_command_v1(session_route_rule_frame, decoded_command) &&
           decoded_command.type == IpcMessageType::SessionRouteRuleCommand &&
           decoded_command.session_route_rule.rule_id_bytes == 10U);
+    auto rejected_session_route_rule_frame = session_route_rule_frame;
+    rejected_session_route_rule_frame.payload[11U] = 0x7fU;
+    CHECK(!decode_control_command_v1(rejected_session_route_rule_frame, decoded_command));
+    CHECK(decoded_command.type == IpcMessageType::Error && decoded_command.request_id == 0U &&
+          !decoded_command.has_volume_target &&
+          decoded_command.session_route_rule.rule_id_bytes == 0U &&
+          decoded_command.session_route_rule.app_id_bytes == 0U &&
+          decoded_command.session_route_rule.lane_bytes == 0U &&
+          decoded_command.session_route_rule.output_group_bytes == 0U);
     IpcFrameV1 ir_prepare_frame;
     ir_prepare_frame.header.type = IpcMessageType::IrPrepareCommand;
     ir_prepare_frame.header.request_id = 783U;
@@ -2862,6 +2907,22 @@ int main() {
           decoded_calibration_peq.filters[1].frequency_hz == 8000.0 &&
           decoded_calibration_peq.filters[1].gain_db == 2.0 &&
           decoded_calibration_peq.filters[1].q == 1.5);
+    const auto calibration_peq_output_is_neutral = [&decoded_calibration_peq]() noexcept {
+        const auto neutral = CalibrationPeqPrepareCommandV1{};
+        return decoded_calibration_peq.schema_version == neutral.schema_version &&
+               decoded_calibration_peq.filter_count == neutral.filter_count &&
+               decoded_calibration_peq.output_group_bytes == neutral.output_group_bytes &&
+               decoded_calibration_peq.clear_existing == neutral.clear_existing &&
+               std::all_of(decoded_calibration_peq.output_group.begin(),
+                           decoded_calibration_peq.output_group.end(),
+                           [](const char value) { return value == '\0'; }) &&
+               std::all_of(decoded_calibration_peq.filters.begin(),
+                           decoded_calibration_peq.filters.end(),
+                           [](const CalibrationPeqPrepareCommandV1::WireFilter& filter) {
+                               return filter.frequency_hz == 0.0 && filter.gain_db == 0.0 &&
+                                      filter.q == 0.0;
+                           });
+    };
     CHECK(is_valid_message_type(IpcMessageType::CalibrationPeqPrepare));
     calibration_peq_command.filters[0].gain_db = 30.0;
     std::vector<std::uint8_t> invalid_calibration_payload;
@@ -2873,10 +2934,17 @@ int main() {
     tampered_calibration[10U] = 1U;
     CHECK(!decode_calibration_peq_prepare_command_v1(
         tampered_calibration, decoded_calibration_peq));
+    CHECK(calibration_peq_output_is_neutral());
+    auto late_tampered_calibration = calibration_peq_payload;
+    late_tampered_calibration[128U] = 1U;
+    CHECK(!decode_calibration_peq_prepare_command_v1(
+        late_tampered_calibration, decoded_calibration_peq));
+    CHECK(calibration_peq_output_is_neutral());
     auto invalid_calibration_schema = calibration_peq_payload;
     invalid_calibration_schema[0U] = 2U;
     CHECK(!decode_calibration_peq_prepare_command_v1(
         invalid_calibration_schema, decoded_calibration_peq));
+    CHECK(calibration_peq_output_is_neutral());
 
     ControlCommandQueueV1 command_queue;
     ControlCommandV1 queued_command{};

@@ -30,6 +30,8 @@ strict printable UTF-8。
 
 operation `Upsert=1` 必須有 rule ID、至少一個 matcher、lane 與 output；`Remove=2` 只
 允許 rule ID；`Clear=3` 不允許任何文字。catalog sequence 必須非零，gain 為 -144..12 dB。
+decoder 必須先在候選命令完成文字、gain 與 operation 語意驗證，再一次交付；任何拒絕都讓
+C++ `SessionRouteRuleCommandV1` 保持 value-initialized，不暴露已通過前段驗證的文字或欄位。
 
 ## 交易與 queue
 
