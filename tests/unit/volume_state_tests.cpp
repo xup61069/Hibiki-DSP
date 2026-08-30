@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <cstdio>
 #include <limits>
 
@@ -298,6 +299,40 @@ int main() {
         CHECK(overflow_control.apply_to_interleaved("out", next_control.data(),
                                                     2U, kEightChannels, 48000U));
         CHECK(next_candidate == next_control);
+
+        // Non-finite samples must be rejected before the caller buffer is
+        // touched or the VolumeRamp state advances.  Compare the candidate's
+        // next finite block with an untouched control bank to cover both.
+        const std::array<float, 3U> invalid_samples{
+            std::numeric_limits<float>::quiet_NaN(),
+            std::numeric_limits<float>::infinity(),
+            -std::numeric_limits<float>::infinity()};
+        for (const auto invalid : invalid_samples) {
+            OutputGroupVolumeBankV1 nonfinite_candidate;
+            OutputGroupVolumeBankV1 nonfinite_control;
+            CHECK(nonfinite_candidate.register_group("out"));
+            CHECK(nonfinite_control.register_group("out"));
+            CHECK(nonfinite_candidate.apply_windows_notification("out", target) ==
+                  VolumeNotificationResult::Accepted);
+            CHECK(nonfinite_control.apply_windows_notification("out", target) ==
+                  VolumeNotificationResult::Accepted);
+            std::array<float, 8U> rejected_buffer{
+                invalid, 0.5F, -0.5F, 0.25F, 0.75F, -0.75F, 0.125F, -0.125F};
+            const auto rejected_sentinels = rejected_buffer;
+            CHECK(!nonfinite_candidate.apply_to_interleaved("out", rejected_buffer.data(),
+                                                             2U, 4U, 48000U));
+            CHECK(std::memcmp(rejected_buffer.data(), rejected_sentinels.data(),
+                              sizeof(rejected_buffer)) == 0);
+            std::array<float, 8U> finite_candidate{};
+            std::array<float, 8U> finite_control{};
+            finite_candidate.fill(0.25F);
+            finite_control.fill(0.25F);
+            CHECK(nonfinite_candidate.apply_to_interleaved("out", finite_candidate.data(),
+                                                             2U, 4U, 48000U));
+            CHECK(nonfinite_control.apply_to_interleaved("out", finite_control.data(),
+                                                          2U, 4U, 48000U));
+            CHECK(finite_candidate == finite_control);
+        }
 
         // Valid call after ramp warm-up should approximately preserve values
         CHECK(bank.apply_to_interleaved("out", buf, 2U, 2U, 48000U));

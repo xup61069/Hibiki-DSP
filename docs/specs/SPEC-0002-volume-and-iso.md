@@ -46,6 +46,9 @@ buffer 前 fail-closed。這只保護 `size_t` arithmetic，不另訂新的 rend
 `OutputGroupVolumeBankV1::apply_to_interleaved` 也先驗證相同的 interleaved geometry；無法
 代表的 `frames * channels` 會在讀寫 caller buffer 或推進 output-group `VolumeRamp` 前
 fail-closed。這只保護 `size_t` arithmetic，不另訂新的 render block-size 上限。
+在讀寫 caller buffer 或推進 `VolumeRamp` 前，它也會預掃描整個已驗證長度的 block；任一
+sample 是 NaN、正 infinity 或負 infinity 時 fail-closed，且 caller buffer 與 ramp state
+都保持不變。有限的 input 保持既有的逐 frame gain 行為。
 需要的衰減立即套用；恢復速率以 dB/ms 計算（約 +6 dB per millisecond），與引擎回呼
 區塊大小無關。避免保護電路本身在短區塊間瞬間跳回或在大區塊間恢復過慢。
 恢復是有界的線性（dB domain）爬升；在爬升完成前，實際增益可能暫時低於 unity，
