@@ -141,6 +141,30 @@ public:
 };
 
 }  // namespace
+#else
+namespace hibiki {
+
+struct WindowsWasapiOutputV1TestAccess {
+    static void seed_fallback(WindowsWasapiOutputV1& output) noexcept {
+        static int marker = 0;
+        output.client_ = &marker;
+        output.render_client_ = &marker;
+        output.clock_ = &marker;
+        output.channels_ = 2U;
+        output.sample_rate_ = 48000U;
+        output.buffer_frames_ = 128U;
+        output.encoding_ = WasapiSampleEncodingV1::Pcm16;
+        output.failure_ = WasapiOutputFailureV1::Other;
+        output.bytes_per_sample_ = 2U;
+        output.started_ = true;
+    }
+
+    static void release_resources(WindowsWasapiOutputV1& output) noexcept {
+        output.release_resources();
+    }
+};
+
+}  // namespace hibiki
 #endif
 
 int main() {
@@ -160,6 +184,30 @@ int main() {
         const InterleavedRingBuffer mono(std::span<float>(storage), 1U);
         CHECK(mono.valid() && mono.capacity_frames() == storage.size());
     }
+
+#if !defined(_WIN32)
+    // The non-Windows fallback must reset every field without recursing
+    // between unbind() and release_resources().
+    {
+        hibiki::WindowsWasapiOutputV1 output;
+        hibiki::WindowsWasapiOutputV1TestAccess::seed_fallback(output);
+        output.unbind();
+        CHECK(!output.bound() && !output.started());
+        CHECK(output.channels() == 0U && output.sample_rate() == 0U &&
+              output.buffer_frames() == 0U);
+        CHECK(output.encoding() == hibiki::WasapiSampleEncodingV1::Float32 &&
+              output.failure() == hibiki::WasapiOutputFailureV1::None);
+
+        hibiki::WindowsWasapiOutputV1TestAccess::seed_fallback(output);
+        hibiki::WindowsWasapiOutputV1TestAccess::release_resources(output);
+        hibiki::WindowsWasapiOutputV1TestAccess::release_resources(output);
+        CHECK(!output.bound() && !output.started());
+        CHECK(output.channels() == 0U && output.sample_rate() == 0U &&
+              output.buffer_frames() == 0U);
+        CHECK(output.encoding() == hibiki::WasapiSampleEncodingV1::Float32 &&
+              output.failure() == hibiki::WasapiOutputFailureV1::None);
+    }
+#endif
 
     // Ring buffer: null pointers and over/underflow are rejected without
     // mutating counters; data survives a write-index wraparound intact.

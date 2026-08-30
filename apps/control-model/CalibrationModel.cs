@@ -160,7 +160,8 @@ public static class CalibrationCompilerV1
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        PropertyNamingPolicy = null
+        PropertyNamingPolicy = null,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };
 
     public static bool ValidatePolicy(CalibrationCompilePolicyV1? policy) =>
@@ -606,7 +607,7 @@ public static class CalibrationCompilerV1
             }
 
             var doc = JsonSerializer.Deserialize<CalibrationResponseDocument>(
-                File.ReadAllText(fullPath, Encoding.UTF8));
+                File.ReadAllText(fullPath, Encoding.UTF8), JsonOptions);
 
             if (doc is null || doc.SchemaVersion != 1 ||
                 doc.SampleRate is < 8000.0 or > 384000.0 ||
@@ -743,7 +744,7 @@ public static class CalibrationCompilerV1
             }
 
             var doc = JsonSerializer.Deserialize<PeqPresetDocument>(
-                File.ReadAllText(fullPath, Encoding.UTF8));
+                File.ReadAllText(fullPath, Encoding.UTF8), JsonOptions);
 
             if (doc is null || doc.SchemaVersion != 1 ||
                 doc.Filters is null || doc.Filters.Count > PeqPresetV1.MaxFilters)
