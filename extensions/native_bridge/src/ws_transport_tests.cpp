@@ -254,6 +254,41 @@ bool test_control_frame_opcode_validation() {
                   "high-bit opcode is rejected without writing");
 }
 
+bool test_outbound_close_payload_validation() {
+    std::string output;
+    const auto writer = [&output](const std::span<const std::uint8_t> bytes) {
+        output.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+        return true;
+    };
+    constexpr std::array<std::uint8_t, 5> kValidClose{
+        0x03U, 0xe8U, 0xe2U, 0x82U, 0xacU};
+    if (!expect(hibiki::send_ws_control_frame(writer, 0x8U, {}) &&
+                    output == std::string{"\x88\x00", 2U},
+                "empty Close payload is written")) {
+        return false;
+    }
+    output.clear();
+    if (!expect(hibiki::send_ws_control_frame(writer, 0x8U, kValidClose) &&
+                    output == std::string{"\x88\x05\x03\xe8\xe2\x82\xac", 7U},
+                "valid-status UTF-8 Close payload is written")) {
+        return false;
+    }
+
+    const auto rejects_without_writing = [&output, &writer](const auto& payload) {
+        output.clear();
+        return !hibiki::send_ws_control_frame(writer, 0x8U, payload) && output.empty();
+    };
+    constexpr std::array<std::uint8_t, 1> kOneByteClose{0x03U};
+    constexpr std::array<std::uint8_t, 2> kReservedCloseStatus{0x03U, 0xedU};
+    constexpr std::array<std::uint8_t, 4> kInvalidUtf8Reason{0x03U, 0xe8U, 0xc0U, 0x80U};
+    return expect(rejects_without_writing(kOneByteClose),
+                  "one-byte Close payload is rejected without writing") &&
+           expect(rejects_without_writing(kReservedCloseStatus),
+                  "reserved Close status is rejected without writing") &&
+           expect(rejects_without_writing(kInvalidUtf8Reason),
+                  "invalid UTF-8 Close reason is rejected without writing");
+}
+
 bool test_fragmented_control_frame_rejection() {
     const auto rejects_without_reading_mask_or_reply = [](const std::uint8_t opcode) {
         const std::vector<std::uint8_t> stream{opcode, 0x81U, 0U, 0U, 0U, 0U, 'x'};
@@ -520,6 +555,7 @@ bool test_unsolicited_pong_continues_stream() {
 int main() {
     if (!test_handshake_size_boundary() || !test_upgrade_header_semantics() ||
         !test_request_line_and_version_semantics() || !test_control_frame_opcode_validation() ||
+        !test_outbound_close_payload_validation() ||
         !test_fragmented_control_frame_rejection() ||
         !test_noncanonical_payload_length_rejection() ||
         !test_close_payload_validation() || !test_close_status_validation() ||

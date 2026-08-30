@@ -395,6 +395,7 @@ bool send_ws_control_frame(const WsStreamWrite& writer,
                            const std::span<const std::uint8_t> payload) {
     if (opcode < 0x8U || opcode > 0xAU) return false;
     if (payload.size() > 125U) return false;
+    if (opcode == 0x8U && !has_valid_ws_close_payload(payload)) return false;
     std::array<std::uint8_t, 2> header{static_cast<std::uint8_t>(0x80U | opcode),
                                        static_cast<std::uint8_t>(payload.size())};
     return writer({header.data(), header.size()}) &&
