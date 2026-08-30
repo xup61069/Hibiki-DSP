@@ -98,6 +98,7 @@ bool test_upgrade_header_semantics() {
         "\r\n";
     constexpr std::string_view kTokenListRequest =
         "GET /v1/tab HTTP/1.1\r\n"
+        "hOsT: \t127.0.0.1:17842 \r\n"
         "Upgrade: WebSocket\r\n"
         "Connection: keep-alive, Upgrade\r\n"
         "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
@@ -136,6 +137,21 @@ bool test_request_line_and_version_semantics() {
         "Upgrade: websocket\r\n"
         "Connection: Upgrade\r\n"
         "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "\r\n";
+    constexpr std::string_view kMissingHost =
+        "GET /v1/tab HTTP/1.1\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
+        "\r\n";
+    constexpr std::string_view kBlankHost =
+        "GET /v1/tab HTTP/1.1\r\n"
+        "Host: \t \r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
         "\r\n";
     constexpr std::string_view kUnsupportedVersion =
         "GET /v1/tab HTTP/1.1\r\n"
@@ -178,6 +194,8 @@ bool test_request_line_and_version_semantics() {
         "\r\n";
     return expect_rejected_handshake(kPostRequest, "non-GET request is rejected") &&
            expect_rejected_handshake(kHttp10Request, "HTTP/1.0 request is rejected") &&
+           expect_rejected_handshake(kMissingHost, "missing Host header is rejected") &&
+           expect_rejected_handshake(kBlankHost, "blank Host header is rejected") &&
            expect_rejected_handshake(kMissingVersion, "missing WebSocket version is rejected") &&
            expect_rejected_handshake(kUnsupportedVersion, "unsupported WebSocket version is rejected") &&
            expect_rejected_handshake(kConflictingDuplicateVersion,
