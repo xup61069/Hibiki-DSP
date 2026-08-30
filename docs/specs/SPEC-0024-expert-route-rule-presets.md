@@ -6,7 +6,7 @@ authority: control-model
 last_reviewed: 2026-08-25
 review_after_days: 30
 related_adrs: [ADR-0001, ADR-0004]
-source_globs: ["apps/control-model/SessionRouteRuleCatalog.cs", "apps/control-model/ControlModel.cs", "apps/control-model/EasyControlViewModel.cs", "apps/winui-shell/MainWindow.xaml", "apps/winui-shell/MainWindow.xaml.cs", "schemas/session-route-rules-v1.schema.json", "apps/control-model-check/Program.cs", "apps/engine-preview/engine_preview.cpp", "tools/engine-preview-smoke.ps1"]
+source_globs: ["apps/control-model/SessionRouteRuleCatalog.cs", "apps/control-model/ControlModel.cs", "apps/control-model/EasyControlViewModel.cs", "apps/winui-shell/MainWindow.xaml", "apps/winui-shell/MainWindow.xaml.cs", "schemas/session-route-rules-v1.schema.json", "apps/control-model-check/Program.cs", "apps/control-model-json-contract-check/Program.cs", "apps/engine-preview/engine_preview.cpp", "tools/engine-preview-smoke.ps1"]
 ---
 
 # SPEC-0024：Expert per-App 路由預設 catalog
@@ -26,6 +26,9 @@ PID、Windows session instance、Endpoint ID 或 plugin state 寫入使用者檔
 output 最多 64 bytes；matcher 欄位允許空字串並視同「未填」，但不得含控制字元；至少一個
 非空白 matcher 與 lane／output 必須存在。優先級由大到小排序，同值
 以 rule ID 穩定排序。容量、文字控制字元、enum、gain（-144..12 dB）與 finite 條件均 fail closed。
+持久化 loader 在頂層與每筆 rule 都使用 `JsonUnmappedMemberHandling.Disallow`，所以未知 JSON
+property 與 `session-route-rules-v1` schema 的 `additionalProperties: false` 一樣 fail-closed；
+拒絕時不交換既有 catalog，已知欄位與合法既有檔案保持可載入。
 
 ## 命令與套用
 

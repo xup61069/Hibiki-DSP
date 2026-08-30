@@ -54,7 +54,8 @@ public sealed class SessionRouteRuleCatalogV1
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        PropertyNamingPolicy = null
+        PropertyNamingPolicy = null,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };
 
     public IReadOnlyList<SessionRouteRuleCard> Rules => _rules;
@@ -188,7 +189,7 @@ public sealed class SessionRouteRuleCatalogV1
                 return false;
             }
             var document = JsonSerializer.Deserialize<CatalogDocument>(
-                File.ReadAllText(fullPath, Encoding.UTF8));
+                File.ReadAllText(fullPath, Encoding.UTF8), JsonOptions);
             if (document is null || document.SchemaVersion != SchemaVersion ||
                 document.Rules is null || document.Rules.Count > MaxRules)
             {
