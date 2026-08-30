@@ -27,6 +27,7 @@ enum class WsFrameError : std::uint8_t {
     None,
     IncompleteFrame,
     ReservedBitsSet,
+    FragmentedControlFrame,
     UnmaskedClientFrame,
     PayloadTooLarge,
     TruncatedPayload,
@@ -50,8 +51,9 @@ using WsStreamWrite = std::function<bool(std::span<const std::uint8_t>)>;
 // Sec-WebSocket-Key; the response is left untouched in those cases.
 [[nodiscard]] bool parse_websocket_handshake(std::string_view request, std::string& response);
 
-// Reads one masked client frame. Fails closed on reserved bits, unmasked
-// frames, payloads above max_payload and truncated streams.
+// Reads one masked client frame. Fails closed on reserved bits, fragmented
+// control frames, unmasked frames, payloads above max_payload and truncated
+// streams.
 [[nodiscard]] bool read_ws_client_frame(const WsStreamRead& reader,
                                         std::size_t max_payload,
                                         WsDecodedFrameV1& frame,
