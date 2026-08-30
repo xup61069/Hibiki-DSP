@@ -468,23 +468,47 @@ int main()
         CHECK(!hibiki::encode_scene_apply_payload_v1(
             std::string_view("g\x01", 2U), "main", payload));
 
+        const auto scene_apply_output_is_neutral = [&decoded]() noexcept {
+            return decoded.scene_id_bytes == 0U && decoded.output_group_bytes == 0U &&
+                   std::all_of(decoded.scene_id.begin(), decoded.scene_id.end(),
+                               [](const char byte) { return byte == '\0'; }) &&
+                   std::all_of(decoded.output_group.begin(), decoded.output_group.end(),
+                               [](const char byte) { return byte == '\0'; });
+        };
         CHECK(hibiki::encode_scene_apply_payload_v1("g", "m", payload));
         payload[1U + 1U] = 1U;
         CHECK(!hibiki::decode_scene_apply_payload_v1(payload, decoded));
+        CHECK(scene_apply_output_is_neutral());
         CHECK(hibiki::encode_scene_apply_payload_v1("g", "m", payload));
         payload[33U + 1U] = 1U;
         CHECK(!hibiki::decode_scene_apply_payload_v1(payload, decoded));
+        CHECK(scene_apply_output_is_neutral());
+        CHECK(hibiki::encode_scene_apply_payload_v1("g", "m", payload));
+        payload[0U] = 2U;
+        payload[1U] = 0xC3U;
+        payload[2U] = 0x28U;
+        std::fill(payload.begin() + 3U, payload.begin() + 32U, std::uint8_t{0U});
+        decoded.scene_id_bytes = 1U;
+        decoded.output_group_bytes = 1U;
+        std::fill(decoded.scene_id.begin(), decoded.scene_id.end(), 's');
+        std::fill(decoded.output_group.begin(), decoded.output_group.end(), 'o');
+        CHECK(!hibiki::decode_scene_apply_payload_v1(payload, decoded));
+        CHECK(scene_apply_output_is_neutral());
         CHECK(hibiki::encode_scene_apply_payload_v1("g", "m", payload));
         payload[1U] = 0x01U;
         CHECK(!hibiki::decode_scene_apply_payload_v1(payload, decoded));
+        CHECK(scene_apply_output_is_neutral());
         CHECK(hibiki::encode_scene_apply_payload_v1("g", "m", payload));
         payload[0U] = 32U;
         CHECK(!hibiki::decode_scene_apply_payload_v1(payload, decoded));
+        CHECK(scene_apply_output_is_neutral());
         CHECK(hibiki::encode_scene_apply_payload_v1("g", "m", payload));
         payload[32U] = 32U;
         CHECK(!hibiki::decode_scene_apply_payload_v1(payload, decoded));
+        CHECK(scene_apply_output_is_neutral());
         CHECK(!hibiki::decode_scene_apply_payload_v1(
             std::span<const std::uint8_t>(payload.data(), payload.size() - 1U), decoded));
+        CHECK(scene_apply_output_is_neutral());
     }
 
     // ---- device switch payload: endpoint and enumerated device parameters -

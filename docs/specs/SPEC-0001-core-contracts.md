@@ -101,6 +101,8 @@ DeviceCatalogSnapshot、ControlStatusSnapshot、SessionCatalogSnapshot 與 EqVis
 只能作 response，未知或 GraphPrepare 未定義
 payload 一律回 Error，避免 UI 任意注入未驗證 graph。SceneApply payload 固定 64 bytes，
 以兩段 length-prefixed printable UTF-8（scene ID、output group）及 zero padding 表示。
+任何長度、padding、UTF-8 或可列印字元失敗都不得暴露部分 decode 結果：C++ SceneApply
+struct 保持 value-initialized，C# scene ID 與 output group 皆為空字串。
 - `handle_control_frame_v1` 是 pipe worker 到 host control queue 的唯一 typed adapter；sink
   必須自行 enqueue／排程，不能在 pipe callback 直接跑 RT DSP 或等待 UI/COM。
 - `ControlPlaneHostV1` 是 host 的組合入口：它擁有 named-pipe server 與 64-slot queue，將

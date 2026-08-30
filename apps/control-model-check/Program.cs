@@ -517,14 +517,27 @@ Check(ControlPayloadsV1.TryDecodeSceneApply(viewModel.LastCommand!.Payload.Span,
           out var selectedSceneId, out var selectedOutput) &&
       selectedSceneId == "quiet-game" && selectedOutput == "main",
     "ViewModel scene command payload was not valid.");
+var whitespaceScene = ControlPayloadsV1.EncodeSceneApply(" ", " ");
+Check(ControlPayloadsV1.TryDecodeSceneApply(whitespaceScene,
+          out var whitespaceSceneId, out var whitespaceOutputGroup) &&
+      whitespaceSceneId == " " && whitespaceOutputGroup == " ",
+    "SceneApply must retain printable whitespace IDs accepted by its encoder.");
+var malformedScenePadding = ControlPayloadsV1.EncodeSceneApply("g", "m");
+malformedScenePadding[2] = 1;
+Check(!ControlPayloadsV1.TryDecodeSceneApply(malformedScenePadding,
+          out var rejectedSceneId, out var rejectedSceneOutput) &&
+      rejectedSceneId == string.Empty && rejectedSceneOutput == string.Empty,
+    "SceneApply decoder must reject non-zero padding with neutral outputs.");
 var encodedSceneCommand = IpcCodecV1.Encode(viewModel.LastCommand);
 Check(IpcCodecV1.TryDecode(encodedSceneCommand, out var decodedSceneCommand, out _) &&
       decodedSceneCommand?.Type == ControlMessageType.SceneApply,
     "SceneApply must be accepted by the C# envelope encoder.");
 var invalidUtf8Scene = viewModel.LastCommand.Payload.ToArray();
 invalidUtf8Scene[1] = 0xFF;
-Check(!ControlPayloadsV1.TryDecodeSceneApply(invalidUtf8Scene, out _, out _),
-    "SceneApply decoder must reject invalid UTF-8 rather than substitute characters.");
+Check(!ControlPayloadsV1.TryDecodeSceneApply(invalidUtf8Scene,
+          out rejectedSceneId, out rejectedSceneOutput) &&
+      rejectedSceneId == string.Empty && rejectedSceneOutput == string.Empty,
+    "SceneApply decoder must reject invalid UTF-8 with neutral outputs.");
 Check(!viewModel.UpsertCustomScene(new SceneCard("control-char-name",
                                                  "好\n名字",
                                                  "控制字元必須拒絕", "零額外緩衝", true)) &&

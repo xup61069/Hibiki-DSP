@@ -1207,24 +1207,28 @@ bool encode_scene_apply_payload_v1(
 bool decode_scene_apply_payload_v1(const std::span<const std::uint8_t> payload,
                                    SceneApplyPayloadV1& command) noexcept {
     command = {};
+    SceneApplyPayloadV1 decoded{};
     if (payload.size() != kSceneApplyPayloadBytesV1 || payload[0] == 0U || payload[0] > 31U ||
         payload[32] == 0U || payload[32] > 31U) {
         return false;
     }
-    command.scene_id_bytes = payload[0];
-    command.output_group_bytes = payload[32];
-    std::copy_n(payload.data() + 1U, command.scene_id_bytes, command.scene_id.data());
-    std::copy_n(payload.data() + 33U, command.output_group_bytes, command.output_group.data());
-    for (std::size_t index = command.scene_id_bytes; index < command.scene_id.size(); ++index) {
+    decoded.scene_id_bytes = payload[0];
+    decoded.output_group_bytes = payload[32];
+    std::copy_n(payload.data() + 1U, decoded.scene_id_bytes, decoded.scene_id.data());
+    std::copy_n(payload.data() + 33U, decoded.output_group_bytes, decoded.output_group.data());
+    for (std::size_t index = decoded.scene_id_bytes; index < decoded.scene_id.size(); ++index) {
         if (payload[1U + index] != 0U) return false;
     }
-    for (std::size_t index = command.output_group_bytes; index < command.output_group.size(); ++index) {
+    for (std::size_t index = decoded.output_group_bytes; index < decoded.output_group.size(); ++index) {
         if (payload[33U + index] != 0U) return false;
     }
-    return is_printable_utf8(
-               std::string_view(command.scene_id.data(), command.scene_id_bytes)) &&
-           is_printable_utf8(
-               std::string_view(command.output_group.data(), command.output_group_bytes));
+    if (!is_printable_utf8(std::string_view(decoded.scene_id.data(), decoded.scene_id_bytes)) ||
+        !is_printable_utf8(
+            std::string_view(decoded.output_group.data(), decoded.output_group_bytes))) {
+        return false;
+    }
+    command = decoded;
+    return true;
 }
 
 std::array<std::uint8_t, kDeviceSwitchPayloadBytesV1>

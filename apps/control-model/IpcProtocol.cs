@@ -748,6 +748,8 @@ public static class ControlPayloadsV1
     {
         sceneId = string.Empty;
         outputGroup = string.Empty;
+        var decodedSceneId = string.Empty;
+        var decodedOutputGroup = string.Empty;
         if (payload.Length != SceneApplyBytes || payload[0] is < 1 or > 31 ||
             payload[32] is < 1 or > 31)
             return false;
@@ -759,14 +761,18 @@ public static class ControlPayloadsV1
             if (payload[index] != 0) return false;
         try
         {
-            sceneId = StrictUtf8.GetString(sceneBytes);
-            outputGroup = StrictUtf8.GetString(outputBytes);
-            return !string.IsNullOrWhiteSpace(sceneId) && !string.IsNullOrWhiteSpace(outputGroup);
+            decodedSceneId = StrictUtf8.GetString(sceneBytes);
+            decodedOutputGroup = StrictUtf8.GetString(outputBytes);
+            if (decodedSceneId.Any(char.IsControl) || decodedOutputGroup.Any(char.IsControl))
+                return false;
         }
         catch (ArgumentException)
         {
             return false;
         }
+        sceneId = decodedSceneId;
+        outputGroup = decodedOutputGroup;
+        return true;
     }
 
     public static byte[] EncodeDeviceSwitch(string endpointId,
