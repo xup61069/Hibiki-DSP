@@ -27,7 +27,9 @@ tabCapture、vendor ASIO 攔截或 Windows 端點重送。實際交付仍由 SPE
 `SessionRouteCommand` 固定 128 bytes little-endian：handle 0..7、catalog sequence 8..15、
 lane/output 長度 16/17、reserved 18..19、lane UTF-8 20..67、output UTF-8 68..115、尾端
 reserved 116..127。lane 與 output 各最多 48 bytes、不可為空；所有未使用 bytes 必須為零。
-decoder 先完整驗證，不得部分寫入控制命令。
+decoder 先完整驗證，不得部分寫入控制命令；任何拒絕都讓 C++
+`SessionRouteCommandV1` 保持 value-initialized，C# handle/catalog sequence 保持 zero，lane/output
+保持空字串。
 
 ## Transaction 與生命週期
 
