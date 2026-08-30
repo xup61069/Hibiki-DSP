@@ -2390,8 +2390,10 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
             if (IsConnected && !await RefreshControlStatusAsync(cancellationToken).ConfigureAwait(true))
                 StatusText = "引擎已連線；控制狀態暫不可用，音訊保持安全狀態";
             if (IsConnected)
+            {
                 _ = await RefreshEqVisualSnapshotAsync(cancellationToken).ConfigureAwait(true);
-            StartEqVisualPolling();
+                if (IsConnected) StartEqVisualPolling();
+            }
             if (IsConnected && !await RefreshSessionCatalogAsync(cancellationToken).ConfigureAwait(true))
                 StatusText = "引擎已連線；App 清單暫不可用，音訊保持安全狀態";
             if (IsConnected && _pendingSceneCatalogOps.Count > 0)
@@ -2401,7 +2403,13 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
                     ReportSceneCatalogStatus(
                         "引擎已連線；離線期間的場景變更尚未全部同步，音訊保持安全狀態");
             }
-            return true;
+            if (!IsConnected)
+            {
+                StopEqVisualPolling();
+                await client.DisposeAsync().ConfigureAwait(true);
+                if (ReferenceEquals(_controlClient, client)) _controlClient = null;
+            }
+            return IsConnected;
         }
         catch (OperationCanceledException)
         {
