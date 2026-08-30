@@ -254,6 +254,10 @@ bool read_ws_client_frame(const WsStreamRead& reader,
         length = 0U;
         for (const auto byte : extended) length = (length << 8U) | byte;
     }
+    if ((frame.opcode & 0x08U) != 0U && length > 125U) {
+        error = WsFrameError::PayloadTooLarge;
+        return false;
+    }
     if (length > max_payload || length > static_cast<std::uint64_t>(SIZE_MAX)) {
         error = WsFrameError::PayloadTooLarge;
         return false;
