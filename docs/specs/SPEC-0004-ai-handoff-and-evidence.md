@@ -29,6 +29,8 @@ source_globs: ["AGENTS.md", "README.md", "CONTRIBUTING.md", ".github/ISSUE_TEMPL
 CI 只保存協作／稽核記錄，不是成果或停止點。每個寫入切片仍須有 human maintainer／designated
 orchestrator 的明確指派、一張完整 execution Issue、一個唯一非 `main` branch、Issue body handoff
 block 與一張 draft PR。其他 writer 活躍、branch occupied 或狀態不確定時使用獨立 worktree。
+Repository-configured Dependabot PR 是唯一可沒有 execution Issue 的例外，仍須通過 branch protection
+與 required checks；其他 orphan PR 一律 fail closed。
 
 除非 maintainer 明確要求規劃 backlog，AI 不得建立 candidate、TBD、pre-claim 或排隊 Issue。
 只有 writer 會立即開始時才建立 execution Issue；AI Issue form 以不可由表單內容改寫的
@@ -118,7 +120,7 @@ repository-relative glob intersection 檢查。完全相同、父子路徑與 wi
 驗證責任必須分離：PR 的 required `verify` workflow 從 `<agent>/<issue>-<slug>` branch 取出 Issue 編號，
 只執行 `handoff-check.ps1 -Issue <id>`；`docs-check.ps1` 不得因 GitHub 上其他 Issue 的暫態狀態而失敗。
 所有 open Issue 的 scope overlap、claim 完整性與 owner/assignee 一致性由獨立 `handoff-audit` workflow
-在 Issue 事件與排程執行。Maintainer 明確要求的 planning backlog 可沒有 handoff；execution-request
+在 Issue、PR、verify／CodeQL 完成事件與排程執行。Maintainer 明確要求的 planning backlog 可沒有 handoff；execution-request
 label（或 legacy marker）、assignee 或 lifecycle label 任一存在時，open Issue 缺少完整 handoff 必須讓全域 audit fail closed，
 但不阻塞不相關 PR。
 Handoff 資料只存在於 issue body block；`schemas/task-handoff-v1.schema.json` 已刪除，

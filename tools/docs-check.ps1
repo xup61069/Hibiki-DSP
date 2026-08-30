@@ -252,6 +252,7 @@ function Get-DeliveryWiringErrors {
   $errors = @()
   $handoffPatterns = @(
     '(?m)^\s*pull_request_target:\s*$',
+    '(?m)^\s*types:\s*\[(?=[^\]]*\bedited\b)(?=[^\]]*\bsynchronize\b)[^\]]*\]\s*$',
     '(?m)^\s*workflow_run:\s*$',
     '(?m)^\s*workflows:\s*\[verify,\s*CodeQL\]\s*$',
     '(?m)^\s*contents:\s*read\s*$',
@@ -1136,7 +1137,8 @@ if ($SelfTest) {
   $caseCount++
 
   $validHandoffWorkflow = @(
-    'pull_request_target:', 'workflow_run:', '  workflows: [verify, CodeQL]', 'permissions:',
+    'pull_request_target:', '  types: [opened, edited, synchronize]',
+    'workflow_run:', '  workflows: [verify, CodeQL]', 'permissions:',
     '  contents: read', '  issues: read', '  pull-requests: read', '  checks: read',
     '  actions: read', '  statuses: read',
     '  uses: actions/checkout@1234567890abcdef1234567890abcdef12345678',
@@ -1155,6 +1157,12 @@ if ($SelfTest) {
   $brokenWiring = @(Get-DeliveryWiringErrors -HandoffWorkflow 'issues:' -ClaimWorkflow $validClaimWorkflow)
   if ($brokenWiring.Count -lt 1) {
     throw 'docs-check self-test failed: missing delivery workflow wiring was accepted.'
+  }
+  $caseCount++
+  $missingPrEvents = $validHandoffWorkflow.Replace('  types: [opened, edited, synchronize]', '  types: [opened]')
+  $missingPrEventErrors = @(Get-DeliveryWiringErrors -HandoffWorkflow $missingPrEvents -ClaimWorkflow $validClaimWorkflow)
+  if ($missingPrEventErrors -notmatch 'trusted delivery wiring') {
+    throw 'docs-check self-test failed: missing PR edited/synchronize audit events were accepted.'
   }
   $caseCount++
   $untrustedWiring = $validHandoffWorkflow + "`n  contents: write`n  ref: `${{ github.event.pull_request.head.sha }}"

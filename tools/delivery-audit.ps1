@@ -16,6 +16,7 @@ $script:HandoffMarker = 'hibiki:handoff-v1'
 $script:ExecutionRequestMarker = 'hibiki:execution-request-v1'
 $script:LifecycleLabels = @('claim-pending', 'claimed', 'in-review', 'done')
 $script:AllowedCheckConclusions = @('SUCCESS', 'NEUTRAL', 'SKIPPED')
+$script:AllowedOrphanAuthors = @('app/dependabot', 'dependabot[bot]')
 
 function Get-ObjectPropertyValue {
   param(
@@ -176,13 +177,20 @@ function Test-ConcreteParkingBlocker {
   foreach ($pattern in $ordinaryWorkPatterns) {
     if ($detail -match $pattern) { return $false }
   }
-  $kindEvidence = @{
-    permission = '(?i)\b(?:permission|access|authori[sz](?:e|ation)|credential|token|privilege|denied|forbidden|grant|allow)\w*\b'
-    safety = '(?i)\b(?:safety|unsafe|destructive|consent|opt-in|live|device|hardware|privacy|license|legal|recovery|risk)\w*\b'
-    scope = '(?i)\b(?:scope|overlap|owner|ownership|assign|conflict|shared\s+path|outside|path)\w*\b'
-    external = '(?i)\b(?:external|unavailable|outage|network|service|dependency|vendor|toolchain|runner|GitHub|API|platform|environment|hardware)\w*\b'
+  $kindBlockerEvidence = @{
+    permission = '(?i)\b(?:denied|forbidden|missing|lacks?|without|must\s+grant|cannot\s+access|not\s+authori[sz]ed|requires?\s+(?:explicit\s+|maintainer\s+)?(?:permission|access|authorization|credential|token|privilege))\b'
+    safety = '(?i)\b(?:unsafe|destructive|risk|without\s+(?:maintainer\s+)?consent|missing\s+consent|not\s+safe|cannot\s+safely|requires?\s+(?:(?:explicit|maintainer)\s+){0,2}(?:consent|opt-in))\b'
+    scope = '(?i)\b(?:outside\s+(?:the\s+)?(?:assigned\s+)?scope|overlaps?|conflicts?|unowned|owner(?:ship)?\s+(?:is\s+)?unknown|must\s+reassign|requires?\s+reassignment|not\s+(?:in|within)\s+(?:the\s+)?assigned\s+scope)\b'
+    external = '(?i)\b(?:unavailable|outage|offline|failure|failed|error|timeout|rate\s+limit|network\s+(?:is\s+)?down|service\s+(?:is\s+)?down|missing\s+(?:dependency|toolchain)|runner\s+(?:is\s+)?unavailable|cannot\s+reach)\b'
   }
-  return $detail -match $kindEvidence[$kind]
+  return $detail -match $kindBlockerEvidence[$kind]
+}
+
+function Test-AllowedOrphanPullRequest {
+  param([Parameter(Mandatory)]$PullRequest)
+  $author = Get-ObjectPropertyValue -InputObject $PullRequest -Name 'author' -Default $null
+  $login = [string](Get-ObjectPropertyValue -InputObject $author -Name 'login' -Default '')
+  return $login -in $script:AllowedOrphanAuthors
 }
 
 function Assert-PrMapping {
@@ -362,6 +370,7 @@ function Assert-DeliveryInventory {
           $closing -contains $_.Number
       })
       if ($matches.Count -eq 0) {
+        if (Test-AllowedOrphanPullRequest -PullRequest $pullRequest) { continue }
         throw "Open PR #$prNumber has no matching open execution handoff by exact branch or closing Issue."
       }
       if ($matches.Count -gt 1) {
@@ -502,12 +511,14 @@ if ($SelfTest) {
       [string]$Base = 'main',
       [int[]]$Closing = @(41),
       [bool]$Draft = $true,
-      [object[]]$Checks = @()
+      [object[]]$Checks = @(),
+      [string]$Author = 'selftest-author'
     )
     return [pscustomobject]@{
       number = $Number; state = 'OPEN'; isDraft = $Draft
       headRefName = $Branch; headRefOid = ('a' * 40); baseRefName = $Base
       mergeStateStatus = 'CLEAN'
+      author = [pscustomobject]@{ login = $Author }
       closingIssuesReferences = @($Closing | ForEach-Object { [pscustomobject]@{ number = $_ } })
       statusCheckRollup = @($Checks)
     }
@@ -593,6 +604,10 @@ if ($SelfTest) {
     Assert-DeliveryInventory -OpenIssues @() -OpenPullRequests @((New-TestPr -Checks (New-PendingChecks)))
   } 'orphan open PR' 'no matching open execution handoff'
   $caseCount++
+  [void](Assert-DeliveryInventory -OpenIssues @() -OpenPullRequests @(
+    (New-TestPr -Branch 'dependabot/powershell/actions' -Closing @() -Checks (New-PendingChecks) -Author 'app/dependabot')
+  ))
+  $caseCount++
 
   Assert-Throws {
     $ready = New-TestPr -Draft $false -Checks (New-GreenChecks)
@@ -637,7 +652,11 @@ if ($SelfTest) {
     'BLOCKED(external): Waiting for review.',
     'BLOCKED(external): Waiting for routine CI to finish.',
     'BLOCKED(scope): Continue implementation tomorrow.',
-    'BLOCKED(scope): Need more tests before merge.'
+    'BLOCKED(scope): Need more tests before merge.',
+    'BLOCKED(scope): The current path is inside the assigned scope.',
+    'BLOCKED(external): GitHub API is available and working normally.',
+    'BLOCKED(permission): The required access has already been granted.',
+    'BLOCKED(safety): This device operation is safe and has maintainer consent.'
   )) {
     Assert-Throws {
       $fakeBlocked = New-TestIssue -NextSafeAction $invalidBlocker
