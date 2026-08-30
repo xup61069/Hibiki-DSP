@@ -66,7 +66,9 @@ bounded guard，RT lookup 不配置；一個 sink 的峰值觸發保護後，另
 `IAudioEndpointVolume`／driver callback 仍待 SPEC-0003 的 Windows driver work。
 Windows build 現在提供 `WindowsVolumeBroker`：control thread 可 bind/unbind
 `IAudioEndpointVolume`、write canonical dB/mute with caller GUID、read-back 實際量化值，
-並以 lock-free atomic snapshot 接收 callback；callback 本身不配置、不等待、不呼叫 COM。
+並以 lock-free atomic snapshot 接收 callback；`OnNotify` 先取得唯一的 bounded sequence claim，
+競爭失敗時丟棄該次通知，避免讀端接受混合的 scalar/mute/channel/context tuple；callback 本身不配置、
+不等待、不呼叫 COM。
 其中 `AUDIO_VOLUME_NOTIFICATION_DATA::fMasterVolume` 是 0..1 的 normalized scalar，
 不是 dB；callback snapshot 以 `master_scalar` 保留它，不能填入 `requested_db`。
 `WindowsVolumeBroker::poll` 必須在 owning control/COM thread 呼叫

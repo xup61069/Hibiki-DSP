@@ -33,8 +33,9 @@ struct WindowsVolumeNotificationSnapshotV1 {
     GUID event_context{};
 };
 
-// Implements only the COM callback. OnNotify performs atomic copies and never
-// waits, allocates, calls COM, or invokes user code.
+// Implements only the COM callback. OnNotify claims one atomic writer before
+// copying a notification, dropping contended events rather than exposing a
+// partial tuple; it never waits, allocates, calls COM, or invokes user code.
 class WindowsVolumeCallback final : public IAudioEndpointVolumeCallback {
 public:
     WindowsVolumeCallback() noexcept;
