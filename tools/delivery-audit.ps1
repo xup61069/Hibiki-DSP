@@ -17,6 +17,7 @@ $script:ExecutionRequestMarker = 'hibiki:execution-request-v1'
 $script:LifecycleLabels = @('claim-pending', 'claimed', 'in-review', 'done')
 $script:AllowedCheckConclusions = @('SUCCESS', 'NEUTRAL', 'SKIPPED')
 $script:AllowedOrphanAuthors = @('app/dependabot', 'dependabot[bot]')
+$script:PullRequestJsonFields = 'number,state,title,isDraft,author,headRefName,headRefOid,baseRefName,closingIssuesReferences,statusCheckRollup,mergeStateStatus,url'
 
 function Get-ObjectPropertyValue {
   param(
@@ -450,6 +451,10 @@ function Assert-Throws {
 
 if ($SelfTest) {
   $caseCount = 0
+  if ($script:PullRequestJsonFields.Split(',') -notcontains 'author') {
+    throw 'delivery-audit self-test failed: production PR inventory omits author required for the Dependabot exception.'
+  }
+  $caseCount++
   function New-TestIssue {
     param(
       [int]$Number = 41,
@@ -708,7 +713,7 @@ if ($Issue -ge 0) {
 
 $pullRequests = @(ConvertFrom-GhJson -Arguments @(
   'pr', 'list', '--state', 'open', '--limit', "$inventoryCap",
-  '--json', 'number,state,title,isDraft,headRefName,headRefOid,baseRefName,closingIssuesReferences,statusCheckRollup,mergeStateStatus,url'
+  '--json', $script:PullRequestJsonFields
 ) -Description 'Open PR inventory')
 if ($pullRequests.Count -ge $inventoryCap) {
   throw "Open PR inventory reached cap $inventoryCap; raise the explicit cap rather than accepting truncation."
