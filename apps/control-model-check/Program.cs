@@ -968,6 +968,14 @@ Check(irCommand.Type == ControlMessageType.IrPrepareCommand &&
       irMode == IrPhaseMode.LinearPhase && Math.Abs(irStrength - 0.5) < 1.0e-5 &&
       irRate == 48000U && irChannels == 2U,
     "IR prepare command must round-trip the bounded path and policy payload.");
+var rejectedIrPayload = irCommand.Payload.ToArray();
+rejectedIrPayload[24] = 0x01;
+Check(!ControlPayloadsV1.TryDecodeIrPrepare(
+          rejectedIrPayload, out var rejectedIrPath, out var rejectedIrMode,
+          out var rejectedIrStrength, out var rejectedIrRate, out var rejectedIrChannels) &&
+      rejectedIrPath == string.Empty && rejectedIrMode == IrPhaseMode.Bypass &&
+      rejectedIrStrength == 0.0 && rejectedIrRate == 0U && rejectedIrChannels == 0U,
+    "A rejected late IR path validation must leave every decoder output neutral.");
 var noEngine = new EasyControlViewModel("HibikiDSP_v1_control_model_check_missing");
 var connectedToMissingEngine = await noEngine.ConnectAsync(TimeSpan.FromMilliseconds(50));
 Check(!connectedToMissingEngine && noEngine.ConnectionState == ControlConnectionState.Degraded &&
