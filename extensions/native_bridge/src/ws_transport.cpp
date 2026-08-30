@@ -273,14 +273,26 @@ bool read_ws_client_frame(const WsStreamRead& reader,
             return false;
         }
         length = (static_cast<std::uint64_t>(extended[0]) << 8U) | extended[1];
+        if (length < 126U) {
+            error = WsFrameError::NonCanonicalPayloadLength;
+            return false;
+        }
     } else if (length == 127U) {
         std::array<std::uint8_t, 8> extended{};
         if (!reader({extended.data(), extended.size()})) {
             error = WsFrameError::TruncatedPayload;
             return false;
         }
+        if ((extended[0] & 0x80U) != 0U) {
+            error = WsFrameError::NonCanonicalPayloadLength;
+            return false;
+        }
         length = 0U;
         for (const auto byte : extended) length = (length << 8U) | byte;
+        if (length <= 0xffffU) {
+            error = WsFrameError::NonCanonicalPayloadLength;
+            return false;
+        }
     }
     if ((frame.opcode & 0x08U) != 0U && length > 125U) {
         error = WsFrameError::PayloadTooLarge;

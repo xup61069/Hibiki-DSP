@@ -287,6 +287,71 @@ bool test_fragmented_control_frame_rejection() {
                   "fragmented reserved control opcode is rejected without a reply");
 }
 
+bool test_noncanonical_payload_length_rejection() {
+    const auto rejects_without_reading_mask_or_reply = [](const std::vector<std::uint8_t>& stream,
+                                                           const std::size_t expected_cursor) {
+        std::size_t cursor{0U};
+        std::size_t reads{0U};
+        const auto reader = [&stream, &cursor, &reads](const std::span<std::uint8_t> bytes) {
+            ++reads;
+            if (cursor + bytes.size() > stream.size()) return false;
+            std::copy_n(stream.data() + cursor, bytes.size(), bytes.data());
+            cursor += bytes.size();
+            return true;
+        };
+        std::string output;
+        const auto writer = [&output](const std::span<const std::uint8_t> bytes) {
+            output.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+            return true;
+        };
+        hibiki::WsMessageKind kind{hibiki::WsMessageKind::Binary};
+        std::vector<std::uint8_t> payload;
+        return !hibiki::next_ws_binary_message(reader, writer, 64U, kind, payload) &&
+               reads == 2U && cursor == expected_cursor && output.empty();
+    };
+
+    const std::vector<std::uint8_t> nonminimal_126{0x82U,
+                                                     0xfeU,
+                                                     0U,
+                                                     1U,
+                                                     0U,
+                                                     0U,
+                                                     0U,
+                                                     0U,
+                                                     'x'};
+    const std::vector<std::uint8_t> nonminimal_127{0x82U,
+                                                     0xffU,
+                                                     0U,
+                                                     0U,
+                                                     0U,
+                                                     0U,
+                                                     0U,
+                                                     0U,
+                                                     0U,
+                                                     1U,
+                                                     0U,
+                                                     0U,
+                                                     0U,
+                                                     0U,
+                                                     'x'};
+    const std::vector<std::uint8_t> high_bit_127{0x82U,
+                                                   0xffU,
+                                                   0x80U,
+                                                   0U,
+                                                   0U,
+                                                   0U,
+                                                   0U,
+                                                   0U,
+                                                   0U,
+                                                   0U};
+    return expect(rejects_without_reading_mask_or_reply(nonminimal_126, 4U),
+                  "non-minimal 126 payload length is rejected before a reply") &&
+           expect(rejects_without_reading_mask_or_reply(nonminimal_127, 10U),
+                  "non-minimal 127 payload length is rejected before a reply") &&
+           expect(rejects_without_reading_mask_or_reply(high_bit_127, 10U),
+                  "high-bit 127 payload length is rejected before a reply");
+}
+
 bool test_close_payload_validation() {
     const std::vector<std::uint8_t> stream{0x88U, 0x81U, 0U, 0U, 0U, 0U, 'x'};
     std::size_t offset = 0U;
@@ -456,6 +521,7 @@ int main() {
     if (!test_handshake_size_boundary() || !test_upgrade_header_semantics() ||
         !test_request_line_and_version_semantics() || !test_control_frame_opcode_validation() ||
         !test_fragmented_control_frame_rejection() ||
+        !test_noncanonical_payload_length_rejection() ||
         !test_close_payload_validation() || !test_close_status_validation() ||
         !test_close_reason_utf8_validation() || !test_unsolicited_pong_continues_stream()) {
         return 1;
