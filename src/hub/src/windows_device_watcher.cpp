@@ -40,7 +40,13 @@ void WindowsDeviceWatcher::publish(const WindowsDeviceChangeKind kind,
                                    const ERole role,
                                    LPCWSTR id,
                                    const DWORD state) noexcept {
-    sequence_.fetch_add(1, std::memory_order_acq_rel);
+    auto claimed_sequence = sequence_.load(std::memory_order_relaxed);
+    if ((claimed_sequence & 1U) != 0U ||
+        !sequence_.compare_exchange_strong(claimed_sequence, claimed_sequence + 1U,
+                                           std::memory_order_acq_rel,
+                                           std::memory_order_relaxed)) {
+        return;
+    }
     kind_.store(static_cast<std::uint8_t>(kind), std::memory_order_relaxed);
     flow_.store(static_cast<std::int32_t>(flow), std::memory_order_relaxed);
     role_.store(static_cast<std::int32_t>(role), std::memory_order_relaxed);
@@ -60,7 +66,7 @@ void WindowsDeviceWatcher::publish(const WindowsDeviceChangeKind kind,
             break;
         }
     }
-    sequence_.fetch_add(1, std::memory_order_release);
+    sequence_.store(claimed_sequence + 2U, std::memory_order_release);
 }
 
 HRESULT STDMETHODCALLTYPE WindowsDeviceWatcher::OnDeviceStateChanged(LPCWSTR id,

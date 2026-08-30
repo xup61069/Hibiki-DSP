@@ -29,9 +29,10 @@ struct WindowsDeviceChangeSnapshotV1 {
     std::array<wchar_t, 260> endpoint_id{};
 };
 
-// IMMNotificationClient callback that only copies bounded data into atomic
-// fields. Rebinding and COM object lifetime changes happen on a worker thread
-// after poll(), never inside these callbacks.
+// IMMNotificationClient callback that uses an atomic sequence claim before
+// copying bounded data into atomic fields. A contended callback drops its
+// event rather than expose a partial tuple. Rebinding and COM object lifetime
+// changes happen on a worker thread after poll(), never inside these callbacks.
 class WindowsDeviceWatcher final : public IMMNotificationClient {
 public:
     WindowsDeviceWatcher() noexcept = default;

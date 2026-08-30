@@ -92,8 +92,9 @@ thread bind default render endpoint、poll callback、以 `WindowsVolumeLinkV1` 
 並以 UI context 將經 safety reconciliation 的 UI 音量寫回。Status route 必須把 broker
 是否已 bind 與 write-through 是否啟用分開呈現；status-only smoke 不得送出 volume command。
 `WindowsDeviceWatcher` 同樣只把 `IMMNotificationClient` 的 default/add/remove/state/property
-事件複製到 bounded snapshot；實際 rebind 必須由 worker 讀取 snapshot 後執行，避免在 OS
-callback 裡 unregister、release 或建立 COM 物件。
+事件複製到 bounded snapshot；每個 callback 先以 lock-free sequence claim 取得唯一 writer，競爭
+失敗時直接丟棄該次事件，避免 `poll()` 接受跨事件混合的欄位。實際 rebind 必須由 worker
+讀取完整 snapshot 後執行，避免在 OS callback 裡 unregister、release 或建立 COM 物件。
 Driver ABI 另外使用 Q16.16 dB；`db_to_q16_16`／`q16_16_to_db` 將量化集中在 boundary，
 避免 scalar 0–1 與 engine dB 互相漂移。
 每個 driver notification 同時攜帶 endpoint 與 event-context GUID；VolumeBroker 可用固定
