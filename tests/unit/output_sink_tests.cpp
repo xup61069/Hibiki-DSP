@@ -74,6 +74,11 @@ struct WindowsWasapiSinkWorkerV1TestAccess {
         return worker.take_clock_request(applied_sequence, source_frames, sink_frames,
                                          elapsed_seconds);
     }
+
+    static void set_clock_request_sequence(WindowsWasapiSinkWorkerV1& worker,
+                                            const std::uint64_t sequence) noexcept {
+        worker.clock_request_sequence_.store(sequence, std::memory_order_relaxed);
+    }
 };
 
 }  // namespace hibiki
@@ -554,6 +559,20 @@ int main() {
                   worker, applied_sequence, source_frames, sink_frames, elapsed_seconds) &&
               source_frames == kFirstSourceFrames && sink_frames == kFirstSinkFrames &&
               elapsed_seconds == kFirstElapsedSeconds);
+
+        worker.observe_clock(kNaN, kFirstSinkFrames, kFirstElapsedSeconds);
+        worker.observe_clock(kFirstSourceFrames, 0.0, kFirstElapsedSeconds);
+        worker.observe_clock(kFirstSourceFrames, kFirstSinkFrames, kNaN);
+        CHECK(!hibiki::WindowsWasapiSinkWorkerV1TestAccess::take_clock_request(
+            worker, applied_sequence, source_frames, sink_frames, elapsed_seconds));
+
+        const auto stable_sequence = applied_sequence;
+        hibiki::WindowsWasapiSinkWorkerV1TestAccess::set_clock_request_sequence(
+            worker, stable_sequence + 1U);
+        CHECK(!hibiki::WindowsWasapiSinkWorkerV1TestAccess::take_clock_request(
+            worker, applied_sequence, source_frames, sink_frames, elapsed_seconds));
+        hibiki::WindowsWasapiSinkWorkerV1TestAccess::set_clock_request_sequence(
+            worker, stable_sequence);
 
         std::atomic<bool> start{false};
         std::atomic<bool> writers_done{false};
