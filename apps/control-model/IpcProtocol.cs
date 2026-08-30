@@ -1283,18 +1283,14 @@ public static class ControlPayloadsV1
             (payload.Length - EqVisualSnapshotHeaderBytes) % EqVisualSnapshotPointBytes != 0)
             return false;
 
-        sequence = BinaryPrimitives.ReadUInt64LittleEndian(payload);
-        source = (EqVisualSourceV1)payload[8];
+        var decodedSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload);
+        var decodedSource = (EqVisualSourceV1)payload[8];
         var count = payload[9];
-        if (sequence == 0UL || !Enum.IsDefined(source) ||
+        if (decodedSequence == 0UL || !Enum.IsDefined(decodedSource) ||
             count is < 4 or > EqVisualSnapshotCapacity ||
             payload.Length != EqVisualSnapshotHeaderBytes +
                               (count * EqVisualSnapshotPointBytes))
-        {
-            sequence = 0UL;
-            source = EqVisualSourceV1.None;
             return false;
-        }
 
         var list = new List<EqVisualPointV1>(count);
         double previousFrequency = 0.0;
@@ -1313,6 +1309,8 @@ public static class ControlPayloadsV1
             list.Add(new EqVisualPointV1(frequencyHz, gainDb));
         }
 
+        sequence = decodedSequence;
+        source = decodedSource;
         points = list;
         return true;
     }

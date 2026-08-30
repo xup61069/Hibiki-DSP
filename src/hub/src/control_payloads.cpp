@@ -187,6 +187,7 @@ bool decode_eq_visual_snapshot_v1(std::span<const std::uint8_t> payload,
         payload.size() != expected_bytes) {
         return false;
     }
+    EqVisualSnapshotV1 decoded{};
     double previous_frequency = 0.0;
     for (std::size_t index = 0U; index < point_count; ++index) {
         const auto* bytes = payload.data() + kEqVisualSnapshotHeaderBytesV1 +
@@ -200,10 +201,11 @@ bool decode_eq_visual_snapshot_v1(std::span<const std::uint8_t> payload,
             return false;
         }
         previous_frequency = frequency_hz;
-        snapshot.points[index] = EqVisualSnapshotPointV1{frequency_hz, gain_db};
+        decoded.points[index] = EqVisualSnapshotPointV1{frequency_hz, gain_db};
     }
-    snapshot.sequence = sequence;
-    snapshot.source = source;
+    decoded.sequence = sequence;
+    decoded.source = source;
+    snapshot = decoded;
     return true;
 }
 
