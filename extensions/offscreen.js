@@ -65,20 +65,23 @@ function setStateHeartbeat(enabled) {
 function connectBridge() {
   if (!capturing || bridge) return;
   try {
-    bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab');
-    bridge.binaryType = 'arraybuffer';
-    bridge.onopen = () => {
+    const socket = new WebSocket('ws://127.0.0.1:17842/v1/tab');
+    bridge = socket;
+    socket.binaryType = 'arraybuffer';
+    socket.onopen = () => {
+      if (bridge !== socket || !capturing) return;
       bridgeRetryAttempt = 0;
       setStateHeartbeat(false);
       setBridgeConnected(true);
     };
-    bridge.onclose = () => {
+    socket.onclose = () => {
+      if (bridge !== socket || !capturing) return;
       bridge = null;
       setBridgeConnected(false);
       setStateHeartbeat(capturing);
       scheduleBridgeRetry();
     };
-    bridge.onerror = () => {};
+    socket.onerror = () => {};
   } catch (_) {
     bridge = null;
     scheduleBridgeRetry();
