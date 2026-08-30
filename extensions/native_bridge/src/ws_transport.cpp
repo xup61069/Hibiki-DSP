@@ -49,6 +49,30 @@ std::string_view find_header_value(const std::string_view request,
     return {};
 }
 
+bool find_single_header_value(const std::string_view request,
+                              const std::string_view lower_headers,
+                              const std::string_view header_name,
+                              std::string_view& value) {
+    auto line_start = lower_headers.find("\r\n");
+    if (line_start == std::string_view::npos) return false;
+    line_start += 2U;
+    bool found = false;
+    while (line_start < lower_headers.size()) {
+        const auto line_end = lower_headers.find("\r\n", line_start);
+        const auto end = line_end == std::string_view::npos ? lower_headers.size() : line_end;
+        const auto separator = lower_headers.find(':', line_start);
+        if (separator != std::string_view::npos && separator < end &&
+            lower_headers.substr(line_start, separator - line_start) == header_name) {
+            if (found) return false;
+            value = trim_ows(request.substr(separator + 1U, end - separator - 1U));
+            found = true;
+        }
+        if (line_end == std::string_view::npos) return found;
+        line_start = line_end + 2U;
+    }
+    return found;
+}
+
 bool has_header_token(const std::string_view lower_headers,
                       const std::string_view header_name,
                       const std::string_view token) {
@@ -195,8 +219,12 @@ bool parse_websocket_handshake(const std::string_view request, std::string& resp
         return false;
     }
     const auto key = find_header_value(request, lower, "sec-websocket-key");
-    const auto version = find_header_value(request, lower, "sec-websocket-version");
-    if (key.empty() || version != "13") return false;
+    std::string_view version;
+    if (key.empty() ||
+        !find_single_header_value(request, lower, "sec-websocket-version", version) ||
+        version != "13") {
+        return false;
+    }
     std::string accept;
     if (!websocket_compute_accept(key, accept)) return false;
     response.clear();
