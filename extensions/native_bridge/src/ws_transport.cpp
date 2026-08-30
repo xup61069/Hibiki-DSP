@@ -84,6 +84,28 @@ bool has_valid_websocket_request_line(const std::string_view request) {
            line.substr(version_start) == " HTTP/1.1";
 }
 
+int base64_value(const char character) {
+    if (character >= 'A' && character <= 'Z') return character - 'A';
+    if (character >= 'a' && character <= 'z') return character - 'a' + 26;
+    if (character >= '0' && character <= '9') return character - '0' + 52;
+    if (character == '+') return 62;
+    if (character == '/') return 63;
+    return -1;
+}
+
+bool has_valid_websocket_key(const std::string_view key) {
+    constexpr std::size_t kEncodedNonceSize = 24U;
+    constexpr std::size_t kUnpaddedNonceSize = kEncodedNonceSize - 2U;
+    if (key.size() != kEncodedNonceSize || key[kUnpaddedNonceSize] != '=' ||
+        key[kUnpaddedNonceSize + 1U] != '=') {
+        return false;
+    }
+    for (std::size_t index = 0U; index < kUnpaddedNonceSize; ++index) {
+        if (base64_value(key[index]) < 0) return false;
+    }
+    return (base64_value(key[kUnpaddedNonceSize - 1U]) & 0x0f) == 0;
+}
+
 std::string base64(const std::uint8_t* bytes, const std::size_t size) {
     constexpr char alphabet[] =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -203,7 +225,7 @@ bool parse_websocket_handshake(const std::string_view request, std::string& resp
     std::string_view version;
     if (!find_single_header_value(request, lower, "host", host) || host.empty() ||
         !find_single_header_value(request, lower, "sec-websocket-key", key) ||
-        key.empty() ||
+        !has_valid_websocket_key(key) ||
         !find_single_header_value(request, lower, "sec-websocket-version", version) ||
         version != "13") {
         return false;
