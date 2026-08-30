@@ -22,6 +22,9 @@ source_globs: ["src/hub/include/hibiki/control_status.hpp", "src/hub/src/control
 `ControlStatusRequest`（type 13）為空 payload；`ControlStatusSnapshot`（type 12）使用
 little-endian fixed header + 最多 8 個 224-byte route entries。Header 保存 snapshot sequence、
 requested／safety ceiling／effective Q16.16 dB、mute、origin、actuator 與 volume generation。
+Snapshot sequence 必須非零；零值保留給未初始化／無 freshness 狀態，C++／C# encode 與
+decode 都必須在任何 visible-state replacement 前拒絕它。這個規則只描述 user-space
+control-plane snapshot 的有效性，不代表 physical audio、driver 或 WaveRT delivery。
 Route entry 保存 bounded UTF-8 ID／名稱／說明、`Ready/Pending/Degraded/Bypassed/Unavailable`
 狀態與 requires-user-action flag。所有 padding 必須為零，ID 不可重複，effective dB 不可高於
 requested 或 safety ceiling。

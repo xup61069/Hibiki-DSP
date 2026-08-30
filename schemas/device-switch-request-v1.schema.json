@@ -11,6 +11,6 @@
     "channels": {"enum": [1, 2, 6, 8]},
     "sample_rate": {"enum": [44100, 48000, 96000, 192000]},
     "buffer_frames": {"type": "integer", "minimum": 16, "maximum": 4096},
-    "catalog_sequence": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615}
+    "catalog_sequence": {"type": "integer", "minimum": 1, "maximum": 18446744073709551615}
   }
 }

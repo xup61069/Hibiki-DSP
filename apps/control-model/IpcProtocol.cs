@@ -221,6 +221,8 @@ public static class ControlPayloadsV1
                                                    bool mute,
                                                    ulong generation)
     {
+        if (generation == 0UL)
+            throw new ArgumentOutOfRangeException(nameof(generation));
         if (!double.IsFinite(requestedDb) || requestedDb < -144.0 || requestedDb > 12.0)
             throw new ArgumentOutOfRangeException(nameof(requestedDb));
         var payload = new byte[VolumeNotificationBytes];
@@ -245,9 +247,13 @@ public static class ControlPayloadsV1
             return false;
         var q16 = BinaryPrimitives.ReadInt32LittleEndian(payload);
         if (q16 < -144 * 65536 || q16 > 12 * 65536) return false;
-        requestedDb = q16 / 65536.0;
-        mute = payload[4] != 0;
-        generation = BinaryPrimitives.ReadUInt64LittleEndian(payload[8..]);
+        var decodedGeneration = BinaryPrimitives.ReadUInt64LittleEndian(payload[8..]);
+        if (decodedGeneration == 0UL) return false;
+        var decodedRequestedDb = q16 / 65536.0;
+        var decodedMute = payload[4] != 0;
+        requestedDb = decodedRequestedDb;
+        mute = decodedMute;
+        generation = decodedGeneration;
         return true;
     }
 
@@ -765,7 +771,7 @@ public static class ControlPayloadsV1
             (endpointId ?? string.Empty).Any(char.IsControl) ||
             channels is not (1 or 2 or 6 or 8) ||
             sampleRate is not (44100 or 48000 or 96000 or 192000) ||
-            bufferFrames is < 16 or > 4096)
+            bufferFrames is < 16 or > 4096 || catalogSequence == 0UL)
             throw new ArgumentException("Physical device request is outside the v1 contract.");
         var payload = new byte[DeviceSwitchBytes];
         BinaryPrimitives.WriteUInt16LittleEndian(payload, (ushort)endpoint.Length);
@@ -795,28 +801,47 @@ public static class ControlPayloadsV1
             return false;
         for (var index = endpointBytes; index < DeviceSwitchEndpointMaxBytes; index++)
             if (payload[2 + index] != 0) return false;
+        string decodedEndpoint;
         try
         {
-            endpointId = StrictUtf8.GetString(payload.Slice(2, endpointBytes));
+            decodedEndpoint = StrictUtf8.GetString(payload.Slice(2, endpointBytes));
         }
         catch (ArgumentException)
         {
             return false;
         }
-        if (endpointId.Any(char.IsControl)) return false;
-        channels = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(payload[264..]));
-        sampleRate = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(payload[268..]));
-        bufferFrames = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(payload[272..]));
-        catalogSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[280..]);
-        return channels is 1 or 2 or 6 or 8 &&
-               sampleRate is 44100 or 48000 or 96000 or 192000 &&
-               bufferFrames is >= 16 and <= 4096;
+        if (decodedEndpoint.Any(char.IsControl)) return false;
+        int decodedChannels;
+        int decodedSampleRate;
+        int decodedBufferFrames;
+        try
+        {
+            decodedChannels = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(payload[264..]));
+            decodedSampleRate = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(payload[268..]));
+            decodedBufferFrames = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(payload[272..]));
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
+        var decodedCatalogSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[280..]);
+        if (decodedCatalogSequence == 0UL ||
+            decodedChannels is not (1 or 2 or 6 or 8) ||
+            decodedSampleRate is not (44100 or 48000 or 96000 or 192000) ||
+            decodedBufferFrames is < 16 or > 4096)
+            return false;
+        endpointId = decodedEndpoint;
+        channels = decodedChannels;
+        sampleRate = decodedSampleRate;
+        bufferFrames = decodedBufferFrames;
+        catalogSequence = decodedCatalogSequence;
+        return true;
     }
 
     public static byte[] EncodeDeviceCatalogSnapshot(IReadOnlyList<PhysicalDeviceCard> devices,
                                                       ulong catalogSequence)
     {
-        if (devices is null || devices.Count > DeviceCatalogSnapshotCapacity)
+        if (catalogSequence == 0UL || devices is null || devices.Count > DeviceCatalogSnapshotCapacity)
             throw new ArgumentException("Physical device snapshot exceeds the v1 limit.",
                                         nameof(devices));
         var payload = new byte[DeviceCatalogSnapshotHeaderBytes +
@@ -877,7 +902,8 @@ public static class ControlPayloadsV1
         var expected = DeviceCatalogSnapshotHeaderBytes +
                        (count * DeviceCatalogSnapshotEntryBytes);
         if (count > DeviceCatalogSnapshotCapacity || payload.Length != expected) return false;
-        catalogSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[4..]);
+        var decodedCatalogSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[4..]);
+        if (decodedCatalogSequence == 0UL) return false;
         var list = new List<PhysicalDeviceCard>(count);
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var defaults = new HashSet<PhysicalDeviceFlowV1>();
@@ -931,6 +957,7 @@ public static class ControlPayloadsV1
                               !defaults.Add(flow))) return false;
             list.Add(card);
         }
+        catalogSequence = decodedCatalogSequence;
         devices = list;
         return true;
     }
@@ -1071,7 +1098,8 @@ public static class ControlPayloadsV1
         VolumeSafetyStateV1 volume,
         IReadOnlyList<RouteHealthCardV1> routes)
     {
-        if (!volume.IsValid || routes is null || routes.Count > ControlStatusSnapshotCapacity)
+        if (sequence == 0UL || !volume.IsValid || routes is null ||
+            routes.Count > ControlStatusSnapshotCapacity)
             throw new ArgumentException("Control status snapshot is outside the v1 limit.");
         var payload = new byte[ControlStatusSnapshotHeaderBytes +
                                (routes.Count * ControlStatusSnapshotEntryBytes)];
@@ -1133,15 +1161,17 @@ public static class ControlPayloadsV1
             payload[24] > 1 || payload[25] > (byte)VolumeStateOriginV1.Session ||
             payload[26] > (byte)VolumeActuatorV1.StrictDirect)
             return false;
+        var decodedSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[4..]);
+        if (decodedSequence == 0UL) return false;
         var requested = ReadDbQ16(payload[12..]);
         var ceiling = ReadDbQ16(payload[16..]);
         var effective = ReadDbQ16(payload[20..]);
-        volume = new VolumeSafetyStateV1(requested, ceiling, effective, payload[24] != 0,
-                                          BinaryPrimitives.ReadUInt64LittleEndian(payload[28..]),
-                                          (VolumeStateOriginV1)payload[25],
-                                          (VolumeActuatorV1)payload[26]);
-        if (!volume.IsValid) return false;
-        sequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[4..]);
+        var decodedVolume = new VolumeSafetyStateV1(
+            requested, ceiling, effective, payload[24] != 0,
+            BinaryPrimitives.ReadUInt64LittleEndian(payload[28..]),
+            (VolumeStateOriginV1)payload[25],
+            (VolumeActuatorV1)payload[26]);
+        if (!decodedVolume.IsValid) return false;
         var list = new List<RouteHealthCardV1>(count);
         var seen = new HashSet<string>(StringComparer.Ordinal);
         for (var index = 0; index < count; index++)
@@ -1177,6 +1207,8 @@ public static class ControlPayloadsV1
             list.Add(new RouteHealthCardV1(id, name, (RouteHealthStateV1)rawState, detail,
                                            (flags & 1) != 0));
         }
+        sequence = decodedSequence;
+        volume = decodedVolume;
         routes = list;
         return true;
     }

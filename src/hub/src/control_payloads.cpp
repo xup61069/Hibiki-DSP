@@ -249,9 +249,15 @@ bool is_printable_utf8_v1(const std::string_view value) noexcept {
     return is_printable_utf8(value);
 }
 
+bool is_valid_volume_notification_v1(const VolumeNotificationV1& notification) noexcept {
+    return notification.generation != 0U && std::isfinite(notification.requested_db) &&
+           notification.requested_db >= -144.0 && notification.requested_db <= 12.0;
+}
+
 std::array<std::uint8_t, kVolumeNotificationPayloadBytesV1>
 encode_volume_notification_payload_v1(const VolumeNotificationV1& notification) noexcept {
     std::array<std::uint8_t, kVolumeNotificationPayloadBytesV1> payload{};
+    if (!is_valid_volume_notification_v1(notification)) return payload;
     write_u32(payload.data(), static_cast<std::uint32_t>(db_to_q16_16(notification.requested_db)));
     payload[4] = notification.mute ? 1U : 0U;
     write_u64(payload.data() + 8U, notification.generation);
@@ -271,10 +277,13 @@ bool decode_volume_notification_payload_v1(
     const auto min_db = static_cast<std::int32_t>(-144 * 65536);
     const auto max_db = static_cast<std::int32_t>(12 * 65536);
     if (raw_db < min_db || raw_db > max_db) return false;
-    notification.requested_db = q16_16_to_db(raw_db);
+    const auto requested_db = q16_16_to_db(raw_db);
+    const auto generation = read_u64(payload.data() + 8U);
+    if (!std::isfinite(requested_db) || generation == 0U) return false;
+    notification.requested_db = requested_db;
     notification.mute = payload[4] != 0U;
-    notification.generation = read_u64(payload.data() + 8U);
-    return std::isfinite(notification.requested_db);
+    notification.generation = generation;
+    return true;
 }
 
 std::array<std::uint8_t, kSessionVolumeCommandPayloadBytesV1>
@@ -1137,7 +1146,7 @@ encode_grouped_volume_notification_payload_v1(
     const VolumeNotificationV1& notification) noexcept {
     std::array<std::uint8_t, kGroupedVolumeNotificationPayloadBytesV1> payload{};
     if (output_group.empty() || output_group.size() > 31U ||
-        !is_printable_utf8(output_group)) {
+        !is_printable_utf8(output_group) || !is_valid_volume_notification_v1(notification)) {
         return payload;
     }
     const auto volume_payload = encode_volume_notification_payload_v1(notification);
@@ -1275,7 +1284,7 @@ bool encode_device_catalog_snapshot_v1(
     std::size_t& payload_bytes) noexcept {
     payload.fill(0U);
     payload_bytes = 0U;
-    if (entries.size() > kDeviceCatalogSnapshotCapacityV1) return false;
+    if (entries.size() > kDeviceCatalogSnapshotCapacityV1 || catalog_sequence == 0U) return false;
     for (std::size_t index = 0U; index < entries.size(); ++index) {
         const auto& entry = entries[index];
         if (entry.endpoint_id_bytes == 0U ||
@@ -1349,6 +1358,8 @@ bool decode_device_catalog_snapshot_v1(
     if (entry_count > kDeviceCatalogSnapshotCapacityV1 || payload.size() != expected_bytes) {
         return false;
     }
+    const auto catalog_sequence = read_u64(payload.data() + 4U);
+    if (catalog_sequence == 0U) return false;
     for (std::size_t index = 0U; index < entry_count; ++index) {
         const auto offset = kDeviceCatalogSnapshotHeaderBytesV1 +
                             (index * kDeviceCatalogSnapshotEntryBytesV1);
@@ -1403,7 +1414,7 @@ bool decode_device_catalog_snapshot_v1(
         entry.last_sequence = read_u64(bytes + 408U);
     }
     snapshot.entry_count = static_cast<std::uint16_t>(entry_count);
-    snapshot.catalog_sequence = read_u64(payload.data() + 4U);
+    snapshot.catalog_sequence = catalog_sequence;
     return true;
 }
 
