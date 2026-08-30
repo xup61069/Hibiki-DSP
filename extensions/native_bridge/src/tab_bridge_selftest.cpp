@@ -497,6 +497,36 @@ bool test_websocket_frames() {
         return false;
     }
 
+    const auto expect_fragmented_control_failure = [](const std::uint8_t opcode,
+                                                       const char* const label) {
+        const std::vector<std::uint8_t> stream{opcode, 0x81U, 0U, 0U, 0U, 0U, 'x'};
+        std::size_t cursor{0U};
+        std::size_t reads{0U};
+        hibiki::WsDecodedFrameV1 frame{};
+        hibiki::WsFrameError error{hibiki::WsFrameError::None};
+        const auto reader = [&stream, &cursor, &reads](const std::span<std::uint8_t> bytes) {
+            ++reads;
+            if (cursor + bytes.size() > stream.size()) return false;
+            std::copy_n(stream.data() + cursor, bytes.size(), bytes.data());
+            cursor += bytes.size();
+            return true;
+        };
+        return expect(!hibiki::read_ws_client_frame(reader, 64U, frame, error) &&
+                          error == hibiki::WsFrameError::FragmentedControlFrame &&
+                          reads == 1U && cursor == 2U,
+                      label);
+    };
+    if (!expect_fragmented_control_failure(0x8U,
+                                           "fragmented Close has its dedicated error") ||
+        !expect_fragmented_control_failure(0x9U,
+                                           "fragmented Ping has its dedicated error") ||
+        !expect_fragmented_control_failure(0xAU,
+                                           "fragmented Pong has its dedicated error") ||
+        !expect_fragmented_control_failure(0xBU,
+                                           "fragmented reserved control has its dedicated error")) {
+        return false;
+    }
+
     std::vector<std::uint8_t> truncated_payload = small_stream;
     truncated_payload.pop_back();
     if (!expect_frame_failure(truncated_payload, 1024U, hibiki::WsFrameError::TruncatedPayload,
