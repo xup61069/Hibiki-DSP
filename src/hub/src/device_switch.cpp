@@ -1,11 +1,16 @@
 #include "hibiki/device_switch.hpp"
 
+#include "hibiki/control_payloads.hpp"
+
 #include <utility>
 
 namespace hibiki {
 
 bool DeviceSwitchTransaction::begin(DeviceTargetV1 target) noexcept {
     if (target.endpoint_id.empty() ||
+        target.endpoint_id.size() > kDeviceSwitchEndpointMaxBytesV1 ||
+        target.endpoint_id.find('\0') != std::string::npos ||
+        !is_printable_utf8_v1(target.endpoint_id) ||
         (target.channels != 2 && target.channels != 6 && target.channels != 8) ||
         target.sample_rate == 0 || target.buffer_frames == 0) {
         return false;

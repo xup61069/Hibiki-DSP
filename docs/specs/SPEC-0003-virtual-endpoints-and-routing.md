@@ -156,7 +156,9 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   process 只讀已設定的 immutable pipeline state，後續仍需真實 USB/HDMI/Bluetooth clock fixture。
 - `OutputHandoffCoordinatorV1` 將 `DeviceSwitchTransaction` 與 30 ms `OutputCrossfade` 綁定：
   begin/prepare 後只能在 fade 完成時 commit，任何 prepare 或 buffer failure 都可 rollback
-  到原 active endpoint；這是 user-space handoff contract，不是實體 driver soak 證據。
+  到原 active endpoint；`DeviceTargetV1` 的 endpoint ID 同樣必須非空、最多 260 bytes、
+  NUL-free 且為 printable UTF-8，不得由 in-memory handoff 繞過 DeviceSwitch wire/schema
+  的 identity boundary；這是 user-space handoff contract，不是實體 driver soak 證據。
 - 原生 ASIO transport 使用 Apache-2.0 固定 layout `hibiki_asio_transport_v1`，由 Engine
   control plane 建立合法的 `Local\\HibikiDSP_v1_asio` named mapping；ASIO DLL 只在 host callback
   完成後把八聲道 Float32 block 寫入 SPSC ring。Engine 端 `AsioTransportConsumerV1` 在 RT lane

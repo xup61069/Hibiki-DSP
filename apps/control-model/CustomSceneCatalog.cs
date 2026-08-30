@@ -18,7 +18,8 @@ public sealed class CustomSceneCatalogV1
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        PropertyNamingPolicy = null
+        PropertyNamingPolicy = null,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };
 
     public IReadOnlyList<SceneCard> Scenes => _scenes;
@@ -126,7 +127,7 @@ public sealed class CustomSceneCatalogV1
                 return false;
             }
             var document = JsonSerializer.Deserialize<CatalogDocument>(
-                File.ReadAllText(fullPath, Encoding.UTF8));
+                File.ReadAllText(fullPath, Encoding.UTF8), JsonOptions);
             if (document is null || document.SchemaVersion != SchemaVersion ||
                 document.Scenes is null || document.Scenes.Count > MaxScenes)
             {

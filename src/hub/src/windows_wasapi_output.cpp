@@ -640,7 +640,7 @@ WindowsWasapiOutputV1::~WindowsWasapiOutputV1() = default;
 bool WindowsWasapiOutputV1::bind(const WasapiOutputConfigV1&) noexcept { return false; }
 bool WindowsWasapiOutputV1::start() noexcept { return false; }
 void WindowsWasapiOutputV1::stop() noexcept { started_ = false; }
-void WindowsWasapiOutputV1::unbind() noexcept {
+void WindowsWasapiOutputV1::release_resources() noexcept {
   stop();
   client_ = nullptr;
   render_client_ = nullptr;
@@ -655,7 +655,7 @@ void WindowsWasapiOutputV1::unbind() noexcept {
 bool WindowsWasapiOutputV1::render(const float*, std::uint32_t) noexcept { return false; }
 bool WindowsWasapiOutputV1::wait_for_buffer(std::uint32_t) noexcept { return false; }
 bool WindowsWasapiOutputV1::read_clock(WasapiClockSampleV1&) const noexcept { return false; }
-void WindowsWasapiOutputV1::release_resources() noexcept { unbind(); }
+void WindowsWasapiOutputV1::unbind() noexcept { release_resources(); }
 
 WindowsWasapiSinkWorkerV1::~WindowsWasapiSinkWorkerV1() { stop(); }
 bool WindowsWasapiSinkWorkerV1::start(const WasapiOutputConfigV1&, std::uint32_t) noexcept {

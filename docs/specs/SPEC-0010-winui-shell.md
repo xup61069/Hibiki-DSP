@@ -56,6 +56,12 @@ Out：WaveRT/PortCls 驅動、實體裝置枚舉、音訊處理、VST3 host UI�
 非同步命令；ViewModel 透過 `NamedPipeControlClientV1` 建立 local-only
 versioned IPC，Hello 成功後才可送出 SceneApply 或 VolumeNotification。
 
+校正精靈的 CSV／REW 文字匯入只會把有限的頻率與電平 double 放入 wizard state；
+`NaN`、`Infinity`、`-Infinity` 與其他無法解析的列會在檔案匯入邊界被跳過。
+每次新匯入都會清除舊的編譯 filters、preview rows 與 exported path；若檔案沒有任何
+有限量測列，匯入 fail-closed 並清除舊的量測／編譯結果。這是 control-model 的本機
+資料驗證，不代表量測資料已完成聲學校正或實體播放驗證。
+
 `EasyControlViewModel` 不再向 WinUI shell 暴露 VST3 時間軸編輯 binding seam。若未來需要
 重新引入，必須另立 Spec 切片並保持 fail-closed 邊界：不送 IPC payload、不寫 native file
 store，也不代表 engine 已載入、plugin 已套用或 timeline 已持久化。

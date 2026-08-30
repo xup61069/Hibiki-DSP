@@ -24,7 +24,8 @@ public sealed class CustomSceneSyncQueueV1
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        PropertyNamingPolicy = null
+        PropertyNamingPolicy = null,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };
 
     public IReadOnlyList<SceneCatalogQueueCard> Operations => _operations;
@@ -128,7 +129,7 @@ public sealed class CustomSceneSyncQueueV1
 
             using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
             var document = JsonSerializer.Deserialize<QueueDocument>(
-                reader.ReadToEnd());
+                reader.ReadToEnd(), JsonOptions);
             if (document is null || document.SchemaVersion != SchemaVersion ||
                 document.DroppedOperations < 0 ||
                 document.Operations is null ||

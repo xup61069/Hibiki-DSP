@@ -112,6 +112,10 @@ invisible-control exclusion pattern（anchored）拒收 U+0000-U+001F 與 U+007F
 執行期驗證一致。離線重播的 Upsert 必須保留原卡片的 `loudness_live_update`
 選擇並寫入相同的 wire byte 84；Remove 不攜帶此旗標。序列化只在 true 寫出該欄位，
 false 或預設值保持欄位省略，讓檔案內容與「缺少即 false」的載入契約一致。
+兩個控制模型 persistence loader 都使用 `JsonUnmappedMemberHandling.Disallow`；因此
+`custom-scene-cards-v1` 與 `scene-sync-queue-v1` 的頂層及巢狀未知欄位會和
+`additionalProperties: false` schema 一樣 fail-closed，合法已知欄位與省略 optional 欄位仍維持
+向後相容。載入失敗時不交換既有記憶體 catalog 或 queue。
 全部成功才回報「引擎已同步」，
 同時保留先前捨棄數量並清空持久化佇列；中途失敗則保留剩餘操作與其持久化狀態，誠實顯示降級
 狀態，待下一次連線再補送。此重播只使用既有 `SceneCatalogCommandV1` wire format 與 Ack 語意，
