@@ -225,3 +225,9 @@ if ($SelfTest) {
 }
 
 Invoke-ControlModelCheck -ProjectPath $project -BaseOutputPath $outputRoot -ProjectExtensionsPath $objRoot
+
+$sceneJsonContractProject = Join-Path $repo 'apps/control-model-scene-json-contract-check/Hibiki.ControlModel.SceneJsonContract.Check.csproj'
+$sceneJsonContractOutputRoot = Join-Path $outputRoot 'scene-json-contract/'
+$sceneJsonContractObjRoot = Join-Path $objRoot 'scene-json-contract/'
+Invoke-ControlModelCheck -ProjectPath $sceneJsonContractProject `
+  -BaseOutputPath $sceneJsonContractOutputRoot -ProjectExtensionsPath $sceneJsonContractObjRoot
