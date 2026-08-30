@@ -54,6 +54,10 @@ exchange 必須 quarantine 並沿用 Degraded 狀態。
 frames 上限；即使 caller-owned ring 的實體容量更大，超過上限的 exchange
 必須在讀取 sample 或前進 ring index 前拒絕。sample-count 與 ring capacity
 算術必須以不溢位的方式驗證，失敗不得改變既有 ring 內容或可用 frame 計數。
+`Vst3LaneRingBridgeV1` 與 `Vst3TapBufferV1` 的直接 setup／publish／lookup 邊界也必須
+使用 output-group 的 bounded printable UTF-8 byte contract；embedded NUL、控制字元與
+malformed UTF-8 identity 一律 fail-closed，合法 ASCII 與合法多位元組 UTF-8 在 64-byte
+上限內維持既有 lane／tap 行為。
 `Vst3TapBufferV1::read` 也必須先確認 caller 的 `max_frames <= SIZE_MAX / channels`，
 再比較 capacity 或複製 snapshot；無法代表的 interleaved capacity 直接 fail-closed。
 `Vst3TapBufferV1` 的 sample payload、group bytes、shape metadata 與 published sequence
