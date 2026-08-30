@@ -42,10 +42,11 @@ Lane、output group、channel map、DSP chain、reported plugin latency、latenc
   process 入口一律 fail-closed。`process_graph_f64`／`process_graph_for_output_group_f64`
   接受 interleaved double input，以 double 累加並寫出 interleaved double output；
   所有 graph process entry point 在初始化 caller-owned output 或計算 lane stride 前，
-  必須先以不溢位的方式驗證 `frames * channels`；graph 支援的 lane/output 聲道上限為
-  8，無法由 `size_t` 表示的 frame geometry 一律 fail-closed。這是 user-space
-  buffer-safety boundary，不新增實體 endpoint 或 driver delivery 保證。若 float graph
-  entry point 帶入 latency bank，還必須在初始化 caller-owned output 前拒絕超過
+  必須先以不溢位的方式驗證 `frames * channels`，並驗證這次會讀取的 enabled lane
+  input samples 全部 finite；NaN/Inf 與無法由 `size_t` 表示的 frame geometry 一律
+  fail-closed，不清除 caller output。graph 支援的 lane/output 聲道上限為 8，這是
+  user-space buffer-safety boundary，不新增實體 endpoint 或 driver delivery 保證。若
+  float graph entry point 帶入 latency bank，還必須在初始化 caller-owned output 前拒絕超過
   `kLaneLatencyMaxFramesV1`（4096）的 block，因為 plugin-latency compensation 的
   fixed scratch 只支援這個 frame 上限；f64 entry point 不帶入此 float latency bank，
   不受這項額外上限影響。
