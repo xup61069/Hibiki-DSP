@@ -36,6 +36,9 @@ offscreen 必須立即釋放整個 capture graph（stream、AudioContext、WebSo
 綁定建立它的 node，且只可在該 node 仍是 active graph 時送包或更新計數，不能把舊佇列封包送進
 replacement bridge。手動 Stop 仍是唯一主動
 `track.stop()` 擁有者，ended 監聽器只負責自然結束路徑，不得重複 teardown。
+service worker 必須把 Start、Stop 與已驗證的自然釋放關閉放在同一個 lifecycle queue；自然釋放
+在關閉 offscreen document 前必須查詢真實 capture 狀態，不能讓舊的 close 路徑關閉已開始的
+replacement capture。
 popup 重新可見時必須再次查詢真實 capture 狀態；此 visibility refresh 只更新狀態，
 不得清除既有錯誤訊息。`tools/extension-check.ps1` 驗證 visible-only refresh 邊界，
 self-test 涵蓋缺少 listener、visible check 或 `refreshState` 呼叫的情況。
