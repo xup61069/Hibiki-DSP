@@ -250,7 +250,8 @@ function Assert-ExtensionSourcePolicy(
       'async\s+function\s+startCapture\s*\([^)]*\)\s*\{\s*await\s+teardownCaptureGraph\s*\(\s*\)\s*;[\s\S]{0,120}capturing\s*=\s*true',
       'track\.addEventListener\(\s*(?:\x27|\x22)ended(?:\x27|\x22)\s*,\s*\(\s*\)\s*=>\s*\{\s*void\s+handleSourceEnded\s*\(\s*stream\s*\)',
       'async\s+function\s+handleSourceEnded\s*\(\s*endedStream\s*\)\s*\{\s*if\s*\(\s*activeStream\s*!==\s*endedStream\s*\)\s*return\s*;',
-      'const\s+streamToStop\s*=\s*activeStream\s*;\s*activeStream\s*=\s*null\s*;\s*streamToStop\?\.getTracks\s*\(\s*\)\.forEach\(\s*track\s*=>\s*track\.stop\s*\(\s*\)\s*\)'
+      'const\s+streamToStop\s*=\s*activeStream\s*;\s*activeStream\s*=\s*null\s*;\s*streamToStop\?\.getTracks\s*\(\s*\)\.forEach\(\s*track\s*=>\s*track\.stop\s*\(\s*\)\s*\)',
+      'const\s+capturePacketizer\s*=\s*packetizer\s*;\s*capturePacketizer\.port\.onmessage\s*=\s*\(\s*event\s*\)\s*=>\s*\{\s*if\s*\(\s*packetizer\s*!==\s*capturePacketizer\s*\|\|\s*!capturing\s*\)\s*return\s*;'
     )) {
     if ($offscreenSource -notmatch $captureOwnershipPattern) {
       throw "Offscreen source must retain replacement capture ownership in $sourceName."
@@ -480,7 +481,7 @@ if ($SelfTest) {
   $sourceFixture.offscreen = $sourceFixture.offscreen.Replace(
     "bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab');bridge.binaryType = 'arraybuffer'; bridge.onopen = () => {}; bridge.onclose = () => { bridge = null; scheduleBridgeRetry(); };",
     "const socket = new WebSocket('ws://127.0.0.1:17842/v1/tab'); bridge = socket; socket.binaryType = 'arraybuffer'; socket.onopen = () => { if (bridge !== socket || !capturing) return; }; socket.onclose = () => { if (bridge !== socket || !capturing) return; bridge = null; scheduleBridgeRetry(); };")
-  $sourceFixture.offscreen += " async function startCapture(message) { await teardownCaptureGraph(); capturing = true; } async function teardownCaptureGraph() { const streamToStop = activeStream; activeStream = null; streamToStop?.getTracks().forEach(track => track.stop()); }"
+  $sourceFixture.offscreen += " async function startCapture(message) { await teardownCaptureGraph(); capturing = true; } async function teardownCaptureGraph() { const streamToStop = activeStream; activeStream = null; streamToStop?.getTracks().forEach(track => track.stop()); } let packetizer = null; const capturePacketizer = packetizer; capturePacketizer.port.onmessage = (event) => { if (packetizer !== capturePacketizer || !capturing) return; };"
   $sourceFixture.offscreen = $sourceFixture.offscreen.Replace(
     "track.addEventListener('ended', handleSourceEnded);",
     "track.addEventListener('ended', () => { void handleSourceEnded(stream); });")
@@ -498,6 +499,11 @@ if ($SelfTest) {
   $caught = $false
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $missingReplacementStreamGuard $sourceFixture.worklet 'selftest-replacement-stream-guard' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected replacement capture stream ownership guard failure.' }
+
+  $missingReplacementPacketizerGuard = $sourceFixture.offscreen -replace 'packetizer !== capturePacketizer \|\| !capturing', 'packetizer !== capturePacketizer'
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $missingReplacementPacketizerGuard $sourceFixture.worklet 'selftest-replacement-packetizer-guard' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected replacement capture packetizer ownership guard failure.' }
 
   $missingStopHandler = $sourceFixture.popup -replace "chrome\.runtime\.sendMessage\(\{type: 'stop-capture'\}\)", 'console.log()'
   $caught = $false
