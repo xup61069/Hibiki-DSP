@@ -136,22 +136,11 @@ Repository 內容的權威順序、active Issue handoff 與衝突處理以
 
 ## 給開發者與 AI 協作者
 
-開始寫入前，先讀 [AGENTS.md](AGENTS.md) 與 [START_HERE](docs/START_HERE.md)，取得
-maintainer／orchestrator 指派，並確認專用 Issue、handoff block、非 `main` branch 與
-`scope_globs`。有其他 writer、branch occupancy 或狀態不確定時，必須使用隔離 worktree。
-
-每個寫入切片至少執行：
-
-```powershell
-pwsh -NoProfile -File tools/handoff-check.ps1 -Issue <n>
-pwsh -NoProfile -File tools/docs-check.ps1
-pwsh -NoProfile -File tools/source-policy.ps1
-git diff --check
-```
-
-C/C++、UI、engine、driver、installer、extension、workflow 或 release policy 變更各有額外
-條件式 gates；完整對照表只以 [AGENTS.md](AGENTS.md) 第三層為準。需要 target-machine
-evidence 時才執行環境 probe；私人路徑與裝置資料只留在 `.local/`。
+先讀 [AGENTS.md](AGENTS.md) 與 [START_HERE](docs/START_HERE.md)。修正／實作要求的預設終點是
+完成變更、匹配驗證並整合到 `main`；Issue、branch、PR 與 CI 只是可稽核記錄。AI 不建立候選或
+待認領工作佇列；只有 writer 會立即開始時才建立一張完整 execution Issue，並遵守 handoff、
+非 `main` branch、獨占 scope 與 worktree ownership。條件式 gates、evidence 與真機邊界以
+[AGENTS.md](AGENTS.md) 為準，私人路徑與裝置資料只留在 `.local/`。
 
 ## Source、發行與授權
 

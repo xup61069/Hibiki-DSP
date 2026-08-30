@@ -1,41 +1,43 @@
-## 變更摘要
+## 產品結果
 
-## 對應 Issue
+- 使用者得到／修好什麼：
+- 已知限制：
+
+## Execution linkage
 
 Closes #
 
-## 多 AI ownership
-
 - Owner:
-- Handoff: Issue body handoff block (linked issue)
-- Head branch:
-- Target branch: `main`
-- `scope_globs`:
-- `shared_paths`:
-- `depends_on`:
+- Head / target branch:
+- `scope_globs` / `shared_paths`:
+- Dependencies:
 
-- [ ] 一個 Issue、唯一非 main branch、單一 active writer；並行／occupied／不確定時使用獨立 worktree
-- [ ] Issue lifecycle 是 `claimed` 或 `in-review`；`claim-pending` 不授予寫入權，不得以此 label push
-- [ ] 已檢查 open Issue／draft PR 與其他 Issue 的 handoff block，沒有未協調的 scope overlap
-- [ ] 超出 scope 或共享整合檔已由 integrator 指定 owner／合併順序
-- [ ] branch 未 force-push，且 handoff 的 base/owner/next action 已更新
+- [ ] 一張完整 execution Issue、唯一非 `main` branch、單一 writer、one PR per branch
+- [ ] Handoff、assignee 與 `claimed`／`in-review` lifecycle 一致，沒有未協調 scope overlap
+- [ ] 並行、occupied 或不確定時使用隔離 worktree；未修改或 force-push 別人的工作
 
-## Spec / ADR / schema 影響
+## Acceptance 與驗證
 
-- [ ] 沒有 public contract 變更
-- [ ] 已更新對應 Spec 或建立新的 ADR
+- Acceptance 結果：
+- Exact head SHA：
+- 執行命令與結果：
 
-## 驗證
+- [ ] `AGENTS.md` always-run checks 全綠，scope-triggered gates 已執行或說明不適用
+- [ ] Required hosted checks 對上述 exact head fresh green；queued、in-progress 或舊 head 不算
+- [ ] Public contract 已同步 Spec／tests／evidence，或確認不適用
+- [ ] Review 接受後立即轉 ready；draft 不停放在 green 狀態
 
-依 [AGENTS.md](../AGENTS.md) 第三層執行 always-run checks（scoped handoff-check／docs-check／
-source-policy／`git diff --check`）與範圍相關的條件式 gates：
+若尚未能 ready／merge，只能填一項具體 safety、permission、scope 或 external blocker：
 
-- [ ] always-run checks 全綠（命令與結果記錄在 handoff block）
-- [ ] 範圍相關的條件式 gates 已執行或明確標註不適用
-- [ ] 已附 evidence manifest 或說明為何不適用
-- [ ] 新／更正 evidence 使用 append-only `evidence_format: 2`，完整 `evidence-audit.ps1` 已通過；未覆寫 legacy manifest
+- Blocker（無則填 `none`）：
 
-## 開源與隱私
+## Evidence、授權與隱私
 
-- [ ] 沒有 binary、private calibration、endpoint ID、credential 或等響度（equal-loudness）受限內容
-- [ ] `THIRD_PARTY.yml`、SPDX 與 NOTICE 已同步（若有依賴變更）
+- [ ] Source／user-space 證據未冒充實體音訊、driver/WaveRT、硬體或 release 證據
+- [ ] 沒有 binary、credential、private calibration、真實裝置 ID 或 equal-loudness 受限內容
+- [ ] 新／更正 evidence 使用 append-only `evidence_format: 2`；依賴變更同步 SPDX／NOTICE／SBOM
+
+## Integrator clean close
+
+- [ ] 合併後已 readback target／`main` 與 Issue closed，清除 lifecycle／assignee residue，且只依安全
+  predicate 清理已完成 refs／worktrees（詳見 `docs/ai/MULTI_AGENT.md`）

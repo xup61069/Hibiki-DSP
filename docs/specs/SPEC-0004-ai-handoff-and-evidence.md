@@ -3,7 +3,7 @@ id: SPEC-0004
 status: accepted
 owner: hibiki-maintainers
 authority: repository-process
-last_reviewed: 2026-08-25
+last_reviewed: 2026-08-30
 review_after_days: 30
 related_adrs: [ADR-0001]
 source_globs: ["AGENTS.md", "README.md", "CONTRIBUTING.md", ".github/ISSUE_TEMPLATE/ai-task.yml", ".github/PULL_REQUEST_TEMPLATE.md", "docs/**", "evidence/**", "tools/**"]
@@ -25,24 +25,24 @@ source_globs: ["AGENTS.md", "README.md", "CONTRIBUTING.md", ".github/ISSUE_TEMPL
 
 ## 多 AI 並行協定
 
-唯讀偵察不需要 claim。每個寫入切片必須有 human maintainer／designated orchestrator 的明確
-指派，並對應一個 Issue、一個唯一非 `main` branch、Issue body handoff block 與一個 draft PR。
-maintainer 對目前 session 的直接要求算指派；active orchestrator 可在 overlap 檢查後建立／正式
-claim Issue，worker 不得自行挑選 backlog。其他 writer 正在工作、branch 已被 worktree 佔用或
-occupancy 不確定時必須使用獨立 clone/worktree；單一 writer 時仍建議隔離。draft PR 在首次可
-重建的 WIP/reviewable commit push 後立即建立，不以空 claim commit 作前置。Issue + handoff 是
-初始 live claim，PR 是後續 review surface。
+唯讀偵察不需要 claim。修正／實作要求預設必須完成實作、匹配驗證與整合；Issue、branch、PR 與
+CI 只保存協作／稽核記錄，不是成果或停止點。每個寫入切片仍須有 human maintainer／designated
+orchestrator 的明確指派、一張完整 execution Issue、一個唯一非 `main` branch、Issue body handoff
+block 與一張 draft PR。其他 writer 活躍、branch occupied 或狀態不確定時使用獨立 worktree。
+Repository-configured Dependabot PR 是唯一可沒有 execution Issue 的例外，仍須通過 branch protection
+與 required checks；其他 orphan PR 一律 fail closed。
 
-Issue 建立時可先使用未指派的 TBD pre-claim：handoff block 的 `issue` 與 `branch` 含 `TBD`，且不得有
-assignee、lifecycle label 或 linked PR。正式 claim 必須原子式補齊實際 Issue、branch、base、owner 與
-write scope，指定唯一且與 `owner` 相同的 assignee，再加入 `claimed`。AI Issue form 不得在仍含 placeholder
-的 Issue 上自動加 `claimed`。
+除非 maintainer 明確要求規劃 backlog，AI 不得建立 candidate、TBD、pre-claim 或排隊 Issue。
+只有 writer 會立即開始時才建立 execution Issue；AI Issue form 以不可由表單內容改寫的
+`execution-request` label 分類，收集 objective、acceptance、owner、scope 與 verification，但不預填
+placeholder handoff。Issue 建立後必須立即補齊實際 Issue、branch、base、owner、scope 與 dependencies，
+再進入 claim admission；該 label 本身不授予寫入權。舊 `hibiki:execution-request-v1` body marker 只供
+既有 Issue 相容稽核，不是新表單的信任來源。
 
 ## Claim admission serialization
 
-`claim-pending` 是非授權的 admission 標記：它表示一個 writer session 已通過初步驗證但尚未取得寫入權。
-`claim-pending` 加 assignee 或加 claimed/in-review/done 均 fail closed；TBD handoff 加任何 lifecycle
-label（含 `claim-pending`）也 fail closed。
+`claim-pending` 是非授權的 admission 暫態：它表示 writer session 已通過初步驗證但尚未取得寫入權。
+它只可由序列化 workflow 短暫使用；加 assignee 或與 claimed/in-review/done 並存均 fail closed。
 
 正式 claim admission 由 `.github/workflows/claim-admission.yml` 提供全 repo 單一 concurrency 的
 序列化 workflow：請求 session 提供 UUID、fresh-read 全部 open Issues、驗證 normalized exact title、
@@ -64,6 +64,12 @@ Foundation integration Issue 只保留 foundation integration。全域 `AI_HANDO
 root README 與 foundation Issue body 由 integrator 單寫；feature AI 維護自己的 handoff block、目標 Spec、
 tests 與 evidence。每個 active claim 各有一個 `Next safe action`，不同 Issue 可在不重疊 scope 內並行。完整操作協定
 見 `docs/ai/MULTI_AGENT.md`。
+
+Draft PR 在首次可重建的 WIP/reviewable push 後建立，之後必須持續到 acceptance 通過、fresh exact-head
+required checks 全綠、轉 ready 並 merge。只有具體 safety、permission、scope 或 external blocker
+可以暫停，且必須寫回 handoff；queued／in-progress CI 與一般待辦不是 blocker。Integrator 每輪先
+drain 可安全合併的 green PR，再發現或安排新工作；merge 後 readback target／`main` 與 Issue closed、
+移除 lifecycle／assignee residue，並只按安全 predicate 清理已完成 refs／worktrees，才是 clean close。
 
 ## 續作協定
 
@@ -96,9 +102,9 @@ source 默認塞入 context，跨子系統檔案必須在 Spec 明確加入 glob
 阻擋與唯一下一步。同一視窗發生第二次上下文壓縮，或工作切換到另一個里程碑時，writer 必須先
 完成 durable checkpoint，再由新視窗以核心入口、active Issue 與最小 pack 接續，不重播完整聊天。
 
-`docs-check.ps1` 必須對固定 AI 入口執行字元預算：`AGENTS.md` 6,000、`START_HERE.md` 7,000、
-四個生成 adapter 各 1,000、`AI_HANDOFF.md` 6,000、`PROJECT_MAP.md` 12,000、`MULTI_AGENT.md`
-9,000、`CODEX_GOALS.md` 6,000、root `README.md` 20,000。超限代表入口混入了應按需查詢的細節，
+`docs-check.ps1` 必須對固定 AI 入口執行字元預算：`AGENTS.md` 3,400、`START_HERE.md` 4,000、
+四個生成 adapter 各 1,000、`AI_HANDOFF.md` 4,000、`PROJECT_MAP.md` 12,000、`MULTI_AGENT.md`
+6,000、`CODEX_GOALS.md` 3,000、root `README.md` 20,000。超限代表入口混入了應按需查詢的細節，
 必須 fail closed；不得為新增 changelog 直接調高上限。README／PROJECT_MAP 不得重新要求新 AI
 預載 `AI_HANDOFF.md`，四個自動 adapter 不得直接指向全域快照；啟動文件不得先全文輸出 Issue body
 再由 pack 重播，也不得使用未經 filter 的 `git worktree list` 或未明確限制筆數的 Git／GitHub 歷史
@@ -114,8 +120,9 @@ repository-relative glob intersection 檢查。完全相同、父子路徑與 wi
 驗證責任必須分離：PR 的 required `verify` workflow 從 `<agent>/<issue>-<slug>` branch 取出 Issue 編號，
 只執行 `handoff-check.ps1 -Issue <id>`；`docs-check.ps1` 不得因 GitHub 上其他 Issue 的暫態狀態而失敗。
 所有 open Issue 的 scope overlap、claim 完整性與 owner/assignee 一致性由獨立 `handoff-audit` workflow
-在 Issue 事件與排程執行。未指派且無 lifecycle label 的 backlog 可沒有 handoff；已有 assignee 或
-lifecycle label 的 open Issue 缺少 handoff 必須讓全域 audit fail closed，但不阻塞不相關 PR。
+在 Issue、PR、verify／CodeQL 完成事件與排程執行。Maintainer 明確要求的 planning backlog 可沒有 handoff；execution-request
+label（或 legacy marker）、assignee 或 lifecycle label 任一存在時，open Issue 缺少完整 handoff 必須讓全域 audit fail closed，
+但不阻塞不相關 PR。
 Handoff 資料只存在於 issue body block；`schemas/task-handoff-v1.schema.json` 已刪除，
 `docs/ai/HANDOFF_SCHEMA.json` 保留為穩定入口，不再指向 JSON schema 檔。
 
@@ -167,7 +174,8 @@ required workflow、GitHub App 或簽章 attestation 建立不可由同一 PR �
 
 public contract 變更必須在同一 slice 更新相關 Spec/schema、source、tests 與 evidence；純文件
 措辭修正不需要假造 product build evidence。每個寫入 slice 的 always-run checks 是 scoped
-`handoff-check.ps1 -Issue <id>`、`docs-check.ps1`、`source-policy.ps1` 與 `git diff --check`。
+`handoff-check.ps1 -Issue <id>`、`delivery-audit.ps1 -Issue <id>`、`docs-check.ps1`、
+`source-policy.ps1` 與 `git diff --check`。
 `doctor`、`verify`、`source-only-ci-check`、subsystem builds 與 live probes 只在 scope 或 acceptance
 觸發時執行；live probes 永遠 opt-in。
 
@@ -177,6 +185,11 @@ public contract 變更必須在同一 slice 更新相關 Spec/schema、source、
 Issue/branch、v2 ownership/scope/dependency、Git ancestry、必要 headings 與最多五個 resume commands。
 CI 失敗時不可宣稱該變更可交接。Handoff 檔案已由 issue body handoff block 取代；
 `schemas/task-handoff-v2.schema.json` 已刪除。
+
+`delivery-audit.ps1` 必須 self-test 並稽核 execution Issue handoff 完整性、branch 與 closing-Issue
+linkage、one-PR-per-branch、lifecycle／draft 一致性，以及 fresh green draft 是否被停放；
+`handoff-audit` workflow 執行此檢查。它提供 delivery convergence evidence，不取代 review、required
+checks、merge 或 main readback。
 
 ## 提交訊息完整性
 
@@ -203,10 +216,9 @@ AI 對 maintainer 的進度與完成回報以產品結果為主：先用白話�
 evidence；除非它們改變風險、阻擋或結論可信度，或 maintainer 明確詢問，否則只在末尾簡短列出，
 不得作為標題或主要敘事。這個呈現規則不降低 handoff、scope、validation 或 evidence 要求。
 
-新 Codex 視窗使用一個可驗證成果作為單一 Goal。長任務也必須包含邊界、驗證、停止條件與需要
-人類決定時的 pause 條件，不得用「永遠處理所有 backlog」讓 agent 自行無限擴張 scope。建議的
-五種視窗角色與可貼用啟動詞見 `docs/ai/CODEX_GOALS.md`；並行視窗仍受本 Spec 的獨占 write scope
-與 handoff 規則約束。
+新 Codex 視窗使用一個可驗證成果作為單一 Goal。三種角色是實作／修正、編排／整合，以及只有
+maintainer 明確要求時才使用的唯讀稽核；修正要求不得改選 audit。可貼用啟動詞見
+`docs/ai/CODEX_GOALS.md`，並行視窗仍受本 Spec 的獨占 write scope 與 handoff 規則約束。
 
 ## 語言與相容性
 

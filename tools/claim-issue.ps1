@@ -26,6 +26,30 @@ function Get-HandoffBranch {
   return $branchLine.Groups['value'].Value.Trim().Trim('"').Trim("'")
 }
 
+function Invoke-RemoteBranchProbe {
+  param([Parameter(Mandatory)] [string]$BranchName)
+  # Keep this as the only ls-remote invocation. Its output and exit code belong
+  # to the same probe, so a transient failure cannot be mistaken for an absent
+  # branch by a second, different network read.
+  $output = @(& git ls-remote --heads origin $BranchName 2>&1)
+  $exitCode = $LASTEXITCODE
+  return [pscustomobject]@{ ExitCode = $exitCode; Output = $output }
+}
+
+function Assert-RemoteBranchAvailable {
+  param(
+    [Parameter(Mandatory)] [string]$BranchName,
+    [Parameter(Mandatory)]$Probe
+  )
+  $probeText = (@($Probe.Output) | ForEach-Object { [string]$_ }) -join "`n"
+  if ([int]$Probe.ExitCode -ne 0) {
+    throw "Remote branch query failed for '$BranchName' (exit $($Probe.ExitCode)); fail closed: $probeText"
+  }
+  if (-not [string]::IsNullOrWhiteSpace($probeText)) {
+    throw "Remote branch '$BranchName' already exists."
+  }
+}
+
 if ($SelfTest) {
   $passedCases = 0
   # LF body with a stray branch outside the block: must pick the block value.
@@ -52,7 +76,36 @@ if ($SelfTest) {
   if (-not $caughtUnterminated) { throw 'Self-test failed: unterminated block did not throw.' }
   $passedCases++
 
-  Write-Output "claim-issue self-test passed ($passedCases cases: LF/CRLF extraction, stray-branch isolation, missing/unterminated block)."
+  # A failed remote read is not evidence that a branch is absent.
+  $caughtRemoteFailure = $false
+  try {
+    Assert-RemoteBranchAvailable -BranchName 'codex/failure' -Probe ([pscustomobject]@{
+      ExitCode = 128; Output = @('fatal: unable to access remote')
+    })
+  } catch {
+    $caughtRemoteFailure = $_.Exception.Message -match 'query failed' -and $_.Exception.Message -match 'exit 128'
+  }
+  if (-not $caughtRemoteFailure) { throw 'Self-test failed: remote-query failure did not fail closed.' }
+  $passedCases++
+
+  # One successful non-empty probe proves the branch already exists.
+  $caughtExistingBranch = $false
+  try {
+    Assert-RemoteBranchAvailable -BranchName 'codex/existing' -Probe ([pscustomobject]@{
+      ExitCode = 0; Output = @('0123456789abcdef refs/heads/codex/existing')
+    })
+  } catch {
+    $caughtExistingBranch = $_.Exception.Message -match 'already exists'
+  }
+  if (-not $caughtExistingBranch) { throw 'Self-test failed: existing remote branch was accepted.' }
+  $passedCases++
+
+  Assert-RemoteBranchAvailable -BranchName 'codex/available' -Probe ([pscustomobject]@{
+    ExitCode = 0; Output = @()
+  })
+  $passedCases++
+
+  Write-Output "claim-issue self-test passed ($passedCases cases: LF/CRLF extraction, block isolation, remote failure/existing/available branch handling)."
   exit 0
 }
 
@@ -82,11 +135,10 @@ $declaredBranch = Get-HandoffBranch -Body $issueData.body
 if ($declaredBranch -ne $Branch) { throw "Declared branch '$declaredBranch' does not match requested '$Branch'." }
 if ($Branch -eq 'main') { throw 'Cannot claim main as a working branch.' }
 
-# Check remote branch does not exist
-git ls-remote --heads origin $Branch | Out-Null
-
-$remoteRef = git ls-remote --heads origin $Branch 2>$null
-if ($remoteRef) { throw "Remote branch '$Branch' already exists." }
+# Query once, then validate both the exit code and the returned ref from that
+# exact observation. Never retry implicitly and interpret failure as absence.
+$remoteProbe = Invoke-RemoteBranchProbe -BranchName $Branch
+Assert-RemoteBranchAvailable -BranchName $Branch -Probe $remoteProbe
 
 Write-Output ('claim-issue: validated #' + $Issue + ' branch=' + $Branch + ' session=' + $SessionId)
 Write-Output 'Next: dispatch claim-admission workflow to atomically add claim-pending label.'

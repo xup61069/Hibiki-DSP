@@ -205,6 +205,89 @@ function Get-AiContextBudgetErrors {
   return $errors
 }
 
+function Get-RequiredTextErrors {
+  param(
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()]$Entries
+  )
+  $errors = @()
+  foreach ($entry in $Entries) {
+    foreach ($pattern in @($entry.RequiredPatterns)) {
+      if (-not [regex]::IsMatch([string]$entry.Content, [string]$pattern)) {
+        $errors += ("{0}: missing required execution-first contract ({1})" -f $entry.Path, $pattern)
+      }
+    }
+  }
+  return $errors
+}
+
+function Get-IssueFormExecutionErrors {
+  param([Parameter(Mandatory = $true)][string]$Content)
+  $errors = @()
+  if ($Content -notmatch '(?m)^labels:\s*\[\s*["'']execution-request["'']\s*\]\s*$') {
+    $errors += '.github/ISSUE_TEMPLATE/ai-task.yml: missing controlled execution-request label.'
+  }
+  if ($Content.Contains('<!-- hibiki:execution-request-v1 -->')) {
+    $errors += '.github/ISSUE_TEMPLATE/ai-task.yml: must not trust an editable execution marker.'
+  }
+  if ($Content -match '(?m)^\s*<!-- hibiki:handoff-v1\s*$') {
+    $errors += '.github/ISSUE_TEMPLATE/ai-task.yml: must not prefill a handoff block.'
+  }
+  $placeholderPattern = '(?im)^\s*(?:issue|branch|base_commit|owner|updated_at|environment_fingerprint|scope_globs|next_safe_action|resume_commands)\s*:\s*[^\r\n]*(?:\bTBD\b|\bunassigned\b)'
+  if ([regex]::IsMatch($Content, $placeholderPattern)) {
+    $errors += '.github/ISSUE_TEMPLATE/ai-task.yml: must not prefill TBD/unassigned handoff fields.'
+  }
+  foreach ($fieldId in @('objective', 'acceptance', 'owner', 'scope', 'verification')) {
+    if ($Content -notmatch "(?m)^\s*id:\s*$([regex]::Escape($fieldId))\s*$") {
+      $errors += ".github/ISSUE_TEMPLATE/ai-task.yml: missing required execution field '$fieldId'."
+    }
+  }
+  return $errors
+}
+
+function Get-DeliveryWiringErrors {
+  param(
+    [Parameter(Mandatory = $true)][string]$HandoffWorkflow,
+    [Parameter(Mandatory = $true)][string]$ClaimWorkflow
+  )
+  $errors = @()
+  $handoffPatterns = @(
+    '(?m)^\s*pull_request_target:\s*$',
+    '(?m)^\s*types:\s*\[(?=[^\]]*\bedited\b)(?=[^\]]*\bsynchronize\b)[^\]]*\]\s*$',
+    '(?m)^\s*workflow_run:\s*$',
+    '(?m)^\s*workflows:\s*\[verify,\s*CodeQL\]\s*$',
+    '(?m)^\s*contents:\s*read\s*$',
+    '(?m)^\s*issues:\s*read\s*$',
+    '(?m)^\s*pull-requests:\s*read\s*$',
+    '(?m)^\s*checks:\s*read\s*$',
+    '(?m)^\s*actions:\s*read\s*$',
+    '(?m)^\s*statuses:\s*read\s*$',
+    '(?m)^\s*uses:\s*actions/checkout@[0-9a-f]{40}\s*$',
+    '(?m)^\s*ref:\s*\$\{\{\s*github\.event\.repository\.default_branch\s*\}\}\s*$',
+    '(?m)^\s*persist-credentials:\s*false\s*$',
+    '(?m)^\s*run:\s*\.?/?tools/handoff-check\.ps1\s*$',
+    '(?m)^\s*run:\s*\.?/?tools/delivery-audit\.ps1\s*$'
+  )
+  foreach ($pattern in $handoffPatterns) {
+    if (-not [regex]::IsMatch($HandoffWorkflow, $pattern)) {
+      $errors += "handoff-audit workflow is missing required trusted delivery wiring ($pattern)."
+    }
+  }
+  if ($HandoffWorkflow -match '(?m)^\s*[a-z-]+:\s*write\s*$') {
+    $errors += 'handoff-audit workflow must keep every token permission read-only.'
+  }
+  if ($HandoffWorkflow -match '(?i)ref\s*:\s*.*(?:pull_request\.head|head_ref|workflow_run\.head)') {
+    $errors += 'handoff-audit workflow must never checkout an untrusted PR/workflow head.'
+  }
+
+  $branchRead = $ClaimWorkflow.IndexOf("Get-HandoffScalar -Body ([string]`$issue.body) -Key 'branch'", [System.StringComparison]::Ordinal)
+  $ordinalCompare = $ClaimWorkflow.IndexOf('[System.StringComparison]::Ordinal', [System.StringComparison]::Ordinal)
+  $reservation = $ClaimWorkflow.IndexOf("'/repos/{owner}/{repo}/git/refs'", [System.StringComparison]::Ordinal)
+  if ($branchRead -lt 0 -or $ordinalCompare -lt $branchRead -or $reservation -lt $ordinalCompare) {
+    $errors += 'claim-admission workflow must compare dispatch branch to the handoff branch with ordinal equality before reservation.'
+  }
+  return $errors
+}
+
 $unboundedWorktreePattern = 'git worktree list(?![^\r\n`]*\|\s*(?:rg|Select-String)\b)'
 $unboundedGitLogPattern = 'git log(?![^\r\n`]*(?:-\d+\b|--max-count(?:=|\s+)\d+\b))[^\r\n`]*origin/main'
 $unboundedGitHubListPattern = 'gh (?:issue|pr) list(?![^\r\n`]*--limit\s+\d+\b)'
@@ -1010,6 +1093,86 @@ if ($SelfTest) {
     $caseCount++
   }
 
+  # Execution-first canonical wording is required, not advisory prose.
+  $requiredTextPass = @(Get-RequiredTextErrors -Entries @(
+    [pscustomobject]@{
+      Path = 'AGENTS.md'
+      Content = '修正／實作要求預設是交付要求；Issue、branch、PR、CI 不是成果或停止點。'
+      RequiredPatterns = @('修正／實作要求預設是交付要求', '不是成果或停止點')
+    }
+  ))
+  if ($requiredTextPass.Count -ne 0) {
+    throw 'docs-check self-test failed: complete execution-first wording was rejected.'
+  }
+  $caseCount++
+  $requiredTextMissing = @(Get-RequiredTextErrors -Entries @(
+    [pscustomobject]@{ Path = 'AGENTS.md'; Content = 'Only tracking prose.'; RequiredPatterns = @('交付要求') }
+  ))
+  if ($requiredTextMissing.Count -ne 1 -or $requiredTextMissing[0] -notmatch 'missing required execution-first') {
+    throw 'docs-check self-test failed: missing execution-first wording was accepted.'
+  }
+  $caseCount++
+
+  # The Issue form uses a controlled label plus concrete input fields. It must
+  # not trust editable markers or recreate a prefilled TBD handoff queue.
+  $validIssueForm = @(
+    'labels: ["execution-request"]',
+    'id: objective', 'id: acceptance', 'id: owner', 'id: scope', 'id: verification'
+  ) -join "`n"
+  if (@(Get-IssueFormExecutionErrors -Content $validIssueForm).Count -ne 0) {
+    throw 'docs-check self-test failed: execution-only Issue form was rejected.'
+  }
+  $caseCount++
+  $invalidIssueForm = $validIssueForm + "`n<!-- hibiki:handoff-v1`nissue: TBD`n-->"
+  $invalidIssueFormErrors = @(Get-IssueFormExecutionErrors -Content $invalidIssueForm)
+  if ($invalidIssueFormErrors.Count -lt 2 -or $invalidIssueFormErrors -notmatch 'prefill') {
+    throw 'docs-check self-test failed: prefilled TBD handoff was accepted.'
+  }
+  $caseCount++
+  $editableMarkerForm = $validIssueForm + "`nvalue: <!-- hibiki:execution-request-v1 -->"
+  $editableMarkerErrors = @(Get-IssueFormExecutionErrors -Content $editableMarkerForm)
+  if ($editableMarkerErrors -notmatch 'editable execution marker') {
+    throw 'docs-check self-test failed: editable execution marker was accepted as trusted classification.'
+  }
+  $caseCount++
+
+  $validHandoffWorkflow = @(
+    'pull_request_target:', '  types: [opened, edited, synchronize]',
+    'workflow_run:', '  workflows: [verify, CodeQL]', 'permissions:',
+    '  contents: read', '  issues: read', '  pull-requests: read', '  checks: read',
+    '  actions: read', '  statuses: read',
+    '  uses: actions/checkout@1234567890abcdef1234567890abcdef12345678',
+    '  ref: ${{ github.event.repository.default_branch }}', '  persist-credentials: false',
+    '  run: ./tools/handoff-check.ps1', '  run: ./tools/delivery-audit.ps1'
+  ) -join "`n"
+  $validClaimWorkflow = @(
+    "Get-HandoffScalar -Body ([string]`$issue.body) -Key 'branch'",
+    '[System.StringComparison]::Ordinal',
+    "'/repos/{owner}/{repo}/git/refs'"
+  ) -join "`n"
+  if (@(Get-DeliveryWiringErrors -HandoffWorkflow $validHandoffWorkflow -ClaimWorkflow $validClaimWorkflow).Count -ne 0) {
+    throw 'docs-check self-test failed: trusted delivery workflow wiring was rejected.'
+  }
+  $caseCount++
+  $brokenWiring = @(Get-DeliveryWiringErrors -HandoffWorkflow 'issues:' -ClaimWorkflow $validClaimWorkflow)
+  if ($brokenWiring.Count -lt 1) {
+    throw 'docs-check self-test failed: missing delivery workflow wiring was accepted.'
+  }
+  $caseCount++
+  $missingPrEvents = $validHandoffWorkflow.Replace('  types: [opened, edited, synchronize]', '  types: [opened]')
+  $missingPrEventErrors = @(Get-DeliveryWiringErrors -HandoffWorkflow $missingPrEvents -ClaimWorkflow $validClaimWorkflow)
+  if ($missingPrEventErrors -notmatch 'trusted delivery wiring') {
+    throw 'docs-check self-test failed: missing PR edited/synchronize audit events were accepted.'
+  }
+  $caseCount++
+  $untrustedWiring = $validHandoffWorkflow + "`n  contents: write`n  ref: `${{ github.event.pull_request.head.sha }}"
+  $untrustedWiringErrors = @(Get-DeliveryWiringErrors -HandoffWorkflow $untrustedWiring -ClaimWorkflow $validClaimWorkflow)
+  $untrustedWiringText = $untrustedWiringErrors -join ' '
+  if ($untrustedWiringText -notmatch 'read-only' -or $untrustedWiringText -notmatch 'untrusted') {
+    throw 'docs-check self-test failed: untrusted pull_request_target wiring was accepted.'
+  }
+  $caseCount++
+
   # Required schema coverage: all tracked contract schemas must be covered.
   if ((Get-MissingRequiredSchemas -TrackedPaths @('schemas/a-v1.schema.json', 'docs/example.json') -RequiredEntries @('schemas/a-v1.schema.json')).Count -ne 0) {
     throw 'docs-check self-test failed: a covered schema was reported as missing.'
@@ -1310,7 +1473,7 @@ if ($SelfTest) {
 if ($caseCount -lt 12) {
     throw "docs-check self-test failed: expected at least 12 passing cases, saw $caseCount."
   }
-  Write-Output "docs-check self-test passed ($caseCount cases; structural parser, schema-instance validation, multiline normalization, branch mode detection, BASELINE edit detection, AI context budgets, live measurement, ADR frontmatter, Spec frontmatter, markdown relative links)."
+  Write-Output "docs-check self-test passed ($caseCount cases; structural parser, schema-instance validation, execution-first documents/workflows, AI context budgets, live measurement, ADR frontmatter, Spec frontmatter, markdown relative links)."
   exit 0
 }
 
@@ -1326,6 +1489,7 @@ $required = @(
   'apps/control-model/Hibiki.ControlModel.csproj', 'tools/control-model-check.ps1',
   'apps/winui-shell/Hibiki.WinUI.csproj', 'tools/winui-shell-check.ps1',
   'tools/distribution-check.ps1', 'tools/source-only-ci-check.ps1', 'tools/handoff-check.ps1',
+  'tools/delivery-audit.ps1',
   'tools/build-preview.ps1',
   'tools/live-device-catalog-check.ps1', 'tools/live-wasapi-handoff-check.ps1',
   'tools/live-audio-session-check.ps1', 'tools/live-process-loopback-check.ps1',
@@ -1376,21 +1540,56 @@ $missing = @($required | Where-Object { -not (Test-Path (Join-Path $repo $_)) })
 if ($missing.Count -gt 0) { throw "Missing required documentation: $($missing -join ', ')" }
 
 $aiContextEntries = @(
-  [pscustomobject]@{ Path = 'AGENTS.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'AGENTS.md') -Raw); MaxCharacters = 6000; ForbiddenPatterns = @() },
+  [pscustomobject]@{ Path = 'AGENTS.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'AGENTS.md') -Raw); MaxCharacters = 3400; ForbiddenPatterns = @() },
   [pscustomobject]@{ Path = 'CLAUDE.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'CLAUDE.md') -Raw); MaxCharacters = 1000; ForbiddenPatterns = @($adapterGlobalPreloadPattern) },
   [pscustomobject]@{ Path = 'GEMINI.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'GEMINI.md') -Raw); MaxCharacters = 1000; ForbiddenPatterns = @($adapterGlobalPreloadPattern) },
   [pscustomobject]@{ Path = '.github/copilot-instructions.md'; Content = (Get-Content -LiteralPath (Join-Path $repo '.github/copilot-instructions.md') -Raw); MaxCharacters = 1000; ForbiddenPatterns = @($adapterGlobalPreloadPattern) },
   [pscustomobject]@{ Path = '.cursor/rules/project.mdc'; Content = (Get-Content -LiteralPath (Join-Path $repo '.cursor/rules/project.mdc') -Raw); MaxCharacters = 1000; ForbiddenPatterns = @($adapterGlobalPreloadPattern) },
   [pscustomobject]@{ Path = 'README.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'README.md') -Raw); MaxCharacters = 20000; ForbiddenPatterns = @($staleGlobalHandoffRoutePattern, $unboundedWorktreePattern, $unboundedGitLogPattern, $unboundedGitHubListPattern) },
-  [pscustomobject]@{ Path = 'docs/START_HERE.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/START_HERE.md') -Raw); MaxCharacters = 7000; ForbiddenPatterns = @($unboundedWorktreePattern, $unboundedGitLogPattern, $unboundedGitHubListPattern) },
-  [pscustomobject]@{ Path = 'docs/AI_HANDOFF.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/AI_HANDOFF.md') -Raw); MaxCharacters = 6000; ForbiddenPatterns = @($unboundedWorktreePattern, $unboundedGitLogPattern, $unboundedGitHubListPattern, $duplicateIssueBodyPattern) },
+  [pscustomobject]@{ Path = 'docs/START_HERE.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/START_HERE.md') -Raw); MaxCharacters = 4000; ForbiddenPatterns = @($unboundedWorktreePattern, $unboundedGitLogPattern, $unboundedGitHubListPattern) },
+  [pscustomobject]@{ Path = 'docs/AI_HANDOFF.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/AI_HANDOFF.md') -Raw); MaxCharacters = 4000; ForbiddenPatterns = @($unboundedWorktreePattern, $unboundedGitLogPattern, $unboundedGitHubListPattern, $duplicateIssueBodyPattern) },
   [pscustomobject]@{ Path = 'docs/PROJECT_MAP.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/PROJECT_MAP.md') -Raw); MaxCharacters = 12000; ForbiddenPatterns = @($staleGlobalHandoffRoutePattern, $unboundedWorktreePattern, $unboundedGitLogPattern, $unboundedGitHubListPattern) },
-  [pscustomobject]@{ Path = 'docs/ai/MULTI_AGENT.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/ai/MULTI_AGENT.md') -Raw); MaxCharacters = 9000; ForbiddenPatterns = @($unboundedWorktreePattern, $unboundedGitLogPattern, $unboundedGitHubListPattern) },
-  [pscustomobject]@{ Path = 'docs/ai/CODEX_GOALS.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/ai/CODEX_GOALS.md') -Raw); MaxCharacters = 6000; ForbiddenPatterns = @($unboundedWorktreePattern, $unboundedGitLogPattern, $unboundedGitHubListPattern) }
+  [pscustomobject]@{ Path = 'docs/ai/MULTI_AGENT.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/ai/MULTI_AGENT.md') -Raw); MaxCharacters = 6000; ForbiddenPatterns = @($unboundedWorktreePattern, $unboundedGitLogPattern, $unboundedGitHubListPattern) },
+  [pscustomobject]@{ Path = 'docs/ai/CODEX_GOALS.md'; Content = (Get-Content -LiteralPath (Join-Path $repo 'docs/ai/CODEX_GOALS.md') -Raw); MaxCharacters = 3000; ForbiddenPatterns = @($unboundedWorktreePattern, $unboundedGitLogPattern, $unboundedGitHubListPattern) }
 )
 $aiContextErrors = @(Get-AiContextBudgetErrors -Entries $aiContextEntries)
 if ($aiContextErrors.Count -gt 0) {
   throw ('AI startup context contract failed: ' + ($aiContextErrors -join '; '))
+}
+
+$agentsContract = Get-Content -LiteralPath (Join-Path $repo 'AGENTS.md') -Raw
+$executionContractErrors = @(Get-RequiredTextErrors -Entries @(
+  [pscustomobject]@{
+    Path = 'AGENTS.md'
+    Content = $agentsContract
+    RequiredPatterns = @(
+      '修正／實作要求預設是交付要求',
+      '(?s)Issue、branch、\s*PR\s+與\s+CI\s+只是協作／稽核(?:記錄|紀錄)，不是成果或停止點',
+      '(?s)不得建立\s+candidate、TBD、pre-claim\s+或排隊\s+Issue',
+      '(?s)draft PR.*acceptance.*fresh exact-head (?:checks\s+全綠|green).*ready.*(?:合併|merge)',
+      '(?s)safety、permission、scope\s+或\s+external\s+blocker',
+      '(?s)Integrator\s+先\s+drain\s+(?:可安全合併的|安全)\s+green PR',
+      '(?s)PowerShell 7（`pwsh`）.*缺少時記錄\s+permission／external blocker',
+      '(?s)未經 maintainer\s+明確授權不得安裝系統套件',
+      'tools/delivery-audit\.ps1\s+-Issue\s+<n>'
+    )
+  }
+))
+if ($executionContractErrors.Count -gt 0) {
+  throw ('Execution-first documentation contract failed: ' + ($executionContractErrors -join '; '))
+}
+
+$issueFormText = Get-Content -LiteralPath (Join-Path $repo '.github/ISSUE_TEMPLATE/ai-task.yml') -Raw
+$issueFormErrors = @(Get-IssueFormExecutionErrors -Content $issueFormText)
+if ($issueFormErrors.Count -gt 0) {
+  throw ('Execution Issue form contract failed: ' + ($issueFormErrors -join '; '))
+}
+
+$handoffWorkflowText = Get-Content -LiteralPath (Join-Path $repo '.github/workflows/handoff-audit.yml') -Raw
+$claimWorkflowText = Get-Content -LiteralPath (Join-Path $repo '.github/workflows/claim-admission.yml') -Raw
+$deliveryWiringErrors = @(Get-DeliveryWiringErrors -HandoffWorkflow $handoffWorkflowText -ClaimWorkflow $claimWorkflowText)
+if ($deliveryWiringErrors.Count -gt 0) {
+  throw ('Execution delivery workflow contract failed: ' + ($deliveryWiringErrors -join '; '))
 }
 
 $trackedSchemas = @(git -C $repo ls-files -- 'schemas/*.schema.json')

@@ -1,59 +1,58 @@
-name: AI task slice
-description: Draft one independently verifiable work slice for orchestrator assignment.
-title: "[AI Task] "
+name: AI execution slice
+description: Create one complete work slice only when its assigned writer will start immediately.
+title: "[Execution] "
+labels: ["execution-request"]
 body:
   - type: markdown
     attributes:
       value: |
-        This form creates an unassigned TBD pre-claim. One Issue maps to one AI writer,
-        one non-main branch, one handoff block and one draft PR. A dedicated clone/worktree
-        is mandatory when another writer is active or occupancy is uncertain, and recommended
-        otherwise. The orchestrator fills the Issue number, branch, base and owner before
-        adding an assignee. `claim-pending` is a non-authoritative admission marker; it does
-        not authorize writes. The serialized claim-admission workflow must complete global
-        overlap/audit/readback before replacing it with `claimed`.
+        Use this form for immediate delivery, not planning or parked work. After creation, the
+        orchestrator must add one concrete `hibiki:handoff-v1` block and complete serialized claim
+        admission before the writer edits. The Issue, branch, PR, and CI are delivery records, not
+        the result.
   - type: textarea
     id: objective
     attributes:
-      label: Objective and acceptance
-      description: Define one independently verifiable outcome.
+      label: Objective
+      description: State the user-visible fix or capability this writer will deliver now.
     validations:
       required: true
   - type: textarea
-    id: handoff
+    id: acceptance
     attributes:
-      label: Machine-readable TBD pre-claim
-      description: Keep this block intact. Declare the proposed write scope; the orchestrator replaces every TBD/unassigned field when claiming the Issue.
-      render: markdown
-      value: |
-        <!-- hibiki:handoff-v1
-        schema_version: 2
-        issue: TBD
-        branch: codex/TBD-short-slug
-        target_branch: main
-        base_commit: TBD
-        role: worker
-        owner: unassigned
-        updated_at: TBD
-        environment_fingerprint: TBD
-        scope_globs: ["TBD"]
-        shared_paths: []
-        depends_on: []
-        specs: []
-        adrs: []
-        next_safe_action: "TBD: orchestrator assigns the Issue, checks overlap/occupancy and selects an isolated workspace when required."
-        resume_commands: ["git fetch origin --prune", "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue TBD"]
-        -->
+      label: Acceptance criteria
+      description: List observable pass conditions, including integration on the target branch.
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Assigned writer
+      description: Enter the GitHub login of the writer who will begin immediately after claim.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Write scope and dependencies
+      description: List repo-relative scope_globs, shared paths, semantic ownership, and dependencies.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification plan
+      description: List the always-run and scope-matched gates plus any exact-head hosted checks.
     validations:
       required: true
   - type: checkboxes
-    id: preclaim
+    id: start
     attributes:
-      label: Pre-claim checks
+      label: Immediate execution checks
       options:
-        - label: I checked open Issues, draft PRs and existing handoff blocks for scope overlap.
+        - label: The assigned writer is ready to start immediately after a complete handoff and claim.
           required: true
-        - label: I understand this draft is not assigned until the orchestrator fills the handoff, assigns one owner and adds `claimed`.
+        - label: Active Issues, PRs, scopes, semantic ownership, and worktree occupancy were checked for conflicts.
           required: true
-        - label: The assigned writer will use a non-main branch, isolate the worktree when required, then push the first WIP/reviewable commit and open one draft PR.
+        - label: The writer will use a non-main branch and will continue its draft PR through acceptance, fresh exact-head green checks, ready state, and merge unless a concrete blocker is recorded.
           required: true
