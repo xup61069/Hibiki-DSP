@@ -251,15 +251,20 @@ bool read_ws_client_frame(const WsStreamRead& reader,
         error = WsFrameError::IncompleteFrame;
         return false;
     }
-    if ((header[0] & 0x70U) != 0U || (header[0] & 0x80U) == 0U) {
+    if ((header[0] & 0x70U) != 0U) {
         error = WsFrameError::ReservedBitsSet;
         return false;
     }
-    frame.opcode = static_cast<std::uint8_t>(header[0] & 0x0fU);
-    if ((frame.opcode & 0x08U) != 0U && (header[0] & 0x80U) == 0U) {
+    const auto opcode = static_cast<std::uint8_t>(header[0] & 0x0fU);
+    if ((opcode & 0x08U) != 0U && (header[0] & 0x80U) == 0U) {
         error = WsFrameError::FragmentedControlFrame;
         return false;
     }
+    if ((header[0] & 0x80U) == 0U) {
+        error = WsFrameError::ReservedBitsSet;
+        return false;
+    }
+    frame.opcode = opcode;
     const bool masked = (header[1] & 0x80U) != 0U;
     if (!masked) {
         error = WsFrameError::UnmaskedClientFrame;
