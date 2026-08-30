@@ -1,4 +1,5 @@
 #include "hibiki/output_fanout.hpp"
+#include "hibiki/control_payloads.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -16,9 +17,7 @@ bool valid_channels(const std::uint32_t channels) noexcept {
 }
 
 [[nodiscard]] bool is_printable_label(const std::string_view value) noexcept {
-    return std::all_of(value.begin(), value.end(), [](unsigned char ch) {
-        return ch >= 0x20U && ch != 0x7FU && !(ch >= 0x80U && ch <= 0x9FU);
-    });
+    return is_printable_utf8_v1(value);
 }
 
 constexpr std::uint64_t kPublicationWritingBit = 1U;
