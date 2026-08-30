@@ -133,12 +133,12 @@ function Get-CurrentHeadCheckState {
     $conclusion = [string](Get-ObjectPropertyValue -InputObject $check -Name 'conclusion' -Default '')
     $state = [string](Get-ObjectPropertyValue -InputObject $check -Name 'state' -Default '')
 
-    # A newer handoff-audit run can cancel its predecessor through the
-    # workflow's concurrency group. The cancelled predecessor is superseded;
-    # it must not permanently poison an otherwise green current head. Every
-    # other failed, pending, or cancelled check remains fail-closed below.
-    if ($workflow -ieq 'handoff-audit' -and $name -ieq 'audit' -and
-        $status -ieq 'COMPLETED' -and $conclusion -ieq 'CANCELLED') {
+    # handoff-audit is the result of this policy, not an input to it. A run
+    # observes its own pending check and may supersede older cancelled or
+    # failed runs through workflow concurrency; considering any of them here
+    # would make the audit recursively block itself. Every non-audit check
+    # remains fail-closed below.
+    if ($workflow -ieq 'handoff-audit' -and $name -ieq 'audit') {
       continue
     }
     $consideredCheckCount++
@@ -562,6 +562,14 @@ if ($SelfTest) {
   $readyGreen.mergeStateStatus = 'BEHIND'
   $inReviewRecords = @(Assert-DeliveryInventory -OpenIssues @($inReview) -OpenPullRequests @($readyGreen))
   $caseCount++
+  $pendingSelfAudit = [pscustomobject]@{
+    name = 'audit'; workflowName = 'handoff-audit'; status = 'IN_PROGRESS'; conclusion = ''
+  }
+  $readyDuringAudit = New-TestPr -Draft $false -Checks @(
+    (New-GreenChecks) + $pendingSelfAudit
+  )
+  [void](Assert-DeliveryInventory -OpenIssues @($inReview) -OpenPullRequests @($readyDuringAudit))
+  $caseCount++
   $cancelledSupersededAudit = [pscustomobject]@{
     name = 'audit'; workflowName = 'handoff-audit'; status = 'COMPLETED'; conclusion = 'CANCELLED'
   }
@@ -569,6 +577,14 @@ if ($SelfTest) {
     (New-GreenChecks) + $cancelledSupersededAudit
   )
   [void](Assert-DeliveryInventory -OpenIssues @($inReview) -OpenPullRequests @($readyAfterCancelledAudit))
+  $caseCount++
+  $failedSupersededAudit = [pscustomobject]@{
+    name = 'audit'; workflowName = 'handoff-audit'; status = 'COMPLETED'; conclusion = 'FAILURE'
+  }
+  $readyAfterFailedAudit = New-TestPr -Draft $false -Checks @(
+    (New-GreenChecks) + $failedSupersededAudit
+  )
+  [void](Assert-DeliveryInventory -OpenIssues @($inReview) -OpenPullRequests @($readyAfterFailedAudit))
   $caseCount++
   Assert-Throws {
     $cancelledNonAudit = [pscustomobject]@{
@@ -581,14 +597,14 @@ if ($SelfTest) {
   } 'cancelled non-audit check remains blocking' 'current head'
   $caseCount++
   Assert-Throws {
-    $failedAudit = [pscustomobject]@{
-      name = 'audit'; workflowName = 'handoff-audit'; status = 'COMPLETED'; conclusion = 'FAILURE'
+    $failedNonAudit = [pscustomobject]@{
+      name = 'external-policy'; workflowName = 'external-policy'; status = 'COMPLETED'; conclusion = 'FAILURE'
     }
-    $readyWithFailedAudit = New-TestPr -Draft $false -Checks @(
-      (New-GreenChecks) + $failedAudit
+    $readyWithFailedNonAudit = New-TestPr -Draft $false -Checks @(
+      (New-GreenChecks) + $failedNonAudit
     )
-    Assert-DeliveryInventory -OpenIssues @($inReview) -OpenPullRequests @($readyWithFailedAudit)
-  } 'failed audit check remains blocking' 'current head'
+    Assert-DeliveryInventory -OpenIssues @($inReview) -OpenPullRequests @($readyWithFailedNonAudit)
+  } 'failed non-audit check remains blocking' 'current head'
   $caseCount++
   $drainCandidates = @(Get-DrainCandidates -Records $inReviewRecords)
   if ($drainCandidates.Count -ne 1 -or $drainCandidates[0].PullRequest -ne 51 -or
