@@ -5,6 +5,7 @@
 #include "hibiki/vst3_lane_bridge.hpp"
 #include "hibiki/vst3_route_status.hpp"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
@@ -77,7 +78,8 @@ int main() {
     CHECK(!bridge.prepare_lane("", kStereo, storage));
     const std::string_view too_long("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", hibiki::kMaxOutputGroupBytesV1 + 1);
     CHECK(!bridge.prepare_lane(too_long, kStereo, storage));
-    const std::array<std::string_view, 7> malformed_groups{{
+    const std::string_view embedded_nul_group("tap\0group", 9U);
+    const std::array<std::string_view, 8> malformed_groups{{
         std::string_view("\x80", 1U),
         std::string_view("\xC0\x80", 2U),
         std::string_view("\xED\xA0\x80", 3U),
@@ -85,6 +87,7 @@ int main() {
         std::string_view("\x01", 1U),
         std::string_view("\x7F", 1U),
         std::string_view("\xC2\x80", 2U),
+        embedded_nul_group,
     }};
     for (const auto group : malformed_groups) {
         CHECK(!bridge.prepare_lane(group, kStereo, storage));
@@ -250,6 +253,11 @@ int main() {
     for (std::size_t i = 0; i < kTapFrames * kStereo; ++i) {
         CHECK(tap_dest[i] == 0.5F);
     }
+    const auto tap_channels_before_invalid_publish = tap_channels;
+    const auto tap_frames_before_invalid_publish = tap_frames;
+    const auto tap_sequence_before_invalid_publish = tap_seq;
+    const std::vector<float> tap_snapshot_before_invalid_publish(
+        tap_dest.begin(), tap_dest.begin() + kTapFrames * kStereo);
 
     // ---- concurrent tap publication/read --------------------------------------
     // Every successful read must be one complete generation-distinct block. A
@@ -356,6 +364,21 @@ int main() {
         CHECK(!tap.publish(group, tap_block.data(), kTapFrames, kStereo));
         CHECK(!tap.read(group, tap_dest.data(), hibiki::kMaxVst3TapFramesV1,
                         tap_channels, tap_frames, tap_seq));
+    }
+    const auto rejected_tap_block = make_block(kTapFrames / 2U, 1U, -0.75F);
+    CHECK(!tap.publish(embedded_nul_group, rejected_tap_block.data(),
+                       kTapFrames / 2U, 1U));
+    std::fill(tap_dest.begin(), tap_dest.end(), -4.0F);
+    tap_channels = 0U;
+    tap_frames = 0U;
+    tap_seq = 0U;
+    CHECK(tap.read("tap-group", tap_dest.data(), hibiki::kMaxVst3TapFramesV1,
+                   tap_channels, tap_frames, tap_seq));
+    CHECK(tap_channels == tap_channels_before_invalid_publish);
+    CHECK(tap_frames == tap_frames_before_invalid_publish);
+    CHECK(tap_seq == tap_sequence_before_invalid_publish);
+    for (std::size_t i = 0U; i < kTapFrames * kStereo; ++i) {
+        CHECK(tap_dest[i] == tap_snapshot_before_invalid_publish[i]);
     }
 
     // ---- tap NaN/Inf rejection --------------------------------------------------------
