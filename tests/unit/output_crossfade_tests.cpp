@@ -177,6 +177,46 @@ int main() {
     CHECK(geometry_candidate.snapshot().processed_frames ==
           geometry_baseline.snapshot().processed_frames);
 
+    // ---- non-finite input is rejected before output/state mutation ----------
+    hibiki::OutputCrossfade finite_baseline;
+    hibiki::OutputCrossfade finite_candidate;
+    CHECK(finite_baseline.begin(kStereo, kRate48k, 10U));
+    CHECK(finite_candidate.begin(kStereo, kRate48k, 10U));
+    const std::array<float, kStereo> finite_old{1.0F, -1.0F};
+    const std::array<float, kStereo> finite_new{0.5F, -0.5F};
+    constexpr float non_finite_values[] = {
+        std::numeric_limits<float>::quiet_NaN(),
+        std::numeric_limits<float>::infinity(),
+        -std::numeric_limits<float>::infinity(),
+    };
+    for (std::size_t source = 0U; source < 2U; ++source) {
+        for (const auto value : non_finite_values) {
+            auto invalid_old = finite_old;
+            auto invalid_new = finite_new;
+            (source == 0U ? invalid_old : invalid_new)[1U] = value;
+            std::array<float, kStereo> untouched_output{-9.0F, -9.0F};
+            const auto snapshot_before_invalid = finite_candidate.snapshot();
+            CHECK(!finite_candidate.process(invalid_old.data(), invalid_new.data(),
+                                            untouched_output.data(), 1U));
+            CHECK(untouched_output[0] == -9.0F && untouched_output[1] == -9.0F);
+            CHECK(finite_candidate.snapshot().active == snapshot_before_invalid.active);
+            CHECK(finite_candidate.snapshot().channels == snapshot_before_invalid.channels);
+            CHECK(finite_candidate.snapshot().total_frames ==
+                  snapshot_before_invalid.total_frames);
+            CHECK(finite_candidate.snapshot().processed_frames ==
+                  snapshot_before_invalid.processed_frames);
+        }
+    }
+    std::array<float, kStereo> finite_baseline_output{-9.0F, -9.0F};
+    std::array<float, kStereo> finite_candidate_output{-9.0F, -9.0F};
+    CHECK(finite_baseline.process(finite_old.data(), finite_new.data(),
+                                  finite_baseline_output.data(), 1U));
+    CHECK(finite_candidate.process(finite_old.data(), finite_new.data(),
+                                   finite_candidate_output.data(), 1U));
+    CHECK(finite_candidate_output == finite_baseline_output);
+    CHECK(finite_candidate.snapshot().processed_frames ==
+          finite_baseline.snapshot().processed_frames);
+
     // ---- multichannel interleaving ------------------------------------------
     hibiki::OutputCrossfade surround;
     constexpr std::uint32_t kSixCh = 6U;
