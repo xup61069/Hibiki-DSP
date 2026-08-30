@@ -246,6 +246,16 @@ function Assert-ExtensionSourcePolicy(
       throw "Offscreen source must ignore stale bridge socket callbacks in $sourceName."
     }
   }
+  foreach ($captureOwnershipPattern in @(
+      'async\s+function\s+startCapture\s*\([^)]*\)\s*\{\s*await\s+teardownCaptureGraph\s*\(\s*\)\s*;[\s\S]{0,120}capturing\s*=\s*true',
+      'track\.addEventListener\(\s*(?:\x27|\x22)ended(?:\x27|\x22)\s*,\s*\(\s*\)\s*=>\s*\{\s*void\s+handleSourceEnded\s*\(\s*stream\s*\)',
+      'async\s+function\s+handleSourceEnded\s*\(\s*endedStream\s*\)\s*\{\s*if\s*\(\s*activeStream\s*!==\s*endedStream\s*\)\s*return\s*;',
+      'const\s+streamToStop\s*=\s*activeStream\s*;\s*activeStream\s*=\s*null\s*;\s*streamToStop\?\.getTracks\s*\(\s*\)\.forEach\(\s*track\s*=>\s*track\.stop\s*\(\s*\)\s*\)'
+    )) {
+    if ($offscreenSource -notmatch $captureOwnershipPattern) {
+      throw "Offscreen source must retain replacement capture ownership in $sourceName."
+    }
+  }
   if ($offscreenSource -notmatch 'capturing\s*=\s*true') {
     throw "Offscreen source must set capturing=true during active capture for retry gating in $sourceName."
   }
@@ -287,8 +297,8 @@ function Assert-ExtensionSourcePolicy(
       throw ("Offscreen source is missing bounded reconnect progress boundary [{0}] in {1}." -f $progressPattern, $sourceName)
     }
   }
-  if ($offscreenSource -notmatch 'async\s+function\s+handleSourceEnded\s*\(\s*\)\s*\{[\s\S]{0,400}await\s+teardownCaptureGraph\s*\(\s*\)\s*;[\s\S]{0,300}offscreen-capture-released') {
-    throw "Offscreen natural-end handler must tear down the capture graph before reporting and requesting document release in $sourceName."
+  if ($offscreenSource -notmatch 'async\s+function\s+handleSourceEnded\s*\(\s*endedStream\s*\)\s*\{\s*if\s*\(\s*activeStream\s*!==\s*endedStream\s*\)\s*return\s*;[\s\S]{0,400}await\s+teardownCaptureGraph\s*\(\s*\)\s*;[\s\S]{0,300}offscreen-capture-released') {
+    throw "Offscreen natural-end handler must retain stream ownership before teardown and document release in $sourceName."
   }
   $webSocketMatches = [regex]::Matches(
     $offscreenSource,
@@ -470,12 +480,24 @@ if ($SelfTest) {
   $sourceFixture.offscreen = $sourceFixture.offscreen.Replace(
     "bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab');bridge.binaryType = 'arraybuffer'; bridge.onopen = () => {}; bridge.onclose = () => { bridge = null; scheduleBridgeRetry(); };",
     "const socket = new WebSocket('ws://127.0.0.1:17842/v1/tab'); bridge = socket; socket.binaryType = 'arraybuffer'; socket.onopen = () => { if (bridge !== socket || !capturing) return; }; socket.onclose = () => { if (bridge !== socket || !capturing) return; bridge = null; scheduleBridgeRetry(); };")
+  $sourceFixture.offscreen += " async function startCapture(message) { await teardownCaptureGraph(); capturing = true; } async function teardownCaptureGraph() { const streamToStop = activeStream; activeStream = null; streamToStop?.getTracks().forEach(track => track.stop()); }"
+  $sourceFixture.offscreen = $sourceFixture.offscreen.Replace(
+    "track.addEventListener('ended', handleSourceEnded);",
+    "track.addEventListener('ended', () => { void handleSourceEnded(stream); });")
+  $sourceFixture.offscreen = $sourceFixture.offscreen.Replace(
+    "async function handleSourceEnded() {",
+    "async function handleSourceEnded(endedStream) { if (activeStream !== endedStream) return;")
   Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-source-valid'
 
   $missingStaleSocketGuard = $sourceFixture.offscreen -replace 'bridge !== socket \|\| !capturing', 'bridge !== socket'
   $caught = $false
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $missingStaleSocketGuard $sourceFixture.worklet 'selftest-stale-socket-guard' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected stale bridge socket callback guard failure.' }
+
+  $missingReplacementStreamGuard = $sourceFixture.offscreen -replace 'activeStream !== endedStream', 'activeStream === endedStream'
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $missingReplacementStreamGuard $sourceFixture.worklet 'selftest-replacement-stream-guard' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected replacement capture stream ownership guard failure.' }
 
   $missingStopHandler = $sourceFixture.popup -replace "chrome\.runtime\.sendMessage\(\{type: 'stop-capture'\}\)", 'console.log()'
   $caught = $false
@@ -583,7 +605,8 @@ connect-src   ws://127.0.0.1:17842
   try { Assert-ExtensionSourcePolicy $droppedResponseCheck $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-popup-drops-ok-check' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected popup dropped ok-check failure.' }
 
-  $droppedEndedListener = $sourceFixture.offscreen -replace "track\.addEventListener\('ended', handleSourceEnded\);", ''
+  $droppedEndedListener = $sourceFixture.offscreen.Replace(
+    "track.addEventListener('ended', () => { void handleSourceEnded(stream); });", '')
   $caught = $false
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $droppedEndedListener $sourceFixture.worklet 'selftest-offscreen-drops-ended-listener' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected missing offscreen ended listener failure.' }
@@ -593,7 +616,7 @@ connect-src   ws://127.0.0.1:17842
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $droppedReleaseNotification $sourceFixture.worklet 'selftest-offscreen-drops-release-notification' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected missing natural-end release notification failure.' }
 
-  $missingHandlerDefinition = $sourceFixture.offscreen -replace 'async function handleSourceEnded\(\) \{.*\}', ''
+  $missingHandlerDefinition = $sourceFixture.offscreen -replace 'async function handleSourceEnded\(endedStream\) \{.*\}', ''
   $caught = $false
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $missingHandlerDefinition $sourceFixture.worklet 'selftest-offscreen-missing-ended-handler-definition' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected missing natural-end handler definition failure.' }

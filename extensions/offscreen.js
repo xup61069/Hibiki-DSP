@@ -15,6 +15,7 @@ let bridgeRetryAttempt = 0;
 let bridgeRetryExhausted = false;
 let bridgeRetryDeadlineMs = 0;
 let stateHeartbeatTimer = null;
+let captureLifecycleTail = Promise.resolve();
 
 const BRIDGE_RETRY_MAX_ATTEMPTS = 10;
 const BRIDGE_RETRY_BASE_MS = 1000;
@@ -115,6 +116,12 @@ function cancelBridgeRetry() {
   bridgeRetryExhausted = false;
 }
 
+function enqueueCaptureLifecycle(operation) {
+  const next = captureLifecycleTail.then(operation, operation);
+  captureLifecycleTail = next.catch(() => {});
+  return next;
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'get-capture-state') {
     sendResponse({
@@ -130,7 +137,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
   if (message?.type === 'stop-tab-stream') {
-    stopCapture()
+    enqueueCaptureLifecycle(() => stopCapture())
       .then(() => sendResponse({ok: true}))
       .catch((error) => sendResponse({ok: false, error: String(error)}));
     return true;
@@ -146,7 +153,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
   if (message?.type !== 'start-tab-stream' || typeof message.streamId !== 'string') return false;
-  startCapture(message)
+  enqueueCaptureLifecycle(() => startCapture(message))
     .then(() => sendResponse({ok: true}))
     .catch((error) => sendResponse({ok: false, error: String(error)}));
   return true;
@@ -159,16 +166,12 @@ function setBridgeConnected(connected) {
 }
 
 async function startCapture(message) {
+  await teardownCaptureGraph();
   capturing = true;
   droppedPackets = 0;
   totalPackets = 0;
   captureStartedAtMs = Date.now();
   lastPacketActivityAtMs = 0;
-  cancelBridgeRetry();
-  bridge?.close();
-  bridge = null;
-  setBridgeConnected(false);
-  await closeExistingContext();
   context = new AudioContext();
   try {
     await context.audioWorklet.addModule('audio-worklet.js');
@@ -181,7 +184,7 @@ async function startCapture(message) {
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     activeStream = stream;
     stream.getTracks().forEach((track) => {
-      track.addEventListener('ended', () => { void handleSourceEnded(); });
+      track.addEventListener('ended', () => { void handleSourceEnded(stream); });
     });
     source = context.createMediaStreamSource(stream);
     packetizer = new AudioWorkletNode(context, 'hibiki-tab-packetizer');
@@ -206,18 +209,14 @@ async function startCapture(message) {
   }
 }
 
-async function handleSourceEnded() {
-  if (!activeStream) return;
-  await teardownCaptureGraph();
-  reportState();
-  chrome.runtime.sendMessage({type: 'offscreen-capture-released'});
-}
-
-async function closeExistingContext() {
-  if (context) {
-    try { await context.close(); } catch (_) {}
-    context = null;
-  }
+async function handleSourceEnded(endedStream) {
+  if (activeStream !== endedStream) return;
+  return enqueueCaptureLifecycle(async () => {
+    if (activeStream !== endedStream) return;
+    await teardownCaptureGraph();
+    reportState();
+    chrome.runtime.sendMessage({type: 'offscreen-capture-released'});
+  });
 }
 
 async function teardownCaptureGraph() {
@@ -226,8 +225,9 @@ async function teardownCaptureGraph() {
   setStateHeartbeat(false);
   captureStartedAtMs = 0;
   lastPacketActivityAtMs = 0;
-  activeStream?.getTracks().forEach(track => track.stop());
+  const streamToStop = activeStream;
   activeStream = null;
+  streamToStop?.getTracks().forEach(track => track.stop());
   source?.disconnect();
   source = null;
   packetizer?.disconnect();
