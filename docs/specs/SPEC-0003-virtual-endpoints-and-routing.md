@@ -213,10 +213,11 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   不屬於目前 target group；背景 lane 只推進 clock，不混入 target output。contract test
   覆蓋 main/movie 交錯 callback 時的 impulse 對齊。
 - `WindowsWasapiOutputV1` 提供 user-space physical sink boundary：同一個 dedicated sink worker
-  apartment 以 endpoint ID 綁定 shared-mode Float32 2/6/8 聲道與固定 sample rate，再由該 worker
-  的 `render` 處理 padding、WASAPI buffer copy、ReleaseBuffer。格式不符、裝置不存在或 buffer
-  不足都回傳失敗；Hibiki graph RT thread 不得呼叫此 COM API、初始化 COM、配置或重新綁定，
-  control plane 只能排程 worker command。
+  apartment 以 endpoint ID 綁定 shared-mode 2/6/8 聲道與固定 sample rate；caller 提供 Float32，
+  該 worker 的 `render` 再依 endpoint mix format 無配置地寫入 Float32、PCM16、PCM24 或 PCM32，
+  並處理 padding、WASAPI buffer copy、ReleaseBuffer。格式不符、裝置不存在或 buffer 不足都回傳
+  失敗；Hibiki graph RT thread 不得呼叫此 COM API、初始化 COM、配置或重新綁定，control plane
+  只能排程 worker command。
 - `VirtualMicRouteModel` 提供未來 Virtual Mic endpoint 的 user-space capture/reference contract：
   固定 1/2 聲道與 44.1/48/96/192 kHz、privacy mute 預設開啟、caller-owned capture 與
   render echo-reference copy。可選 `VirtualMicDspV1` 以固定 128-tap 上限做 normalized-LMS

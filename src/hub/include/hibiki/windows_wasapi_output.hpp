@@ -46,7 +46,8 @@ struct WindowsWasapiOutputV1TestAccess;
 // WASAPI shared-mode endpoint owned by one dedicated sink worker (not the
 // Hibiki graph RT thread). That worker must initialize COM and perform bind,
 // start, render and unbind on the same apartment; the control plane schedules
-// commands to it. Only Float32 mix formats are accepted.
+// commands to it. Callers submit Float32; the render boundary writes the
+// endpoint's accepted Float32, PCM16, PCM24, or PCM32 mix format.
 class WindowsWasapiOutputV1 final {
 public:
   WindowsWasapiOutputV1() noexcept = default;
