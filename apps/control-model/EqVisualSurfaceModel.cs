@@ -32,6 +32,7 @@ public sealed record EqVisualFrameV1(
     IReadOnlyList<EqVisualPointV1> Points)
 {
     public bool IsValid =>
+        Sequence != 0UL &&
         Points is not null &&
         Points.Count is >= 4 and <= 32 &&
         Points.All(point => EqVisualPointV1.IsValid(point)) &&
