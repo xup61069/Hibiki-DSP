@@ -448,6 +448,13 @@ bool test_websocket_frames() {
         return false;
     }
 
+    std::vector<std::uint8_t> oversized_close;
+    append_client_frame(oversized_close, 0x8U, std::vector<std::uint8_t>(126U, 0U));
+    if (!expect_frame_failure(oversized_close, 1024U * 1024U, hibiki::WsFrameError::PayloadTooLarge,
+                              "oversized control frame fails closed")) {
+        return false;
+    }
+
     std::vector<std::uint8_t> long_form_stream;
     append_client_frame(long_form_stream, 0x2U, small, true, false, true, true);
     if (!expect_frame_success(long_form_stream, 0x2U, small,
@@ -605,6 +612,16 @@ bool test_serve_loop_semantics() {
     std::vector<std::uint8_t> payload;
     if (!expect(!hibiki::next_ws_binary_message(reader, writer, 64U * 1024U, kind, payload),
                 "non-binary non-control opcode fails closed")) {
+        return false;
+    }
+
+    client_stream.clear();
+    append_client_frame(client_stream, 0x8U, std::vector<std::uint8_t>(126U, 0U));
+    offset = 0U;
+    server_output.clear();
+    if (!expect(!hibiki::next_ws_binary_message(reader, writer, 64U * 1024U, kind, payload) &&
+                    server_output.empty(),
+                "oversized close is rejected without a normal close reply")) {
         return false;
     }
 
