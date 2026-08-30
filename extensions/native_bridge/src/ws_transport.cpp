@@ -311,6 +311,69 @@ bool has_valid_ws_close_status(const std::span<const std::uint8_t> payload) {
            status != 1006U && status != 1015U;
 }
 
+bool is_utf8_continuation(const std::uint8_t byte) {
+    return (byte & 0xc0U) == 0x80U;
+}
+
+bool has_valid_utf8(const std::span<const std::uint8_t> bytes) {
+    for (std::size_t index = 0U; index < bytes.size();) {
+        const auto first = bytes[index];
+        if (first <= 0x7fU) {
+            ++index;
+        } else if (first >= 0xc2U && first <= 0xdfU) {
+            if (index + 1U >= bytes.size() || !is_utf8_continuation(bytes[index + 1U])) return false;
+            index += 2U;
+        } else if (first == 0xe0U) {
+            if (index + 2U >= bytes.size() || bytes[index + 1U] < 0xa0U ||
+                bytes[index + 1U] > 0xbfU || !is_utf8_continuation(bytes[index + 2U])) {
+                return false;
+            }
+            index += 3U;
+        } else if ((first >= 0xe1U && first <= 0xecU) || (first >= 0xeeU && first <= 0xefU)) {
+            if (index + 2U >= bytes.size() || !is_utf8_continuation(bytes[index + 1U]) ||
+                !is_utf8_continuation(bytes[index + 2U])) {
+                return false;
+            }
+            index += 3U;
+        } else if (first == 0xedU) {
+            if (index + 2U >= bytes.size() || bytes[index + 1U] < 0x80U ||
+                bytes[index + 1U] > 0x9fU || !is_utf8_continuation(bytes[index + 2U])) {
+                return false;
+            }
+            index += 3U;
+        } else if (first == 0xf0U) {
+            if (index + 3U >= bytes.size() || bytes[index + 1U] < 0x90U ||
+                bytes[index + 1U] > 0xbfU || !is_utf8_continuation(bytes[index + 2U]) ||
+                !is_utf8_continuation(bytes[index + 3U])) {
+                return false;
+            }
+            index += 4U;
+        } else if (first >= 0xf1U && first <= 0xf3U) {
+            if (index + 3U >= bytes.size() || !is_utf8_continuation(bytes[index + 1U]) ||
+                !is_utf8_continuation(bytes[index + 2U]) || !is_utf8_continuation(bytes[index + 3U])) {
+                return false;
+            }
+            index += 4U;
+        } else if (first == 0xf4U) {
+            if (index + 3U >= bytes.size() || bytes[index + 1U] < 0x80U ||
+                bytes[index + 1U] > 0x8fU || !is_utf8_continuation(bytes[index + 2U]) ||
+                !is_utf8_continuation(bytes[index + 3U])) {
+                return false;
+            }
+            index += 4U;
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool has_valid_ws_close_payload(const std::span<const std::uint8_t> payload) {
+    return payload.empty() ||
+           (payload.size() >= 2U && has_valid_ws_close_status(payload) &&
+            has_valid_utf8(payload.subspan(2U)));
+}
+
 bool send_ws_control_frame(const WsStreamWrite& writer,
                            const std::uint8_t opcode,
                            const std::span<const std::uint8_t> payload) {
@@ -333,7 +396,7 @@ bool next_ws_binary_message(const WsStreamRead& reader,
     WsFrameError error{WsFrameError::None};
     if (!read_ws_client_frame(reader, max_payload, frame, error)) return false;
     if (frame.opcode == 0x8U) {
-        if (frame.payload.size() == 1U || !has_valid_ws_close_status(frame.payload)) return false;
+        if (!has_valid_ws_close_payload(frame.payload)) return false;
         if (!send_ws_control_frame(writer, 0x8U, {})) return false;
         kind = WsMessageKind::Close;
         return true;

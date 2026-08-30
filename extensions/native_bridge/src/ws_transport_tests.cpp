@@ -324,12 +324,64 @@ bool test_close_status_validation() {
     return true;
 }
 
+bool test_close_reason_utf8_validation() {
+    const auto run_close = [](const std::vector<std::uint8_t>& close_payload,
+                              hibiki::WsMessageKind& kind,
+                              std::string& output) {
+        std::vector<std::uint8_t> stream{0x88U,
+                                         static_cast<std::uint8_t>(0x80U | close_payload.size()),
+                                         0U,
+                                         0U,
+                                         0U,
+                                         0U};
+        stream.insert(stream.end(), close_payload.begin(), close_payload.end());
+        std::size_t offset = 0U;
+        const auto reader = [&stream, &offset](std::span<std::uint8_t> destination) {
+            if (offset + destination.size() > stream.size()) return false;
+            for (std::size_t index = 0U; index < destination.size(); ++index) {
+                destination[index] = stream[offset + index];
+            }
+            offset += destination.size();
+            return true;
+        };
+        const auto writer = [&output](const std::span<const std::uint8_t> bytes) {
+            output.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+            return true;
+        };
+        std::vector<std::uint8_t> payload;
+        return hibiki::next_ws_binary_message(reader, writer, 64U, kind, payload);
+    };
+
+    hibiki::WsMessageKind kind{hibiki::WsMessageKind::Binary};
+    std::string output;
+    const std::vector<std::uint8_t> valid_reason{0x03U, 0xe8U, 0xe2U, 0x82U, 0xacU};
+    if (!expect(run_close(valid_reason, kind, output) && kind == hibiki::WsMessageKind::Close &&
+                    output == std::string{"\x88\x00", 2U},
+                "valid UTF-8 Close reason receives an empty Close reply")) {
+        return false;
+    }
+    for (const auto& invalid_reason : {std::vector<std::uint8_t>{0x03U, 0xe8U, 0xc0U, 0x80U},
+                                       std::vector<std::uint8_t>{0x03U, 0xe8U, 0xe2U, 0x82U},
+                                       std::vector<std::uint8_t>{0x03U, 0xe8U, 0xedU, 0xa0U, 0x80U},
+                                       std::vector<std::uint8_t>{0x03U, 0xe8U, 0xf4U, 0x90U, 0x80U,
+                                                                 0x80U}}) {
+        kind = hibiki::WsMessageKind::Binary;
+        output.clear();
+        if (!expect(!run_close(invalid_reason, kind, output) && output.empty(),
+                    "invalid UTF-8 Close reason is rejected without a Close reply")) {
+            return false;
+        }
+    }
+    return true;
+}
+
 }  // namespace
 
 int main() {
     if (!test_handshake_size_boundary() || !test_upgrade_header_semantics() ||
         !test_request_line_and_version_semantics() || !test_control_frame_opcode_validation() ||
-        !test_close_payload_validation() || !test_close_status_validation()) {
+        !test_close_payload_validation() || !test_close_status_validation() ||
+        !test_close_reason_utf8_validation()) {
         return 1;
     }
     std::cout << "hibiki_ws_transport_tests passed (handshake, request and control-frame semantics).\n";
