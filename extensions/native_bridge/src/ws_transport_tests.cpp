@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace {
 
@@ -253,11 +254,35 @@ bool test_control_frame_opcode_validation() {
                   "high-bit opcode is rejected without writing");
 }
 
+bool test_close_payload_validation() {
+    const std::vector<std::uint8_t> stream{0x88U, 0x81U, 0U, 0U, 0U, 0U, 'x'};
+    std::size_t offset = 0U;
+    const auto reader = [&stream, &offset](std::span<std::uint8_t> destination) {
+        if (offset + destination.size() > stream.size()) return false;
+        for (std::size_t index = 0U; index < destination.size(); ++index) {
+            destination[index] = stream[offset + index];
+        }
+        offset += destination.size();
+        return true;
+    };
+    std::string output;
+    const auto writer = [&output](const std::span<const std::uint8_t> bytes) {
+        output.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+        return true;
+    };
+    hibiki::WsMessageKind kind{hibiki::WsMessageKind::Binary};
+    std::vector<std::uint8_t> payload;
+    return expect(!hibiki::next_ws_binary_message(reader, writer, 64U, kind, payload) &&
+                      output.empty(),
+                  "one-byte Close payload is rejected without a Close reply");
+}
+
 }  // namespace
 
 int main() {
     if (!test_handshake_size_boundary() || !test_upgrade_header_semantics() ||
-        !test_request_line_and_version_semantics() || !test_control_frame_opcode_validation()) {
+        !test_request_line_and_version_semantics() || !test_control_frame_opcode_validation() ||
+        !test_close_payload_validation()) {
         return 1;
     }
     std::cout << "hibiki_ws_transport_tests passed (handshake, request and control-frame semantics).\n";

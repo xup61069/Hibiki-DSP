@@ -325,6 +325,7 @@ bool next_ws_binary_message(const WsStreamRead& reader,
     WsFrameError error{WsFrameError::None};
     if (!read_ws_client_frame(reader, max_payload, frame, error)) return false;
     if (frame.opcode == 0x8U) {
+        if (frame.payload.size() == 1U) return false;
         if (!send_ws_control_frame(writer, 0x8U, {})) return false;
         kind = WsMessageKind::Close;
         return true;
