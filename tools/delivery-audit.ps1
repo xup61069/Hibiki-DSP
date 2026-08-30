@@ -159,16 +159,30 @@ function Test-ConcreteParkingBlocker {
   param([Parameter(Mandatory)] [string]$NextSafeAction)
   $match = [regex]::Match(
     $NextSafeAction.Trim(),
-    '(?i)^BLOCKED\((?:permission|safety|scope|external)\):\s*(?<detail>\S(?:.*\S)?)$'
+    '(?i)^BLOCKED\((?<kind>permission|safety|scope|external)\):\s*(?<detail>\S(?:.*\S)?)$'
   )
   if (-not $match.Success) { return $false }
+  $kind = $match.Groups['kind'].Value.ToLowerInvariant()
   $detail = $match.Groups['detail'].Value.Trim()
   if ($detail.Length -lt 12) { return $false }
   if ($detail -match '(?i)^(?:TBD|TODO|none|n/?a|unknown|blocked)[.!]?$') { return $false }
-  if ($detail -match '(?i)^(?:awaiting|waiting(?:\s+for)?|needs?|pending)\b.*\b(?:review|reviewer|approval)\b') {
-    return $false
+  $ordinaryWorkPatterns = @(
+    '(?i)\b(?:routine|ordinary|normal)\s+(?:CI|checks?|tests?|review)\b',
+    '(?i)^(?:awaiting|waiting(?:\s+for)?|pending)\b.*\b(?:CI|checks?|tests?|review|reviewer|approval)\b',
+    '(?i)\b(?:continue|resume)\s+(?:the\s+)?(?:implementation|work|coding|tests?)\b',
+    '(?i)\b(?:need|needs|add|write|run|finish|complete)\s+(?:more|additional|remaining)?\s*(?:tests?|implementation|work|changes?)\b',
+    '(?i)\b(?:tomorrow|later|next\s+(?:session|turn|day|time))\b'
+  )
+  foreach ($pattern in $ordinaryWorkPatterns) {
+    if ($detail -match $pattern) { return $false }
   }
-  return $true
+  $kindEvidence = @{
+    permission = '(?i)\b(?:permission|access|authori[sz](?:e|ation)|credential|token|privilege|denied|forbidden|grant|allow)\w*\b'
+    safety = '(?i)\b(?:safety|unsafe|destructive|consent|opt-in|live|device|hardware|privacy|license|legal|recovery|risk)\w*\b'
+    scope = '(?i)\b(?:scope|overlap|owner|ownership|assign|conflict|shared\s+path|outside|path)\w*\b'
+    external = '(?i)\b(?:external|unavailable|outage|network|service|dependency|vendor|toolchain|runner|GitHub|API|platform|environment|hardware)\w*\b'
+  }
+  return $detail -match $kindEvidence[$kind]
 }
 
 function Assert-PrMapping {
@@ -338,6 +352,24 @@ function Assert-DeliveryInventory {
     throw "Unsupported lifecycle '$($record.Lifecycle)' for Issue #$($record.Number)."
   }
 
+  if ($SelectedIssue -lt 0) {
+    foreach ($pullRequest in $OpenPullRequests) {
+      $prNumber = [int](Get-ObjectPropertyValue -InputObject $pullRequest -Name 'number' -Default 0)
+      $head = [string](Get-ObjectPropertyValue -InputObject $pullRequest -Name 'headRefName' -Default '')
+      $closing = @(Get-ClosingIssueNumbers -PullRequest $pullRequest)
+      $matches = @($records | Where-Object {
+        [string]::Equals($_.Branch, $head, [System.StringComparison]::Ordinal) -or
+          $closing -contains $_.Number
+      })
+      if ($matches.Count -eq 0) {
+        throw "Open PR #$prNumber has no matching open execution handoff by exact branch or closing Issue."
+      }
+      if ($matches.Count -gt 1) {
+        throw "Open PR #$prNumber ambiguously matches more than one open execution handoff."
+      }
+    }
+  }
+
   return @($records)
 }
 
@@ -345,8 +377,22 @@ function Get-DrainCandidates {
   param([Parameter(Mandatory)] [AllowEmptyCollection()] [object[]]$Records)
   $candidates = [System.Collections.Generic.List[object]]::new()
   foreach ($record in $Records) {
-    if ($null -eq $record.PullRequest) { continue }
-    if (Test-ConcreteParkingBlocker -NextSafeAction ([string]$record.NextSafeAction)) { continue }
+    $hasBlocker = Test-ConcreteParkingBlocker -NextSafeAction ([string]$record.NextSafeAction)
+    if ($null -eq $record.PullRequest) {
+      if ($record.Lifecycle -eq 'claim-pending' -or
+          ($record.Lifecycle -eq 'claimed' -and -not $hasBlocker)) {
+        [void]$candidates.Add([pscustomobject]@{
+          Issue = [int]$record.Number
+          PullRequest = 0
+          Draft = $true
+          MergeState = 'NO_PR'
+          HeadOid = 'none'
+          Lifecycle = [string]$record.Lifecycle
+        })
+      }
+      continue
+    }
+    if ($hasBlocker) { continue }
     $checkState = Get-CurrentHeadCheckState -PullRequest $record.PullRequest
     if (-not $checkState.IsGreen) { continue }
     $pr = $record.PullRequest
@@ -356,6 +402,7 @@ function Get-DrainCandidates {
       Draft = [bool](Get-ObjectPropertyValue -InputObject $pr -Name 'isDraft' -Default $false)
       MergeState = [string](Get-ObjectPropertyValue -InputObject $pr -Name 'mergeStateStatus' -Default 'UNKNOWN')
       HeadOid = [string](Get-ObjectPropertyValue -InputObject $pr -Name 'headRefOid' -Default 'unknown')
+      Lifecycle = [string]$record.Lifecycle
     })
   }
   return @($candidates)
@@ -365,13 +412,17 @@ function Assert-NoDrainCandidates {
   param([Parameter(Mandatory)] [AllowEmptyCollection()] [object[]]$Candidates)
   if ($Candidates.Count -eq 0) { return }
   $details = @($Candidates | Select-Object -First 8 | ForEach-Object {
-    "PR #$($_.PullRequest) / Issue #$($_.Issue) (draft=$($_.Draft), mergeState=$($_.MergeState), head=$($_.HeadOid))"
+    if ($_.PullRequest -eq 0) {
+      "Issue #$($_.Issue) (lifecycle=$($_.Lifecycle), no open PR)"
+    } else {
+      "PR #$($_.PullRequest) / Issue #$($_.Issue) (draft=$($_.Draft), mergeState=$($_.MergeState), head=$($_.HeadOid))"
+    }
   })
   if ($Candidates.Count -gt $details.Count) {
     $details += "+ $($Candidates.Count - $details.Count) more"
   }
-  throw ("Before-explore drain gate found current-head green PR(s) without a concrete blocker: " +
-    ($details -join '; ') + '. Drain by readying, syncing/reverifying when behind, and merging before discovering more work.')
+  throw ("Before-explore drain gate found unfinished execution work without a concrete blocker: " +
+    ($details -join '; ') + '. Create the first reviewable draft when missing; otherwise ready, sync/reverify when behind, and merge before discovering more work.')
 }
 
 function Assert-Throws {
@@ -465,7 +516,16 @@ if ($SelfTest) {
   # Passing states: claimed may have no PR or one active draft; in-review owns
   # one ready PR whose current-head verify and CodeQL analyze contexts are green.
   $claimed = New-TestIssue
-  [void](Assert-DeliveryInventory -OpenIssues @($claimed) -OpenPullRequests @())
+  $claimedNoPrRecords = @(Assert-DeliveryInventory -OpenIssues @($claimed) -OpenPullRequests @())
+  $caseCount++
+  $claimedNoPrCandidates = @(Get-DrainCandidates -Records $claimedNoPrRecords)
+  if ($claimedNoPrCandidates.Count -ne 1 -or $claimedNoPrCandidates[0].PullRequest -ne 0 -or
+      $claimedNoPrCandidates[0].Lifecycle -ne 'claimed') {
+    throw 'delivery-audit self-test failed: claimed Issue without a PR was not selected before exploration.'
+  }
+  Assert-Throws {
+    Assert-NoDrainCandidates -Candidates $claimedNoPrCandidates
+  } 'claimed Issue without PR before-explore drain' 'no open PR'
   $caseCount++
   $activeDraft = New-TestPr -Checks (New-PendingChecks)
   [void](Assert-DeliveryInventory -OpenIssues @($claimed) -OpenPullRequests @($activeDraft))
@@ -529,6 +589,10 @@ if ($SelfTest) {
     Assert-DeliveryInventory -OpenIssues @($claimed) -OpenPullRequests @($first, $second)
   } 'duplicate branch PR' 'more than one open PR'
   $caseCount++
+  Assert-Throws {
+    Assert-DeliveryInventory -OpenIssues @() -OpenPullRequests @((New-TestPr -Checks (New-PendingChecks)))
+  } 'orphan open PR' 'no matching open execution handoff'
+  $caseCount++
 
   Assert-Throws {
     $ready = New-TestPr -Draft $false -Checks (New-GreenChecks)
@@ -560,20 +624,37 @@ if ($SelfTest) {
   $blocked = New-TestIssue -NextSafeAction 'BLOCKED(permission): Maintainer must grant ruleset administration access.'
   [void](Assert-DeliveryInventory -OpenIssues @($blocked) -OpenPullRequests @((New-TestPr -Checks (New-GreenChecks))))
   $caseCount++
-  Assert-Throws {
-    $fakeBlocked = New-TestIssue -NextSafeAction 'BLOCKED(external): Waiting for review.'
-    Assert-DeliveryInventory -OpenIssues @($fakeBlocked) -OpenPullRequests @((New-TestPr -Checks (New-GreenChecks)))
-  } 'vague review blocker' 'Green draft parking'
-  $caseCount++
+  foreach ($validBlocker in @(
+    'BLOCKED(safety): Live endpoint write requires explicit maintainer opt-in before changing device volume.',
+    'BLOCKED(scope): Scope overlaps Issue #99 ownership for schemas/x; integrator must reassign the path.',
+    'BLOCKED(external): GitHub Actions service is unavailable due a public outage; retry after recovery.'
+  )) {
+    $validBlockedIssue = New-TestIssue -NextSafeAction $validBlocker
+    [void](Assert-DeliveryInventory -OpenIssues @($validBlockedIssue) -OpenPullRequests @((New-TestPr -Checks (New-GreenChecks))))
+    $caseCount++
+  }
+  foreach ($invalidBlocker in @(
+    'BLOCKED(external): Waiting for review.',
+    'BLOCKED(external): Waiting for routine CI to finish.',
+    'BLOCKED(scope): Continue implementation tomorrow.',
+    'BLOCKED(scope): Need more tests before merge.'
+  )) {
+    Assert-Throws {
+      $fakeBlocked = New-TestIssue -NextSafeAction $invalidBlocker
+      Assert-DeliveryInventory -OpenIssues @($fakeBlocked) -OpenPullRequests @((New-TestPr -Checks (New-GreenChecks)))
+    } "invalid blocker: $invalidBlocker" 'Green draft parking'
+    $caseCount++
+  }
 
   # A scoped audit must ignore an unrelated malformed Issue while still using
   # the complete PR inventory for the selected branch.
   $unrelatedBad = New-TestIssue -Number 99 -Branch 'codex/TBD-other' -Tbd
-  [void](Assert-DeliveryInventory -OpenIssues @($claimed, $unrelatedBad) -OpenPullRequests @() -SelectedIssue 41)
+  $unrelatedOrphan = New-TestPr -Number 99 -Branch 'codex/99-orphan' -Closing @(99) -Checks (New-GreenChecks)
+  [void](Assert-DeliveryInventory -OpenIssues @($claimed, $unrelatedBad) -OpenPullRequests @($unrelatedOrphan) -SelectedIssue 41)
   $caseCount++
 
   Write-Output ("delivery-audit self-test passed ($caseCount cases: pass states, TBD/missing handoff, " +
-    'PR mapping/base/link uniqueness, lifecycle consistency, exact-head checks, green-draft parking/blockers, before-explore drain, scoped isolation).')
+    'PR mapping/base/link/orphan detection, lifecycle consistency, exact-head checks, strict blockers, green-draft/no-PR before-explore drain, scoped isolation).')
   exit 0
 }
 
