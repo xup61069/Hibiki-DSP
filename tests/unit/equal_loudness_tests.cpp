@@ -110,7 +110,7 @@ int main() {
         CHECK(!hibiki::validate_policy(control_anchor));
         control_anchor.anchor_id = std::string("anchor") + static_cast<char>(0x7F);
         CHECK(!hibiki::validate_policy(control_anchor));
-        control_anchor.anchor_id = std::string("anchor") + static_cast<char>(0x9F);
+        control_anchor.anchor_id = std::string("anchor") + "\xC2\x9F";
         CHECK(!hibiki::validate_policy(control_anchor));
         control_anchor.anchor_id = std::string("anchor") + static_cast<char>(0x80);
         CHECK(!hibiki::validate_policy(control_anchor));
