@@ -22,13 +22,14 @@
   不得建立 candidate、TBD、pre-claim 或排隊 Issue，只在立即開始時建立一張完整 execution Issue。
 - 寫入須有明確指派、完整 handoff、非 `main` branch、獨占 `scope_globs` 與 `claimed`；maintainer 直接要求
   算指派。`claim-pending` 不授予權限。唯有具體 safety、permission、scope 或 external blocker 才能暫停，且
-  必須 commit、push、更新 handoff 與唯一下一步。
+  必須 commit、push、更新 handoff 與唯一下一步；換 writer／電腦前也必須如此。
 - 有其他 writer、occupied branch 或不確定性就用獨立 worktree；不得越 scope 或修改、reset、rebase、cleanup、
   force-push 別人的 branch／worktree。語意契約重疊也是衝突。
 - 首個可重建 push 後立刻開 draft PR，持續到 acceptance、fresh exact-head green、ready、merge。Integrator 先
   drain 安全 green PR，再 readback `main` 與 Issue closed，安全清理 residue。全域快照只由 integrator 單寫。
   Accepted ADR 不可改寫；public API／schema／DSP order／safety／build contract 變更要同步 Spec／ADR、tests、
-  evidence。evidence 是 append-only `evidence_format: 2`，綁非-evidence blob；更正用 `supersedes`。
+  evidence。evidence 是 append-only `evidence_format: 2`，綁非-evidence blob；不預填 future squash commit、
+  不覆寫 legacy evidence，更正用 `supersedes`。
 
 ## 驗證
 
