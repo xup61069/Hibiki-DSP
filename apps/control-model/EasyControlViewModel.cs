@@ -594,6 +594,16 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(WizardPerChannelMeasurements));
     }
 
+    private void ClearWizardCompilation()
+    {
+        WizardHasResult = false;
+        _wizardCompiledFilters = Array.Empty<PeqFilterV1>();
+        _wizardPreviewRows = Array.Empty<WizardPeqRow>();
+        _wizardExportedPath = string.Empty;
+        OnPropertyChanged(nameof(WizardPreviewFilters));
+        OnPropertyChanged(nameof(WizardExportedPath));
+    }
+
     private static List<double>[] ReadMeasurementFile(string fullPath)
     {
         List<double> frequencies = [];
@@ -623,11 +633,12 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
     }
 
     private static bool TryParseInvariantDouble(string token, out double value) =>
-        double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+        double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out value) &&
+        double.IsFinite(value);
 
     public bool ImportWizardMeasurement(string filePath)
     {
-        WizardHasResult = false;
+        ClearWizardCompilation();
         string fullPath;
         try
         {
@@ -852,6 +863,7 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
 
     public bool ImportWizardPerChannelMeasurements(IReadOnlyList<string> filePaths)
     {
+        ClearWizardCompilation();
         if (!_wizardMultiChannel)
         {
             WizardHasResult = false;
