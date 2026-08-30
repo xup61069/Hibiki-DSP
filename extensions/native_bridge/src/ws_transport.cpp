@@ -306,6 +306,7 @@ bool read_ws_client_frame(const WsStreamRead& reader,
 bool send_ws_control_frame(const WsStreamWrite& writer,
                            const std::uint8_t opcode,
                            const std::span<const std::uint8_t> payload) {
+    if (opcode < 0x8U || opcode > 0xAU) return false;
     if (payload.size() > 125U) return false;
     std::array<std::uint8_t, 2> header{static_cast<std::uint8_t>(0x80U | opcode),
                                        static_cast<std::uint8_t>(payload.size())};
