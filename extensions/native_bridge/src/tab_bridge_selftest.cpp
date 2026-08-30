@@ -455,10 +455,19 @@ bool test_websocket_frames() {
         return false;
     }
 
+    std::vector<std::uint8_t> long_form_payload(65536U, 0x5aU);
     std::vector<std::uint8_t> long_form_stream;
-    append_client_frame(long_form_stream, 0x2U, small, true, false, true, true);
-    if (!expect_frame_success(long_form_stream, 0x2U, small,
-                              "127-bit length form decodes")) {
+    append_client_frame(long_form_stream, 0x2U, long_form_payload, true, false, true, true);
+    if (!expect_frame_success(long_form_stream, 0x2U, long_form_payload,
+                              "canonical 127-bit length form decodes")) {
+        return false;
+    }
+
+    std::vector<std::uint8_t> noncanonical_long_form_stream;
+    append_client_frame(noncanonical_long_form_stream, 0x2U, small, true, false, true, true);
+    if (!expect_frame_failure(noncanonical_long_form_stream, 1024U * 1024U,
+                              hibiki::WsFrameError::NonCanonicalPayloadLength,
+                              "non-canonical 127-bit length form fails closed")) {
         return false;
     }
 
