@@ -333,9 +333,9 @@ public static class ControlPayloadsV1
             payload[17] is < 1 or > SessionRouteCommandOutputMaxBytes || payload[18] != 0 ||
             payload[19] != 0)
             return false;
-        handle = BinaryPrimitives.ReadUInt64LittleEndian(payload);
-        catalogSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[8..]);
-        if (handle == 0UL || catalogSequence == 0UL) return false;
+        var decodedHandle = BinaryPrimitives.ReadUInt64LittleEndian(payload);
+        var decodedCatalogSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[8..]);
+        if (decodedHandle == 0UL || decodedCatalogSequence == 0UL) return false;
         for (var index = payload[16]; index < SessionRouteCommandLaneMaxBytes; index++)
             if (payload[20 + index] != 0) return false;
         for (var index = payload[17]; index < SessionRouteCommandOutputMaxBytes; index++)
@@ -344,9 +344,15 @@ public static class ControlPayloadsV1
             if (payload[index] != 0) return false;
         try
         {
-            laneId = StrictUtf8.GetString(payload.Slice(20, payload[16]));
-            outputGroup = StrictUtf8.GetString(payload.Slice(68, payload[17]));
-            return !laneId.Any(char.IsControl) && !outputGroup.Any(char.IsControl);
+            var decodedLaneId = StrictUtf8.GetString(payload.Slice(20, payload[16]));
+            var decodedOutputGroup = StrictUtf8.GetString(payload.Slice(68, payload[17]));
+            if (decodedLaneId.Any(char.IsControl) || decodedOutputGroup.Any(char.IsControl))
+                return false;
+            handle = decodedHandle;
+            catalogSequence = decodedCatalogSequence;
+            laneId = decodedLaneId;
+            outputGroup = decodedOutputGroup;
+            return true;
         }
         catch (ArgumentException)
         {

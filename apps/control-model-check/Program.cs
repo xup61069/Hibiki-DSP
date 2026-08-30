@@ -452,8 +452,24 @@ Check(ControlPayloadsV1.TryDecodeSessionRouteCommand(sessionRouteBytes,
 var malformedSessionRoute = sessionRouteBytes.ToArray();
 malformedSessionRoute[18] = 1;
 Check(!ControlPayloadsV1.TryDecodeSessionRouteCommand(malformedSessionRoute,
-                                                       out _, out _, out _, out _),
-    "Session route decoder must reject reserved bytes.");
+                                                       out var rejectedRouteHandle,
+                                                       out var rejectedRouteSequence,
+                                                       out var rejectedRouteLane,
+                                                       out var rejectedRouteOutput) &&
+      rejectedRouteHandle == 0UL && rejectedRouteSequence == 0UL &&
+      rejectedRouteLane == string.Empty && rejectedRouteOutput == string.Empty,
+    "Session route decoder must reject reserved bytes with neutral outputs.");
+malformedSessionRoute = sessionRouteBytes.ToArray();
+malformedSessionRoute[20] = 0xc3;
+malformedSessionRoute[21] = 0x28;
+Check(!ControlPayloadsV1.TryDecodeSessionRouteCommand(malformedSessionRoute,
+                                                       out rejectedRouteHandle,
+                                                       out rejectedRouteSequence,
+                                                       out rejectedRouteLane,
+                                                       out rejectedRouteOutput) &&
+      rejectedRouteHandle == 0UL && rejectedRouteSequence == 0UL &&
+      rejectedRouteLane == string.Empty && rejectedRouteOutput == string.Empty,
+    "Session route decoder must reject invalid UTF-8 with neutral outputs.");
 var ruleCommand = new SessionRouteRuleCommandV1(
     1U, 20, 3.5, SessionRouteRuleOperationV1.Upsert, true,
     SessionRouteRuleGainOwnerV1.WindowsSession, 12UL, "quiet-game", "game.exe",

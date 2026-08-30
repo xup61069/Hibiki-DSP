@@ -331,6 +331,15 @@ int main()
         CHECK(hibiki::decode_session_route_command_v1(maximum_payload, decoded));
         CHECK(decoded.lane_bytes == 48U && decoded.output_group_bytes == 48U);
 
+        const auto route_output_is_neutral = [&decoded]() noexcept {
+            return decoded.handle == 0U && decoded.catalog_sequence == 0U &&
+                   decoded.lane_bytes == 0U && decoded.output_group_bytes == 0U &&
+                   std::all_of(decoded.lane.begin(), decoded.lane.end(),
+                               [](const char value) { return value == '\0'; }) &&
+                   std::all_of(decoded.output_group.begin(), decoded.output_group.end(),
+                               [](const char value) { return value == '\0'; });
+        };
+
         auto invalid = make_route(std::string(49U, 'l'), "main");
         CHECK(all_zero(hibiki::encode_session_route_command_v1(invalid)));
         invalid = make_route("game", std::string(49U, 'o'));
@@ -343,28 +352,41 @@ int main()
         auto malformed = payload;
         write_u64_le(malformed, 0U, 0U);
         CHECK(!hibiki::decode_session_route_command_v1(malformed, decoded));
+        CHECK(route_output_is_neutral());
         malformed = payload;
         write_u64_le(malformed, 8U, 0U);
         CHECK(!hibiki::decode_session_route_command_v1(malformed, decoded));
+        CHECK(route_output_is_neutral());
         for (const std::size_t index : {18U, 19U}) {
             malformed = payload;
             malformed[index] = 1U;
             CHECK(!hibiki::decode_session_route_command_v1(malformed, decoded));
+            CHECK(route_output_is_neutral());
         }
         malformed = payload;
         malformed[20U + 4U] = 1U;
         CHECK(!hibiki::decode_session_route_command_v1(malformed, decoded));
+        CHECK(route_output_is_neutral());
         malformed = payload;
         malformed[68U + 7U] = 1U;
         CHECK(!hibiki::decode_session_route_command_v1(malformed, decoded));
+        CHECK(route_output_is_neutral());
         malformed = payload;
         malformed[116U] = 1U;
         CHECK(!hibiki::decode_session_route_command_v1(malformed, decoded));
+        CHECK(route_output_is_neutral());
         malformed = payload;
         malformed[20U] = 0x01U;
         CHECK(!hibiki::decode_session_route_command_v1(malformed, decoded));
+        CHECK(route_output_is_neutral());
+        malformed = payload;
+        malformed[20U] = 0xc3U;
+        malformed[21U] = 0x28U;
+        CHECK(!hibiki::decode_session_route_command_v1(malformed, decoded));
+        CHECK(route_output_is_neutral());
         CHECK(!hibiki::decode_session_route_command_v1(
             std::span<const std::uint8_t>(payload.data(), payload.size() - 1U), decoded));
+        CHECK(route_output_is_neutral());
     }
 
     // ---- IR prepare command: modes, optional expectations and path bounds -
