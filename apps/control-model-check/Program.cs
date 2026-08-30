@@ -227,6 +227,39 @@ Check(ControlPayloadsV1.TryDecodeGroupedVolumeNotification(groupedVolumeCommand.
       groupedOutput == "movie" && Math.Abs(groupedDb + 9.0) < 1e-6 && !groupedMute &&
       groupedGeneration == 10UL,
     "Grouped volume payload did not round-trip with the v1 contract.");
+var groupedSpace = ControlPayloadsV1.EncodeGroupedVolumeNotification(" ", -9.0, false, 10UL);
+Check(ControlPayloadsV1.TryDecodeGroupedVolumeNotification(groupedSpace,
+          out var spaceOutput, out var spaceDb, out var spaceMute, out var spaceGeneration) &&
+      spaceOutput == " " && Math.Abs(spaceDb + 9.0) < 1e-6 && !spaceMute &&
+      spaceGeneration == 10UL,
+    "Grouped volume payload must retain printable whitespace identifiers.");
+var malformedGroupedVolume = groupedVolumeCommand.Payload.ToArray();
+malformedGroupedVolume[22] = 1;
+Check(!ControlPayloadsV1.TryDecodeGroupedVolumeNotification(malformedGroupedVolume,
+          out var rejectedGroupedOutput, out var rejectedGroupedDb, out var rejectedGroupedMute,
+          out var rejectedGroupedGeneration) &&
+      rejectedGroupedOutput == string.Empty && rejectedGroupedDb == 0.0 && !rejectedGroupedMute &&
+      rejectedGroupedGeneration == 0UL,
+    "Grouped volume decoder must reject non-zero padding with neutral outputs.");
+malformedGroupedVolume = groupedVolumeCommand.Payload.ToArray();
+malformedGroupedVolume[17] = 0x01;
+Check(!ControlPayloadsV1.TryDecodeGroupedVolumeNotification(malformedGroupedVolume,
+          out rejectedGroupedOutput, out rejectedGroupedDb, out rejectedGroupedMute,
+          out rejectedGroupedGeneration) &&
+      rejectedGroupedOutput == string.Empty && rejectedGroupedDb == 0.0 && !rejectedGroupedMute &&
+      rejectedGroupedGeneration == 0UL,
+    "Grouped volume decoder must reject invalid UTF-8 with neutral outputs.");
+malformedGroupedVolume = groupedVolumeCommand.Payload.ToArray();
+malformedGroupedVolume[16] = 2;
+malformedGroupedVolume[17] = 0xC3;
+malformedGroupedVolume[18] = 0x28;
+Array.Clear(malformedGroupedVolume, 19, malformedGroupedVolume.Length - 19);
+Check(!ControlPayloadsV1.TryDecodeGroupedVolumeNotification(malformedGroupedVolume,
+          out rejectedGroupedOutput, out rejectedGroupedDb, out rejectedGroupedMute,
+          out rejectedGroupedGeneration) &&
+      rejectedGroupedOutput == string.Empty && rejectedGroupedDb == 0.0 && !rejectedGroupedMute &&
+      rejectedGroupedGeneration == 0UL,
+    "Grouped volume decoder must reject malformed UTF-8 with neutral outputs.");
 var statusPayload = ControlPayloadsV1.EncodeControlStatusSnapshot(
     7UL, cappedVolume, RouteHealthCatalogV1.Defaults);
 Check(ControlPayloadsV1.TryDecodeControlStatusSnapshot(statusPayload,
