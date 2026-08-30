@@ -42,6 +42,7 @@ enum class WasapiOutputFailureV1 : std::uint8_t {
 };
 
 struct WindowsWasapiOutputV1TestAccess;
+struct WindowsWasapiSinkWorkerV1TestAccess;
 
 // WASAPI shared-mode endpoint owned by one dedicated sink worker (not the
 // Hibiki graph RT thread). That worker must initialize COM and perform bind,
@@ -125,6 +126,8 @@ public:
   [[nodiscard]] bool start(const WasapiOutputConfigV1& config,
                            std::uint32_t block_frames = 128U) noexcept;
   void stop() noexcept;
+  // Publishes one bounded clock tuple. Concurrent callers drop a contended
+  // request rather than exposing a mixed source/sink/elapsed observation.
   void observe_clock(double source_frames,
                      double sink_frames,
                      double elapsed_seconds) noexcept;
@@ -138,6 +141,8 @@ public:
   [[nodiscard]] WasapiSinkWorkerSnapshotV1 snapshot() const noexcept;
 
 private:
+  friend struct WindowsWasapiSinkWorkerV1TestAccess;
+
   static constexpr std::uint32_t kSlotCount = 8U;
   static constexpr std::uint32_t kMaxChannels = 8U;
   static constexpr std::uint32_t kMaxFrames = 4096U;
@@ -155,6 +160,10 @@ private:
                          std::uint32_t output_capacity_frames,
                          std::uint32_t& frames,
                          std::uint32_t& channels) noexcept;
+  [[nodiscard]] bool take_clock_request(std::uint64_t& applied_sequence,
+                                        double& source_frames,
+                                        double& sink_frames,
+                                        double& elapsed_seconds) noexcept;
 
   std::atomic<bool> stop_requested_{false};
   std::atomic<bool> running_{false};
