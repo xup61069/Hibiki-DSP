@@ -101,6 +101,78 @@ try
     Check(!CalibrationCompilerV1.TryLoadPreset(
               unknownPresetFilterPath, out _, out _),
         "Unknown nested PEQ filter properties must be rejected.");
+
+    var validRouteRulesPath = Path.Combine(directory, "valid-route-rules.json");
+    File.WriteAllText(validRouteRulesPath, """
+        {
+          "schema_version": 1,
+          "rules": [
+            {
+              "rule_id": "quiet-game",
+              "priority": 20,
+              "enabled": true,
+              "gain_owner": 0,
+              "makeup_gain_db": 3.5,
+              "app_id": "game.exe",
+              "display_name": "DJMAX",
+              "lane_id": "game",
+              "output_group": "surround"
+            }
+          ]
+        }
+        """);
+    var routeRules = new SessionRouteRuleCatalogV1();
+    Check(routeRules.TryLoad(validRouteRulesPath, out _) && routeRules.Count == 1 &&
+          routeRules.Rules[0].RuleId == "quiet-game",
+        "Known route-rule properties must remain loadable.");
+
+    var unknownRouteRulesTopLevelPath = Path.Combine(directory, "unknown-route-rules-top.json");
+    File.WriteAllText(unknownRouteRulesTopLevelPath, """
+        {
+          "schema_version": 1,
+          "unexpected": true,
+          "rules": [
+            {
+              "rule_id": "quiet-game",
+              "priority": 20,
+              "enabled": true,
+              "gain_owner": 0,
+              "makeup_gain_db": 3.5,
+              "app_id": "game.exe",
+              "display_name": "DJMAX",
+              "lane_id": "game",
+              "output_group": "surround"
+            }
+          ]
+        }
+        """);
+    Check(!routeRules.TryLoad(unknownRouteRulesTopLevelPath, out _) &&
+          routeRules.Count == 1 && routeRules.Rules[0].RuleId == "quiet-game",
+        "Unknown top-level route-rule properties must fail closed and preserve the catalog.");
+
+    var unknownRouteRulePath = Path.Combine(directory, "unknown-route-rule.json");
+    File.WriteAllText(unknownRouteRulePath, """
+        {
+          "schema_version": 1,
+          "rules": [
+            {
+              "rule_id": "quiet-game",
+              "priority": 20,
+              "enabled": true,
+              "gain_owner": 0,
+              "makeup_gain_db": 3.5,
+              "app_id": "game.exe",
+              "display_name": "DJMAX",
+              "lane_id": "game",
+              "output_group": "surround",
+              "unexpected": true
+            }
+          ]
+        }
+        """);
+    Check(!routeRules.TryLoad(unknownRouteRulePath, out _) &&
+          routeRules.Count == 1 && routeRules.Rules[0].RuleId == "quiet-game",
+        "Unknown nested route-rule properties must fail closed and preserve the catalog.");
 }
 finally
 {
