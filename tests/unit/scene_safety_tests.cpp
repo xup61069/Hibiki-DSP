@@ -56,9 +56,16 @@ int main() {
         scene.output_group = "\xE4\xB8\xbb";
         CHECK(hibiki::validate_scene(scene));
 
+        scene.name = std::string(120U, 'n');
+        CHECK(hibiki::validate_scene(scene));
+        scene.name = std::string(121U, 'n');
+        CHECK(!hibiki::validate_scene(scene));
+
         scene.name = "Name\n";
         CHECK(!hibiki::validate_scene(scene));
         scene.name = "Name\x7F" "del";
+        CHECK(!hibiki::validate_scene(scene));
+        scene.name = "Name\xC2\x9F";
         CHECK(!hibiki::validate_scene(scene));
         scene.name = std::string("Name") + static_cast<char>(0x80);
         CHECK(!hibiki::validate_scene(scene));
@@ -70,7 +77,7 @@ int main() {
         scene.name = "Safe";
         scene.output_group = "Group\t";
         CHECK(!hibiki::validate_scene(scene));
-        scene.output_group = "Group\x9F" "c1";
+        scene.output_group = "Group\xC2\x9F" "c1";
         CHECK(!hibiki::validate_scene(scene));
         scene.output_group = std::string("Group") + static_cast<char>(0x80);
         CHECK(!hibiki::validate_scene(scene));

@@ -8,6 +8,7 @@ namespace hibiki {
 
 bool validate_scene(const SceneProfileV1& scene) noexcept {
     if (scene.schema_version != 1 || scene.id.empty() || scene.name.empty() ||
+        scene.name.size() > 120U ||
         scene.output_group.empty() || scene.output_group.size() > 64U ||
         !is_printable_utf8_v1(scene.name) ||
         !is_printable_utf8_v1(scene.output_group) ||
