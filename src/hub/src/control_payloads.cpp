@@ -75,7 +75,7 @@ bool is_printable_utf8(const std::string_view value) noexcept {
             const auto second = static_cast<unsigned char>(value[index + 1U]);
             const auto third = static_cast<unsigned char>(value[index + 2U]);
             const bool second_valid = first == 0xE0U ? second >= 0xA0U && second <= 0xBFU
-                                                    : first == 0xEDU ? second <= 0x9FU
+                                                    : first == 0xEDU ? second >= 0x80U && second <= 0x9FU
                                                                       : second >= 0x80U && second <= 0xBFU;
             if (!second_valid || !is_continuation(third)) return false;
             codepoint = ((first & 0x0FU) << 12U) | ((second & 0x3FU) << 6U) |
@@ -87,7 +87,7 @@ bool is_printable_utf8(const std::string_view value) noexcept {
             const auto third = static_cast<unsigned char>(value[index + 2U]);
             const auto fourth = static_cast<unsigned char>(value[index + 3U]);
             const bool second_valid = first == 0xF0U ? second >= 0x90U && second <= 0xBFU
-                                                    : first == 0xF4U ? second <= 0x8FU
+                                                    : first == 0xF4U ? second >= 0x80U && second <= 0x8FU
                                                                       : second >= 0x80U && second <= 0xBFU;
             if (!second_valid || !is_continuation(third) || !is_continuation(fourth)) {
                 return false;
