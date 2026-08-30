@@ -29,6 +29,9 @@ buffer period 與累計 frame；停止、timeout、格式不符或 WASAPI 失效
   thread 呼叫；該 thread 必須先初始化 COM。
 - `read` 非阻塞，一次最多處理一個 WASAPI packet；`frames_read==0` 的成功代表目前沒有
   packet。caller 必須提供足夠容量；不足時 packet 被明確丟棄並增加 `dropped_frames`。
+  非靜音 packet 的每個 Float32 sample 都必須是 finite；遇到 NaN 或 infinity 時，source
+  釋放該 packet、進入 `Degraded` 並回報錯誤，不寫 caller buffer、不增加 captured frame，
+  也不把該 packet 標成成功讀取。
 - RT graph 不呼叫 COM、事件等待、配置或 process ID 查詢；它只接收已驗證、caller-owned 的
   Float32 block，並沿用既有 Lane／Group Master／limiter transaction。
 - process ID 只作即時 activation target，不進 Scene/Profile 或永久 identity；持久路由仍使用
@@ -46,7 +49,9 @@ buffer period 與累計 frame；停止、timeout、格式不符或 WASAPI 失效
 ## 失敗／fallback
 
 - `process_id==0`、非 Float32 mix format、requested format 不匹配、activation timeout 或
-  `IAudioClient`／`IAudioCaptureClient` 任何 HRESULT 失敗都回報 `Degraded` 與最後錯誤碼。
+  `IAudioClient`／`IAudioCaptureClient` 任何 HRESULT 失敗，以及非有限 Float32 capture
+  sample，都回報 `Degraded` 與最後錯誤碼；非有限 sample 的本地診斷為 `E_INVALIDARG`，
+  但若釋放 packet 同時失敗則保留釋放操作的 HRESULT。
 - source 失效時不重試、不自動改 Windows Master，也不把舊 block 重播；上層可依裝置／session
   generation 重新建立 source。
 - process loopback 無法提供 Chrome tab identity；瀏覽器 tab bridge 的使用者手勢、權限與
@@ -63,8 +68,8 @@ buffer period 與累計 frame；停止、timeout、格式不符或 WASAPI 失效
 
 ## 驗收
 
-1. contract test 驗證零 process ID fail-closed、Degraded snapshot、stop 不恢復成 Ready，
-   且無效 source 不可讀取 block。
+1. contract test 驗證零 process ID fail-closed、Degraded snapshot、stop 不恢復成 Ready、
+   非有限 Float32 packet fail-closed，且無效 source 不可讀取 block。
 2. `pwsh -File tools/live-process-loopback-check.ps1` 會在本機建立短暫 render tone，嘗試以
    current process 作為 include-tree target，只輸出匿名格式／frame aggregate；沒有可用的
    process-loopback runtime 時回報 `loopback=unavailable` 並保留 source-only 結果。
