@@ -24,6 +24,7 @@ std::string handshake_with_size(const std::size_t size) {
         "Upgrade: websocket\r\n"
         "Connection: Upgrade\r\n"
         "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
         "X-Pad: ";
     constexpr std::string_view kSuffix = "\r\n\r\n";
     if (size < kPrefix.size() + kSuffix.size()) return {};
@@ -95,6 +96,7 @@ bool test_upgrade_header_semantics() {
         "Upgrade: WebSocket\r\n"
         "Connection: keep-alive, Upgrade\r\n"
         "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
         "\r\n";
     if (!expect_rejected_handshake(kMissingUpgrade, "missing Upgrade header is rejected") ||
         !expect_rejected_handshake(kMissingConnection, "missing Connection header is rejected") ||
@@ -109,10 +111,47 @@ bool test_upgrade_header_semantics() {
                   "case-insensitive upgrade and connection token list are accepted");
 }
 
+bool test_request_line_and_version_semantics() {
+    constexpr std::string_view kPostRequest =
+        "POST /v1/tab HTTP/1.1\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
+        "\r\n";
+    constexpr std::string_view kHttp10Request =
+        "GET /v1/tab HTTP/1.0\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
+        "\r\n";
+    constexpr std::string_view kMissingVersion =
+        "GET /v1/tab HTTP/1.1\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "\r\n";
+    constexpr std::string_view kUnsupportedVersion =
+        "GET /v1/tab HTTP/1.1\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+        "Sec-WebSocket-Version: 12\r\n"
+        "\r\n";
+    return expect_rejected_handshake(kPostRequest, "non-GET request is rejected") &&
+           expect_rejected_handshake(kHttp10Request, "HTTP/1.0 request is rejected") &&
+           expect_rejected_handshake(kMissingVersion, "missing WebSocket version is rejected") &&
+           expect_rejected_handshake(kUnsupportedVersion, "unsupported WebSocket version is rejected");
+}
+
 }  // namespace
 
 int main() {
-    if (!test_handshake_size_boundary() || !test_upgrade_header_semantics()) return 1;
-    std::cout << "hibiki_ws_transport_tests passed (handshake size and upgrade semantics).\n";
+    if (!test_handshake_size_boundary() || !test_upgrade_header_semantics() ||
+        !test_request_line_and_version_semantics()) {
+        return 1;
+    }
+    std::cout << "hibiki_ws_transport_tests passed (handshake size, upgrade and request semantics).\n";
     return 0;
 }

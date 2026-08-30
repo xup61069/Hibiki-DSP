@@ -70,6 +70,16 @@ bool has_header_token(const std::string_view lower_headers,
     return false;
 }
 
+bool has_valid_websocket_request_line(const std::string_view request) {
+    const auto line_end = request.find("\r\n");
+    if (line_end == std::string_view::npos) return false;
+    const auto line = request.substr(0U, line_end);
+    if (!line.starts_with("GET ")) return false;
+    const auto version_start = line.rfind(' ');
+    return version_start > 4U && line.find(' ', 4U) == version_start &&
+           line.substr(version_start) == " HTTP/1.1";
+}
+
 std::string base64(const std::uint8_t* bytes, const std::size_t size) {
     constexpr char alphabet[] =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -175,6 +185,7 @@ bool parse_websocket_handshake(const std::string_view request, std::string& resp
     if (request.size() > kMaxHandshakeBytes) return false;
     const auto end = request.find("\r\n\r\n");
     if (end == std::string_view::npos) return false;
+    if (!has_valid_websocket_request_line(request)) return false;
     std::string lower(request.substr(0U, end));
     std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char character) {
         return static_cast<char>(std::tolower(character));
@@ -184,7 +195,8 @@ bool parse_websocket_handshake(const std::string_view request, std::string& resp
         return false;
     }
     const auto key = find_header_value(request, lower, "sec-websocket-key");
-    if (key.empty()) return false;
+    const auto version = find_header_value(request, lower, "sec-websocket-version");
+    if (key.empty() || version != "13") return false;
     std::string accept;
     if (!websocket_compute_accept(key, accept)) return false;
     response.clear();
