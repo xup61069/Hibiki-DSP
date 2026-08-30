@@ -797,6 +797,12 @@ bool decode_scene_catalog_command_v1(
             command = {};
             return false;
         }
+        for (std::size_t index = 121U; index < 135U; ++index) {
+            if (in[index] != 0U) {
+                command = {};
+                return false;
+            }
+        }
         std::copy_n(in, lane.id_bytes, lane.id.data());
         std::copy_n(in + 31U, lane.output_group_bytes, lane.output_group.data());
         lane.channel_count = read_u32(in + 95U);

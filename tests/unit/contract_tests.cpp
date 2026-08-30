@@ -3037,6 +3037,7 @@ int main() {
     std::copy_n("custom-output", 13, catalog_command.lanes[0].output_group.data());
     std::vector<std::uint8_t> catalog_payload;
     CHECK(encode_scene_catalog_command_v1(catalog_command, catalog_payload));
+    const auto upsert_catalog_payload = catalog_payload;
     IpcFrameV1 catalog_frame;
     catalog_frame.header.type = IpcMessageType::SceneCatalogCommand;
     catalog_frame.header.request_id = 555U;
@@ -3125,6 +3126,17 @@ int main() {
     ControlCommandV1 reserved_zero_command{};
     CHECK(!decode_control_command_v1(reserved_zero_frame,
                                      reserved_zero_command));
+
+    constexpr std::size_t kSceneCatalogLaneBase =
+        440U + (kSceneCatalogTimelineCapacityV1 * 64U);
+    constexpr std::size_t kSceneCatalogLaneReservedOffset = 121U;
+    auto lane_reserved_payload = upsert_catalog_payload;
+    lane_reserved_payload[kSceneCatalogLaneBase + kSceneCatalogLaneReservedOffset] = 1U;
+    IpcFrameV1 lane_reserved_frame;
+    lane_reserved_frame.header.type = IpcMessageType::SceneCatalogCommand;
+    lane_reserved_frame.payload = lane_reserved_payload;
+    ControlCommandV1 lane_reserved_command{};
+    CHECK(!decode_control_command_v1(lane_reserved_frame, lane_reserved_command));
 
     AudioEngineModel control_engine;
     EngineControlWorkerV1 control_worker(control_engine);
