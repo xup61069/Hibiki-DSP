@@ -277,12 +277,59 @@ bool test_close_payload_validation() {
                   "one-byte Close payload is rejected without a Close reply");
 }
 
+bool test_close_status_validation() {
+    const auto run_close = [](const std::uint16_t status,
+                              hibiki::WsMessageKind& kind,
+                              std::string& output) {
+        const std::vector<std::uint8_t> stream{0x88U,
+                                               0x82U,
+                                               0U,
+                                               0U,
+                                               0U,
+                                               0U,
+                                               static_cast<std::uint8_t>(status >> 8U),
+                                               static_cast<std::uint8_t>(status)};
+        std::size_t offset = 0U;
+        const auto reader = [&stream, &offset](std::span<std::uint8_t> destination) {
+            if (offset + destination.size() > stream.size()) return false;
+            for (std::size_t index = 0U; index < destination.size(); ++index) {
+                destination[index] = stream[offset + index];
+            }
+            offset += destination.size();
+            return true;
+        };
+        const auto writer = [&output](const std::span<const std::uint8_t> bytes) {
+            output.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+            return true;
+        };
+        std::vector<std::uint8_t> payload;
+        return hibiki::next_ws_binary_message(reader, writer, 64U, kind, payload);
+    };
+
+    hibiki::WsMessageKind kind{hibiki::WsMessageKind::Binary};
+    std::string output;
+    if (!expect(run_close(1000U, kind, output) && kind == hibiki::WsMessageKind::Close &&
+                    output == std::string{"\x88\x00", 2U},
+                "valid Close status receives an empty Close reply")) {
+        return false;
+    }
+    for (const auto status : {999U, 1004U, 1005U, 1006U, 1015U, 5000U}) {
+        kind = hibiki::WsMessageKind::Binary;
+        output.clear();
+        if (!expect(!run_close(static_cast<std::uint16_t>(status), kind, output) && output.empty(),
+                    "invalid Close status is rejected without a Close reply")) {
+            return false;
+        }
+    }
+    return true;
+}
+
 }  // namespace
 
 int main() {
     if (!test_handshake_size_boundary() || !test_upgrade_header_semantics() ||
         !test_request_line_and_version_semantics() || !test_control_frame_opcode_validation() ||
-        !test_close_payload_validation()) {
+        !test_close_payload_validation() || !test_close_status_validation()) {
         return 1;
     }
     std::cout << "hibiki_ws_transport_tests passed (handshake, request and control-frame semantics).\n";
