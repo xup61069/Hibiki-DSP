@@ -45,6 +45,35 @@ jobs:
           OWNER_REPO: ${{ github.repository }}
         run: |
           $ErrorActionPreference = 'Stop'
+          function Invoke-RequiredPowerShell {
+            param(
+              [Parameter(Mandatory)]
+              [string[]]$Arguments
+            )
+            & pwsh @Arguments
+            $exitCode = $LASTEXITCODE
+            if ($exitCode -ne 0) {
+              throw "PowerShell validation gate failed with exit code $exitCode; command: pwsh $($Arguments -join ' ')"
+            }
+          }
+
+          # Native child-process failures do not become terminating parent
+          # errors merely because ErrorActionPreference is Stop. Keep this
+          # deterministic probe next to the wrapper so a future edit cannot
+          # silently remove the exit-code conversion contract.
+          $caughtChildFailure = $false
+          try {
+            Invoke-RequiredPowerShell -Arguments @('-NoProfile', '-Command', 'exit 37')
+          } catch {
+            $caughtChildFailure = $true
+            if ($_.Exception.Message -notmatch 'exit code 37') {
+              throw
+            }
+          }
+          if (-not $caughtChildFailure) {
+            throw 'Native child-process failure probe did not terminate the admission step.'
+          }
+
           if ($env:SESSION_ID -notmatch '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$') {
             throw 'session_id must be a valid UUID.'
           }
@@ -73,7 +102,10 @@ jobs:
           Test-AdmissionIssueEligibility -IssueData $issue
           $owner = Get-AdmissionOwner -Body ([string]$issue.body) -IssueNumber $issueNumber
 
-          pwsh -NoProfile -File tools/handoff-check.ps1 -AdmissionPrecheck -Issue $issueNumber
+          Invoke-RequiredPowerShell -Arguments @(
+            '-NoProfile', '-File', 'tools/handoff-check.ps1',
+            '-AdmissionPrecheck', '-Issue', "$issueNumber"
+          )
 
           $baseCommit = Get-AdmissionBaseCommit -Body ([string]$issue.body) -IssueNumber $issueNumber
           $apiArgs = @(
@@ -88,7 +120,9 @@ jobs:
 
           try {
             Add-IssueLabelSafe -IssueNumber $issueNumber -Label 'claim-pending'
-            pwsh -NoProfile -File tools/handoff-check.ps1
+            Invoke-RequiredPowerShell -Arguments @(
+              '-NoProfile', '-File', 'tools/handoff-check.ps1'
+            )
             $readback = ConvertTo-AdmissionReadback -GhArgs @(
               'issue', 'view', "$issueNumber", '--json', 'labels,assignees,state'
             )

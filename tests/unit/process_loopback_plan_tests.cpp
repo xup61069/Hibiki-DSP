@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <initializer_list>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -199,6 +200,33 @@ int run_process_loopback_read_tests() {
         const auto snapshot = source.snapshot();
         CHECK(snapshot.state == hibiki::WindowsProcessLoopbackStateV1::Running);
         CHECK(snapshot.captured_frames == 2U);
+        CHECK(snapshot.dropped_frames == 0U);
+    }
+
+    // Non-finite packets are released but never exposed as a successful
+    // caller-owned block or counted as captured.
+    for (const float invalid_sample : {
+             std::numeric_limits<float>::quiet_NaN(),
+             std::numeric_limits<float>::infinity(),
+             -std::numeric_limits<float>::infinity()}) {
+        hibiki::WindowsProcessLoopbackSourceV1 source;
+        auto* fake = attach_fake_capture_client(source);
+        fake->add_packet({0.25F, invalid_sample, 1.0F, -1.0F}, 2U);
+        std::array<float, 4> output{41.0F, 42.0F, 43.0F, 44.0F};
+        std::uint32_t frames_read = 99U;
+
+        CHECK(!source.read(output.data(), 2U, frames_read));
+        CHECK(frames_read == 0U);
+        CHECK(output[0] == 41.0F && output[1] == 42.0F);
+        CHECK(output[2] == 43.0F && output[3] == 44.0F);
+        CHECK(fake->get_buffer_calls == 1U);
+        CHECK(fake->release_buffer_calls == 1U);
+        CHECK(fake->last_released_frames == 2U);
+        CHECK(!fake->packet_acquired);
+        const auto snapshot = source.snapshot();
+        CHECK(snapshot.state == hibiki::WindowsProcessLoopbackStateV1::Degraded);
+        CHECK(snapshot.last_error == E_INVALIDARG);
+        CHECK(snapshot.captured_frames == 0U);
         CHECK(snapshot.dropped_frames == 0U);
     }
 

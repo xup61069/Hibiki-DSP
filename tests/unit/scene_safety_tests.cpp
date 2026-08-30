@@ -49,6 +49,46 @@ int main() {
         scene.name = "Safety";
         scene.output_group = "main";
         CHECK(hibiki::validate_scene(scene));
+
+        // The shared SceneProfile validator must use the same printable
+        // UTF-8 boundary as the scene schema and catalog validator.
+        scene.name = "\xE5\xAE\xA2\xE5\xBB\xB3";
+        scene.output_group = "\xE4\xB8\xbb";
+        CHECK(hibiki::validate_scene(scene));
+
+        scene.name = std::string(120U, 'n');
+        CHECK(hibiki::validate_scene(scene));
+        scene.name = std::string(121U, 'n');
+        CHECK(!hibiki::validate_scene(scene));
+
+        scene.name = "Name\n";
+        CHECK(!hibiki::validate_scene(scene));
+        scene.name = "Name\x7F" "del";
+        CHECK(!hibiki::validate_scene(scene));
+        scene.name = "Name\xC2\x9F";
+        CHECK(!hibiki::validate_scene(scene));
+        scene.name = std::string("Name") + static_cast<char>(0x80);
+        CHECK(!hibiki::validate_scene(scene));
+        scene.name = "Name\xC3\x28";
+        CHECK(!hibiki::validate_scene(scene));
+        scene.name = std::string("Name") + std::string("\0hidden", 7U);
+        CHECK(!hibiki::validate_scene(scene));
+
+        scene.name = "Safe";
+        scene.output_group = "Group\t";
+        CHECK(!hibiki::validate_scene(scene));
+        scene.output_group = "Group\xC2\x9F" "c1";
+        CHECK(!hibiki::validate_scene(scene));
+        scene.output_group = std::string("Group") + static_cast<char>(0x80);
+        CHECK(!hibiki::validate_scene(scene));
+        scene.output_group = "Group\xE2\x82";
+        CHECK(!hibiki::validate_scene(scene));
+        scene.output_group = std::string("Group") + std::string("\0hidden", 7U);
+        CHECK(!hibiki::validate_scene(scene));
+
+        scene.name = "Safe";
+        scene.output_group = "main";
+        CHECK(hibiki::validate_scene(scene));
         scene.limiter_dbtp = std::numeric_limits<double>::quiet_NaN();
         CHECK(!hibiki::validate_scene(scene));
         scene.limiter_dbtp = std::numeric_limits<double>::infinity();

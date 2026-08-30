@@ -10,6 +10,7 @@
 #include <propidl.h>
 #include <wrl/implements.h>
 
+#include <cmath>
 #include <cstring>
 #include <memory>
 #include <new>
@@ -274,6 +275,14 @@ bool WindowsProcessLoopbackSourceV1::read(float* const interleaved,
     if ((flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0U) {
         std::memset(interleaved, 0, sample_count * sizeof(float));
     } else {
+        const auto* const samples = reinterpret_cast<const float*>(data);
+        for (std::size_t index = 0U; index < sample_count; ++index) {
+            if (!std::isfinite(samples[index])) {
+                result = capture_client_->ReleaseBuffer(frames);
+                set_degraded(FAILED(result) ? result : E_INVALIDARG);
+                return false;
+            }
+        }
         std::memcpy(interleaved, data, sample_count * sizeof(float));
     }
     result = capture_client_->ReleaseBuffer(frames);
