@@ -1346,6 +1346,7 @@ bool decode_device_catalog_snapshot_v1(
     const std::span<const std::uint8_t> payload,
     DeviceCatalogSnapshotV1& snapshot) noexcept {
     snapshot = {};
+    auto decoded = DeviceCatalogSnapshotV1{};
     if (payload.size() < kDeviceCatalogSnapshotHeaderBytesV1 ||
         payload.size() > kDeviceCatalogSnapshotPayloadBytesV1 || payload[2U] != 0U ||
         payload[3U] != 0U || payload[12U] != 0U || payload[13U] != 0U ||
@@ -1394,13 +1395,13 @@ bool decode_device_catalog_snapshot_v1(
             return false;
         }
         for (std::size_t previous = 0U; previous < index; ++previous) {
-            const auto& prior = snapshot.entries[previous];
+            const auto& prior = decoded.entries[previous];
             if (endpoint == std::string_view(prior.endpoint_id.data(), prior.endpoint_id_bytes) ||
                 ((flags & 1U) != 0U && (prior.flags & 1U) != 0U && flow == prior.flow)) {
                 return false;
             }
         }
-        auto& entry = snapshot.entries[index];
+        auto& entry = decoded.entries[index];
         entry.endpoint_id_bytes = static_cast<std::uint16_t>(endpoint_bytes);
         entry.display_name_bytes = static_cast<std::uint16_t>(display_bytes);
         std::copy_n(bytes + 8U, endpoint_bytes, entry.endpoint_id.data());
@@ -1413,8 +1414,9 @@ bool decode_device_catalog_snapshot_v1(
         entry.buffer_frames = buffer_frames;
         entry.last_sequence = read_u64(bytes + 408U);
     }
-    snapshot.entry_count = static_cast<std::uint16_t>(entry_count);
-    snapshot.catalog_sequence = catalog_sequence;
+    decoded.entry_count = static_cast<std::uint16_t>(entry_count);
+    decoded.catalog_sequence = catalog_sequence;
+    snapshot = decoded;
     return true;
 }
 

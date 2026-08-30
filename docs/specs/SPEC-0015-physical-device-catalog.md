@@ -71,6 +71,8 @@ Disabled／Unplugged／Unknown 時，catalog 清除該 flow 的 default；切換
 
 - 非法 descriptor、容量超過 32、非 Active default、過期 sequence 或 allocation 失敗時，既有
   catalog 保持不變。
+- 格式錯誤的 `DeviceCatalogSnapshot` 必須先在候選快照完成所有 entry 驗證；decode 回傳失敗時
+  caller output 保持完整預設值，不得留下已驗證的前段 entry。
 - 移除未知 ID 回傳 `NotFound`；狀態／flow 不合法回傳 `InvalidState`。
 - catalog 是 UI／worker snapshot，不得在 audio callback 讀取可變字串或呼叫其 mutator。
 - snapshot store 的 mutex／vector 複製只存在 control-plane；不得從 RT callback 呼叫 store，
