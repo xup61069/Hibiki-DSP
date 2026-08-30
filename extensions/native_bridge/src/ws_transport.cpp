@@ -198,9 +198,11 @@ bool parse_websocket_handshake(const std::string_view request, std::string& resp
         !has_header_token(lower, "connection", "upgrade")) {
         return false;
     }
+    std::string_view host;
     std::string_view key;
     std::string_view version;
-    if (!find_single_header_value(request, lower, "sec-websocket-key", key) ||
+    if (!find_single_header_value(request, lower, "host", host) || host.empty() ||
+        !find_single_header_value(request, lower, "sec-websocket-key", key) ||
         key.empty() ||
         !find_single_header_value(request, lower, "sec-websocket-version", version) ||
         version != "13") {
