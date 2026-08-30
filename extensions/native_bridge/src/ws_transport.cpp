@@ -113,6 +113,7 @@ bool websocket_compute_accept(const std::string_view key, std::string& accept) {
 }
 
 bool parse_websocket_handshake(const std::string_view request, std::string& response) {
+    if (request.size() > kMaxHandshakeBytes) return false;
     const auto end = request.find("\r\n\r\n");
     if (end == std::string_view::npos) return false;
     std::string lower(request.substr(0U, end));
