@@ -375,13 +375,55 @@ bool test_close_reason_utf8_validation() {
     return true;
 }
 
+bool test_unsolicited_pong_continues_stream() {
+    const std::vector<std::uint8_t> stream{0x8aU,
+                                           0x81U,
+                                           0U,
+                                           0U,
+                                           0U,
+                                           0U,
+                                           'p',
+                                           0x82U,
+                                           0x81U,
+                                           0U,
+                                           0U,
+                                           0U,
+                                           0U,
+                                           'b'};
+    std::size_t offset = 0U;
+    const auto reader = [&stream, &offset](std::span<std::uint8_t> destination) {
+        if (offset + destination.size() > stream.size()) return false;
+        for (std::size_t index = 0U; index < destination.size(); ++index) {
+            destination[index] = stream[offset + index];
+        }
+        offset += destination.size();
+        return true;
+    };
+    std::string output;
+    const auto writer = [&output](const std::span<const std::uint8_t> bytes) {
+        output.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+        return true;
+    };
+    hibiki::WsMessageKind kind{hibiki::WsMessageKind::Binary};
+    std::vector<std::uint8_t> payload;
+    if (!expect(hibiki::next_ws_binary_message(reader, writer, 64U, kind, payload) &&
+                    kind == hibiki::WsMessageKind::Pong && payload.empty() && output.empty(),
+                "unsolicited Pong is accepted without a reply")) {
+        return false;
+    }
+    return expect(hibiki::next_ws_binary_message(reader, writer, 64U, kind, payload) &&
+                      kind == hibiki::WsMessageKind::Binary &&
+                      payload == std::vector<std::uint8_t>{'b'} && output.empty(),
+                  "binary frame after unsolicited Pong remains deliverable");
+}
+
 }  // namespace
 
 int main() {
     if (!test_handshake_size_boundary() || !test_upgrade_header_semantics() ||
         !test_request_line_and_version_semantics() || !test_control_frame_opcode_validation() ||
         !test_close_payload_validation() || !test_close_status_validation() ||
-        !test_close_reason_utf8_validation()) {
+        !test_close_reason_utf8_validation() || !test_unsolicited_pong_continues_stream()) {
         return 1;
     }
     std::cout << "hibiki_ws_transport_tests passed (handshake, request and control-frame semantics).\n";

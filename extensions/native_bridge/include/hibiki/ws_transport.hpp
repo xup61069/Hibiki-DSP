@@ -36,6 +36,7 @@ enum class WsMessageKind : std::uint8_t {
     Binary,
     Close,
     Ping,
+    Pong,
 };
 
 using WsStreamRead = std::function<bool(std::span<std::uint8_t>)>;
@@ -63,9 +64,9 @@ using WsStreamWrite = std::function<bool(std::span<const std::uint8_t>)>;
                                          std::span<const std::uint8_t> payload);
 
 // Runs one step of the serve loop against injectable streams. Pings are
-// answered inline (kind=Ping); closes are answered (kind=Close); binary
-// frames deliver their unmasked payload (kind=Binary); any other opcode
-// fails closed.
+// answered inline (kind=Ping); Pongs are accepted without a reply
+// (kind=Pong); closes are answered (kind=Close); binary frames deliver their
+// unmasked payload (kind=Binary); any other opcode fails closed.
 [[nodiscard]] bool next_ws_binary_message(const WsStreamRead& reader,
                                           const WsStreamWrite& writer,
                                           std::size_t max_payload,
