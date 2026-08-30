@@ -213,8 +213,8 @@ opt-in 時，才會在同一 control transaction 掛載單點 1 kHz formula atta
 因此自訂 catalog scene 仍需在 wire 上把 [84] 設為 1 才會啟用；
 內建 Easy scene 則由 factory 預設帶入上述值。
 
-成功且未靜音的 live phon recompute 會發布一次 `EqVisualSnapshotV1`（sequence、
-source、最多 32 組頻率/增益點），存入 bounded control-plane cache；UI 以
+成功且未靜音的 live phon recompute 會發布一次 `EqVisualSnapshotV1`（非零且全域單調的
+sequence、source、最多 32 組頻率/增益點），存入 bounded control-plane cache；UI 以
 `EqVisualSnapshotRequest` 主動拉取，pipe server 不推送。這是控制面視覺回饋，
 不是音訊內容偵測，也不是 driver／實體音訊 evidence；缺少快照時 request 回 Error，
 UI 必須保留上一個安全畫面。

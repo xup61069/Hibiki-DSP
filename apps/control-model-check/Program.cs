@@ -1734,6 +1734,26 @@ static async Task RunSceneCatalogCheckServerAsync(
           eqViewModel.EqSurface.LastAppliedSequence == 0UL,
         "A queued/local-only volume change must not drive the live EQ animation.");
 
+    DateTimeOffset viewModelTestNow = EqVisualSurfaceModelV1.EpochUtc;
+    eqViewModel.EqSurface.SetTransitionClockForTesting(() => viewModelTestNow);
+    var zeroSequence = new EqVisualFrameV1(0UL, EqVisualSourceV1.EqualLoudness,
+        [new EqVisualPointV1(31.0, 4.0), new EqVisualPointV1(120.0, 3.0),
+         new EqVisualPointV1(1000.0, 0.0), new EqVisualPointV1(8000.0, 2.0)]);
+    Check(!zeroSequence.IsValid,
+        "A zero-sequence EQ visual frame must be invalid before the first frame.");
+    var initialPoints = eqViewModel.EqSurface.Points.ToArray();
+    var initialTargetPoints = eqViewModel.EqSurface.TargetPoints.ToArray();
+    Check(!eqViewModel.ApplyEqVisualFrame(zeroSequence, out var zeroBeforeError) &&
+          zeroBeforeError.Contains("invalid", StringComparison.Ordinal),
+        "A zero-sequence frame must fail closed before the first confirmed frame.");
+    Check(!eqViewModel.EqSurface.HasConfirmedFrame &&
+          eqViewModel.EqSurface.Source == EqVisualSourceV1.None &&
+          eqViewModel.EqSurface.LastAppliedSequence == 0UL &&
+          eqViewModel.EqSurface.Points.SequenceEqual(initialPoints) &&
+          eqViewModel.EqSurface.TargetPoints.SequenceEqual(initialTargetPoints) &&
+          eqViewModel.EqSurface.TransitionProgress == 1.0,
+        "Rejecting a first zero-sequence frame must preserve the safe surface exactly.");
+
     Check(eqViewModel.ApplyEqVisualFrame(confirmed, out var appliedError), appliedError);
     Check(eqViewModel.EqSurface.HasConfirmedFrame &&
           eqViewModel.EqSurface.LastAppliedSequence == 11UL &&
@@ -1756,11 +1776,42 @@ static async Task RunSceneCatalogCheckServerAsync(
           Math.Abs(eqViewModel.EqSurface.TargetPoints[0].GainDb - 4.0) < 1e-12,
         "Rejected frames must preserve the previous safe surface.");
 
+    var confirmedPoints = eqViewModel.EqSurface.Points.ToArray();
+    var confirmedTargetPoints = eqViewModel.EqSurface.TargetPoints.ToArray();
+    var confirmedProgress = eqViewModel.EqSurface.TransitionProgress;
+    Check(!eqViewModel.ApplyEqVisualFrame(new EqVisualFrameV1(
+            0UL, EqVisualSourceV1.AdaptiveCorrection,
+            [new EqVisualPointV1(31.0, -4.0), new EqVisualPointV1(120.0, -2.0),
+             new EqVisualPointV1(1000.0, -1.0), new EqVisualPointV1(8000.0, 0.0)]),
+        out var zeroAfterError) && zeroAfterError.Contains("invalid", StringComparison.Ordinal),
+        "A zero-sequence frame must fail closed after a confirmed frame.");
+    Check(eqViewModel.EqSurface.Source == EqVisualSourceV1.EqualLoudness &&
+          eqViewModel.EqSurface.HasConfirmedFrame &&
+          eqViewModel.EqSurface.LastAppliedSequence == 11UL &&
+          eqViewModel.EqSurface.Points.SequenceEqual(confirmedPoints) &&
+          eqViewModel.EqSurface.TargetPoints.SequenceEqual(confirmedTargetPoints) &&
+          Math.Abs(eqViewModel.EqSurface.TransitionProgress - confirmedProgress) < 1e-12,
+        "Rejecting a confirmed zero-sequence frame must preserve the live surface exactly.");
+
     await eqViewModel.DisconnectAsync();
     Check(!eqViewModel.EqSurface.HasConfirmedFrame &&
           eqViewModel.EqSurface.Source == EqVisualSourceV1.None &&
           eqViewModel.EqSurface.TargetPoints.All(point => point.GainDb == 0.0),
         "Disconnect must reset the live EQ surface to its safe baseline.");
+
+    var resetPoints = eqViewModel.EqSurface.Points.ToArray();
+    var resetTargetPoints = eqViewModel.EqSurface.TargetPoints.ToArray();
+    var resetSequence = eqViewModel.EqSurface.LastAppliedSequence;
+    Check(!eqViewModel.ApplyEqVisualFrame(zeroSequence, out var zeroAfterResetError) &&
+          zeroAfterResetError.Contains("invalid", StringComparison.Ordinal),
+        "A zero-sequence frame must fail closed after a surface reset.");
+    Check(!eqViewModel.EqSurface.HasConfirmedFrame &&
+          eqViewModel.EqSurface.Source == EqVisualSourceV1.None &&
+          eqViewModel.EqSurface.LastAppliedSequence == resetSequence &&
+          eqViewModel.EqSurface.Points.SequenceEqual(resetPoints) &&
+          eqViewModel.EqSurface.TargetPoints.SequenceEqual(resetTargetPoints) &&
+          eqViewModel.EqSurface.TransitionProgress == 1.0,
+        "Rejecting a reset zero-sequence frame must preserve the reset surface exactly.");
 
     var surface = eqViewModel.EqSurface;
     DateTimeOffset testNow = EqVisualSurfaceModelV1.EpochUtc;
@@ -1775,6 +1826,18 @@ static async Task RunSceneCatalogCheckServerAsync(
     testNow = testNow.AddMilliseconds(90);
     Check(Math.Abs(surface.TransitionProgress - 0.5) < 1e-12,
         "Transition progress must advance deterministically halfway through 180 ms.");
+    var directPoints = surface.Points.ToArray();
+    var directTargetPoints = surface.TargetPoints.ToArray();
+    var directProgress = surface.TransitionProgress;
+    Check(!surface.ApplyFrame(zeroSequence),
+        "The direct EQ surface API must reject a zero-sequence frame.");
+    Check(surface.Points.SequenceEqual(directPoints) &&
+          surface.TargetPoints.SequenceEqual(directTargetPoints) &&
+          surface.Source == EqVisualSourceV1.EqualLoudness &&
+          surface.HasConfirmedFrame &&
+          surface.LastAppliedSequence == confirmed.Sequence &&
+          Math.Abs(surface.TransitionProgress - directProgress) < 1e-12,
+        "The direct surface API must preserve the transition and frame state on rejection.");
     testNow = testNow.AddMilliseconds(180);
     Check(surface.TransitionProgress == 1.0,
         "Transition progress must clamp at completion and cannot exceed the target curve.");

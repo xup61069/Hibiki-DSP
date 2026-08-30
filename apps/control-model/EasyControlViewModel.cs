@@ -1651,8 +1651,9 @@ public sealed class EasyControlViewModel : INotifyPropertyChanged
         return true;
     }
 
-    // Applies a confirmed engine visual frame. Invalid or out-of-order frames
-    // fail closed and preserve the previous surface exactly.
+    // Applies a confirmed engine visual frame with a non-zero monotonic
+    // sequence. Invalid or out-of-order frames fail closed and preserve the
+    // previous surface exactly.
     public bool ApplyEqVisualFrame(EqVisualFrameV1 frame, out string error)
     {
         error = string.Empty;

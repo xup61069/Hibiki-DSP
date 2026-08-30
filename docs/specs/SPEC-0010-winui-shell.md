@@ -43,7 +43,7 @@ engine/control-plane 狀態。Root theme 以 `ElementTheme.Light`／`ElementThem
 頁面或導覽背景合併成難以辨識的單一黑色平面；兩種主題都必須保留可讀文字與狀態邊界。
 
 音量保護頁的主要視覺卡稱為「等響度補償」，顯示既有 `EqVisualSurface` 的狀態、來源圖例
-與曲線。它只呈現引擎確認的 user-space `EqVisualSnapshotV1`；這不是音量量測、耳機校準、
+與曲線。它只呈現 sequence 非零且由引擎確認的 user-space `EqVisualSnapshotV1`；這不是音量量測、耳機校準、
 受限等響度表格或任何聲學合規證據。
 
 Out：WaveRT/PortCls 驅動、實體裝置枚舉、音訊處理、VST3 host UI、校正量測與
