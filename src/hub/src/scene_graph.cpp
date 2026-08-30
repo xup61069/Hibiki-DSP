@@ -1,4 +1,5 @@
 #include "hibiki/scene_graph.hpp"
+#include "hibiki/control_payloads.hpp"
 
 #include <cmath>
 #include <algorithm>
@@ -14,9 +15,7 @@ namespace {
     if (value.empty() || value.size() > maximum_bytes) {
         return false;
     }
-    return std::all_of(value.begin(), value.end(), [](unsigned char ch) {
-        return ch >= 0x20U && ch != 0x7FU && !(ch >= 0x80U && ch <= 0x9FU);
-    });
+    return is_printable_utf8_v1(value);
 }
 
 [[nodiscard]] bool checked_graph_output_samples(
