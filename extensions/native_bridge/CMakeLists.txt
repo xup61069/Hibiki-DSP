@@ -36,4 +36,16 @@ if(HIBIKI_BUILD_TESTS)
     target_compile_options(hibiki_tab_bridge_selftest PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
   endif()
   add_test(NAME hibiki_tab_bridge_selftest COMMAND hibiki_tab_bridge_selftest)
+
+  add_executable(hibiki_ws_transport_tests
+    src/ws_transport_tests.cpp
+  )
+  target_link_libraries(hibiki_ws_transport_tests PRIVATE hibiki_tab_bridge_contract)
+  target_compile_features(hibiki_ws_transport_tests PRIVATE cxx_std_20)
+  if(MSVC)
+    target_compile_options(hibiki_ws_transport_tests PRIVATE /W4 /permissive- /EHsc)
+  else()
+    target_compile_options(hibiki_ws_transport_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+  endif()
+  add_test(NAME hibiki_ws_transport_tests COMMAND hibiki_ws_transport_tests)
 endif()
