@@ -52,7 +52,9 @@ non-owning packet view.
 目前 extension 只連 `ws://127.0.0.1:17842/v1/tab` 的 loopback receiver；bridge 未啟動
 時丟棄送出 packet；capture 進行中 offscreen 會以 bounded exponential backoff（最多
 10 次、上限 15 秒）重試連線，bridge 恢復後新 packet 即送入，不需重新 Start capture。
-連線建立失敗或 `WebSocket.onerror` 觸發時走同一個有界重試計時器。offscreen 透過現有
+連線建立失敗或 `WebSocket.onerror` 觸發時走同一個有界重試計時器。只有目前擁有的
+WebSocket 才可改變 bridge state 或排程重試；已被 Stop／新 Start 取代的 socket 即使稍後
+觸發 open/close callback 也必須忽略。offscreen 透過現有
 capture-state / get-capture-state path 回報 bounded reconnect state：connected、waiting、
 retrying、exhausted 或 idle；popup 在 capture 中顯示等待重試、正在重試或已停止重試，
 而不是只顯示靜態未連線。重試用完時 tab playback 繼續且 packet 繼續丟棄；手動 Stop

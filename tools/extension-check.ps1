@@ -236,6 +236,16 @@ function Assert-ExtensionSourcePolicy(
   if ($offscreenSource -notmatch 'function\s+cancelBridgeRetry\s*\(\s*\)') {
     throw "Offscreen source must define cancelBridgeRetry to stop retries on teardown in $sourceName."
   }
+  foreach ($socketOwnershipPattern in @(
+      'const\s+socket\s*=\s*new\s+WebSocket\s*\(',
+      'bridge\s*=\s*socket\s*;',
+      'socket\.onopen\s*=\s*\(\s*\)\s*=>\s*\{\s*if\s*\(\s*bridge\s*!==\s*socket\s*\|\|\s*!capturing\s*\)\s*return\s*;',
+      'socket\.onclose\s*=\s*\(\s*\)\s*=>\s*\{\s*if\s*\(\s*bridge\s*!==\s*socket\s*\|\|\s*!capturing\s*\)\s*return\s*;'
+    )) {
+    if ($offscreenSource -notmatch $socketOwnershipPattern) {
+      throw "Offscreen source must ignore stale bridge socket callbacks in $sourceName."
+    }
+  }
   if ($offscreenSource -notmatch 'capturing\s*=\s*true') {
     throw "Offscreen source must set capturing=true during active capture for retry gating in $sourceName."
   }
@@ -457,7 +467,15 @@ if ($SelfTest) {
     offscreen = "let capturing = false; let droppedPackets = 0; let captureStartedAtMs = null; let lastPacketActivityAtMs = null; let totalPackets = 0; let bridge = null; let bridgeRetryTimer = null;let bridgeRetryAttempt = 0; let bridgeRetryExhausted = false; const BRIDGE_RETRY_MAX_ATTEMPTS = 10;const BRIDGE_RECONNECT_IDLE_V1 = 'idle'; const BRIDGE_RECONNECT_WAITING_V1 = 'waiting';const BRIDGE_RECONNECT_RETRYING_V1 = 'retrying'; const BRIDGE_RECONNECT_EXHAUSTED_V1 = 'exhausted';function connectBridge() { if (!capturing || bridge) return; try { bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab');bridge.binaryType = 'arraybuffer'; bridge.onopen = () => {}; bridge.onclose = () => { bridge = null; scheduleBridgeRetry(); }; }catch (_) { bridge = null; scheduleBridgeRetry(); } } function bridgeReconnectState() { return BRIDGE_RECONNECT_IDLE_V1; }function markPacketActivity() { lastPacketActivityAtMs = Date.now(); } function reportState() { chrome.runtime.sendMessage({type: 'capture-state', totalPackets, droppedPackets, captureStartedAtMs, lastPacketActivityAtMs}); }function scheduleBridgeRetry() { if (!capturing || bridgeRetryTimer !== null || bridgeRetryAttempt >= BRIDGE_RETRY_MAX_ATTEMPTS) return;bridgeRetryAttempt++; bridgeRetryTimer = setTimeout(() => { bridgeRetryTimer = null; connectBridge(); }, 1000); }function cancelBridgeRetry() { if (bridgeRetryTimer !== null) { clearTimeout(bridgeRetryTimer); bridgeRetryTimer = null; } bridgeRetryAttempt = 0; }chrome.runtime.onMessage.addListener(async (message, _sender, sendResponse) => { if (message.type === 'stop-tab-stream') { capturing = false;cancelBridgeRetry(); activeStream.getTracks().forEach(track => track.stop()); sendResponse({stopped: true}); return true; }if (message.type === 'get-capture-state') { sendResponse({capturing, bridgeConnected: false, droppedPackets, totalPackets, bridgeReconnectState: bridgeReconnectState()}); return false; }if (message.type !== 'start-tab-stream') return false; const context = new AudioContext(); await context.audioWorklet.addModule('audio-worklet.js');const node = new AudioWorkletNode(context, 'hibiki-tab-packetizer');const constraints = {audio: {mandatory: {chromeMediaSource: 'tab', chromeMediaSourceId: message.streamId}}, video: false};await navigator.mediaDevices.getUserMedia(constraints); const stream = await navigator.mediaDevices.getUserMedia(constraints); activeStream = stream;track.addEventListener('ended', handleSourceEnded); sendResponse({ok: true}); capturing = true; connectBridge(); return true; });async function handleSourceEnded() { capturing = false; cancelBridgeRetry(); await teardownCaptureGraph(); reportState();chrome.runtime.sendMessage({type: 'offscreen-capture-released'}); }"
     worklet = "const packet = new ArrayBuffer(16 + 4); const view = new DataView(packet); view.setUint8(0, 0x48); view.setUint8(1, 0x49); view.setUint8(2, 0x42); view.setUint8(3, 0x54); view.setUint16(4, 1, true); this.port.postMessage(packet, [packet]); registerProcessor('hibiki-tab-packetizer', HibikiTabPacketizer);"
   }
+  $sourceFixture.offscreen = $sourceFixture.offscreen.Replace(
+    "bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab');bridge.binaryType = 'arraybuffer'; bridge.onopen = () => {}; bridge.onclose = () => { bridge = null; scheduleBridgeRetry(); };",
+    "const socket = new WebSocket('ws://127.0.0.1:17842/v1/tab'); bridge = socket; socket.binaryType = 'arraybuffer'; socket.onopen = () => { if (bridge !== socket || !capturing) return; }; socket.onclose = () => { if (bridge !== socket || !capturing) return; bridge = null; scheduleBridgeRetry(); };")
   Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-source-valid'
+
+  $missingStaleSocketGuard = $sourceFixture.offscreen -replace 'bridge !== socket \|\| !capturing', 'bridge !== socket'
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $missingStaleSocketGuard $sourceFixture.worklet 'selftest-stale-socket-guard' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected stale bridge socket callback guard failure.' }
 
   $missingStopHandler = $sourceFixture.popup -replace "chrome\.runtime\.sendMessage\(\{type: 'stop-capture'\}\)", 'console.log()'
   $caught = $false
