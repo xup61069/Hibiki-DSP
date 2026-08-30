@@ -194,8 +194,17 @@ function Assert-ExtensionSourcePolicy(
   if ($serviceWorkerSource -notmatch 'sender\.url\.endsWith\(\s*(?:\x27|\x22)/offscreen\.html(?:\x27|\x22)\s*\)') {
     throw "Service worker must accept the natural-end release notification only from offscreen.html in $sourceName."
   }
-  if ($serviceWorkerSource -notmatch 'offscreen-capture-released[\s\S]{0,500}closeOffscreenDocument\s*\(') {
-    throw "Service worker must close the offscreen document after a validated natural-end release notification in $sourceName."
+  foreach ($serviceLifecyclePattern in @(
+      'let\s+captureLifecycleTail\s*=\s*Promise\.resolve\s*\(\s*\)\s*;',
+      'function\s+enqueueCaptureLifecycle\s*\(\s*operation\s*\)\s*\{[\s\S]{0,250}captureLifecycleTail\.then\s*\(\s*operation\s*,\s*operation\s*\)[\s\S]{0,250}captureLifecycleTail\s*=\s*next\.catch',
+      'message(?:\?)?\.type\s*===\s*(?:\x27|\x22)capture-active-tab(?:\x27|\x22)[\s\S]{0,250}enqueueCaptureLifecycle\s*\(',
+      'message(?:\?)?\.type\s*===\s*(?:\x27|\x22)stop-capture(?:\x27|\x22)[\s\S]{0,250}enqueueCaptureLifecycle\s*\(',
+      'offscreen-capture-released[\s\S]{0,500}enqueueCaptureLifecycle\s*\(\s*\(\s*\)\s*=>\s*releaseOffscreenDocumentIfIdle\s*\(\s*\)',
+      'async\s+function\s+releaseOffscreenDocumentIfIdle\s*\(\s*\)\s*\{[\s\S]{0,500}get-capture-state[\s\S]{0,300}state\?\.capturing\s*===\s*true[\s\S]{0,300}closeOffscreenDocument\s*\('
+    )) {
+    if ($serviceWorkerSource -notmatch $serviceLifecyclePattern) {
+      throw "Service worker must serialize replacement-safe capture document lifecycle operations in $sourceName."
+    }
   }
 
   foreach ($pattern in @(
@@ -488,6 +497,7 @@ if ($SelfTest) {
   $sourceFixture.offscreen = $sourceFixture.offscreen.Replace(
     "async function handleSourceEnded() {",
     "async function handleSourceEnded(endedStream) { if (activeStream !== endedStream) return;")
+  $sourceFixture.serviceWorker += " let captureLifecycleTail = Promise.resolve(); function enqueueCaptureLifecycle(operation) { const next = captureLifecycleTail.then(operation, operation); captureLifecycleTail = next.catch(() => {}); return next; } async function releaseOffscreenDocumentIfIdle() { const contexts = await chrome.runtime.getContexts({contextTypes: ['OFFSCREEN_DOCUMENT']}); if (contexts.length === 0) return; const state = await chrome.runtime.sendMessage({type: 'get-capture-state'}); if (state?.capturing === true) return; await closeOffscreenDocument(); } if (message?.type === 'capture-active-tab') { enqueueCaptureLifecycle(() => startCapture(message)); } if (message?.type === 'stop-capture') { enqueueCaptureLifecycle(() => stopCapture()); } if (message?.type === 'offscreen-capture-released') { enqueueCaptureLifecycle(() => releaseOffscreenDocumentIfIdle()); }"
   Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-source-valid'
 
   $missingStaleSocketGuard = $sourceFixture.offscreen -replace 'bridge !== socket \|\| !capturing', 'bridge !== socket'
@@ -505,6 +515,16 @@ if ($SelfTest) {
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $missingReplacementPacketizerGuard $sourceFixture.worklet 'selftest-replacement-packetizer-guard' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected replacement capture packetizer ownership guard failure.' }
 
+  $missingServiceLifecycleQueue = $sourceFixture.serviceWorker -replace 'enqueueCaptureLifecycle', 'bypassCaptureLifecycle'
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $missingServiceLifecycleQueue $sourceFixture.offscreen $sourceFixture.worklet 'selftest-service-lifecycle-queue' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected service-worker lifecycle serialization failure.' }
+
+  $missingReleaseIdleGuard = $sourceFixture.serviceWorker -replace 'state\?\.capturing === true', 'state?.capturing === false'
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $missingReleaseIdleGuard $sourceFixture.offscreen $sourceFixture.worklet 'selftest-service-release-idle-guard' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected service-worker release idle-state guard failure.' }
+
   $missingStopHandler = $sourceFixture.popup -replace "chrome\.runtime\.sendMessage\(\{type: 'stop-capture'\}\)", 'console.log()'
   $caught = $false
   try { Assert-ExtensionSourcePolicy $missingStopHandler $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-missing-stop-handler' } catch { $caught = $true }
@@ -515,7 +535,7 @@ if ($SelfTest) {
   try { Assert-ExtensionSourcePolicy $missingStateQuery $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-missing-state-query' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected missing popup state query failure.' }
 
-  $missingWorkerStop = $sourceFixture.serviceWorker -replace "message\.type === 'stop-capture'", "message.type === 'other'"
+  $missingWorkerStop = $sourceFixture.serviceWorker -replace "message(?:\?)?\.type === 'stop-capture'", "message.type === 'other'"
   $caught = $false
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $missingWorkerStop $sourceFixture.offscreen $sourceFixture.worklet 'selftest-missing-worker-stop' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected missing service-worker stop boundary failure.' }
@@ -637,7 +657,7 @@ connect-src   ws://127.0.0.1:17842
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $unvalidatedSenderPath $sourceFixture.offscreen $sourceFixture.worklet 'selftest-release-skips-sender-path-check' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected unvalidated release sender path failure.' }
 
-  $releaseWithoutClose = $sourceFixture.serviceWorker -replace 'closeOffscreenDocument\(\); return false;', 'return false;'
+  $releaseWithoutClose = $sourceFixture.serviceWorker -replace 'closeOffscreenDocument\(\)', 'skipClose()'
   $caught = $false
   try { Assert-ExtensionSourcePolicy $sourceFixture.popup $releaseWithoutClose $sourceFixture.offscreen $sourceFixture.worklet 'selftest-release-without-close' } catch { $caught = $true }
   if (-not $caught) { throw 'SelfTest expected release notification without document close failure.' }
