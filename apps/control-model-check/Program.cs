@@ -439,8 +439,33 @@ Check(rejectedPositiveSessionVolume,
 var malformedSessionVolume = sessionVolumeBytes.ToArray();
 malformedSessionVolume[13] = 1;
 Check(!ControlPayloadsV1.TryDecodeSessionVolumeCommand(malformedSessionVolume,
-                                                        out _, out _, out _, out _),
-    "Session volume decoder must reject reserved bytes.");
+                                                        out var rejectedSessionVolumeHandle,
+                                                        out var rejectedSessionVolumeDb,
+                                                        out var rejectedSessionVolumeMute,
+                                                        out var rejectedSessionVolumeSequence) &&
+      rejectedSessionVolumeHandle == 0UL && rejectedSessionVolumeDb == 0.0 &&
+      !rejectedSessionVolumeMute && rejectedSessionVolumeSequence == 0UL,
+    "Session volume decoder must reject reserved bytes with neutral outputs.");
+malformedSessionVolume = sessionVolumeBytes.ToArray();
+BinaryPrimitives.WriteUInt64LittleEndian(malformedSessionVolume, 0UL);
+Check(!ControlPayloadsV1.TryDecodeSessionVolumeCommand(malformedSessionVolume,
+                                                        out rejectedSessionVolumeHandle,
+                                                        out rejectedSessionVolumeDb,
+                                                        out rejectedSessionVolumeMute,
+                                                        out rejectedSessionVolumeSequence) &&
+      rejectedSessionVolumeHandle == 0UL && rejectedSessionVolumeDb == 0.0 &&
+      !rejectedSessionVolumeMute && rejectedSessionVolumeSequence == 0UL,
+    "Session volume decoder must reject zero handle with neutral outputs.");
+malformedSessionVolume = sessionVolumeBytes.ToArray();
+BinaryPrimitives.WriteInt32LittleEndian(malformedSessionVolume.AsSpan(8), 65536);
+Check(!ControlPayloadsV1.TryDecodeSessionVolumeCommand(malformedSessionVolume,
+                                                        out rejectedSessionVolumeHandle,
+                                                        out rejectedSessionVolumeDb,
+                                                        out rejectedSessionVolumeMute,
+                                                        out rejectedSessionVolumeSequence) &&
+      rejectedSessionVolumeHandle == 0UL && rejectedSessionVolumeDb == 0.0 &&
+      !rejectedSessionVolumeMute && rejectedSessionVolumeSequence == 0UL,
+    "Session volume decoder must reject invalid dB with neutral outputs.");
 var sessionRouteBytes = ControlPayloadsV1.EncodeSessionRouteCommand(
     sessionEntries[0].Handle, 12UL, "game", "surround");
 Check(ControlPayloadsV1.TryDecodeSessionRouteCommand(sessionRouteBytes,

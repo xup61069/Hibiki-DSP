@@ -278,6 +278,11 @@ int main()
                   hibiki::kSessionVolumeMaxDbQ16_16V1) &&
               !hibiki::is_valid_session_volume_db_q16_16_v1(1));
 
+        const auto session_volume_output_is_neutral = [&decoded]() noexcept {
+            return decoded.handle == 0U && decoded.requested_db_q16_16 == 0 &&
+                   decoded.mute == 0U && decoded.catalog_sequence == 0U;
+        };
+
         auto invalid = command;
         invalid.handle = 0U;
         CHECK(all_zero(hibiki::encode_session_volume_command_v1(invalid)));
@@ -296,22 +301,28 @@ int main()
         auto malformed = maximum;
         write_u64_le(malformed, 0U, 0U);
         CHECK(!hibiki::decode_session_volume_command_v1(malformed, decoded));
+        CHECK(session_volume_output_is_neutral());
         malformed = maximum;
         write_u64_le(malformed, 16U, 0U);
         CHECK(!hibiki::decode_session_volume_command_v1(malformed, decoded));
+        CHECK(session_volume_output_is_neutral());
         malformed = maximum;
         malformed[12U] = 2U;
         CHECK(!hibiki::decode_session_volume_command_v1(malformed, decoded));
+        CHECK(session_volume_output_is_neutral());
         malformed = maximum;
         write_u32_le(malformed, 8U, 1U * 65536U);
         CHECK(!hibiki::decode_session_volume_command_v1(malformed, decoded));
+        CHECK(session_volume_output_is_neutral());
         for (std::size_t index = 13U; index <= 15U; ++index) {
             malformed = maximum;
             malformed[index] = 1U;
             CHECK(!hibiki::decode_session_volume_command_v1(malformed, decoded));
+            CHECK(session_volume_output_is_neutral());
         }
         CHECK(!hibiki::decode_session_volume_command_v1(
             std::span<const std::uint8_t>(maximum.data(), maximum.size() - 1U), decoded));
+        CHECK(session_volume_output_is_neutral());
     }
 
     // ---- session route command: two bounded printable labels -------------

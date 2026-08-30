@@ -287,12 +287,14 @@ public static class ControlPayloadsV1
         if (payload.Length != SessionVolumeCommandBytes ||
             payload[12] > 1 || payload[13] != 0 || payload[14] != 0 || payload[15] != 0)
             return false;
-        handle = BinaryPrimitives.ReadUInt64LittleEndian(payload);
-        catalogSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[16..]);
+        var decodedHandle = BinaryPrimitives.ReadUInt64LittleEndian(payload);
+        var decodedCatalogSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload[16..]);
         var q16 = BinaryPrimitives.ReadInt32LittleEndian(payload[8..]);
-        if (handle == 0UL || catalogSequence == 0UL ||
+        if (decodedHandle == 0UL || decodedCatalogSequence == 0UL ||
             q16 < SessionVolumeMinDb * 65536 || q16 > SessionVolumeMaxDb * 65536)
             return false;
+        handle = decodedHandle;
+        catalogSequence = decodedCatalogSequence;
         requestedDb = q16 / 65536.0;
         mute = payload[12] != 0;
         return true;

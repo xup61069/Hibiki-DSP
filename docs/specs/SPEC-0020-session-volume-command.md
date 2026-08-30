@@ -35,7 +35,8 @@ Chrome tabCapture、vendor ASIO 攔截或對所有 exclusive stream 生效。實
 | 16 | 8 | `catalog_sequence` |
 
 decoder 先驗證完整長度、reserved bytes、有限且在 −144…0 dB 的 dB 值、非零 handle／sequence；失敗不得部分
-寫入 `ControlCommandV1`。pipe handler 只負責驗證與送入 control queue，EngineControlWorker
+寫入 `ControlCommandV1`：C++ `SessionVolumeCommandV1` 保持 value-initialized，C# handle／sequence
+為零、dB 為 `0.0`、mute 為 `false`。pipe handler 只負責驗證與送入 control queue，EngineControlWorker
 再呼叫明確的 `SessionVolumeHandlerFnV1`。Windows runtime handler 只把命令送入固定容量的
 `SessionCommandQueueV1`；`Applied` 表示已入列，不表示 COM readback 已完成。沒有 handler、
 queue 滿載或 worker 未啟動時回報 Failed，不假裝已套用。
