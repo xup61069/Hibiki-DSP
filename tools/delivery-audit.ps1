@@ -120,7 +120,8 @@ function Get-ClosingIssueNumbers {
 function Get-CurrentHeadCheckState {
   param([Parameter(Mandatory)]$PullRequest)
   $checks = @((Get-ObjectPropertyValue -InputObject $PullRequest -Name 'statusCheckRollup' -Default @()))
-  $allSettledAllowed = $checks.Count -gt 0
+  $allSettledAllowed = $true
+  $consideredCheckCount = 0
   $hasVerify = $false
   $hasCodeQlAnalyze = $false
 
@@ -131,6 +132,16 @@ function Get-CurrentHeadCheckState {
     $status = [string](Get-ObjectPropertyValue -InputObject $check -Name 'status' -Default '')
     $conclusion = [string](Get-ObjectPropertyValue -InputObject $check -Name 'conclusion' -Default '')
     $state = [string](Get-ObjectPropertyValue -InputObject $check -Name 'state' -Default '')
+
+    # A newer handoff-audit run can cancel its predecessor through the
+    # workflow's concurrency group. The cancelled predecessor is superseded;
+    # it must not permanently poison an otherwise green current head. Every
+    # other failed, pending, or cancelled check remains fail-closed below.
+    if ($workflow -ieq 'handoff-audit' -and $name -ieq 'audit' -and
+        $status -ieq 'COMPLETED' -and $conclusion -ieq 'CANCELLED') {
+      continue
+    }
+    $consideredCheckCount++
 
     if ($name -ieq 'verify') { $hasVerify = $true }
     if ($workflow -ieq 'CodeQL' -and $name -match '(?i)^Analyze(?:\s|\()') {
@@ -149,11 +160,11 @@ function Get-CurrentHeadCheckState {
   }
 
   return [pscustomobject]@{
-    Count = $checks.Count
+    Count = $consideredCheckCount
     HasVerify = $hasVerify
     HasCodeQlAnalyze = $hasCodeQlAnalyze
-    AllSettledAllowed = $allSettledAllowed
-    IsGreen = $allSettledAllowed -and $hasVerify -and $hasCodeQlAnalyze
+    AllSettledAllowed = $consideredCheckCount -gt 0 -and $allSettledAllowed
+    IsGreen = $consideredCheckCount -gt 0 -and $allSettledAllowed -and $hasVerify -and $hasCodeQlAnalyze
   }
 }
 
@@ -550,6 +561,34 @@ if ($SelfTest) {
   $readyGreen = New-TestPr -Draft $false -Checks (New-GreenChecks)
   $readyGreen.mergeStateStatus = 'BEHIND'
   $inReviewRecords = @(Assert-DeliveryInventory -OpenIssues @($inReview) -OpenPullRequests @($readyGreen))
+  $caseCount++
+  $cancelledSupersededAudit = [pscustomobject]@{
+    name = 'audit'; workflowName = 'handoff-audit'; status = 'COMPLETED'; conclusion = 'CANCELLED'
+  }
+  $readyAfterCancelledAudit = New-TestPr -Draft $false -Checks @(
+    (New-GreenChecks) + $cancelledSupersededAudit
+  )
+  [void](Assert-DeliveryInventory -OpenIssues @($inReview) -OpenPullRequests @($readyAfterCancelledAudit))
+  $caseCount++
+  Assert-Throws {
+    $cancelledNonAudit = [pscustomobject]@{
+      name = 'optional'; workflowName = 'optional'; status = 'COMPLETED'; conclusion = 'CANCELLED'
+    }
+    $readyWithCancelledNonAudit = New-TestPr -Draft $false -Checks @(
+      (New-GreenChecks) + $cancelledNonAudit
+    )
+    Assert-DeliveryInventory -OpenIssues @($inReview) -OpenPullRequests @($readyWithCancelledNonAudit)
+  } 'cancelled non-audit check remains blocking' 'current head'
+  $caseCount++
+  Assert-Throws {
+    $failedAudit = [pscustomobject]@{
+      name = 'audit'; workflowName = 'handoff-audit'; status = 'COMPLETED'; conclusion = 'FAILURE'
+    }
+    $readyWithFailedAudit = New-TestPr -Draft $false -Checks @(
+      (New-GreenChecks) + $failedAudit
+    )
+    Assert-DeliveryInventory -OpenIssues @($inReview) -OpenPullRequests @($readyWithFailedAudit)
+  } 'failed audit check remains blocking' 'current head'
   $caseCount++
   $drainCandidates = @(Get-DrainCandidates -Records $inReviewRecords)
   if ($drainCandidates.Count -ne 1 -or $drainCandidates[0].PullRequest -ne 51 -or
