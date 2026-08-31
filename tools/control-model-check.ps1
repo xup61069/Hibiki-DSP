@@ -242,3 +242,8 @@ $routeHealthContractProject = Join-Path $repo 'apps/control-model-route-health-c
 $routeHealthContractOutputRoot = Join-Path $outputRoot 'route-health-contract/'
 $routeHealthContractObjRoot = Join-Path $objRoot 'route-health-contract/'
 Invoke-ControlModelCheck -ProjectPath $routeHealthContractProject -BaseOutputPath $routeHealthContractOutputRoot -ProjectExtensionsPath $routeHealthContractObjRoot
+
+$physicalDeviceAvailabilityContractProject = Join-Path $repo 'apps/control-model-physical-device-availability-check/Hibiki.ControlModel.PhysicalDeviceAvailability.Check.csproj'
+$physicalDeviceAvailabilityContractOutputRoot = Join-Path $outputRoot 'physical-device-availability/'
+$physicalDeviceAvailabilityContractObjRoot = Join-Path $objRoot 'physical-device-availability/'
+Invoke-ControlModelCheck -ProjectPath $physicalDeviceAvailabilityContractProject -BaseOutputPath $physicalDeviceAvailabilityContractOutputRoot -ProjectExtensionsPath $physicalDeviceAvailabilityContractObjRoot
