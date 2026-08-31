@@ -35,6 +35,10 @@ public static class OutputGroupCatalog
         new("low-latency", "Low Latency", 2),
         new("surround", "Surround 7.1", 8)
     ];
+
+    public static bool IsSupported(string? outputGroup) =>
+        !string.IsNullOrWhiteSpace(outputGroup) &&
+        Fixed.Any(item => string.Equals(item.Id, outputGroup.Trim(), StringComparison.OrdinalIgnoreCase));
 }
 
 public enum PhysicalDeviceFlowV1
@@ -289,7 +293,12 @@ public sealed class EasyControlSession
             Status = AudioControlStatus.Degraded;
             return new(false, null, Status, "尚未選擇輸出裝置");
         }
-        ActiveOutputGroup = outputGroup.Trim();
+        var normalized = outputGroup.Trim();
+        if (!OutputGroupCatalog.IsSupported(normalized))
+        {
+            return new(false, null, Status, "不支援的輸出群組");
+        }
+        ActiveOutputGroup = normalized;
         ActiveScene = ScenePresetCatalog.EasyDefaults[0];
         Status = AudioControlStatus.Controlled;
         return new(true, ActiveScene, Status, "已套用遊戲低延遲與音量保護");
