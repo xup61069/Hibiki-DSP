@@ -198,6 +198,12 @@ transaction 清掉上一個 loudness EQ，避免不相關 Scene 的音色殘留�
 不是 equal-loudness conformance、正式係數 fit、實體 sink delivery 或 driver/WaveRT evidence；production
 concurrent swap 以 commit-point snapshot 取代 epoch/RCU：同一 output group 的 attached-to-attached prepare/commit 保留上一組 immutable PEQ，使用 engine-owned 固定容量緩衝（最多 8 聲道、120 ms 的 interleaved samples）與 sin/cos equal-power gain 做 120 ms crossfade；`process`／`process_output_group` 入口會在 graph render 與 latency-bank 推進前先做同一個唯讀 geometry preflight，RT copy 前也必須確認 frames * channels 可表示且不超過該緩衝，否則整個呼叫 fail-closed，且不改 caller output、latency 或 crossfade state；內層 guard 仍保留作第二道防線。clear 後重掛、不同 group 首次掛載、rollback 或 Strict Direct 不啟動 fade。單次 render block 超過 23040 frames 時整個呼叫 fail-closed，不做部分淡化。這仍不是 equal-loudness conformance、實體 sink delivery 或 driver/WaveRT evidence；真實裝置上的主觀無感切換尚未驗收。
 
+Model-level Float64 render 的 Group Master 也沿用同一個 bounded ramp，但以 double domain
+預掃描整個 caller-owned output，確認所有 samples finite 後才推進 ramp 並寫回；gain
+會在 double 中套用，不把有限 double sample 窄化成 Float32。故 Float32 範圍之外的 finite
+double 仍可保留，非有限 block 則不改 output 或 ramp state。這是 user-space render contract，
+不代表任何實體 sink、driver/WaveRT 或聲學證據。
+
 Live phon recompute 的 debounce 狀態屬於每個 output group 的 attachment
 （per-group），不是 engine 層級單一狀態：engine 同時只保留一份 active loudness
 attachment，切換到另一個 group 時不會繼承前一個 group 的 250 ms 等待窗口或

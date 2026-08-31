@@ -121,6 +121,14 @@ public:
                                             std::size_t frames,
                                             std::uint32_t channels,
                                             std::uint32_t sample_rate) const noexcept;
+    // RT-only double-domain variant. It preflights every caller-owned sample
+    // before advancing the ramp or writing output, and never narrows samples
+    // through Float32.
+    [[nodiscard]] bool apply_to_interleaved_f64(std::string_view output_group,
+                                                double* interleaved,
+                                                std::size_t frames,
+                                                std::uint32_t channels,
+                                                std::uint32_t sample_rate) const noexcept;
 
 private:
     struct Slot {

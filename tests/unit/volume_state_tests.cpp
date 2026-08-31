@@ -338,6 +338,34 @@ int main() {
         CHECK(bank.apply_to_interleaved("out", buf, 2U, 2U, 48000U));
         CHECK(buf[0] > 0.99F && buf[0] <= 1.01F);
         CHECK(buf[3] > -0.505F && buf[3] < -0.495F);
+
+        // The double-domain path must accept finite values outside Float32
+        // range and must reject a bad later sample before advancing the ramp.
+        OutputGroupVolumeBankV1 f64_candidate;
+        OutputGroupVolumeBankV1 f64_control;
+        CHECK(f64_candidate.register_group("out"));
+        CHECK(f64_control.register_group("out"));
+        CHECK(f64_candidate.apply_windows_notification("out", {0.0, false, 1U}) ==
+              VolumeNotificationResult::Accepted);
+        CHECK(f64_control.apply_windows_notification("out", {0.0, false, 1U}) ==
+              VolumeNotificationResult::Accepted);
+        std::array<double, 4U> invalid_f64{1.0e300,
+                                            std::numeric_limits<double>::quiet_NaN(),
+                                            3.0, 4.0};
+        const auto invalid_f64_sentinels = invalid_f64;
+        CHECK(!f64_candidate.apply_to_interleaved_f64("out", invalid_f64.data(),
+                                                       2U, 2U, 48000U));
+        CHECK(std::memcmp(invalid_f64.data(), invalid_f64_sentinels.data(),
+                          sizeof(invalid_f64)) == 0);
+        std::array<double, 4U> f64_candidate_block{1.0e300, -1.0e300, 0.5, -0.5};
+        std::array<double, 4U> f64_control_block = f64_candidate_block;
+        CHECK(f64_candidate.apply_to_interleaved_f64("out", f64_candidate_block.data(),
+                                                      2U, 2U, 48000U));
+        CHECK(f64_control.apply_to_interleaved_f64("out", f64_control_block.data(),
+                                                    2U, 2U, 48000U));
+        CHECK(f64_candidate_block == f64_control_block);
+        CHECK(std::isfinite(f64_candidate_block[0]) &&
+              f64_candidate_block[0] > 1.0e296);
     }
 
     // ---- reset_limiters() ------------------------------------------------------------------------

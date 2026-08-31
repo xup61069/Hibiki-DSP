@@ -226,4 +226,35 @@ bool OutputGroupVolumeBankV1::apply_to_interleaved(const std::string_view output
     return true;
 }
 
+bool OutputGroupVolumeBankV1::apply_to_interleaved_f64(
+    const std::string_view output_group,
+    double* const interleaved,
+    const std::size_t frames,
+    const std::uint32_t channels,
+    std::uint32_t sample_rate) const noexcept {
+    if (interleaved == nullptr || frames == 0U || channels == 0U || channels > 8U) return false;
+    const auto channel_count = static_cast<std::size_t>(channels);
+    if (frames > std::numeric_limits<std::size_t>::max() / channel_count) return false;
+    const auto sample_count = frames * channel_count;
+    const auto* const slot = find_slot(output_group);
+    if (slot == nullptr) return false;
+
+    // Validate the complete caller-owned block before changing ramp state or
+    // committing any gain, so a bad later sample cannot expose partial output.
+    for (std::size_t sample = 0U; sample < sample_count; ++sample) {
+        if (!std::isfinite(interleaved[sample])) return false;
+    }
+
+    const auto volume_word = slot->rt_word.load(std::memory_order_acquire);
+    const auto effective_q16 = static_cast<std::int32_t>(volume_word >> 32U);
+    slot->ramp.observe_target(effective_q16, (volume_word & 1ULL) != 0ULL, sample_rate);
+    for (std::size_t frame = 0U; frame < frames; ++frame) {
+        const auto gain = static_cast<double>(slot->ramp.next_gain());
+        for (std::uint32_t channel = 0U; channel < channels; ++channel) {
+            interleaved[frame * channels + channel] *= gain;
+        }
+    }
+    return true;
+}
+
 }  // namespace hibiki
