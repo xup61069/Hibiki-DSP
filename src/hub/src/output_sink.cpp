@@ -187,6 +187,14 @@ bool PersistentPolyphaseResampler::process(const float* const input,
         return false;
     }
 
+    // Reject the complete caller-owned block before producing any output or
+    // carrying samples into the persistent history. A single NaN/Inf would
+    // otherwise poison the FIR accumulator and every subsequent block.
+    const auto input_samples = input_frames * channel_count;
+    for (std::size_t index = 0U; index < input_samples; ++index) {
+        if (!std::isfinite(input[index])) return false;
+    }
+
     const auto expected = required_output_frames(input_frames);
     if (expected > output_capacity_frames) {
         return false;
