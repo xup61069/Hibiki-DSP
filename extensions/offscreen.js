@@ -72,7 +72,7 @@ function connectBridge() {
     socket.onopen = () => {
       if (bridge !== socket || !capturing) return;
       bridgeRetryAttempt = 0;
-      setStateHeartbeat(false);
+      setStateHeartbeat(capturing);
       setBridgeConnected(true);
     };
     socket.onclose = () => {
