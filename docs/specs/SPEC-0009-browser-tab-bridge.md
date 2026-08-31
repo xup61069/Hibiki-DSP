@@ -77,6 +77,9 @@ offscreen 另追蹤每次 Start capture 重置的匿名時間戳：capture 開�
 與最後一次收到 packetizer packet 的 `lastPacketActivityAtMs`（送出或丟棄都算活動）。這些欄位
 隨 capture-state 傳給 popup；popup 顯示擷取已持續多久與最近是否仍有音訊活動，並在尚未收到
 packet 時誠實顯示「尚未收到音訊封包」，不偽造時間。停止或自然結束後不再回報 active timing。
+capture active 期間 offscreen 每秒最多回報一次 capture-state，不因 bridge 已連線而停止；因此
+已開啟的 popup 也能在不重新開啟或手動 visibility refresh 的情況下看到最新封包活動。heartbeat
+只在 capture teardown 時停止，且仍屬 user-space 診斷訊息。
 「複製診斷資訊」快照也會包含兩個時間戳與當下的 elapsed／age 值。此為 user-space 匿名健康資訊，
 不宣稱 engine 接收率或音訊品質。`TabCaptureQueueV1` 將 validated packet 複製到四格固定 SPSC ring，
 控制執行緒可用 `enqueue_tab_capture_packet_v1` 作 callback，RT lane 再以 caller-owned

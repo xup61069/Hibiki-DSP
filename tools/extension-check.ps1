@@ -255,6 +255,9 @@ function Assert-ExtensionSourcePolicy(
       throw "Offscreen source must ignore stale bridge socket callbacks in $sourceName."
     }
   }
+  if ($offscreenSource -notmatch 'socket\.onopen\s*=\s*\(\s*\)\s*=>\s*\{[\s\S]{0,240}setStateHeartbeat\(\s*capturing\s*\)') {
+    throw "Offscreen source must keep the capture-state heartbeat active after bridge connection in $sourceName."
+  }
   foreach ($captureOwnershipPattern in @(
       'async\s+function\s+startCapture\s*\([^)]*\)\s*\{\s*await\s+teardownCaptureGraph\s*\(\s*\)\s*;[\s\S]{0,120}capturing\s*=\s*true',
       'track\.addEventListener\(\s*(?:\x27|\x22)ended(?:\x27|\x22)\s*,\s*\(\s*\)\s*=>\s*\{\s*void\s+handleSourceEnded\s*\(\s*stream\s*\)',
@@ -489,7 +492,7 @@ if ($SelfTest) {
   }
   $sourceFixture.offscreen = $sourceFixture.offscreen.Replace(
     "bridge = new WebSocket('ws://127.0.0.1:17842/v1/tab');bridge.binaryType = 'arraybuffer'; bridge.onopen = () => {}; bridge.onclose = () => { bridge = null; scheduleBridgeRetry(); };",
-    "const socket = new WebSocket('ws://127.0.0.1:17842/v1/tab'); bridge = socket; socket.binaryType = 'arraybuffer'; socket.onopen = () => { if (bridge !== socket || !capturing) return; }; socket.onclose = () => { if (bridge !== socket || !capturing) return; bridge = null; scheduleBridgeRetry(); };")
+    "const socket = new WebSocket('ws://127.0.0.1:17842/v1/tab'); bridge = socket; socket.binaryType = 'arraybuffer'; socket.onopen = () => { if (bridge !== socket || !capturing) return; setStateHeartbeat(capturing); }; socket.onclose = () => { if (bridge !== socket || !capturing) return; bridge = null; scheduleBridgeRetry(); };")
   $sourceFixture.offscreen += " async function startCapture(message) { await teardownCaptureGraph(); capturing = true; } async function teardownCaptureGraph() { const streamToStop = activeStream; activeStream = null; streamToStop?.getTracks().forEach(track => track.stop()); } let packetizer = null; const capturePacketizer = packetizer; capturePacketizer.port.onmessage = (event) => { if (packetizer !== capturePacketizer || !capturing) return; };"
   $sourceFixture.offscreen = $sourceFixture.offscreen.Replace(
     "track.addEventListener('ended', handleSourceEnded);",
@@ -499,6 +502,11 @@ if ($SelfTest) {
     "async function handleSourceEnded(endedStream) { if (activeStream !== endedStream) return;")
   $sourceFixture.serviceWorker += " let captureLifecycleTail = Promise.resolve(); function enqueueCaptureLifecycle(operation) { const next = captureLifecycleTail.then(operation, operation); captureLifecycleTail = next.catch(() => {}); return next; } async function releaseOffscreenDocumentIfIdle() { const contexts = await chrome.runtime.getContexts({contextTypes: ['OFFSCREEN_DOCUMENT']}); if (contexts.length === 0) return; const state = await chrome.runtime.sendMessage({type: 'get-capture-state'}); if (state?.capturing === true) return; await closeOffscreenDocument(); } if (message?.type === 'capture-active-tab') { enqueueCaptureLifecycle(() => startCapture(message)); } if (message?.type === 'stop-capture') { enqueueCaptureLifecycle(() => stopCapture()); } if (message?.type === 'offscreen-capture-released') { enqueueCaptureLifecycle(() => releaseOffscreenDocumentIfIdle()); }"
   Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $sourceFixture.offscreen $sourceFixture.worklet 'selftest-source-valid'
+
+  $missingConnectedHeartbeat = $sourceFixture.offscreen -replace 'setStateHeartbeat\(capturing\);', 'setBridgeConnected(true);'
+  $caught = $false
+  try { Assert-ExtensionSourcePolicy $sourceFixture.popup $sourceFixture.serviceWorker $missingConnectedHeartbeat $sourceFixture.worklet 'selftest-connected-activity-heartbeat' } catch { $caught = $true }
+  if (-not $caught) { throw 'SelfTest expected connected capture-state heartbeat failure.' }
 
   $missingStaleSocketGuard = $sourceFixture.offscreen -replace 'bridge !== socket \|\| !capturing', 'bridge !== socket'
   $caught = $false
@@ -741,7 +749,7 @@ connect-src   ws://127.0.0.1:17842
   }
   if (-not $popupDuplicateIdCaught) { throw 'Extension accessibility self-test expected a duplicate control id failure.' }
 
-  Write-Output 'Browser extension policy self-test passed (52 cases).'
+  Write-Output 'Browser extension policy self-test passed (53 cases).'
   exit 0
 }
 
