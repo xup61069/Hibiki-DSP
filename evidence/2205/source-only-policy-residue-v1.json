@@ -1,0 +1,81 @@
+{
+  "evidence_format": 2,
+  "issue": 2205,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "docs/adr/0008-source-only-driver-release-boundary.md",
+      "docs/adr/INDEX.md",
+      "docs/specs/SPEC-0003-virtual-endpoints-and-routing.md",
+      "docs/state/BASELINE.md",
+      "driver/README.md"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "f9741cae4785b1719adc43ddf266211bc339950818e5cf548b1e660973517e88"
+  },
+  "metadata": {
+    "scope": "source-only-policy-residue-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-source-only-policy-residue",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 2205",
+      "pwsh -NoProfile -File tools/delivery-audit.ps1 -Issue 2205",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "pwsh -NoProfile -File tools/driver-source-check.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "handoff-check and delivery-audit",
+        "status": "pass",
+        "detail": "Issue #2205 ownership, declared documentation scope, branch state and open-delivery inventory passed before the first draft PR."
+      },
+      {
+        "command": "documentation and source policy gates",
+        "status": "pass",
+        "detail": "docs-check, source-policy and source-only-ci-check passed with the new ADR-0008 boundary and current documentation aligned to the source-only policy."
+      },
+      {
+        "command": "driver-source-check",
+        "status": "pass",
+        "detail": "The existing WDK source boundary passed without building, packaging, installing or loading a driver."
+      },
+      {
+        "command": "evidence-audit -DescribeCurrentChange",
+        "status": "pass",
+        "detail": "Derived the five exact staged non-evidence documentation paths and source-set digest f9741cae4785b1719adc43ddf266211bc339950818e5cf548b1e660973517e88."
+      },
+      {
+        "command": "evidence-audit -SelfTest",
+        "status": "pass",
+        "detail": "All 48 offline evidence-audit self-test cases passed."
+      },
+      {
+        "command": "evidence-audit",
+        "status": "pass",
+        "detail": "The append-only manifest, its v2 schema shape and staged source provenance passed the repository audit."
+      },
+      {
+        "command": "git diff --check",
+        "status": "pass",
+        "detail": "No whitespace errors detected in the scoped source change."
+      }
+    ],
+    "limitations": [
+      "This is a documentation, policy and evidence-boundary change only; it does not create a V1 tag, GitHub release, asset, binary, package, signing workflow or paid channel.",
+      "No driver source, installer behavior or target-machine state changed, and no driver install, driver load, WaveRT stream, endpoint behavior, physical audio, upgrade, rollback or uninstall result is claimed.",
+      "The provenance digest binds this record to the staged non-evidence source set; it does not independently attest target-machine behavior."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1"
+    },
+    "started_at": "2026-08-31T09:30:00+08:00",
+    "finished_at": "2026-08-31T09:46:23+08:00"
+  }
+}

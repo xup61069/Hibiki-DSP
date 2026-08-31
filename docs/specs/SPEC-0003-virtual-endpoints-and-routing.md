@@ -5,7 +5,7 @@ owner: hibiki-maintainers
 authority: product-behavior
 last_reviewed: 2026-08-25
 review_after_days: 14
-related_adrs: [ADR-0002, ADR-0004]
+related_adrs: [ADR-0002, ADR-0004, ADR-0008]
 source_globs: ["driver/**", "sdk/**", "apps/**", "asio/**", "extensions/**", "src/**"]
 ---
 
@@ -233,7 +233,7 @@ App、Hibiki ASIO client、瀏覽器分頁與輸入裝置都是獨立 Lane，可
   驗證整個 block，兩層檢查都不能省略。
 - `process_virtual_mic_lane_to_wasapi_v1` 在 privacy gate／optional DSP 後共用 lane-to-WASAPI
   adapter；capture、reference、graph 或 sink 任一邊界失敗都不提交。這只提供 user-space
-  monitor/output path，不能取代真正的 signed Virtual Mic capture driver。
+  monitor/output path，不能取代真正的 Virtual Mic capture driver。
 - `HibikiMiniportTopologyV1`、topology filter tables、WaveRT/topology subdevice pair 與 INF
   per-subdevice interfaces 提供 local WDK build／Inf2Cat 的 PortCls start-path wiring。這仍是
   source/build evidence：不新增 guest 安裝、載入、實體 endpoint 或實體音訊

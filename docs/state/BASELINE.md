@@ -109,7 +109,7 @@
   suppresses registered event contexts and applies requested dB/mute through the canonical
   output-group safety path; its 16-byte header-only Hello/Ack/Error request-correlation path
   is also contract-tested. This remains source/control evidence and does not claim a loadable
-  or signed driver.
+  driver or target-machine behavior.
 - `OutputGroupVolumeState` 與 ISO compensation public C++ boundary 的初始骨架。
 - Scene graph、device-switch transaction 與初始 CMake/CTest 驗證入口。
 - Immutable RT graph snapshot、2/6/8 聲道 mapping、IPC frame codec、ASIO stream model、VST
@@ -117,9 +117,10 @@
 - Caller-owned output ring buffer、clock-drift estimator、bounded linear SRC prototype、
   Apache C driver ABI 與 portable driver validator。
 - Source-only PowerShell installer bootstrapper with manifest/hash dry-run gate.
-- `ReleaseManifest v1` now requires toolchain/dependency/SBOM digests plus driver package/catalog
-  and Microsoft signature metadata, and installer signer/RFC3161 metadata before a package can be
-  staged; no signed payload is stored in this repository.
+- `ReleaseManifest v1` now requires source identity, a non-empty distribution ID, toolchain/
+  dependency/SBOM digests, and driver package/catalog and installer content hashes before a package
+  can be staged; signer, RFC3161 and signed-payload metadata are rejected, and no payload is stored
+  in this repository.
 - Easy Scene factory、AcousticAnchor phon mapping、PEQ/APO/CamillaDSP/REW exporters 與 WAV IR
   serializer。
 - `IrPhasePolicyV1` 與 C# binding-ready slider contract 已加入：Game minimum-phase 0 ms、
@@ -414,7 +415,7 @@
 - Optional source-only native ASIO COM transport now builds when a local pinned ASIO SDK is
   supplied: stable CLSID, eight Float32 output channels, 32--4096 frame buffers, supported
   sample rates, callbacks, sample position and ASIO registry routines. It remains disabled in
-  normal CI and does not yet connect buffers to a physical sink or the signed virtual endpoint.
+  normal CI and does not yet connect buffers to a physical sink or a real virtual endpoint.
 - `SceneSafetyController` now provides a tested control-plane policy for smart scene attenuation:
   it rate-limits true-peak overage actions, detects manual Windows volume overrides and restores
   the remembered scene baseline only when it is safe to do so.
@@ -500,8 +501,8 @@
   bounded read/write, local-only pipe validation, request decoding and callback response framing;
   a Windows loopback contract test exercises Ack/request-ID round-trip.
 - `driver/inf/HibikiVirtualAudio.inf` is a source-only MS-PL package template with stable Root
-  hardware identity, four endpoint GUIDs and service boundary; it references only the future
-  signed SYS/CAT and remains non-installable from a fresh clone.
+  hardware identity, four endpoint GUIDs and service boundary; it references future SYS/CAT build
+  outputs and remains non-installable from a fresh clone.
 - `driver/include/hibiki/wavert_stream_v1.h` and `src/wavert_stream.c` now provide a portable
   WaveRT Float32 ring boundary: caller-owned storage, whole-block overrun rejection, counted
   underrun silence fallback, bounded 2/6/8-channel format validation and no allocation/wait.
@@ -527,7 +528,7 @@
   shared lane-to-WASAPI adapter, so a user-gesture-gated browser tab follows the same Group Master,
   limiter and device handoff semantics as ASIO and driver lanes.
 - `process_virtual_mic_lane_to_wasapi_v1` now applies privacy/optional bounded VirtualMicDsp before
-  the same lane-to-WASAPI adapter; it remains a monitor/output boundary, not a signed capture driver.
+  the same lane-to-WASAPI adapter; it remains a monitor/output boundary, not a real capture driver.
 - `WindowsWasapiFanoutV1` now validates up to eight enabled, unique same-layout/rate sinks and
   coordinates an independent handoff per sink; any physical submit failure is reported as degraded.
 - `AudioEngineModel::prepare_wasapi_fanout` and `process_output_group_to_wasapi_fanout` now connect
@@ -535,13 +536,13 @@
 ## 尚未開始
 - 可載入的 WaveRT/SYSVAD-derived driver、ASIO physical sink delivery、Scene-wired out-of-process
   VST3 SDK plugin host、WinUI 3 SDK/build and accessibility validation、real-device sink clock
-  evidence/soak 與 signed package delivery。
+  evidence/soak，以及目標機安裝、升級／回復與卸載驗證。
 - equal-loudness 合法係數來源與正式 conformance oracle（公式本身已完成，但係數資料仍待
   授權／法務確認）。
-- Microsoft driver signing、Gumroad release artifact 與 production installer。
+- 目標機的實體音訊與 WaveRT streaming 驗證。
 toolchain lock 已依 ADR-0005 對 SDK/WDK 改採最低基線 >= 10.0.26100：目前開發機是
 Windows build 26200、VS 2026／SDK-WDK 26100 家族，符合基線。user-space tests 可通過，
-但本機結果仍不是 driver 安裝、載入、runtime audio、HLK 或簽章的 target evidence。
+但本機結果仍不是 driver 安裝、載入、runtime audio 或目標機的實體驗證。
 ## 最近驗證
 初始 foundation evidence 已寫入 `evidence/0000-foundation/initial.json`，目前對應
 Windows volume/device、ISO formula、recovery、driver control-core/INF template、persistent SRC、
@@ -567,14 +568,14 @@ Endpoint-ID-preserving volume rebind 的 source commit 是 `4d9e1d5`。
 固定四組 volume event-context GUID 與自動註冊的 source commit 是 `1ebf026`。
 WASAPI PCM render conversion 與 silent 30 ms live handoff probe 的 source commit 是 `9d0d426`。
 WASAPI rollback/retry state-machine fix 與 live probe 的 source commit 是 `135c7ac`；target
-Audio Service restart、hotplug、HLK 與 signed endpoint evidence 仍未完成。
+Audio Service restart、hotplug 與 target endpoint evidence 仍未完成。
 WASAPI service/device invalidation recovery source commit 是 `5333ac4`；本機尚未注入實際
 restart 或拔插事件。
-Driver signability source gate 的 source commit 是 `dc1d3b2`；預設只驗證 INF contract，
+Driver source-boundary gate 的 source commit 是 `dc1d3b2`；預設只驗證 INF contract，
 目標 WDK package 才能執行 Inf2Cat。
 Topology-indexed WDK render/capture pin formats 與 Virtual Mic generic format boundary 的
-source commit 是 `741a54b`；文件與 evidence 對應 commit 是 `d2c8717`，仍未宣稱 `.sys`、HLK
-或 Microsoft signing。
+source commit 是 `741a54b`；文件與 evidence 對應 commit 是 `d2c8717`，仍未宣稱 `.sys`
+或 target-machine endpoint evidence。
 ReleaseManifest custody metadata source commit 是 `b1c64d4`；documentation gate 擴充的 source
 commit 是 `2a6aa8f`，文件與 evidence 對應 commit 是 `015a4eb`。
 ReleaseManifest hash-casing schema compatibility fix 的 source commit 是 `8ae3499`；目前
