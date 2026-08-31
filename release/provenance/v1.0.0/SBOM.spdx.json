@@ -1,0 +1,107 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "Hibiki DSP v1.0.0 source SBOM",
+  "documentNamespace": "https://github.com/xup61069/Hibiki-DSP/tree/v1.0.0/release/provenance/v1.0.0/SBOM.spdx.json",
+  "creationInfo": {
+    "created": "2026-08-31T16:19:30Z",
+    "creators": [
+      "Tool: Hibiki DSP source provenance"
+    ]
+  },
+  "documentDescribes": [
+    "SPDXRef-Package-HibikiDSP"
+  ],
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-HibikiDSP",
+      "name": "Hibiki DSP source tree",
+      "versionInfo": "1.0.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "primaryPackagePurpose": "APPLICATION",
+      "comment": "This is a source-only release. Component licenses are declared by SPDX in LICENSES/README.md; third-party source, license, purpose, and redistribution terms are recorded in THIRD_PARTY.yml."
+    },
+    {
+      "SPDXID": "SPDXRef-Package-UserSpace",
+      "name": "Hibiki DSP user-space source",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "GPL-3.0-only",
+      "licenseDeclared": "GPL-3.0-only",
+      "copyrightText": "NOASSERTION",
+      "primaryPackagePurpose": "APPLICATION"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-DriverBoundary",
+      "name": "Hibiki DSP driver source boundary",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MS-PL",
+      "licenseDeclared": "MS-PL",
+      "copyrightText": "NOASSERTION",
+      "primaryPackagePurpose": "OTHER"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-SdkSchemas",
+      "name": "Hibiki DSP public SDK and schemas",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-Documentation",
+      "name": "Hibiki DSP documentation",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "CC-BY-4.0",
+      "licenseDeclared": "CC-BY-4.0",
+      "copyrightText": "NOASSERTION",
+      "primaryPackagePurpose": "OTHER"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-TestFixtures",
+      "name": "Hibiki DSP synthetic test fixtures",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "CC0-1.0",
+      "licenseDeclared": "CC0-1.0",
+      "copyrightText": "NOASSERTION",
+      "primaryPackagePurpose": "OTHER"
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-Package-HibikiDSP",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Package-UserSpace"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-HibikiDSP",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Package-DriverBoundary"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-HibikiDSP",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Package-SdkSchemas"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-HibikiDSP",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Package-Documentation"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-HibikiDSP",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Package-TestFixtures"
+    }
+  ]
+}
