@@ -1246,7 +1246,7 @@ public static class ControlPayloadsV1
                                                 EqVisualSourceV1 source,
                                                 IReadOnlyList<EqVisualPointV1> points)
     {
-        if (sequence == 0UL || !Enum.IsDefined(source) ||
+        if (sequence == 0UL || !IsEqVisualSource(source) ||
             points is null || points.Count is < 4 or > EqVisualSnapshotCapacity)
             throw new ArgumentException("EQ visual snapshot is outside the v1 limit.");
         for (var index = 0; index < points.Count; index++)
@@ -1292,7 +1292,7 @@ public static class ControlPayloadsV1
         var decodedSequence = BinaryPrimitives.ReadUInt64LittleEndian(payload);
         var decodedSource = (EqVisualSourceV1)payload[8];
         var count = payload[9];
-        if (decodedSequence == 0UL || !Enum.IsDefined(decodedSource) ||
+        if (decodedSequence == 0UL || !IsEqVisualSource(decodedSource) ||
             count is < 4 or > EqVisualSnapshotCapacity ||
             payload.Length != EqVisualSnapshotHeaderBytes +
                               (count * EqVisualSnapshotPointBytes))
@@ -1326,6 +1326,9 @@ public static class ControlPayloadsV1
         var q16 = checked((int)Math.Round(db * 65536.0, MidpointRounding.AwayFromZero));
         BinaryPrimitives.WriteInt32LittleEndian(destination, q16);
     }
+
+    private static bool IsEqVisualSource(EqVisualSourceV1 source) =>
+        source is EqVisualSourceV1.EqualLoudness or EqVisualSourceV1.AdaptiveCorrection;
 
     private static double ReadDbQ16(ReadOnlySpan<byte> source) =>
         BinaryPrimitives.ReadInt32LittleEndian(source) / 65536.0;

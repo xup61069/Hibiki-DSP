@@ -1930,6 +1930,27 @@ static async Task RunInitialConnectFailureCheckServerAsync(
           roundTripDecoded.Count == 4,
         "An adaptive-correction EQ visual frame must round-trip with source=2.");
 
+    var sourceZeroEncodeRejected = false;
+    try
+    {
+        _ = ControlPayloadsV1.EncodeEqVisualSnapshot(22UL, EqVisualSourceV1.None,
+            eqPoints);
+    }
+    catch (ArgumentException)
+    {
+        sourceZeroEncodeRejected = true;
+    }
+    Check(sourceZeroEncodeRejected,
+        "The managed EQ visual encoder must reject reserved source=0.");
+    var sourceZeroPayload = (byte[])encodedEq.Clone();
+    sourceZeroPayload[8] = 0;
+    Check(!ControlPayloadsV1.TryDecodeEqVisualSnapshot(
+              sourceZeroPayload, out var rejectedSourceSequence,
+              out var rejectedSource, out var rejectedSourcePoints) &&
+          rejectedSourceSequence == 0UL && rejectedSource == EqVisualSourceV1.None &&
+          rejectedSourcePoints.Count == 0,
+        "A source=0 EQ visual payload must fail closed with neutral outputs.");
+
     var badEq = (byte[])encodedEq.Clone();
     badEq[9] = 3;
     Check(!ControlPayloadsV1.TryDecodeEqVisualSnapshot(badEq, out _, out _, out _),
@@ -1967,6 +1988,9 @@ static async Task RunInitialConnectFailureCheckServerAsync(
     };
     var confirmed = new EqVisualFrameV1(11UL, EqVisualSourceV1.EqualLoudness, points);
     Check(confirmed.IsValid, "A bounded increasing-frequency EQ frame must be valid.");
+    var zeroSourceFrame = new EqVisualFrameV1(12UL, EqVisualSourceV1.None, points);
+    Check(!zeroSourceFrame.IsValid,
+        "A source=0 EQ visual frame must be invalid before surface application.");
 
     var eqViewModel = new EasyControlViewModel("HibikiDSP_eq_visual_check");
     Check(!eqViewModel.EqSurface.HasConfirmedFrame &&
