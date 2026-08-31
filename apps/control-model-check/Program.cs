@@ -181,6 +181,21 @@ Check(IpcCodecV1.TryDecode(knownHello, out var knownEnvelope, out _ ) &&
       knownEnvelope?.RequestId == 42UL &&
       knownEnvelope.Type == ControlMessageType.Hello,
     "C# IPC bytes are not compatible with the C++ envelope.");
+foreach (var rawOperation in new byte[] { 0, 4, 255 })
+{
+    var rejectedSceneOperation = false;
+    try
+    {
+        _ = ControlPayloadsV1.EncodeSceneCatalogCommand(
+            (SessionRouteRuleOperationV1)rawOperation, "invalid-operation");
+    }
+    catch (ArgumentOutOfRangeException)
+    {
+        rejectedSceneOperation = true;
+    }
+    Check(rejectedSceneOperation,
+        $"Managed SceneCatalog encoder must reject operation value {rawOperation}.");
+}
 var malformedIpc = knownHello[..^1];
 Check(!IpcCodecV1.TryDecode(malformedIpc, out _, out var malformedError) &&
       malformedError == IpcDecodeError.Truncated,

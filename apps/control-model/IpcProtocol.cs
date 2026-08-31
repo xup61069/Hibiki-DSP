@@ -638,6 +638,11 @@ public static class ControlPayloadsV1
         string irReference = "",
         bool loudnessLiveUpdate = false)
     {
+        if (operation is not (SessionRouteRuleOperationV1.Upsert or
+                              SessionRouteRuleOperationV1.Remove or
+                              SessionRouteRuleOperationV1.Clear))
+            throw new ArgumentOutOfRangeException(nameof(operation));
+
         var id = StrictUtf8.GetBytes(sceneId ?? string.Empty);
         var payload = new byte[SceneCatalogPayloadBytes];
         if (operation == SessionRouteRuleOperationV1.Clear)
