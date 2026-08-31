@@ -1,0 +1,100 @@
+{
+  "evidence_format": 2,
+  "issue": 2202,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "SOURCE_POLICY.md",
+      "docs/adr/0007-source-only-release-policy-supersession.md",
+      "docs/adr/INDEX.md",
+      "docs/specs/SPEC-0005-source-only-paid-release.md",
+      "driver/inf/HibikiVirtualAudio.inf",
+      "installer/HibikiSetup.ps1",
+      "schemas/release-manifest-v1.schema.json",
+      "tools/installer-check.ps1"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "68c6346943bbb2627d24c8061602694aa817827d9e1288e4d06ee35407b6c3df"
+  },
+  "metadata": {
+    "scope": "release-policy-manifest-contract-v1",
+    "environment_fingerprint": "windows-26200-amd64-pwsh-7.6.4-vs2026-sdk-wdk-28000",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 2202",
+      "pwsh -NoProfile -File tools/delivery-audit.ps1 -Issue 2202",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/installer-check.ps1",
+      "pwsh -NoProfile -File tools/distribution-check.ps1",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "pwsh -NoProfile -File tools/driver-source-check.ps1",
+      "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+      "pwsh -NoProfile -File tools/verify.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -SelfTest",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "handoff-check -Issue 2202",
+        "status": "pass",
+        "detail": "Issue ownership, declared scope_globs, branch ancestry and worktree state validated."
+      },
+      {
+        "command": "delivery-audit -Issue 2202",
+        "status": "pass",
+        "detail": "The claimed handoff has no bounded open PR conflict."
+      },
+      {
+        "command": "documentation and source policy gates",
+        "status": "pass",
+        "detail": "docs-check, source-policy, source-only-ci-check and driver-source-check passed; no compiled or signed release payload is published."
+      },
+      {
+        "command": "installer and distribution checks",
+        "status": "pass",
+        "detail": "Installer parser requires a non-empty distribution_id and rejects missing or empty values; distribution profile checks passed."
+      },
+      {
+        "command": "doctor -CheckOnly",
+        "status": "pass",
+        "detail": "Windows 11 build 26200, AMD64, Visual Studio 2026, Windows SDK/WDK 10.0.28000.0 and PowerShell 7.6.4 detected."
+      },
+      {
+        "command": "verify",
+        "status": "pass",
+        "detail": "CMake configure/build completed with serialized MSBuild and all 52 CTest targets passed."
+      },
+      {
+        "command": "evidence-audit -DescribeCurrentChange",
+        "status": "pass",
+        "detail": "Derived the eight exact non-evidence paths and source-set digest from the staged Git index."
+      },
+      {
+        "command": "evidence-audit and evidence-audit -SelfTest",
+        "status": "pass",
+        "detail": "Final evidence schema, append-only and source provenance checks are recorded after evidence creation."
+      },
+      {
+        "command": "git diff --check",
+        "status": "pass",
+        "detail": "No whitespace errors detected."
+      }
+    ],
+    "limitations": [
+      "This is source, documentation, schema and installer-policy evidence; it does not claim a GitHub release asset, binary delivery, signing, paid channel or HLK/WHCP acceptance.",
+      "Local verify generated ignored build outputs only; no EXE, DLL, SYS, MSI, MSIX, VST3, PE/COFF or certificate was added to the repository.",
+      "No physical audio, driver loading, WaveRT streaming, endpoint delivery or Secure Boot/HVCI result is claimed."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1",
+      "visual_studio": "2026 18.9.12112.369",
+      "windows_sdk_wdk": "10.0.28000.0"
+    },
+    "started_at": "2026-08-31T08:18:14+08:00",
+    "finished_at": "2026-08-31T08:21:50+08:00"
+  }
+}
