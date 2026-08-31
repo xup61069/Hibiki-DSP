@@ -195,6 +195,14 @@ int main() {
         CHECK(hibiki::export_wav_f32_ir(samples, 0U, 1U).empty());
     }
 
+    // WAV IR: rates outside the decoder/convolver contract fail closed even
+    // when their serialized byte rate would otherwise fit.
+    {
+        const std::vector<float> samples{0.0F};
+        CHECK(hibiki::export_wav_f32_ir(samples, 7999U, 1U).empty());
+        CHECK(hibiki::export_wav_f32_ir(samples, 192001U, 1U).empty());
+    }
+
     // WAV IR: zero or oversized channel count fails closed.
     {
         const std::vector<float> samples{0.0F, 0.0F};
