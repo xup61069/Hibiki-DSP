@@ -123,6 +123,9 @@ bool linear_resample_interleaved(const float* const input,
     if (input_frames > max_frames || output_frames > max_frames) {
         return false;
     }
+    // Validate the complete source-position request before touching the
+    // caller-owned destination. A later out-of-range position must not leave
+    // earlier output frames partially committed.
     for (std::size_t output_frame = 0; output_frame < output_frames; ++output_frame) {
         const double source_position = static_cast<double>(output_frame) * source_step;
         if (!std::isfinite(source_position) ||
@@ -130,11 +133,15 @@ bool linear_resample_interleaved(const float* const input,
             return false;
         }
         const auto left = static_cast<std::size_t>(source_position);
-        const auto right = std::min(left + 1, input_frames - 1);
-        const float fraction = static_cast<float>(source_position - static_cast<double>(left));
         if (left >= input_frames) {
             return false;
         }
+    }
+    for (std::size_t output_frame = 0; output_frame < output_frames; ++output_frame) {
+        const double source_position = static_cast<double>(output_frame) * source_step;
+        const auto left = static_cast<std::size_t>(source_position);
+        const auto right = std::min(left + 1, input_frames - 1);
+        const float fraction = static_cast<float>(source_position - static_cast<double>(left));
         for (std::uint32_t channel = 0; channel < channels; ++channel) {
             const float a = input[left * channels + channel];
             const float b = input[right * channels + channel];

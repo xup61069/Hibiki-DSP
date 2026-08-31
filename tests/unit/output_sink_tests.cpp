@@ -358,6 +358,14 @@ int main() {
 
         const float single[2] = {7.0F, 9.0F};
         CHECK(!linear_resample_interleaved(single, 1U, output, 2U, 1U, 2.0));
+
+        // A late source-position failure must not leave an earlier output
+        // frame partially committed.
+        const float late_input[2] = {1.0F, 2.0F};
+        float late_output[2] = {-7.0F, -7.0F};
+        CHECK(!linear_resample_interleaved(late_input, 2U, late_output, 2U,
+                                           1U, 2.0));
+        CHECK(late_output[0] == -7.0F && late_output[1] == -7.0F);
     }
 
     // Persistent polyphase resampler: exact step bounds are accepted,

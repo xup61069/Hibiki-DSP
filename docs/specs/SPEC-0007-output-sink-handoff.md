@@ -40,6 +40,8 @@ fail-closed；合法 multi-byte printable ID 保持可用。
   capacity 不足都 fail-closed。Stateless `linear_resample_interleaved` 另在讀取或寫入
   caller-owned interleaved buffer 前檢查 input/output frames 均不超過
   `SIZE_MAX / channels`；無法表示的 geometry 直接回傳 failure，不留下部分輸出。
+  它也會在第一次寫入 destination 前預掃描所有 requested output frame 的 source position
+  與 derived input index；任何後段 position 越界或無法表示都保持整個 destination 不變。
   PersistentPolyphaseResampler 的 `process` 也會在讀寫 caller-owned interleaved buffer 前
   檢查 input/output capacity 均不超過 `SIZE_MAX / channels`，並先確認完整 input block
   的每個 sample 都是 finite；任何 NaN/Inf 都 fail-closed，不寫部分輸出、不更新 phase/history。
