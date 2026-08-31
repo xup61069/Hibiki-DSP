@@ -475,10 +475,13 @@ public sealed partial class MainWindow : Window
         if (sender is Button { Tag: string sceneId })
         {
             await ViewModel.SelectSceneAsync(sceneId);
+#if !HIBIKI_COMPATIBILITY_PREVIEW
             UpdateAllSceneCardsSelection();
+#endif
         }
     }
 
+#if !HIBIKI_COMPATIBILITY_PREVIEW
     private void UpdateSceneCardSelection(UIElement element)
     {
         if (element is Button btn && btn.Tag is string sceneId)
@@ -506,6 +509,8 @@ public sealed partial class MainWindow : Window
             }
         }
     }
+
+#endif
 
     private async void OnAddCustomSceneClick(object sender, RoutedEventArgs e)
     {
