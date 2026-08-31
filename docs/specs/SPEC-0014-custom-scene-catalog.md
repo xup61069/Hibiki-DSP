@@ -51,7 +51,9 @@ reference 字串分別佔用固定區間，timeline ID 表與最多 4 條 lane r
 
 編碼與解碼必須對稱且嚴格：schema 版本、operation 範圍、zero-padding、bounded-string
 可列印 UTF-8、enum 邊界、finite double、lane/timeline 容量任一驗證失敗即拒收，
-不得部分套用。make-up gain 以 Q16.16 定點數傳輸；channel matrix 以 f32 bit-level 序列化。
+不得部分套用。C++ 與 managed C# encoder 都必須先拒絕 Upsert、Remove、Clear 以外的
+operation underlying value，不得產生明知會被 decoder 拒收的 payload。make-up gain 以
+Q16.16 定點數傳輸；channel matrix 以 f32 bit-level 序列化。
 引擎收到 Upsert 後重建完整 `SceneDefinitionV1`，通過既有 Scene/Graph/equal-loudness policy 驗證後
 才進入 catalog；Remove/Clear 同樣走原子替換。
 
