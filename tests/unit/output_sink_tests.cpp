@@ -447,6 +447,29 @@ int main() {
                                 candidate_output.data(), valid_required,
                                 candidate_frames));
         CHECK(baseline_frames == candidate_frames);
+
+        // Non-finite input is rejected before output/history mutation. The
+        // candidate must remain bit-for-bit equivalent to the untouched
+        // baseline on the next valid block.
+        const auto phase_before_nonfinite = candidate.phase();
+        for (const auto invalid : {std::numeric_limits<float>::quiet_NaN(),
+                                   std::numeric_limits<float>::infinity(),
+                                   -std::numeric_limits<float>::infinity()}) {
+            auto invalid_input = valid_input;
+            invalid_input[3U] = invalid;
+            std::array<float, 128> untouched_nonfinite{};
+            untouched_nonfinite.fill(-9.0F);
+            const auto untouched_nonfinite_copy = untouched_nonfinite;
+            std::size_t rejected_nonfinite_frames = 17U;
+            CHECK(!candidate.process(invalid_input.data(),
+                                     invalid_input.size() / kChannels,
+                                     untouched_nonfinite.data(), valid_required,
+                                     rejected_nonfinite_frames));
+            CHECK(rejected_nonfinite_frames == 0U &&
+                  untouched_nonfinite == untouched_nonfinite_copy &&
+                  candidate.phase() == phase_before_nonfinite);
+        }
+
         const auto phase_before_invalid = candidate.phase();
         CHECK(candidate.required_output_frames(std::numeric_limits<std::size_t>::max()) == 0U);
 

@@ -41,9 +41,10 @@ fail-closed；合法 multi-byte printable ID 保持可用。
   caller-owned interleaved buffer 前檢查 input/output frames 均不超過
   `SIZE_MAX / channels`；無法表示的 geometry 直接回傳 failure，不留下部分輸出。
   PersistentPolyphaseResampler 的 `process` 也會在讀寫 caller-owned interleaved buffer 前
-  檢查 input/output capacity 均不超過 `SIZE_MAX / channels`；`required_output_frames`
-  對 history-end 與 output-count 算術溢位 fail-closed，失敗不更新 phase/history。這是
-  representability 邊界，不另訂新的 render block-size 上限。
+  檢查 input/output capacity 均不超過 `SIZE_MAX / channels`，並先確認完整 input block
+  的每個 sample 都是 finite；任何 NaN/Inf 都 fail-closed，不寫部分輸出、不更新 phase/history。
+  `required_output_frames` 對 history-end 與 output-count 算術溢位 fail-closed，失敗不更新
+  phase/history。這是 representability 邊界，不另訂新的 render block-size 上限。
 - USB/HDMI/Bluetooth 拔插或 Audio Service invalidation 由 `DeviceRecoveryCoordinator`
   進入 safe-start；不得回到 0 dB、100% 或未驗證的舊 endpoint。
 - `WindowsWasapiSinkWorkerV1` 將 COM/WASAPI 完整限制在單一 dedicated sink worker apartment：
