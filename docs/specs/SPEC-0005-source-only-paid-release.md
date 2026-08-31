@@ -19,18 +19,20 @@ container、Actions artifact 或任何 EXE／DLL／SYS／MSI／MSIX／VST3／PE-
 可在 ephemeral runner 編譯與測試，job 結束即刪除輸出，且不得要求、保存或使用任何 signing
 permission。公開 `verify.yml` 必須同時執行 CMake/CTest、docs/source policy、WinUI source shell、
 driver source boundary、extension/installer/control-model、stable identity 與 JSON parse gates；對
-`v*` source tag 還必須執行 read-only source-tag provenance gate。任何 gate 失敗都不得視為可交付
-source tag。
+   `v*` source tag 還必須執行 read-only source-tag provenance gate，且該 step 必須為 tag-scoped
+   並不得用 `continue-on-error` 忽略失敗。任何 gate 失敗都不得視為可交付 source tag。
 
 ## 發布流程
 
 1. 維護者先完成 source commit，再建立只新增或更新
    `release/manifests/<tag>.json` 的 single-parent provenance metadata commit，並以受保護 annotated
-   source tag 指向該 metadata commit；不產生或上傳 repository release artifact。為避免 Git hash
+   source tag 直接指向該 metadata commit（不得經由 nested tag）；不產生或上傳 repository release
+   artifact。為避免 Git hash
    自我參照，manifest 的 `source_tag` 必須等於 tag，而 `source_commit` 必須等於 metadata commit
    的唯一直接 parent；metadata commit 不得改動任何其他 product 或 policy 路徑。
 2. Public CI 在 ephemeral workspace 執行 user-space、DSP、driver source 與相關測試；對 `v*` tag
-   另驗證 annotated tag、唯一 parent、manifest path、tag/commit identity 與 metadata diff。HLK／WHCP
+   另驗證 annotated tag 的直接 commit target、唯一 parent、regular `100644` manifest blob、既有
+   `ReleaseManifest v1` schema、tag/commit identity 與不做 rename 偵測的 metadata diff。HLK／WHCP
    與任何形式的簽章都不是驗收項目。
 3. 產生 `ReleaseManifest v1` 文字紀錄，至少記錄 source tag、commit、toolchain digest、dependency
    lock digest、required non-empty `distribution_id`、payload SHA-256 清單、driver package/catalog

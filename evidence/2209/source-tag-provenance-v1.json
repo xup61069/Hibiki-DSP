@@ -11,14 +11,14 @@
       "tools/source-only-ci-check.ps1"
     ],
     "digest_algorithm": "sha256-git-source-set-v1",
-    "digest": "391a2e244cda5a0d8e5b86f9c6008f7ef51824fb43a5d5e09bbf3fa3579a90ba"
+    "digest": "abe1188f191698b48eaefeaeae5eaa43f81ae80434887a55c404ba5c6d2f445e"
   },
   "metadata": {
     "scope": "source-tag-provenance-v1",
     "environment_fingerprint": "windows-amd64-pwsh-7.6.4-source-tag-provenance",
     "commands": [
       "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 2209",
-      "pwsh -NoProfile -File tools/delivery-audit.ps1",
+      "pwsh -NoProfile -File tools/delivery-audit.ps1 -Issue 2209",
       "pwsh -NoProfile -File tools/docs-check.ps1",
       "pwsh -NoProfile -File tools/source-policy.ps1",
       "pwsh -NoProfile -File tools/source-only-ci-check.ps1 -SelfTest",
@@ -26,11 +26,13 @@
       "pwsh -NoProfile -File tools/release-provenance-check.ps1 -SelfTest",
       "pwsh -NoProfile -File tools/installer-check.ps1",
       "pwsh -NoProfile -File tools/distribution-check.ps1",
-      "$env:CMAKE_BUILD_PARALLEL_LEVEL = '1'; pwsh -NoProfile -File tools/verify.ps1",
+      "pwsh -NoProfile -Command '$env:CMAKE_BUILD_PARALLEL_LEVEL = ''1''; & .\\tools\\verify.ps1'",
       "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
       "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange",
       "pwsh -NoProfile -File tools/evidence-audit.ps1 -SelfTest",
-      "git diff --check"
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "git diff --check",
+      "git diff --cached --check"
     ],
     "results": [
       {
@@ -46,12 +48,12 @@
       {
         "command": "source-only CI gate",
         "status": "pass",
-        "detail": "Static workflow policy passed for 4 workflows and 817 tracked paths; self-test passed 24 cases including structural jobs.verify.steps tag-wiring, spoof rejection and fail-open guards."
+        "detail": "Static workflow policy passed for 4 workflows and 817 tracked paths; self-test passed 27 cases including structural jobs.verify.steps tag-wiring, spoof rejection, fail-open guards, dependency/matrix rejection and workspace-anchored command enforcement."
       },
       {
         "command": "source-tag provenance gate self-test",
         "status": "pass",
-        "detail": "All 13 offline temporary-repository cases passed, including annotated-tag success, invalid ref, lightweight tag, missing and malformed manifest, tag/commit mismatch, non-string commit, metadata-path violation, multiple-parent target, symlink manifest and nested-tag rejection. ReleaseManifest v1 validation uses the resolver-aware existing schema and printable-string reference."
+        "detail": "All 15 offline temporary-repository cases passed, including annotated-tag success, invalid ref, lightweight tag, missing and malformed manifest, tag/commit mismatch, non-string commit, metadata-path violation, multiple-parent and zero-parent target, symlink manifest, nested-tag rejection and header-like tag-message acceptance. ReleaseManifest v1 validation uses the resolver-aware existing schema and printable-string reference."
       },
       {
         "command": "installer and distribution gates",
@@ -71,7 +73,7 @@
       {
         "command": "current-change provenance description",
         "status": "pass",
-        "detail": "The five exact staged non-evidence source paths produced digest 391a2e244cda5a0d8e5b86f9c6008f7ef51824fb43a5d5e09bbf3fa3579a90ba."
+        "detail": "The five exact staged non-evidence source paths produced digest abe1188f191698b48eaefeaeae5eaa43f81ae80434887a55c404ba5c6d2f445e."
       },
       {
         "command": "git diff --check",
@@ -95,6 +97,6 @@
       "windows_sdk_wdk": "10.0.28000.0"
     },
     "started_at": "2026-08-31T16:42:00+08:00",
-    "finished_at": "2026-08-31T16:55:14+08:00"
+    "finished_at": "2026-08-31T17:11:13+08:00"
   }
 }

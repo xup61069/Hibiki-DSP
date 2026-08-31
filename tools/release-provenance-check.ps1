@@ -121,19 +121,27 @@ function Get-DirectAnnotatedTagCommit {
     [Parameter(Mandatory)][string]$TagRef
   )
 
-  $tagHeaders = @(Invoke-GitText -RepositoryPath $RepositoryPath `
+  # A tag message is free form, so inspect only the canonical leading headers.
+  $tagLines = @(Invoke-GitText -RepositoryPath $RepositoryPath `
     -Arguments @('cat-file', '-p', $TagRef) `
     -FailurePrefix "Release tag '$TagName' cannot read its annotated tag object")
-  $objectHeaders = @($tagHeaders | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^object [0-9a-f]{40}$' })
-  $typeHeaders = @($tagHeaders | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^type [A-Za-z]+$' })
-  if ($objectHeaders.Count -ne 1 -or $typeHeaders.Count -ne 1) {
-    throw "Release tag '$TagName' must contain one direct object and type header."
+  if ($tagLines.Count -lt 4) {
+    throw "Release tag '$TagName' must contain canonical annotated tag headers."
   }
-  if ($typeHeaders[0] -cne 'type commit') {
+  $objectHeader = $tagLines[0].Trim()
+  $typeHeader = $tagLines[1].Trim()
+  $tagHeader = $tagLines[2].Trim()
+  $taggerHeader = $tagLines[3].Trim()
+  if ($objectHeader -notmatch '^object [0-9a-f]{40}$' -or
+      $tagHeader -notmatch '^tag .+$' -or
+      $taggerHeader -notmatch '^tagger .+$') {
+    throw "Release tag '$TagName' must contain canonical annotated tag headers."
+  }
+  if ($typeHeader -cne 'type commit') {
     throw "Release tag '$TagName' must directly target a commit; nested tags are rejected."
   }
 
-  $tagCommit = $objectHeaders[0].Substring('object '.Length)
+  $tagCommit = $objectHeader.Substring('object '.Length)
   $targetObjectType = Get-GitSingleLine -RepositoryPath $RepositoryPath `
     -Arguments @('cat-file', '-t', $tagCommit) `
     -FailurePrefix "Release tag '$TagName' direct target cannot be read"
@@ -238,7 +246,9 @@ function New-ReleaseProvenanceFixture {
     [switch]$AddNonProvenancePath,
     [switch]$MultipleParents,
     [switch]$ManifestSymlink,
-    [switch]$NestedAnnotatedTag
+    [switch]$NestedAnnotatedTag,
+    [switch]$ZeroParents,
+    [switch]$HeaderLikeTagMessage
   )
 
   $root = Join-Path ([IO.Path]::GetTempPath()) ('hibiki-release-provenance-' + [guid]::NewGuid().ToString('N'))
@@ -306,9 +316,13 @@ function New-ReleaseProvenanceFixture {
         -FailurePrefix 'Self-test merge provenance commit failed'
       $null = Invoke-GitText -RepositoryPath $root -Arguments @('update-ref', 'refs/heads/main', $targetCommit) -FailurePrefix 'Self-test merge provenance ref update failed'
     }
+    if ($ZeroParents) {
+      $targetCommit = $sourceCommit
+    }
+    $annotatedTagMessage = if ($HeaderLikeTagMessage) { 'object ' + ('0' * 40) + [char]10 + 'type commit' } else { 'source-only provenance' }
     if ($NestedAnnotatedTag) {
       $nestedTagName = $TagName + '-inner'
-      $null = Invoke-GitText -RepositoryPath $root -Arguments @('tag', '-a', $nestedTagName, '-m', 'nested source-only provenance') -FailurePrefix 'Self-test nested annotated tag failed'
+      $null = Invoke-GitText -RepositoryPath $root -Arguments @('tag', '-a', $nestedTagName, '-m', 'nested source-only provenance', $targetCommit) -FailurePrefix 'Self-test nested annotated tag failed'
       $nestedTagObject = Get-GitSingleLine -RepositoryPath $root -Arguments @('rev-parse', ('refs/tags/' + $nestedTagName)) -FailurePrefix 'Self-test nested tag object lookup failed'
       $outerTagObjectPath = Join-Path $root '.nested-annotated-tag-object'
       $lineFeed = [char]10
@@ -318,9 +332,9 @@ function New-ReleaseProvenanceFixture {
       Remove-Item -LiteralPath $outerTagObjectPath -Force
       $null = Invoke-GitText -RepositoryPath $root -Arguments @('update-ref', ('refs/tags/' + $TagName), $outerTagObject) -FailurePrefix 'Self-test outer nested tag ref update failed'
     } elseif ($LightweightTag) {
-      $null = Invoke-GitText -RepositoryPath $root -Arguments @('tag', $TagName) -FailurePrefix 'Self-test lightweight tag failed'
+      $null = Invoke-GitText -RepositoryPath $root -Arguments @('tag', $TagName, $targetCommit) -FailurePrefix 'Self-test lightweight tag failed'
     } else {
-      $null = Invoke-GitText -RepositoryPath $root -Arguments @('tag', '-a', $TagName, '-m', 'source-only provenance') -FailurePrefix 'Self-test annotated tag failed'
+      $null = Invoke-GitText -RepositoryPath $root -Arguments @('tag', '-a', $TagName, '-m', $annotatedTagMessage, $targetCommit) -FailurePrefix 'Self-test annotated tag failed'
     }
     return [pscustomobject]@{ Root = $root; SourceCommit = $sourceCommit; TargetCommit = $targetCommit }
   } catch {
@@ -358,7 +372,7 @@ if ($SelfTest) {
   }
 
   $caseCount = 0
-  $valid = New-ReleaseProvenanceFixture -TagName 'v1.2.3'
+  $valid = New-ReleaseProvenanceFixture -TagName 'v1.2.3' -HeaderLikeTagMessage
   try {
     $result = Test-ReleaseTagProvenance -RepositoryPath $valid.Root -TagName 'v1.2.3'
     if ($result.tag -cne 'v1.2.3' -or $result.source_commit -cne $valid.SourceCommit -or
@@ -455,24 +469,46 @@ if ($SelfTest) {
     Remove-ReleaseProvenanceFixture -Root $mergeTarget.Root
   }
 
-  $symlinkManifest = New-ReleaseProvenanceFixture -TagName 'v1.3.1' -ManifestSymlink
+  $zeroParent = New-ReleaseProvenanceFixture -TagName 'v1.3.1' -ZeroParents
+  try {
+    Assert-ProvenanceRejected -Label 'zero-parent-target' -ExpectedPattern 'single-parent provenance metadata commit' -Action {
+      Test-ReleaseTagProvenance -RepositoryPath $zeroParent.Root -TagName 'v1.3.1' | Out-Null
+    }
+    $caseCount++
+  } finally {
+    Remove-ReleaseProvenanceFixture -Root $zeroParent.Root
+  }
+
+  $symlinkManifest = New-ReleaseProvenanceFixture -TagName 'v1.3.2' -ManifestSymlink
   try {
     Assert-ProvenanceRejected -Label 'symlink-manifest' -ExpectedPattern 'must be a regular 100644 blob' -Action {
-      Test-ReleaseTagProvenance -RepositoryPath $symlinkManifest.Root -TagName 'v1.3.1' | Out-Null
+      Test-ReleaseTagProvenance -RepositoryPath $symlinkManifest.Root -TagName 'v1.3.2' | Out-Null
     }
     $caseCount++
   } finally {
     Remove-ReleaseProvenanceFixture -Root $symlinkManifest.Root
   }
 
-  $nestedTag = New-ReleaseProvenanceFixture -TagName 'v1.3.2' -NestedAnnotatedTag
+  $nestedTag = New-ReleaseProvenanceFixture -TagName 'v1.3.3' -NestedAnnotatedTag
   try {
     Assert-ProvenanceRejected -Label 'nested-annotated-tag' -ExpectedPattern 'must directly target a commit' -Action {
-      Test-ReleaseTagProvenance -RepositoryPath $nestedTag.Root -TagName 'v1.3.2' | Out-Null
+      Test-ReleaseTagProvenance -RepositoryPath $nestedTag.Root -TagName 'v1.3.3' | Out-Null
     }
     $caseCount++
   } finally {
     Remove-ReleaseProvenanceFixture -Root $nestedTag.Root
+  }
+
+  $headerLikeMessage = New-ReleaseProvenanceFixture -TagName 'v1.3.4' -HeaderLikeTagMessage
+  try {
+    $result = Test-ReleaseTagProvenance -RepositoryPath $headerLikeMessage.Root -TagName 'v1.3.4'
+    if ($result.tag_commit -cne $headerLikeMessage.TargetCommit -or
+        $result.source_commit -cne $headerLikeMessage.SourceCommit) {
+      throw 'release-provenance-check self-test header-like tag message returned an unexpected result.'
+    }
+    $caseCount++
+  } finally {
+    Remove-ReleaseProvenanceFixture -Root $headerLikeMessage.Root
   }
 
   $tempSibling = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([char[]]@([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)) + 'Sibling' + [IO.Path]::DirectorySeparatorChar + 'hibiki-release-provenance-test'

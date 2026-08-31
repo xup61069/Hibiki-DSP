@@ -69,7 +69,7 @@ jobs:
       - name: Source-tag provenance gate
         if: github.ref_type == 'tag'
         shell: pwsh
-        run: ./tools/release-provenance-check.ps1 -Tag $env:GITHUB_REF_NAME
+        run: '& "$env:GITHUB_WORKSPACE/tools/release-provenance-check.ps1" -Tag $env:GITHUB_REF_NAME'
 
       - name: Source-only CI publication gate
         shell: pwsh

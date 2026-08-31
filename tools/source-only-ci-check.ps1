@@ -52,7 +52,7 @@ function Get-WorkflowMapKeyIndices {
     )
 
     $prefix = ' ' * $Indent
-    $pattern = '^' + [regex]::Escape($prefix + $Key + ':') + '\s*(?:#.*)?$'
+    $pattern = '^' + [regex]::Escape($prefix + $Key + ':') + '(?:\s+#.*)?\s*$'
     return @($StartIndex..($EndExclusive - 1) | Where-Object { $Lines[$_] -match $pattern })
 }
 
@@ -129,7 +129,7 @@ function Assert-VerifyTagProvenanceWiring {
     }
     $pushEnd = Get-WorkflowBlockEnd -Lines $lines -StartIndex $pushIndices[0] -Indent 2
     $tagLines = @(Get-WorkflowScalarKeyLines -Lines $lines -StartIndex ($pushIndices[0] + 1) -EndExclusive $pushEnd -Indent 4 -Key 'tags')
-    if ($tagLines.Count -ne 1 -or $tagLines[0].Value -notmatch '^\s*\[\s*[''"]v\*[''"]\s*\]\s*(?:#.*)?$') {
+    if ($tagLines.Count -ne 1 -or $tagLines[0].Value -notmatch '^\s*\[\s*[''"]v\*[''"]\s*\](?:\s+#.*)?\s*$') {
         throw "verify.yml must trigger on v* source tags."
     }
 
@@ -151,6 +151,14 @@ function Assert-VerifyTagProvenanceWiring {
     if ($jobContinueOnErrorLines.Count -ne 0) {
         throw "verify.yml jobs.verify cannot use job-level continue-on-error."
     }
+    $jobNeedsLines = @(Get-WorkflowScalarKeyLines -Lines $lines -StartIndex ($verifyIndices[0] + 1) -EndExclusive $verifyEnd -Indent 4 -Key 'needs')
+    if ($jobNeedsLines.Count -ne 0) {
+        throw "verify.yml jobs.verify cannot use needs; source-tag gating must not depend on a skipped job."
+    }
+    $jobStrategyLines = @(Get-WorkflowScalarKeyLines -Lines $lines -StartIndex ($verifyIndices[0] + 1) -EndExclusive $verifyEnd -Indent 4 -Key 'strategy')
+    if ($jobStrategyLines.Count -ne 0) {
+        throw "verify.yml jobs.verify cannot use strategy; source-tag gating must not depend on a matrix."
+    }
     $stepsIndices = @(Get-WorkflowMapKeyIndices -Lines $lines -StartIndex ($verifyIndices[0] + 1) -EndExclusive $verifyEnd -Indent 4 -Key 'steps')
     if ($stepsIndices.Count -ne 1) {
         throw "verify.yml must contain one jobs.verify.steps sequence."
@@ -159,15 +167,15 @@ function Assert-VerifyTagProvenanceWiring {
 
     $validStep = $false
     for ($index = $stepsIndices[0] + 1; $index -lt $stepsEnd; $index++) {
-        if ($lines[$index] -notmatch '^ {6}- name:\s*Source-tag provenance gate\s*(?:#.*)?$') { continue }
+        if ($lines[$index] -notmatch '^ {6}- name:\s*Source-tag provenance gate(?:\s+#.*)?\s*$') { continue }
         $stepEnd = Get-WorkflowBlockEnd -Lines $lines -StartIndex $index -Indent 6
         $stepContinueOnErrorLines = @(Get-WorkflowScalarKeyLines -Lines $lines -StartIndex ($index + 1) -EndExclusive $stepEnd -Indent 8 -Key 'continue-on-error')
         if ($stepContinueOnErrorLines.Count -ne 0) {
             throw "Source-tag provenance gate cannot set continue-on-error."
         }
-        $hasTagGuard = Test-WorkflowStepScalar -Lines $lines -StartIndex ($index + 1) -EndExclusive $stepEnd -Key 'if' -ValuePattern '^\s*github\.ref_type\s*==\s*[''"]tag[''"]\s*(?:#.*)?$'
-        $hasPwsh = Test-WorkflowStepScalar -Lines $lines -StartIndex ($index + 1) -EndExclusive $stepEnd -Key 'shell' -ValuePattern '^\s*pwsh\s*(?:#.*)?$'
-        $hasGateCommand = Test-WorkflowStepScalar -Lines $lines -StartIndex ($index + 1) -EndExclusive $stepEnd -Key 'run' -ValuePattern '^\s*\.\/tools\/release-provenance-check\.ps1\s+-Tag\s+\$env:GITHUB_REF_NAME\s*(?:#.*)?$'
+        $hasTagGuard = Test-WorkflowStepScalar -Lines $lines -StartIndex ($index + 1) -EndExclusive $stepEnd -Key 'if' -ValuePattern '^\s*github\.ref_type\s*==\s*[''"]tag[''"](?:\s+#.*)?\s*$'
+        $hasPwsh = Test-WorkflowStepScalar -Lines $lines -StartIndex ($index + 1) -EndExclusive $stepEnd -Key 'shell' -ValuePattern '^\s*pwsh(?:\s+#.*)?\s*$'
+        $hasGateCommand = Test-WorkflowStepScalar -Lines $lines -StartIndex ($index + 1) -EndExclusive $stepEnd -Key 'run' -ValuePattern '^\s*''&\s+"\$env:GITHUB_WORKSPACE/tools/release-provenance-check\.ps1"\s+-Tag\s+\$env:GITHUB_REF_NAME''(?:\s+#.*)?\s*$'
         if ($hasTagGuard -and $hasPwsh -and $hasGateCommand) {
             $validStep = $true
             break
@@ -269,7 +277,7 @@ jobs:
       - name: Source-tag provenance gate
         if: github.ref_type == 'tag'
         shell: pwsh
-        run: ./tools/release-provenance-check.ps1 -Tag $env:GITHUB_REF_NAME
+        run: '& "$env:GITHUB_WORKSPACE/tools/release-provenance-check.ps1" -Tag $env:GITHUB_REF_NAME'
 '@
     Assert-VerifyTagProvenanceWiring -Text $verifyTagWorkflow
     $caseCount++
@@ -297,13 +305,13 @@ jobs:
       - name: Source-tag provenance gate
         if: github.ref_type == 'tag'
         shell: pwsh
-        run: ./tools/release-provenance-check.ps1 -Tag $env:GITHUB_REF_NAME
+        run: '& "$env:GITHUB_WORKSPACE/tools/release-provenance-check.ps1" -Tag $env:GITHUB_REF_NAME'
   verify:
     steps:
       # - name: Source-tag provenance gate
       #   if: github.ref_type == 'tag'
       #   shell: pwsh
-      #   run: ./tools/release-provenance-check.ps1 -Tag $env:GITHUB_REF_NAME
+      #   run: '& "$env:GITHUB_WORKSPACE/tools/release-provenance-check.ps1" -Tag $env:GITHUB_REF_NAME'
 '@
     Assert-GateRejection -Label 'spoofed-verify-wiring' -ExpectedPattern 'must include the tag-scoped Source-tag provenance gate' `
         -Action { Assert-VerifyTagProvenanceWiring -Text $spoofedWorkflow }
@@ -342,7 +350,7 @@ jobs:
       - name: Source-tag provenance gate
         if: github.ref_type == 'tag'
         shell: pwsh
-        run: ./tools/release-provenance-check.ps1 -Tag $env:GITHUB_REF_NAME
+        run: '& "$env:GITHUB_WORKSPACE/tools/release-provenance-check.ps1" -Tag $env:GITHUB_REF_NAME'
 '@
     Assert-GateRejection -Label 'job-level-tag-guard' -ExpectedPattern 'jobs\.verify cannot use a job-level if' -Action { Assert-VerifyTagProvenanceWiring -Text $jobLevelGuardWorkflow }
     $caseCount++
@@ -361,7 +369,7 @@ jobs:
       - name: Source-tag provenance gate
         if: github.ref_type == 'tag'
         shell: pwsh
-        run: ./tools/release-provenance-check.ps1 -Tag $env:GITHUB_REF_NAME
+        run: '& "$env:GITHUB_WORKSPACE/tools/release-provenance-check.ps1" -Tag $env:GITHUB_REF_NAME'
 '@
     Assert-GateRejection -Label 'misplaced-tag-selector' -ExpectedPattern ([regex]::Escape('must trigger on v* source tags')) -Action { Assert-VerifyTagProvenanceWiring -Text $misplacedTagWorkflow }
     $caseCount++
@@ -378,10 +386,57 @@ jobs:
       - name: Source-tag provenance gate
         if: github.ref_type == 'tag'
         shell: pwsh
-        run: ./tools/release-provenance-check.ps1 -Tag $env:GITHUB_REF_NAME
+        run: '& "$env:GITHUB_WORKSPACE/tools/release-provenance-check.ps1" -Tag $env:GITHUB_REF_NAME'
         continue-on-error: true
 '@
     Assert-GateRejection -Label 'step-continue-on-error' -ExpectedPattern 'Source-tag provenance gate cannot set continue-on-error' -Action { Assert-VerifyTagProvenanceWiring -Text $continueOnErrorWorkflow }
+    $caseCount++
+
+    # Case 25: a skipped dependency must not prevent the provenance job from running.
+    $needsWorkflow = @'
+name: verify
+on:
+  push:
+    tags: ['v*']
+jobs:
+  blocker:
+    if: false
+    steps:
+      - run: echo skipped
+  verify:
+    needs: blocker
+    steps:
+      - name: Source-tag provenance gate
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: '& "$env:GITHUB_WORKSPACE/tools/release-provenance-check.ps1" -Tag $env:GITHUB_REF_NAME'
+'@
+    Assert-GateRejection -Label 'job-needs-dependency' -ExpectedPattern 'jobs\.verify cannot use needs' -Action { Assert-VerifyTagProvenanceWiring -Text $needsWorkflow }
+    $caseCount++
+
+    # Case 26: a matrix strategy must not turn the provenance job into zero jobs.
+    $strategyWorkflow = @'
+name: verify
+on:
+  push:
+    tags: ['v*']
+jobs:
+  verify:
+    strategy:
+      matrix:
+        include: []
+    steps:
+      - name: Source-tag provenance gate
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: '& "$env:GITHUB_WORKSPACE/tools/release-provenance-check.ps1" -Tag $env:GITHUB_REF_NAME'
+'@
+    Assert-GateRejection -Label 'job-matrix-strategy' -ExpectedPattern 'jobs\.verify cannot use strategy' -Action { Assert-VerifyTagProvenanceWiring -Text $strategyWorkflow }
+    $caseCount++
+
+    # Case 27: the provenance command is anchored at the checked-out workspace.
+    $relativeRunWorkflow = $verifyTagWorkflow.Replace('& "$env:GITHUB_WORKSPACE/tools/release-provenance-check.ps1"', './tools/release-provenance-check.ps1')
+    Assert-GateRejection -Label 'relative-provenance-command' -ExpectedPattern 'must include the tag-scoped Source-tag provenance gate' -Action { Assert-VerifyTagProvenanceWiring -Text $relativeRunWorkflow }
     $caseCount++
 
     Write-Output "Source-only CI publication gate self-test passed ($caseCount cases)."
