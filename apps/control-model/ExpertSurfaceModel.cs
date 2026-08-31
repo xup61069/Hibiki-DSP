@@ -256,10 +256,13 @@ public sealed class ExpertSurfaceModel : INotifyPropertyChanged
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var card in cards)
         {
-            if (string.IsNullOrWhiteSpace(card.Id) || card.Id.Length > 31 ||
-                card.Id.Any(char.IsControl) || !seen.Add(card.Id) ||
-                string.IsNullOrWhiteSpace(card.Name) || string.IsNullOrWhiteSpace(card.Detail) ||
-                !Enum.IsDefined(card.State))
+            if (string.IsNullOrWhiteSpace(card.Id) ||
+                string.IsNullOrWhiteSpace(card.Name) ||
+                string.IsNullOrWhiteSpace(card.Detail) ||
+                !Utf8TextValidation.IsPrintable(card.Id, 31, allowEmpty: false) ||
+                !Utf8TextValidation.IsPrintable(card.Name, 63, allowEmpty: false) ||
+                !Utf8TextValidation.IsPrintable(card.Detail, 119, allowEmpty: false) ||
+                !seen.Add(card.Id) || !Enum.IsDefined(card.State))
             {
                 error = "路由狀態快照含有無效或重複身份";
                 return false;

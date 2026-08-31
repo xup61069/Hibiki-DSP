@@ -25,9 +25,16 @@ requested／safety ceiling／effective Q16.16 dB、mute、origin、actuator 與 
 Snapshot sequence 必須非零；零值保留給未初始化／無 freshness 狀態，C++／C# encode 與
 decode 都必須在任何 visible-state replacement 前拒絕它。這個規則只描述 user-space
 control-plane snapshot 的有效性，不代表 physical audio、driver 或 WaveRT delivery。
-Route entry 保存 bounded UTF-8 ID／名稱／說明、`Ready/Pending/Degraded/Bypassed/Unavailable`
+Route entry 保存 bounded printable UTF-8 ID／名稱／說明、`Ready/Pending/Degraded/Bypassed/Unavailable`
 狀態與 requires-user-action flag。所有 padding 必須為零，ID 不可重複，effective dB 不可高於
-requested 或 safety ceiling。
+requested 或 safety ceiling。v1 的 wire 上限固定為 ID 1..31 bytes、名稱 1..63 bytes、說明
+1..119 bytes；上限以 UTF-8 encoded bytes 計算，不是 C# UTF-16 code units，且 isolated
+surrogate、C0/C1 control、DEL 與非法 UTF-8 一律拒絕。
+
+`ExpertSurfaceModel.TryApplyRouteHealth` 仍可在 control-model 內保留最多 16 張 route cards，
+這是刻意保留給本地診斷聚合與未來狀態投影的 control-plane 容量，不會改變 v1 snapshot 的
+8-entry wire 上限。第 9..16 張卡片只能代表本地模型狀態，不能被宣稱可裝入單一 v1
+`ControlStatusSnapshot`；若要傳輸，必須由較新的版本化協定另行定義。
 
 ## 執行緒與資料流
 

@@ -237,3 +237,8 @@ $surrogateContractOutputRoot = Join-Path $outputRoot 'surrogate-contract/'
 $surrogateContractObjRoot = Join-Path $objRoot 'surrogate-contract/'
 Invoke-ControlModelCheck -ProjectPath $surrogateContractProject `
   -BaseOutputPath $surrogateContractOutputRoot -ProjectExtensionsPath $surrogateContractObjRoot
+
+$routeHealthContractProject = Join-Path $repo 'apps/control-model-route-health-contract-check/Hibiki.ControlModel.RouteHealthContract.Check.csproj'
+$routeHealthContractOutputRoot = Join-Path $outputRoot 'route-health-contract/'
+$routeHealthContractObjRoot = Join-Path $objRoot 'route-health-contract/'
+Invoke-ControlModelCheck -ProjectPath $routeHealthContractProject -BaseOutputPath $routeHealthContractOutputRoot -ProjectExtensionsPath $routeHealthContractObjRoot
