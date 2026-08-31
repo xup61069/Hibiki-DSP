@@ -1,11 +1,11 @@
----
+﻿---
 id: SPEC-0005
 status: accepted
 owner: hibiki-maintainers
 authority: release-policy
 last_reviewed: 2026-08-31
 review_after_days: 30
-related_adrs: [ADR-0001, ADR-0006, ADR-0007]
+related_adrs: [ADR-0001, ADR-0006, ADR-0007, ADR-0008, ADR-0009]
 source_globs: ["installer/**", "tools/**", ".github/**", "schemas/release-manifest-v1.schema.json", "SOURCE_POLICY.md"]
 ---
 
@@ -34,7 +34,7 @@ driver source boundary、extension/installer/control-model、stable identity 與
    另驗證 annotated tag 的直接 commit target、唯一 parent、regular `100644` manifest blob、既有
    `ReleaseManifest v1` schema、tag/commit identity 與不做 rename 偵測的 metadata diff。HLK／WHCP
    與任何形式的簽章都不是驗收項目。
-3. 產生 `ReleaseManifest v1` 文字紀錄，至少記錄 source tag、commit、toolchain digest、dependency
+3. 官方 source tag 使用 `SourceReleaseManifest v1`（見 SPEC-0025），外部安裝程式則支援外部交付的 `ReleaseManifest v1`，至少記錄 source tag、commit、toolchain digest、dependency
    lock digest、required non-empty `distribution_id`、payload SHA-256 清單、driver package/catalog
    內容 hash、SBOM digest 與 test run。Manifest 與 schema 不得包含 Microsoft signature thumbprint、
    installer signer thumbprint、RFC3161 timestamp 或 signed payload hash 欄位。`product_version` 為

@@ -1,4 +1,4 @@
-# Specs index
+﻿# Specs index
 
 | ID | 狀態 | 主題 |
 | --- | --- | --- |
@@ -29,3 +29,4 @@
 
 Draft spec 有 blocking open question 時不得直接實作；公開行為變更必須在同一 PR
 更新 spec 與測試。
+- [SPEC-0025: Source-Tag Manifest Provenance 契約](SPEC-0025-source-tag-manifest-provenance.md)

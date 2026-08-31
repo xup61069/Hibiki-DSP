@@ -1,0 +1,91 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/source-release-manifest-v1.schema.json",
+  "title": "Hibiki SourceReleaseManifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "product_version",
+    "source_tag",
+    "source_commit",
+    "distribution_id",
+    "toolchain_lock",
+    "dependency_lock",
+    "sbom",
+    "release_notes",
+    "notices",
+    "source_files",
+    "tests"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "product_version": {"type": "string", "minLength": 1, "maxLength": 64, "$ref": "printable-string-v1.schema.json#/$defs/printableString"},
+    "source_tag": {"type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+[A-Za-z0-9._:+-]{0,32}$"},
+    "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "distribution_id": {"type": "string", "minLength": 1, "$ref": "printable-string-v1.schema.json#/$defs/printableString"},
+    "toolchain_lock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "maxLength": 260, "$ref": "printable-string-v1.schema.json#/$defs/printableString"},
+        "sha256": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-fA-F]{64}$"}
+      }
+    },
+    "dependency_lock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "maxLength": 260, "$ref": "printable-string-v1.schema.json#/$defs/printableString"},
+        "sha256": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-fA-F]{64}$"}
+      }
+    },
+    "sbom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "maxLength": 260, "$ref": "printable-string-v1.schema.json#/$defs/printableString"},
+        "sha256": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-fA-F]{64}$"}
+      }
+    },
+    "release_notes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "maxLength": 260, "$ref": "printable-string-v1.schema.json#/$defs/printableString"},
+        "sha256": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-fA-F]{64}$"}
+      }
+    },
+    "notices": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "maxLength": 260, "$ref": "printable-string-v1.schema.json#/$defs/printableString"},
+        "sha256": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-fA-F]{64}$"}
+      }
+    },
+    "source_files": {
+      "type": "array",
+      "maxItems": 2048,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1, "maxLength": 260, "$ref": "printable-string-v1.schema.json#/$defs/printableString"},
+          "sha256": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-fA-F]{64}$"}
+        }
+      }
+    },
+    "tests": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {"type": "string", "minLength": 1, "maxLength": 120, "$ref": "printable-string-v1.schema.json#/$defs/printableString"}
+    }
+  }
+}

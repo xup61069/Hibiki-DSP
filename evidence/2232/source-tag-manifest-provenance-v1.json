@@ -1,0 +1,67 @@
+﻿{
+  "evidence_format": 2,
+  "issue": 2232,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "SOURCE_POLICY.md",
+      "docs/adr/0009-source-release-manifest-boundary.md",
+      "docs/adr/INDEX.md",
+      "docs/specs/INDEX.md",
+      "docs/specs/SPEC-0005-source-only-paid-release.md",
+      "docs/specs/SPEC-0025-source-tag-manifest-provenance.md",
+      "docs/state/BASELINE.md",
+      "installer/README.md",
+      "schemas/source-release-manifest-v1.schema.json",
+      "tools/docs-check.ps1",
+      "tools/release-provenance-check.ps1"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "3dd675608ac1c32f1e0d93818e780b9ee2c155c1a529f377e22ffff2138b1b40"
+  },
+  "metadata": {
+    "scope": "source-tag-manifest-provenance-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-source-tag-manifest-provenance",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 2232",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "pwsh -NoProfile -File tools/release-provenance-check.ps1 -SelfTest",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "handoff admission",
+        "status": "pass",
+        "detail": "Issue #2232 ownership and worktree isolation verified."
+      },
+      {
+        "command": "documentation and source policy gates",
+        "status": "pass",
+        "detail": "docs-check measured 88 required paths, 25 specs; source-policy passed."
+      },
+      {
+        "command": "source-only CI and release provenance gates",
+        "status": "pass",
+        "detail": "source-only-ci-check passed 27 self-test cases; release-provenance-check passed 18 self-test cases verifying text-only source tag provenance against Git parent commit."
+      },
+      {
+        "command": "git diff --check",
+        "status": "pass",
+        "detail": "Clean diff."
+      }
+    ],
+    "limitations": [
+      "Source-level metadata evidence only; does not create a remote release or publish binary packages."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1"
+    },
+    "started_at": "2026-08-31T23:50:00+08:00",
+    "finished_at": "2026-08-31T23:59:00+08:00"
+  }
+}

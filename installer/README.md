@@ -1,4 +1,4 @@
-# HibikiSetup
+﻿# HibikiSetup
 
 The planned open-source bootstrapper will install the user-space app and
 virtual-driver package transactionally, preserve Scene/Calibration data, and
@@ -49,3 +49,10 @@ This document describes source-level design and offline verification only.
 It does not claim install, load, runtime audio, driver, or physical-audio
 evidence. Running `-Apply` changes machine state and
 requires administrator privileges on a locked test machine.
+
+## Source-tag manifests vs Package manifests
+
+Official Git source tags carry text-only SourceReleaseManifest v1 metadata
+(see SPEC-0025 / ADR-0009) that verifies source blob content directly from Git.
+HibikiSetup.ps1 processes externally supplied ReleaseManifest v1 packages
+when an installer or driver package is delivered outside GitHub.

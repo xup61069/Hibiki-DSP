@@ -11,7 +11,7 @@ $ErrorActionPreference = 'Stop'
 
 $script:SourceTagPattern = '^v[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9._:+-]{0,32}$'
 $script:ManifestRoot = 'release/manifests'
-$script:SchemaPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'schemas/release-manifest-v1.schema.json'
+$script:SchemaPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'schemas/source-release-manifest-v1.schema.json'
 $script:SchemaDependenciesRegistered = $false
 
 function Invoke-GitText {
@@ -52,7 +52,7 @@ function Assert-SourceTagName {
   )
 
   if ($TagName -notmatch $script:SourceTagPattern) {
-    throw "Release tag '$TagName' must match the ReleaseManifest source_tag format."
+    throw "Release tag '$TagName' must match the SourceReleaseManifest source_tag format."
   }
   $null = Invoke-GitText -RepositoryPath $RepositoryPath `
     -Arguments @('check-ref-format', '--allow-onelevel', ('refs/tags/' + $TagName)) `
@@ -85,13 +85,13 @@ function Assert-ReleaseManifestSchema {
   )
 
   if (-not (Test-Path -LiteralPath $SchemaFile -PathType Leaf)) {
-    throw "ReleaseManifest v1 schema is missing: $SchemaFile"
+    throw "SourceReleaseManifest v1 schema is missing: $SchemaFile"
   }
   try {
     if (-not $script:SchemaDependenciesRegistered) {
       $printableSchema = Join-Path (Split-Path -Parent $SchemaFile) 'printable-string-v1.schema.json'
       if (-not (Test-Path -LiteralPath $printableSchema -PathType Leaf)) {
-        throw "ReleaseManifest printable-string schema is missing: $printableSchema"
+        throw "SourceReleaseManifest printable-string schema is missing: $printableSchema"
       }
       $null = Test-Json -Json '{}' -SchemaFile $printableSchema -ErrorAction Stop
       $printable = [Json.Schema.JsonSchema]::FromFile($printableSchema)
@@ -110,7 +110,7 @@ function Assert-ReleaseManifestSchema {
     throw "Release manifest '$ManifestPath' schema validation returned an invalid result."
   }
   if (-not [bool]$validation[0]) {
-    throw "Release manifest '$ManifestPath' must satisfy ReleaseManifest v1 schema."
+    throw "Release manifest '$ManifestPath' must satisfy SourceReleaseManifest v1 schema."
   }
 }
 
@@ -121,7 +121,6 @@ function Get-DirectAnnotatedTagCommit {
     [Parameter(Mandatory)][string]$TagRef
   )
 
-  # A tag message is free form, so inspect only the canonical leading headers.
   $tagLines = @(Invoke-GitText -RepositoryPath $RepositoryPath `
     -Arguments @('cat-file', '-p', $TagRef) `
     -FailurePrefix "Release tag '$TagName' cannot read its annotated tag object")
@@ -149,6 +148,48 @@ function Get-DirectAnnotatedTagCommit {
     throw "Release tag '$TagName' must directly target a commit."
   }
   return $tagCommit
+}
+
+function Get-BlobSha256FromCommit {
+  param(
+    [Parameter(Mandatory)][string]$RepositoryPath,
+    [Parameter(Mandatory)][string]$CommitSha,
+    [Parameter(Mandatory)][string]$RelativePath
+  )
+
+  if ($RelativePath -match '^[/\\]' -or $RelativePath.Contains('..')) {
+    throw "Declared source path '$RelativePath' is not safe."
+  }
+
+  $lsOutput = @(Invoke-GitText -RepositoryPath $RepositoryPath `
+    -Arguments @('ls-tree', $CommitSha, '--', $RelativePath) `
+    -FailurePrefix "Cannot find path '$RelativePath' in commit $CommitSha")
+  if ($lsOutput.Count -eq 0) {
+    throw "Declared path '$RelativePath' does not exist in commit $CommitSha."
+  }
+  $regularPattern = '^100644 blob ([0-9a-f]{40})' + [char]9 + [regex]::Escape($RelativePath) + '$'
+  if ($lsOutput.Count -ne 1 -or $lsOutput[0] -notmatch $regularPattern) {
+    throw "Declared path '$RelativePath' in commit $CommitSha must be a regular 100644 blob."
+  }
+
+  $blobSha = $Matches[1]
+  $psi = [System.Diagnostics.ProcessStartInfo]::new()
+  $psi.FileName = 'git'
+  $psi.Arguments = "-C `"$RepositoryPath`" cat-file blob $blobSha"
+  $psi.RedirectStandardOutput = $true
+  $psi.UseShellExecute = $false
+  $psi.CreateNoWindow = $true
+  $proc = [System.Diagnostics.Process]::Start($psi)
+  $ms = [System.IO.MemoryStream]::new()
+  $proc.StandardOutput.BaseStream.CopyTo($ms)
+  $proc.WaitForExit()
+  if ($proc.ExitCode -ne 0) {
+    throw "git cat-file blob failed for '$RelativePath' in $CommitSha"
+  }
+  $rawBytes = $ms.ToArray()
+  $shaObj = [System.Security.Cryptography.SHA256]::Create()
+  $hashBytes = $shaObj.ComputeHash($rawBytes)
+  return ([System.BitConverter]::ToString($hashBytes) -replace '-', '').ToLowerInvariant()
 }
 
 function Test-ReleaseTagProvenance {
@@ -227,6 +268,31 @@ function Test-ReleaseTagProvenance {
     throw "Release tag '$TagName' provenance metadata commit may change only '$manifestPath'."
   }
 
+  # Verify all declared source blobs exist in sourceCommit and match SHA-256
+  $declaredItems = @(
+    $manifest.toolchain_lock,
+    $manifest.dependency_lock,
+    $manifest.sbom,
+    $manifest.release_notes,
+    $manifest.notices
+  )
+  if ($manifest.PSObject.Properties.Name -contains 'source_files' -and $null -ne $manifest.source_files) {
+    $declaredItems += @($manifest.source_files)
+  }
+
+  $seenPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+  foreach ($item in $declaredItems) {
+    $p = $item.path
+    $declaredSha = $item.sha256.ToLowerInvariant()
+    if (-not $seenPaths.Add($p)) {
+      throw "Release manifest '$manifestPath' contains duplicate declared path '$p'."
+    }
+    $actualSha = Get-BlobSha256FromCommit -RepositoryPath $RepositoryPath -CommitSha $sourceCommit -RelativePath $p
+    if ($actualSha -cne $declaredSha) {
+      throw "Declared path '$p' hash mismatch in $sourceCommit (expected $declaredSha, computed $actualSha)."
+    }
+  }
+
   return [pscustomobject]@{
     tag = $TagName
     tag_commit = $tagCommit
@@ -248,7 +314,10 @@ function New-ReleaseProvenanceFixture {
     [switch]$ManifestSymlink,
     [switch]$NestedAnnotatedTag,
     [switch]$ZeroParents,
-    [switch]$HeaderLikeTagMessage
+    [switch]$HeaderLikeTagMessage,
+    [switch]$CorruptedFileHash,
+    [switch]$DuplicateFilePath,
+    [switch]$MissingSourceFile
   )
 
   $root = Join-Path ([IO.Path]::GetTempPath()) ('hibiki-release-provenance-' + [guid]::NewGuid().ToString('N'))
@@ -260,9 +329,22 @@ function New-ReleaseProvenanceFixture {
 
     New-Item -ItemType Directory -Path (Join-Path $root 'source') -Force | Out-Null
     Set-Content -LiteralPath (Join-Path $root 'source/payload.txt') -Value 'source-only fixture' -NoNewline -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $root 'source/toolchain.lock') -Value 'toolchain-lock' -NoNewline -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $root 'source/deps.lock') -Value 'deps-lock' -NoNewline -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $root 'source/sbom.json') -Value '{"sbom":true}' -NoNewline -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $root 'source/notes.md') -Value '# Release Notes' -NoNewline -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $root 'source/notices.txt') -Value 'Third party notices' -NoNewline -Encoding utf8
+
     $null = Invoke-GitText -RepositoryPath $root -Arguments @('add', '--all') -FailurePrefix 'Self-test source add failed'
     $null = Invoke-GitText -RepositoryPath $root -Arguments @('commit', '-m', 'source input') -FailurePrefix 'Self-test source commit failed'
     $sourceCommit = Get-GitSingleLine -RepositoryPath $root -Arguments @('rev-parse', 'HEAD') -FailurePrefix 'Self-test source commit lookup failed'
+
+    $shaOf = {
+      param($p)
+      $rawBytes = [System.IO.File]::ReadAllBytes((Join-Path $root $p))
+      $hash = [System.Security.Cryptography.SHA256]::HashData($rawBytes)
+      return ([System.BitConverter]::ToString($hash) -replace '-', '').ToLowerInvariant()
+    }
 
     $manifestIndexEntry = $null
     if (-not $MissingManifest) {
@@ -274,18 +356,23 @@ function New-ReleaseProvenanceFixture {
           source_commit = if (-not $PSBoundParameters.ContainsKey('ManifestCommit')) { $sourceCommit } else { $ManifestCommit }
         }
       } else {
+        $payloadHash = if ($CorruptedFileHash) { '0' * 64 } else { & $shaOf 'source/payload.txt' }
+        $sourceFiles = @([ordered]@{ path = if ($MissingSourceFile) { 'source/missing.txt' } else { 'source/payload.txt' }; sha256 = $payloadHash })
+        if ($DuplicateFilePath) {
+          $sourceFiles += [ordered]@{ path = 'source/payload.txt'; sha256 = $payloadHash }
+        }
         $manifestValue = [ordered]@{
           schema_version = 1
           product_version = '1.0.0'
           source_tag = if (-not $PSBoundParameters.ContainsKey('ManifestTag')) { $TagName } else { $ManifestTag }
           source_commit = if (-not $PSBoundParameters.ContainsKey('ManifestCommit')) { $sourceCommit } else { $ManifestCommit }
           distribution_id = 'hibiki-self-test'
-          toolchain_digest = 'a' * 64
-          dependency_lock_digest = 'b' * 64
-          unsigned_files = @([ordered]@{ path = 'source/payload.txt'; sha256 = 'c' * 64 })
-          driver_package = [ordered]@{ sha256 = 'd' * 64; catalog_sha256 = 'e' * 64 }
-          installer = [ordered]@{ sha256 = 'f' * 64 }
-          sbom_digest = '0' * 64
+          toolchain_lock = [ordered]@{ path = 'source/toolchain.lock'; sha256 = & $shaOf 'source/toolchain.lock' }
+          dependency_lock = [ordered]@{ path = 'source/deps.lock'; sha256 = & $shaOf 'source/deps.lock' }
+          sbom = [ordered]@{ path = 'source/sbom.json'; sha256 = & $shaOf 'source/sbom.json' }
+          release_notes = [ordered]@{ path = 'source/notes.md'; sha256 = & $shaOf 'source/notes.md' }
+          notices = [ordered]@{ path = 'source/notices.txt'; sha256 = & $shaOf 'source/notices.txt' }
+          source_files = $sourceFiles
           tests = @('self-test')
         }
       }
@@ -411,7 +498,7 @@ if ($SelfTest) {
 
   $malformed = New-ReleaseProvenanceFixture -TagName 'v1.2.5-m' -MalformedManifest
   try {
-    Assert-ProvenanceRejected -Label 'malformed-release-manifest' -ExpectedPattern 'must satisfy ReleaseManifest v1 schema' -Action {
+    Assert-ProvenanceRejected -Label 'malformed-release-manifest' -ExpectedPattern 'must satisfy SourceReleaseManifest v1 schema' -Action {
       Test-ReleaseTagProvenance -RepositoryPath $malformed.Root -TagName 'v1.2.5-m' | Out-Null
     }
     $caseCount++
@@ -441,7 +528,7 @@ if ($SelfTest) {
 
   $nonStringCommit = New-ReleaseProvenanceFixture -TagName 'v1.2.8' -ManifestCommit 123
   try {
-    Assert-ProvenanceRejected -Label 'manifest-commit-non-string' -ExpectedPattern 'must satisfy ReleaseManifest v1 schema' -Action {
+    Assert-ProvenanceRejected -Label 'manifest-commit-non-string' -ExpectedPattern 'must satisfy SourceReleaseManifest v1 schema' -Action {
       Test-ReleaseTagProvenance -RepositoryPath $nonStringCommit.Root -TagName 'v1.2.8' | Out-Null
     }
     $caseCount++
@@ -509,6 +596,36 @@ if ($SelfTest) {
     $caseCount++
   } finally {
     Remove-ReleaseProvenanceFixture -Root $headerLikeMessage.Root
+  }
+
+  $corruptHash = New-ReleaseProvenanceFixture -TagName 'v1.3.5' -CorruptedFileHash
+  try {
+    Assert-ProvenanceRejected -Label 'corrupted-file-hash' -ExpectedPattern 'hash mismatch' -Action {
+      Test-ReleaseTagProvenance -RepositoryPath $corruptHash.Root -TagName 'v1.3.5' | Out-Null
+    }
+    $caseCount++
+  } finally {
+    Remove-ReleaseProvenanceFixture -Root $corruptHash.Root
+  }
+
+  $duplicatePath = New-ReleaseProvenanceFixture -TagName 'v1.3.6' -DuplicateFilePath
+  try {
+    Assert-ProvenanceRejected -Label 'duplicate-path' -ExpectedPattern 'duplicate declared path' -Action {
+      Test-ReleaseTagProvenance -RepositoryPath $duplicatePath.Root -TagName 'v1.3.6' | Out-Null
+    }
+    $caseCount++
+  } finally {
+    Remove-ReleaseProvenanceFixture -Root $duplicatePath.Root
+  }
+
+  $missingFile = New-ReleaseProvenanceFixture -TagName 'v1.3.7' -MissingSourceFile
+  try {
+    Assert-ProvenanceRejected -Label 'missing-source-file' -ExpectedPattern 'does not exist in commit' -Action {
+      Test-ReleaseTagProvenance -RepositoryPath $missingFile.Root -TagName 'v1.3.7' | Out-Null
+    }
+    $caseCount++
+  } finally {
+    Remove-ReleaseProvenanceFixture -Root $missingFile.Root
   }
 
   $tempSibling = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([char[]]@([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)) + 'Sibling' + [IO.Path]::DirectorySeparatorChar + 'hibiki-release-provenance-test'
