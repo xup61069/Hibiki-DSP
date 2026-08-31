@@ -1219,23 +1219,9 @@ bool AudioEngineModel::apply_group_master_f64(
     if (volume_bank_ == nullptr) return false;
     const auto channel_count = active_graph_.output_channels;
     if (channel_count == 0U || channel_count > 8U) return false;
-    for (std::size_t frame = 0U; frame < frames; ++frame) {
-        auto* const output_frame =
-            output_interleaved + frame * static_cast<std::size_t>(channel_count);
-        std::array<float, 8> float_frame{};
-        for (std::uint32_t channel = 0U; channel < channel_count; ++channel) {
-            float_frame[channel] = static_cast<float>(output_frame[channel]);
-        }
-        if (!volume_bank_->apply_to_interleaved(
-                output_group, float_frame.data(), 1U, channel_count,
-                sample_rate_.load(std::memory_order_relaxed))) {
-            return false;
-        }
-        for (std::uint32_t channel = 0U; channel < channel_count; ++channel) {
-            output_frame[channel] = static_cast<double>(float_frame[channel]);
-        }
-    }
-    return true;
+    return volume_bank_->apply_to_interleaved_f64(
+        output_group, output_interleaved, frames, channel_count,
+        sample_rate_.load(std::memory_order_relaxed));
 }
 
 bool AudioEngineModel::apply_ir(const std::string_view output_group,

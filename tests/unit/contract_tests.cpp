@@ -2229,6 +2229,24 @@ int main() {
                        (model_f64_input[0] * default_gain) - 1.0) < 1e-6);
     CHECK(std::abs(model_f64_output[3] /
                        (model_f64_input[3] * default_gain) - 1.0) < 1e-6);
+
+    // Model-level Float64 Group Master must stay in the double domain. A
+    // finite sample outside Float32 range must not be narrowed into infinity
+    // after an earlier frame has already been committed.
+    const std::array<double, 4U> wide_model_f64_input{
+        1.0, 1.0, 1.0e300, 1.0e300};
+    const RtLaneInputF64V1 wide_model_f64_view{wide_model_f64_input.data(), 2U};
+    std::array<double, 4U> wide_model_f64_output{};
+    CHECK(f64_engine.process_f64(
+        std::span<const RtLaneInputF64V1>(&wide_model_f64_view, 1),
+        wide_model_f64_output.data(), 2U));
+    CHECK(std::isfinite(wide_model_f64_output[2]) &&
+          wide_model_f64_output[2] > 1.0e299);
+    CHECK(f64_engine.process_output_group_f64(
+        "main", std::span<const RtLaneInputF64V1>(&wide_model_f64_view, 1),
+        wide_model_f64_output.data(), 2U));
+    CHECK(std::isfinite(wide_model_f64_output[3]) &&
+          wide_model_f64_output[3] > 1.0e299);
     CHECK(!f64_engine.process_output_group_f64(
         "missing",
         std::span<const RtLaneInputF64V1>(&model_f64_view, 1),
