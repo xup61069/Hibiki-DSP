@@ -9,6 +9,19 @@ static void Check(bool condition, string message)
     if (!condition) throw new InvalidOperationException(message);
 }
 
+static bool RejectsArgument(Action action)
+{
+    try
+    {
+        action();
+        return false;
+    }
+    catch (ArgumentException)
+    {
+        return true;
+    }
+}
+
 Check(ScenePresetCatalog.EasyDefaults.Count == 4, "Expected four Easy defaults.");
 Check(ScenePresetCatalog.EasyDefaults[0].Id == "game", "Game preset missing.");
 var customScenes = new CustomSceneCatalogV1();
@@ -920,6 +933,45 @@ var duplicateRoutes = new[] { routeSnapshot[0], routeSnapshot[0] };
 Check(!viewModel.ApplyRouteHealth(duplicateRoutes, out var duplicateRouteError) &&
       duplicateRouteError.Contains("重複"),
     "Duplicate route-health identities must fail closed.");
+
+// Native is_printable_utf8 rejects C0, DEL, and C1 controls. Outbound managed
+// encoders must apply the same rule before constructing a wire payload.
+foreach (var blocked in new[] { "\u007f", "\u0085", "\u009f" })
+{
+    Check(RejectsArgument(() => ControlPayloadsV1.EncodeSessionRouteCommand(
+              sessionEntries[0].Handle, 12UL, blocked, "main")),
+          $"SessionRoute encoder must reject U+{(int)blocked[0]:X4}.");
+    Check(RejectsArgument(() => ControlPayloadsV1.EncodeGroupedVolumeNotification(
+              blocked, -9.0, false, 10UL)),
+          $"GroupedVolume encoder must reject U+{(int)blocked[0]:X4}.");
+    Check(RejectsArgument(() => ControlPayloadsV1.EncodeSceneApply(blocked, "main")),
+          $"SceneApply encoder must reject U+{(int)blocked[0]:X4}.");
+    Check(RejectsArgument(() => ControlPayloadsV1.EncodeIrPrepare(
+              blocked, new IrPhasePolicyV1(IrPhaseMode.LinearPhase, 0.5))),
+          $"IR prepare encoder must reject U+{(int)blocked[0]:X4}.");
+    Check(RejectsArgument(() => ControlPayloadsV1.EncodeCalibrationPeqPrepare(
+              blocked, [(1000.0, -3.0, 1.0)])),
+          $"Calibration PEQ encoder must reject U+{(int)blocked[0]:X4}.");
+    Check(RejectsArgument(() => ControlPayloadsV1.EncodeSceneCatalogCommand(
+              SessionRouteRuleOperationV1.Upsert, blocked, "name", "main")),
+          $"SceneCatalog encoder must reject U+{(int)blocked[0]:X4}.");
+    Check(RejectsArgument(() => ControlPayloadsV1.EncodeDeviceCatalogSnapshot(
+              [speakers with { DisplayName = blocked }], 30UL)),
+          $"DeviceCatalog encoder must reject U+{(int)blocked[0]:X4}.");
+    Check(RejectsArgument(() => ControlPayloadsV1.EncodeSessionCatalogSnapshot(
+              12UL, 2UL, [sessionEntries[0] with { Name = blocked }])),
+          $"SessionCatalog encoder must reject U+{(int)blocked[0]:X4}.");
+    Check(RejectsArgument(() => ControlPayloadsV1.EncodeControlStatusSnapshot(
+              7UL, cappedVolume, [routeSnapshot[0] with { Name = blocked }])),
+          $"ControlStatus encoder must reject U+{(int)blocked[0]:X4}.");
+}
+var printableUnicodeGrouped = ControlPayloadsV1.EncodeGroupedVolumeNotification(
+    "音量", -9.0, false, 10UL);
+Check(ControlPayloadsV1.TryDecodeGroupedVolumeNotification(
+          printableUnicodeGrouped, out var printableUnicodeGroup, out _, out _, out _) &&
+      printableUnicodeGroup == "音量",
+    "Printable multi-byte text must remain accepted by outbound encoders.");
+
 viewModel.IsExpert = false;
 Check(!viewModel.Expert.IsVisible && viewModel.Expert.StatusText.Contains("隱藏"),
     "Expert surface must hide when Easy mode is selected.");
