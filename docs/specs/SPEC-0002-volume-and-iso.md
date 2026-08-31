@@ -154,7 +154,9 @@ C# 的 calibration response 與 PEQ preset loader 也在 top-level 及 nested ob
 `additionalProperties: false` 保持一致；這是本機檔案契約驗證，不代表資料已完成聲學量測。
 編譯後可交給同一組 exporter。
 同一 exporter 也能把 caller-supplied interleaved impulse samples 寫成 32-bit
-IEEE-float WAV IR；它只負責檔案格式，不替任何未授權量測資料背書。
+IEEE-float WAV IR，取樣率限制與 decoder／convolver 相同為 8000–192000 Hz；
+超出範圍的輸入一律拒絕，避免產生無法重新載入的檔案。它只負責檔案格式，
+不替任何未授權量測資料背書。
 
 `PeqProcessorV1` 會把最多 16 個 `PeqFilterV1` 編譯成 RBJ peaking biquad，固定支援 1–8
 聲道；係數在 control side 準備，`process_interleaved` 只使用固定 state，不配置、不等待，

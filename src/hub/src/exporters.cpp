@@ -98,7 +98,8 @@ std::vector<std::uint8_t> export_wav_f32_ir(const std::span<const float> interle
     constexpr std::uint64_t kFloatBytes = sizeof(float);
     constexpr auto kMaxU32 = std::numeric_limits<std::uint32_t>::max();
 
-    if (interleaved_samples.empty() || sample_rate == 0 || channels == 0 || channels > 8) {
+    if (interleaved_samples.empty() || sample_rate < 8000U || sample_rate > 192000U ||
+        channels == 0 || channels > 8) {
         return {};
     }
     if (interleaved_samples.size() % channels != 0) {
