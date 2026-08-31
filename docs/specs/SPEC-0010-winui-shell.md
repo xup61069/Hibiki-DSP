@@ -108,6 +108,9 @@ Hello 與裝置 catalog 成功後，ViewModel 會以序列化的 `ControlStatusR
 - 沒有輸出群組時 One-Tap Enhance fail-closed，不產生 SceneApply。
 - pipe 連線、Hello、命令回覆任何一步失敗，UI 顯示 Degraded，保留上一個
   已提交 graph；不得假裝已控制，也不得重試成無限迴圈。
+- `ConnectAsync` 只有在初始 snapshot setup 後仍為 Connected 時才能回傳成功；setup
+  期間的 transport exception 必須回傳失敗、釋放 pipe client，且不得留下 EQ 背景輪詢。
+  尚未掛載的 status store 仍依既有 fail-soft 顯示，不能單獨誤判整個連線失敗。
 - 音量拖曳不可並行寫入 named pipe；上一個尚未送出的值可取消，最終值必須在
   bounded debounce 後送出，避免 OSD／UI event storm。
 - ViewModel 的 async pipe 工作不在 audio callback 執行；RT thread 不等待 UI、

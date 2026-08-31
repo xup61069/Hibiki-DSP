@@ -1428,6 +1428,18 @@ static async Task ReadExactBytesAsync(Stream stream, byte[] buffer, Cancellation
     }
 }
 
+static async Task WriteCheckReplyAsync(NamedPipeServerStream server,
+                                       IpcEnvelopeV1 response,
+                                       CancellationToken token)
+{
+    var encoded = IpcCodecV1.Encode(response);
+    var replyLength = new byte[4];
+    BinaryPrimitives.WriteUInt32LittleEndian(replyLength, (uint)encoded.Length);
+    await server.WriteAsync(replyLength, token);
+    await server.WriteAsync(encoded, token);
+    await server.FlushAsync(token);
+}
+
 static async Task RunSceneCatalogCheckServerAsync(
     string pipeName,
     Func<IpcEnvelopeV1, IpcEnvelopeV1?> responder,
@@ -1455,12 +1467,7 @@ static async Task RunSceneCatalogCheckServerAsync(
                 if (!IpcCodecV1.TryDecode(frame, out var request, out _))
                     throw new InvalidDataException("undecodable request");
                 var response = responder(request!) ?? AckReply(request!);
-                var encoded = IpcCodecV1.Encode(response);
-                var replyLength = new byte[4];
-                BinaryPrimitives.WriteUInt32LittleEndian(replyLength, (uint)encoded.Length);
-                await server.WriteAsync(replyLength, token);
-                await server.WriteAsync(encoded, token);
-                await server.FlushAsync(token);
+                await WriteCheckReplyAsync(server, response, token);
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -1475,6 +1482,58 @@ static async Task RunSceneCatalogCheckServerAsync(
         {
             if (server is not null) await server.DisposeAsync();
         }
+    }
+}
+
+static async Task RunInitialConnectFailureCheckServerAsync(
+    string pipeName,
+    TaskCompletionSource deviceCatalogFailureDelivered,
+    TaskCompletionSource<ControlMessageType> unexpectedRequest,
+    CancellationToken token)
+{
+    await using var server = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1,
+        PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+    try
+    {
+        await server.WaitForConnectionAsync(token);
+        while (true)
+        {
+            var lengthPrefix = new byte[4];
+            await ReadExactBytesAsync(server, lengthPrefix, token);
+            var frameLength = BinaryPrimitives.ReadUInt32LittleEndian(lengthPrefix);
+            if (frameLength > IpcCodecV1.MaxPayloadBytes + IpcCodecV1.HeaderBytes)
+                throw new InvalidDataException("frame too large");
+            var frame = new byte[frameLength];
+            await ReadExactBytesAsync(server, frame, token);
+            if (!IpcCodecV1.TryDecode(frame, out var request, out _))
+                throw new InvalidDataException("undecodable request");
+
+            if (request!.Type == ControlMessageType.Hello)
+            {
+                await WriteCheckReplyAsync(server, AckReply(request), token);
+                continue;
+            }
+
+            if (request.Type == ControlMessageType.DeviceCatalogRequest)
+            {
+                // A zero-byte frame is an invalid transport reply. Keep the
+                // pipe alive to expose any follow-on background request.
+                await server.WriteAsync(new byte[4], token);
+                await server.FlushAsync(token);
+                deviceCatalogFailureDelivered.TrySetResult();
+                continue;
+            }
+
+            unexpectedRequest.TrySetResult(request.Type);
+        }
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested)
+    {
+    }
+    catch (EndOfStreamException)
+    {
+        // The ViewModel releases the failed client before this fixture is
+        // canceled; that orderly disconnect ends the server read loop.
     }
 }
 
@@ -2116,6 +2175,46 @@ static async Task RunSceneCatalogCheckServerAsync(
     finally
     {
         await eqViewModel.DisconnectAsync();
+        serverCts.Cancel();
+        try { await serverTask; } catch (OperationCanceledException) { }
+    }
+}
+
+// Case 7c: a transport failure during initial setup must not report a
+// successful connection or leave the periodic EQ poll running in degraded
+// state. The mock keeps the pipe open after its invalid catalog frame so an
+// accidental follow-on request is observable.
+{
+    const string pipeName = "HibikiDSP_initial_connect_failure_check";
+    using var serverCts = new CancellationTokenSource();
+    var deviceCatalogFailureDelivered = new TaskCompletionSource(
+        TaskCreationOptions.RunContinuationsAsynchronously);
+    var unexpectedRequest = new TaskCompletionSource<ControlMessageType>(
+        TaskCreationOptions.RunContinuationsAsynchronously);
+    var serverTask = RunInitialConnectFailureCheckServerAsync(pipeName,
+        deviceCatalogFailureDelivered, unexpectedRequest, serverCts.Token);
+    var failedConnectViewModel = new EasyControlViewModel(pipeName);
+    try
+    {
+        var connectResult = await failedConnectViewModel.ConnectAsync(
+            TimeSpan.FromSeconds(2), serverCts.Token);
+        var failureDelivered = await Task.WhenAny(
+            deviceCatalogFailureDelivered.Task,
+            Task.Delay(TimeSpan.FromSeconds(2), serverCts.Token));
+        Check(failureDelivered == deviceCatalogFailureDelivered.Task &&
+              !connectResult &&
+              failedConnectViewModel.ConnectionState == ControlConnectionState.Degraded &&
+              !failedConnectViewModel.IsConnected,
+            "An initial transport failure must return false and retain the degraded state.");
+
+        var completed = await Task.WhenAny(unexpectedRequest.Task, Task.Delay(1400))
+            .ConfigureAwait(true);
+        Check(completed != unexpectedRequest.Task,
+            "A degraded initial connection must not start EQ polling or send another control request.");
+    }
+    finally
+    {
+        await failedConnectViewModel.DisconnectAsync();
         serverCts.Cancel();
         try { await serverTask; } catch (OperationCanceledException) { }
     }
