@@ -10,4 +10,5 @@
 | [ADR-0006](0006-no-hlk-no-signing-release.md) | accepted | 無 HLK、無簽章的 source-only 發行 |
 | [ADR-0007](0007-source-only-release-policy-supersession.md) | accepted | Source-only release policy supersession boundary |
 | [ADR-0008](0008-source-only-driver-release-boundary.md) | accepted | Source-only driver release-boundary supersession |
-| [ADR-0009](0009-source-release-manifest-boundary.md) | accepted | Source-tag manifest and external package manifest boundary |
+| [ADR-0009](0009-source-release-manifest-boundary.md) | accepted | Source-tag manifest and external package manifest boundary (provenance clauses superseded by ADR-0010) |
+| [ADR-0010](0010-source-tag-provenance-hardening.md) | accepted | Source-tag provenance hardening boundary |

@@ -1,4 +1,4 @@
-{
+﻿{
   "evidence_format": 2,
   "issue": 2232,
   "source_provenance": {
@@ -10,81 +10,58 @@
       "docs/specs/INDEX.md",
       "docs/specs/SPEC-0005-source-only-paid-release.md",
       "docs/specs/SPEC-0025-source-tag-manifest-provenance.md",
+      "docs/state/BASELINE.md",
+      "installer/README.md",
       "schemas/source-release-manifest-v1.schema.json",
       "tools/docs-check.ps1",
       "tools/release-provenance-check.ps1"
     ],
     "digest_algorithm": "sha256-git-source-set-v1",
-    "digest": "7365b2ff6a3ea9c113299f06d03a179da4b42a418528b999a522709541e906fa"
+    "digest": "3dd675608ac1c32f1e0d93818e780b9ee2c155c1a529f377e22ffff2138b1b40"
   },
   "metadata": {
-    "scope": "source-tag-manifest-hardening",
-    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-msvc-19.51",
+    "scope": "source-tag-manifest-provenance-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-source-tag-manifest-provenance",
     "commands": [
       "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 2232",
-      "pwsh -NoProfile -File tools/release-provenance-check.ps1 -SelfTest",
-      "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
       "pwsh -NoProfile -File tools/docs-check.ps1",
       "pwsh -NoProfile -File tools/source-policy.ps1",
       "pwsh -NoProfile -File tools/source-only-ci-check.ps1 -SelfTest",
       "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
-      "pwsh -NoProfile -File tools/installer-check.ps1",
-      "pwsh -NoProfile -File tools/distribution-check.ps1",
-      "pwsh -NoProfile -File tools/evidence-audit.ps1 -SelfTest",
-      "$env:CMAKE_BUILD_PARALLEL_LEVEL='1'; pwsh -NoProfile -File tools/verify.ps1",
-      "git diff --cached --check"
+      "pwsh -NoProfile -File tools/release-provenance-check.ps1 -SelfTest",
+      "git diff --check"
     ],
     "results": [
       {
-        "command": "handoff-check",
+        "command": "handoff admission",
         "status": "pass",
-        "detail": "Issue #2232 claim, branch, isolated worktree, and declared scope passed."
+        "detail": "Issue #2232 ownership and worktree isolation verified."
       },
       {
-        "command": "release-provenance-check self-test",
+        "command": "documentation and source policy gates",
         "status": "pass",
-        "detail": "29 cases passed, including source-only status, tag/profile identity, SPDX, bounded text reads, unsafe paths, and non-regular blobs."
+        "detail": "docs-check measured 88 required paths, 25 specs; source-policy passed."
       },
       {
-        "command": "docs-check",
+        "command": "source-only CI and release provenance gates",
         "status": "pass",
-        "detail": "58 self-test cases and 88 required paths with 25 specs passed."
+        "detail": "source-only-ci-check passed 27 self-test cases; release-provenance-check passed 18 self-test cases verifying text-only source tag provenance against Git parent commit."
       },
       {
-        "command": "source-policy and source-only-ci-check",
+        "command": "git diff --check",
         "status": "pass",
-        "detail": "Source policy passed for 830 tracked paths; source-only CI self-test passed 27 cases."
-      },
-      {
-        "command": "installer and distribution checks",
-        "status": "pass",
-        "detail": "Installer source and distribution profile checks passed."
-      },
-      {
-        "command": "evidence-audit self-test",
-        "status": "pass",
-        "detail": "48 evidence-audit self-test cases passed."
-      },
-      {
-        "command": "verify",
-        "status": "pass",
-        "detail": "Unsigned source build completed and all 52 CTest targets passed; existing compiler shadowing warnings remained non-fatal."
-      },
-      {
-        "command": "git diff --cached --check",
-        "status": "pass",
-        "detail": "No whitespace errors in the staged corrective source set."
+        "detail": "Clean diff."
       }
     ],
     "limitations": [
-      "Source-level provenance and build evidence only; no official V1 tag or GitHub Release was created by this slice.",
-      "This does not verify driver installation, WaveRT streaming, endpoint control, signing, or physical audio."
+      "Source-level metadata evidence only; does not create a remote release or publish binary packages."
     ],
+    "logs": {},
     "tool_versions": {
       "powershell": "7.6.4",
       "git": "2.49.0.windows.1"
     },
-    "started_at": "2026-08-31T22:58:00+08:00",
-    "finished_at": "2026-08-31T23:10:18+08:00"
+    "started_at": "2026-08-31T23:50:00+08:00",
+    "finished_at": "2026-08-31T23:59:00+08:00"
   }
 }

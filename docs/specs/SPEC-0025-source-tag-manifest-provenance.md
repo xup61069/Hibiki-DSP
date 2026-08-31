@@ -5,7 +5,7 @@ owner: hibiki-maintainers
 authority: release-policy
 last_reviewed: 2026-08-31
 review_after_days: 30
-related_adrs: [ADR-0006, ADR-0007, ADR-0008, ADR-0009]
+related_adrs: [ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0010]
 source_globs: ["tools/release-provenance-check.ps1", "schemas/source-release-manifest-v1.schema.json", "config/distribution-profile.yml", "docs/specs/SPEC-0005-source-only-paid-release.md", "SOURCE_POLICY.md"]
 ---
 

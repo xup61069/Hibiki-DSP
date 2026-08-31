@@ -5,7 +5,7 @@ owner: hibiki-maintainers
 authority: release-policy
 last_reviewed: 2026-08-31
 review_after_days: 30
-related_adrs: [ADR-0001, ADR-0006, ADR-0007, ADR-0008, ADR-0009]
+related_adrs: [ADR-0001, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0010]
 source_globs: ["installer/**", "tools/**", ".github/**", "schemas/release-manifest-v1.schema.json", "schemas/source-release-manifest-v1.schema.json", "docs/specs/SPEC-0025-source-tag-manifest-provenance.md", "SOURCE_POLICY.md"]
 ---
 
@@ -24,7 +24,7 @@ driver source boundary、extension/installer/control-model、stable identity 與
 
 ## 發布流程
 
-1. 維護者先完成 source commit，再建立只新增或更新
+1. 維護者先完成 source commit，再建立只新增
    `release/manifests/<tag>.json` 的 single-parent provenance metadata commit，並以受保護 annotated
    source tag 直接指向該 metadata commit（不得經由 nested tag）；不產生或上傳 repository release
    artifact。為避免 Git hash

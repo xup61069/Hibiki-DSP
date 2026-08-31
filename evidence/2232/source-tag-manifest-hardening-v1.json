@@ -1,0 +1,105 @@
+{
+  "evidence_format": 2,
+  "issue": 2232,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "SOURCE_POLICY.md",
+      "docs/adr/0010-source-tag-provenance-hardening.md",
+      "docs/adr/INDEX.md",
+      "docs/specs/INDEX.md",
+      "docs/specs/SPEC-0005-source-only-paid-release.md",
+      "docs/specs/SPEC-0025-source-tag-manifest-provenance.md",
+      "schemas/source-release-manifest-v1.schema.json",
+      "tools/docs-check.ps1",
+      "tools/release-provenance-check.ps1"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "50d28809813d9755d09fb66347e47c620bbdda1520e5566a5f29c4383332a7c1"
+  },
+  "metadata": {
+    "scope": "source-tag-manifest-hardening",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-msvc-19.51",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 2232",
+      "pwsh -NoProfile -File tools/release-provenance-check.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/docs-check.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "pwsh -NoProfile -File tools/installer-check.ps1",
+      "pwsh -NoProfile -File tools/distribution-check.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "$env:CMAKE_BUILD_PARALLEL_LEVEL='1'; pwsh -NoProfile -File tools/verify.ps1",
+      "git diff --cached --check"
+    ],
+    "results": [
+      {
+        "command": "handoff-check",
+        "status": "pass",
+        "detail": "Issue #2232 claim, branch, isolated worktree, and declared scope passed."
+      },
+      {
+        "command": "release-provenance-check self-test",
+        "status": "pass",
+        "detail": "29 cases passed, including source-only status, tag/profile identity, SPDX, bounded text reads, unsafe paths, and non-regular blobs."
+      },
+      {
+        "command": "docs-check",
+        "status": "pass",
+        "detail": "58 self-test cases and 88 required paths with 25 specs passed."
+      },
+      {
+        "command": "source-policy and source-only-ci-check",
+        "status": "pass",
+        "detail": "Source policy passed for 832 tracked paths; source-only CI self-test passed 27 cases."
+      },
+      {
+        "command": "source provenance",
+        "status": "pass",
+        "detail": "DescribeCurrentChange bound 10 non-evidence source paths with sha256-git-source-set-v1."
+      },
+      {
+        "command": "installer and distribution checks",
+        "status": "pass",
+        "detail": "Installer source and distribution profile checks passed."
+      },
+      {
+        "command": "evidence-audit self-test",
+        "status": "pass",
+        "detail": "48 evidence-audit self-test cases passed."
+      },
+      {
+        "command": "evidence-audit",
+        "status": "pass",
+        "detail": "checked=338, v2_checked=27, findings=0."
+      },
+      {
+        "command": "verify",
+        "status": "pass",
+        "detail": "Unsigned source build completed and all 52 CTest targets passed; existing compiler shadowing warnings remained non-fatal."
+      },
+      {
+        "command": "git diff --cached --check",
+        "status": "pass",
+        "detail": "No whitespace errors in the staged corrective source set."
+      }
+    ],
+    "limitations": [
+      "Source-level provenance and build evidence only; no official V1 tag or GitHub Release was created by this slice.",
+      "This does not verify driver installation, WaveRT streaming, endpoint control, signing, or physical audio."
+    ],
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1"
+    },
+    "started_at": "2026-08-31T22:58:00+08:00",
+    "finished_at": "2026-08-31T23:53:17+08:00"
+  },
+  "supersedes": [
+    "evidence/2232/source-tag-manifest-provenance-v1.json"
+  ]
+}
