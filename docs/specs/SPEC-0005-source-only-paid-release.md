@@ -3,10 +3,10 @@ id: SPEC-0005
 status: accepted
 owner: hibiki-maintainers
 authority: release-policy
-last_reviewed: 2026-08-25
+last_reviewed: 2026-08-31
 review_after_days: 30
 related_adrs: [ADR-0001, ADR-0006, ADR-0007]
-source_globs: ["installer/**", "tools/**", ".github/**", "schemas/release-manifest-v1.schema.json"]
+source_globs: ["installer/**", "tools/**", ".github/**", "schemas/release-manifest-v1.schema.json", "SOURCE_POLICY.md"]
 ---
 
 # SPEC-0005：source-only GitHub 發布與無簽章交付
@@ -18,14 +18,19 @@ Release page 只識別 source tag 與 release notes；不得上傳 GitHub releas
 container、Actions artifact 或任何 EXE／DLL／SYS／MSI／MSIX／VST3／PE-COFF 輸出。Public CI
 可在 ephemeral runner 編譯與測試，job 結束即刪除輸出，且不得要求、保存或使用任何 signing
 permission。公開 `verify.yml` 必須同時執行 CMake/CTest、docs/source policy、WinUI source shell、
-driver source boundary、extension/installer/control-model、stable identity 與 JSON parse gates；
-任何 gate 失敗都不得視為可交付 source tag。
+driver source boundary、extension/installer/control-model、stable identity 與 JSON parse gates；對
+`v*` source tag 還必須執行 read-only source-tag provenance gate。任何 gate 失敗都不得視為可交付
+source tag。
 
 ## 發布流程
 
-1. 維護者建立受保護 annotated source tag 與 release notes；不產生或上傳 repository release
-   artifact。
-2. Public CI 在 ephemeral workspace 執行 user-space、DSP、driver source 與相關測試；HLK／WHCP
+1. 維護者先完成 source commit，再建立只新增或更新
+   `release/manifests/<tag>.json` 的 single-parent provenance metadata commit，並以受保護 annotated
+   source tag 指向該 metadata commit；不產生或上傳 repository release artifact。為避免 Git hash
+   自我參照，manifest 的 `source_tag` 必須等於 tag，而 `source_commit` 必須等於 metadata commit
+   的唯一直接 parent；metadata commit 不得改動任何其他 product 或 policy 路徑。
+2. Public CI 在 ephemeral workspace 執行 user-space、DSP、driver source 與相關測試；對 `v*` tag
+   另驗證 annotated tag、唯一 parent、manifest path、tag/commit identity 與 metadata diff。HLK／WHCP
    與任何形式的簽章都不是驗收項目。
 3. 產生 `ReleaseManifest v1` 文字紀錄，至少記錄 source tag、commit、toolchain digest、dependency
    lock digest、required non-empty `distribution_id`、payload SHA-256 清單、driver package/catalog
