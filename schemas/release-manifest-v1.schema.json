@@ -4,7 +4,7 @@
   "title": "Hibiki ReleaseManifest v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "product_version", "source_tag", "source_commit", "toolchain_digest", "dependency_lock_digest", "unsigned_files", "driver_package", "installer", "sbom_digest", "tests"],
+  "required": ["schema_version", "product_version", "source_tag", "source_commit", "distribution_id", "toolchain_digest", "dependency_lock_digest", "unsigned_files", "driver_package", "installer", "sbom_digest", "tests"],
   "properties": {
     "schema_version": {"const": 1},
     "product_version": {"type": "string", "minLength": 1, "maxLength": 64, "$ref": "printable-string-v1.schema.json#/$defs/printableString"},

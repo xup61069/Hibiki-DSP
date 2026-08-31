@@ -8,3 +8,4 @@
 | [ADR-0004](0004-fixed-endpoint-topology-and-channel-masks.md) | accepted | Fixed endpoint topology and channel masks |
 | [ADR-0005](0005-toolchain-minimum-baseline.md) | accepted | Toolchain minimum baseline (SDK/WDK >= 10.0.26100 floor) |
 | [ADR-0006](0006-no-hlk-no-signing-release.md) | accepted | 無 HLK、無簽章的 source-only 發行 |
+| [ADR-0007](0007-source-only-release-policy-supersession.md) | accepted | Source-only release policy supersession boundary |

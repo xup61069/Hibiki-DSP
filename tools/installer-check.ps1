@@ -23,6 +23,7 @@ $script:RequiredBoundaries = @(
   'IsPathRooted',
   'sha256',
   'dependency_lock_digest',
+  'distribution_id',
   'driver_package',
   'catalog_sha256',
   'sbom_digest'
@@ -89,6 +90,7 @@ $null = "pnputil.exe"
 $null = [IO.Path]::IsPathRooted("test")
 $null = "sha256"
 $null = "dependency_lock_digest"
+$null = "distribution_id"
 $null = "driver_package"
 $null = "catalog_sha256"
 $null = "sbom_digest"
@@ -146,6 +148,7 @@ $null = "sbom_digest"
       schema_version = 1
       source_tag = 'v1.0.0-test'
       source_commit = ('a' * 40)
+      distribution_id = 'hibiki-public-2026'
       toolchain_digest = ('b' * 64)
       dependency_lock_digest = ('c' * 64)
       sbom_digest = ('d' * 64)
@@ -167,7 +170,30 @@ $null = "sbom_digest"
     $validManifestPath = Join-Path $tempRoot 'valid-manifest.json'
     $validFullManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $validManifestPath -Encoding UTF8
     $parsed = Read-ReleaseManifest $validManifestPath
-    if ($parsed.product_version -ne '1.0.0') { throw 'SelfTest expected valid manifest to parse.' }
+    if ($parsed.product_version -ne '1.0.0' -or
+        $parsed.distribution_id -ne 'hibiki-public-2026') {
+      throw 'SelfTest expected valid manifest to parse.'
+    }
+    $caseCount++
+
+    # Case 1c.1: Read-ReleaseManifest rejects a missing distribution_id.
+    $missingDistributionManifest = $validFullManifest.Clone()
+    $missingDistributionManifest.Remove('distribution_id')
+    $missingDistributionPath = Join-Path $tempRoot 'missing-distribution-id-manifest.json'
+    $missingDistributionManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $missingDistributionPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $missingDistributionPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected missing distribution_id failure.' }
+    $caseCount++
+
+    # Case 1c.2: Read-ReleaseManifest rejects an empty distribution_id.
+    $emptyDistributionManifest = $validFullManifest.Clone()
+    $emptyDistributionManifest['distribution_id'] = ' '
+    $emptyDistributionPath = Join-Path $tempRoot 'empty-distribution-id-manifest.json'
+    $emptyDistributionManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $emptyDistributionPath -Encoding UTF8
+    $caught = $false
+    try { Read-ReleaseManifest $emptyDistributionPath } catch { $caught = $true }
+    if (-not $caught) { throw 'SelfTest expected empty distribution_id failure.' }
     $caseCount++
 
     # Case 1d: Read-ReleaseManifest rejects unknown root fields.

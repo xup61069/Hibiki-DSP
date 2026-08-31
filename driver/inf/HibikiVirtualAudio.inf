@@ -1,6 +1,6 @@
 ; SPDX-License-Identifier: MS-PL
-; Source-only INF scaffold. The referenced SYS/CAT are produced and signed by
-; the private WDK release pipeline; neither is stored in this repository.
+; Source-only INF scaffold. The referenced SYS/CAT are rebuilt from this source
+; package by the user; neither is stored in this repository.
 
 [Version]
 Signature="$WINDOWS NT$"

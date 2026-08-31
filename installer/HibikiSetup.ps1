@@ -31,7 +31,7 @@ function Read-ReleaseManifest([string]$Path) {
       throw "Manifest contains unknown field: $prop"
     }
   }
-  foreach ($required in @('unsigned_files', 'tests')) {
+  foreach ($required in @('distribution_id', 'unsigned_files', 'tests')) {
     if (-not ($manifest.PSObject.Properties.Name -contains $required)) {
       throw "Manifest is missing required field: $required"
     }
@@ -90,12 +90,11 @@ function Read-ReleaseManifest([string]$Path) {
     throw 'Manifest installer must carry an installer SHA-256 hash.'
   }
 
-  if (($manifest.PSObject.Properties.Name -contains 'distribution_id') -and
+  if ($manifest.distribution_id -isnot [string] -or
       [string]::IsNullOrWhiteSpace($manifest.distribution_id)) {
-    throw 'Manifest distribution_id must be a non-empty string when present.'
+    throw 'Manifest distribution_id must be a non-empty string.'
   }
-  if (($manifest.PSObject.Properties.Name -contains 'distribution_id') -and
-      ($manifest.distribution_id -is [string]) -and $manifest.distribution_id -notmatch $printablePattern) {
+  if ($manifest.distribution_id -notmatch $printablePattern) {
     throw 'Manifest distribution_id must not contain control characters.'
   }
 
@@ -352,7 +351,7 @@ function Invoke-HibikiInstall {
   $driverInfs = @(Get-ChildItem -LiteralPath $Root -Recurse -Filter '*.inf' -File)
   if ($driverInfs.Count -eq 0) { throw 'No driver INF found in the supplied package.' }
   $driverInfs | ForEach-Object {
-    if ($PSCmdlet.ShouldProcess($_.FullName, 'Stage signed Hibiki driver')) {
+    if ($PSCmdlet.ShouldProcess($_.FullName, 'Stage Hibiki driver from source package')) {
       & pnputil.exe /add-driver $_.FullName /install
       if ($LASTEXITCODE -ne 0) { throw "PnPUtil failed for $($_.Name): $LASTEXITCODE" }
     }
@@ -485,7 +484,7 @@ if ($Uninstall) {
   }
   if (-not $Apply) {
     Write-Output 'Dry-run only. No files or directories were created.'
-    Write-Output 'Re-run with -Apply after reviewing the signed package.'
+    Write-Output 'Re-run with -Apply after reviewing the source package.'
     return
   }
   if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
