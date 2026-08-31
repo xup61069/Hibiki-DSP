@@ -38,7 +38,7 @@ public sealed record EqVisualFrameV1(
         Points.All(point => EqVisualPointV1.IsValid(point)) &&
         Points.Zip(Points.Skip(1), (left, right) =>
             right.FrequencyHz > left.FrequencyHz).All(isIncreasing => isIncreasing) &&
-        Enum.IsDefined(Source);
+        Source is EqVisualSourceV1.EqualLoudness or EqVisualSourceV1.AdaptiveCorrection;
 }
 
 public sealed class EqVisualSurfaceModelV1 : INotifyPropertyChanged
