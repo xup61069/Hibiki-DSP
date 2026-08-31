@@ -247,3 +247,8 @@ $physicalDeviceAvailabilityContractProject = Join-Path $repo 'apps/control-model
 $physicalDeviceAvailabilityContractOutputRoot = Join-Path $outputRoot 'physical-device-availability/'
 $physicalDeviceAvailabilityContractObjRoot = Join-Path $objRoot 'physical-device-availability/'
 Invoke-ControlModelCheck -ProjectPath $physicalDeviceAvailabilityContractProject -BaseOutputPath $physicalDeviceAvailabilityContractOutputRoot -ProjectExtensionsPath $physicalDeviceAvailabilityContractObjRoot
+
+$outputGroupContractProject = Join-Path $repo 'apps/control-model-output-group-check/Hibiki.ControlModel.OutputGroup.Check.csproj'
+$outputGroupContractOutputRoot = Join-Path $outputRoot 'output-group/'
+$outputGroupContractObjRoot = Join-Path $objRoot 'output-group/'
+Invoke-ControlModelCheck -ProjectPath $outputGroupContractProject -BaseOutputPath $outputGroupContractOutputRoot -ProjectExtensionsPath $outputGroupContractObjRoot

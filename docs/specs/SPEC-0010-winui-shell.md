@@ -68,6 +68,9 @@ store，也不代表 engine 已載入、plugin 已套用或 timeline 已持久�
 
 固定輸出群組 ID 為 `main`、`low-latency`、`surround`；它們是 UI 選擇值，
 不是實體 Endpoint ID。場景 ID 延用 `game`、`movie`、`voice`、`studio`。
+`EasyControlSession.OneTapEnhance` 在進入控制狀態前會驗證 output group 是否屬於這三個固定
+ID（`main`、`low-latency`、`surround`）；非固定群組或不支援的字串會 fail-closed 拒絕並保留
+原先的狀態與選定群組，不發出無效的 `SceneApply` 指令。
 
 `PhysicalDeviceCatalogV1` 是引擎提供的 bounded metadata snapshot；ViewModel 只鏡像
 Active render/capture 裝置，不自行枚舉或捏造裝置。可選 render 卡片以
