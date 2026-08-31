@@ -1,0 +1,77 @@
+{
+  "evidence_format": 2,
+  "issue": 2237,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "release/provenance/v1.0.0/NOTICE.md",
+      "release/provenance/v1.0.0/RELEASE_NOTES.md",
+      "release/provenance/v1.0.0/SBOM.spdx.json"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "c26bc729623d8f274d39e9c012520b24f35844cac057dde1e47e74c20b4f093b"
+  },
+  "metadata": {
+    "scope": "v1.0.0-source-snapshot",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-v1-source-snapshot",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 2237",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "pwsh -NoProfile -File tools/release-provenance-check.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "$env:CMAKE_BUILD_PARALLEL_LEVEL='1'; pwsh -NoProfile -File tools/verify.ps1",
+      "git diff --cached --check"
+    ],
+    "results": [
+      {
+        "command": "source provenance",
+        "status": "pass",
+        "detail": "DescribeCurrentChange bound the three release-provenance text files with sha256-git-source-set-v1."
+      },
+      {
+        "command": "SPDX identity parse",
+        "status": "pass",
+        "detail": "SBOM parsed as JSON with SPDX-2.3, SPDXRef-DOCUMENT, and a non-empty source-SBOM name."
+      },
+      {
+        "command": "gates",
+        "status": "pass",
+        "detail": "Handoff, documentation, source policy, source-only CI, release-provenance self-test, and evidence-audit self-test passed."
+      },
+      {
+        "command": "documentation and source-only policy",
+        "status": "pass",
+        "detail": "Documentation checks passed for 88 required paths and 25 specs; source policy and source-only CI passed for 836 tracked paths."
+      },
+      {
+        "command": "verify",
+        "status": "pass",
+        "detail": "Unsigned source build completed and all 52 CTest targets passed; existing compiler shadowing warnings remained non-fatal."
+      },
+      {
+        "command": "git diff --cached --check",
+        "status": "pass",
+        "detail": "No whitespace errors in the staged source snapshot."
+      },
+      {
+        "command": "evidence-audit",
+        "status": "pass",
+        "detail": "checked=339, v2_checked=28, findings=0."
+      }
+    ],
+    "limitations": [
+      "This is a text-only source snapshot; it does not create an annotated tag, GitHub Release, or published binary artifact.",
+      "It does not verify driver installation, WaveRT streaming, endpoint control, signing, or physical audio."
+    ],
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1"
+    },
+    "started_at": "2026-09-01T00:20:52+08:00",
+    "finished_at": "2026-09-01T00:31:19+08:00"
+  }
+}
