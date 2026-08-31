@@ -3,6 +3,7 @@ name: verify
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   merge_group:
   workflow_dispatch:
@@ -64,6 +65,11 @@ jobs:
       - name: Source-only and secret gate
         shell: pwsh
         run: ./tools/source-policy.ps1
+
+      - name: Source-tag provenance gate
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: '& "$env:GITHUB_WORKSPACE/tools/release-provenance-check.ps1" -Tag $env:GITHUB_REF_NAME'
 
       - name: Source-only CI publication gate
         shell: pwsh

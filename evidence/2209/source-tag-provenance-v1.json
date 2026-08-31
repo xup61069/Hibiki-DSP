@@ -1,0 +1,102 @@
+{
+  "evidence_format": 2,
+  "issue": 2209,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      ".github/workflows/verify.yml",
+      "SOURCE_POLICY.md",
+      "docs/specs/SPEC-0005-source-only-paid-release.md",
+      "tools/release-provenance-check.ps1",
+      "tools/source-only-ci-check.ps1"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "abe1188f191698b48eaefeaeae5eaa43f81ae80434887a55c404ba5c6d2f445e"
+  },
+  "metadata": {
+    "scope": "source-tag-provenance-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-source-tag-provenance",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 2209",
+      "pwsh -NoProfile -File tools/delivery-audit.ps1 -Issue 2209",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "pwsh -NoProfile -File tools/release-provenance-check.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/installer-check.ps1",
+      "pwsh -NoProfile -File tools/distribution-check.ps1",
+      "pwsh -NoProfile -Command '$env:CMAKE_BUILD_PARALLEL_LEVEL = ''1''; & .\\tools\\verify.ps1'",
+      "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "git diff --check",
+      "git diff --cached --check"
+    ],
+    "results": [
+      {
+        "command": "handoff and delivery admission",
+        "status": "pass",
+        "detail": "Issue #2209 ownership, scope, branch ancestry, worktree state and open-delivery inventory passed before reviewable work."
+      },
+      {
+        "command": "documentation and source policy gates",
+        "status": "pass",
+        "detail": "docs-check measured 87 required paths, 24 specs, 817 tracked paths, 371 repository JSON files and 34 markdown links; source-policy passed for 817 tracked paths."
+      },
+      {
+        "command": "source-only CI gate",
+        "status": "pass",
+        "detail": "Static workflow policy passed for 4 workflows and 817 tracked paths; self-test passed 27 cases including structural jobs.verify.steps tag-wiring, spoof rejection, fail-open guards, dependency/matrix rejection and workspace-anchored command enforcement."
+      },
+      {
+        "command": "source-tag provenance gate self-test",
+        "status": "pass",
+        "detail": "All 15 offline temporary-repository cases passed, including annotated-tag success, invalid ref, lightweight tag, missing and malformed manifest, tag/commit mismatch, non-string commit, metadata-path violation, multiple-parent and zero-parent target, symlink manifest, nested-tag rejection and header-like tag-message acceptance. ReleaseManifest v1 validation uses the resolver-aware existing schema and printable-string reference."
+      },
+      {
+        "command": "installer and distribution gates",
+        "status": "pass",
+        "detail": "Installer source checks and stable distribution identity checks passed without staging or applying a payload."
+      },
+      {
+        "command": "serialized unsigned verify",
+        "status": "pass",
+        "detail": "CMake/CTest completed with CMAKE_BUILD_PARALLEL_LEVEL=1 and all 52 of 52 configured tests passed."
+      },
+      {
+        "command": "toolchain and evidence self-checks",
+        "status": "pass",
+        "detail": "doctor -CheckOnly passed on Windows 11 AMD64 with Visual Studio 2026, Windows SDK/WDK 10.0.28000.0 and PowerShell 7.6.4; evidence-audit self-test passed 48 cases."
+      },
+      {
+        "command": "current-change provenance description",
+        "status": "pass",
+        "detail": "The five exact staged non-evidence source paths produced digest abe1188f191698b48eaefeaeae5eaa43f81ae80434887a55c404ba5c6d2f445e."
+      },
+      {
+        "command": "git diff --check",
+        "status": "pass",
+        "detail": "No whitespace errors were detected in the staged source change."
+      }
+    ],
+    "limitations": [
+      "This is source-level source-tag identity and CI-policy evidence; it does not create or validate a real remote source tag, GitHub Release, release asset, package or artifact.",
+      "Temporary repositories used by self-tests create only local disposable Git metadata; no installer payload is staged or applied, and no driver, endpoint or target-machine state is changed.",
+      "Local verify generated ignored build outputs only; no EXE, DLL, SYS, MSI, MSIX, VST3, PE/COFF, signing material or private key was added to the repository.",
+      "No driver loading, WaveRT streaming, physical audio, signing, HLK/WHCP or consumer-delivery result is claimed.",
+      "The provenance digest binds this record to the staged Git source set; it does not independently attest that the declared commands ran."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1",
+      "cmake": "4.4.2",
+      "visual_studio": "2026 18.9.12112.369",
+      "windows_sdk_wdk": "10.0.28000.0"
+    },
+    "started_at": "2026-08-31T16:42:00+08:00",
+    "finished_at": "2026-08-31T17:11:13+08:00"
+  }
+}
