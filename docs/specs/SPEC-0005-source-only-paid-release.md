@@ -1,4 +1,4 @@
-﻿---
+---
 id: SPEC-0005
 status: accepted
 owner: hibiki-maintainers
@@ -6,7 +6,7 @@ authority: release-policy
 last_reviewed: 2026-08-31
 review_after_days: 30
 related_adrs: [ADR-0001, ADR-0006, ADR-0007, ADR-0008, ADR-0009]
-source_globs: ["installer/**", "tools/**", ".github/**", "schemas/release-manifest-v1.schema.json", "SOURCE_POLICY.md"]
+source_globs: ["installer/**", "tools/**", ".github/**", "schemas/release-manifest-v1.schema.json", "schemas/source-release-manifest-v1.schema.json", "docs/specs/SPEC-0025-source-tag-manifest-provenance.md", "SOURCE_POLICY.md"]
 ---
 
 # SPEC-0005：source-only GitHub 發布與無簽章交付
@@ -31,13 +31,17 @@ driver source boundary、extension/installer/control-model、stable identity 與
    自我參照，manifest 的 `source_tag` 必須等於 tag，而 `source_commit` 必須等於 metadata commit
    的唯一直接 parent；metadata commit 不得改動任何其他 product 或 policy 路徑。
 2. Public CI 在 ephemeral workspace 執行 user-space、DSP、driver source 與相關測試；對 `v*` tag
-   另驗證 annotated tag 的直接 commit target、唯一 parent、regular `100644` manifest blob、既有
-   `ReleaseManifest v1` schema、tag/commit identity 與不做 rename 偵測的 metadata diff。HLK／WHCP
-   與任何形式的簽章都不是驗收項目。
-3. 官方 source tag 使用 `SourceReleaseManifest v1`（見 SPEC-0025），外部安裝程式則支援外部交付的 `ReleaseManifest v1`，至少記錄 source tag、commit、toolchain digest、dependency
-   lock digest、required non-empty `distribution_id`、payload SHA-256 清單、driver package/catalog
-   內容 hash、SBOM digest 與 test run。Manifest 與 schema 不得包含 Microsoft signature thumbprint、
-   installer signer thumbprint、RFC3161 timestamp 或 signed payload hash 欄位。`product_version` 為
+   另驗證 annotated tag 的直接 commit target、唯一 parent、regular `100644` manifest blob、
+   `SourceReleaseManifest v1` schema、source-only artifact status、tag/version/commit/profile identity、
+   固定的 text provenance 路徑、SPDX 結構、raw Git-blob SHA-256 與不做 rename 偵測的新增 metadata
+   diff。HLK／WHCP 與任何形式的簽章都不是驗收項目。
+3. 官方 source tag 使用 `SourceReleaseManifest v1`（見 SPEC-0025），其 `driver` 與 `installer`
+   artifact status 必須為 `not-published`，不得有 package、catalog、installer 或 signed payload hash。
+   外部安裝程式才支援使用者外部取得的 `ReleaseManifest v1`，至少記錄 source tag、commit、toolchain
+   digest、dependency lock digest、required non-empty `distribution_id`、payload SHA-256 清單、driver
+   package/catalog 內容 hash、SBOM digest 與 test run。該 package manifest 與 schema 不得包含 Microsoft
+   signature thumbprint、installer signer thumbprint、RFC3161 timestamp 或 signed payload hash 欄位。
+   `product_version` 為
    1–64 字元的非空字串，`toolchain_digest` 必須符合 SHA-256 hex 格式（64 字元 [0-9a-fA-F]）；
    `unsigned_files[]` 最多 1024 筆且每個路徑為 1–260 字元，每筆項目僅允許 path 與 sha256 兩個
    宣告欄位（additionalProperties false）；`tests[]` 最多 256 項且每項為 1–120 字元的非空標籤。

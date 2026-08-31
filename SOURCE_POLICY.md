@@ -1,4 +1,4 @@
-﻿# Source and distribution policy
+# Source and distribution policy
 
 GitHub is the canonical source repository. Source tags and release notes are
 the release provenance; text manifests, SBOM and notices may accompany that
@@ -13,13 +13,16 @@ runtime DRM, and HLK/WHCP is not a release prerequisite.
 
 Every official source tag records toolchain, dependency lock, content hashes,
 the non-empty `distribution_id` and test evidence in a text-only
-`ReleaseManifest v1`; the release notes, SBOM and notices remain text
-provenance. To avoid a self-referential Git commit, an annotated source tag
-`T` directly points to a single-parent provenance metadata commit whose only
-change is `release/manifests/T.json`; that manifest is a regular text blob
-which satisfies the `SourceReleaseManifest v1` schema and records
-`source_tag: T` plus the metadata commit's direct parent as `source_commit`.
-The tag-triggered provenance gate verifies the direct tag target, manifest
-mode/schema/identity and metadata diff and fails closed; it neither creates a
-tag nor publishes a release. Anyone can obtain the corresponding source at no
-additional charge and rebuild it.
+`SourceReleaseManifest v1`. It declares `release_kind: source-only` and both
+artifact statuses as `not-published`; it never contains package hashes. The
+release notes, SPDX SBOM and notices remain text provenance. To avoid a
+self-referential Git commit, an annotated source tag `T` directly points to a
+single-parent provenance metadata commit whose only change is the newly added
+`release/manifests/T.json`. That regular text blob records `source_tag: T`, a
+matching tag version, and the metadata commit's direct parent as
+`source_commit`. The tag-triggered provenance gate verifies the direct target,
+schema, source-only status, parent identity, profile `distribution_id`, fixed
+text-provenance paths, SPDX structure and raw Git-blob SHA-256 values before
+accepting the metadata diff. It neither creates a tag nor publishes a release.
+Anyone can obtain the corresponding source at no additional charge and rebuild
+it.

@@ -1,4 +1,4 @@
-﻿# ADR index
+# ADR index
 
 | ID | Status | Topic |
 | --- | --- | --- |
@@ -10,4 +10,4 @@
 | [ADR-0006](0006-no-hlk-no-signing-release.md) | accepted | 無 HLK、無簽章的 source-only 發行 |
 | [ADR-0007](0007-source-only-release-policy-supersession.md) | accepted | Source-only release policy supersession boundary |
 | [ADR-0008](0008-source-only-driver-release-boundary.md) | accepted | Source-only driver release-boundary supersession |
-- [ADR-0009: Source-Tag Manifest 與外部 Package Manifest 邊界分離](0009-source-release-manifest-boundary.md)
+| [ADR-0009](0009-source-release-manifest-boundary.md) | accepted | Source-tag manifest and external package manifest boundary |
