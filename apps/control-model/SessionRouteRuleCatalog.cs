@@ -304,13 +304,10 @@ public sealed class SessionRouteRuleCatalogV1
     }
 
     private static bool Bounded(string value, int maxBytes) =>
-        !string.IsNullOrWhiteSpace(value) &&
-        Encoding.UTF8.GetByteCount(value) <= maxBytes &&
-        value.All(character => !char.IsControl(character));
+        Utf8TextValidation.IsPrintable(value, maxBytes, allowEmpty: false);
 
     private static bool BoundedOptional(string value, int maxBytes) =>
-        value is not null && Encoding.UTF8.GetByteCount(value) <= maxBytes &&
-        value.All(character => !char.IsControl(character));
+        Utf8TextValidation.IsPrintable(value, maxBytes);
 
     private sealed class CatalogDocument
     {

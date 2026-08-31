@@ -40,9 +40,8 @@ public sealed record CalibrationResponseV1(
                 return false;
             }
 
-            if (DeviceId is not null && (DeviceId.Length < 1 ||
-                Encoding.UTF8.GetByteCount(DeviceId) > MaxDeviceIdBytes ||
-                DeviceId.Any(char.IsControl)))
+            if (DeviceId is not null &&
+                !Utf8TextValidation.IsPrintable(DeviceId, MaxDeviceIdBytes, allowEmpty: false))
             {
                 return false;
             }

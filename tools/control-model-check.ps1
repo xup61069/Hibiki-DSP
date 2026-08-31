@@ -231,3 +231,9 @@ $sceneJsonContractOutputRoot = Join-Path $outputRoot 'scene-json-contract/'
 $sceneJsonContractObjRoot = Join-Path $objRoot 'scene-json-contract/'
 Invoke-ControlModelCheck -ProjectPath $sceneJsonContractProject `
   -BaseOutputPath $sceneJsonContractOutputRoot -ProjectExtensionsPath $sceneJsonContractObjRoot
+
+$surrogateContractProject = Join-Path $repo 'apps/control-model-surrogate-contract-check/Hibiki.ControlModel.SurrogateContract.Check.csproj'
+$surrogateContractOutputRoot = Join-Path $outputRoot 'surrogate-contract/'
+$surrogateContractObjRoot = Join-Path $objRoot 'surrogate-contract/'
+Invoke-ControlModelCheck -ProjectPath $surrogateContractProject `
+  -BaseOutputPath $surrogateContractOutputRoot -ProjectExtensionsPath $surrogateContractObjRoot

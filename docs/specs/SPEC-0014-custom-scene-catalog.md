@@ -110,7 +110,10 @@ Upsert 操作必須有
 離線佇列載入同樣 fail-closed，
 且附帶文字欄位都不得含控制字元（對齊引擎 bounded-string 的可列印 UTF-8 契約），持久化 schema 也以
 invisible-control exclusion pattern（anchored）拒收 U+0000-U+001F 與 U+007F-U+009F，不會等到送出
-同步指令或外部驗證才失敗。Remove 操作三個附帶文字欄位都必須為空字串，且欄位限制必須與控制模型
+同步指令或外部驗證才失敗。
+控制模型在儲存、載入與離線重播前也使用嚴格 UTF-8 scalar encoding；孤立的 UTF-16 high/low
+surrogate 一律 fail-closed，合法 supplementary-plane scalar 在位元組上限內仍可接受。
+Remove 操作三個附帶文字欄位都必須為空字串，且欄位限制必須與控制模型
 執行期驗證一致。離線重播的 Upsert 必須保留原卡片的 `loudness_live_update`
 選擇並寫入相同的 wire byte 84；Remove 不攜帶此旗標。序列化只在 true 寫出該欄位，
 false 或預設值保持欄位省略，讓檔案內容與「缺少即 false」的載入契約一致。

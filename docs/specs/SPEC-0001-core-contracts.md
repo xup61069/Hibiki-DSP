@@ -105,6 +105,10 @@ Managed outbound codecs apply the same printable UTF-8 rule as the native
 `is_printable_utf8` boundary, rejecting C0, DEL, and C1 controls before
 constructing session, scene, calibration, device-catalog, or status payloads;
 valid multi-byte printable text remains accepted.
+Managed persistence and command-bound validators use strict UTF-8 scalar encoding as well:
+isolated UTF-16 high or low surrogates are rejected before save, load, or replay instead of
+being counted as replacement bytes; valid supplementary-plane scalars remain accepted when
+the byte bounds hold.
 任何長度、padding、UTF-8 或可列印字元失敗都不得暴露部分 decode 結果：C++ SceneApply
 struct 保持 value-initialized，C# scene ID 與 output group 皆為空字串。這個原子交付也適用
 於 C++ `decode_control_command_v1` 的 envelope：只有選定 payload decoder 完整成功才寫入 type、

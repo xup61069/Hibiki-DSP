@@ -196,15 +196,13 @@ public sealed class CustomSceneCatalogV1
     private static bool IsValid(SceneCard scene)
     {
         if (string.IsNullOrWhiteSpace(scene.Id) || scene.Id.Length > 31 ||
-            string.IsNullOrWhiteSpace(scene.Name) ||
-            Encoding.UTF8.GetByteCount(scene.Name) > 120 ||
-            scene.Name.Any(char.IsControl) ||
-            scene.Description.Length > 240 || scene.LatencyLabel.Length > 64 ||
-            scene.Description.Any(char.IsControl) ||
-            scene.LatencyLabel.Any(char.IsControl) ||
-            Encoding.UTF8.GetByteCount(scene.IrReference) > 64 ||
+            !Utf8TextValidation.IsPrintable(scene.Name, 120, allowEmpty: false) ||
+            scene.Description.Length > 240 ||
+            !Utf8TextValidation.IsPrintable(scene.Description, int.MaxValue) ||
+            scene.LatencyLabel.Length > 64 ||
+            !Utf8TextValidation.IsPrintable(scene.LatencyLabel, int.MaxValue) ||
+            !Utf8TextValidation.IsPrintable(scene.IrReference, 64) ||
             (scene.IrReference.Length > 0 && Encoding.UTF8.GetByteCount(scene.IrReference) < 8) ||
-            scene.IrReference.Any(char.IsControl) ||
             ScenePresetCatalog.EasyDefaults.Any(item => item.Id == scene.Id))
             return false;
 
