@@ -5,9 +5,10 @@ The driver remains MS-PL and communicates with the GPL user-space engine only
 through the versioned control contract. It must expose volume/mute nodes,
 multichannel formats and stable identities from `config/distribution-profile.yml`.
 
-Production driver loading on x64 Windows requires the Microsoft signing chain.
-The public repository contains source and build instructions, never a signed
-driver package.
+A locally built driver may be refused by Secure Boot/HVCI or another Windows
+configuration. That is a target-machine platform limitation, not a Hibiki
+signing requirement or release gate. The public repository contains source and
+build instructions, never a driver package.
 
 The public ABI header is in `sdk/include/hibiki/driver_control_v1.h`. The driver
 must include only this Apache-2.0 boundary plus its MS-PL implementation; it
@@ -20,21 +21,21 @@ validate the supported LPCM formats, hold Q16.16 dB/mute/generation state and
 apply the safety ceiling without allocation or COM. The future PortCls/KS
 property handlers must call this core from the WaveRT miniport and publish the
 result through the Apache ABI. The files are intentionally portable so CI can
-test their invariants without pretending that a `.sys` has been built or
-signed.
+test their invariants without pretending that a `.sys` has been built or is
+loadable.
 
 `wdk/hibiki_property_adapter.cpp` is the next MS-PL source boundary for a
 WDK/SYSVAD-derived project. Run `pwsh -File tools/driver-source-check.ps1` to
 verify that the scaffold retains its license and does not pull GPL user-space;
 the check deliberately does not claim that a loadable driver exists. The
-source-only INF template is in `inf/HibikiVirtualAudio.inf`; it references the
-future signed SYS/CAT package and is not installable from this repository alone.
+source-only INF template is in `inf/HibikiVirtualAudio.inf`; it references
+future SYS/CAT build outputs and is not installable from this repository alone.
 
 The WDK adapter entry points are endpoint-indexed and consume the fixed
 `endpoint_topology_v1` catalog for render geometry, Windows channel mask and
 property-state identity. A future SYSVAD/PortCls project must wire these
 functions into its pin/property tables; this source boundary alone is not a
-loadable, signed driver. The same indexed format builder and capture-pin
+loadable driver. The same indexed format builder and capture-pin
 initializer cover the Virtual Mic topology entry.
 
 `include/hibiki/endpoint_topology_v1.h` and `src/endpoint_topology.c` fix the
@@ -44,7 +45,7 @@ the explicit Windows `0x63f` side/back channel mask, and Virtual Mic is stereo
 capture. Every descriptor carries direction, default rate, supported-rate
 flags, buffer size, channel mask and the permanent distribution GUID. The
 catalog is a portable MS-PL input to the eventual SYSVAD tables; it is not a
-PortCls miniport or a signed driver.
+PortCls miniport or a loadable driver.
 
 `include/hibiki/wavert_stream_v1.h` and `src/wavert_stream.c` provide the next
 portable WaveRT data-path core: caller-owned byte storage, fixed LPCM Float32
@@ -52,4 +53,4 @@ frame geometry, single-producer/single-consumer ring operations, whole-block
 overrun rejection and an underrun-safe silence fallback. It is deliberately
 free of allocation, waits and GPL/user-space linkage. A future miniport must
 provide the required synchronization and connect its pin callbacks to this
-core; the source still does not constitute a loadable or signed `.sys`.
+core; the source still does not constitute a loadable `.sys`.
