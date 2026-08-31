@@ -1,4 +1,4 @@
-﻿#Requires -Version 7
+#Requires -Version 7
 [CmdletBinding()]
 param(
   [switch]$SelfTest
@@ -757,6 +757,58 @@ function Assert-ExtendedPrintableContractSchemas {
         }
         sbom_digest = $digest64
         tests = @('schema strict-end regression')
+      }
+    },
+    [pscustomobject]@{
+      SchemaName = 'source-release-manifest-v1'
+      Fields = @(
+        'product_version',
+        'source_tag',
+        'distribution_id',
+        'toolchain_lock.path',
+        'dependency_lock.path',
+        'sbom.path',
+        'release_notes.path',
+        'notices.path',
+        'source_files.0.path',
+        'tests.0'
+      )
+      Document = [ordered]@{
+        schema_version = 1
+        release_kind = 'source-only'
+        product_version = '1.0.0'
+        source_tag = 'v1.0.0'
+        source_commit = $commit40
+        distribution_id = 'distribution-標準'
+        toolchain_lock = [ordered]@{
+          path = 'build/toolchain-lock.yml'
+          sha256 = $digest64
+        }
+        dependency_lock = [ordered]@{
+          path = 'THIRD_PARTY.yml'
+          sha256 = $digest64
+        }
+        sbom = [ordered]@{
+          path = 'release/provenance/v1.0.0/SBOM.spdx.json'
+          sha256 = $digest64
+        }
+        release_notes = [ordered]@{
+          path = 'release/provenance/v1.0.0/RELEASE_NOTES.md'
+          sha256 = $digest64
+        }
+        notices = [ordered]@{
+          path = 'release/provenance/v1.0.0/NOTICE.md'
+          sha256 = $digest64
+        }
+        source_files = @([ordered]@{
+          path = 'README.md'
+          sha256 = $digest64
+        })
+        artifacts = [ordered]@{
+          driver = 'not-published'
+          installer = 'not-published'
+        }
+        tests = @('source manifest printable regression')
       }
     },
     [pscustomobject]@{

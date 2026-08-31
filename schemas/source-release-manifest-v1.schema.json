@@ -1,4 +1,4 @@
-﻿{
+{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://hibiki.example/schemas/source-release-manifest-v1.schema.json",
   "title": "Hibiki SourceReleaseManifest v1",
@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": [
     "schema_version",
+    "release_kind",
     "product_version",
     "source_tag",
     "source_commit",
@@ -16,10 +17,12 @@
     "release_notes",
     "notices",
     "source_files",
+    "artifacts",
     "tests"
   ],
   "properties": {
     "schema_version": {"const": 1},
+    "release_kind": {"const": "source-only"},
     "product_version": {"type": "string", "minLength": 1, "maxLength": 64, "$ref": "printable-string-v1.schema.json#/$defs/printableString"},
     "source_tag": {"type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+[A-Za-z0-9._:+-]{0,32}$"},
     "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
@@ -71,6 +74,7 @@
     },
     "source_files": {
       "type": "array",
+      "minItems": 1,
       "maxItems": 2048,
       "items": {
         "type": "object",
@@ -82,8 +86,18 @@
         }
       }
     },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["driver", "installer"],
+      "properties": {
+        "driver": {"const": "not-published"},
+        "installer": {"const": "not-published"}
+      }
+    },
     "tests": {
       "type": "array",
+      "minItems": 1,
       "maxItems": 256,
       "items": {"type": "string", "minLength": 1, "maxLength": 120, "$ref": "printable-string-v1.schema.json#/$defs/printableString"}
     }

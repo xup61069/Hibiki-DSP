@@ -150,16 +150,31 @@ function Get-DirectAnnotatedTagCommit {
   return $tagCommit
 }
 
-function Get-BlobSha256FromCommit {
+function Assert-SafeSourceBlobPath {
+  param(
+    [Parameter(Mandatory)][string]$RelativePath
+  )
+
+  if ([string]::IsNullOrWhiteSpace($RelativePath) -or
+      [IO.Path]::IsPathRooted($RelativePath) -or
+      $RelativePath.StartsWith('/') -or
+      $RelativePath.Contains([char]92) -or
+      $RelativePath.Contains('//') -or
+      $RelativePath -match '(^|/)(?:\.|\.\.)(?:/|$)' -or
+      $RelativePath -match '[\\:*?"<>|\[\]]' -or
+      $RelativePath -match '[\x00-\x1F\x7F]') {
+    throw "Declared source path '$RelativePath' is not safe."
+  }
+}
+
+function Get-BlobObjectIdFromCommit {
   param(
     [Parameter(Mandatory)][string]$RepositoryPath,
     [Parameter(Mandatory)][string]$CommitSha,
     [Parameter(Mandatory)][string]$RelativePath
   )
 
-  if ($RelativePath -match '^[/\\]' -or $RelativePath.Contains('..')) {
-    throw "Declared source path '$RelativePath' is not safe."
-  }
+  Assert-SafeSourceBlobPath -RelativePath $RelativePath
 
   $lsOutput = @(Invoke-GitText -RepositoryPath $RepositoryPath `
     -Arguments @('ls-tree', $CommitSha, '--', $RelativePath) `
@@ -168,28 +183,95 @@ function Get-BlobSha256FromCommit {
     throw "Declared path '$RelativePath' does not exist in commit $CommitSha."
   }
   $regularPattern = '^100644 blob ([0-9a-f]{40})' + [char]9 + [regex]::Escape($RelativePath) + '$'
-  if ($lsOutput.Count -ne 1 -or $lsOutput[0] -notmatch $regularPattern) {
+  $entryMatch = if ($lsOutput.Count -eq 1) { [regex]::Match($lsOutput[0], $regularPattern) } else { $null }
+  if ($null -eq $entryMatch -or -not $entryMatch.Success) {
     throw "Declared path '$RelativePath' in commit $CommitSha must be a regular 100644 blob."
   }
+  return $entryMatch.Groups[1].Value
+}
 
-  $blobSha = $Matches[1]
+function Get-BlobBytesFromCommit {
+  param(
+    [Parameter(Mandatory)][string]$RepositoryPath,
+    [Parameter(Mandatory)][string]$CommitSha,
+    [Parameter(Mandatory)][string]$RelativePath,
+    [ValidateRange(1, 67108864)][Int64]$MaxBytes = 67108864
+  )
+
+  $blobSha = Get-BlobObjectIdFromCommit -RepositoryPath $RepositoryPath -CommitSha $CommitSha -RelativePath $RelativePath
+  $blobSizeText = Get-GitSingleLine -RepositoryPath $RepositoryPath `
+    -Arguments @('cat-file', '-s', $blobSha) `
+    -FailurePrefix "Cannot determine size for declared path '$RelativePath' in $CommitSha"
+  if ($blobSizeText -notmatch '^[0-9]+$') {
+    throw "Declared path '$RelativePath' in $CommitSha returned an invalid blob size."
+  }
+  $blobSize = [Int64]$blobSizeText
+  if ($blobSize -gt $MaxBytes) {
+    throw "Declared path '$RelativePath' in $CommitSha exceeds the $MaxBytes-byte provenance read limit."
+  }
   $psi = [System.Diagnostics.ProcessStartInfo]::new()
   $psi.FileName = 'git'
-  $psi.Arguments = "-C `"$RepositoryPath`" cat-file blob $blobSha"
+  $null = $psi.ArgumentList.Add('-C')
+  $null = $psi.ArgumentList.Add($RepositoryPath)
+  $null = $psi.ArgumentList.Add('cat-file')
+  $null = $psi.ArgumentList.Add('blob')
+  $null = $psi.ArgumentList.Add($blobSha)
   $psi.RedirectStandardOutput = $true
+  $psi.RedirectStandardError = $true
   $psi.UseShellExecute = $false
   $psi.CreateNoWindow = $true
-  $proc = [System.Diagnostics.Process]::Start($psi)
+  $proc = $null
   $ms = [System.IO.MemoryStream]::new()
-  $proc.StandardOutput.BaseStream.CopyTo($ms)
-  $proc.WaitForExit()
-  if ($proc.ExitCode -ne 0) {
-    throw "git cat-file blob failed for '$RelativePath' in $CommitSha"
+  try {
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    if ($null -eq $proc) {
+      throw "git cat-file blob could not start for '$RelativePath' in $CommitSha"
+    }
+    $proc.StandardOutput.BaseStream.CopyTo($ms)
+    $stderr = $proc.StandardError.ReadToEnd()
+    $proc.WaitForExit()
+    if ($proc.ExitCode -ne 0) {
+      $detail = $stderr.Trim()
+      if ([string]::IsNullOrWhiteSpace($detail)) { $detail = 'no diagnostic output' }
+      throw "git cat-file blob failed for '$RelativePath' in ${CommitSha}: $detail"
+    }
+    return ,$ms.ToArray()
+  } finally {
+    $ms.Dispose()
+    if ($null -ne $proc) { $proc.Dispose() }
   }
-  $rawBytes = $ms.ToArray()
+}
+
+function Get-BlobSha256FromCommit {
+  param(
+    [Parameter(Mandatory)][string]$RepositoryPath,
+    [Parameter(Mandatory)][string]$CommitSha,
+    [Parameter(Mandatory)][string]$RelativePath
+  )
+
+  $rawBytes = Get-BlobBytesFromCommit -RepositoryPath $RepositoryPath -CommitSha $CommitSha -RelativePath $RelativePath
   $shaObj = [System.Security.Cryptography.SHA256]::Create()
-  $hashBytes = $shaObj.ComputeHash($rawBytes)
-  return ([System.BitConverter]::ToString($hashBytes) -replace '-', '').ToLowerInvariant()
+  try {
+    $hashBytes = $shaObj.ComputeHash($rawBytes)
+    return ([System.BitConverter]::ToString($hashBytes) -replace '-', '').ToLowerInvariant()
+  } finally {
+    $shaObj.Dispose()
+  }
+}
+
+function Get-TextBlobFromCommit {
+  param(
+    [Parameter(Mandatory)][string]$RepositoryPath,
+    [Parameter(Mandatory)][string]$CommitSha,
+    [Parameter(Mandatory)][string]$RelativePath
+  )
+
+  $rawBytes = Get-BlobBytesFromCommit -RepositoryPath $RepositoryPath -CommitSha $CommitSha -RelativePath $RelativePath -MaxBytes 4MB
+  try {
+    return [System.Text.UTF8Encoding]::new($false, $true).GetString($rawBytes)
+  } catch {
+    throw "Declared text path '$RelativePath' in $CommitSha must be valid UTF-8 text: $($_.Exception.Message)"
+  }
 }
 
 function Test-ReleaseTagProvenance {
@@ -248,6 +330,26 @@ function Test-ReleaseTagProvenance {
   }
   Assert-ReleaseManifestSchema -Json $manifestText -ManifestPath $manifestPath -SchemaFile $SchemaFile
 
+  $releaseKind = Get-ManifestString -Manifest $manifest -Name 'release_kind' -ManifestPath $manifestPath
+  if ($releaseKind -cne 'source-only') {
+    throw "Release manifest '$manifestPath' release_kind must be source-only."
+  }
+  if ($manifest.artifacts -isnot [pscustomobject]) {
+    throw "Release manifest '$manifestPath' artifacts must be an object."
+  }
+  foreach ($artifactName in @('driver', 'installer')) {
+    if (-not ($manifest.artifacts.PSObject.Properties.Name -contains $artifactName) -or
+        $manifest.artifacts.$artifactName -isnot [string] -or
+        $manifest.artifacts.$artifactName -cne 'not-published') {
+      throw "Release manifest '$manifestPath' artifact status '$artifactName' must be not-published."
+    }
+  }
+
+  $productVersion = Get-ManifestString -Manifest $manifest -Name 'product_version' -ManifestPath $manifestPath
+  $expectedProductVersion = $TagName.Substring(1)
+  if ($productVersion -cne $expectedProductVersion) {
+    throw "Release manifest '$manifestPath' product_version '$productVersion' does not match tag version '$expectedProductVersion'."
+  }
   $manifestTag = Get-ManifestString -Manifest $manifest -Name 'source_tag' -ManifestPath $manifestPath
   if ($manifestTag -cne $TagName) {
     throw "Release manifest '$manifestPath' source_tag '$manifestTag' does not match tag '$TagName'."
@@ -263,9 +365,61 @@ function Test-ReleaseTagProvenance {
   $changedPaths = @(Invoke-GitText -RepositoryPath $RepositoryPath `
     -Arguments @('diff', '--name-status', '--no-renames', $sourceCommit, $tagCommit) `
     -FailurePrefix "Release tag '$TagName' metadata diff cannot be read")
-  $expectedChange = '^[AM]' + [char]9 + [regex]::Escape($manifestPath) + '$'
+  $expectedChange = '^A' + [char]9 + [regex]::Escape($manifestPath) + '$'
   if ($changedPaths.Count -ne 1 -or $changedPaths[0] -notmatch $expectedChange) {
     throw "Release tag '$TagName' provenance metadata commit may change only '$manifestPath'."
+  }
+
+  $expectedSourcePaths = [ordered]@{
+    toolchain_lock = 'build/toolchain-lock.yml'
+    dependency_lock = 'THIRD_PARTY.yml'
+    sbom = ('release/provenance/' + $TagName + '/SBOM.spdx.json')
+    release_notes = ('release/provenance/' + $TagName + '/RELEASE_NOTES.md')
+    notices = ('release/provenance/' + $TagName + '/NOTICE.md')
+  }
+  foreach ($fieldName in $expectedSourcePaths.Keys) {
+    $item = $manifest.PSObject.Properties[$fieldName].Value
+    if ($item.path -cne $expectedSourcePaths[$fieldName]) {
+      throw "Release manifest '$manifestPath' $fieldName.path must be '$($expectedSourcePaths[$fieldName])'."
+    }
+  }
+
+  $profileText = Get-TextBlobFromCommit -RepositoryPath $RepositoryPath -CommitSha $sourceCommit -RelativePath 'config/distribution-profile.yml'
+  $profileMatches = [regex]::Matches($profileText, '(?m)^distribution_id:\s*(?<id>[^#\s]+)\s*(?:#.*)?$')
+  if ($profileMatches.Count -ne 1) {
+    throw "Source commit $sourceCommit must contain exactly one top-level distribution_id in config/distribution-profile.yml."
+  }
+  $manifestDistributionId = Get-ManifestString -Manifest $manifest -Name 'distribution_id' -ManifestPath $manifestPath
+  $profileDistributionId = $profileMatches[0].Groups['id'].Value
+  if ($manifestDistributionId -cne $profileDistributionId) {
+    throw "Release manifest '$manifestPath' distribution_id '$manifestDistributionId' does not match config/distribution-profile.yml '$profileDistributionId'."
+  }
+
+  $sbomText = Get-TextBlobFromCommit -RepositoryPath $RepositoryPath -CommitSha $sourceCommit -RelativePath $manifest.sbom.path
+  try {
+    $sbom = $sbomText | ConvertFrom-Json -AsHashtable
+  } catch {
+    throw "Declared SBOM '$($manifest.sbom.path)' must contain valid SPDX JSON: $($_.Exception.Message)"
+  }
+  if ($sbom -isnot [System.Collections.IDictionary]) {
+    throw "Declared SBOM '$($manifest.sbom.path)' must contain an SPDX JSON object."
+  }
+  foreach ($spdxField in @('spdxVersion', 'SPDXID', 'name')) {
+    if (-not $sbom.ContainsKey($spdxField) -or
+        $sbom[$spdxField] -isnot [string] -or
+        [string]::IsNullOrWhiteSpace($sbom[$spdxField])) {
+      throw "Declared SBOM '$($manifest.sbom.path)' must contain non-empty $spdxField."
+    }
+  }
+  if ($sbom['spdxVersion'] -notmatch '^SPDX-[0-9]+\.[0-9]+$') {
+    throw "Declared SBOM '$($manifest.sbom.path)' spdxVersion must use an SPDX version identifier."
+  }
+  foreach ($textFieldName in @('release_notes', 'notices')) {
+    $textPath = $manifest.PSObject.Properties[$textFieldName].Value.path
+    $textContent = Get-TextBlobFromCommit -RepositoryPath $RepositoryPath -CommitSha $sourceCommit -RelativePath $textPath
+    if ([string]::IsNullOrWhiteSpace($textContent)) {
+      throw "Declared text provenance '$textPath' must not be empty."
+    }
   }
 
   # Verify all declared source blobs exist in sourceCommit and match SHA-256
@@ -317,7 +471,18 @@ function New-ReleaseProvenanceFixture {
     [switch]$HeaderLikeTagMessage,
     [switch]$CorruptedFileHash,
     [switch]$DuplicateFilePath,
-    [switch]$MissingSourceFile
+    [switch]$DuplicateRequiredFilePath,
+    [switch]$MissingSourceFile,
+    [switch]$UnsafeSourceFilePath,
+    [switch]$SourceFileSymlink,
+    [switch]$WrongRolePath,
+    [switch]$WrongProductVersion,
+    [switch]$WrongDistributionId,
+    [switch]$PublishedArtifact,
+    [switch]$MalformedSbom,
+    [switch]$EmptyReleaseNotes,
+    [switch]$EmptySourceFiles,
+    [switch]$EmptyTests
   )
 
   $root = Join-Path ([IO.Path]::GetTempPath()) ('hibiki-release-provenance-' + [guid]::NewGuid().ToString('N'))
@@ -327,15 +492,39 @@ function New-ReleaseProvenanceFixture {
     $null = Invoke-GitText -RepositoryPath $root -Arguments @('config', 'user.name', 'Hibiki self-test') -FailurePrefix 'Self-test git user.name setup failed'
     $null = Invoke-GitText -RepositoryPath $root -Arguments @('config', 'user.email', 'hibiki-self-test@example.invalid') -FailurePrefix 'Self-test git user.email setup failed'
 
-    New-Item -ItemType Directory -Path (Join-Path $root 'source') -Force | Out-Null
+    $provenanceDirectory = Join-Path $root ('release/provenance/' + $TagName)
+    foreach ($directory in @(
+      (Join-Path $root 'source'),
+      (Join-Path $root 'build'),
+      (Join-Path $root 'config'),
+      $provenanceDirectory
+    )) {
+      New-Item -ItemType Directory -Path $directory -Force | Out-Null
+    }
     Set-Content -LiteralPath (Join-Path $root 'source/payload.txt') -Value 'source-only fixture' -NoNewline -Encoding utf8
-    Set-Content -LiteralPath (Join-Path $root 'source/toolchain.lock') -Value 'toolchain-lock' -NoNewline -Encoding utf8
-    Set-Content -LiteralPath (Join-Path $root 'source/deps.lock') -Value 'deps-lock' -NoNewline -Encoding utf8
-    Set-Content -LiteralPath (Join-Path $root 'source/sbom.json') -Value '{"sbom":true}' -NoNewline -Encoding utf8
-    Set-Content -LiteralPath (Join-Path $root 'source/notes.md') -Value '# Release Notes' -NoNewline -Encoding utf8
-    Set-Content -LiteralPath (Join-Path $root 'source/notices.txt') -Value 'Third party notices' -NoNewline -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $root 'build/toolchain-lock.yml') -Value 'toolchain-lock' -NoNewline -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $root 'THIRD_PARTY.yml') -Value 'deps-lock' -NoNewline -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $root 'config/distribution-profile.yml') -Value "schema_version: 1`ndistribution_id: hibiki-self-test" -NoNewline -Encoding utf8
+    $sbomPath = Join-Path $provenanceDirectory 'SBOM.spdx.json'
+    $sbomText = if ($MalformedSbom) {
+      '{"spdxVersion":"SPDX-2.3"}'
+    } else {
+      '{"spdxVersion":"SPDX-2.3","SPDXID":"SPDXRef-DOCUMENT","name":"Hibiki self-test source"}'
+    }
+    Set-Content -LiteralPath $sbomPath -Value $sbomText -NoNewline -Encoding utf8
+    $releaseNotesText = if ($EmptyReleaseNotes) { '' } else { '# Release Notes' }
+    Set-Content -LiteralPath (Join-Path $provenanceDirectory 'RELEASE_NOTES.md') -Value $releaseNotesText -NoNewline -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $provenanceDirectory 'NOTICE.md') -Value 'Third party notices' -NoNewline -Encoding utf8
 
     $null = Invoke-GitText -RepositoryPath $root -Arguments @('add', '--all') -FailurePrefix 'Self-test source add failed'
+    if ($SourceFileSymlink) {
+      $symlinkPayloadPath = Join-Path $root '.source-symlink-payload'
+      Set-Content -LiteralPath $symlinkPayloadPath -Value 'source/payload-target.txt' -NoNewline -Encoding utf8
+      $symlinkBlob = Get-GitSingleLine -RepositoryPath $root -Arguments @('hash-object', '-w', '--', $symlinkPayloadPath) -FailurePrefix 'Self-test source symlink blob failed'
+      Remove-Item -LiteralPath $symlinkPayloadPath -Force
+      $sourceSymlinkIndexEntry = '120000,' + $symlinkBlob + ',source/payload.txt'
+      $null = Invoke-GitText -RepositoryPath $root -Arguments @('update-index', '--cacheinfo', $sourceSymlinkIndexEntry) -FailurePrefix 'Self-test source symlink index update failed'
+    }
     $null = Invoke-GitText -RepositoryPath $root -Arguments @('commit', '-m', 'source input') -FailurePrefix 'Self-test source commit failed'
     $sourceCommit = Get-GitSingleLine -RepositoryPath $root -Arguments @('rev-parse', 'HEAD') -FailurePrefix 'Self-test source commit lookup failed'
 
@@ -357,23 +546,45 @@ function New-ReleaseProvenanceFixture {
         }
       } else {
         $payloadHash = if ($CorruptedFileHash) { '0' * 64 } else { & $shaOf 'source/payload.txt' }
-        $sourceFiles = @([ordered]@{ path = if ($MissingSourceFile) { 'source/missing.txt' } else { 'source/payload.txt' }; sha256 = $payloadHash })
+        $sourceFilePath = if ($UnsafeSourceFilePath) {
+          'source\\payload.txt'
+        } elseif ($MissingSourceFile) {
+          'source/missing.txt'
+        } else {
+          'source/payload.txt'
+        }
+        $sourceFiles = @()
+        if (-not $EmptySourceFiles) {
+          $sourceFiles += [ordered]@{ path = $sourceFilePath; sha256 = $payloadHash }
+        }
         if ($DuplicateFilePath) {
           $sourceFiles += [ordered]@{ path = 'source/payload.txt'; sha256 = $payloadHash }
         }
+        if ($DuplicateRequiredFilePath) {
+          $sourceFiles += [ordered]@{ path = 'build/toolchain-lock.yml'; sha256 = & $shaOf 'build/toolchain-lock.yml' }
+        }
+        $testLabels = @()
+        if (-not $EmptyTests) {
+          $testLabels += 'self-test'
+        }
         $manifestValue = [ordered]@{
           schema_version = 1
-          product_version = '1.0.0'
+          release_kind = 'source-only'
+          product_version = if ($WrongProductVersion) { '9.9.9' } else { $TagName.Substring(1) }
           source_tag = if (-not $PSBoundParameters.ContainsKey('ManifestTag')) { $TagName } else { $ManifestTag }
           source_commit = if (-not $PSBoundParameters.ContainsKey('ManifestCommit')) { $sourceCommit } else { $ManifestCommit }
-          distribution_id = 'hibiki-self-test'
-          toolchain_lock = [ordered]@{ path = 'source/toolchain.lock'; sha256 = & $shaOf 'source/toolchain.lock' }
-          dependency_lock = [ordered]@{ path = 'source/deps.lock'; sha256 = & $shaOf 'source/deps.lock' }
-          sbom = [ordered]@{ path = 'source/sbom.json'; sha256 = & $shaOf 'source/sbom.json' }
-          release_notes = [ordered]@{ path = 'source/notes.md'; sha256 = & $shaOf 'source/notes.md' }
-          notices = [ordered]@{ path = 'source/notices.txt'; sha256 = & $shaOf 'source/notices.txt' }
+          distribution_id = if ($WrongDistributionId) { 'wrong-distribution' } else { 'hibiki-self-test' }
+          toolchain_lock = [ordered]@{ path = if ($WrongRolePath) { 'source/toolchain.lock' } else { 'build/toolchain-lock.yml' }; sha256 = & $shaOf 'build/toolchain-lock.yml' }
+          dependency_lock = [ordered]@{ path = 'THIRD_PARTY.yml'; sha256 = & $shaOf 'THIRD_PARTY.yml' }
+          sbom = [ordered]@{ path = ('release/provenance/' + $TagName + '/SBOM.spdx.json'); sha256 = & $shaOf ('release/provenance/' + $TagName + '/SBOM.spdx.json') }
+          release_notes = [ordered]@{ path = ('release/provenance/' + $TagName + '/RELEASE_NOTES.md'); sha256 = & $shaOf ('release/provenance/' + $TagName + '/RELEASE_NOTES.md') }
+          notices = [ordered]@{ path = ('release/provenance/' + $TagName + '/NOTICE.md'); sha256 = & $shaOf ('release/provenance/' + $TagName + '/NOTICE.md') }
           source_files = $sourceFiles
-          tests = @('self-test')
+          artifacts = [ordered]@{
+            driver = if ($PublishedArtifact) { 'published' } else { 'not-published' }
+            installer = 'not-published'
+          }
+          tests = $testLabels
         }
       }
       $manifestText = $manifestValue | ConvertTo-Json -Depth 10
@@ -390,7 +601,12 @@ function New-ReleaseProvenanceFixture {
     if ($AddNonProvenancePath) {
       Set-Content -LiteralPath (Join-Path $root 'unexpected.txt') -Value 'not provenance' -NoNewline -Encoding utf8
     }
-    $null = Invoke-GitText -RepositoryPath $root -Arguments @('add', '--all') -FailurePrefix 'Self-test provenance add failed'
+    if (-not $MissingManifest -and -not $ManifestSymlink) {
+      $null = Invoke-GitText -RepositoryPath $root -Arguments @('add', '--', ('release/manifests/' + $TagName + '.json')) -FailurePrefix 'Self-test provenance manifest add failed'
+    }
+    if ($AddNonProvenancePath) {
+      $null = Invoke-GitText -RepositoryPath $root -Arguments @('add', '--', 'unexpected.txt') -FailurePrefix 'Self-test non-provenance add failed'
+    }
     if ($null -ne $manifestIndexEntry) {
       $null = Invoke-GitText -RepositoryPath $root -Arguments @('update-index', '--add', '--cacheinfo', $manifestIndexEntry) -FailurePrefix 'Self-test symlink manifest index update failed'
     }
@@ -626,6 +842,116 @@ if ($SelfTest) {
     $caseCount++
   } finally {
     Remove-ReleaseProvenanceFixture -Root $missingFile.Root
+  }
+
+  $wrongProductVersion = New-ReleaseProvenanceFixture -TagName 'v1.3.8' -WrongProductVersion
+  try {
+    Assert-ProvenanceRejected -Label 'product-version-mismatch' -ExpectedPattern 'product_version.*does not match tag version' -Action {
+      Test-ReleaseTagProvenance -RepositoryPath $wrongProductVersion.Root -TagName 'v1.3.8' | Out-Null
+    }
+    $caseCount++
+  } finally {
+    Remove-ReleaseProvenanceFixture -Root $wrongProductVersion.Root
+  }
+
+  $wrongDistributionId = New-ReleaseProvenanceFixture -TagName 'v1.3.9' -WrongDistributionId
+  try {
+    Assert-ProvenanceRejected -Label 'distribution-id-mismatch' -ExpectedPattern 'distribution_id.*does not match config/distribution-profile' -Action {
+      Test-ReleaseTagProvenance -RepositoryPath $wrongDistributionId.Root -TagName 'v1.3.9' | Out-Null
+    }
+    $caseCount++
+  } finally {
+    Remove-ReleaseProvenanceFixture -Root $wrongDistributionId.Root
+  }
+
+  $publishedArtifact = New-ReleaseProvenanceFixture -TagName 'v1.4.0' -PublishedArtifact
+  try {
+    Assert-ProvenanceRejected -Label 'published-artifact-status' -ExpectedPattern 'must satisfy SourceReleaseManifest v1 schema' -Action {
+      Test-ReleaseTagProvenance -RepositoryPath $publishedArtifact.Root -TagName 'v1.4.0' | Out-Null
+    }
+    $caseCount++
+  } finally {
+    Remove-ReleaseProvenanceFixture -Root $publishedArtifact.Root
+  }
+
+  $malformedSbom = New-ReleaseProvenanceFixture -TagName 'v1.4.1' -MalformedSbom
+  try {
+    Assert-ProvenanceRejected -Label 'malformed-spdx-sbom' -ExpectedPattern 'must contain non-empty SPDXID' -Action {
+      Test-ReleaseTagProvenance -RepositoryPath $malformedSbom.Root -TagName 'v1.4.1' | Out-Null
+    }
+    $caseCount++
+  } finally {
+    Remove-ReleaseProvenanceFixture -Root $malformedSbom.Root
+  }
+
+  $emptyReleaseNotes = New-ReleaseProvenanceFixture -TagName 'v1.4.1-notes' -EmptyReleaseNotes
+  try {
+    Assert-ProvenanceRejected -Label 'empty-release-notes' -ExpectedPattern 'must not be empty' -Action {
+      Test-ReleaseTagProvenance -RepositoryPath $emptyReleaseNotes.Root -TagName 'v1.4.1-notes' | Out-Null
+    }
+    $caseCount++
+  } finally {
+    Remove-ReleaseProvenanceFixture -Root $emptyReleaseNotes.Root
+  }
+
+  $emptySourceFiles = New-ReleaseProvenanceFixture -TagName 'v1.4.2' -EmptySourceFiles
+  try {
+    Assert-ProvenanceRejected -Label 'empty-source-files' -ExpectedPattern 'must satisfy SourceReleaseManifest v1 schema' -Action {
+      Test-ReleaseTagProvenance -RepositoryPath $emptySourceFiles.Root -TagName 'v1.4.2' | Out-Null
+    }
+    $caseCount++
+  } finally {
+    Remove-ReleaseProvenanceFixture -Root $emptySourceFiles.Root
+  }
+
+  $emptyTests = New-ReleaseProvenanceFixture -TagName 'v1.4.3' -EmptyTests
+  try {
+    Assert-ProvenanceRejected -Label 'empty-tests' -ExpectedPattern 'must satisfy SourceReleaseManifest v1 schema' -Action {
+      Test-ReleaseTagProvenance -RepositoryPath $emptyTests.Root -TagName 'v1.4.3' | Out-Null
+    }
+    $caseCount++
+  } finally {
+    Remove-ReleaseProvenanceFixture -Root $emptyTests.Root
+  }
+
+  $unsafeSourcePath = New-ReleaseProvenanceFixture -TagName 'v1.4.4' -UnsafeSourceFilePath
+  try {
+    Assert-ProvenanceRejected -Label 'unsafe-source-path' -ExpectedPattern 'is not safe' -Action {
+      Test-ReleaseTagProvenance -RepositoryPath $unsafeSourcePath.Root -TagName 'v1.4.4' | Out-Null
+    }
+    $caseCount++
+  } finally {
+    Remove-ReleaseProvenanceFixture -Root $unsafeSourcePath.Root
+  }
+
+  $sourceSymlink = New-ReleaseProvenanceFixture -TagName 'v1.4.5' -SourceFileSymlink
+  try {
+    Assert-ProvenanceRejected -Label 'source-file-symlink' -ExpectedPattern 'must be a regular 100644 blob' -Action {
+      Test-ReleaseTagProvenance -RepositoryPath $sourceSymlink.Root -TagName 'v1.4.5' | Out-Null
+    }
+    $caseCount++
+  } finally {
+    Remove-ReleaseProvenanceFixture -Root $sourceSymlink.Root
+  }
+
+  $duplicateRequiredPath = New-ReleaseProvenanceFixture -TagName 'v1.4.6' -DuplicateRequiredFilePath
+  try {
+    Assert-ProvenanceRejected -Label 'duplicate-required-path' -ExpectedPattern 'duplicate declared path' -Action {
+      Test-ReleaseTagProvenance -RepositoryPath $duplicateRequiredPath.Root -TagName 'v1.4.6' | Out-Null
+    }
+    $caseCount++
+  } finally {
+    Remove-ReleaseProvenanceFixture -Root $duplicateRequiredPath.Root
+  }
+
+  $wrongRolePath = New-ReleaseProvenanceFixture -TagName 'v1.4.7' -WrongRolePath
+  try {
+    Assert-ProvenanceRejected -Label 'wrong-role-path' -ExpectedPattern 'toolchain_lock\.path must be' -Action {
+      Test-ReleaseTagProvenance -RepositoryPath $wrongRolePath.Root -TagName 'v1.4.7' | Out-Null
+    }
+    $caseCount++
+  } finally {
+    Remove-ReleaseProvenanceFixture -Root $wrongRolePath.Root
   }
 
   $tempSibling = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([char[]]@([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)) + 'Sibling' + [IO.Path]::DirectorySeparatorChar + 'hibiki-release-provenance-test'
