@@ -217,6 +217,21 @@ public static class ControlPayloadsV1
     private static readonly System.Text.UTF8Encoding StrictUtf8 =
         new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
+    // Keep outbound text validation symmetric with the native
+    // is_printable_utf8 helper: C0, DEL, and C1 controls are not printable,
+    // even when they have a valid UTF-8 encoding.
+    private static bool IsPrintableUtf8(ReadOnlySpan<byte> value)
+    {
+        try
+        {
+            return !StrictUtf8.GetString(value).Any(char.IsControl);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
     public static byte[] EncodeVolumeNotification(double requestedDb,
                                                    bool mute,
                                                    ulong generation)
@@ -311,7 +326,7 @@ public static class ControlPayloadsV1
         var output = StrictUtf8.GetBytes(outputGroup ?? string.Empty);
         if (lane.Length is < 1 or > SessionRouteCommandLaneMaxBytes ||
             output.Length is < 1 or > SessionRouteCommandOutputMaxBytes ||
-            lane.Any(value => value < 0x20) || output.Any(value => value < 0x20))
+            !IsPrintableUtf8(lane) || !IsPrintableUtf8(output))
             throw new ArgumentException("Session route labels are outside the v1 limit.");
         var payload = new byte[SessionRouteCommandBytes];
         BinaryPrimitives.WriteUInt64LittleEndian(payload, handle);
@@ -491,7 +506,7 @@ public static class ControlPayloadsV1
                                                           ulong generation)
     {
         var group = StrictUtf8.GetBytes(outputGroup ?? string.Empty);
-        if (group.Length is < 1 or > 31 || group.Any(value => value < 0x20))
+        if (group.Length is < 1 or > 31 || !IsPrintableUtf8(group))
             throw new ArgumentException("Output-group ID must be 1..31 printable UTF-8 bytes.",
                                         nameof(outputGroup));
         var volume = EncodeVolumeNotification(requestedDb, mute, generation);
@@ -543,7 +558,7 @@ public static class ControlPayloadsV1
         var scene = StrictUtf8.GetBytes(sceneId ?? string.Empty);
         var output = StrictUtf8.GetBytes(outputGroup ?? string.Empty);
         if (scene.Length is < 1 or > 31 || output.Length is < 1 or > 31 ||
-            scene.Any(value => value < 0x20) || output.Any(value => value < 0x20))
+            !IsPrintableUtf8(scene) || !IsPrintableUtf8(output))
             throw new ArgumentException("Scene and output-group IDs must be 1..31 printable UTF-8 bytes.");
         var payload = new byte[SceneApplyBytes];
         payload[0] = (byte)scene.Length;
@@ -560,7 +575,7 @@ public static class ControlPayloadsV1
         var pathBytes = StrictUtf8.GetBytes(path ?? string.Empty);
         if (!policy.IsValid || policy.Mode == IrPhaseMode.Bypass ||
             pathBytes.Length is < 1 or > IrPreparePathMaxBytes ||
-            pathBytes.Any(value => value < 0x20) ||
+            !IsPrintableUtf8(pathBytes) ||
             (expectedSampleRate != 0U && expectedSampleRate is < 8000U or > 192000U) ||
             (expectedChannels != 0U && expectedChannels > 8U))
             throw new ArgumentException("IR prepare request is outside the v1 limit.", nameof(path));
@@ -583,7 +598,7 @@ public static class ControlPayloadsV1
     {
         var groupBytes = StrictUtf8.GetBytes(outputGroup ?? string.Empty);
         if (groupBytes.Length is < 1 or > CalibrationPeqOutputGroupMaxBytes ||
-            groupBytes.Any(value => value < 0x20) ||
+            !IsPrintableUtf8(groupBytes) ||
             filters is null || filters.Count is < 1 or > CalibrationPeqMaxFilters)
             throw new ArgumentException(
                 "Calibration PEQ prepare is outside the v1 limit.", nameof(outputGroup));
@@ -651,7 +666,7 @@ public static class ControlPayloadsV1
             payload[1] = (byte)operation;
             return payload;
         }
-        if (id.Length is < 1 or > 31 || id.Any(value => value < 0x20))
+        if (id.Length is < 1 or > 31 || !IsPrintableUtf8(id))
             throw new ArgumentException("Scene ID must be 1..31 printable UTF-8 bytes.",
                                         nameof(sceneId));
         payload[1] = (byte)operation;
@@ -664,12 +679,12 @@ public static class ControlPayloadsV1
         var outputBytes = StrictUtf8.GetBytes(outputGroup ?? string.Empty);
         if (nameBytes.Length is < 1 or > 120 ||
             outputBytes.Length is < 1 or > 64 ||
-            nameBytes.Any(value => value < 0x20) || outputBytes.Any(value => value < 0x20))
+            !IsPrintableUtf8(nameBytes) || !IsPrintableUtf8(outputBytes))
             throw new ArgumentException("Scene name/output group are outside the v1 limit.");
         var irRefBytes = StrictUtf8.GetBytes(irReference ?? string.Empty);
         if (irRefBytes.Length is > 64 ||
             (irRefBytes.Length > 0 && irRefBytes.Length < 8) ||
-            irRefBytes.Any(value => value < 0x20))
+            !IsPrintableUtf8(irRefBytes))
             throw new ArgumentException("IR reference must be empty or 8..64 printable UTF-8 bytes.",
                                         nameof(irReference));
         nameBytes.CopyTo(payload.AsSpan(128));
@@ -890,8 +905,8 @@ public static class ControlPayloadsV1
             var endpoint = StrictUtf8.GetBytes(device.EndpointId ?? string.Empty);
             var display = StrictUtf8.GetBytes(device.DisplayName ?? string.Empty);
             if (endpoint.Length is < 1 or > DeviceSwitchEndpointMaxBytes ||
-                display.Length is < 1 or > 128 || endpoint.Any(value => value < 0x20) ||
-                display.Any(value => value < 0x20) || !seen.Add(device.EndpointId ?? string.Empty) ||
+                display.Length is < 1 or > 128 || !IsPrintableUtf8(endpoint) ||
+                !IsPrintableUtf8(display) || !seen.Add(device.EndpointId ?? string.Empty) ||
                 !Enum.IsDefined(device.Flow) || !Enum.IsDefined(device.Availability) ||
                 (device.IsDefault && (device.Availability != PhysicalDeviceAvailabilityV1.Active ||
                                       !defaults.Add(device.Flow))) ||
@@ -1022,8 +1037,8 @@ public static class ControlPayloadsV1
             if (!HasExpectedHandle(session.Handle, generation, index) || !seen.Add(session.Handle) ||
                 (!session.Active && session.VolumeAvailable) ||
                 name.Length > 64 || app.Length > 64 || lane.Length > 48 || output.Length > 48 ||
-                name.Any(value => value < 0x20) || app.Any(value => value < 0x20) ||
-                lane.Any(value => value < 0x20) || output.Any(value => value < 0x20) ||
+                !IsPrintableUtf8(name) || !IsPrintableUtf8(app) ||
+                !IsPrintableUtf8(lane) || !IsPrintableUtf8(output) ||
                 !Enum.IsDefined(session.RouteState) ||
                 !double.IsFinite(session.RequestedDb) ||
                 (session.VolumeAvailable &&
@@ -1155,8 +1170,8 @@ public static class ControlPayloadsV1
             var name = StrictUtf8.GetBytes(route.Name ?? string.Empty);
             var detail = StrictUtf8.GetBytes(route.Detail ?? string.Empty);
             if (id.Length is < 1 or > 31 || name.Length is < 1 or > 63 ||
-                detail.Length is < 1 or > 119 || id.Any(value => value < 0x20) ||
-                name.Any(value => value < 0x20) || detail.Any(value => value < 0x20) ||
+                detail.Length is < 1 or > 119 || !IsPrintableUtf8(id) ||
+                !IsPrintableUtf8(name) || !IsPrintableUtf8(detail) ||
                 !Enum.IsDefined(route.State) || !seen.Add(routeId))
                 throw new ArgumentException("Route health entry is invalid.", nameof(routes));
             var offset = ControlStatusSnapshotHeaderBytes +
