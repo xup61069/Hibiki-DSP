@@ -210,16 +210,11 @@ public sealed class CustomSceneSyncQueueV1
 
         if (operation.IsUpsert)
         {
-            return !string.IsNullOrWhiteSpace(operation.Name) &&
-                   Encoding.UTF8.GetByteCount(operation.Name) <= 120 &&
-                   !operation.Name.Any(char.IsControl) &&
-                   !string.IsNullOrWhiteSpace(operation.OutputGroup) &&
-                   Encoding.UTF8.GetByteCount(operation.OutputGroup) <= 64 &&
-                   !operation.OutputGroup.Any(char.IsControl) &&
-                   Encoding.UTF8.GetByteCount(operation.IrReference) <= 64 &&
+            return Utf8TextValidation.IsPrintable(operation.Name, 120, allowEmpty: false) &&
+                   Utf8TextValidation.IsPrintable(operation.OutputGroup, 64, allowEmpty: false) &&
+                   Utf8TextValidation.IsPrintable(operation.IrReference, 64) &&
                    (operation.IrReference.Length == 0 ||
-                    Encoding.UTF8.GetByteCount(operation.IrReference) >= 8) &&
-                   !operation.IrReference.Any(char.IsControl);
+                    Encoding.UTF8.GetByteCount(operation.IrReference) >= 8);
         }
 
         return string.IsNullOrEmpty(operation.Name) &&

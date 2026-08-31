@@ -205,8 +205,7 @@ public sealed class PhysicalDeviceCatalogV1
         error = string.Empty;
         static bool Printable(string value, int maxBytes) =>
             !string.IsNullOrWhiteSpace(value) &&
-            System.Text.Encoding.UTF8.GetByteCount(value) <= maxBytes &&
-            value.All(character => !char.IsControl(character));
+            Utf8TextValidation.IsPrintable(value, maxBytes, allowEmpty: false);
         if (!Printable(device.EndpointId, 260) || !Printable(device.DisplayName, 128))
         { error = "裝置身份或名稱無效"; return false; }
         if (!Enum.IsDefined(device.Flow) || !Enum.IsDefined(device.Availability) ||
