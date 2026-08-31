@@ -142,6 +142,29 @@ $null = "sbom_digest"
       Invoke-Expression $fn.Extent.Text
     }
 
+    function Copy-Manifest {
+      param([Parameter(Mandatory)][System.Collections.IDictionary]$Manifest)
+      return ($Manifest | ConvertTo-Json -Depth 10 | ConvertFrom-Json -AsHashtable)
+    }
+
+    function Assert-ManifestReadRejected {
+      param(
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Manifest,
+        [Parameter(Mandatory)][string]$FileName,
+        [Parameter(Mandatory)][string]$ExpectedMessage
+      )
+      $path = Join-Path $tempRoot $FileName
+      $Manifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $path -Encoding UTF8
+      try {
+        Read-ReleaseManifest $path | Out-Null
+      } catch {
+        if ($_.Exception.Message -notlike ('*' + $ExpectedMessage + '*')) {
+          throw ("SelfTest expected '" + $ExpectedMessage + "' for " + $FileName + ", got: " + $_.Exception.Message)
+        }
+        return
+      }
+      throw ("SelfTest expected manifest rejection for " + $FileName + '.')
+    }
 
     # Case 1b: Read-ReleaseManifest rejects missing product_version.
     $missingVersionManifest = @{
@@ -154,7 +177,7 @@ $null = "sbom_digest"
       sbom_digest = ('d' * 64)
       driver_package = @{ sha256 = ('e' * 64); catalog_sha256 = ('f' * 64) }
       installer = @{ sha256 = ('2' * 64) }
-      unsigned_files = @()
+      unsigned_files = @(@{ path = 'payload.txt'; sha256 = ('0' * 64) })
       tests = @('unit-test-1', 'integration-test-2')
     }
     $manifestPath = Join-Path $tempRoot 'missing-version-manifest.json'
@@ -175,6 +198,45 @@ $null = "sbom_digest"
       throw 'SelfTest expected valid manifest to parse.'
     }
     $caseCount++
+
+    # Case 1c.0: JSON numeric equivalents of 1 remain schema-compatible.
+    $numericSchemaManifest = Copy-Manifest $validFullManifest
+    $numericSchemaManifest['schema_version'] = 1.0
+    $numericSchemaPath = Join-Path $tempRoot 'numeric-schema-version-manifest.json'
+    $numericSchemaManifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $numericSchemaPath -Encoding UTF8
+    $numericSchemaParsed = Read-ReleaseManifest $numericSchemaPath
+    if ($numericSchemaParsed.schema_version -ne 1 -or $numericSchemaParsed.schema_version -isnot [double]) {
+      throw 'SelfTest expected numeric schema_version equivalent to parse as Double.'
+    }
+    $caseCount++
+
+    # Scalar-type cases: reject values that coerce to valid-looking strings.
+    $bigCommit = [System.Numerics.BigInteger]::Parse(('1' * 40))
+    $bigDigest = [System.Numerics.BigInteger]::Parse(('1' * 64))
+    foreach ($scalarCase in @(
+      @{ Name = 'schema-version-string'; Expected = 'Manifest schema_version must be the JSON number 1.'; Action = { param($m, $commit, $digest) $m['schema_version'] = '1' } },
+      @{ Name = 'schema-version-boolean'; Expected = 'Manifest schema_version must be the JSON number 1.'; Action = { param($m, $commit, $digest) $m['schema_version'] = $true } },
+      @{ Name = 'product-version-number'; Expected = 'Manifest product_version must be a non-empty string.'; Action = { param($m, $commit, $digest) $m['product_version'] = 1 } },
+      @{ Name = 'source-tag-boolean'; Expected = 'Manifest source_tag must be a string.'; Action = { param($m, $commit, $digest) $m['source_tag'] = $true } },
+      @{ Name = 'source-commit-number'; Expected = 'Manifest source_commit must be a 40-character commit string.'; Action = { param($m, $commit, $digest) $m['source_commit'] = $commit } },
+      @{ Name = 'distribution-id-number'; Expected = 'Manifest distribution_id must be a non-empty string.'; Action = { param($m, $commit, $digest) $m['distribution_id'] = 1 } },
+      @{ Name = 'toolchain-digest-number'; Expected = 'Manifest toolchain_digest must be a SHA-256 digest string.'; Action = { param($m, $commit, $digest) $m['toolchain_digest'] = $digest } },
+      @{ Name = 'dependency-digest-number'; Expected = 'Manifest dependency_lock_digest must be a SHA-256 digest string.'; Action = { param($m, $commit, $digest) $m['dependency_lock_digest'] = $digest } },
+      @{ Name = 'sbom-digest-number'; Expected = 'Manifest sbom_digest must be a SHA-256 digest string.'; Action = { param($m, $commit, $digest) $m['sbom_digest'] = $digest } },
+      @{ Name = 'driver-package-object-array'; Expected = 'Manifest driver_package must carry package/catalog SHA-256 hash strings.'; Action = { param($m, $commit, $digest) $m['driver_package'] = @($m['driver_package']) } },
+      @{ Name = 'driver-package-hash-number'; Expected = 'Manifest driver_package must carry package/catalog SHA-256 hash strings.'; Action = { param($m, $commit, $digest) $m['driver_package']['sha256'] = $digest } },
+      @{ Name = 'driver-catalog-hash-number'; Expected = 'Manifest driver_package must carry package/catalog SHA-256 hash strings.'; Action = { param($m, $commit, $digest) $m['driver_package']['catalog_sha256'] = $digest } },
+      @{ Name = 'installer-object-array'; Expected = 'Manifest installer must carry an installer SHA-256 hash string.'; Action = { param($m, $commit, $digest) $m['installer'] = @($m['installer']) } },
+      @{ Name = 'installer-hash-number'; Expected = 'Manifest installer must carry an installer SHA-256 hash string.'; Action = { param($m, $commit, $digest) $m['installer']['sha256'] = $digest } },
+      @{ Name = 'unsigned-file-path-number'; Expected = 'Manifest unsigned_files path must be a string of 1..260 characters.'; Action = { param($m, $commit, $digest) $m['unsigned_files'][0]['path'] = 1 } },
+      @{ Name = 'unsigned-file-hash-number'; Expected = 'Manifest unsigned_files sha256 must be a 64-character hexadecimal digest string'; Action = { param($m, $commit, $digest) $m['unsigned_files'][0]['sha256'] = $digest } },
+      @{ Name = 'test-label-number'; Expected = 'Manifest tests entries must be non-empty strings of at most 120 characters.'; Action = { param($m, $commit, $digest) $m['tests'] = @(1) } }
+    )) {
+      $scalarManifest = Copy-Manifest $validFullManifest
+      & $scalarCase.Action $scalarManifest $bigCommit $bigDigest
+      Assert-ManifestReadRejected -Manifest $scalarManifest -FileName ('scalar-' + $scalarCase.Name + '-manifest.json') -ExpectedMessage $scalarCase.Expected
+      $caseCount++
+    }
 
     # Case 1c.1: Read-ReleaseManifest rejects a missing distribution_id.
     $missingDistributionManifest = $validFullManifest.Clone()

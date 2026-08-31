@@ -37,34 +37,48 @@ function Read-ReleaseManifest([string]$Path) {
     }
   }
 
-  if ($manifest.schema_version -ne 1) { throw 'Unsupported ReleaseManifest schema.' }
-  if ([string]::IsNullOrWhiteSpace($manifest.product_version)) {
+  $schemaVersionIsJsonNumber = (
+    $manifest.schema_version -is [long] -or
+    $manifest.schema_version -is [double]
+  )
+  if (-not $schemaVersionIsJsonNumber -or $manifest.schema_version -ne 1) {
+    throw 'Manifest schema_version must be the JSON number 1.'
+  }
+  if ($manifest.product_version -isnot [string] -or
+      [string]::IsNullOrWhiteSpace($manifest.product_version)) {
     throw 'Manifest product_version must be a non-empty string.'
   }
-  if (($manifest.product_version -is [string]) -and $manifest.product_version.Length -gt 64) {
+  if ($manifest.product_version.Length -gt 64) {
     throw 'Manifest product_version exceeds maximum length of 64 characters.'
   }
-  if (($manifest.product_version -is [string]) -and ($manifest.product_version -notmatch $printablePattern)) {
+  if ($manifest.product_version -notmatch $printablePattern) {
     throw 'Manifest product_version must not contain control characters.'
+  }
+  if ($manifest.source_tag -isnot [string]) {
+    throw 'Manifest source_tag must be a string.'
   }
   if ($manifest.source_tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9._:+-]{0,32}$') {
     throw 'Manifest source_tag must match v<major>.<minor>.<patch> with at most 32 allowed suffix characters.'
   }
-  if ([string]::IsNullOrWhiteSpace($manifest.source_commit) -or
+  if ($manifest.source_commit -isnot [string] -or
+      [string]::IsNullOrWhiteSpace($manifest.source_commit) -or
       $manifest.source_commit -notmatch '^[0-9a-f]{40}$') {
-    throw 'Manifest source_commit must be a 40-character commit.'
+    throw 'Manifest source_commit must be a 40-character commit string.'
   }
-  if ([string]::IsNullOrWhiteSpace($manifest.toolchain_digest) -or
+  if ($manifest.toolchain_digest -isnot [string] -or
+      [string]::IsNullOrWhiteSpace($manifest.toolchain_digest) -or
       $manifest.toolchain_digest -notmatch '^[0-9a-fA-F]{64}$') {
-    throw 'Manifest toolchain_digest must be a SHA-256 digest.'
+    throw 'Manifest toolchain_digest must be a SHA-256 digest string.'
   }
-  if ([string]::IsNullOrWhiteSpace($manifest.dependency_lock_digest) -or
+  if ($manifest.dependency_lock_digest -isnot [string] -or
+      [string]::IsNullOrWhiteSpace($manifest.dependency_lock_digest) -or
       $manifest.dependency_lock_digest -notmatch '^[0-9a-fA-F]{64}$') {
-    throw 'Manifest dependency_lock_digest must be a SHA-256 digest.'
+    throw 'Manifest dependency_lock_digest must be a SHA-256 digest string.'
   }
-  if ([string]::IsNullOrWhiteSpace($manifest.sbom_digest) -or
+  if ($manifest.sbom_digest -isnot [string] -or
+      [string]::IsNullOrWhiteSpace($manifest.sbom_digest) -or
       $manifest.sbom_digest -notmatch '^[0-9a-fA-F]{64}$') {
-    throw 'Manifest sbom_digest must be a SHA-256 digest.'
+    throw 'Manifest sbom_digest must be a SHA-256 digest string.'
   }
   foreach ($sectionName in @('driver_package', 'installer')) {
     $section = $manifest.$sectionName
@@ -80,14 +94,20 @@ function Read-ReleaseManifest([string]$Path) {
     }
   }
 
-  if ($null -eq $manifest.driver_package -or
+  if ($manifest.driver_package -isnot [pscustomobject] -or
+      -not ($manifest.driver_package.PSObject.Properties.Name -contains 'sha256') -or
+      -not ($manifest.driver_package.PSObject.Properties.Name -contains 'catalog_sha256') -or
+      $manifest.driver_package.sha256 -isnot [string] -or
+      $manifest.driver_package.catalog_sha256 -isnot [string] -or
       $manifest.driver_package.sha256 -notmatch '^[0-9a-fA-F]{64}$' -or
       $manifest.driver_package.catalog_sha256 -notmatch '^[0-9a-fA-F]{64}$') {
-    throw 'Manifest driver_package must carry package/catalog SHA-256 hashes.'
+    throw 'Manifest driver_package must carry package/catalog SHA-256 hash strings.'
   }
-  if ($null -eq $manifest.installer -or
+  if ($manifest.installer -isnot [pscustomobject] -or
+      -not ($manifest.installer.PSObject.Properties.Name -contains 'sha256') -or
+      $manifest.installer.sha256 -isnot [string] -or
       $manifest.installer.sha256 -notmatch '^[0-9a-fA-F]{64}$') {
-    throw 'Manifest installer must carry an installer SHA-256 hash.'
+    throw 'Manifest installer must carry an installer SHA-256 hash string.'
   }
 
   if ($manifest.distribution_id -isnot [string] -or
@@ -126,7 +146,7 @@ function Read-ReleaseManifest([string]$Path) {
       throw ('Manifest unsigned_files path must not contain control characters: ' + $entry.path)
     }
     if ($entry.sha256 -isnot [string] -or $entry.sha256 -notmatch '^[0-9a-fA-F]{64}$') {
-      throw ("Manifest unsigned_files sha256 must be a 64-character hexadecimal digest: " + $entry.path)
+      throw ("Manifest unsigned_files sha256 must be a 64-character hexadecimal digest string: " + $entry.path)
     }
   }
 
@@ -137,7 +157,7 @@ function Read-ReleaseManifest([string]$Path) {
     throw 'Manifest tests exceeds maximum count of 256 entries.'
   }
   foreach ($test in @($manifest.tests)) {
-    if ([string]::IsNullOrWhiteSpace($test) -or $test.Length -gt 120) {
+    if ($test -isnot [string] -or [string]::IsNullOrWhiteSpace($test) -or $test.Length -gt 120) {
       throw 'Manifest tests entries must be non-empty strings of at most 120 characters.'
     }
     if ($test -notmatch $printablePattern) {

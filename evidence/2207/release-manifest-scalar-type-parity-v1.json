@@ -1,0 +1,87 @@
+{
+  "evidence_format": 2,
+  "issue": 2207,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "installer/HibikiSetup.ps1",
+      "tools/installer-check.ps1"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "ae815ee7be1396d7d881fbba8b6afeab1bb5e2d0c7d805ecdeacd67e69e6b455"
+  },
+  "metadata": {
+    "scope": "release-manifest-scalar-type-parity-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-release-manifest-scalar-type-parity",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 2207",
+      "pwsh -NoProfile -File tools/delivery-audit.ps1",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/installer-check.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/installer-check.ps1",
+      "pwsh -NoProfile -File tools/distribution-check.ps1",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "$env:CMAKE_BUILD_PARALLEL_LEVEL = '1'; pwsh -NoProfile -File tools/verify.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeCurrentChange",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "handoff-check and delivery-audit",
+        "status": "pass",
+        "detail": "Issue #2207 ownership, declared parser/test/evidence scope, branch state and open-delivery inventory passed before reviewable work."
+      },
+      {
+        "command": "ReleaseManifest scalar parser self-test",
+        "status": "pass",
+        "detail": "All 53 cases passed, including accepted JSON numeric schema_version equivalents and rejected root, nested object and array scalar-type coercion bypasses."
+      },
+      {
+        "command": "installer, documentation and source-policy gates",
+        "status": "pass",
+        "detail": "installer-check, docs-check, source-policy, distribution-check and source-only-ci-check passed for the scoped parser and regression-test change."
+      },
+      {
+        "command": "verify",
+        "status": "pass",
+        "detail": "A serialized unsigned local build completed and all 52 CTest targets passed."
+      },
+      {
+        "command": "evidence-audit -DescribeCurrentChange",
+        "status": "pass",
+        "detail": "Derived the two exact staged non-evidence source paths and source-set digest ae815ee7be1396d7d881fbba8b6afeab1bb5e2d0c7d805ecdeacd67e69e6b455."
+      },
+      {
+        "command": "evidence-audit -SelfTest",
+        "status": "pass",
+        "detail": "All 48 offline evidence-audit self-test cases passed."
+      },
+      {
+        "command": "evidence-audit",
+        "status": "pass",
+        "detail": "The append-only manifest, its v2 schema shape and staged source provenance passed the repository audit."
+      },
+      {
+        "command": "git diff --check",
+        "status": "pass",
+        "detail": "No whitespace errors detected in the scoped source change."
+      }
+    ],
+    "limitations": [
+      "This is source-level ReleaseManifest parser and regression-test evidence only; it does not assert installation, update or uninstall of a payload.",
+      "No -Apply path, PnP operation, driver load, endpoint operation, tag, release, asset, signing flow or target-machine state change is claimed.",
+      "No driver or WaveRT streaming, physical-audio, signing, HLK/WHCP or consumer-delivery result is claimed.",
+      "The provenance digest binds the staged Git source set; it does not independently attest command execution or target-machine behavior."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1"
+    },
+    "started_at": "2026-08-31T10:18:11+08:00",
+    "finished_at": "2026-08-31T10:21:41+08:00"
+  }
+}
