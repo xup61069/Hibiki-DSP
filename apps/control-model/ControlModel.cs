@@ -151,6 +151,11 @@ public sealed class PhysicalDeviceCatalogV1
                                 out string error)
     {
         error = string.Empty;
+        if (!Enum.IsDefined(availability))
+        {
+            error = "裝置狀態不受支援";
+            return false;
+        }
         var index = _devices.FindIndex(item => item.EndpointId == endpointId);
         if (index < 0) { error = "找不到裝置"; return false; }
         var current = _devices[index];
