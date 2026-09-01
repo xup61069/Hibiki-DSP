@@ -22,11 +22,13 @@ function Get-CounterClaims([string]$Text) {
     CTests   = @('verify\.ps1`\s*的\s*(?<count>\d+)\s*個\s*CTest（(?<names>[^）]+)）通過', 'CTest verification summary')
   }
   foreach ($key in $patterns.Keys) {
-    $match = [regex]::Match($Text, [string]$patterns[$key][0])
-    if (-not $match.Success) {
+    $matches = [regex]::Matches($Text, [string]$patterns[$key][0])
+    if ($matches.Count -eq 0) {
       throw ("BASELINE.md is missing the {0} counter expected by docs-check; keep the " +
              "verification-summary sentence in docs/state/BASELINE.md up to date.") -f $patterns[$key][1]
     }
+    # BASELINE is append-only: the last matching counter is its current claim.
+    $match = $matches[$matches.Count - 1]
     $claims.$key = [int]$match.Groups['count'].Value
     if ($key -eq 'CTests') {
       $claims.CTestNames = @($match.Groups['names'].Value -split '、' |
@@ -1543,11 +1545,13 @@ $required = @(
   'tools/distribution-check.ps1', 'tools/source-only-ci-check.ps1', 'tools/handoff-check.ps1',
   'tools/delivery-audit.ps1',
   'tools/build-preview.ps1',
+  'tools/portable-preview-package.ps1', 'tools/portable-preview-package-check.ps1',
   'tools/live-device-catalog-check.ps1', 'tools/live-wasapi-handoff-check.ps1',
   'tools/live-audio-session-check.ps1', 'tools/live-process-loopback-check.ps1',
   'tools/driver-source-check.ps1',
   'schemas/release-manifest-v1.schema.json',
   'schemas/source-release-manifest-v1.schema.json', 'schemas/evidence-manifest-v2.schema.json',
+  'schemas/portable-preview-package-manifest-v1.schema.json',
   'schemas/printable-string-v1.schema.json',
   'docs/START_HERE.md', 'docs/AI_HANDOFF.md', 'docs/PROJECT_MAP.md', 'docs/state/BASELINE.md',
   'docs/specs/INDEX.md', 'docs/specs/SPEC-0001-core-contracts.md',

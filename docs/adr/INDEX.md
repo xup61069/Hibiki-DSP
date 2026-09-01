@@ -12,3 +12,4 @@
 | [ADR-0008](0008-source-only-driver-release-boundary.md) | accepted | Source-only driver release-boundary supersession |
 | [ADR-0009](0009-source-release-manifest-boundary.md) | accepted | Source-tag manifest and external package manifest boundary (provenance clauses superseded by ADR-0010) |
 | [ADR-0010](0010-source-tag-provenance-hardening.md) | accepted | Source-tag provenance hardening boundary |
+| [ADR-0011](0011-portable-preview-distribution-boundary.md) | accepted | Portable user-space preview distribution boundary |

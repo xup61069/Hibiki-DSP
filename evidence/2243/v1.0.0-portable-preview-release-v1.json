@@ -1,0 +1,100 @@
+{
+  "evidence_format": 2,
+  "issue": 2243,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "README.md",
+      "SOURCE_POLICY.md",
+      "docs/adr/0011-portable-preview-distribution-boundary.md",
+      "docs/adr/INDEX.md",
+      "docs/specs/INDEX.md",
+      "docs/specs/SPEC-0026-portable-user-space-preview-distribution.md",
+      "docs/state/BASELINE.md",
+      "schemas/portable-preview-package-manifest-v1.schema.json",
+      "tools/docs-check.ps1",
+      "tools/portable-preview-package-check.ps1",
+      "tools/portable-preview-package.ps1"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "7b38dc050c62a32bfb7853b9624d74c1b0b594d4861369a1212c29c530d0633a"
+  },
+  "metadata": {
+    "scope": "portable-preview-local-package-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-msvc-19.51-portable-preview",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 2243",
+      "pwsh -NoProfile -File tools/delivery-audit.ps1 -Issue 2243",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "pwsh -NoProfile -File tools/distribution-check.ps1",
+      "pwsh -NoProfile -File tools/doctor.ps1 -CheckOnly",
+      "pwsh -NoProfile -File tools/portable-preview-package.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/portable-preview-package-check.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/verify.ps1",
+      "ctest --test-dir .local/build -C RelWithDebInfo --output-on-failure",
+      "pwsh -NoProfile -File tools/portable-preview-package.ps1 -SourceRepository <clean detached v1.0.0 checkout> -PayloadRoot <source-tag DesktopCompat payload>",
+      "pwsh -NoProfile -File tools/portable-preview-package-check.ps1 -ArchivePath <local ZIP> -ExtractTo <fresh temp directory> -SourceRepository <clean detached v1.0.0 checkout> -ExpectedArchiveSha256 42a9fd9e99bace4f563cf5fc1f14cadd559e7fc09ed90438a1e7545b0f6fc8ec -LaunchSmoke",
+      "Expand-Archive <local ZIP> <fresh temp directory>; Start-Process Hibiki.DesktopPreview.exe",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "handoff and delivery admission",
+        "status": "pass",
+        "detail": "Issue #2243 claim, isolated branch, declared scope, active draft PR, and bounded delivery inventory passed."
+      },
+      {
+        "command": "source policy and documentation gates",
+        "status": "pass",
+        "detail": "docs-check passed 91 required paths and 26 specs; source-policy and source-only-ci policy passed for 843 tracked paths; distribution profile passed."
+      },
+      {
+        "command": "toolchain and source verification",
+        "status": "pass",
+        "detail": "doctor -CheckOnly passed on Windows AMD64 with Visual Studio 2026 and SDK/WDK 10.0.28000.0; verify built the unsigned source tree and CTest rerun passed all 52 of 52 targets."
+      },
+      {
+        "command": "package tooling self-tests",
+        "status": "pass",
+        "detail": "The packager self-test passed 6 cases and the checker self-test passed 13 cases, including unsafe paths, duplicate JSON keys, sidecar mismatch, relative extraction target, independently expected hash, data-carrying directory, and DOS reparse-point rejection."
+      },
+      {
+        "command": "source-tag package build",
+        "status": "pass",
+        "detail": "The package was generated from the clean detached annotated v1.0.0 checkout after its source-tag provenance gate passed: tag commit ba7f6f14f8ca3dbf42a22b868359362b8dc82f96, source commit e7c44f310cab01c0ea0d7c70912ad5c9c375f0d7, raw source-manifest SHA-256 15e8feac2c37addd07513f2d3f6620493ffe69f6e5cb39c08aee15537303eadb, distribution hibiki-public-2026."
+      },
+      {
+        "command": "local portable archive verification",
+        "status": "pass",
+        "detail": "A 72179144-byte ZIP with SHA-256 42a9fd9e99bace4f563cf5fc1f14cadd559e7fc09ed90438a1e7545b0f6fc8ec passed sidecar, independently expected hash, detached source binding, safe extraction, manifest, 466 payload-file hashes, and hidden launch smoke. Its manifest records packager commit 445f1e4539424f80a42274236accece6ca7ae0b9 and no driver or installer."
+      },
+      {
+        "command": "documented user extraction flow",
+        "status": "pass",
+        "detail": "A separate fresh Expand-Archive extraction contained Hibiki.DesktopPreview.exe and the process remained alive for the three-second launch smoke before controlled shutdown."
+      },
+      {
+        "command": "git diff --check",
+        "status": "pass",
+        "detail": "No whitespace errors were detected before adding this append-only local package evidence."
+      }
+    ],
+    "limitations": [
+      "This is local package and launch evidence only. No GitHub Release asset has been published or downloaded from GitHub yet; post-publication readback remains required.",
+      "The unsigned DesktopCompat package is a driver-free offline control-surface preview. It does not verify or claim driver installation, WaveRT streaming, endpoint control, system-audio changes, physical audio, signing, HLK/WHCP, accessibility certification, installer behavior, upgrade, rollback, or uninstall.",
+      "The provenance digest binds this record to the candidate Git source set; it does not independently attest that the listed commands ran.",
+      "All build and package binaries remain ignored local output and were not added to Git or public CI artifacts."
+    ],
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1",
+      "cmake": "4.4.2",
+      "visual_studio": "2026 18.9.12112.369",
+      "windows_sdk_wdk": "10.0.28000.0"
+    },
+    "started_at": "2026-09-01T14:20:00+08:00",
+    "finished_at": "2026-09-01T14:28:00+08:00"
+  }
+}

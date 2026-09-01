@@ -6,14 +6,35 @@ Hibiki DSP 是一個公開開發中的 Windows 音訊平台。產品目標是讓
 模式快速選擇場景，也讓進階使用者在 Expert 模式管理輸出群組、per-App 路由、Matrix、
 校正、IR、VST3 與 Hibiki ASIO。
 
-> **目前狀態：source-only developer preview。** 這不是可供一般使用者安裝的成品；
-> GitHub 不提供 EXE、DLL、SYS、MSI、MSIX、VST3 或其他編譯產物。現階段可重跑的是
-> 原始碼、控制面預覽、測試與匿名證據，不是正式音訊產品的完整驗收。
+> **目前可用：Windows x64 portable user-space preview。** [下載 v1.0.0](https://github.com/xup61069/Hibiki-DSP/releases/tag/v1.0.0)
+> 的 ZIP 後可驗證、解壓並啟動 DesktopCompat，不需 .NET runtime、driver 或 administrator。
+> 它是 unsigned、driver-free 的離線控制面 preview，不是 installer、WaveRT、endpoint control
+> 或實體音訊產品。
 
 **English:** Hibiki DSP is an open-source Windows audio platform in development. It aims
 to combine one-tap audio scenes with expert routing, calibration and plugin workflows.
-Today it is a source-only developer preview, not a consumer installer. Documentation is
+An unsigned, driver-free Windows x64 portable control-surface preview is available on the
+official v1.0.0 Release; it is not a consumer audio-driver installation. Documentation is
 primarily in Traditional Chinese.
+
+## 下載並啟動（Windows x64）
+
+從 [v1.0.0 Release](https://github.com/xup61069/Hibiki-DSP/releases/tag/v1.0.0) 下載
+`Hibiki-DSP-v1.0.0-portable-win-x64.zip` 與同名 `.sha256`。在 PowerShell 驗證後再解壓：
+
+```powershell
+$zip = '.\Hibiki-DSP-v1.0.0-portable-win-x64.zip'
+$expected = ((Get-Content "$zip.sha256" -Raw).Trim() -split ' \*', 2)[0]
+$actual = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actual -cne $expected) { throw 'SHA-256 mismatch; do not run this download.' }
+Expand-Archive $zip .\Hibiki-DSP
+Start-Process .\Hibiki-DSP\Hibiki.DesktopPreview.exe
+```
+
+Windows may show an unsigned/reputation warning; continue only when the hash matches the
+official sidecar. The preview opens offline and may save its own UI preferences under your user
+profile. It does not install a driver/service, create an endpoint, start Engine Preview, alter
+system audio settings, or produce physical audio.
 
 ## 為什麼做 Hibiki？
 
@@ -31,9 +52,9 @@ Hibiki 不攔截廠商 ASIO、WASAPI Exclusive 或 RAW 路徑，也不使用 act
 
 ## 今天可以做什麼？
 
-目前最完整的體驗是 unsigned、driver-free 的 user-space preview。它會啟動本機 Engine
-Preview 與桌面控制介面，可查看 Easy／Expert 控制流程、Scene、輸出群組、路由健康、
-安全音量、裝置摘要與 IR phase policy。
+一般使用者可直接使用上方的 portable DesktopCompat preview，離線查看 Easy／Expert 控制
+流程、Scene、輸出群組、路由健康、安全音量、裝置摘要與 IR phase policy。從 source 啟動的
+開發者 preview 則可選擇另外啟動本機 Engine Preview；兩者都不是實體音訊交付。
 
 | 層級 | 已有可重跑證據 | 仍未證明／未交付 |
 | --- | --- | --- |
@@ -41,16 +62,16 @@ Preview 與桌面控制介面，可查看 Easy／Expert 控制流程、Scene、�
 | Windows user-space | Engine Preview、裝置／session catalog、系統與 session 音量 write-through probe、route transaction、shared-mode WASAPI 邊界 | 實體 per-App capture/re-send、完整 DSP delivery 或長時間實機播放 |
 | UX | UI-independent C# control model、Desktop／WinUI compatibility preview、本機 formal XAML build 與 UIA smoke | 鎖定 target 機器上的完整 accessibility 與長時間驗收 |
 | Driver | WDK source build、Inf2Cat 與本機 package 建置；隔離 Hyper-V guest 已完成安裝、PnP start 與穩定重啟（ProblemCode 0） | 實體音訊播放與 WaveRT streaming 行為 |
-| 發行 | source-only policy、ReleaseManifest schema、installer／rollback 來源與 gates；專案不需要 HLK 或任何簽章 | consumer upgrade／rollback 驗收 |
+| 發行 | `v1.0.0` driver-free portable DesktopCompat ZIP、SHA-256 sidecar、source-tag provenance 與 strict package checker | consumer upgrade／rollback、installer、driver 或實體音訊驗收 |
 
 完整的 main 狀態、來源 commit 與限制以 [baseline](docs/state/BASELINE.md) 為準；子系統位置與
 契約看 [project map](docs/PROJECT_MAP.md)。Contract test、source gate、preview 或 live probe
 都不能單獨當成實體音訊、driver 或 release evidence。
 
-## 安全試跑
+## 從 source 安全試跑（開發者）
 
 需要 Windows x64、Git 與 PowerShell 7（`pwsh`）。建置工具不足時，腳本會直接回報缺少的
-dependency；所有輸出都留在 ignored 的 `.local/`。
+dependency；所有輸出都留在 ignored 的 `.local/`。這條流程是給開發者，不是下載版的必要步驟。
 
 ```powershell
 git clone https://github.com/xup61069/Hibiki-DSP.git
@@ -145,9 +166,11 @@ Repository 內容的權威順序、active Issue handoff 與衝突處理以
 ## Source、發行與授權
 
 [github.com/xup61069/Hibiki-DSP](https://github.com/xup61069/Hibiki-DSP) 是唯一官方公開
-source 入口。GitHub 只存放 source、依賴鎖定、建置腳本、文字 manifest、SBOM 與 evidence；
-專案不使用簽章或 binary release。詳見
-[SOURCE_POLICY.md](SOURCE_POLICY.md) 與 [SPEC-0005](docs/specs/SPEC-0005-source-only-paid-release.md)。
+source 入口。GitHub repository 與 public CI 只存放 source、依賴鎖定、建置腳本、文字
+manifest、SBOM 與 evidence；唯一例外是 `v1.0.0` Release 上由維護者手動上傳的 unsigned
+portable preview ZIP 與 SHA-256 sidecar。詳見 [SOURCE_POLICY.md](SOURCE_POLICY.md)、
+[SPEC-0005](docs/specs/SPEC-0005-source-only-paid-release.md) 與
+[SPEC-0026](docs/specs/SPEC-0026-portable-user-space-preview-distribution.md)。
 
 - user-space：GPL-3.0-only
 - SYSVAD-derived driver：MS-PL

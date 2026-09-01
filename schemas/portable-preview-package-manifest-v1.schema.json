@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hibiki.example/schemas/portable-preview-package-manifest-v1.schema.json",
+  "title": "Hibiki PortablePreviewPackageManifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "package_kind",
+    "product_version",
+    "source_tag",
+    "tag_commit",
+    "source_commit",
+    "source_manifest_sha256",
+    "packager_commit",
+    "distribution_id",
+    "platform",
+    "entry_point",
+    "runtime",
+    "driver",
+    "installer",
+    "limitations",
+    "files"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "package_kind": {"const": "portable-user-space-preview"},
+    "product_version": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]+$"},
+    "source_tag": {"type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+[A-Za-z0-9._:+-]{0,32}$"},
+    "tag_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source_manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "packager_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "distribution_id": {"type": "string", "minLength": 1, "maxLength": 120, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]+$"},
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "os_min_build", "architecture"],
+      "properties": {
+        "target": {"const": "windows-11"},
+        "os_min_build": {"const": 26100},
+        "architecture": {"const": "x64"}
+      }
+    },
+    "entry_point": {"const": "Hibiki.DesktopPreview.exe"},
+    "runtime": {"const": "self-contained-dotnet-win-x64"},
+    "driver": {"const": "not-included"},
+    "installer": {"const": "not-included"},
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {"type": "string", "minLength": 1, "maxLength": 240, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]+$"}
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1024,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "size"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1, "maxLength": 260, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]+$"},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "size": {"type": "integer", "minimum": 1}
+        }
+      }
+    }
+  }
+}
