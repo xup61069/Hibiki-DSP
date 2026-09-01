@@ -1,0 +1,79 @@
+{
+  "evidence_format": 2,
+  "issue": 2241,
+  "source_provenance": {
+    "mode": "snapshot",
+    "snapshot_commit": "ba7f6f14f8ca3dbf42a22b868359362b8dc82f96",
+    "paths": [
+      "release/manifests/v1.0.0.json"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "1bd116bc9a3fd64b6c8e39133503147f87608905259613db7ec66741c85c67d2"
+  },
+  "metadata": {
+    "scope": "v1.0.0-tag-provenance-evidence",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-v1.0.0-tag-provenance-evidence",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 2241",
+      "pwsh -NoProfile -File tools/delivery-audit.ps1 -Issue 2241",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/release-provenance-check.ps1 -Tag v1.0.0",
+      "git ls-remote --tags origin refs/tags/v1.0.0*",
+      "gh run view 33457191225",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeSnapshotSourceSet -SnapshotCommit ba7f6f14f8ca3dbf42a22b868359362b8dc82f96",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "git diff --cached --check"
+    ],
+    "results": [
+      {
+        "command": "annotated source tag topology",
+        "status": "pass",
+        "detail": "Remote v1.0.0 tag object 1b34d7456f4c981143a7e23320ee752a7f21b95f peels to metadata commit ba7f6f14f8ca3dbf42a22b868359362b8dc82f96, whose sole parent is e7c44f310cab01c0ea0d7c70912ad5c9c375f0d7 and whose only diff is release/manifests/v1.0.0.json."
+      },
+      {
+        "command": "source-tag provenance gate",
+        "status": "pass",
+        "detail": "release-provenance-check validated the annotated tag, single-parent metadata topology, SourceReleaseManifest v1 identity, canonical text provenance paths, SPDX structure, and raw Git-blob SHA-256 values."
+      },
+      {
+        "command": "tag-scoped hosted verify",
+        "status": "pass",
+        "detail": "GitHub Actions verify run 33457191225 completed successfully for push event v1.0.0 at ba7f6f14f8ca3dbf42a22b868359362b8dc82f96, including its source-tag provenance gate."
+      },
+      {
+        "command": "pre-write policy gates",
+        "status": "pass",
+        "detail": "Handoff, delivery, documentation, source-policy, source-only CI, and evidence-audit self-test gates passed on the evidence-only branch."
+      },
+      {
+        "command": "snapshot provenance derivation",
+        "status": "pass",
+        "detail": "DescribeSnapshotSourceSet derived the sole metadata path release/manifests/v1.0.0.json and digest 1bd116bc9a3fd64b6c8e39133503147f87608905259613db7ec66741c85c67d2 from already-reachable commit ba7f6f14f8ca3dbf42a22b868359362b8dc82f96."
+      },
+      {
+        "command": "git diff --cached --check",
+        "status": "pass",
+        "detail": "The staged evidence-only record has no whitespace errors."
+      },
+      {
+        "command": "evidence-audit",
+        "status": "pass",
+        "detail": "checked=340, v2_checked=29, findings=0."
+      }
+    ],
+    "limitations": [
+      "This records source-level provenance and hosted source checks only; it does not create, update, or delete the v1.0.0 tag or publish a GitHub Release or release asset.",
+      "The official source manifest declares driver and installer as not-published. This evidence does not verify driver installation, WaveRT streaming, endpoint control, signing, or physical audio.",
+      "The provenance digest binds this evidence record to the immutable metadata source set; it does not independently attest that the declared commands ran."
+    ],
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1"
+    },
+    "started_at": "2026-09-01T09:17:12+08:00",
+    "finished_at": "2026-09-01T09:21:33+08:00"
+  }
+}
