@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "release_kind": "source-only",
+  "product_version": "1.0.0",
+  "source_tag": "v1.0.0",
+  "source_commit": "e7c44f310cab01c0ea0d7c70912ad5c9c375f0d7",
+  "distribution_id": "hibiki-public-2026",
+  "toolchain_lock": {
+    "path": "build/toolchain-lock.yml",
+    "sha256": "53bf8a12ad82781f0ee4a8bd3c90b760a6be4a5c8dd72d450e3d35a860b13d48"
+  },
+  "dependency_lock": {
+    "path": "THIRD_PARTY.yml",
+    "sha256": "6ef223ee3926a80843ffe2d2703b083d92537306ad4787f275484ad90106fadd"
+  },
+  "sbom": {
+    "path": "release/provenance/v1.0.0/SBOM.spdx.json",
+    "sha256": "64a5f8daeb401f9e702f23bd2545628dbbc9ab142d57a4c61424c3af4602615f"
+  },
+  "release_notes": {
+    "path": "release/provenance/v1.0.0/RELEASE_NOTES.md",
+    "sha256": "3c8151a51f4e01c0c1c5119188755aa09ba1b38b1d786a5dd8ed4933d25102e3"
+  },
+  "notices": {
+    "path": "release/provenance/v1.0.0/NOTICE.md",
+    "sha256": "28f8df9428e6a0dad6a7608188942d9c095bde1cf25c94aaaba10a0fd9536428"
+  },
+  "source_files": [
+    {
+      "path": "src/hub/src/engine_control.cpp",
+      "sha256": "2512b83bd907e5437fb4e3024a26e248f1d9a7d08963387e42715920832b6c8c"
+    }
+  ],
+  "artifacts": {
+    "driver": "not-published",
+    "installer": "not-published"
+  },
+  "tests": [
+    "verify.ps1 (52/52 CTest)",
+    "docs-check.ps1",
+    "source-policy.ps1",
+    "source-only-ci-check.ps1",
+    "evidence-audit.ps1",
+    "release-provenance-check.ps1 -SelfTest"
+  ]
+}
