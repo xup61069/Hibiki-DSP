@@ -1,0 +1,96 @@
+{
+  "evidence_format": 2,
+  "issue": 2245,
+  "source_provenance": {
+    "mode": "snapshot",
+    "snapshot_commit": "a172def04b2e2c5f657b8a1b7b86d31f26d64db7",
+    "paths": [
+      "README.md",
+      "SOURCE_POLICY.md",
+      "docs/adr/0011-portable-preview-distribution-boundary.md",
+      "docs/adr/INDEX.md",
+      "docs/specs/INDEX.md",
+      "docs/specs/SPEC-0026-portable-user-space-preview-distribution.md",
+      "docs/state/BASELINE.md",
+      "schemas/portable-preview-package-manifest-v1.schema.json",
+      "tools/docs-check.ps1",
+      "tools/portable-preview-package-check.ps1",
+      "tools/portable-preview-package.ps1"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "7b38dc050c62a32bfb7853b9624d74c1b0b594d4861369a1212c29c530d0633a"
+  },
+  "metadata": {
+    "scope": "portable-preview-publication-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-portable-publication-readback",
+    "commands": [
+      "gh release view v1.0.0 --repo xup61069/Hibiki-DSP --json tagName,url,isDraft,isPrerelease,publishedAt,assets",
+      "gh release download v1.0.0 --repo xup61069/Hibiki-DSP --pattern Hibiki-DSP-v1.0.0-portable-win-x64.zip --pattern Hibiki-DSP-v1.0.0-portable-win-x64.zip.sha256",
+      "Get-FileHash <downloaded ZIP> -Algorithm SHA256",
+      "pwsh -NoProfile -File tools/portable-preview-package-check.ps1 -ArchivePath <downloaded ZIP> -ExtractTo <fresh extraction> -SourceRepository <clean detached v1.0.0 checkout> -ExpectedArchiveSha256 fc48610547cfeffc71f7930305a96205db7be5ab7e90c1478b3cbaec2fbb2c36 -LaunchSmoke",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -DescribeSnapshotSourceSet -SnapshotCommit a172def04b2e2c5f657b8a1b7b86d31f26d64db7",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "pwsh -NoProfile -File tools/distribution-check.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "GitHub Release readback",
+        "status": "pass",
+        "detail": "The public v1.0.0 Release at https://github.com/xup61069/Hibiki-DSP/releases/tag/v1.0.0 was neither draft nor prerelease and had exactly two uploaded assets: Hibiki-DSP-v1.0.0-portable-win-x64.zip and its .sha256 sidecar."
+      },
+      {
+        "command": "public asset identity",
+        "status": "pass",
+        "detail": "The ZIP was 72179157 bytes; its GitHub asset digest and independently retained expected SHA-256 both equaled fc48610547cfeffc71f7930305a96205db7be5ab7e90c1478b3cbaec2fbb2c36. The sidecar was 104 bytes and contained the required single line for that ZIP."
+      },
+      {
+        "command": "fresh public download hash",
+        "status": "pass",
+        "detail": "A fresh public download of both assets produced SHA-256 fc48610547cfeffc71f7930305a96205db7be5ab7e90c1478b3cbaec2fbb2c36, matching the independently retained value, GitHub asset digest, and downloaded sidecar."
+      },
+      {
+        "command": "detached source-tag package verification",
+        "status": "pass",
+        "detail": "The downloaded archive passed the checker against a clean detached annotated v1.0.0 checkout: tag commit ba7f6f14f8ca3dbf42a22b868359362b8dc82f96, source commit e7c44f310cab01c0ea0d7c70912ad5c9c375f0d7, raw source-manifest SHA-256 15e8feac2c37addd07513f2d3f6620493ffe69f6e5cb39c08aee15537303eadb, and distribution hibiki-public-2026."
+      },
+      {
+        "command": "safe extraction and launch smoke",
+        "status": "pass",
+        "detail": "Safe extraction, manifest verification, 466 payload-file hashes, entry-point presence, and hidden Hibiki.DesktopPreview.exe launch smoke passed for the downloaded archive."
+      },
+      {
+        "command": "source snapshot binding",
+        "status": "pass",
+        "detail": "The evidence-audit snapshot descriptor bound this record to the already-merged portable-preview source snapshot a172def04b2e2c5f657b8a1b7b86d31f26d64db7 without adding binary material to Git."
+      },
+      {
+        "command": "repository policy gates",
+        "status": "pass",
+        "detail": "docs-check passed 91 required paths and 26 specs; source-policy and source-only-ci policy passed for 844 tracked paths; and distribution profile checks passed."
+      },
+      {
+        "command": "evidence validation",
+        "status": "pass",
+        "detail": "The evidence-audit self-test passed 48 cases and the full audit checked 342 records, including 31 v2 records, with zero findings; git diff --check found no whitespace errors."
+      }
+    ],
+    "limitations": [
+      "This is GitHub Release package, archive, and launch evidence only; it does not verify or claim driver installation, WaveRT streaming, endpoint control, system-audio changes, or physical audio.",
+      "The package is an unsigned Windows x64 driver-free offline control-surface preview. It does not establish signing, HLK/WHCP, accessibility certification, installer behavior, upgrade, rollback, or uninstall behavior.",
+      "The snapshot digest binds the record to the merged source set, not to a new source implementation or an assertion that every listed command can be replayed unchanged on another host.",
+      "No ZIP, EXE, DLL, driver, installer, signing material, or other binary output was added to Git or public CI artifacts by this evidence record."
+    ],
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.49.0.windows.1",
+      "github_cli": "2.97.0"
+    },
+    "started_at": "2026-09-01T14:52:42+08:00",
+    "finished_at": "2026-09-01T14:55:27+08:00"
+  }
+}
