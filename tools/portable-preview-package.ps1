@@ -50,7 +50,7 @@ function Assert-SafeRelativePath {
       throw "$Context has an unsafe path segment: $Path"
     }
     $stem = ($segment -split '\.', 2)[0]
-    if ($stem -match '^(?i:con|prn|aux|nul|com[1-9]|lpt[1-9])$') {
+    if ($stem -match '^(?i:con|prn|aux|nul|com(?:[1-9]|[¹²³])|lpt(?:[1-9]|[¹²³]))$') {
       throw "$Context has a Windows reserved path segment: $Path"
     }
   }
@@ -122,7 +122,7 @@ function Assert-SafeFutureDirectory {
   if (Test-Path -LiteralPath $full) { throw "$Context already exists: $full" }
   $parent = Split-Path -Parent $full
   while ($parent) {
-    if (Test-Path -LiteralPath $parent) { [void](Assert-NoReparsePoint -Path $parent -Context "$Context parent"); break }
+    if (Test-Path -LiteralPath $parent) { [void](Assert-NoReparsePoint -Path $parent -Context "$Context parent") }
     $next = Split-Path -Parent $parent
     if ($next -eq $parent) { break }
     $parent = $next
@@ -140,6 +140,8 @@ function Get-SourceBinding {
   }
   $status = Invoke-GitText -Repository $sourceRoot -Arguments @('status', '--porcelain') -FailurePrefix 'Source repository status check failed'
   if ($status) { throw 'Source repository must be clean before packaging.' }
+  $branch = Invoke-GitText -Repository $sourceRoot -Arguments @('branch', '--show-current') -FailurePrefix 'Source checkout mode check failed'
+  if ($branch) { throw "Source repository must be a detached checkout, not branch '$branch'." }
   $tagRef = 'refs/tags/' + $Tag
   if ((Invoke-GitText -Repository $sourceRoot -Arguments @('cat-file', '-t', $tagRef) -FailurePrefix 'Source tag lookup failed') -ne 'tag') {
     throw "Source tag must be annotated: $Tag"
@@ -270,7 +272,7 @@ function Write-PortableManifest {
     limitations = @(
       'Unsigned Windows user-space preview; verify the release SHA-256 before launch.',
       'No driver, service, endpoint, Engine Preview, WaveRT streaming, or physical audio.',
-      'Per-user DesktopCompat UI preferences may be stored under %LOCALAPPDATA%\\Hibiki DSP.'
+      'Per-user DesktopCompat UI preferences may be stored under %LOCALAPPDATA%\Hibiki DSP.'
     )
     files = @(Get-StageRecords -Stage $Stage)
   }
@@ -293,7 +295,7 @@ function Remove-OwnedTemporaryDirectory {
 
 function Invoke-PortablePreviewPackageSelfTest {
   Assert-SafeRelativePath -Path 'runtime/System.Private.CoreLib.dll' -Context 'self-test valid path'
-  $cases = @('..\escape', 'CON.txt', 'folder/trailing. ', 'folder/../escape', 'folder/file.ps1')
+  $cases = @('..\escape', 'CON.txt', ('COM' + [char]0x00b9 + '.txt'), 'folder/trailing. ', 'folder/../escape', 'folder/file.ps1')
   foreach ($case in $cases) {
     $caught = $false
     try { Assert-AllowedPayloadPath -Path $case -Context 'self-test unsafe path' } catch { $caught = $true }
@@ -333,7 +335,7 @@ try {
   Write-PortableManifest -Binding $binding -Stage $stage -PackagerCommit $packagerCommit
 
   $checker = Join-Path $repo 'tools/portable-preview-package-check.ps1'
-  & pwsh -NoProfile -File $checker -PackageRoot $stage
+  & pwsh -NoProfile -File $checker -PackageRoot $stage -SourceRepository $binding.SourceRoot
   if ($LASTEXITCODE -ne 0) { throw 'Portable package root validation failed.' }
 
   Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -342,7 +344,7 @@ try {
   $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
   [IO.File]::WriteAllText("$archive.sha256", "$hash *$script:ArchiveName", [Text.UTF8Encoding]::new($false))
 
-  & pwsh -NoProfile -File $checker -ArchivePath $archive -ExtractTo $extract -LaunchSmoke
+  & pwsh -NoProfile -File $checker -ArchivePath $archive -ExtractTo $extract -SourceRepository $binding.SourceRoot -ExpectedArchiveSha256 $hash -LaunchSmoke
   if ($LASTEXITCODE -ne 0) { throw 'Portable archive validation or launch smoke failed.' }
   Write-Output "Portable preview package created: $archive"
   Write-Output "Portable preview SHA-256 sidecar: $archive.sha256"

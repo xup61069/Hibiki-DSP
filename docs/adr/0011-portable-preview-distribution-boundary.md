@@ -38,8 +38,10 @@ driver/installer binary 分開。然而，純 source tag 要求一般使用者�
 - ZIP 必須含 `PortablePreviewPackageManifest v1`、使用說明與每個 regular payload file 的 SHA-256。
   self-contained .NET runtime 檔案是可歸屬的 user-space payload，必須和其他檔案一樣被清單、hash，
   並附帶 source tag 中的 `THIRD_PARTY.yml`；不得帶入不明來源或未宣告的 prebuilt dependency。
-  package checker 必須 fail closed 驗證 source tag/commit、safe archive paths、沒有 reparse point、
-  完整 file set、hash 與 self-contained entry point。
+  package checker 必須以乾淨、detached 的 source-tag checkout fail closed 驗證 source tag/commit、
+  raw source-manifest SHA-256 與 distribution identity，並驗證 safe archive paths、沒有 reparse
+  point、完整 file set、hash 與 self-contained entry point。發布後的 readback 另須把下載 ZIP
+  比對上傳前獨立記錄的 SHA-256，不能只信任同一路徑 sidecar。
 - 公開 CI 不得 build/upload/release package；產物只能由維護者在可重現的本機 source-tag checkout
   建置、驗證並手動上傳。這個例外不建立 binary custody、driver install 保證、signing requirement、
   HLK/WHCP requirement 或付費 channel。

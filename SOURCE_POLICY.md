@@ -8,10 +8,11 @@ ADR-0011 / SPEC-0026 permit one narrow manual exception: the official `v1.0.0`
 GitHub Release may contain exactly an unsigned Windows x64 DesktopCompat
 portable-preview ZIP and its SHA-256 sidecar. The ZIP is an external release
 asset, never a tracked repository file or Actions artifact. It must pass the
-strict portable-preview package check and may not contain a driver, installer,
-service, signing material, VST3, or updater. Its self-contained .NET runtime payload must be
-attributable, listed and hash-checked alongside every other package file, and the package must
-include the source-tag `THIRD_PARTY.yml`; unlisted or opaque prebuilt dependencies remain prohibited.
+strict portable-preview package check against a clean detached source-tag checkout and an
+independently recorded ZIP SHA-256, and may not contain a driver, installer, service, signing
+material, VST3, or updater. Its self-contained .NET runtime payload must be attributable, listed
+and hash-checked alongside every other package file, and the package must include the source-tag
+`THIRD_PARTY.yml`; unlisted or opaque prebuilt dependencies remain prohibited.
 
 Public CI may compile and test in an ephemeral workspace. It must not upload
 artifacts, publish packages, persist build outputs in caches or use signing

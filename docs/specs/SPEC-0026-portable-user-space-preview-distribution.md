@@ -47,10 +47,14 @@ source-only、no-signing、no-HLK、no-paid-channel 與 source-tag provenance �
 1. Releaser 從 clean detached `v1.0.0` checkout 驗證 provenance，並用
    `tools/build-preview.ps1 -Target DesktopCompat -SmokeTest` 建置。
 2. `tools/portable-preview-package.ps1` 產生 ZIP/sidecar；
-   `tools/portable-preview-package-check.ps1` 必須驗證 archive sidecar、safe extraction、
-   manifest 與每個 payload hash，並在乾淨解壓目錄執行 entry-point launch smoke。
-3. 發布後重新下載兩個 GitHub asset，重跑 archive check，並讀回 release tag、asset 名稱與
-   SHA-256。這些是 package/launch evidence，不是 driver 或 physical-audio evidence。
+   `tools/portable-preview-package-check.ps1` 必須以 `-SourceRepository` 指向乾淨、detached 的
+   `v1.0.0` source-tag checkout，驗證 annotated tag 的直接 target、source commit、raw
+   source-manifest SHA-256、distribution identity、archive sidecar、safe extraction、manifest
+   與每個 payload hash，並在乾淨解壓目錄執行 entry-point launch smoke。
+3. 發布後重新下載兩個 GitHub asset，重跑 archive check，並以
+   `-ExpectedArchiveSha256 <上傳前獨立記錄的值>` 比對下載 ZIP；不可只用同一下載位置的
+   sidecar。讀回 release tag、asset 名稱與 SHA-256。這些是 package/launch evidence，不是
+   driver 或 physical-audio evidence。
 
 使用者可在 PowerShell 執行：
 
