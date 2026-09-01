@@ -211,13 +211,13 @@ function Assert-PreviewLaunchTarget {
   }
 }
 
-if ($SelfTest) {
 function Get-PreviewAutomationCount([object]$AutomationCollection) {
   $countProperty = $AutomationCollection.PSObject.Properties['Count']
   if ($null -ne $countProperty) { return [int]$countProperty.Value }
   return @($AutomationCollection | ForEach-Object { $_ }).Count
 }
 
+if ($SelfTest) {
   $expected = [ordered]@{
     WinUI = @{ ProjectRelativePath = 'apps/winui-shell/Hibiki.WinUI.csproj'; OutputProperty = 'OutputPath'; SmokeExecutable = $null }
     WinUICompat = @{ ProjectRelativePath = 'apps/winui-shell/Hibiki.WinUI.csproj'; OutputProperty = 'OutputPath'; SmokeExecutable = 'Hibiki.WinUI.exe' }
