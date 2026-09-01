@@ -147,14 +147,16 @@ function Get-SourceBinding {
   $tagCommit = Invoke-GitText -Repository $sourceRoot -Arguments @('rev-parse', ($tagRef + '^{}')) -FailurePrefix 'Source tag target lookup failed'
   $head = Invoke-GitText -Repository $sourceRoot -Arguments @('rev-parse', 'HEAD') -FailurePrefix 'Source HEAD lookup failed'
   if ($head -cne $tagCommit) { throw "Source repository HEAD must be the detached tag target $tagCommit, got $head" }
-  $parents = @(Invoke-GitText -Repository $sourceRoot -Arguments @('rev-list', '--parents', '-n', '1', $tagCommit) -FailurePrefix 'Source parent lookup failed' -split '\s+' | Where-Object { $_ })
+  $parentLine = Invoke-GitText -Repository $sourceRoot -Arguments @('rev-list', '--parents', '-n', '1', $tagCommit) -FailurePrefix 'Source parent lookup failed'
+  $parents = @($parentLine -split '\s+' | Where-Object { $_ })
   if ($parents.Count -ne 2 -or $parents[0] -cne $tagCommit) { throw 'Source tag target must be a single-parent provenance metadata commit.' }
   $sourceCommit = $parents[1]
   $manifestRelative = 'release/manifests/' + $Tag + '.json'
   $manifestPath = Join-Path $sourceRoot $manifestRelative
   if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw "Source tag manifest is missing: $manifestRelative" }
   [void](Assert-NoReparsePoint -Path $manifestPath -Context 'Source tag manifest')
-  & pwsh -NoProfile -File (Join-Path $sourceRoot 'tools/release-provenance-check.ps1') -Tag $Tag -Repository $sourceRoot
+  $provenanceOutput = @(& pwsh -NoProfile -File (Join-Path $sourceRoot 'tools/release-provenance-check.ps1') -Tag $Tag -Repository $sourceRoot 2>&1)
+  foreach ($line in $provenanceOutput) { Write-Host ([string]$line) }
   if ($LASTEXITCODE -ne 0) { throw 'Source-tag provenance gate failed.' }
   $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json -AsHashtable -ErrorAction Stop
   $productVersion = $Tag.Substring(1)
@@ -162,7 +164,8 @@ function Get-SourceBinding {
       $manifest.source_commit -cne $sourceCommit -or [string]::IsNullOrWhiteSpace([string]$manifest.distribution_id)) {
     throw 'Source tag manifest does not match the package source binding.'
   }
-  $changed = @(Invoke-GitText -Repository $sourceRoot -Arguments @('diff', '--name-only', $sourceCommit, $tagCommit) -FailurePrefix 'Source tag diff check failed' -split "`r?`n" | Where-Object { $_ })
+  $changedText = Invoke-GitText -Repository $sourceRoot -Arguments @('diff', '--name-only', $sourceCommit, $tagCommit) -FailurePrefix 'Source tag diff check failed'
+  $changed = @($changedText -split "`r?`n" | Where-Object { $_ })
   if ($changed.Count -ne 1 -or $changed[0] -cne $manifestRelative) {
     throw 'Source tag provenance metadata commit contains unexpected files.'
   }
