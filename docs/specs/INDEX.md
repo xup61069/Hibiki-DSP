@@ -27,6 +27,7 @@
 | SPEC-0023 | accepted | per-App 路由規則命令與候選交易 |
 | SPEC-0024 | accepted | Expert per-App 路由預設 catalog、保存與 UI |
 | SPEC-0025 | accepted | Source-tag manifest provenance contract |
+| SPEC-0026 | accepted | Windows x64 portable user-space preview distribution |
 
 Draft spec 有 blocking open question 時不得直接實作；公開行為變更必須在同一 PR
 更新 spec 與測試。
