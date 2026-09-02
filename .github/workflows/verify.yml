@@ -109,6 +109,10 @@ jobs:
         shell: pwsh
         run: ./tools/control-model-check.ps1
 
+      - name: Control model scene sync failure gate
+        shell: pwsh
+        run: ./tools/control-model-scene-sync-check.ps1
+
       - name: Control model JSON contract gate
         shell: pwsh
         run: dotnet run --project ./apps/control-model-json-contract-check/Hibiki.ControlModel.JsonContract.Check.csproj --configuration Release --nologo
