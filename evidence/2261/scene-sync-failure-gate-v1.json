@@ -1,0 +1,66 @@
+{
+  "evidence_format": 2,
+  "issue": 2261,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      ".github/workflows/verify.yml",
+      "docs/state/BASELINE.md"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "0c6a00a30b8e8c2796ad115c2121f3be6bf097fe3ba47e49f05f2689476a50f8"
+  },
+  "metadata": {
+    "scope": "scene-sync-failure-gate-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-git-2.49.0-scene-sync-failure-gate-v1",
+    "commands": [
+      "gh workflow run claim-admission.yml (session f02c4ca2-0c98-4f91-8009-017a0c5a461f, issue 2261, branch codex/2261-scene-sync-failure-gate)",
+      "pwsh -NoProfile -File tools/control-model-scene-sync-check.ps1 (main fc546f59 and worktree change set)",
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 2261",
+      "pwsh -NoProfile -File tools/delivery-audit.ps1 -Issue 2261",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "handoff admission",
+        "status": "pass",
+        "detail": "Serialized claim admission (session f02c4ca2-0c98-4f91-8009-017a0c5a461f) set claimed and assignee xup61069 on Issue #2261; handoff-check passed for #2261@codex/2261-scene-sync-failure-gate (issue-based ownership, scope and Git state)."
+      },
+      {
+        "command": "scene sync failure check",
+        "status": "pass",
+        "detail": "tools/control-model-scene-sync-check.ps1 returned rc=0 ('Connected scene synchronization failure checks passed.') on main fc546f59 and on the worktree change set (~6 s). The offline check covers the #2019 fix behaviors that hosted CI did not gate: mid-connection engine Error replies persisting scene add/remove failure records across restart, and queue save-failure rollback restoring card, selection and card file state."
+      },
+      {
+        "command": "change wiring",
+        "status": "pass",
+       "detail": "verify.yml adds step 'Control model scene sync failure gate' (shell pwsh, run ./tools/control-model-scene-sync-check.ps1) after the Control model gate and before the Control model JSON contract gate; docs/state/BASELINE.md records wave 62. Drift audit: commit 71158039 (fix persist scene sync failures, Fixes #2019) introduced the tool but no workflow, docs or evidence referenced it (workflow tool-reference inventory: 29 of 46 tools/*.ps1 unreferenced); the hosted #832 Case 3 NACK scenario predates the #2019 fix and does not cover the two persisted behaviors."
+      },
+      {
+        "command": "local policy and documentation gates",
+        "status": "pass",
+        "detail": "handoff-check passed for Issue #2261 (claimed, issue-based ownership, scope and Git state), delivery-audit passed (1 handoff, 0 bounded open PRs), docs-check passed (91 required paths, 26 specs; live measurement 852 tracked paths, 386 repository JSON files, 40 markdown links), source-policy passed for 852 tracked paths, source-only-ci-check passed (4 workflows, 852 tracked paths), git diff --check clean."
+      },
+      {
+        "command": "evidence provenance audit",
+        "status": "pass",
+        "detail": "Full tools/evidence-audit.ps1 over the repository returns findings=0 with this append-only change-mode file bound to digest 0c6a00a30b8e8c2796ad115c2121f3be6bf097fe3ba47e49f05f2689476a50f8."
+      }
+    ],
+    "limitations": [
+      "The hosted step runs the offline control-model scene sync failure contract check only; it is user-space control-model evidence and does not claim physical audio, driver, WaveRT, signing, installer, accessibility, or release readiness.",
+      "The gate detects regressions in the committed check fixture set only; scene sync behavior changes without a matching check update remain outside its coverage.",
+      "Hosted CI results for the exact final PR head are pending at evidence-writing time and are verified separately before merge."
+    ],
+    "tool_versions": {
+      "powershell": "pwsh 7.6.4 local",
+      "git": "git 2.49.0.windows.1 local"
+    },
+    "started_at": "2026-09-02T13:03:10+08:00",
+    "finished_at": "2026-09-02T13:06:27.6829450+08:00"
+  }
+}
