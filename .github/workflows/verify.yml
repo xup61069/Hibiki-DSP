@@ -117,6 +117,10 @@ jobs:
         shell: pwsh
         run: ./tools/winui-shell-check.ps1
 
+      - name: Theme fallback byte verification gate
+        shell: pwsh
+        run: ./tools/verify-theme-fallbacks.ps1
+
       - name: Driver INF source gate
         shell: pwsh
         run: ./tools/driver-source-check.ps1
