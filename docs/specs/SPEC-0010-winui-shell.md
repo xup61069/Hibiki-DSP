@@ -176,8 +176,10 @@ fallback dictionary（3242 個具型別鍵，涵蓋 Color、Thickness、CornerRa
 FontWeight、FontSize、Brush 字串與 Style target types），並單次 merge 進
 `Application.Resources.MergedDictionaries`，補上 framework 因 PRI 停用而無法提供的
 deferred theme resource 面；這同時修復相容宿主因缺漏主題資源造成的啟動 crash
-（stowed exception 0xC000027B）。fallback 值由機器本機 `.local/` extractor 從 framework
-XAML 解碼產生；少數無法解析的 token 使用已記錄的近似值（elevation/acrylic），
+（stowed exception 0xC000027B）。fallback 值由 versioned `tools/extract-theme-fallbacks.ps1`
+從 framework XAML 解碼產生（`-VerifyCommitted` 對 committed 區塊做 byte-for-byte 驗證、
+`-SelfTest` 驗證合成 extraction rules 與 committed 結構 invariants）；少數無法解析的
+token 使用已記錄的近似值（elevation/acrylic），
 color-typed 鍵以 `Windows.UI.Color` 儲存。相容預覽因此呈現以 fallback 值套樣式的
 降級外觀，而非未套樣式；這仍不等於完整 framework 資源載入。fallback 字典只在相容
 宿主 merge 一次，不改變正式 shell 的資源行為、wire 契約或 engine 狀態。
