@@ -1,0 +1,59 @@
+{
+  "evidence_format": 2,
+  "issue": 2251,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "docs/specs/SPEC-0010-winui-shell.md"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "121b0a61b9f392c4cb2a5961c156984eb1a1cb7164129aab9e96cbe840bd992c"
+  },
+  "metadata": {
+    "scope": "spec0010-compat-fallback-sync-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-spec0010-compat-fallback-sync",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 2251",
+      "pwsh -NoProfile -File tools/delivery-audit.ps1 -Issue 2251",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "handoff admission",
+        "status": "pass",
+        "detail": "AI handoff checks passed (#2251@codex/2251-spec0010-compat-fallback-sync; issue-based ownership, scope and Git state)."
+      },
+      {
+        "command": "delivery audit",
+        "status": "pass",
+        "detail": "Delivery audit passed for Issue #2251 (1 handoff, 0 bounded open PRs inspected)."
+      },
+      {
+        "command": "documentation and source policy gates",
+        "status": "pass",
+        "detail": "docs-check passed (91 required paths, 26 specs; live measurement: 845 tracked paths, 381 repository JSON files, 40 markdown links) and source-policy passed for 845 tracked paths."
+      },
+      {
+        "command": "spec drift verification",
+        "status": "pass",
+        "detail": "Confirmed on main fdc2e155 that SPEC-0010 still described missing theme resources as ignored with an unstyled degraded appearance, while merged PR #2250 (Issue #2249) supplies a 3242-key typed fallback dictionary merged once at OnLaunched and a text search over docs/ and README.md found no description of the mechanism. SPEC-0010 compatibility section now records the dictionary behavior, key types, machine-local extractor provenance, approximation boundary, and the unchanged evidence boundaries."
+      }
+    ],
+    "limitations": [
+      "Documentation-only change; no product source, schema, wire, DSP or build contract is modified and no compat build or smoke was re-run in this slice.",
+      "Recorded compat smoke evidence (10/10 launches, keys=3242, failed=0) comes from PR #2250 verification; this slice only syncs the accepted spec text with that merged behavior.",
+      "The fallback dictionary generator remains a machine-local extractor under .local/; this slice documents provenance but does not migrate the tool into tools/.",
+      "No claim of physical audio, driver, WaveRT, signing, or release readiness; compat preview remains not formal XAML, accessibility or release evidence."
+    ],
+    "tool_versions": {
+      "powershell": "pwsh 7.6.4 local",
+      "git": "git 2.x local"
+    },
+    "started_at": "2026-09-02T08:20:00+08:00",
+    "finished_at": "2026-09-02T08:41:51+08:00"
+  }
+}
