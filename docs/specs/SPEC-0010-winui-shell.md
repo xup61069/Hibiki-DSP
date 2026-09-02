@@ -3,7 +3,7 @@ id: SPEC-0010
 status: accepted
 owner: hibiki-maintainers
 authority: product-behavior
-last_reviewed: 2026-08-25
+last_reviewed: 2026-09-02
 review_after_days: 30
 related_adrs: [ADR-0002]
 source_globs: ["apps/control-model/**", "apps/winui-shell/**", "evidence/0000-foundation/winui-vst3-history-clear-v1.json", "tools/winui-shell-check.ps1"]
@@ -170,9 +170,19 @@ bytes。WinUI shell 可在沒有引擎時啟動，並以 Degraded 狀態呈現�
 Compatibility Preview 在純 .NET SDK 主機保留 `EnableDefaultApplicationDefinition=false`、
 `EnableDefaultPageItems=false`，且必須維持 Core MRT resource tooling 停用：dotnet CLI
 建置不會載入 Visual Studio 的 Appx packaging 工作（MSBuild host boundary），因此
-MrtCore.PriGen 會以 MSB4062 失敗；即使主機已安裝 VS2026 與相關工作也一樣。此模式不產生 PRI；
-缺漏的主題資源由 fail-soft resolver 忽略，視窗可啟動但呈現未套樣式的降級外觀。
-Compatibility Preview 的建置與啟動 smoke 不構成樣式、資源載入、無障礙或正式 XAML 證據。
+MrtCore.PriGen 會以 MSB4062 失敗；即使主機已安裝 VS2026 與相關工作也一樣。此模式不產生 PRI。
+自 PR #2250（Issue #2249）起，相容宿主在 `OnLaunched` 建立一個 app-level typed theme
+fallback dictionary（3242 個具型別鍵，涵蓋 Color、Thickness、CornerRadius、Double、
+FontWeight、FontSize、Brush 字串與 Style target types），並單次 merge 進
+`Application.Resources.MergedDictionaries`，補上 framework 因 PRI 停用而無法提供的
+deferred theme resource 面；這同時修復相容宿主因缺漏主題資源造成的啟動 crash
+（stowed exception 0xC000027B）。fallback 值由機器本機 `.local/` extractor 從 framework
+XAML 解碼產生；少數無法解析的 token 使用已記錄的近似值（elevation/acrylic），
+color-typed 鍵以 `Windows.UI.Color` 儲存。相容預覽因此呈現以 fallback 值套樣式的
+降級外觀，而非未套樣式；這仍不等於完整 framework 資源載入。fallback 字典只在相容
+宿主 merge 一次，不改變正式 shell 的資源行為、wire 契約或 engine 狀態。
+Compatibility Preview 的建置與啟動 smoke 不構成樣式、資源載入、無障礙或正式 XAML 證據；
+本段落亦不宣稱實體音訊、driver、WaveRT、簽章或 release readiness 證據。
 
 ## 驗收
 
