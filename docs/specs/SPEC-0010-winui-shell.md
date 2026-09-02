@@ -179,7 +179,11 @@ deferred theme resource 面；這同時修復相容宿主因缺漏主題資源�
 （stowed exception 0xC000027B）。fallback 值由 versioned `tools/extract-theme-fallbacks.ps1`
 從 framework XAML 解碼產生（`-VerifyCommitted` 對 committed 區塊做 byte-for-byte 驗證、
 `-SelfTest` 驗證合成 extraction rules 與 committed 結構 invariants）；少數無法解析的
-token 使用已記錄的近似值（elevation/acrylic），
+token 使用已記錄的近似值（elevation/acrylic）；hosted CI 的
+`tools/verify-theme-fallbacks.ps1` gate 會從 nuget.org 取得 pinned
+microsoft.windowsappsdk 套件（nupkg SHA-512 與解出的 generic.xaml SHA-256
+皆 fail-closed 驗證）後執行 `-VerifyCommitted`，因此 byte-for-byte 驗證可在任何
+有網路的機器重現，不再依賴本機 NuGet cache，
 color-typed 鍵以 `Windows.UI.Color` 儲存。相容預覽因此呈現以 fallback 值套樣式的
 降級外觀，而非未套樣式；這仍不等於完整 framework 資源載入。fallback 字典只在相容
 宿主 merge 一次，不改變正式 shell 的資源行為、wire 契約或 engine 狀態。
