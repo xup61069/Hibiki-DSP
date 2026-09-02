@@ -10,7 +10,7 @@
       "tools/extract-theme-fallbacks.ps1"
     ],
     "digest_algorithm": "sha256-git-source-set-v1",
-    "digest": "21baf520a2e11e4e9f5f2401e5fdace1c054a15be0fe89c21fa8a1febe1968eb"
+    "digest": "ef10b3c8b72b6d9b88220ae65c4d76d3be0cedd1b05e8ed504ca5f78ce630253"
   },
   "metadata": {
     "scope": "theme-fallback-extractor-tools-v1",
@@ -66,7 +66,7 @@
       "git": "git 2.x local"
     },
     "started_at": "2026-09-02T10:05:00+08:00",
-    "finished_at": "2026-09-02T10:59:56+08:00"
+    "finished_at": "2026-09-02T11:13:32+08:00"
   }
 }
 
