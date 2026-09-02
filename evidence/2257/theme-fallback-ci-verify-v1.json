@@ -1,0 +1,73 @@
+{
+  "evidence_format": 2,
+  "issue": 2257,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      ".github/workflows/verify.yml",
+      "docs/PROJECT_MAP.md",
+      "docs/specs/SPEC-0010-winui-shell.md",
+      "docs/state/BASELINE.md",
+      "tools/verify-theme-fallbacks.ps1"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "ffdb4e10fc3b0130b9aaf991a8edfebaa4a1040b12fb43cca3cc24b3048183a7"
+  },
+  "metadata": {
+    "scope": "theme-fallback-ci-verify-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-theme-fallback-ci-verify",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 2257",
+      "pwsh -NoProfile -File tools/delivery-audit.ps1 -Issue 2257",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "pwsh -NoProfile -File tools/verify-theme-fallbacks.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/verify-theme-fallbacks.ps1 -PackagePath <local pinned nupkg>",
+      "pwsh -NoProfile -File tools/verify-theme-fallbacks.ps1",
+      "pwsh -NoProfile -File tools/extract-theme-fallbacks.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "handoff admission",
+        "status": "pass",
+        "detail": "Serialized claim admission (run 33588263861) set claimed on Issue #2257; handoff-check passed for #2257@codex/2257-theme-fallback-ci-verify (issue-based ownership, scope and Git state)."
+      },
+      {
+        "command": "gate self-tests and policy gates",
+        "status": "pass",
+        "detail": "docs-check passed (91 required paths, 26 specs), source-policy passed for 849 tracked paths, source-only-ci-check passed (4 workflows, 849 tracked paths), and delivery-audit passed for Issue #2257."
+      },
+      {
+        "command": "verify-theme-fallbacks self-test",
+        "status": "pass",
+        "detail": "tools/verify-theme-fallbacks.ps1 -SelfTest passed 6 case groups without network access or file writes: pinned hash constant shape (SHA-512 128 hex, SHA-256 64 hex), csproj WindowsAppSDKVersion coupling to the gate pin 1.7.250401001, flat-container URL and package file name construction, in-memory zip entry selection plus streaming SHA-256 against a direct .NET computation, missing-pinned-entry fail-closed, and extractor wiring (XamlPath/VerifyCommitted parameters present)."
+      },
+      {
+        "command": "verify-theme-fallbacks local package mode",
+        "status": "pass",
+        "detail": "tools/verify-theme-fallbacks.ps1 -PackagePath verified the local pinned microsoft.windowsappsdk 1.7.250401001 nupkg (SHA-512 531565343791a64027a143690d0c51e3492eda982d13caa6be2015c53109860bf06c8d5b69576836d2ff37d69796cde3668a6af320608d1f8bbd425680655593), extracted lib/net6.0-windows10.0.22621.0/Microsoft.WinUI/Themes/generic.xaml (SHA256 0A32014884636EFE31FE7D71F6C620705E3D5FC3A90ADD1EE93E03F478912408), and extract-theme-fallbacks.ps1 -VerifyCommitted byte-for-byte matched the committed App.xaml.cs block: 222459 bytes, 3242 rows, committed dictionary unchanged."
+      },
+      {
+        "command": "verify-theme-fallbacks hosted download mode",
+        "status": "pass",
+        "detail": "tools/verify-theme-fallbacks.ps1 default mode downloaded the pinned nupkg from https://api.nuget.org/v3-flatcontainer/microsoft.windowsappsdk/1.7.250401001/microsoft.windowsappsdk.1.7.250401001.nupkg (about 111 MB), passed the same fail-closed hash checks, and produced the same byte-for-byte -VerifyCommitted result (222459 bytes, 3242 rows); this is the code path the new verify.yml hosted step runs."
+      }
+    ],
+    "limitations": [
+      "The hosted verify.yml step re-verifies byte equality of the committed fallback block against the pinned package on every pull request; this is byte-level provenance only and is not formal XAML, accessibility, driver, WaveRT, signing, installer, or release evidence.",
+      "The pinned nupkg SHA-512 and generic.xaml SHA-256 are hard-wired to version 1.7.250401001; the gate fails closed if apps/winui-shell/Hibiki.WinUI.csproj pins a different version, and a future SDK bump must update the gate constants and re-verify.",
+      "The hosted verification depends on network access to nuget.org with bounded retries; a transient nuget.org outage fails the gate visibly instead of silently skipping verification.",
+      "No claim of physical audio, driver, WaveRT, signing, installer, or release readiness; the committed dictionary in apps/winui-shell/App.xaml.cs is verified, not regenerated, and no product source, schema, wire, DSP, or build contract is modified."
+    ],
+    "tool_versions": {
+      "powershell": "pwsh 7.6.4 local",
+      "git": "git 2.x local"
+    },
+    "started_at": "2026-09-02T11:30:00+08:00",
+    "finished_at": "2026-09-02T12:20:00+08:00"
+  }
+}
