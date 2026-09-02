@@ -1,0 +1,59 @@
+{
+  "evidence_format": 2,
+  "issue": 2259,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      ".github/workflows/verify.yml",
+      "docs/state/BASELINE.md"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "2b42b9dea975de2588419eb43cb3e3c4c112fdad59bcee2d353886fd69e5850a"
+  },
+  "metadata": {
+    "scope": "sweep-threshold-43-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-sweep-threshold-43",
+    "commands": [
+      "gh workflow run claim-admission.yml (session 77ae1cae-9774-42a2-980a-6f7416338c8b, issue 2259, branch codex/2259-sweep-threshold-43)",
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 2259",
+      "pwsh -NoProfile -File tools/delivery-audit.ps1 -Issue 2259",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "handoff admission",
+        "status": "pass",
+        "detail": "Serialized claim admission (session 77ae1cae-9774-42a2-980a-6f7416338c8b) set claimed and assignee xup61069 on Issue #2259; handoff-check passed for #2259@codex/2259-sweep-threshold-43 (issue-based ownership, scope and Git state)."
+      },
+      {
+        "command": "local policy and documentation gates",
+        "status": "pass",
+        "detail": "delivery-audit passed for Issue #2259 (1 handoff, 0 bounded open PRs), docs-check passed (91 required paths, 26 specs; live measurement 851 tracked paths, 385 repository JSON files), source-policy passed for 851 tracked paths, source-only-ci-check passed (4 workflows, 851 tracked paths), git diff --check clean."
+      },
+      {
+        "command": "sweep threshold change",
+        "status": "pass",
+        "detail": "verify.yml Gate self-test sweep minimumModes raised 26 -> 43 (line 94). Drift audit: foundation commit 425ba5b3 set 26 when exactly 26 tools/*.ps1 scripts had -SelfTest (evidence/0000-foundation/sweep-threshold-26-v1.json); hosted run 33587258357 on main 429ef1d7 reported 42 modes; wave 60 (#2258) added tools/verify-theme-fallbacks.ps1 for 43 discovered via Get-Command parameter inspection on main 4439c7e5. The raised bound restores single-regression fail-closed detection; BASELINE wave 61 records the increment."
+      },
+      {
+        "command": "evidence provenance audit",
+        "status": "pass",
+        "detail": "Full tools/evidence-audit.ps1 over the repository returns findings=0 with this append-only change-mode file bound to digest 2b42b9dea975de2588419eb43cb3e3c4c112fdad59bcee2d353886fd69e5850a."
+      }
+    ],
+    "limitations": [
+      "minimumModes=43 restores single-regression fail-closed detection for gate self-test discovery only; a future tool addition makes the bound stale again until updated by a following wave.",
+      "No claim of physical audio, driver, WaveRT, signing, installer, accessibility, or release readiness; no tool script, product source, schema, wire, DSP, or build contract is modified."
+    ],
+    "tool_versions": {
+      "powershell": "pwsh 7.6.4 local",
+      "git": "git 2.x local"
+    },
+    "started_at": "2026-09-02T12:21:00+08:00",
+    "finished_at": "2026-09-02T12:33:19+08:00"
+  }
+}
