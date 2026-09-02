@@ -1,0 +1,76 @@
+{
+  "evidence_format": 2,
+  "issue": 2253,
+  "source_provenance": {
+    "mode": "change",
+    "paths": [
+      "docs/state/BASELINE.md"
+    ],
+    "digest_algorithm": "sha256-git-source-set-v1",
+    "digest": "fb64d53d8ec66c3d5d4d7b20d6bd4620d60ed0f7b110be3988c9fe66cd5f7595"
+  },
+  "metadata": {
+    "scope": "baseline-wave58-v1",
+    "environment_fingerprint": "windows-amd64-pwsh-7.6.4-baseline-wave58",
+    "commands": [
+      "pwsh -NoProfile -File tools/handoff-check.ps1 -Issue 2253",
+      "pwsh -NoProfile -File tools/delivery-audit.ps1 -Issue 2253",
+      "pwsh -NoProfile -File tools/docs-check.ps1",
+      "pwsh -NoProfile -File tools/source-policy.ps1",
+      "pwsh -NoProfile -File tools/source-only-ci-check.ps1",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1 -SelfTest",
+      "pwsh -NoProfile -File tools/evidence-audit.ps1",
+      "git diff --check"
+    ],
+    "results": [
+      {
+        "command": "handoff admission",
+        "status": "pass",
+        "detail": "AI handoff checks passed (#2253@codex/2253-baseline-wave58; issue-based ownership, scope and Git state)."
+      },
+      {
+        "command": "delivery audit",
+        "status": "pass",
+        "detail": "Delivery audit passed for Issue #2253 (1 handoff, 0 bounded open PRs inspected)."
+      },
+      {
+        "command": "documentation and source policy gates",
+        "status": "pass",
+        "detail": "docs-check passed (91 required paths, 26 specs; live measurement: 846 tracked paths, 382 repository JSON files, 40 markdown links), source-policy passed for 846 tracked paths, and source-only-ci-check passed 4 workflows."
+      },
+      {
+        "command": "baseline drift verification",
+        "status": "pass",
+        "detail": "Confirmed on main f583462a that BASELINE newest wave was 57 and its last modification was in a172def0. Appended wave 58 to record public v1.0.0 portable publication readback, build-preview WinUI smoke helper fix, typed theme fallback dictionary launch fix, and SPEC-0010 sync, with unchanged evidence boundaries."
+      },
+      {
+        "command": "evidence-audit -SelfTest",
+        "status": "pass",
+        "detail": "All 48 offline evidence-audit self-test cases passed."
+      },
+      {
+        "command": "evidence-audit",
+        "status": "pass",
+        "detail": "The append-only manifest, its v2 schema shape and staged source provenance passed the repository audit."
+      },
+      {
+        "command": "git diff --check",
+        "status": "pass",
+        "detail": "No whitespace errors detected in the scoped source change."
+      }
+    ],
+    "limitations": [
+      "Documentation and append-only evidence change only; no product source, schema, wire, DSP, build contract, release asset or runtime behavior is modified.",
+      "The public v1.0.0 portable readback evidence remains from Issue #2245; this slice only records it in the baseline and does not establish signing, HLK, installer, upgrade, rollback, uninstall, physical audio, driver or WaveRT delivery.",
+      "The Compatibility Preview smoke evidence remains from Issue #2249 and is not formal XAML, accessibility or release evidence; the fallback extractor remains a machine-local .local tool and is not migrated into tools/.",
+      "The provenance digest binds this record to the staged non-evidence BASELINE source set; it does not independently attest target-machine behavior."
+    ],
+    "logs": {},
+    "tool_versions": {
+      "powershell": "7.6.4",
+      "git": "2.x local"
+    },
+    "started_at": "2026-09-02T08:59:44+08:00",
+    "finished_at": "2026-09-02T09:02:27+08:00"
+  }
+}
